@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node / frontend build tooling (built dist IS committed; node_modules is not)
+node_modules/
+app/frontend/.vite/
+
+# Per-machine + secrets (never in the repo)
+*.local
+.env
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Launcher-provisioned runtimes (bootstrapped on the user's machine, not committed)
+/runtime/
+/tools/uv*
+/tools/mingit/
