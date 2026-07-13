@@ -83,8 +83,13 @@ export function ComponentsPage() {
   }
 
   // Auto-select the first part when the current selection falls out of the list
-  // (a new search, a category change, or the first successful load).
+  // (a new search, a category change, or the first successful load). Act only on
+  // SETTLED data: while a refetch is in flight TanStack retains the previous
+  // list, so re-selecting parts[0] here would re-pick a just-deleted or
+  // filtered-out part and fire a wasted, guaranteed-404 detail request.
+  const partsFetching = partsQuery.isFetching;
   useEffect(() => {
+    if (partsFetching) return;
     if (parts.length === 0) {
       if (selectedId !== null) setSelectedId(null);
       return;
@@ -92,7 +97,7 @@ export function ComponentsPage() {
     if (!selectedId || !parts.some((p) => p.id === selectedId)) {
       setSelectedId(parts[0].id);
     }
-  }, [parts, selectedId]);
+  }, [parts, selectedId, partsFetching]);
 
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
 

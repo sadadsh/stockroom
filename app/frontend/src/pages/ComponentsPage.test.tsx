@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
@@ -151,6 +151,52 @@ describe("ComponentsPage", () => {
 
     expect(mockApi.deletePart).toHaveBeenCalledWith("lm358");
     expect(await screen.findByText("Part Deleted")).toBeInTheDocument();
+  });
+
+  it("does not re-fetch the just-deleted part off the retained list mid-refetch", async () => {
+    // Hold the post-delete list refetch open so the window where TanStack still
+    // serves the previous (retained) list is observable. During that window the
+    // deleted part must not be re-selected or re-fetched (it would 404).
+    let resolveRefetch!: (v: { parts: PartSummary[]; count: number }) => void;
+    mockApi.listParts
+      .mockResolvedValueOnce({ parts: [SUMMARY], count: 1 })
+      .mockImplementationOnce(
+        () =>
+          new Promise<{ parts: PartSummary[]; count: number }>((res) => {
+            resolveRefetch = res;
+          }),
+      );
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.deletePart.mockResolvedValue(undefined);
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await screen.findByText("Dual Operational Amplifier");
+    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
+
+    await user.click(await screen.findByRole("button", { name: "Delete Part" }));
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
+    );
+
+    // Delete succeeded; the refetch is in flight and the old list is retained.
+    await screen.findByText("Part Deleted");
+    expect(mockApi.partDetail).toHaveBeenCalledTimes(1); // not re-fetched off the stale list
+
+    // Resolve the refetch to an empty library: the honest empty state shows and
+    // still nothing re-fetches the deleted part.
+    await act(async () => {
+      resolveRefetch({ parts: [], count: 0 });
+    });
+    expect(await screen.findByText("Your Library Is Empty")).toBeInTheDocument();
+    expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
   });
 
   it("shows the honest empty state when the library has no parts", async () => {
