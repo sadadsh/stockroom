@@ -63,6 +63,37 @@ every `nd_*` import at the extracted Qt-free modules; (d) never imports `fp_rend
 kicad-cli plus three.js). The `nd_*` modules reference no Qt symbols themselves, and `kicad_tools.py`
 is already Qt-free, so the extraction is bounded and well-defined rather than open-ended.
 
+### 2.2 Responsive, snappy, fail-proof (non-functional contract, owner directive)
+
+Every surface must feel instant and never lose or half-write data. This is a first-class
+requirement, enforced per milestone, not a hope.
+
+Responsive and snappy:
+- The window never blocks. Any operation over ~100ms runs off the UI/request path as a background
+  job with SSE progress (ingest, enrich, scrape, BOM build, prepare); quick reads and mutations are
+  synchronous REST.
+- Reads are served from the derived SQLite index (order of the index, not order of the files on
+  disk), so search, facets, and duplicate detection stay instant at thousands of parts. The index is
+  built on load and after each pull, and kept warm.
+- Previews are cached on disk keyed by content hash; the frontend uses TanStack Query caching plus
+  optimistic updates. No synchronous network call ever sits on the UI path.
+
+Fail-proof:
+- Every library mutation is one git-backed atomic transaction: it commits as a single scoped commit
+  or restores every touched path and leaves zero trace. A failure never leaves a half-written library.
+- The complete-to-add gate fails BEFORE any write, so a rejected add leaves zero trace.
+- Honest degradation: no swallowed errors; partial results are labeled partial; every failure states
+  what happened and what to do. Offline and divergence are first-class states, surfaced with exact
+  state and safe options, never clobbered.
+- The derived index is a rebuildable cache, never the source of truth, so a corrupt or missing index
+  rebuilds from the JSON files and cannot lose data.
+- The byte-preserving layer fails loud on overlapping or corrupt edits (never splices garbage); the
+  independent semantic-diff gate verifies every edit. Inputs are validated at the boundary (vendor
+  zips fingerprinted by content, datasheets validated by magic bytes, version stamps never invented).
+- Concurrency-safe: symbol-lib writes take a file lock once behind concurrent API requests (M5).
+- Enforced by tests: zero-trace-on-failure and fail-injection tests assert no partial state ever
+  survives, at every layer that writes.
+
 ## 3. Per-axis synthesis decisions
 
 | Axis | Decision | Rationale |

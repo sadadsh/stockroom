@@ -69,6 +69,13 @@ class Profile:
         self.root = Path(root)
         self.library = ProfileLibrary(self.root)
 
+    @property
+    def is_archive(self) -> bool:
+        """A grandfathered archive profile (spec section 7): holds the imported legacy
+        library and is exempt from the complete-to-add gate. Marked by an `.archive`
+        sentinel in the profile root."""
+        return (self.root / ".archive").exists()
+
 
 class ProfileStore:
     def __init__(self, libraries_root: Path, repo: GitRepo):
@@ -89,13 +96,17 @@ class ProfileStore:
             raise ValueError(f"profile does not exist: {name}")
         return Profile(name, self.libraries_root / name)
 
-    def create(self, name: str) -> Profile:
+    def create(self, name: str, archive: bool = False) -> Profile:
         _validate_name(name)
         if self.exists(name):
             raise ValueError(f"profile already exists: {name}")
         profile = Profile(name, self.libraries_root / name)
-        keeps = profile.library.ensure_layout()
-        self.repo.commit(f"Create profile {name}", keeps)
+        tracked = list(profile.library.ensure_layout())
+        if archive:
+            marker = profile.root / ".archive"
+            marker.write_text("")
+            tracked.append(marker)
+        self.repo.commit(f"Create {'archive ' if archive else ''}profile {name}", tracked)
         return profile
 
     def delete(self, name: str) -> None:
