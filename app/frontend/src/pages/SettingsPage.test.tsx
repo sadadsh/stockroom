@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
+import type { ProfilesResponse, SettingsInfo } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { SettingsPage } from "./SettingsPage";
@@ -134,6 +135,24 @@ describe("SettingsPage — profiles", () => {
     expect(mockApi.createProfile).toHaveBeenCalledWith("Scratch", true);
   });
 
+  it("does not double-create on a rapid double-Enter while the first is in flight", async () => {
+    let resolve!: (v: ProfilesResponse) => void;
+    mockApi.createProfile.mockReturnValue(
+      new Promise<ProfilesResponse>((r) => {
+        resolve = r;
+      }),
+    );
+    renderPage();
+    await screen.findByText("Archive");
+    const input = screen.getByPlaceholderText(/new profile/i);
+    await userEvent.type(input, "Scratch");
+    // two Enter presses before the first create resolves; the second must be
+    // dropped by the pending guard, not fire a duplicate create.
+    await userEvent.type(input, "{Enter}{Enter}");
+    expect(mockApi.createProfile).toHaveBeenCalledTimes(1);
+    resolve({ profiles: ["Main", "Archive", "Scratch"], active: "Main" });
+  });
+
   it("deletes a non-active profile only after an in-window confirm", async () => {
     renderPage();
     await screen.findByText("Archive");
@@ -170,6 +189,22 @@ describe("SettingsPage — distributor key", () => {
     });
   });
 
+  it("does not double-save on a rapid double-Enter while the first is in flight", async () => {
+    let resolve!: (v: SettingsInfo) => void;
+    mockApi.updateSettings.mockReturnValue(
+      new Promise<SettingsInfo>((r) => {
+        resolve = r;
+      }),
+    );
+    renderPage();
+    await screen.findByText(/not set/i);
+    const input = screen.getByLabelText(/mouser api key/i);
+    await userEvent.type(input, "MOUSERKEY123");
+    await userEvent.type(input, "{Enter}{Enter}");
+    expect(mockApi.updateSettings).toHaveBeenCalledTimes(1);
+    resolve({ mouser_api_key_set: true, mouser_api_key_hint: "Y123" });
+  });
+
   it("shows the hint when a key is set and can clear it", async () => {
     mockApi.getSettings.mockResolvedValue({
       mouser_api_key_set: true,
@@ -188,6 +223,34 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(await screen.findByText(/main/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
+  });
+
+  it("surfaces a diverged sync as a failure, never a green up-to-date success", async () => {
+    mockApi.doSync.mockResolvedValue({
+      state: "diverged",
+      pulled: false,
+      pushed: false,
+      detail: "! [rejected] main -> main (non-fast-forward)",
+    });
+    renderPage();
+    await screen.findByText("Archive");
+    await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
+    expect(await screen.findByText(/diverged from its remote/i)).toBeInTheDocument();
+    expect(screen.queryByText(/already up to date/i)).toBeNull();
+  });
+
+  it("surfaces a no-remote sync honestly, not as up to date", async () => {
+    mockApi.doSync.mockResolvedValue({
+      state: "no_remote",
+      pulled: false,
+      pushed: false,
+      detail: "no remote configured",
+    });
+    renderPage();
+    await screen.findByText("Archive");
+    await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
+    expect(await screen.findByText(/no remote is configured/i)).toBeInTheDocument();
+    expect(screen.queryByText(/already up to date/i)).toBeNull();
   });
 
   it("renders the kicad status", async () => {

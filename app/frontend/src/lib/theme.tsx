@@ -40,7 +40,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readStored);
 
   // Mirror the theme onto the root so the CSS variable set switches, and persist
-  // it. Runs on mount too, so a persisted preference paints the first frame.
+  // it. The first paint is already correct (the inline script in index.html sets
+  // data-theme before React boots); this keeps it in sync on every toggle.
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
