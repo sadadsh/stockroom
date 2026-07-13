@@ -1,8 +1,11 @@
 """Byte-preserving s-expression document.
 
 Parse builds a node tree whose leaves carry source spans. Edits are recorded
-as (start, end, replacement) tuples and applied to the ORIGINAL text in reverse
-order at serialize time, so untouched bytes are never rewritten.
+as (start, end, replacement, seq) tuples and applied to the ORIGINAL text from
+the highest offset down at serialize time, so untouched bytes are never
+rewritten. A replacement has start < end (deduped by span, last write wins); an
+insertion has start == end (never deduped, ordered by seq so multiple inserts at
+one anchor stack in insertion order).
 """
 
 from __future__ import annotations
@@ -216,9 +219,11 @@ class SexpDocument:
 
     def insert_span(self, pos: int, text: str) -> None:
         # Zero-width insertion at a real byte offset in self.text. Never deduped;
-        # multiple insertions at the same anchor keep their order via seq. Always
-        # anchored on original text (callers never anchor on an inserted node), so
-        # the offset stays valid.
+        # multiple insertions at the same anchor keep their order via seq. Callers
+        # must anchor on original text (never on an inserted node); this guard
+        # fails loud if a future caller passes a fragment-relative offset.
+        if not 0 <= pos <= len(self.text):
+            raise ValueError(f"insert offset {pos} out of range 0..{len(self.text)}")
         self._edits.append((pos, pos, text, self._seq))
         self._seq += 1
 
