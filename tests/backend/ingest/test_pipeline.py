@@ -108,3 +108,53 @@ def test_attach_model_to_existing_part(tmp_path, fixtures_dir):
     assert updated.model is not None
     fp_path = pipe.profile.library.footprint_lib_path("ICs") / "TESTPART.kicad_mod"
     assert "models/" in (Footprint.load(fp_path).model_path or "")
+
+
+from tests.backend.ingest.vendor_fixtures import make_vendor_zip
+
+
+@pytest.mark.parametrize("vendor", ["octopart", "samacsys", "ultralibrarian", "snapeda"])
+def test_end_to_end_ingest_each_vendor_layout(tmp_path, fixtures_dir, vendor):
+    pipe = _pipeline(tmp_path)
+    z = make_vendor_zip(tmp_path / f"{vendor}.zip", vendor, fixtures_dir)
+    cands = pipe.inspect(inputs=[z], workdir=tmp_path / "work")
+    assert len(cands) >= 1
+    c = cands[0]
+    assert c.vendor == vendor
+    # UltraLibrarian ships several footprint variants for the user to pick.
+    if vendor == "ultralibrarian":
+        assert len(c.footprint_variants) == 2
+    c.category = "ICs"
+    c.entry_name = f"PART_{vendor}"
+    record = pipe.commit(c)
+    from stockroom.kicad.symbol_lib import SymbolLib
+    sym_lib = SymbolLib.load(pipe.profile.library.symbol_lib_path("ICs"))
+    assert f"PART_{vendor}" in sym_lib.symbol_names
+    # a real git commit was produced
+    assert record.id
+
+
+def test_second_add_only_adds_to_target_lib(tmp_path, fixtures_dir):
+    """Adding a second part must not rewrite the first part's symbol node: the
+    target category lib changes only by ADDITION (byte preservation via the M1
+    span layer + semantic-diff gate)."""
+    from stockroom.verify.semdiff import semantic_diff
+
+    pipe = _pipeline(tmp_path)
+    z1 = make_vendor_zip(tmp_path / "a.zip", "snapeda", fixtures_dir)
+    [c1] = pipe.inspect(inputs=[z1], workdir=tmp_path / "w1")
+    c1.category = "ICs"; c1.entry_name = "FIRST"
+    pipe.commit(c1)
+    sym_path = pipe.profile.library.symbol_lib_path("ICs")
+    after_first = sym_path.read_text(encoding="utf-8")
+
+    z2 = make_vendor_zip(tmp_path / "b.zip", "snapeda", fixtures_dir)
+    [c2] = pipe.inspect(inputs=[z2], workdir=tmp_path / "w2")
+    c2.category = "ICs"; c2.entry_name = "SECOND"
+    pipe.commit(c2)
+    after_second = sym_path.read_text(encoding="utf-8")
+
+    assert '(symbol "FIRST"' in after_second
+    assert '(symbol "SECOND"' in after_second
+    diffs = semantic_diff(after_first, after_second)
+    assert diffs and all(d.startswith("ADDED") for d in diffs)
