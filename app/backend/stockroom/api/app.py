@@ -42,7 +42,10 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import previews as previews_router_mod
     app.include_router(previews_router_mod.previews_router(require_token))
 
-    # Routers added in later tasks are included here (ingest, enrich, profiles,
+    from stockroom.api.routers import ingest as ingest_router_mod
+    app.include_router(ingest_router_mod.ingest_router(require_token))
+
+    # Routers added in later tasks are included here (enrich, profiles,
     # sync, doctor), each behind Depends(require_token).
 
     if _FRONTEND_DIST.exists():
