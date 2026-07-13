@@ -178,6 +178,40 @@ class GitRepo:
             commits.append(Commit(sha=sha, subject=subject, author=author, iso_date=date))
         return commits
 
+    def _rel(self, path: Path | str) -> str:
+        """Repo-relative POSIX path for a `<rev>:<path>` pathspec. git addresses blobs
+        by a path relative to the repo root with forward slashes on every platform; an
+        absolute path under root is relativised, a path already relative is returned as
+        POSIX unchanged."""
+        p = Path(path)
+        if p.is_absolute():
+            try:
+                p = p.relative_to(self.root)
+            except ValueError:
+                pass  # outside the tree: let git report it as a miss
+        return p.as_posix()
+
+    def show_file(self, rev: str, path: Path | str) -> str | None:
+        """The content of `path` at revision `rev`, read straight from the git blob with
+        no working-tree checkout (spec section 9). Returns None when the path does not
+        exist at that rev (e.g. the part was added later), so a diff caller can treat an
+        absent side as empty rather than crash. A malformed rev raises GitError."""
+        proc = self._run("show", f"{rev}:{self._rel(path)}", check=False)
+        if proc.returncode == 0:
+            return proc.stdout
+        err = proc.stderr.lower()
+        # a path absent at this rev is an expected "miss" (the part was added later), not
+        # an error; git phrases it a few ways across versions. Anything else (a bad rev,
+        # a corrupt object) is a real failure and raises.
+        miss = (
+            "does not exist in" in err
+            or "exists on disk, but not in" in err
+            or "does not exist" in err  # "...(neither on disk nor in the index)"
+        )
+        if miss:
+            return None
+        raise GitError(f"git show {rev}:{self._rel(path)} failed: {proc.stderr.strip()}")
+
     def restore_paths(self, paths: list[Path]) -> None:
         """Roll back exactly these paths: revert tracked modifications to HEAD,
         and delete anything untracked that was created. This is the transaction
