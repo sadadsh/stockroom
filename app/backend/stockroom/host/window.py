@@ -54,13 +54,16 @@ def dropped_paths_to_inspect_body(paths: list[str]) -> dict:
 
 
 def inject_script(base_url: str, token: str) -> str:
-    """The renderer bootstrap: set window.__STOCKROOM__ = {base, token} so the SPA
-    authenticates every request, and unregister any service worker so a self-update
-    never serves a stale bundle. Values are JSON-encoded so a token with a quote or
-    backslash cannot break out of the JS string (defense in depth)."""
-    payload = json.dumps({"base": base_url, "token": token})
+    """The renderer bootstrap: set the two globals the SPA actually reads — the
+    frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__ —
+    so the SPA authenticates every request, and unregister any service worker so a
+    self-update never serves a stale bundle. Values are JSON-encoded so a token with a
+    quote or backslash cannot break out of the JS string (defense in depth)."""
+    base = json.dumps(base_url)
+    tok = json.dumps(token)
     return (
-        f"window.__STOCKROOM__ = {payload};\n"
+        f"window.__API_BASE__ = {base};\n"
+        f"window.__STOCKROOM_TOKEN__ = {tok};\n"
         "if ('serviceWorker' in navigator) {\n"
         "  navigator.serviceWorker.getRegistrations().then(function (rs) {\n"
         "    rs.forEach(function (r) { r.unregister(); });\n"
