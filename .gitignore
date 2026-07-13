@@ -28,3 +28,6 @@ Thumbs.db
 
 # Developer-local Claude Code settings + personal commands (ledger hook references a private path)
 .claude/
+
+# Claude instructions: local only, never pushed (owner directive)
+/CLAUDE.md
