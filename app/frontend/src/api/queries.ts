@@ -85,3 +85,18 @@ export function useEnrichPart() {
       api.enrichPart(vars.mpn, vars.category, vars.want),
   });
 }
+
+// Committing a staging candidate adds a real part, so it invalidates the list and
+// facets (the new part must appear in Components). A gate failure rejects with an
+// ApiError carrying `missing`; the caller surfaces that, so no invalidation runs.
+export function useIngestCommit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (candidate: import("./types").StagingCandidate) =>
+      api.ingestCommit(candidate),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["facets"] });
+    },
+  });
+}

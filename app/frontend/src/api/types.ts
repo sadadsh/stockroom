@@ -118,3 +118,41 @@ export interface EnrichmentResult {
   specs: Record<string, SourcedField | null>;
   schema_version: number;
 }
+
+// A purchase link on a staging candidate (a scrape/API supplies vendor + url;
+// the gate needs at least one entry with a non-empty url).
+export interface PurchaseDTO {
+  vendor?: string;
+  url?: string;
+  price_breaks?: unknown[];
+  stock?: number | null;
+  currency?: string;
+  fetched_at?: string;
+}
+
+// A staging candidate produced by POST /api/ingest/inspect (the SSE result), and
+// the exact DTO POST /api/ingest/commit accepts (stockroom.ingest.StagingCandidate).
+// The user edits these fields until the complete-to-add gate passes.
+export interface StagingCandidate {
+  vendor: string;
+  symbol_lib_path: string | null;
+  symbol_name: string;
+  footprint_variants: string[];
+  chosen_footprint_index: number;
+  model_path: string | null;
+  datasheet_path: string | null;
+  display_name: string;
+  entry_name: string;
+  category: string;
+  mpn: string;
+  manufacturer: string;
+  description: string;
+  tags: string[];
+  purchase: PurchaseDTO[];
+  gaps: string[];
+}
+
+// POST /api/ingest/inspect -> a background job.
+export interface JobRef {
+  job_id: string;
+}
