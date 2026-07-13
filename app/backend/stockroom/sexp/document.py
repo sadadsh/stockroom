@@ -26,7 +26,7 @@ def _unquote(text: str, tok: Token) -> str:
 
 
 class SexpNode:
-    __slots__ = ("_doc", "_token", "_children", "_text", "_list_span")
+    __slots__ = ("_doc", "_token", "_children", "_text", "_list_span", "_value_override")
 
     def __init__(self, doc, text, token=None, children=None):
         self._doc = doc
@@ -34,6 +34,7 @@ class SexpNode:
         self._token = token  # set for leaves
         self._children = children  # set for lists
         self._list_span = None  # (open, close) byte span; set for list nodes
+        self._value_override = None  # reflects a pending set_value for read-after-write
 
     @property
     def is_atom(self) -> bool:
@@ -58,6 +59,8 @@ class SexpNode:
     def value(self) -> str:
         if not self._token:
             return ""
+        if self._value_override is not None:
+            return self._value_override  # a pending set_value is visible to reads
         return _unquote(self._text, self._token)
 
     @property
@@ -89,6 +92,7 @@ class SexpNode:
             raise ValueError("set_value is only valid on a leaf node")
         replacement = quote_kicad(new) if quote else new
         self._doc.replace_span(self._token.start, self._token.end, replacement)
+        self._value_override = new  # so .value reflects the edit before serialize
 
     def _indent_before(self, index: int) -> str:
         """Whitespace run (including a leading newline) before child `index`,
@@ -119,6 +123,11 @@ class SexpNode:
             self._doc.replace_span(pos, pos, f"{indent}{sexp_text}")
         else:
             self._doc.replace_span(pos, pos, f" {sexp_text}")
+        # Attach a readable node so find/find_all/value see the insert. It parses
+        # into its own mini-document, so its leaves read from the fragment text.
+        # A freshly inserted node is read-only this session; re-editing its value
+        # needs a reload (its spans point into the fragment, not the main text).
+        self._children.insert(idx + 1, SexpDocument.parse(sexp_text).root)
 
     def insert_child_text(self, sexp_text: str) -> None:
         if self._children is None:
@@ -130,6 +139,7 @@ class SexpNode:
         # empty list: insert right before ')'
         close = self._list_span[1] - 1
         self._doc.replace_span(close, close, sexp_text)
+        self._children.append(SexpDocument.parse(sexp_text).root)
 
     def remove_child(self, child: "SexpNode") -> None:
         if self._children is None:
@@ -138,6 +148,7 @@ class SexpNode:
         indent = self._indent_before(idx)
         start = child.span[0] - len(indent) if indent else child.span[0]
         self._doc.replace_span(start, child.span[1], "")
+        self._children.pop(idx)  # so find/find_all no longer see the removed child
 
 
 class SexpDocument:

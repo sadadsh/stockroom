@@ -11,7 +11,6 @@ from stockroom.sexp.document import SexpDocument, SexpNode, quote_kicad
 class Symbol:
     def __init__(self, node: SexpNode):
         self._node = node
-        self._property_overrides: dict[str, str] = {}
 
     @property
     def name(self) -> str:
@@ -25,9 +24,6 @@ class Symbol:
         return None
 
     def get_property(self, name: str) -> str | None:
-        # Check overrides first (edits made via set_property)
-        if name in self._property_overrides:
-            return self._property_overrides[name]
         prop = self._property_node(name)
         return prop.children[2].value if prop else None
 
@@ -35,14 +31,10 @@ class Symbol:
         prop = self._property_node(name)
         if prop is not None:
             prop.children[2].set_value(value, quote=True)
-            # Track the override for subsequent reads
-            self._property_overrides[name] = value
         else:
             self._node.insert_child_text(
                 f"(property {quote_kicad(name)} {quote_kicad(value)} (at 0 0 0))"
             )
-            # Track the new property for subsequent reads
-            self._property_overrides[name] = value
 
 
 class SymbolLib:

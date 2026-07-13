@@ -104,3 +104,22 @@ def test_remove_child_preserves_crlf():
     out = doc.serialize()
     assert out == '(x\r\n\t(a 1)\r\n)'
     assert "\r\r" not in out  # no orphaned CR left behind
+
+
+def test_set_value_is_visible_to_reads():
+    doc = SexpDocument.parse('(property "Value" "10k")')
+    doc.root.children[2].set_value("22k", quote=True)
+    assert doc.root.children[2].value == "22k"
+
+
+def test_inserted_child_is_visible_to_reads():
+    doc = SexpDocument.parse('(symbol\n\t(property "Value" "10k")\n)')
+    doc.root.insert_child_text('(property "MPN" "RC0603")')
+    mpns = [p for p in doc.root.find_all("property") if p.children[1].value == "MPN"]
+    assert len(mpns) == 1 and mpns[0].children[2].value == "RC0603"
+
+
+def test_removed_child_is_not_visible_to_reads():
+    doc = SexpDocument.parse('(x\n\t(a 1)\n\t(b 2)\n)')
+    doc.root.remove_child(doc.root.find("b"))
+    assert doc.root.find("b") is None
