@@ -793,6 +793,14 @@ def test_assert_only_changed_rejects_lost_node():
 def test_assert_only_changed_rejects_extra_change():
     with pytest.raises(SemDiffError):
         assert_only_changed('(p "10k" "1")', '(p "22k" "2")', allowed_changes=1)
+
+
+def test_malformed_input_raises_semdifferror():
+    # the gate must surface a catchable SemDiffError, not crash with IndexError,
+    # when an edit produces malformed output (the exact case it exists to catch).
+    for bad in ("", '(a "unterminated)', "(a (b 1)"):
+        with pytest.raises(SemDiffError):
+            semantic_diff(bad, "(a 1)")
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -843,6 +851,8 @@ def _tokenize(text):
                 else:
                     buf.append(text[j])
                     j += 1
+            if j >= n:
+                raise SemDiffError(f"unterminated string at index {i}")
             yield "str", "".join(buf)
             i = j + 1
         else:
@@ -870,12 +880,16 @@ def _parse(text):
 
     def read():
         nonlocal pos
+        if pos >= len(toks):
+            raise SemDiffError("unexpected end of input")
         kind, val = toks[pos]
         if kind == "(":
             pos += 1
             lst = []
-            while toks[pos][0] != ")":
+            while pos < len(toks) and toks[pos][0] != ")":
                 lst.append(read())
+            if pos >= len(toks):
+                raise SemDiffError("missing close paren")
             pos += 1
             return tuple(lst)
         pos += 1
