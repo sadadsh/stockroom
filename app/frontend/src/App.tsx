@@ -1,5 +1,6 @@
 import { AppShell } from "./components/AppShell";
 import { ComponentsPage } from "./pages/ComponentsPage";
+import { DuplicatesPage } from "./pages/DuplicatesPage";
 import { IngestPage } from "./pages/IngestPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useRouter, type Route } from "./lib/router";
@@ -17,6 +18,8 @@ function renderRoute(route: Route) {
       return <ComponentsPage />;
     case "ingest":
       return <IngestPage />;
+    case "duplicates":
+      return <DuplicatesPage />;
     case "settings":
       return <SettingsPage />;
     default:

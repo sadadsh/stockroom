@@ -48,6 +48,19 @@ class FacetsDTO(BaseModel):
         )
 
 
+class DuplicateGroup(BaseModel):
+    """Parts that share one duplicate key (an MPN or a footprint name), the members
+    ordered most-complete-first so the keep-candidate is the first entry."""
+
+    key: str
+    parts: list[PartSummary]
+
+
+class DuplicatesDTO(BaseModel):
+    by_mpn: list[DuplicateGroup]
+    by_footprint: list[DuplicateGroup]
+
+
 class EditFieldBody(BaseModel):
     field: str
     value: object
