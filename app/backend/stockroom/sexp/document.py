@@ -103,7 +103,10 @@ class SexpDocument:
 
     @classmethod
     def load(cls, path) -> "SexpDocument":
-        text = Path(path).read_text(encoding="utf-8", newline="")
+        # newline="" disables newline translation so CRLF is read back exactly.
+        # (Path.read_text does not accept newline on Python 3.12, so use open().)
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
         return cls(text)
 
     def _build(self) -> SexpNode:
@@ -130,11 +133,18 @@ class SexpDocument:
         return read()
 
     def replace_span(self, start: int, end: int, replacement: str) -> None:
+        # Last write wins for an identical span, so re-editing the same token
+        # supersedes the prior edit instead of splicing both against the
+        # original coordinates (which would corrupt the output).
+        self._edits = [e for e in self._edits if not (e[0] == start and e[1] == end)]
         self._edits.append((start, end, replacement))
 
     def serialize(self) -> str:
         text = self.text
-        for start, end, replacement in sorted(self._edits, reverse=True):
+        # Apply edits from the highest start offset down so earlier offsets stay
+        # valid. Spans are distinct leaf tokens (deduped in replace_span), so
+        # sorting by start alone is unambiguous.
+        for start, end, replacement in sorted(self._edits, key=lambda e: e[0], reverse=True):
             text = text[:start] + replacement + text[end:]
         return text
 

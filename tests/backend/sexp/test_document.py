@@ -39,3 +39,21 @@ def test_set_value_on_unquoted_atom():
     doc = SexpDocument.parse(text)
     doc.root.children[3].set_value("180", quote=False)
     assert doc.serialize() == '(at 1.5 2.5 180)'
+
+
+def test_load_and_save_preserve_crlf(tmp_path):
+    text = '(symbol\r\n\t(property "V" "1")\r\n)'
+    src = tmp_path / "x.kicad_sym"
+    src.write_text(text, encoding="utf-8", newline="")
+    doc = SexpDocument.load(src)
+    out = tmp_path / "out.kicad_sym"
+    doc.save(out)
+    assert out.read_bytes() == src.read_bytes()
+
+
+def test_double_set_value_last_write_wins():
+    doc = SexpDocument.parse('(at 90)')
+    leaf = doc.root.children[1]
+    leaf.set_value("180", quote=False)
+    leaf.set_value("270", quote=False)
+    assert doc.serialize() == '(at 270)'
