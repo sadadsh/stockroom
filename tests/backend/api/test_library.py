@@ -115,3 +115,10 @@ def test_set_specs_unknown_part_is_404(client):
         json={"specs": {"pinout": {"value": [], "source": "x"}}},
     )
     assert r.status_code == 404
+
+
+def test_set_specs_rejects_a_malformed_specs_body(client):
+    # specs must be an object; a list (or scalar) is a client error, surfaced as a
+    # 422 by the typed body, never an opaque 500 from specs.items() blowing up.
+    r = client.post("/api/library/parts/tps62130/specs", json={"specs": ["pinout"]})
+    assert r.status_code == 422

@@ -130,4 +130,30 @@ describe("DetailPanel pinout (M6i)", () => {
     wrap(<DetailPanel detail={detail({ specs: {} })} {...BASE} />);
     expect(screen.queryByText("Pinout")).not.toBeInTheDocument();
   });
+
+  it("resets the pinout filter when switching to a different part (keyed per part)", async () => {
+    // Without a per-part key the single PinoutViewer instance carries its filter
+    // across a part switch (the same leak the sibling EnrichPanel is keyed to avoid).
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (d: PartDetail) => (
+      <QueryClientProvider client={qc}>
+        <ThemeProvider>
+          <DetailPanel detail={d} {...BASE} />
+        </ThemeProvider>
+      </QueryClientProvider>
+    );
+    const A = detail({ id: "a", specs: { pinout: [{ pin: "1", name: "VCC" }] } });
+    const B = detail({
+      id: "b",
+      specs: { pinout: [{ pin: "1", name: "GND" }, { pin: "2", name: "OUT" }] },
+    });
+    const { rerender } = render(view(A));
+    await userEvent.type(screen.getByRole("textbox", { name: /filter pins/i }), "vcc");
+    expect(screen.getByText("VCC")).toBeInTheDocument();
+
+    rerender(view(B)); // switch parts: the filter must reset so B's pins show
+    expect(screen.getByText("GND")).toBeInTheDocument();
+    expect(screen.getByText("OUT")).toBeInTheDocument();
+    expect(screen.queryByText(/no pins match/i)).not.toBeInTheDocument();
+  });
 });

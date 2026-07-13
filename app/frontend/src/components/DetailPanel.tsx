@@ -265,7 +265,11 @@ export function DetailPanel({
         <>
           <Eyebrow className="mb-2.5 mt-6">Pinout</Eyebrow>
           <div className="max-w-[600px]">
+            {/* Keyed by part id so the viewer's own filter/sort state resets on a
+                part switch (matches the EnrichPanel key below); a cached-part switch
+                does not unmount the panel, so without this the filter would leak. */}
             <PinoutViewer
+              key={detail.id}
               pins={pinout}
               source={pinoutProvenance?.source}
               confidence={pinoutProvenance?.confidence}
