@@ -75,3 +75,13 @@ export function useDeletePart() {
     },
   });
 }
+
+// Enrichment is a lookup, not a write: it returns sourced candidates without
+// touching the record, so there is nothing to invalidate here. Applying a
+// candidate goes through useEditField, which does the read-after-write invalidation.
+export function useEnrichPart() {
+  return useMutation({
+    mutationFn: (vars: { mpn: string; category?: string; want?: string[] }) =>
+      api.enrichPart(vars.mpn, vars.category, vars.want),
+  });
+}

@@ -90,3 +90,31 @@ export interface ApiErrorBody {
   detail?: string;
   message?: string;
 }
+
+// POST /api/enrich/part -> the canonical enrichment result (stockroom.enrich.schema).
+// Each single-valued field carries the source it came from and a confidence, or is
+// null when no source could fill it (a scrape miss is null, never an error).
+export interface SourcedField {
+  value: unknown;
+  source: string;
+  confidence: string;
+}
+
+export interface EnrichPriceBreak {
+  qty: number;
+  price: number;
+  currency: string;
+}
+
+export interface EnrichmentResult {
+  category: string;
+  mpn: SourcedField | null;
+  manufacturer: SourcedField | null;
+  description: SourcedField | null;
+  datasheet_url: SourcedField | null;
+  stock: SourcedField | null;
+  package: SourcedField | null;
+  price_breaks: EnrichPriceBreak[];
+  specs: Record<string, SourcedField | null>;
+  schema_version: number;
+}

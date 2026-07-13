@@ -21,6 +21,7 @@ vi.mock("../api/client", async (importActual) => {
       editField: vi.fn(),
       moveCategory: vi.fn(),
       deletePart: vi.fn(),
+      enrichPart: vi.fn(),
     },
   };
 });
@@ -197,6 +198,45 @@ describe("ComponentsPage", () => {
     });
     expect(await screen.findByText("Your Library Is Empty")).toBeInTheDocument();
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("enriches a part from its MPN and applies a sourced field through editField", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    // The record has no manufacturer, so the sourced value is applyable.
+    mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "" });
+    mockApi.enrichPart.mockResolvedValue({
+      category: "ICs",
+      mpn: null,
+      manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
+      description: null,
+      datasheet_url: null,
+      stock: null,
+      package: null,
+      price_breaks: [],
+      specs: {},
+      schema_version: 1,
+    });
+    mockApi.editField.mockResolvedValue(DETAIL);
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Enrich From Distributor" }),
+    );
+    expect(mockApi.enrichPart).toHaveBeenCalledWith("LM358DR", "ICs", undefined);
+
+    const row = (await screen.findByText("Analog Devices")).closest("div")!;
+    await user.click(within(row).getByRole("button", { name: "Apply" }));
+
+    expect(mockApi.editField).toHaveBeenCalledWith("lm358", "manufacturer", "Analog Devices");
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
   it("shows the honest empty state when the library has no parts", async () => {
