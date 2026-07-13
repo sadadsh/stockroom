@@ -6,6 +6,7 @@ sections 3, 5, 9).
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -103,6 +104,50 @@ class DriftItem:
 class DriftReport:
     items: list[DriftItem] = field(default_factory=list)
     missing_symbol: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RepairAction:
+    """A defect the doctor can heal automatically and idempotently. `before`/`after`
+    let the UI show the exact diff before the user commits to the repair."""
+
+    kind: str  # "drift" | "model_path"
+    part_id: str
+    detail: str
+    before: str
+    after: str
+
+
+@dataclass
+class RepairFinding:
+    """A defect the doctor detected but CANNOT auto-fix (a missing file can't be
+    fabricated). Reported honestly with how to resolve it by hand, never silently
+    dropped or papered over by deleting the reference."""
+
+    kind: str  # "missing_symbol" | "dangling_model" | "dangling_datasheet" | "dangling_model_link"
+    part_id: str
+    detail: str
+    how_to_fix: str
+
+
+@dataclass
+class RepairPlan:
+    fixable: list[RepairAction] = field(default_factory=list)
+    manual: list[RepairFinding] = field(default_factory=list)
+    uncommitted: list[str] = field(default_factory=list)  # git porcelain lines
+
+    @property
+    def is_healthy(self) -> bool:
+        return not (self.fixable or self.manual or self.uncommitted)
+
+
+@dataclass
+class RepairResult:
+    healed_drift: int = 0
+    fixed_paths: int = 0
+    committed_files: int = 0
+    commit: str = ""
+    manual: list[RepairFinding] = field(default_factory=list)
 
 
 class LibraryOps:
@@ -335,3 +380,182 @@ class LibraryOps:
                         DriftItem(part_id=record.id, property=prop, json_value=expected, symbol_value=actual)
                     )
         return report
+
+    def _footprint_file(self, record: PartRecord) -> Path | None:
+        """The on-disk .kicad_mod for a part's footprint (or None if the record has no
+        footprint reference). Footprints live under the category .pretty keyed on the
+        footprint entry name, mirroring how add_part places them."""
+        if record.footprint is None or not record.footprint.name:
+            return None
+        return self.lib.footprint_lib_path(record.category) / f"{record.footprint.name}.kicad_mod"
+
+    def _load_records(self) -> dict[str, PartRecord]:
+        parts_dir = self.lib.parts_dir
+        if not parts_dir.exists():
+            return {}
+        out: dict[str, PartRecord] = {}
+        for json_path in sorted(parts_dir.glob("*.json")):
+            rec = PartRecord.loads(json_path.read_text(encoding="utf-8"))
+            out[rec.id] = rec
+        return out
+
+    def _model_path_action(self, record: PartRecord) -> tuple[RepairAction | None, RepairFinding | None]:
+        """Inspect a part's footprint 3D-model link. Returns a fixable action when the
+        link is non-portable but the model resolves under models/ (rewrite to the
+        canonical ${SR_LIB}/models/<file>), a manual finding when the link points at a
+        file that is not present, or (None, None) when the link is already canonical or
+        absent. Portability is the whole point of the SR_LIB substitution, so a link that
+        resolves only on this machine is exactly what a hand-off would break."""
+        fp_file = self._footprint_file(record)
+        if fp_file is None or not fp_file.exists():
+            return None, None
+        model_path = Footprint.load(fp_file).model_path
+        if not model_path:
+            return None, None
+        basename = re.split(r"[\\/]", model_path)[-1]
+        canonical = f"${{SR_LIB}}/models/{basename}"
+        model_present = bool(basename) and (self.lib.models_dir / basename).exists()
+        if not model_present:
+            return None, RepairFinding(
+                kind="dangling_model_link",
+                part_id=record.id,
+                detail=f"footprint 3D-model link points at a missing file: {model_path}",
+                how_to_fix="re-import the 3D model, or repoint the footprint's model path",
+            )
+        if model_path != canonical:
+            return (
+                RepairAction(
+                    kind="model_path",
+                    part_id=record.id,
+                    detail=f"footprint 3D-model link is not portable: {model_path}",
+                    before=model_path,
+                    after=canonical,
+                ),
+                None,
+            )
+        return None, None
+
+    def scan_repairs(self) -> RepairPlan:
+        """A read-only health pass (spec section 3: show the diff BEFORE healing).
+        Reports every self-healable defect (drift + non-portable model links) as a
+        RepairAction, every unfixable defect (missing symbol, dangling asset files) as
+        a RepairFinding, and every uncommitted working-tree change. Never writes."""
+        plan = RepairPlan()
+        records = self._load_records()
+
+        drift = self.detect_drift()
+        for it in drift.items:
+            plan.fixable.append(
+                RepairAction(
+                    kind="drift",
+                    part_id=it.part_id,
+                    detail=f'{it.property}: symbol shows "{it.symbol_value}", record has "{it.json_value}"',
+                    before=it.symbol_value,
+                    after=it.json_value,
+                )
+            )
+        for part_id in drift.missing_symbol:
+            plan.manual.append(
+                RepairFinding(
+                    kind="missing_symbol",
+                    part_id=part_id,
+                    detail="the part's symbol is missing from its category library",
+                    how_to_fix="re-add or re-ingest the part to recreate its symbol",
+                )
+            )
+
+        for record in records.values():
+            if record.model and record.model.file and not (self.lib.root / record.model.file).exists():
+                plan.manual.append(
+                    RepairFinding(
+                        kind="dangling_model",
+                        part_id=record.id,
+                        detail=f"3D model file is missing: {record.model.file}",
+                        how_to_fix="re-import the 3D model for this part",
+                    )
+                )
+            if (
+                record.datasheet
+                and record.datasheet.file
+                and not (self.lib.datasheets_dir / record.datasheet.file).exists()
+            ):
+                plan.manual.append(
+                    RepairFinding(
+                        kind="dangling_datasheet",
+                        part_id=record.id,
+                        detail=f"datasheet file is missing: {record.datasheet.file}",
+                        how_to_fix="re-fetch the datasheet for this part",
+                    )
+                )
+            action, finding = self._model_path_action(record)
+            if action is not None:
+                plan.fixable.append(action)
+            if finding is not None:
+                plan.manual.append(finding)
+
+        plan.uncommitted = self.repo.status_porcelain()
+        return plan
+
+    def apply_repairs(self) -> RepairResult:
+        """Heal every fixable defect and sweep every uncommitted change into ONE scoped
+        commit, atomically (spec sections 5, 9). Drift heals toward the JSON source of
+        truth; non-portable model links rewrite to ${SR_LIB}. Manual findings are
+        returned untouched — a missing file is never "fixed" by deleting the reference to
+        it. A healthy library is a true no-op: no empty commit."""
+        plan = self.scan_repairs()
+        result = RepairResult(manual=plan.manual)
+        if not plan.fixable and not plan.uncommitted:
+            return result
+
+        records = self._load_records()
+        with Transaction(self.repo) as txn:
+            # 1. heal drift toward JSON (re-run detection so we carry the property + value)
+            touched_libs: dict[Path, SymbolLib] = {}
+            for it in self.detect_drift().items:
+                record = records.get(it.part_id)
+                if record is None or record.symbol is None:
+                    continue
+                sym_lib_path = self.lib.symbol_lib_path(record.category)
+                sym_lib = touched_libs.get(sym_lib_path)
+                if sym_lib is None:
+                    sym_lib = SymbolLib.load(sym_lib_path)
+                    touched_libs[sym_lib_path] = sym_lib
+                sym_lib.get_symbol(record.symbol.name).set_property(it.property, it.json_value)
+                result.healed_drift += 1
+            for sym_lib_path, sym_lib in touched_libs.items():
+                sym_lib.save(sym_lib_path)
+                txn.track(sym_lib_path)
+
+            # 2. rewrite non-portable 3D-model links to the canonical ${SR_LIB} form
+            for action in [a for a in plan.fixable if a.kind == "model_path"]:
+                record = records.get(action.part_id)
+                fp_file = self._footprint_file(record) if record else None
+                if fp_file is None or not fp_file.exists():
+                    continue
+                fp = Footprint.load(fp_file)
+                fp.set_model_path(action.after)
+                fp_file.write_text(fp.serialize(), encoding="utf-8", newline="")
+                txn.track(fp_file)
+                result.fixed_paths += 1
+
+            # 3. sweep every uncommitted working-tree change into the same commit
+            for line in plan.uncommitted:
+                rel = self._porcelain_path(line)
+                if rel:
+                    txn.track(self.repo.root / rel)
+                    result.committed_files += 1
+
+            result.commit = txn.commit("Repair library")
+        return result
+
+    @staticmethod
+    def _porcelain_path(line: str) -> str:
+        """The path out of one `git status --porcelain` line (`XY <path>`), taking the
+        destination of a rename and unquoting a path git quoted for special chars."""
+        raw = line[3:] if len(line) > 3 else line
+        if " -> " in raw:
+            raw = raw.split(" -> ", 1)[1]
+        raw = raw.strip()
+        if raw.startswith('"') and raw.endswith('"'):
+            raw = raw[1:-1]
+        return raw

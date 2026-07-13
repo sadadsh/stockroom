@@ -205,3 +205,23 @@ export function useApplyUpdate() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["update-check"] }),
   });
 }
+
+// --- Doctor page server state (M6f) ---
+
+// The library-health scan. Read-only, so it just fetches; the repair mutation below
+// invalidates it so the page reflects the healed state the moment repair returns.
+export function useDoctorScan() {
+  return useQuery({ queryKey: ["doctor-scan"], queryFn: () => api.scanDoctor() });
+}
+
+// Repair heals drift + rewrites non-portable model links + commits stray files in one
+// scoped commit. It changes what the scan reports, but NOT the derived index (the JSON
+// records are the source of truth and are left untouched), so it invalidates only the
+// doctor scan, never the parts list or facets.
+export function useRepairLibrary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.repairLibrary(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["doctor-scan"] }),
+  });
+}

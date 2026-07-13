@@ -25,6 +25,46 @@ def doctor_router(require_token) -> APIRouter:
             "missing_symbol": list(report.missing_symbol),
         }
 
+    @r.get("/scan")
+    def scan(request: Request) -> dict:
+        """A read-only health pass: what the one-click repair would fix, what it can't
+        (shown so the user sees the diff before healing, spec section 3)."""
+        ctx = request.app.state.ctx
+        plan = ctx.ops.scan_repairs()
+        return {
+            "fixable": [
+                {"kind": a.kind, "part_id": a.part_id, "detail": a.detail,
+                 "before": a.before, "after": a.after}
+                for a in plan.fixable
+            ],
+            "manual": [
+                {"kind": f.kind, "part_id": f.part_id, "detail": f.detail,
+                 "how_to_fix": f.how_to_fix}
+                for f in plan.manual
+            ],
+            "uncommitted": list(plan.uncommitted),
+            "healthy": plan.is_healthy,
+        }
+
+    @r.post("/repair")
+    def repair(request: Request) -> dict:
+        """Heal every fixable defect and sweep uncommitted changes into one scoped
+        commit. A mutation like edit/move/delete, so it runs synchronously and returns
+        what it did plus the manual findings it could not auto-fix."""
+        ctx = request.app.state.ctx
+        result = ctx.ops.apply_repairs()
+        return {
+            "healed_drift": result.healed_drift,
+            "fixed_paths": result.fixed_paths,
+            "committed_files": result.committed_files,
+            "commit": result.commit,
+            "manual": [
+                {"kind": f.kind, "part_id": f.part_id, "detail": f.detail,
+                 "how_to_fix": f.how_to_fix}
+                for f in result.manual
+            ],
+        }
+
     @r.post("/wire-kicad")
     def wire_kicad(request: Request) -> dict:
         ctx = request.app.state.ctx

@@ -1,5 +1,6 @@
 import { AppShell } from "./components/AppShell";
 import { ComponentsPage } from "./pages/ComponentsPage";
+import { DoctorPage } from "./pages/DoctorPage";
 import { DuplicatesPage } from "./pages/DuplicatesPage";
 import { IngestPage } from "./pages/IngestPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -20,6 +21,8 @@ function renderRoute(route: Route) {
       return <IngestPage />;
     case "duplicates":
       return <DuplicatesPage />;
+    case "doctor":
+      return <DoctorPage />;
     case "settings":
       return <SettingsPage />;
     default:
