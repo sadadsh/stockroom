@@ -170,8 +170,27 @@ class GitRepo:
             return PullResult(ok=False, updated=False, reason=reason)
         return PullResult(ok=True, updated=self.head() != before, reason="")
 
+    def has_remote(self) -> bool:
+        return bool(self._run("remote", check=False).stdout.strip())
+
+    def current_branch(self) -> str:
+        return self._run("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+
+    def has_upstream(self) -> bool:
+        return (
+            self._run(
+                "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False
+            ).returncode
+            == 0
+        )
+
     def push(self) -> PushResult:
-        proc = self._run("push", check=False)
+        # first push on a branch with no upstream sets it (-u origin <branch>);
+        # afterwards a bare push follows the configured upstream.
+        if self.has_upstream():
+            proc = self._run("push", check=False)
+        else:
+            proc = self._run("push", "-u", "origin", self.current_branch(), check=False)
         if proc.returncode != 0:
             return PushResult(ok=False, reason=proc.stderr.strip())
         return PushResult(ok=True, reason="")
