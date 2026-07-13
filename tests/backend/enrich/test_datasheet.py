@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from stockroom.enrich.datasheet import fetch_datasheet, looks_like_pdf
+from stockroom.enrich.datasheet import (
+    extract_datasheet_specs,
+    fetch_datasheet,
+    looks_like_pdf,
+)
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.fetch import FetchResult
 
@@ -59,3 +63,19 @@ def test_fetch_datasheet_rejects_a_non_2xx_status(tmp_path):
     bad = FetchResult("u", 404, "nope", b"nope", "text/html", "u")
     with pytest.raises(EnrichError):
         fetch_datasheet("https://x/d.pdf", tmp_path / "d.pdf", fetcher=_StubFetcher(bad))
+
+
+def test_extract_datasheet_specs_reads_mpn_manufacturer_package():
+    r = extract_datasheet_specs(FIX / "sample_datasheet.pdf", known_mpn="TPS62130RGTR")
+    assert r.mpn.value == "TPS62130RGTR"
+    assert r.mpn.source == "datasheet"
+    assert r.mpn.confidence == "high"
+    assert "Texas Instruments" in (r.manufacturer.value or "")
+    assert r.package.value == "VQFN-16"
+
+
+def test_extract_datasheet_specs_is_lenient_on_a_bad_pdf(tmp_path):
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"%PDF-1.4\nnot really a pdf\n%%EOF\n")
+    r = extract_datasheet_specs(bad)  # must not raise
+    assert r.filled_fields() == set() or r.mpn is None
