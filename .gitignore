@@ -22,3 +22,6 @@ Thumbs.db
 /runtime/
 /tools/uv*
 /tools/mingit/
+
+# Superpowers SDD scratch (ledger, task briefs, review packages)
+.superpowers/
