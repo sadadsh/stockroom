@@ -22,6 +22,7 @@ class KiCadCli:
             capture_output=True,
             text=True,
             encoding="utf-8",
+            errors="replace",
         )
         if proc.returncode != 0:
             raise KiCadCliError(f"kicad-cli {' '.join(args)} failed: {proc.stderr.strip()}")

@@ -9,6 +9,7 @@ def test_edited_symbol_lib_still_exports(tmp_fixture, tmp_path):
     src = tmp_fixture("minimal.kicad_sym")
     lib = SymbolLib.load(src)
     lib.get_symbol("R_0603").set_property("MPN", "RC0603FR-0710KL")
+    lib.get_symbol("R_0603").set_property("Tolerance", "1%")
     lib.save(src)
     # kicad-cli parsing the edited lib and exporting a symbol proves it is valid.
     out = KiCadCli().sym_export_svg(src, "R_0603", tmp_path)

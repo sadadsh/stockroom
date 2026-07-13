@@ -14,7 +14,6 @@ def test_enumerates_instances(fixtures_dir):
 
 def test_rewrites_only_target_instance(tmp_fixture):
     sch = Schematic.load(tmp_fixture("minimal.kicad_sch"))
-    original = sch.serialize()
     r1 = sch.instance_by_reference("R1")
     r1.set_lib_id("SR-Resistors:R_0603")
     r1.set_property("MPN", "RC0603FR-0710KL")
