@@ -119,7 +119,7 @@ export function FootprintArt() {
   const pads = [34, 48, 62, 76, 90];
   return (
     <svg viewBox="0 0 132 94" width="132" height="94">
-      <g style={{ fill: "var(--c-icon-line)" }}>
+      <g style={{ fill: "var(--c-icon-fill)" }}>
         {pads.map((x) => (
           <rect key={`t${x}`} x={x} y="26" width="9" height="7" rx="1" />
         ))}
@@ -148,7 +148,7 @@ export function CubeArt() {
       width="70"
       height="70"
       fill="none"
-      style={{ stroke: "var(--c-icon-line)" }}
+      style={{ stroke: "var(--c-icon-cube)" }}
       strokeWidth="1.4"
     >
       <path d="M45 12l30 17v32L45 78 15 61V29z" />

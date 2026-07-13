@@ -95,7 +95,7 @@ function AppearanceSection() {
     <Section title="Appearance" hint="The theme is remembered the next time the window opens.">
       <div className="flex items-center justify-between">
         <span className="text-sm text-t2">Theme</span>
-        <div className="inline-flex rounded-control border border-line2 p-0.5">
+        <div className="inline-flex rounded-card border border-line2 p-0.5">
           {options.map((o) => (
             <button
               key={o.value}
@@ -103,7 +103,7 @@ function AppearanceSection() {
               aria-pressed={theme === o.value}
               onClick={() => setTheme(o.value)}
               className={cx(
-                "rounded-[5px] px-3 py-1 text-sm transition-colors",
+                "rounded-control px-3 py-1 text-sm transition-colors",
                 theme === o.value
                   ? "bg-raise2 text-t1"
                   : "text-t3 hover:text-t2",
@@ -137,7 +137,9 @@ function ProfilesSection() {
 
   function onCreate() {
     const name = newName.trim();
-    if (!name) return;
+    // guard the keyboard (Enter) path too, not just the disabled button, so a
+    // rapid double-Enter cannot fire a duplicate create for the same name.
+    if (!name || create.isPending) return;
     create.mutate(
       { name, archive },
       {
@@ -266,11 +268,25 @@ function SyncSection() {
   function onSync() {
     sync.mutate(undefined, {
       onSuccess: (r) => {
+        // Divergence and offline are FAILURES, surfaced verbatim and never faked
+        // green; no-remote is informational; only a real pull/push/clean is ok.
+        if (r.state === "diverged") {
+          toast("Sync failed: the library has diverged from its remote.", "err");
+          return;
+        }
+        if (r.state === "offline") {
+          toast("Sync failed: the remote is unreachable.", "err");
+          return;
+        }
+        if (r.state === "no_remote") {
+          toast("No remote is configured for this library.", "neutral");
+          return;
+        }
         const parts: string[] = [];
         if (r.pulled) parts.push("pulled");
         if (r.pushed) parts.push("pushed");
         const what = parts.length ? parts.join(" and ") : "already up to date";
-        toast(`Sync ${what}.`, r.state === "offline" ? "err" : "ok");
+        toast(`Sync ${what}.`, "ok");
       },
       onError: (e) => toast(errMsg(e), "err"),
     });
@@ -355,7 +371,9 @@ function DistributorSection() {
 
   function onSave() {
     const key = keyInput.trim();
-    if (!key) return;
+    // guard the Enter path too (the button is disabled while pending, the input
+    // is not), so a double-Enter cannot fire a duplicate save.
+    if (!key || save.isPending) return;
     save.mutate(
       { mouser_api_key: key },
       {

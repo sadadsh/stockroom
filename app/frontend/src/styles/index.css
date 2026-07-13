@@ -48,8 +48,11 @@
     --c-hover: rgba(255, 255, 255, 0.03);
     --c-sticky: rgba(15, 15, 16, 0.72);
     --c-ring-track: #26272c;
-    /* the file-card line art (Symbol/Footprint/3D): tuned to read on the canvas */
+    /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
+       pre-refactor dark value, so the dark app stays byte-identical. */
     --c-icon-line: #8b9099;
+    --c-icon-fill: #7f858e;
+    --c-icon-cube: #8a8f97;
     --c-icon-edge: #4b5057;
     --c-icon-faint: #c7ccd3;
   }
@@ -93,6 +96,8 @@
     --c-sticky: rgba(244, 244, 245, 0.82);
     --c-ring-track: #dfe0e3;
     --c-icon-line: #6b7078;
+    --c-icon-fill: #6b7078;
+    --c-icon-cube: #6b7078;
     --c-icon-edge: #b0b5bd;
     --c-icon-faint: #6b7078;
   }
