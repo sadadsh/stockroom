@@ -13,7 +13,6 @@ import { ApiError } from "../api/client";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
-import { Rail } from "../components/Rail";
 import { UploadIcon } from "../components/icons";
 import { Button } from "../components/primitives";
 
@@ -44,73 +43,66 @@ export function ComponentsPage() {
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-surface text-t1">
-      <div className="flex min-h-screen">
-        <Rail />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-14 flex-none items-center px-[18px]">
-            <div className="text-lg font-semibold text-t1">Components</div>
-            <div className="ml-auto text-2xs text-t3">
-              {partsQuery.data ? `${partsQuery.data.count} Parts` : ""}
-            </div>
-          </div>
-
-          <div className="flex min-h-0 flex-1">
-            {/* picker */}
-            <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
-              <div className="px-2 pt-2">
-                <Finder
-                  search={search}
-                  onSearch={setSearch}
-                  facets={facetsQuery.data}
-                  category={category}
-                  onCategory={setCategory}
-                  completeOnly={completeOnly}
-                  onCompleteOnly={setCompleteOnly}
-                />
-              </div>
-              <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                <PickerBody
-                  isLoading={partsQuery.isLoading}
-                  error={partsQuery.error}
-                  parts={parts}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onRetry={() => partsQuery.refetch()}
-                  hasSearchOrFilter={
-                    !!search || !!category || completeOnly
-                  }
-                  onClearFilters={() => {
-                    setSearch("");
-                    setCategory(null);
-                    setCompleteOnly(false);
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* detail */}
-            <div className="min-w-0 flex-1 overflow-y-auto border-l border-line px-[30px] pt-[22px]">
-              {selectedId ? (
-                <DetailPanel
-                  detail={detailQuery.data}
-                  isLoading={detailQuery.isLoading}
-                  error={detailQuery.error}
-                  missing={selectedSummary?.missing ?? []}
-                  isComplete={selectedSummary?.is_complete ?? false}
-                />
-              ) : (
-                <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
-                  {partsQuery.isLoading
-                    ? "Loading Library..."
-                    : "Select A Part To See Its Details."}
-                </div>
-              )}
-            </div>
-          </div>
+    <>
+      <div className="flex h-14 flex-none items-center px-[18px]">
+        <div className="text-lg font-semibold text-t1">Components</div>
+        <div className="ml-auto text-2xs text-t3">
+          {partsQuery.data ? `${partsQuery.data.count} Parts` : ""}
         </div>
       </div>
-    </div>
+
+      <div className="flex min-h-0 flex-1">
+        {/* picker */}
+        <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
+          <div className="px-2 pt-2">
+            <Finder
+              search={search}
+              onSearch={setSearch}
+              facets={facetsQuery.data}
+              category={category}
+              onCategory={setCategory}
+              completeOnly={completeOnly}
+              onCompleteOnly={setCompleteOnly}
+            />
+          </div>
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            <PickerBody
+              isLoading={partsQuery.isLoading}
+              error={partsQuery.error}
+              parts={parts}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onRetry={() => partsQuery.refetch()}
+              hasSearchOrFilter={!!search || !!category || completeOnly}
+              onClearFilters={() => {
+                setSearch("");
+                setCategory(null);
+                setCompleteOnly(false);
+              }}
+            />
+          </div>
+        </div>
+
+        {/* detail */}
+        <div className="min-w-0 flex-1 overflow-y-auto border-l border-line px-[30px] pt-[22px]">
+          {selectedId ? (
+            <DetailPanel
+              detail={detailQuery.data}
+              isLoading={detailQuery.isLoading}
+              error={detailQuery.error}
+              missing={selectedSummary?.missing ?? []}
+              isComplete={selectedSummary?.is_complete ?? false}
+            />
+          ) : (
+            <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
+              {partsQuery.isLoading
+                ? "Loading Library..."
+                : "Select A Part To See Its Details."}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
