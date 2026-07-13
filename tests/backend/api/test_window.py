@@ -28,9 +28,11 @@ def test_active_window_is_none_before_a_window_runs():
 
 def test_inject_script_hands_the_spa_the_base_and_token():
     js = inject_script("http://127.0.0.1:5123", "tok-abc123")
-    # the renderer object carries exactly base + token so the SPA authenticates
-    assert json.dumps({"base": "http://127.0.0.1:5123", "token": "tok-abc123"}) in js
-    assert "window.__STOCKROOM__" in js
+    # the SPA reads EXACTLY these two globals (app/frontend/src/lib/runtime.ts):
+    # window.__API_BASE__ and window.__STOCKROOM_TOKEN__ — anything else and the
+    # window opens but the SPA cannot authenticate (a blank page).
+    assert f"window.__API_BASE__ = {json.dumps('http://127.0.0.1:5123')}" in js
+    assert f"window.__STOCKROOM_TOKEN__ = {json.dumps('tok-abc123')}" in js
     # service workers are cleared so a self-update never serves a stale bundle
     assert "serviceWorker" in js and "unregister" in js
 
@@ -39,8 +41,10 @@ def test_inject_script_escapes_a_token_with_special_characters():
     # a token containing a quote/backslash must not break out of the JS string; the
     # values are JSON-encoded, so the raw quote never appears unescaped.
     js = inject_script("http://127.0.0.1:5123", 'tok"quote\\back')
-    obj = js.split("window.__STOCKROOM__ = ", 1)[1].split(";", 1)[0]
-    assert json.loads(obj) == {"base": "http://127.0.0.1:5123", "token": 'tok"quote\\back'}
+    tok = js.split("window.__STOCKROOM_TOKEN__ = ", 1)[1].split(";", 1)[0]
+    assert json.loads(tok) == 'tok"quote\\back'
+    base = js.split("window.__API_BASE__ = ", 1)[1].split(";", 1)[0]
+    assert json.loads(base) == "http://127.0.0.1:5123"
 
 
 def test_should_inject_only_on_the_loopback_spa_origin():
