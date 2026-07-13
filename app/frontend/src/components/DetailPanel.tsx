@@ -9,6 +9,7 @@
 import type { ReactNode } from "react";
 import type { PartDetail, PurchaseRef } from "../api/types";
 import { Badge, Card, Dot, Eyebrow } from "./primitives";
+import { EditableText } from "./EditableText";
 import { CompletenessRing } from "./CompletenessRing";
 import {
   CubeArt,
@@ -28,6 +29,10 @@ interface Props {
   error: Error | null;
   missing: string[];
   isComplete: boolean;
+  // When provided, the identity fields become inline-editable and each save
+  // routes through here (field name + new value). Omit it for a read-only panel.
+  onEditField?: (field: string, value: unknown) => void;
+  busy?: boolean;
 }
 
 export function DetailPanel({
@@ -36,6 +41,8 @@ export function DetailPanel({
   error,
   missing,
   isComplete,
+  onEditField,
+  busy = false,
 }: Props) {
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
@@ -64,7 +71,18 @@ export function DetailPanel({
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-title font-semibold text-t1">
-            <span className="min-w-0 break-words">{detail.display_name}</span>
+            {onEditField ? (
+              <EditableText
+                value={detail.display_name}
+                onSave={(v) => onEditField("display_name", v)}
+                label="Name"
+                placeholder="Name This Part"
+                disabled={busy}
+                displayClassName="text-title font-semibold"
+              />
+            ) : (
+              <span className="min-w-0 break-words">{detail.display_name}</span>
+            )}
             {!isComplete ? (
               <span className="flex-none text-err" title="Incomplete">
                 <WarnIcon />
@@ -124,17 +142,43 @@ export function DetailPanel({
       {/* identity fields */}
       <Eyebrow className="mb-2.5 mt-6">Component Fields</Eyebrow>
       <div>
-        <IdRow label="Part Number" value={detail.mpn} mono />
-        <IdRow label="Manufacturer" value={detail.manufacturer} />
+        <IdRow
+          label="Part Number"
+          value={detail.mpn}
+          mono
+          onSave={onEditField ? (v) => onEditField("mpn", v) : undefined}
+          busy={busy}
+        />
+        <IdRow
+          label="Manufacturer"
+          value={detail.manufacturer}
+          onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
+          busy={busy}
+        />
+        {/* Category moves the symbol + footprint between libraries, so it is not
+            an inline field edit; the move flow lands in the next slice. */}
         <IdRow label="Category" value={detail.category} />
-        <IdRow label="Description" value={detail.description} />
+        <IdRow
+          label="Description"
+          value={detail.description}
+          multiline
+          onSave={onEditField ? (v) => onEditField("description", v) : undefined}
+          busy={busy}
+        />
         <IdRow
           label="Datasheet"
           value={detail.datasheet?.file || detail.datasheet?.source_url || ""}
           mono
           href={detail.datasheet?.source_url || undefined}
         />
-        {detail.tags.length > 0 ? (
+        {onEditField ? (
+          <IdRow
+            label="Tags"
+            value={detail.tags.join(", ")}
+            onSave={(v) => onEditField("tags", splitTags(v))}
+            busy={busy}
+          />
+        ) : detail.tags.length > 0 ? (
           <IdRow label="Tags" value={detail.tags.join(", ")} />
         ) : null}
       </div>
@@ -170,24 +214,40 @@ function IdRow({
   value,
   mono,
   href,
+  onSave,
+  multiline,
+  busy,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   href?: string;
+  onSave?: (value: string) => void;
+  multiline?: boolean;
+  busy?: boolean;
 }) {
   const empty = !value;
   return (
     <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
-      <span className="w-[116px] flex-none text-xs text-t3">{label}</span>
+      <span className="w-[116px] flex-none pt-1.5 text-xs text-t3">{label}</span>
       <span
         className={
           "flex min-w-0 flex-1 items-center gap-1.5 text-base " +
-          (empty ? "text-err" : "text-t1") +
+          (empty && !onSave ? "text-err" : "text-t1") +
           (mono ? " tnum" : "")
         }
       >
-        {empty ? (
+        {onSave ? (
+          <EditableText
+            value={value}
+            onSave={onSave}
+            label={label}
+            placeholder="Missing"
+            mono={mono}
+            multiline={multiline}
+            disabled={busy}
+          />
+        ) : empty ? (
           "Missing"
         ) : href ? (
           <a
@@ -205,6 +265,14 @@ function IdRow({
       </span>
     </div>
   );
+}
+
+// Tags edit as a comma-separated string; store them as a clean array.
+function splitTags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function FileCard({

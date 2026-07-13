@@ -4,6 +4,7 @@ import App from "./App";
 import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { RouterProvider } from "./lib/router";
+import { ToastProvider } from "./lib/toast";
 
 vi.mock("./api/client", async (importActual) => {
   const actual = await importActual<typeof import("./api/client")>();
@@ -57,9 +58,11 @@ describe("App shell", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <RouterProvider initial="components">
-          <App />
-        </RouterProvider>
+        <ToastProvider>
+          <RouterProvider initial="components">
+            <App />
+          </RouterProvider>
+        </ToastProvider>
       </QueryClientProvider>,
     );
 
