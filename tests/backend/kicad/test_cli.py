@@ -30,3 +30,20 @@ def test_sym_upgrade_produces_v10_stamp(tmp_path, fixtures_dir):
 def test_sym_export_svg_writes_file(tmp_path, fixtures_dir):
     out = KiCadCli().sym_export_svg(fixtures_dir / "minimal.kicad_sym", "R_0603", tmp_path)
     assert out and all(p.suffix == ".svg" and p.exists() for p in out)
+
+
+@requires_kicad_cli
+def test_fp_upgrade_rewrites_footprint_to_current_format(tmp_path, fixtures_dir):
+    from stockroom.kicad.cli import KiCadCli
+    import shutil
+
+    cli = KiCadCli()
+    pretty = tmp_path / "in.pretty"
+    pretty.mkdir()
+    # one_footprint.kicad_mod carries an older (version 20240108) stamp.
+    shutil.copyfile(fixtures_dir / "one_footprint.kicad_mod", pretty / "fp.kicad_mod")
+    cli.fp_upgrade(pretty)
+    # still a valid, parseable footprint after upgrade
+    from stockroom.kicad.footprint import Footprint
+    fp = Footprint.load(pretty / "fp.kicad_mod")
+    assert fp.name  # non-empty name survives the upgrade

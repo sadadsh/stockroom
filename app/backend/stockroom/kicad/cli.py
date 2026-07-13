@@ -34,6 +34,12 @@ class KiCadCli:
     def sym_upgrade(self, src: Path, dst: Path) -> None:
         self._run("sym", "upgrade", "-o", str(Path(dst)), str(Path(src)))
 
+    def fp_upgrade(self, pretty_dir: Path) -> None:
+        """Upgrade every footprint in a .pretty directory to the current KiCad
+        format, in place. A no-op-equivalent rewrite for already-current
+        footprints; normalizes older and foreign-origin footprints."""
+        self._run("fp", "upgrade", str(Path(pretty_dir)))
+
     def sym_export_svg(
         self, lib: Path, symbol: str, out_dir: Path, *, black_and_white: bool = False
     ) -> list[Path]:
