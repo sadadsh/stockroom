@@ -2,6 +2,11 @@ from stockroom.kicad.footprint import Footprint
 from stockroom.verify.semdiff import assert_only_changed, semantic_diff
 
 
+def test_reads_footprint_name(fixtures_dir):
+    fp = Footprint.load(fixtures_dir / "minimal.kicad_mod")
+    assert fp.name == "R_0603"
+
+
 def test_reads_model_path(fixtures_dir):
     fp = Footprint.load(fixtures_dir / "minimal.kicad_mod")
     assert fp.model_path.endswith("R_0603.step")
