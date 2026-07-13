@@ -2,8 +2,32 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import { useActivateProfile, useDoSync } from "./queries";
+import {
+  useActivateProfile,
+  useDeletePart,
+  useEditField,
+  useDoSync,
+} from "./queries";
 import { api } from "./client";
+import type { PartDetail } from "./types";
+
+const PART_DETAIL: PartDetail = {
+  id: "lm358",
+  display_name: "LM358",
+  category: "ICs",
+  description: "",
+  tags: [],
+  mpn: "LM358DR",
+  manufacturer: "TI",
+  datasheet: null,
+  purchase: [],
+  symbol: null,
+  footprint: null,
+  model: null,
+  provenance: null,
+  hashes: null,
+  enrichment: {},
+};
 
 function wrapperWith(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
@@ -72,5 +96,40 @@ describe("profile + sync invalidation", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidatedKeys(spy)).not.toContain("parts");
+  });
+});
+
+describe("duplicates invalidation (M6e)", () => {
+  // The Duplicates page deletes a member and expects that surface to refresh
+  // itself, else the resolved duplicate lingers on screen. Lock the invalidation
+  // so a delete can never silently leave a stale group behind.
+  it("deleting a part refreshes the duplicates surface", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "deletePart").mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useDeletePart(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate("lm358");
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toContain("duplicates");
+  });
+
+  // Editing an MPN can change which parts share it, so an edit must refresh the
+  // surface too (locks the shared useInvalidateAfterWrite path).
+  it("editing a field refreshes the duplicates surface", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "editField").mockResolvedValue(PART_DETAIL);
+
+    const { result } = renderHook(() => useEditField(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({ id: "lm358", field: "mpn", value: "NEW-MPN" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toContain("duplicates");
   });
 });
