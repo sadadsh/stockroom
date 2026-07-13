@@ -74,3 +74,44 @@ def test_delete_part_removes_it(client):
 def test_edit_unknown_part_is_404(client):
     r = client.patch("/api/library/parts/nope", json={"field": "mpn", "value": "X"})
     assert r.status_code == 404
+
+
+def test_set_specs_persists_pinout(client):
+    pins = [{"pin": "1", "name": "VIN"}, {"pin": "2", "name": "GND"}]
+    r = client.post(
+        "/api/library/parts/tps62130/specs",
+        json={"specs": {"pinout": {"value": pins, "source": "datasheet", "confidence": "high"}}},
+    )
+    assert r.status_code == 200
+    assert r.json()["specs"]["pinout"] == pins
+    # the read surface reflects it
+    detail = client.get("/api/library/parts/tps62130").json()
+    assert detail["specs"]["pinout"] == pins
+    assert detail["enrichment"]["pinout"]["source"] == "datasheet"
+
+
+def test_set_specs_does_not_change_completeness(client):
+    # setting a pinout on the incomplete part leaves its missing list untouched
+    # (missing/is_complete live on the list summary, not the detail record)
+    def _mystery():
+        parts = client.get("/api/library/parts").json()["parts"]
+        return next(p for p in parts if p["id"] == "mystery")
+
+    before = _mystery()
+    pins = [{"pin": "1", "name": "A"}]
+    r = client.post(
+        "/api/library/parts/mystery/specs",
+        json={"specs": {"pinout": {"value": pins, "source": "datasheet"}}},
+    )
+    assert r.status_code == 200
+    after = _mystery()
+    assert after["missing"] == before["missing"]
+    assert after["is_complete"] is False
+
+
+def test_set_specs_unknown_part_is_404(client):
+    r = client.post(
+        "/api/library/parts/nope/specs",
+        json={"specs": {"pinout": {"value": [], "source": "x"}}},
+    )
+    assert r.status_code == 404
