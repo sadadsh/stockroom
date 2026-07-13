@@ -29,10 +29,17 @@ def _standard_kicad_cli_paths() -> list[Path]:
             if not base:
                 continue
             root = Path(base) / "KiCad"
-            if root in seen or not root.is_dir():
+            if root in seen:
                 continue
             seen.add(root)
-            vers = [d for d in root.iterdir() if d.is_dir() and d.name[:1].isdigit()]
+            try:
+                if not root.is_dir():
+                    continue
+                vers = [d for d in root.iterdir() if d.is_dir() and d.name[:1].isdigit()]
+            except OSError:
+                # unreadable ACL / broken junction / reparse point: skip this root
+                # rather than crash startup (the point of non-fatal discovery).
+                continue
             for ver_dir in sorted(vers, key=lambda d: _version_key(d.name), reverse=True):
                 out.append(ver_dir / "bin" / "kicad-cli.exe")
         return out
@@ -48,9 +55,11 @@ def find_kicad_cli(override: str | None = None) -> str | None:
     the absolute path, or None if KiCad is not installed — the app then runs without
     previews/import and surfaces an honest error only when a KiCad op is requested."""
     if override:
-        p = Path(override)
-        if p.is_file():
-            return str(p)
+        try:
+            if Path(override).is_file():
+                return str(override)
+        except OSError:
+            pass
         on_path = shutil.which(override)
         if on_path:
             return on_path
@@ -58,8 +67,11 @@ def find_kicad_cli(override: str | None = None) -> str | None:
     if on_path:
         return on_path
     for cand in _standard_kicad_cli_paths():
-        if cand.is_file():
-            return str(cand)
+        try:
+            if cand.is_file():
+                return str(cand)
+        except OSError:
+            continue
     return None
 
 

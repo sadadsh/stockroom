@@ -3,6 +3,8 @@ kicad-cli is not on PATH (library browse/search/mutations/sync do not need it), 
 it wherever KiCad is installed, and raise a CLEAR error only when a KiCad operation is
 actually requested. None of these tests need a real kicad-cli — discovery is mocked."""
 
+from pathlib import Path
+
 import stockroom.kicad.cli as cli_mod
 import pytest
 from stockroom.kicad.cli import KiCadCli, find_kicad_cli
@@ -46,6 +48,31 @@ def test_windows_versions_sort_newest_first():
     assert cli_mod._version_key("10.0") > cli_mod._version_key("9.0")
     assert cli_mod._version_key("10.0") > cli_mod._version_key("8.0.1")
     assert cli_mod._version_key("9.0") > cli_mod._version_key("8.99")
+
+
+def test_discovery_survives_an_unreadable_standard_install_dir(tmp_path, monkeypatch):
+    # An unreadable / broken KiCad install dir (locked ACL, broken junction) must be
+    # SKIPPED, never crash startup — otherwise discovery re-introduces the very crash
+    # the non-fatal change exists to prevent.
+    monkeypatch.setattr(cli_mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli_mod.sys, "platform", "win32")
+    kroot = tmp_path / "KiCad"
+    kroot.mkdir()
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    monkeypatch.delenv("ProgramW6432", raising=False)
+    monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+    real_iterdir = Path.iterdir
+
+    def boom(self):
+        if self == kroot:
+            raise PermissionError(13, "denied")
+        return real_iterdir(self)
+
+    monkeypatch.setattr(Path, "iterdir", boom)
+    # neither discovery nor construction may raise; the bad root is skipped
+    assert cli_mod._standard_kicad_cli_paths() == []
+    assert find_kicad_cli() is None
+    assert KiCadCli().available is False
 
 
 def test_kicadcli_construction_is_non_fatal_when_absent(monkeypatch):
