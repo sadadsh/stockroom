@@ -25,3 +25,6 @@ Thumbs.db
 
 # work plans SDD scratch (ledger, task briefs, review packages)
 .work plans/
+
+# Developer-local external tool Code settings + personal commands (ledger hook references a private path)
+.local-tools/
