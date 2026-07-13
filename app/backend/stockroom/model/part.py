@@ -26,6 +26,31 @@ KICAD_MIRROR_FIELDS: tuple[str, ...] = (
     "Purchase",
 )
 
+# The strict completion passport (owner directive, 2026-07-12): a part may not enter
+# the primary library unless every one of these is present. Identity + assets + sourcing.
+# Each pair is (presence-flag key, human label); the key names a flag, not a record
+# attribute directly, so the same set gates staged inputs and finished records alike.
+REQUIRED_FIELDS: tuple[tuple[str, str], ...] = (
+    ("display_name", "name"),
+    ("mpn", "MPN"),
+    ("manufacturer", "manufacturer"),
+    ("category", "category"),
+    ("description", "value/description"),
+    ("symbol", "symbol"),
+    ("footprint", "footprint"),
+    ("model", "3D model"),
+    ("datasheet", "datasheet"),
+    ("purchase", "purchase link"),
+)
+
+
+def missing_from_presence(present: dict[str, bool]) -> list[str]:
+    """Given a {field_key: present} map, return the human labels of the required
+    fields that are missing, in passport order. The single source of truth for both
+    the complete-to-add gate (checked on staged inputs) and PartRecord.is_complete
+    (checked on the canonical record), so the two can never drift apart."""
+    return [label for key, label in REQUIRED_FIELDS if not present.get(key)]
+
 
 @dataclass
 class Datasheet:
@@ -141,6 +166,27 @@ class PartRecord:
     @classmethod
     def loads(cls, text: str) -> "PartRecord":
         return cls.from_dict(json.loads(text))
+
+    def _presence(self) -> dict[str, bool]:
+        return {
+            "display_name": bool(self.display_name.strip()),
+            "mpn": bool(self.mpn.strip()),
+            "manufacturer": bool(self.manufacturer.strip()),
+            "category": bool(self.category.strip()),
+            "description": bool(self.description.strip()),
+            "symbol": self.symbol is not None and bool(self.symbol.name),
+            "footprint": self.footprint is not None and bool(self.footprint.name),
+            "model": self.model is not None and bool(self.model.file),
+            "datasheet": self.datasheet is not None and bool(self.datasheet.file),
+            "purchase": any(bool(p.url) for p in self.purchase),
+        }
+
+    def missing_fields(self) -> list[str]:
+        """Human labels of the required passport fields this record lacks (empty => complete)."""
+        return missing_from_presence(self._presence())
+
+    def is_complete(self) -> bool:
+        return not self.missing_fields()
 
 
 def new_part_id(parts_dir: Path, base: str) -> str:

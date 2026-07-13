@@ -3,6 +3,7 @@ import json
 from stockroom.model.part import (
     Datasheet,
     LibRef,
+    ModelRef,
     PartRecord,
     Provenance,
     Purchase,
@@ -41,6 +42,35 @@ def test_dumps_is_canonical_json():
     assert list(parsed.keys()) == sorted(parsed.keys())
     assert parsed["mpn"] == "TPS62130RGTR"
     assert parsed["purchase"][0]["stock"] == 42
+
+
+def test_is_complete_false_when_model_missing():
+    p = _sample()  # has full identity + assets + sourcing EXCEPT a 3D model
+    assert p.model is None
+    assert p.missing_fields() == ["3D model"]
+    assert not p.is_complete()
+
+
+def test_is_complete_true_with_full_passport():
+    p = _sample()
+    p.model = ModelRef(file="models/TPS62130RGTR.step")
+    assert p.missing_fields() == []
+    assert p.is_complete()
+
+
+def test_missing_fields_lists_all_gaps_in_passport_order():
+    p = PartRecord(id="x", display_name="", category="ICs")
+    assert p.missing_fields() == [
+        "name",
+        "MPN",
+        "manufacturer",
+        "value/description",
+        "symbol",
+        "footprint",
+        "3D model",
+        "datasheet",
+        "purchase link",
+    ]
 
 
 def test_loads_round_trip():

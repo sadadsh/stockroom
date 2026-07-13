@@ -19,6 +19,8 @@ from stockroom.model.part import (
     ModelRef,
     PartRecord,
     Provenance,
+    Purchase,
+    missing_from_presence,
     new_part_id,
 )
 from stockroom.mutation.placement import (
@@ -56,6 +58,36 @@ class StagedPart:
     datasheet_source: Path | None = None
     provenance: Provenance | None = None
     datasheet_meta: Datasheet | None = None
+    purchase: list[Purchase] = field(default_factory=list)
+
+
+class IncompleteError(ValueError):
+    """Raised when add_part is asked to add a part that fails the strict completion
+    passport (spec section 6). Carries the list of missing field labels so the caller
+    (UI or API) can tell the user exactly what to fill."""
+
+    def __init__(self, missing: list[str]):
+        self.missing = list(missing)
+        super().__init__("cannot add an incomplete part; missing: " + ", ".join(missing))
+
+
+def staged_missing_fields(staged: "StagedPart") -> list[str]:
+    """The passport fields a staged part is missing, using the SAME required set as
+    PartRecord.is_complete (via model.part.missing_from_presence), so the gate and the
+    record's own completeness can never disagree."""
+    present = {
+        "display_name": bool(staged.display_name.strip()),
+        "mpn": bool(staged.mpn.strip()),
+        "manufacturer": bool(staged.manufacturer.strip()),
+        "category": bool(staged.category.strip()),
+        "description": bool(staged.description.strip()),
+        "symbol": staged.symbol_source is not None and bool(staged.entry_name),
+        "footprint": staged.footprint_source is not None,
+        "model": staged.model_source is not None,
+        "datasheet": staged.datasheet_source is not None,
+        "purchase": any(bool(p.url) for p in staged.purchase),
+    }
+    return missing_from_presence(present)
 
 
 @dataclass
@@ -78,7 +110,15 @@ class LibraryOps:
         self.repo = repo
         self.lib = profile.library
 
-    def add_part(self, staged: StagedPart) -> PartRecord:
+    def add_part(self, staged: StagedPart, require_complete: bool = True) -> PartRecord:
+        # Complete-to-add gate (spec section 6): the primary library is complete-only.
+        # Fails BEFORE any file write, so a rejected add leaves zero trace. An archive
+        # profile is grandfathered (spec section 7), so its adds bypass the gate
+        # automatically; callers may also pass require_complete=False explicitly.
+        if require_complete and not self.profile.is_archive:
+            missing = staged_missing_fields(staged)
+            if missing:
+                raise IncompleteError(missing)
         self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
         self.lib.models_dir.mkdir(parents=True, exist_ok=True)
         self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
@@ -135,6 +175,7 @@ class LibraryOps:
                 footprint=LibRef(lib=nickname, name=staged.entry_name),
                 model=model_ref,
                 provenance=staged.provenance,
+                purchase=list(staged.purchase),
             )
             sym_lib = SymbolLib.load(sym_lib_path)
             sym = sym_lib.get_symbol(staged.entry_name)

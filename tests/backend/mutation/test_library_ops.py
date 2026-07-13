@@ -4,8 +4,13 @@ import pytest
 
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.kicad.footprint import Footprint
-from stockroom.model.part import PartRecord
-from stockroom.mutation.library_ops import LibraryOps, StagedPart
+from stockroom.model.part import PartRecord, Purchase
+from stockroom.mutation.library_ops import (
+    IncompleteError,
+    LibraryOps,
+    StagedPart,
+    staged_missing_fields,
+)
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
 
@@ -25,6 +30,10 @@ def _setup(tmp_path, fixtures_dir):
         '(kicad_symbol_lib\r\n\t(version 20251024)\r\n\t(generator "x")\r\n)\r\n', newline=""
     )
     profile.library.footprint_lib_path("ICs").mkdir(parents=True, exist_ok=True)
+    # commit the seeded category lib so the fixture leaves a CLEAN repo (a real profile's
+    # category libs are committed at wiring time); this makes repo.is_clean() a valid
+    # zero-trace invariant for the gate-rejection tests below.
+    repo.commit("seed ICs category lib", [profile.library.symbol_lib_path("ICs")])
     sym_src = tmp_path / "one_symbol.kicad_sym"
     fp_src = tmp_path / "one_footprint.kicad_mod"
     model_src = tmp_path / "part.step"
@@ -46,6 +55,7 @@ def _setup(tmp_path, fixtures_dir):
         entry_name="TPS62130RGTR",
         model_source=model_src,
         datasheet_source=ds_src,
+        purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/ProductDetail/595-TPS62130RGTR")],
     )
     return repo, profile, staged
 
@@ -87,15 +97,101 @@ def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):
     assert repo.log_paths([json_path])[0].subject.startswith("Add TPS62130RGTR")
 
 
-def test_add_part_without_model_or_datasheet(tmp_path, fixtures_dir):
+def test_add_part_rejects_incomplete_and_leaves_zero_trace(tmp_path, fixtures_dir):
+    """The strict complete-to-add gate: a part missing required assets is refused
+    BEFORE any file write, so the reject leaves zero trace (spec section 6)."""
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     staged.model_source = None
     staged.datasheet_source = None
     ops = LibraryOps(profile, repo)
-    record = ops.add_part(staged)
+    before = repo.head()
+    with pytest.raises(IncompleteError) as ei:
+        ops.add_part(staged)
+    assert "3D model" in ei.value.missing
+    assert "datasheet" in ei.value.missing
+    # zero trace: no commit, clean tree, nothing written
+    assert repo.head() == before
+    assert repo.is_clean()
+    assert not list(profile.library.parts_dir.glob("*.json"))
+
+
+def test_add_part_partial_allowed_when_gate_bypassed(tmp_path, fixtures_dir):
+    """The archive-import path (require_complete=False) grandfathers a part with no
+    model or datasheet; placement still succeeds."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.model_source = None
+    staged.datasheet_source = None
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged, require_complete=False)
     assert record.model is None
     fp = Footprint.load(profile.library.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod")
     assert fp.model_path is None  # no (model ...) block written
+
+
+@pytest.mark.parametrize(
+    "field_attr,label",
+    [
+        ("display_name", "name"),
+        ("mpn", "MPN"),
+        ("manufacturer", "manufacturer"),
+        ("description", "value/description"),
+    ],
+)
+def test_add_part_rejects_each_missing_identity_field(tmp_path, fixtures_dir, field_attr, label):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    setattr(staged, field_attr, "")
+    ops = LibraryOps(profile, repo)
+    with pytest.raises(IncompleteError) as ei:
+        ops.add_part(staged)
+    assert label in ei.value.missing
+    assert repo.is_clean()
+
+
+def test_add_part_rejects_missing_purchase_link(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.purchase = []
+    ops = LibraryOps(profile, repo)
+    with pytest.raises(IncompleteError) as ei:
+        ops.add_part(staged)
+    assert "purchase link" in ei.value.missing
+
+
+def test_staged_missing_fields_lists_all_gaps_in_passport_order(tmp_path, fixtures_dir):
+    _, _, staged = _setup(tmp_path, fixtures_dir)
+    staged.mpn = ""
+    staged.model_source = None
+    staged.purchase = []
+    assert staged_missing_fields(staged) == ["MPN", "3D model", "purchase link"]
+
+
+def test_archive_profile_grandfathers_incomplete_parts(tmp_path, fixtures_dir):
+    """An archive profile (spec section 7) bypasses the gate automatically, so a very
+    incomplete legacy part imports fine even at the default require_complete=True, while
+    the same part is refused by a primary profile."""
+    from stockroom.store.profile import ProfileStore
+
+    repo, primary, staged = _setup(tmp_path, fixtures_dir)  # primary "Main"
+    staged.model_source = None
+    staged.datasheet_source = None
+    staged.purchase = []  # deeply incomplete legacy part
+
+    # a primary profile refuses it
+    with pytest.raises(IncompleteError):
+        LibraryOps(primary, repo).add_part(staged)
+
+    # an archive profile grandfathers it
+    store = ProfileStore(repo.root / "libraries", repo)
+    archive = store.create("Archive", archive=True)
+    assert archive.is_archive
+    archive.library.symbols_dir.mkdir(parents=True, exist_ok=True)
+    (archive.library.symbol_lib_path("ICs")).write_text(
+        '(kicad_symbol_lib\r\n\t(version 20251024)\r\n\t(generator "x")\r\n)\r\n', newline=""
+    )
+    archive.library.footprint_lib_path("ICs").mkdir(parents=True, exist_ok=True)
+    record = LibraryOps(archive, repo).add_part(staged)
+    assert record.id == "tps62130rgtr"
+    assert not record.is_complete()  # grandfathered, intentionally incomplete
+    assert repo.is_clean()
 
 
 def test_add_part_rolls_back_on_duplicate_symbol(tmp_path, fixtures_dir):
