@@ -123,3 +123,26 @@ def test_removed_child_is_not_visible_to_reads():
     doc = SexpDocument.parse('(x\n\t(a 1)\n\t(b 2)\n)')
     doc.root.remove_child(doc.root.find("b"))
     assert doc.root.find("b") is None
+
+
+def test_two_inserts_on_same_node_stack_in_order():
+    doc = SexpDocument.parse('(symbol\n\t(property "A" "1")\n)')
+    doc.root.insert_child_text('(property "B" "2")')
+    doc.root.insert_child_text('(property "C" "3")')
+    out = doc.serialize()
+    assert out == (
+        '(symbol\n\t(property "A" "1")\n\t(property "B" "2")\n\t(property "C" "3")\n)'
+    )
+    SexpDocument.parse(out)  # re-parses cleanly, proving no corruption
+
+
+def test_two_inserts_preserve_crlf():
+    doc = SexpDocument.parse('(symbol\r\n\t(property "A" "1")\r\n)')
+    doc.root.insert_child_text('(property "B" "2")')
+    doc.root.insert_child_text('(property "C" "3")')
+    out = doc.serialize()
+    assert out == (
+        '(symbol\r\n\t(property "A" "1")'
+        '\r\n\t(property "B" "2")\r\n\t(property "C" "3")\r\n)'
+    )
+    assert "\r\r" not in out
