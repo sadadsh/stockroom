@@ -23,7 +23,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-pythonpath = ["app/backend"]
+pythonpath = ["app/backend", "."]
 testpaths = ["tests/backend"]
 addopts = "-m 'not live_enrich'"
 markers = [
