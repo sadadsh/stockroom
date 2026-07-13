@@ -85,7 +85,9 @@ export function SvgViewport({ blob, alt }: { blob: Blob; alt: string }) {
               src={url}
               alt={alt}
               draggable={false}
-              className="max-h-[82%] max-w-[82%] select-none object-contain"
+              // Fill the viewport (object-contain upscales the small-intrinsic KiCad
+              // SVG to fit); the transform below adds the pan/zoom on top.
+              className="h-full w-full select-none object-contain p-10"
               style={{
                 transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
                 filter: theme === "dark" ? "invert(1)" : "none",

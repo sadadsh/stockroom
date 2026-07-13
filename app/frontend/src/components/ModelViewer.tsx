@@ -31,7 +31,11 @@ export function ModelViewer({ partId }: { partId: string }) {
       try {
         const { mountModelScene } = await import("../lib/threeScene");
         if (disposed || !mountRef.current) return;
-        dispose = mountModelScene(mountRef.current, query.data as ArrayBuffer);
+        dispose = mountModelScene(mountRef.current, query.data as ArrayBuffer, () => {
+          // GLTFLoader rejected the GLB asynchronously: show an honest message rather
+          // than a blank canvas.
+          if (!disposed) setRenderError(true);
+        });
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
         if (!disposed) setRenderError(true);
@@ -47,14 +51,14 @@ export function ModelViewer({ partId }: { partId: string }) {
     return <Centered>Loading 3D model...</Centered>;
   }
   if (query.isError) {
-    const status = query.error instanceof ApiError ? query.error.status : 0;
-    return (
-      <Centered>
-        {status === 502
-          ? "3D preview is unavailable: the model conversion tooling is not installed on this machine."
-          : "Could not load the 3D model."}
-      </Centered>
-    );
+    const err = query.error instanceof ApiError ? query.error : null;
+    // A 502 carries an honest, specific reason from the backend (tooling not installed,
+    // or a WRL model that is not convertible yet) — show it rather than a single guess.
+    const message =
+      err?.status === 502 && err.message
+        ? err.message
+        : "Could not load the 3D model.";
+    return <Centered>{message}</Centered>;
   }
   if (renderError) {
     return <Centered>This device could not render the 3D preview.</Centered>;

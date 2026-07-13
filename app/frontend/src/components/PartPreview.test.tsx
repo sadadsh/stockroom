@@ -19,9 +19,15 @@ vi.mock("../api/client", async (importActual) => {
 });
 
 // The three.js half is verified in the Windows pixel gate, not jsdom (no WebGL); mock
-// it so the component's mount/error wiring is exercised without a GL context.
-const mountSpy = vi.fn(() => vi.fn());
-vi.mock("../lib/threeScene", () => ({ mountModelScene: (...a: unknown[]) => mountSpy(...a) }));
+// it so the component's mount/error wiring is exercised without a GL context. The mock
+// keeps the (container, glb, onError) signature so a test can fire the async parse error.
+const mountSpy = vi.fn(
+  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => vi.fn(),
+);
+vi.mock("../lib/threeScene", () => ({
+  mountModelScene: (c: HTMLElement, g: ArrayBuffer, onErr?: () => void) =>
+    mountSpy(c, g, onErr),
+}));
 
 const mockApi = vi.mocked(api);
 
@@ -94,12 +100,12 @@ describe("SvgViewport", () => {
 });
 
 describe("ModelViewer", () => {
-  it("shows an honest message when 3D conversion tooling is absent (502)", async () => {
-    mockApi.modelGlb.mockRejectedValue(new ApiError(502, "trimesh not installed"));
+  it("shows the backend's honest reason when 3D conversion tooling is absent (502)", async () => {
+    mockApi.modelGlb.mockRejectedValue(
+      new ApiError(502, "3D preview needs the 'trimesh' package; install it"),
+    );
     wrap(<ModelViewer partId="tps62130" />);
-    expect(
-      await screen.findByText(/conversion tooling is not installed/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/needs the 'trimesh' package/i)).toBeInTheDocument();
   });
 
   it("shows a generic honest message on any other load error", async () => {
@@ -114,6 +120,25 @@ describe("ModelViewer", () => {
     wrap(<ModelViewer partId="tps62130" />);
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
     expect(mountSpy.mock.calls[0][1]).toBe(buf);
+  });
+
+  it("shows an honest message (not a blank canvas) when the GLB fails to parse", async () => {
+    // simulate GLTFLoader's async onError firing after a successful fetch + mount
+    mountSpy.mockImplementation((_c, _g, onErr) => {
+      onErr?.();
+      return vi.fn();
+    });
+    mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
+    wrap(<ModelViewer partId="tps62130" />);
+    expect(await screen.findByText(/could not render the 3d preview/i)).toBeInTheDocument();
+  });
+
+  it("shows the backend's honest 502 reason (e.g. a WRL model is STEP-only)", async () => {
+    mockApi.modelGlb.mockRejectedValue(
+      new ApiError(502, "3D preview supports STEP models; .wrl models are not convertible yet"),
+    );
+    wrap(<ModelViewer partId="led_red" />);
+    expect(await screen.findByText(/supports step models/i)).toBeInTheDocument();
   });
 });
 
@@ -157,7 +182,7 @@ describe("PreviewModal", () => {
 
   it("switches to the 3D tab and renders the 3D body", async () => {
     mockApi.previewSvg.mockResolvedValue(svgBlob());
-    mockApi.modelGlb.mockRejectedValue(new ApiError(502, "no tooling"));
+    mockApi.modelGlb.mockRejectedValue(new ApiError(502, "no 3D tooling on this box"));
     wrap(
       <PreviewModal
         open
@@ -169,9 +194,7 @@ describe("PreviewModal", () => {
       />,
     );
     await userEvent.click(screen.getByRole("tab", { name: "3D Model" }));
-    expect(
-      await screen.findByText(/conversion tooling is not installed/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no 3d tooling on this box/i)).toBeInTheDocument();
   });
 
   it("closes on Escape, on the Close button, and on a scrim click", async () => {

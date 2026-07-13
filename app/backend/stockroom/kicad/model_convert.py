@@ -1,11 +1,13 @@
-"""3D model (STEP/WRL) → GLB conversion for the web 3D preview (M6d).
+"""3D model → GLB conversion for the web 3D preview (M6d).
 
-The library stores each part's 3D model as the KiCad file the user dropped in
-(STEP or WRL). The browser's three.js viewer wants GLB, so this shells the mesh
-through trimesh (which reads STEP via cascadio, and WRL/VRML natively) and emits a
-single binary glTF. The stack is OPTIONAL tooling: when trimesh/cascadio are not
-installed the caller surfaces an honest 502, never a crash, and the symbol/footprint
-SVG previews still work without it."""
+The library stores each part's 3D model as the KiCad file the user dropped in, which
+is normally STEP (a footprint may instead carry a WRL/VRML mesh). The browser's
+three.js viewer wants GLB, so this shells STEP through trimesh (which reads it via
+cascadio) and emits a single binary glTF. trimesh has no VRML loader, so WRL/VRML
+models are not convertible yet and are reported honestly (never a "install cascadio"
+misdirection). The stack is OPTIONAL tooling: when trimesh/cascadio are not installed
+the caller surfaces an honest 502, never a crash, and the symbol/footprint SVG
+previews still work without it."""
 
 from __future__ import annotations
 
@@ -14,6 +16,10 @@ from pathlib import Path
 # GLB (binary glTF) starts with the ASCII magic "glTF"; named here so the converter
 # and its tests share one contract for "this really is a GLB".
 GLB_MAGIC = b"glTF"
+
+# Mesh formats trimesh cannot load here (no VRML loader). A part legitimately stores a
+# WRL, so it gets an honest "not convertible yet" message, not a tooling-missing one.
+_UNSUPPORTED_SUFFIXES = {".wrl", ".vrml", ".x3d"}
 
 
 class ModelToolingMissing(RuntimeError):
@@ -34,6 +40,11 @@ def model_to_glb(src: Path) -> bytes:
     upstream. The caller has already checked the file exists (a missing model is a
     404, decided before we get here)."""
     src = Path(src)
+    if src.suffix.lower() in _UNSUPPORTED_SUFFIXES:
+        raise ModelConversionError(
+            f"3D preview supports STEP models; {src.suffix.lower()} models are not "
+            "convertible yet"
+        )
     try:
         import trimesh
     except Exception as exc:  # ImportError, or a broken partial install
