@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from stockroom.api.jobs import JobRunner
 from stockroom.kicad.cli import KiCadCli
@@ -35,6 +36,13 @@ class AppContext:
     token: str
     jobs: JobRunner = field(default_factory=JobRunner)
     rendered_dom_fetcher: object | None = None  # RenderedDomFetcher; set by the host on Windows
+    # App-repo self-update (updater.py): the CODE/UI/DATA repo (distinct from the
+    # library repo above), a `uv sync` runner, and the host restart hook. All three
+    # default to safe values so the fixture context imports and the routes mount
+    # without a host present; serve.py (Task 14) attaches the real uv_sync + restart.
+    app_repo: GitRepo | None = None
+    uv_sync: Callable[[], None] = lambda: None
+    request_restart: Callable[[], None] = lambda: None
 
     def rebuild_index(self) -> None:
         self.index.close()
@@ -68,6 +76,18 @@ def build_context(
         override=config.kicad_config_override
     )
     enrich_cache = libraries_root.parent / ".stockroom-enrich-cache"
+    # The app repo is the git repo containing THIS package (the CODE/UI/DATA repo),
+    # used only by the self-update route (updater.py). GitRepo needs git on PATH; if
+    # it is absent we leave app_repo None so the update route surfaces the state
+    # honestly rather than crash the whole context build. serve.py (Task 14) swaps in
+    # the real uv_sync + restart hooks.
+    from stockroom.vcs.repo import GitError
+
+    app_repo_root = Path(__file__).resolve().parents[4]
+    try:
+        app_repo = GitRepo(app_repo_root)
+    except GitError:
+        app_repo = None
     return AppContext(
         libraries_root=libraries_root,
         repo=repo,
@@ -81,4 +101,5 @@ def build_context(
         cli=cli,
         enrich_cache_dir=enrich_cache,
         token=token or mint_token(),
+        app_repo=app_repo,
     )
