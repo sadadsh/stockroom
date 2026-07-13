@@ -9,9 +9,11 @@ import {
 describe("command registry", () => {
   it("derives a nav command only for available destinations", () => {
     const ids = navCommands().map((c) => c.id);
+    // Built surfaces are offered...
     expect(ids).toContain("nav.components");
-    // Unbuilt surfaces are not offered, so the palette can never route to a stub.
-    expect(ids).not.toContain("nav.ingest");
+    expect(ids).toContain("nav.ingest");
+    // ...but unbuilt ones are not, so the palette can never route to a stub.
+    expect(ids).not.toContain("nav.duplicates");
   });
 
   it("a nav command navigates to its route when run", () => {

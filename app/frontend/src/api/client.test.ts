@@ -79,6 +79,53 @@ describe("api client", () => {
     });
   });
 
+  it("posts inspect paths and lcsc ids and returns the job id", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job123" }));
+
+    const res = await api.ingestInspect(["/tmp/part.zip"], ["C123"]);
+
+    expect(res).toEqual({ job_id: "job123" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/ingest/inspect");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      paths: ["/tmp/part.zip"],
+      lcsc_ids: ["C123"],
+    });
+  });
+
+  it("surfaces the 422 complete-to-add gate missing list on commit as ApiError.missing", async () => {
+    fetchMock.mockResolvedValueOnce(
+      errJson(422, {
+        error: "IncompleteError",
+        detail: "cannot add an incomplete part; missing: 3D model, datasheet",
+        missing: ["3D model", "datasheet"],
+      }),
+    );
+
+    await expect(
+      api.ingestCommit({ vendor: "snapeda", display_name: "X" } as never),
+    ).rejects.toMatchObject({ status: 422, missing: ["3D model", "datasheet"] });
+  });
+
+  it("opens the job event stream with the bearer header and returns the raw body", async () => {
+    const fakeBody = {} as ReadableStream<Uint8Array>;
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      body: fakeBody,
+    } as unknown as Response);
+
+    const body = await api.openJobStream("job123");
+
+    expect(body).toBe(fakeBody);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/jobs/job123/events");
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+  });
+
   it("posts the mpn and category to enrich and returns the sourced result", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({

@@ -6,14 +6,25 @@
  * the caller invalidates the affected queries after a success.
  */
 import { apiBase, apiToken } from "../lib/runtime";
-import type { EnrichmentResult, Facets, PartDetail, PartsResponse } from "./types";
+import type {
+  EnrichmentResult,
+  Facets,
+  JobRef,
+  PartDetail,
+  PartsResponse,
+  StagingCandidate,
+} from "./types";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // The complete-to-add gate returns 422 with a `missing` label list; callers
+  // (the ingest commit flow) read it to highlight exactly what still needs filling.
+  missing?: string[];
+  constructor(status: number, message: string, missing?: string[]) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.missing = missing;
   }
 }
 
@@ -52,15 +63,17 @@ async function request<T>(
 
   if (!res.ok) {
     let msg = `request failed (${res.status})`;
+    let missing: string[] | undefined;
     try {
       const body = await res.json();
-      // The gate returns 422 with a `missing` list; keep the human message here
-      // and let callers read `missing` off the record when they need the detail.
       msg = body.error || body.detail || body.message || msg;
+      // The complete-to-add gate returns 422 with a `missing` label list; carry it
+      // on the error so the ingest commit flow can highlight the unfilled fields.
+      if (Array.isArray(body.missing)) missing = body.missing as string[];
     } catch {
       /* non-JSON error body, keep the status message */
     }
-    throw new ApiError(res.status, msg);
+    throw new ApiError(res.status, msg, missing);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -126,5 +139,36 @@ export const api = {
     if (category) body.category = category;
     if (want && want.length > 0) body.want = want;
     return request<EnrichmentResult>("POST", "/api/enrich/part", { body });
+  },
+
+  // Inspect dropped file paths / LCSC ids into staging candidates. Returns a job
+  // id; the candidates arrive on the job's SSE result event (openJobStream).
+  ingestInspect(paths: string[], lcsc_ids: string[]): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/ingest/inspect", {
+      body: { paths, lcsc_ids },
+    });
+  },
+
+  // Add a staging candidate to the library. On success returns the new record; on
+  // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
+  ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {
+    return request<PartDetail>("POST", "/api/ingest/commit", { body: candidate });
+  },
+
+  // Open a job's Server-Sent Events stream. Native EventSource cannot send the
+  // bearer token, so this reads the stream through fetch (see lib/sse) and returns
+  // the raw body for streamEvents to parse.
+  async openJobStream(jobId: string): Promise<ReadableStream<Uint8Array>> {
+    const token = apiToken();
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(
+      apiBase() + `/api/jobs/${encodeURIComponent(jobId)}/events`,
+      { headers },
+    );
+    if (!res.ok || !res.body) {
+      throw new ApiError(res.status || 0, `job stream failed (${res.status})`);
+    }
+    return res.body;
   },
 };
