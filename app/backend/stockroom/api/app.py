@@ -51,8 +51,10 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import profiles as profiles_router_mod
     app.include_router(profiles_router_mod.profiles_router(require_token))
 
-    # Routers added in later tasks are included here (sync, doctor),
-    # each behind Depends(require_token).
+    from stockroom.api.routers import sync as sync_router_mod
+    from stockroom.api.routers import doctor as doctor_router_mod
+    app.include_router(sync_router_mod.sync_router(require_token))
+    app.include_router(doctor_router_mod.doctor_router(require_token))
 
     if _FRONTEND_DIST.exists():
         from fastapi.staticfiles import StaticFiles
