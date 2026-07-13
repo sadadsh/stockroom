@@ -20,6 +20,20 @@ export interface PartsResponse {
   count: number;
 }
 
+// GET /api/duplicates -> parts that share a duplicate key. by_mpn groups parts
+// recorded under the same MPN (a real accidental duplicate); by_footprint groups
+// parts sharing a footprint name (often a legitimate shared standard footprint).
+// Within each group the members are ordered most-complete-first (the keep-candidate).
+export interface DuplicateGroup {
+  key: string;
+  parts: PartSummary[];
+}
+
+export interface DuplicatesResponse {
+  by_mpn: DuplicateGroup[];
+  by_footprint: DuplicateGroup[];
+}
+
 // GET /api/library/facets
 export interface Facets {
   by_category: Record<string, number>;

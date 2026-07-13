@@ -8,6 +8,7 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  DuplicatesResponse,
   EnrichmentResult,
   Facets,
   JobRef,
@@ -108,6 +109,12 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Parts that share an MPN or a footprint name, straight from the derived index
+  // (M6e). Read-only: the keep/delete resolution reuses deletePart.
+  getDuplicates(): Promise<DuplicatesResponse> {
+    return apiGet<DuplicatesResponse>("/api/duplicates");
   },
 
   partDetail(id: string): Promise<PartDetail> {

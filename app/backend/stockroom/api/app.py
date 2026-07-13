@@ -42,6 +42,9 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import previews as previews_router_mod
     app.include_router(previews_router_mod.previews_router(require_token))
 
+    from stockroom.api.routers import duplicates as duplicates_router_mod
+    app.include_router(duplicates_router_mod.duplicates_router(require_token))
+
     from stockroom.api.routers import ingest as ingest_router_mod
     app.include_router(ingest_router_mod.ingest_router(require_token))
 

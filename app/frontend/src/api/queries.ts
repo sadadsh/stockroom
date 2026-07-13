@@ -27,6 +27,15 @@ export function useFacetsQuery() {
   });
 }
 
+// The duplicates surface (M6e). Any write can change the duplicate set (editing an
+// MPN, deleting a member), so every mutation below also invalidates this key.
+export function useDuplicates() {
+  return useQuery({
+    queryKey: ["duplicates"],
+    queryFn: () => api.getDuplicates(),
+  });
+}
+
 export function usePartDetailQuery(id: string | null) {
   return useQuery({
     queryKey: ["part", id],
@@ -42,6 +51,7 @@ function useInvalidateAfterWrite() {
   return (id: string) => {
     qc.invalidateQueries({ queryKey: ["parts"] });
     qc.invalidateQueries({ queryKey: ["facets"] });
+    qc.invalidateQueries({ queryKey: ["duplicates"] });
     qc.invalidateQueries({ queryKey: ["part", id] });
   };
 }
@@ -71,6 +81,7 @@ export function useDeletePart() {
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["facets"] });
+      qc.invalidateQueries({ queryKey: ["duplicates"] });
       qc.removeQueries({ queryKey: ["part", id] });
     },
   });

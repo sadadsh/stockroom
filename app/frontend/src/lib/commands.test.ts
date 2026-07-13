@@ -12,8 +12,9 @@ describe("command registry", () => {
     // Built surfaces are offered...
     expect(ids).toContain("nav.components");
     expect(ids).toContain("nav.ingest");
+    expect(ids).toContain("nav.duplicates");
     // ...but unbuilt ones are not, so the palette can never route to a stub.
-    expect(ids).not.toContain("nav.duplicates");
+    expect(ids).not.toContain("nav.projects");
   });
 
   it("a nav command navigates to its route when run", () => {
