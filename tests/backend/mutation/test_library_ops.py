@@ -111,3 +111,51 @@ def test_add_part_rolls_back_on_duplicate_symbol(tmp_path, fixtures_dir):
     assert repo.is_clean()
     # only one part json exists
     assert len(list(profile.library.parts_dir.glob("*.json"))) == 1
+
+
+def test_edit_field_updates_json_and_mirror(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.edit_field("tps62130rgtr", "manufacturer", "Texas Instruments")
+    assert rec.manufacturer == "Texas Instruments"
+    sym = SymbolLib.load(profile.library.symbol_lib_path("ICs")).get_symbol("TPS62130RGTR")
+    assert sym.get_property("Manufacturer") == "Texas Instruments"
+    assert repo.is_clean()
+
+
+def test_move_category_relocates_symbol_and_footprint(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    # also pre-create the destination category (Modules) libs
+    (profile.library.symbol_lib_path("Modules")).write_text(
+        '(kicad_symbol_lib\r\n\t(version 20251024)\r\n\t(generator "x")\r\n)\r\n', newline=""
+    )
+    profile.library.footprint_lib_path("Modules").mkdir(parents=True, exist_ok=True)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.move_category("tps62130rgtr", "Modules")
+
+    assert rec.category == "Modules"
+    assert rec.symbol.lib == "SR-Modules"
+    # gone from ICs, present in Modules
+    assert "TPS62130RGTR" not in SymbolLib.load(profile.library.symbol_lib_path("ICs")).symbol_names
+    assert "TPS62130RGTR" in SymbolLib.load(profile.library.symbol_lib_path("Modules")).symbol_names
+    assert not (profile.library.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
+    assert (profile.library.footprint_lib_path("Modules") / "TPS62130RGTR.kicad_mod").exists()
+    sym = SymbolLib.load(profile.library.symbol_lib_path("Modules")).get_symbol("TPS62130RGTR")
+    assert sym.get_property("Footprint") == "SR-Modules:TPS62130RGTR"
+    assert repo.is_clean()
+
+
+def test_delete_part_removes_everything(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    ops.delete_part("tps62130rgtr")
+    lib = profile.library
+    assert not (lib.parts_dir / "tps62130rgtr.json").exists()
+    assert "TPS62130RGTR" not in SymbolLib.load(lib.symbol_lib_path("ICs")).symbol_names
+    assert not (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
+    assert not (lib.models_dir / "TPS62130RGTR.step").exists()
+    assert not (lib.datasheets_dir / "tps62130rgtr.pdf").exists()
+    assert repo.is_clean()
