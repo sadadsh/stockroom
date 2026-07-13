@@ -256,6 +256,39 @@ The chain has real dependencies (M3 calls M2's mutation engine, M6 calls M5's AP
 so it is a pipeline, not a parallel build. Two things always need one pass on the real Windows machine with
 KiCad 10: the launcher (M5) and the final KiCad wiring and preview verification.
 
+### 8.1 Committed feature additions (owner, 2026-07-13)
+
+From the KiCad-ecosystem research cross-pollinated with the old app, the owner committed these into the
+roadmap (research map: `docs/research/2026-07-13-kicad-ecosystem-learnings.md`):
+
+- **Datasheet-first enrichment + a specs/pinout panel (M4).** Extract MPN/manufacturer/package/specs/pinout
+  from the stored datasheet PDF; a ban-proof primary source that fits scrape-first (section 6.1).
+- **Bulk MPN-list / BOM import (M3/M4).** Paste a BOM or MPN list, scrape-fill every part, add the ones that
+  reach complete, report the rest.
+- **Library Doctor, auto-repair (extends M2 drift into a doctor surface, M6 UI).** Detect AND one-click fix
+  broken symbol/footprint/3D links, absolute paths (rewrite to `${SR_LIB}`-relative), dangling refs,
+  duplicates, incomplete parts, and assets referenced but not committed.
+- **Interactive pinout viewer for MCUs/connectors (M6),** driven by the datasheet extraction above.
+- **Per-part git timeline + visual diff (M6).** History per part with symbol/footprint visual diffs plus a
+  library-wide recent-changes feed; reads blobs straight from git objects, never a checkout.
+- **kicanvas interactive previews (M6).** Embed the kicanvas WebGL viewer (MIT); keep kicad-cli for 3D/STEP
+  and headless SVG fallback.
+- **Similar-parts consolidation (M3 dedup / M6).** Surface near-duplicates (same value plus footprint,
+  different MPN/vendor) and pick a canonical, beyond exact-MPN dedup.
+- **Unified Buildability verdict (M7).** One screen fusing readiness (parts complete, ERC/DRC clean, BOM
+  sourceable and priced) into a single ready-to-build-and-order answer or a prioritized fix list.
+- **Panelization / fab-prep (M7).** A prepare-for-fab flow (KiKit panelization plus gerber/BOM/CPL export).
+- **InvenTree stock bridge (M8, optional).** Sync the library to InvenTree for physical stock tracking; the
+  library owns the parts, InvenTree owns the stock.
+
+Deferred (not added now, kept on the backlog): symbol/footprint generation from a pin list (KiPart/QEDA);
+in-app AI design review (kicad-happy).
+
+**Code-reuse stance (owner, 2026-07-13): case-by-case.** Permissive tools (MIT/ISC: kicanvas, KiCost,
+KinJector, KiBoM, kicad-db-lib schema) are reused directly. For each GPL-3.0 tool (Import-LIB, Ki-nTree,
+uConfig) the reuse-and-accept-GPL vs reimplement choice is made per tool with the owner. AGPL (easyeda2kicad)
+stays subprocess-only regardless.
+
 ## 9. Migration and consolidation approach
 
 **Approach: engine-first (chosen over shell-first and dual-track).** Absorb Stockroom's shipped clean-room
