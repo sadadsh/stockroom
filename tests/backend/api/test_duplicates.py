@@ -122,12 +122,17 @@ def test_groups_parts_that_share_a_footprint(client, app_ctx):
 
 
 def test_group_lists_the_most_complete_part_first(client, app_ctx):
-    # tps62130 (from the fixture) is complete; the alt sharing its MPN is not.
-    _seed(app_ctx, "tps62130_alt", mpn="TPS62130", footprint_name="ALT_FP")
+    # ANTI-ALIGNED on purpose: the COMPLETE member ("zzz_full") sorts AFTER the
+    # incomplete one ("aaa_stub") both by id and display name, so only the
+    # completeness key of the sort can put it first. A name-only (or drop-the-
+    # completeness) regression would list "aaa_stub" first and fail here, which a
+    # fixture whose complete part is also alphabetically first would miss.
+    _seed(app_ctx, "aaa_stub", mpn="SHARED-MPN", complete=False)
+    _seed(app_ctx, "zzz_full", mpn="SHARED-MPN", complete=True)
     group = client.get("/api/duplicates").json()["by_mpn"][0]
+    assert group["key"] == "SHARED-MPN"
     ids = [p["id"] for p in group["parts"]]
-    assert ids[0] == "tps62130"  # complete part is the keep-candidate, listed first
-    assert ids[1] == "tps62130_alt"
+    assert ids == ["zzz_full", "aaa_stub"]  # complete first, despite sorting later by name
     assert group["parts"][0]["is_complete"] is True
     assert group["parts"][1]["is_complete"] is False
 

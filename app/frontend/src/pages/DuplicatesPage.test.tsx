@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
-import type { DuplicateGroup } from "../api/types";
+import type { DuplicateGroup, DuplicatesResponse } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { DuplicatesPage } from "./DuplicatesPage";
 
@@ -124,6 +124,37 @@ describe("DuplicatesPage", () => {
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /^delete$/i }));
     expect(mockApi.deletePart).toHaveBeenCalledWith("lm358_dup");
+  });
+
+  it("disables the per-card Delete while the surface refetches, so a resolved delete cannot be re-fired into a 404", async () => {
+    // First load shows the group; the post-delete refetch is held open so the
+    // just-deleted card is still on screen (the real background-refetch window).
+    let releaseRefetch!: (v: DuplicatesResponse) => void;
+    mockApi.getDuplicates
+      .mockResolvedValueOnce({ by_mpn: [MPN_GROUP], by_footprint: [FP_GROUP] })
+      .mockReturnValueOnce(
+        new Promise<DuplicatesResponse>((r) => {
+          releaseRefetch = r;
+        }),
+      );
+    renderPage();
+    await screen.findByText("LM358 Copy");
+    await userEvent.click(
+      within(partCard("lm358_dup")).getByRole("button", { name: /delete/i }),
+    );
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }),
+    );
+    // the delete resolved (once) and the surface is now refetching; the stale
+    // card's Delete must be disabled so a second click cannot fire another delete.
+    await waitFor(() => expect(mockApi.deletePart).toHaveBeenCalledTimes(1));
+    const staleDelete = within(partCard("lm358_dup")).getByRole("button", {
+      name: /delete/i,
+    });
+    expect(staleDelete).toBeDisabled();
+    await userEvent.click(staleDelete);
+    expect(mockApi.deletePart).toHaveBeenCalledTimes(1); // still one, no re-fire
+    releaseRefetch({ by_mpn: [], by_footprint: [] });
   });
 
   it("frames a shared standard footprint as informational, not an error", async () => {
