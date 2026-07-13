@@ -9,6 +9,7 @@ completeness, the load-bearing rule)."""
 
 from __future__ import annotations
 
+import inspect
 from typing import Protocol, runtime_checkable
 
 from stockroom.enrich.errors import EnrichError
@@ -28,6 +29,20 @@ class Source(Protocol):
     def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult: ...
 
 
+def _accepts_kw(fn, name: str) -> bool:
+    """True if fn declares keyword `name` (or **kwargs). Lets a source opt in to the
+    accumulated result (e.g. DatasheetSource needs the datasheet_url a prior source
+    found) without forcing every Source to grow the parameter."""
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):
+        return False
+    params = sig.parameters
+    if name in params:
+        return True
+    return any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+
+
 class SourceRegistry:
     def __init__(self, sources: list[Source]):
         self.sources = list(sources)
@@ -39,7 +54,15 @@ class SourceRegistry:
             if not remaining:
                 break
             try:
-                partial = source.enrich(mpn, category, set(remaining))
+                # A source that opts in (declares `resolved=`) receives the result so
+                # far, so a later source can act on an earlier one's fields (the
+                # datasheet source fetches the URL the scrape surfaced). This is
+                # per-source and backward compatible: sources that don't declare it
+                # keep the original three-arg signature.
+                if _accepts_kw(source.enrich, "resolved"):
+                    partial = source.enrich(mpn, category, set(remaining), resolved=result)
+                else:
+                    partial = source.enrich(mpn, category, set(remaining))
             except EnrichError:
                 continue  # a dead source never blocks
             result.merge_missing(partial)

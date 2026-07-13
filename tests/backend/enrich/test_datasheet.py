@@ -65,6 +65,24 @@ def test_fetch_datasheet_rejects_a_non_2xx_status(tmp_path):
         fetch_datasheet("https://x/d.pdf", tmp_path / "d.pdf", fetcher=_StubFetcher(bad))
 
 
+def test_fetch_datasheet_rejects_html_served_as_octet_stream(tmp_path):
+    # a generic application/octet-stream Content-Type must NOT alone qualify: the
+    # body is HTML, so without %PDF- magic it is refused (never store a wrapper).
+    body = b"<!doctype html><html><body>unavailable</body></html>"
+    res = FetchResult("u", 200, body.decode(), body, "application/octet-stream", "u")
+    with pytest.raises(EnrichError):
+        fetch_datasheet("https://x/d.pdf", tmp_path / "d.pdf", fetcher=_StubFetcher(res))
+    assert not (tmp_path / "d.pdf").exists()
+
+
+def test_fetch_datasheet_accepts_pdf_bytes_served_as_octet_stream(tmp_path):
+    # octet-stream IS fine when the magic bytes confirm a real PDF (common for CDNs)
+    data = (FIX / "sample_datasheet.pdf").read_bytes()
+    res = FetchResult("u", 200, data.decode("latin-1"), data, "application/octet-stream", "u")
+    out = fetch_datasheet("https://x/d.pdf", tmp_path / "d.pdf", fetcher=_StubFetcher(res))
+    assert out.read_bytes().startswith(b"%PDF-")
+
+
 def test_extract_datasheet_specs_reads_mpn_manufacturer_package():
     r = extract_datasheet_specs(FIX / "sample_datasheet.pdf", known_mpn="TPS62130RGTR")
     assert r.mpn.value == "TPS62130RGTR"

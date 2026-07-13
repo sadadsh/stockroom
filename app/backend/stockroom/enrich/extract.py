@@ -58,6 +58,37 @@ def _brand_name(brand) -> str:
     return _first_str(brand)
 
 
+# JSON-LD keys a distributor Product commonly carries a datasheet link under. Kept
+# narrow: only an explicit datasheet field, never a generic "url" (which is the
+# product page, not the PDF), so we never mislabel a product URL as a datasheet.
+_DATASHEET_KEYS = ("datasheet", "datasheetUrl", "datasheetURL", "datasheet_url")
+
+
+def _looks_like_datasheet_url(val: str) -> bool:
+    v = val.strip().lower()
+    return v.startswith("http") and (v.endswith(".pdf") or "datasheet" in v or ".pdf?" in v)
+
+
+def _datasheet_url(obj: dict) -> str:
+    """Pull a datasheet URL from a JSON-LD Product: an explicit datasheet key, or a
+    schema.org additionalProperty whose name mentions 'datasheet'. Only a URL that
+    actually looks like a datasheet (PDF/datasheet path) is accepted, so a product
+    page is never mislabelled as the datasheet."""
+    for key in _DATASHEET_KEYS:
+        cand = _first_str(obj.get(key))
+        if cand and _looks_like_datasheet_url(cand):
+            return cand
+    props = obj.get("additionalProperty")
+    for prop in props if isinstance(props, list) else []:
+        if not isinstance(prop, dict):
+            continue
+        name = _first_str(prop.get("name")).lower()
+        val = _first_str(prop.get("value"), prop.get("url"))
+        if "datasheet" in name and val and _looks_like_datasheet_url(val):
+            return val
+    return ""
+
+
 def _offers_to_breaks(offers) -> tuple[list[PriceBreak], bool]:
     breaks: list[PriceBreak] = []
     in_stock = False
@@ -99,6 +130,9 @@ def extract_jsonld_product(html: str) -> EnrichmentResult:
             desc = _first_str(obj.get("description"), obj.get("name"))
             if desc:
                 r.description = Sourced(desc, "jsonld", "high")
+            ds = _datasheet_url(obj)
+            if ds:
+                r.datasheet_url = Sourced(ds, "jsonld", "high")
             breaks, in_stock = _offers_to_breaks(obj.get("offers"))
             if breaks:
                 r.price_breaks = breaks
@@ -174,6 +208,8 @@ def extract_next_data(html: str) -> EnrichmentResult:
         man = _first_str(node.get("manufacturer"))
         pkg = _first_str(node.get("package"), node.get("packageType"))
         desc = _first_str(node.get("description"))
+        ds = _first_str(node.get("datasheet"), node.get("datasheetUrl"),
+                        node.get("datasheetURL"), node.get("datasheet_url"))
         if mpn and r.mpn is None:
             r.mpn = Sourced(mpn, "next_data", "medium")
         if man and r.manufacturer is None:
@@ -182,6 +218,8 @@ def extract_next_data(html: str) -> EnrichmentResult:
             r.package = Sourced(pkg, "next_data", "medium")
         if desc and r.description is None:
             r.description = Sourced(desc, "next_data", "medium")
+        if ds and r.datasheet_url is None and _looks_like_datasheet_url(ds):
+            r.datasheet_url = Sourced(ds, "next_data", "medium")
     return r
 
 

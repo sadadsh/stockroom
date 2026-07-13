@@ -15,7 +15,11 @@ from pathlib import Path
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 
-_PDF_CONTENT_TYPES = ("application/pdf", "application/x-pdf", "application/octet-stream")
+# A Content-Type that unambiguously means PDF: it may stand on its own. A generic
+# binary type (application/octet-stream) is deliberately NOT here: it is trusted
+# only when the %PDF- magic bytes also confirm a PDF, so an HTML error page served
+# as octet-stream can never be stored as a .pdf (research: reject the HTML wrapper).
+_PDF_CONTENT_TYPES = ("application/pdf", "application/x-pdf")
 
 
 def looks_like_pdf(content: bytes) -> bool:

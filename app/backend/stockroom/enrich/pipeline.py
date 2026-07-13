@@ -13,8 +13,10 @@ from pathlib import Path
 from urllib.parse import quote
 
 from stockroom.enrich.cache import TtlCache
+from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
+from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
-from stockroom.enrich.fetch import HttpRenderedDomFetcher, RenderedDomFetcher
+from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry
 from stockroom.enrich.schema import EnrichmentResult, Sourced
@@ -61,26 +63,66 @@ class ScrapeSource:
 
 
 class DatasheetSource:
+    """The ban-proof PRIMARY source (spec section 6.1 item 3). It runs AFTER the
+    scrape in the registry: if a prior source surfaced a `datasheet_url`, it follows
+    it, validates a real PDF (Content-Type + %PDF- magic), and extracts specs
+    (package, manufacturer, pinout) at high confidence, so the datasheet's values are
+    merged for any field still empty. With no datasheet_url it contributes nothing
+    and never blocks the walk."""
+
     name = "datasheet"
 
-    def __init__(self, fetcher=None):
+    def __init__(self, fetcher=None, cache_dir=None):
         self._fetcher = fetcher
+        # PDFs are fetched into this dir so a stored path can back the passport's
+        # datasheet requirement; a temp dir is used when the pipeline gives none.
+        self._cache_dir = Path(cache_dir) if cache_dir is not None else None
 
-    def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult:
-        # The pipeline threads a resolved datasheet_url via remaining context is
-        # not used here; this source contributes nothing on a bare MPN and is a
-        # placeholder for the pipeline's explicit fetch_and_extract path below.
-        return EnrichmentResult(category=category)
+    def enrich(self, mpn: str, category: str, remaining: set[str],
+               resolved: EnrichmentResult | None = None) -> EnrichmentResult:
+        empty = EnrichmentResult(category=category)
+        if resolved is None or resolved.datasheet_url is None:
+            return empty
+        url = str(resolved.datasheet_url.value)
+        # Only worth fetching+parsing the PDF if a datasheet-derived field is still
+        # wanted; specs/pinout/package/manufacturer are what the datasheet adds.
+        if remaining and not (remaining & {"package", "manufacturer", "specs", "mpn"}):
+            return empty
+        import tempfile
+
+        base = self._cache_dir or Path(tempfile.gettempdir()) / "stockroom-datasheets"
+        base.mkdir(parents=True, exist_ok=True)
+        from stockroom.enrich.schema import normalize_mpn
+
+        dst = base / f"{normalize_mpn(mpn or 'part')}.pdf"
+        try:
+            pdf_path = fetch_datasheet(url, dst, fetcher=self._fetcher)
+        except EnrichError:
+            return empty  # a dead/HTML datasheet link never blocks the walk
+        try:
+            return extract_datasheet_specs(pdf_path, known_mpn=mpn)
+        except EnrichError:
+            return empty
 
 
 class EnrichmentPipeline:
     def __init__(self, cache_dir, fetcher: RenderedDomFetcher | None = None,
-                 mouser=None, limiter=None, url_for=None):
+                 mouser=None, limiter=None, url_for=None, http_fetcher=None):
         self.cache = TtlCache(Path(cache_dir))
         self.fetcher = fetcher or HttpRenderedDomFetcher()
         self.limiter = limiter or SlidingWindowLimiter(limit=10, window=60.0)
         self.mouser = mouser
-        sources = [ScrapeSource(self.fetcher, self.limiter, url_for=url_for)]
+        # The datasheet PDF is a direct HTTP GET (not a rendered DOM), so it uses an
+        # HttpFetcher; injectable so tests never touch the network.
+        self.http_fetcher = http_fetcher or HttpFetcher()
+        self._datasheet_dir = Path(cache_dir) / "datasheets"
+        # Default registry: scrape (surfaces a datasheet_url) -> datasheet (follows
+        # it, the ban-proof primary source) -> optional Mouser. Each fills only what
+        # is still missing (spec section 6.1).
+        sources = [
+            ScrapeSource(self.fetcher, self.limiter, url_for=url_for),
+            DatasheetSource(fetcher=self.http_fetcher, cache_dir=self._datasheet_dir),
+        ]
         if mouser is not None and getattr(mouser, "enabled", False):
             sources.append(_MouserSource(mouser))
         self.registry = SourceRegistry(sources)
@@ -123,7 +165,39 @@ class EnrichmentPipeline:
         if result.datasheet_url is not None and candidate.provenance is not None:
             if not candidate.provenance.source_url or "datasheet" in overwrite:
                 candidate.provenance.source_url = str(result.datasheet_url.value)
+
+        # actually FETCH+store the PDF so the passport's datasheet requirement can be
+        # met (the gate checks a stored datasheet_path, not just a URL). Per-field:
+        # only if the candidate has no datasheet yet (or datasheet is opted in). A
+        # failed/HTML datasheet link never blocks: datasheet_path is simply left unset.
+        if result.datasheet_url is not None and (
+            candidate.datasheet_path is None or "datasheet" in overwrite
+        ):
+            self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
+
+    def fetch_and_store_datasheet(self, candidate: StagingCandidate, url: str) -> Path | None:
+        """Follow a datasheet URL, validate a real PDF, store it under the pipeline's
+        datasheet dir, and set candidate.datasheet_path. Returns the path, or None if
+        the link was dead or not a PDF (never raises: enrichment never blocks)."""
+        from stockroom.enrich.schema import normalize_mpn
+
+        from stockroom.enrich.datasheet import looks_like_pdf
+
+        self._datasheet_dir.mkdir(parents=True, exist_ok=True)
+        key = normalize_mpn(candidate.mpn or candidate.entry_name or candidate.display_name or "part")
+        dst = self._datasheet_dir / f"{key}.pdf"
+        # The registry's DatasheetSource may already have fetched this exact PDF (same
+        # deterministic path) to extract specs; reuse it instead of a second download.
+        if dst.exists() and looks_like_pdf(dst.read_bytes()[:5]):
+            candidate.datasheet_path = dst
+            return dst
+        try:
+            path = fetch_datasheet(url, dst, fetcher=self.http_fetcher)
+        except EnrichError:
+            return None
+        candidate.datasheet_path = path
+        return path
 
 
 class _MouserSource:
