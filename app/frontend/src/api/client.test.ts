@@ -21,7 +21,10 @@ function errJson(status: number, body: unknown): Response {
 }
 
 function okBlob(bytes: Uint8Array, type: string): Response {
-  const blob = new Blob([bytes], { type });
+  // TS 5.7+ made Uint8Array generic over its buffer, so a bare Uint8Array is no
+  // longer directly assignable to BlobPart (ArrayBufferView<ArrayBuffer>); the
+  // bytes are a valid BlobPart at runtime, so cast for the Blob constructor.
+  const blob = new Blob([bytes as BlobPart], { type });
   return {
     ok: true,
     status: 200,
