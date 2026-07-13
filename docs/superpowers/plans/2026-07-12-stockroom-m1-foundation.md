@@ -440,7 +440,7 @@ def _unquote(text: str, tok: Token) -> str:
 
 
 class SexpNode:
-    __slots__ = ("_doc", "_token", "_children", "_text", "_list_span")
+    __slots__ = ("_doc", "_token", "_children", "_text", "_list_span", "_value_override")
 
     def __init__(self, doc, text, token=None, children=None):
         self._doc = doc
@@ -448,6 +448,7 @@ class SexpNode:
         self._token = token  # set for leaves
         self._children = children  # set for lists
         self._list_span = None  # (open, close) byte span; set for list nodes
+        self._value_override = None  # reflects a pending set_value for read-after-write
 
     @property
     def is_atom(self) -> bool:
@@ -472,6 +473,8 @@ class SexpNode:
     def value(self) -> str:
         if not self._token:
             return ""
+        if self._value_override is not None:
+            return self._value_override  # a pending set_value is visible to reads
         return _unquote(self._text, self._token)
 
     @property
@@ -503,6 +506,7 @@ class SexpNode:
             raise ValueError("set_value is only valid on a leaf node")
         replacement = quote_kicad(new) if quote else new
         self._doc.replace_span(self._token.start, self._token.end, replacement)
+        self._value_override = new  # so .value reflects the edit before serialize
 
 
 class SexpDocument:
@@ -655,6 +659,25 @@ def test_remove_child_preserves_crlf():
     out = doc.serialize()
     assert out == '(x\r\n\t(a 1)\r\n)'
     assert "\r\r" not in out  # no orphaned CR left behind
+
+
+def test_set_value_is_visible_to_reads():
+    doc = SexpDocument.parse('(property "Value" "10k")')
+    doc.root.children[2].set_value("22k", quote=True)
+    assert doc.root.children[2].value == "22k"  # read-after-write on the node
+
+
+def test_inserted_child_is_visible_to_reads():
+    doc = SexpDocument.parse('(symbol\n\t(property "Value" "10k")\n)')
+    doc.root.insert_child_text('(property "MPN" "RC0603")')
+    mpns = [p for p in doc.root.find_all("property") if p.children[1].value == "MPN"]
+    assert len(mpns) == 1 and mpns[0].children[2].value == "RC0603"
+
+
+def test_removed_child_is_not_visible_to_reads():
+    doc = SexpDocument.parse('(x\n\t(a 1)\n\t(b 2)\n)')
+    doc.root.remove_child(doc.root.find("b"))
+    assert doc.root.find("b") is None
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -696,6 +719,12 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
             self._doc.replace_span(pos, pos, f"{indent}{sexp_text}")
         else:
             self._doc.replace_span(pos, pos, f" {sexp_text}")
+        # Attach a readable node so find/find_all/value see the insert. It parses
+        # into its own mini-document, so its leaves read from the fragment text.
+        # (A freshly inserted node is read-only in this session; re-editing its
+        # value needs a reload, since its spans point into the fragment, not the
+        # main text. M2 inserts a property with its final value, so this holds.)
+        self._children.insert(idx + 1, SexpDocument.parse(sexp_text).root)
 
     def insert_child_text(self, sexp_text: str) -> None:
         if self._children is None:
@@ -707,6 +736,7 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
         # empty list: insert right before ')'
         close = self._list_span[1] - 1
         self._doc.replace_span(close, close, sexp_text)
+        self._children.append(SexpDocument.parse(sexp_text).root)
 
     def remove_child(self, child: "SexpNode") -> None:
         if self._children is None:
@@ -715,6 +745,7 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
         indent = self._indent_before(idx)
         start = child.span[0] - len(indent) if indent else child.span[0]
         self._doc.replace_span(start, child.span[1], "")
+        self._children.pop(idx)  # so find/find_all no longer see the removed child
 ```
 
 - [ ] **Step 4: Run to verify it passes**
