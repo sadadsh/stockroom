@@ -1,0 +1,130 @@
+"""High-level, atomic library operations: add / edit / move-category / delete a
+part, and drift detection. Each mutation runs inside one git-backed Transaction
+so it either commits as a single scoped commit or leaves zero trace (spec
+sections 3, 5, 9).
+"""
+
+from __future__ import annotations
+
+import shutil
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from stockroom.kicad.footprint import Footprint
+from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.model.category import category_nickname, slugify
+from stockroom.model.part import (
+    Datasheet,
+    LibRef,
+    ModelRef,
+    PartRecord,
+    Provenance,
+    new_part_id,
+)
+from stockroom.mutation.placement import (
+    merge_symbol_into_lib,
+    mirror_fields_to_symbol,
+    place_footprint,
+)
+from stockroom.mutation.transaction import Transaction
+from stockroom.store.profile import Profile
+from stockroom.vcs.repo import GitRepo
+
+
+@dataclass
+class StagedPart:
+    display_name: str
+    category: str
+    mpn: str = ""
+    manufacturer: str = ""
+    description: str = ""
+    tags: list[str] = field(default_factory=list)
+    symbol_source: Path | None = None
+    symbol_source_name: str = ""
+    footprint_source: Path | None = None
+    entry_name: str = ""
+    model_source: Path | None = None
+    datasheet_source: Path | None = None
+    provenance: Provenance | None = None
+    datasheet_meta: Datasheet | None = None
+
+
+class LibraryOps:
+    def __init__(self, profile: Profile, repo: GitRepo):
+        self.profile = profile
+        self.repo = repo
+        self.lib = profile.library
+
+    def add_part(self, staged: StagedPart) -> PartRecord:
+        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+        self.lib.models_dir.mkdir(parents=True, exist_ok=True)
+        self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
+
+        part_id = new_part_id(self.lib.parts_dir, staged.mpn or staged.display_name)
+        nickname = category_nickname(staged.category)
+        sym_lib_path = self.lib.symbol_lib_path(staged.category)
+        pretty_dir = self.lib.footprint_lib_path(staged.category)
+
+        with Transaction(self.repo) as txn:
+            # 1. merge the symbol (renamed to entry_name) into the category lib
+            merge_symbol_into_lib(
+                sym_lib_path, staged.symbol_source, staged.symbol_source_name, staged.entry_name
+            )
+            txn.track(sym_lib_path)
+
+            # 2. place the footprint into the category .pretty
+            fp_path = place_footprint(pretty_dir, staged.footprint_source, staged.entry_name)
+            txn.track(fp_path)
+
+            # 3. model file + (model ...) link
+            model_ref = None
+            if staged.model_source is not None:
+                model_name = f"{staged.entry_name}{Path(staged.model_source).suffix}"
+                model_dst = self.lib.models_dir / model_name
+                shutil.copyfile(staged.model_source, model_dst)
+                txn.track(model_dst)
+                fp = Footprint.load(fp_path)
+                fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
+                fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
+                model_ref = ModelRef(file=f"models/{model_name}")
+
+            # 4. datasheet file
+            datasheet = None
+            if staged.datasheet_source is not None:
+                ds_name = f"{part_id}.pdf"
+                ds_dst = self.lib.datasheets_dir / ds_name
+                shutil.copyfile(staged.datasheet_source, ds_dst)
+                txn.track(ds_dst)
+                datasheet = staged.datasheet_meta or Datasheet()
+                datasheet.file = ds_name
+
+            # 5. the symbol's Footprint property, then mirror KiCad-visible fields
+            record = PartRecord(
+                id=part_id,
+                display_name=staged.display_name,
+                category=staged.category,
+                description=staged.description,
+                tags=list(staged.tags),
+                mpn=staged.mpn,
+                manufacturer=staged.manufacturer,
+                datasheet=datasheet,
+                symbol=LibRef(lib=nickname, name=staged.entry_name),
+                footprint=LibRef(lib=nickname, name=staged.entry_name),
+                model=model_ref,
+                provenance=staged.provenance,
+            )
+            sym_lib = SymbolLib.load(sym_lib_path)
+            sym = sym_lib.get_symbol(staged.entry_name)
+            sym.set_property("Footprint", f"{nickname}:{staged.entry_name}")
+            mirror_fields_to_symbol(sym, record)
+            sym_lib.save(sym_lib_path)
+
+            # 6. the JSON record
+            json_path = self.lib.parts_dir / f"{part_id}.json"
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+
+            txn.commit(f"Add {staged.entry_name} ({staged.category}): symbol, footprint, "
+                       f"{'3D model, ' if model_ref else ''}"
+                       f"{'datasheet, ' if datasheet else ''}record")
+        return record
