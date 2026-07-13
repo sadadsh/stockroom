@@ -7,9 +7,16 @@ from stockroom.kicad.errors import KiCadCliError
 from tests.backend.conftest import requires_kicad_cli
 
 
-def test_missing_binary_raises():
+def test_missing_binary_is_non_fatal_but_commands_raise(monkeypatch):
+    # Construction MUST NOT raise when kicad-cli is absent (the app has to start
+    # without it); a clear error surfaces only when a command is actually invoked.
+    import stockroom.kicad.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "find_kicad_cli", lambda binary=None: None)
+    cli = KiCadCli(binary="definitely-not-kicad-cli-xyz")
+    assert cli.available is False
     with pytest.raises(KiCadCliError):
-        KiCadCli(binary="definitely-not-kicad-cli-xyz")
+        cli.version()
 
 
 @requires_kicad_cli

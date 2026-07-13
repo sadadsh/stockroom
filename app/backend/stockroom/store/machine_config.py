@@ -38,6 +38,9 @@ class MachineConfig:
     active_profile: str = "Main"
     mouser_api_key: str = ""
     kicad_config_override: str = ""
+    # An explicit kicad-cli binary path, for a non-standard KiCad install that
+    # discovery (PATH + standard locations) does not find. Empty = auto-discover.
+    kicad_cli_override: str = ""
     sync_enabled: bool = True
     window: dict = field(default_factory=dict)
 

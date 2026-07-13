@@ -69,7 +69,7 @@ def build_context(
     config = config or MachineConfig.load()
     profile_store = ProfileStore(libraries_root, repo)
     profile = profile_store.get(config.active_profile)
-    cli = KiCadCli()
+    cli = KiCadCli(config.kicad_cli_override or None)
     ops = LibraryOps(profile, repo, cli)
     index = LibraryIndex.build(profile.library.parts_dir)
     kdir = Path(kicad_dir) if kicad_dir is not None else kicad_config_dir(

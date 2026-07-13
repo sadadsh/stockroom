@@ -30,6 +30,9 @@ def system_info_router(require_token) -> APIRouter:
             "part_count": ctx.index.count(),
             "kicad_config_dir": ctx.kicad_dir.as_posix(),
             "kicad_running": detect_running_kicad(),
+            # so the UI can honestly surface when previews/import are unavailable
+            "kicad_cli_available": ctx.cli.available,
+            "kicad_cli_path": ctx.cli.binary or "",
         }
 
     return r
