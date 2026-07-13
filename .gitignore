@@ -28,3 +28,6 @@ Thumbs.db
 
 # Developer-local external tool Code settings + personal commands (ledger hook references a private path)
 .local-tools/
+
+# external tool instructions: local only, never pushed (owner directive)
+/local instructions
