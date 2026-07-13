@@ -1,0 +1,10 @@
+{"SearchResults": {"NumberOfResult": 2, "Parts": [
+  {"ManufacturerPartNumber": "TPS62130RGTR-NEAR", "Manufacturer": "TI",
+   "Description": "near match", "DataSheetUrl": "http://x/near.pdf",
+   "AvailabilityInStock": "10", "PriceBreaks": [{"Quantity": 1, "Price": "$9.99"}],
+   "ProductDetailUrl": "http://x/near"},
+  {"ManufacturerPartNumber": "TPS62130RGTR", "Manufacturer": "Texas Instruments",
+   "Description": "3A step-down converter VQFN-16", "DataSheetUrl": "http://x/exact.pdf",
+   "AvailabilityInStock": "4200", "PriceBreaks": [{"Quantity": 1, "Price": "$1.23"},
+   {"Quantity": 100, "Price": "$0.98"}], "ProductDetailUrl": "http://x/exact"}
+]}}
