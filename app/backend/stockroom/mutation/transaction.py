@@ -26,6 +26,7 @@ class Transaction:
     def __init__(self, repo: GitRepo):
         self.repo = repo
         self._paths: list[Path] = []
+        self._dirs: list[Path] = []
         self._committed = False
 
     def track(self, *paths: Path) -> None:
@@ -33,6 +34,15 @@ class Transaction:
             path = Path(p)
             if path not in self._paths:
                 self._paths.append(path)
+
+    def track_dir(self, *dirs: Path) -> None:
+        """Record a directory this transaction may freshly create so rollback prunes it
+        if it ends up empty. Git cannot track an empty directory, so restore_paths alone
+        would leave a brand-new category's .pretty dir behind (the zero-trace contract)."""
+        for d in dirs:
+            path = Path(d)
+            if path not in self._dirs:
+                self._dirs.append(path)
 
     def validate(self) -> None:
         for p in self._paths:
@@ -61,4 +71,12 @@ class Transaction:
     def __exit__(self, exc_type, exc, tb) -> bool:
         if not self._committed:
             self.repo.restore_paths(self._paths)
+            # prune freshly-created dirs that rollback left empty (deepest first), so a
+            # failed mutation leaves zero trace even for a brand-new category.
+            for d in sorted(self._dirs, key=lambda p: len(p.parts), reverse=True):
+                try:
+                    if d.is_dir() and not any(d.iterdir()):
+                        d.rmdir()
+                except OSError:
+                    pass
         return False  # never suppress exceptions
