@@ -1,6 +1,31 @@
 from __future__ import annotations
 
 
+def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
+    # candidate_to_dto must emit a `purchase` key (even empty) so the frontend
+    # StagingCandidate shape is complete (a missing key crashes the review card),
+    # and a candidate's purchase links must survive the inspect -> edit -> commit
+    # round trip instead of being silently dropped.
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+    from stockroom.model.part import Purchase
+
+    empty = StagingCandidate(vendor="lcsc", symbol_lib_path=None, symbol_name="X",
+                             footprint_variants=[], mpn="LM358", display_name="LM358",
+                             entry_name="LM358", category="ICs")
+    dto = candidate_to_dto(empty)
+    assert "purchase" in dto and dto["purchase"] == []
+
+    withp = StagingCandidate(vendor="lcsc", symbol_lib_path=None, symbol_name="X",
+                             footprint_variants=[], mpn="LM358", display_name="LM358",
+                             entry_name="LM358", category="ICs",
+                             purchase=[Purchase(vendor="Mouser", url="https://m/x",
+                                                stock=5, currency="USD")])
+    dto = candidate_to_dto(withp)
+    assert dto["purchase"][0]["url"] == "https://m/x"
+    assert dto_to_candidate(dto).purchase[0].url == "https://m/x"
+
+
 def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx):
     # No fake: drive the REAL IngestPipeline.commit -> LibraryOps.add_part gate through
     # the API. The candidate carries real symbol + footprint SOURCES (so to_staged_part

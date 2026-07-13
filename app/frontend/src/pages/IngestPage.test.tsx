@@ -98,6 +98,7 @@ describe("IngestPage", () => {
     await user.click(screen.getByRole("button", { name: "Add To Library" }));
 
     expect(mockApi.ingestCommit).toHaveBeenCalledTimes(1);
+    expect(mockApi.ingestCommit).toHaveBeenCalledWith(CANDIDATE);
     expect(await screen.findByText(/Added NE555P/i)).toBeInTheDocument();
   });
 
@@ -113,6 +114,55 @@ describe("IngestPage", () => {
     const card = (await screen.findByText("3D model")).closest("[data-candidate]")!;
     expect(within(card as HTMLElement).getByText("3D model")).toBeInTheDocument();
     expect(within(card as HTMLElement).getByText("purchase link")).toBeInTheDocument();
+  });
+
+  it("commits the edited candidate values, not the originals", async () => {
+    const user = await inspectOnce([CANDIDATE]);
+    await screen.findByLabelText("Name");
+    mockApi.ingestCommit.mockResolvedValue(PART_DETAIL);
+
+    const manu = screen.getByLabelText("Manufacturer");
+    await user.clear(manu);
+    await user.type(manu, "Acme Corp");
+    await user.click(screen.getByRole("button", { name: "Add To Library" }));
+
+    expect(mockApi.ingestCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ manufacturer: "Acme Corp" }),
+    );
+  });
+
+  it("keeps edits on sibling candidates when one is committed", async () => {
+    const A = { ...CANDIDATE, display_name: "PART_A", entry_name: "A", mpn: "A" };
+    const B = { ...CANDIDATE, display_name: "PART_B", entry_name: "B", mpn: "B" };
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
+    mockApi.openJobStream.mockResolvedValue(resultStream([A, B]));
+    mockApi.ingestCommit.mockResolvedValue(PART_DETAIL);
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("LCSC Part IDs"), "C1 C2");
+    await user.click(screen.getByRole("button", { name: "Inspect" }));
+    await screen.findByText("Review And Add");
+
+    // Edit the second card's Manufacturer, then commit the first card.
+    const manus = screen.getAllByLabelText("Manufacturer");
+    expect(manus).toHaveLength(2);
+    await user.clear(manus[1]);
+    await user.type(manus[1], "EDITED_B");
+    await user.click(screen.getAllByRole("button", { name: "Add To Library" })[0]);
+    await screen.findByText(/Added PART_A/i);
+
+    // The surviving card must still hold the edit, not be reset by a remount.
+    const remaining = screen.getAllByLabelText("Manufacturer");
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toHaveValue("EDITED_B");
+  });
+
+  it("renders a candidate that arrives without a purchase field instead of crashing", async () => {
+    const noPurchase: Partial<StagingCandidate> = { ...CANDIDATE };
+    delete noPurchase.purchase;
+    const user = await inspectOnce([noPurchase as StagingCandidate]);
+    expect(await screen.findByLabelText("Name")).toHaveValue("NE555P");
+    void user;
   });
 
   it("shows an honest empty state when inspection finds nothing", async () => {

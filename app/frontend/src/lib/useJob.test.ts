@@ -35,6 +35,25 @@ describe("useJob", () => {
 
     expect(result.current.status).toBe("done");
     expect(result.current.result).toEqual([{ mpn: "LM358" }]);
+    // The progress event is folded into state (a live progress bar reads this).
+    expect(result.current.progress).toEqual({ pct: 50, message: "unpacking" });
+  });
+
+  it("does not hang in running if the stream ends without a terminal event", async () => {
+    // Abnormal termination (the sidecar dies / the host drops the SSE body): the
+    // stream EOFs after only progress, with no result/error/done. That must become
+    // an honest error, never a permanent busy state.
+    mockApi.openJobStream.mockResolvedValue(
+      streamOf(['event: progress\ndata: {"pct":30}\n\n']),
+    );
+    const { result } = renderHook(() => useJob());
+
+    await act(async () => {
+      await result.current.run("j");
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toBeTruthy();
   });
 
   it("surfaces a job error event as an error state", async () => {

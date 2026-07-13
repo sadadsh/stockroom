@@ -7,7 +7,7 @@
  * required fields are still missing, shown on the candidate, and nothing is added
  * until it passes.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useIngestCommit } from "../api/queries";
 import type { StagingCandidate } from "../api/types";
@@ -17,16 +17,25 @@ import { onQueuedPaths } from "../lib/ingestQueue";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
 import { UploadIcon } from "../components/icons";
 
+// Each staged candidate carries a stable id assigned on load, so committing or
+// removing one never shifts another's React key (which would remount its sibling
+// cards and discard their in-progress edits).
+interface Staged {
+  id: number;
+  candidate: StagingCandidate;
+}
+
 export function IngestPage() {
   const [lcsc, setLcsc] = useState("");
   // null = nothing inspected yet; [] = inspected, found nothing.
-  const [candidates, setCandidates] = useState<StagingCandidate[] | null>(null);
+  const [staged, setStaged] = useState<Staged[] | null>(null);
+  const nextId = useRef(0);
   const job = useJob<StagingCandidate[]>();
   const { toast } = useToast();
 
   const inspect = useCallback(
     async (paths: string[], lcscIds: string[]) => {
-      setCandidates(null);
+      setStaged(null);
       job.reset();
       try {
         const { job_id } = await api.ingestInspect(paths, lcscIds);
@@ -38,9 +47,12 @@ export function IngestPage() {
     [job, toast],
   );
 
-  // Load the job's result into editable local state once it settles.
+  // Load the job's result into editable local state once it settles, tagging each
+  // with a stable id so a commit/remove never remounts its siblings.
   useEffect(() => {
-    if (job.status === "done" && job.result) setCandidates(job.result);
+    if (job.status === "done" && job.result) {
+      setStaged(job.result.map((candidate) => ({ id: nextId.current++, candidate })));
+    }
   }, [job.status, job.result]);
 
   // A drop anywhere in the window queues native paths here; inspect them.
@@ -55,8 +67,8 @@ export function IngestPage() {
     if (ids.length > 0) inspect([], ids);
   }
 
-  function removeCandidate(idx: number) {
-    setCandidates((cs) => (cs ? cs.filter((_, i) => i !== idx) : cs));
+  function removeStaged(id: number) {
+    setStaged((s) => (s ? s.filter((x) => x.id !== id) : s));
   }
 
   const busy = job.status === "running";
@@ -110,19 +122,19 @@ export function IngestPage() {
             </div>
           ) : null}
 
-          {candidates && candidates.length > 0 ? (
+          {staged && staged.length > 0 ? (
             <div className="mt-6 flex flex-col gap-4">
               <Eyebrow>Review And Add</Eyebrow>
-              {candidates.map((c, i) => (
+              {staged.map(({ id, candidate }) => (
                 <CandidateCard
-                  key={`${c.entry_name}-${i}`}
-                  candidate={c}
-                  onCommitted={() => removeCandidate(i)}
+                  key={id}
+                  candidate={candidate}
+                  onCommitted={() => removeStaged(id)}
                   toast={toast}
                 />
               ))}
             </div>
-          ) : candidates && candidates.length === 0 ? (
+          ) : staged && staged.length === 0 ? (
             <div className="mt-8 text-center text-sm text-t3">
               No parts found in what you dropped or entered.
             </div>
@@ -185,7 +197,8 @@ function CandidateCard({
     });
   }
 
-  const purchaseUrl = c.purchase[0]?.url ?? "";
+  // Guard the array itself: a candidate may arrive without a purchase field.
+  const purchaseUrl = c.purchase?.[0]?.url ?? "";
   const chosenFootprint = c.footprint_variants[c.chosen_footprint_index] ?? "";
 
   return (

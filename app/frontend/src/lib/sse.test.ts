@@ -45,4 +45,26 @@ describe("streamEvents", () => {
     const events = await collect(body);
     expect(events).toEqual([{ event: "error", data: "boom" }]);
   });
+
+  // sse_starlette (the real backend) terminates lines and frames with CRLF, not
+  // LF. The parser must handle it, or no event is ever emitted and the job hangs.
+  it("parses CRLF frames (the real sse_starlette wire format)", async () => {
+    const body = streamOf([
+      'event: progress\r\ndata: {"pct":5,"message":"unpacking"}\r\n\r\n',
+      'event: result\r\ndata: {"result":[{"mpn":"NE555P"}]}\r\n\r\n',
+      "event: done\r\ndata: {}\r\n\r\n",
+    ]);
+    const events = await collect(body);
+    expect(events).toEqual([
+      { event: "progress", data: { pct: 5, message: "unpacking" } },
+      { event: "result", data: { result: [{ mpn: "NE555P" }] } },
+      { event: "done", data: {} },
+    ]);
+  });
+
+  it("reassembles a CRLF frame split across chunks", async () => {
+    const body = streamOf(["event: progress\r\nda", 'ta: {"pct":50}\r\n', "\r\n"]);
+    const events = await collect(body);
+    expect(events).toEqual([{ event: "progress", data: { pct: 50 } }]);
+  });
 });
