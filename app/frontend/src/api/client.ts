@@ -7,12 +7,20 @@
  */
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
+  ActivateResponse,
   EnrichmentResult,
   Facets,
   JobRef,
   PartDetail,
   PartsResponse,
+  ProfilesResponse,
+  SettingsInfo,
   StagingCandidate,
+  SyncResult,
+  SyncStatus,
+  SystemInfo,
+  UpdateApply,
+  UpdateCheck,
 } from "./types";
 
 export class ApiError extends Error {
@@ -170,5 +178,62 @@ export const api = {
       throw new ApiError(res.status || 0, `job stream failed (${res.status})`);
     }
     return res.body;
+  },
+
+  // Per-machine settings (spec section 11). The GET is redacted (presence + a
+  // last-4 hint, never the raw key); the PATCH applies live on the server and
+  // persists. Only fields present in the patch are touched.
+  getSettings(): Promise<SettingsInfo> {
+    return apiGet<SettingsInfo>("/api/settings");
+  },
+
+  updateSettings(patch: { mouser_api_key?: string }): Promise<SettingsInfo> {
+    return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
+  },
+
+  // Library profiles (spec section 5.3). Activating one rebuilds the index, so
+  // the caller invalidates the parts list and facets after it resolves.
+  listProfiles(): Promise<ProfilesResponse> {
+    return apiGet<ProfilesResponse>("/api/profiles");
+  },
+
+  createProfile(name: string, archive = false): Promise<ProfilesResponse> {
+    return request<ProfilesResponse>("POST", "/api/profiles", {
+      body: { name, archive },
+    });
+  },
+
+  activateProfile(name: string): Promise<ActivateResponse> {
+    return request<ActivateResponse>(
+      "POST",
+      `/api/profiles/${encodeURIComponent(name)}/activate`,
+    );
+  },
+
+  deleteProfile(name: string): Promise<void> {
+    return request<void>("DELETE", `/api/profiles/${encodeURIComponent(name)}`);
+  },
+
+  // Library repo sync (spec section 9): offline and divergence are first-class
+  // states surfaced verbatim, never guessed.
+  getSyncStatus(): Promise<SyncStatus> {
+    return apiGet<SyncStatus>("/api/sync/status");
+  },
+
+  doSync(): Promise<SyncResult> {
+    return request<SyncResult>("POST", "/api/sync");
+  },
+
+  // App self-update (spec section 12), distinct from library sync.
+  checkUpdate(): Promise<UpdateCheck> {
+    return apiGet<UpdateCheck>("/api/update/check");
+  },
+
+  applyUpdate(): Promise<UpdateApply> {
+    return request<UpdateApply>("POST", "/api/update/apply");
+  },
+
+  getSystemInfo(): Promise<SystemInfo> {
+    return apiGet<SystemInfo>("/api/system/info");
   },
 };

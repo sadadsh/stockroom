@@ -156,4 +156,100 @@ describe("api client", () => {
       category: "ICs",
     });
   });
+
+  it("reads the redacted settings", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ mouser_api_key_set: true, mouser_api_key_hint: "1234" }),
+    );
+    const res = await api.getSettings();
+    expect(res.mouser_api_key_set).toBe(true);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/settings");
+  });
+
+  it("PATCHes the mouser key and returns the redacted result", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ mouser_api_key_set: true, mouser_api_key_hint: "9999" }),
+    );
+    const res = await api.updateSettings({ mouser_api_key: "SECRET9999" });
+    expect(res.mouser_api_key_hint).toBe("9999");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/settings");
+    expect((init as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      mouser_api_key: "SECRET9999",
+    });
+  });
+
+  it("lists profiles and creates one with an archive flag", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ profiles: ["Main"], active: "Main" }));
+    await api.listProfiles();
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/profiles");
+
+    fetchMock.mockResolvedValueOnce(
+      okJson({ profiles: ["Main", "Archive"], active: "Main" }),
+    );
+    await api.createProfile("Archive", true);
+    const init = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Archive", archive: true });
+  });
+
+  it("activates and deletes a profile by name", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ active: "Archive", part_count: 0 }));
+    const res = await api.activateProfile("Archive");
+    expect(res.active).toBe("Archive");
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe(
+      "/api/profiles/Archive/activate",
+    );
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe("POST");
+
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 204 } as unknown as Response);
+    await api.deleteProfile("Archive");
+    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe("DELETE");
+  });
+
+  it("reads sync status and runs a sync", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ has_remote: true, current_branch: "main", ahead: 0, behind: 2 }),
+    );
+    const status = await api.getSyncStatus();
+    expect(status.behind).toBe(2);
+
+    fetchMock.mockResolvedValueOnce(
+      okJson({ state: "synced", pulled: true, pushed: false, detail: "" }),
+    );
+    const res = await api.doSync();
+    expect(res.pulled).toBe(true);
+    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe("POST");
+    expect(new URL(String(fetchMock.mock.calls[1][0])).pathname).toBe("/api/sync");
+  });
+
+  it("checks for and applies an app update", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ update_available: true, behind: 3 }));
+    const check = await api.checkUpdate();
+    expect(check.update_available).toBe(true);
+
+    fetchMock.mockResolvedValueOnce(
+      okJson({ state: "updated", updated: true, detail: "", restart_requested: true }),
+    );
+    const res = await api.applyUpdate();
+    expect(res.restart_requested).toBe(true);
+    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe("POST");
+  });
+
+  it("reads system info", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        active_profile: "Main",
+        part_count: 8,
+        kicad_config_dir: "/x/kicad",
+        kicad_running: false,
+        kicad_cli_available: true,
+        kicad_cli_path: "/usr/bin/kicad-cli",
+      }),
+    );
+    const info = await api.getSystemInfo();
+    expect(info.kicad_cli_available).toBe(true);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/system/info");
+  });
 });

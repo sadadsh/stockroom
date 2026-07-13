@@ -156,3 +156,63 @@ export interface StagingCandidate {
 export interface JobRef {
   job_id: string;
 }
+
+// GET/PATCH /api/settings -> the redacted per-machine settings surface. The raw
+// Mouser key never crosses the wire; only its presence and a last-4 hint do.
+export interface SettingsInfo {
+  mouser_api_key_set: boolean;
+  mouser_api_key_hint: string;
+}
+
+// GET /api/profiles, POST /api/profiles
+export interface ProfilesResponse {
+  profiles: string[];
+  active: string;
+}
+
+// POST /api/profiles/{name}/activate
+export interface ActivateResponse {
+  active: string;
+  part_count: number;
+}
+
+// GET /api/sync/status
+export interface SyncStatus {
+  has_remote: boolean;
+  current_branch: string;
+  ahead: number;
+  behind: number;
+}
+
+// POST /api/sync
+export interface SyncResult {
+  state: string;
+  pulled: boolean;
+  pushed: boolean;
+  detail: string;
+}
+
+// GET /api/update/check -> check() reports availability; state/behind vary by case.
+export interface UpdateCheck {
+  update_available: boolean;
+  state?: string;
+  behind?: number;
+}
+
+// POST /api/update/apply
+export interface UpdateApply {
+  state: string;
+  updated: boolean;
+  detail: string;
+  restart_requested: boolean;
+}
+
+// GET /api/system/info
+export interface SystemInfo {
+  active_profile: string;
+  part_count: number;
+  kicad_config_dir: string;
+  kicad_running: boolean;
+  kicad_cli_available: boolean;
+  kicad_cli_path: string;
+}

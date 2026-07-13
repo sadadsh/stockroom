@@ -11,6 +11,15 @@ from stockroom.store.machine_config import MachineConfig
 from stockroom.vcs.repo import GitRepo
 
 
+@pytest.fixture(autouse=True)
+def _isolate_machine_config(tmp_path, monkeypatch):
+    """Keep every config.save() (a profile switch, a settings write) inside the
+    test's own tmp dir so the API suite never writes to the developer's real
+    ~/.config/stockroom (or %APPDATA%/Stockroom). config_dir() reads this env on
+    every call, so it governs load() and save() alike."""
+    monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+
+
 @pytest.fixture
 def library_root(tmp_path):
     """A git-backed libraries root with one Main profile holding a couple of parts,

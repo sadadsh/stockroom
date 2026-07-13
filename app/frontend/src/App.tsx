@@ -1,6 +1,7 @@
 import { AppShell } from "./components/AppShell";
 import { ComponentsPage } from "./pages/ComponentsPage";
 import { IngestPage } from "./pages/IngestPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { useRouter, type Route } from "./lib/router";
 
 // The shell hosts whichever page the active route names. Routes light up as their
@@ -16,6 +17,8 @@ function renderRoute(route: Route) {
       return <ComponentsPage />;
     case "ingest":
       return <IngestPage />;
+    case "settings":
+      return <SettingsPage />;
     default:
       // Unreachable in practice (the rail and palette only offer available
       // routes); fall back to the Components home rather than a blank frame.
