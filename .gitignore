@@ -31,3 +31,7 @@ Thumbs.db
 
 # Claude instructions: local only, never pushed (owner directive)
 /CLAUDE.md
+
+# AI-workflow design docs: local only, never pushed (owner directive)
+docs/superpowers/
+docs/research/
