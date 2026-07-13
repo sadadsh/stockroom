@@ -37,10 +37,23 @@ export function DuplicatesPage() {
       },
       onError: (e) => {
         setPending(null);
-        toast(errMsg(e), "err");
+        // A 404 means the part is already gone (e.g. a stale card was acted on
+        // twice); that is the desired end state, so report it neutrally, not as a
+        // red failure for a part that no longer exists.
+        if (e instanceof ApiError && e.status === 404) {
+          toast(`${part.display_name} was already removed.`, "neutral");
+        } else {
+          toast(errMsg(e), "err");
+        }
       },
     });
   }
+
+  // Guard every per-card Delete while a delete is in flight AND while the surface
+  // is refetching after one: invalidation refetches in the background, so a
+  // just-deleted card lingers for the round-trip and must not be re-clickable
+  // (a second delete would hit a 404).
+  const deleteBusy = del.isPending || dups.isFetching;
 
   return (
     <>
@@ -61,6 +74,7 @@ export function DuplicatesPage() {
                 groups={dups.data.by_mpn}
                 emptyLabel="No parts share an MPN."
                 onDelete={setPending}
+                deleteBusy={deleteBusy}
               />
               <DupSection
                 title="Shared Footprint"
@@ -68,6 +82,7 @@ export function DuplicatesPage() {
                 groups={dups.data.by_footprint}
                 emptyLabel="No parts share a footprint."
                 onDelete={setPending}
+                deleteBusy={deleteBusy}
               />
             </>
           ) : null}
@@ -99,12 +114,14 @@ function DupSection({
   groups,
   emptyLabel,
   onDelete,
+  deleteBusy,
 }: {
   title: string;
   hint: string;
   groups: DuplicateGroup[];
   emptyLabel: string;
   onDelete: (part: PartSummary) => void;
+  deleteBusy: boolean;
 }) {
   return (
     <section className="mb-8">
@@ -115,7 +132,7 @@ function DupSection({
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map((group) => (
-            <GroupCard key={group.key} group={group} onDelete={onDelete} />
+            <GroupCard key={group.key} group={group} onDelete={onDelete} deleteBusy={deleteBusy} />
           ))}
         </div>
       )}
@@ -126,9 +143,11 @@ function DupSection({
 function GroupCard({
   group,
   onDelete,
+  deleteBusy,
 }: {
   group: DuplicateGroup;
   onDelete: (part: PartSummary) => void;
+  deleteBusy: boolean;
 }) {
   return (
     <Card className="px-4 py-3.5">
@@ -143,6 +162,7 @@ function GroupCard({
             part={part}
             keepCandidate={i === 0}
             onDelete={onDelete}
+            deleteBusy={deleteBusy}
           />
         ))}
       </div>
@@ -154,10 +174,12 @@ function PartCompareCard({
   part,
   keepCandidate,
   onDelete,
+  deleteBusy,
 }: {
   part: PartSummary;
   keepCandidate: boolean;
   onDelete: (part: PartSummary) => void;
+  deleteBusy: boolean;
 }) {
   return (
     <div
@@ -186,7 +208,8 @@ function PartCompareCard({
         <button
           type="button"
           onClick={() => onDelete(part)}
-          className="ml-auto rounded-control border border-line px-2.5 py-1 text-xs text-err transition-colors hover:bg-err hover:text-white"
+          disabled={deleteBusy}
+          className="ml-auto rounded-control border border-line px-2.5 py-1 text-xs text-err transition-colors hover:bg-err hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-err"
         >
           Delete
         </button>
