@@ -44,6 +44,7 @@ const DETAIL: PartDetail = {
   provenance: null,
   hashes: null,
   enrichment: {},
+  specs: {},
 };
 
 describe("App shell", () => {

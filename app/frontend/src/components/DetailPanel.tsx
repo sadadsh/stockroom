@@ -7,10 +7,11 @@
  * absent, and no data is fabricated.
  */
 import { useState, type ReactNode } from "react";
-import type { PartDetail, PurchaseRef } from "../api/types";
+import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
+import { PinoutViewer, parsePinout } from "./PinoutViewer";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
 import { PreviewImage } from "./PreviewImage";
@@ -42,6 +43,9 @@ interface Props {
   categories?: string[];
   // Deleting confirms in-window, then routes here.
   onDelete?: () => void;
+  // Applying an enriched pinout persists through the specs seam (not editField);
+  // omit it and the enrich panel offers no pinout Apply.
+  onApplyPinout?: (sourced: SourcedField) => void;
   busy?: boolean;
 }
 
@@ -55,6 +59,7 @@ export function DetailPanel({
   onMoveCategory,
   categories,
   onDelete,
+  onApplyPinout,
   busy = false,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -81,6 +86,10 @@ export function DetailPanel({
   const subtitle = [detail.mpn || "No Part Number", detail.manufacturer || "Unknown Maker"].join(
     "  ·  ",
   );
+  // The persisted pinout (M6i) reads from the record's specs, its provenance from
+  // the enrichment map. Shown when present, in both read-only and editable modes.
+  const pinout = parsePinout(detail.specs);
+  const pinoutProvenance = detail.enrichment?.pinout;
 
   return (
     <div className="max-w-[760px] pb-10">
@@ -250,6 +259,21 @@ export function DetailPanel({
         ) : null}
       </div>
 
+      {/* pinout: shown whenever the record carries one (read-only view of the
+          persisted specs.pinout, source of truth per M6i). */}
+      {pinout.length > 0 ? (
+        <>
+          <Eyebrow className="mb-2.5 mt-6">Pinout</Eyebrow>
+          <div className="max-w-[600px]">
+            <PinoutViewer
+              pins={pinout}
+              source={pinoutProvenance?.source}
+              confidence={pinoutProvenance?.confidence}
+            />
+          </div>
+        </>
+      ) : null}
+
       {/* enrich-to-fill: only in editable mode, and only when there is an MPN to
           look the part up by. Keyed by the MPN so switching parts starts fresh. */}
       {onEditField && detail.mpn ? (
@@ -262,6 +286,8 @@ export function DetailPanel({
             description: detail.description,
           }}
           onApply={onEditField}
+          onApplyPinout={onApplyPinout}
+          hasPinout={pinout.length > 0}
           busy={busy}
         />
       ) : null}

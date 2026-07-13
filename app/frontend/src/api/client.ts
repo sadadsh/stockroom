@@ -178,6 +178,22 @@ export const api = {
     });
   },
 
+  // Persist canonical spec data (e.g. an enriched pinout) onto the record so a
+  // viewer reads the source of truth (M6i). Each entry is {value, source?,
+  // confidence?}; the server merges key-by-key (an existing key is kept unless
+  // overwrite) and records provenance in the record's enrichment map.
+  setSpecs(
+    id: string,
+    specs: Record<string, { value: unknown; source?: string; confidence?: string }>,
+    overwrite = false,
+  ): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/specs`,
+      { body: { specs, overwrite } },
+    );
+  },
+
   moveCategory(id: string, category: string): Promise<PartDetail> {
     return request<PartDetail>(
       "POST",

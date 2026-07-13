@@ -80,6 +80,13 @@ export interface Provenance {
   ingested_at: string;
 }
 
+// One entry of a persisted pinout (specs.pinout). The datasheet extractor emits
+// {pin, name}; the viewer tolerates numbers by coercing to string.
+export interface PinoutPin {
+  pin: string;
+  name: string;
+}
+
 // GET /api/library/parts/{id} -> full PartRecord.to_dict()
 export interface PartDetail {
   id: string;
@@ -97,6 +104,9 @@ export interface PartDetail {
   provenance: Provenance | null;
   hashes: Record<string, string> | null;
   enrichment: Record<string, { source: string; confidence: string }>;
+  // Persisted canonical spec data (M6i). A free-form value bag keyed by spec name;
+  // specs.pinout is a list of {pin, name}. Per-key provenance lives in `enrichment`.
+  specs: Record<string, unknown>;
 }
 
 export interface ApiErrorBody {

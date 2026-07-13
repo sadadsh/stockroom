@@ -23,6 +23,7 @@ vi.mock("../api/client", async (importActual) => {
       moveCategory: vi.fn(),
       deletePart: vi.fn(),
       enrichPart: vi.fn(),
+      setSpecs: vi.fn(),
     },
   };
 });
@@ -55,6 +56,7 @@ const DETAIL: PartDetail = {
   provenance: null,
   hashes: null,
   enrichment: {},
+  specs: {},
 };
 
 function wrap(ui: ReactNode) {
@@ -276,6 +278,53 @@ describe("ComponentsPage", () => {
 
     expect(await screen.findByText("Already Set")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
+
+  it("applies an enriched pinout through the specs seam and reports a toast", async () => {
+    // Drives the whole ComponentsPage -> DetailPanel -> EnrichPanel -> handleApplyPinout
+    // -> setSpecs wire. If any link breaks (a dropped onApplyPinout prop), the Apply
+    // Pinout button never reaches setSpecs and this goes RED. The record has no pinout
+    // yet, so Apply Pinout is offered (not "Already Set").
+    const pins = [
+      { pin: "1", name: "OUT1" },
+      { pin: "2", name: "IN1-" },
+    ];
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.enrichPart.mockResolvedValue({
+      category: "ICs",
+      mpn: null,
+      manufacturer: null,
+      description: null,
+      datasheet_url: null,
+      stock: null,
+      package: null,
+      price_breaks: [],
+      specs: { pinout: { value: pins, source: "datasheet", confidence: "high" } },
+      schema_version: 1,
+    });
+    mockApi.setSpecs.mockResolvedValue({ ...DETAIL, specs: { pinout: pins } });
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Enrich From Distributor" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Apply Pinout" }));
+
+    expect(mockApi.setSpecs).toHaveBeenCalledWith(
+      "lm358",
+      { pinout: { value: pins, source: "datasheet", confidence: "high" } },
+      undefined,
+    );
+    expect(await screen.findByText("Pinout Saved")).toBeInTheDocument();
   });
 
   it("consumes a palette part request: clears filters and selects that part even when a search hid it", async () => {

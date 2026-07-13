@@ -7,6 +7,7 @@ import {
   useDeletePart,
   useEditField,
   useDoSync,
+  useSetSpecs,
 } from "./queries";
 import { api } from "./client";
 import type { PartDetail } from "./types";
@@ -27,6 +28,7 @@ const PART_DETAIL: PartDetail = {
   provenance: null,
   hashes: null,
   enrichment: {},
+  specs: {},
 };
 
 function wrapperWith(qc: QueryClient) {
@@ -131,5 +133,35 @@ describe("duplicates invalidation (M6e)", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidatedKeys(spy)).toContain("duplicates");
+  });
+});
+
+describe("set-specs invalidation (M6i)", () => {
+  // Persisting a pinout changes only the detail record; specs are not indexed, so
+  // it must refresh the affected part detail and nothing else (never churn the list
+  // or facets over an un-indexed write).
+  it("persisting specs invalidates only the affected part detail", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    const setSpecs = vi.spyOn(api, "setSpecs").mockResolvedValue(PART_DETAIL);
+
+    const { result } = renderHook(() => useSetSpecs(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({
+      id: "lm358",
+      specs: { pinout: { value: [{ pin: "1", name: "VIN" }], source: "datasheet" } },
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(setSpecs).toHaveBeenCalledWith(
+      "lm358",
+      { pinout: { value: [{ pin: "1", name: "VIN" }], source: "datasheet" } },
+      undefined,
+    );
+    const keys = invalidatedKeys(spy);
+    expect(keys).toContain("part");
+    expect(keys).not.toContain("parts");
+    expect(keys).not.toContain("facets");
   });
 });

@@ -44,6 +44,7 @@ function detail(over: Partial<PartDetail> = {}): PartDetail {
     provenance: null,
     hashes: null,
     enrichment: {},
+    specs: {},
     ...over,
   };
 }
@@ -100,5 +101,33 @@ describe("DetailPanel files previews (M6d)", () => {
     expect(
       screen.queryByRole("button", { name: "Open 3D Model Preview" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel pinout (M6i)", () => {
+  it("renders the pinout table when the record has a persisted pinout", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          specs: {
+            pinout: [
+              { pin: "1", name: "OUT1" },
+              { pin: "2", name: "IN1-" },
+            ],
+          },
+          enrichment: { pinout: { source: "datasheet", confidence: "high" } },
+        })}
+        {...BASE}
+      />,
+    );
+    expect(screen.getByText("Pinout")).toBeInTheDocument();
+    expect(screen.getByText("2 Pins")).toBeInTheDocument();
+    expect(screen.getByText("OUT1")).toBeInTheDocument();
+    expect(screen.getByText(/datasheet · high/i)).toBeInTheDocument();
+  });
+
+  it("shows no Pinout section when the record has no pinout", () => {
+    wrap(<DetailPanel detail={detail({ specs: {} })} {...BASE} />);
+    expect(screen.queryByText("Pinout")).not.toBeInTheDocument();
   });
 });

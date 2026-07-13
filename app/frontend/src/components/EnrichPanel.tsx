@@ -20,6 +20,11 @@ interface Props {
   // "Already Set" instead of a redundant Apply that would commit a no-op.
   current: { manufacturer: string; description: string };
   onApply: (field: string, value: string) => void;
+  // The pinout persists through a different seam than editField (specs, not an
+  // identity field), so it applies through its own callback. Omit it and no
+  // pinout Apply is offered. hasPinout gates it to "Already Set".
+  onApplyPinout?: (sourced: SourcedField) => void;
+  hasPinout?: boolean;
   busy?: boolean;
 }
 
@@ -47,7 +52,22 @@ function hasAnyData(r: EnrichmentResult): boolean {
   );
 }
 
-export function EnrichPanel({ mpn, category, current, onApply, busy = false }: Props) {
+// The enriched pinout as a Sourced field with a non-empty pin list, or null.
+function pinoutOf(r: EnrichmentResult): SourcedField | null {
+  const p = r.specs.pinout;
+  if (p && Array.isArray(p.value) && p.value.length > 0) return p;
+  return null;
+}
+
+export function EnrichPanel({
+  mpn,
+  category,
+  current,
+  onApply,
+  onApplyPinout,
+  hasPinout = false,
+  busy = false,
+}: Props) {
   const enrich = useEnrichPart();
   const result = enrich.data;
 
@@ -90,6 +110,14 @@ export function EnrichPanel({ mpn, category, current, onApply, busy = false }: P
                   busy={busy}
                 />
               ))}
+              {onApplyPinout && pinoutOf(result) ? (
+                <PinoutRow
+                  sourced={pinoutOf(result) as SourcedField}
+                  already={hasPinout}
+                  onApply={onApplyPinout}
+                  busy={busy}
+                />
+              ) : null}
               <AlsoFound result={result} />
             </div>
           ) : (
@@ -137,6 +165,38 @@ function CandidateRow({
         </>
       ) : (
         <span className="flex-1 text-sm text-t3">Not Found</span>
+      )}
+    </div>
+  );
+}
+
+function PinoutRow({
+  sourced,
+  already,
+  onApply,
+  busy,
+}: {
+  sourced: SourcedField;
+  already: boolean;
+  onApply: (sourced: SourcedField) => void;
+  busy?: boolean;
+}) {
+  const count = Array.isArray(sourced.value) ? sourced.value.length : 0;
+  return (
+    <div className="flex items-center gap-3 border-b border-line py-2 last:border-b-0">
+      <span className="w-[116px] flex-none text-xs text-t3">Pinout</span>
+      <span className="min-w-0 flex-1 break-words text-base text-t1">
+        {count} {count === 1 ? "pin" : "pins"}
+      </span>
+      <Badge tone={confidenceTone(sourced.confidence)}>
+        {sourced.source} · {sourced.confidence}
+      </Badge>
+      {already ? (
+        <span className="flex-none text-xs text-t3">Already Set</span>
+      ) : (
+        <Button small disabled={busy} onClick={() => onApply(sourced)}>
+          Apply Pinout
+        </Button>
       )}
     </div>
   );

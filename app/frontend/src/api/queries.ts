@@ -87,6 +87,21 @@ export function useDeletePart() {
   });
 }
 
+// Persisting specs (e.g. an enriched pinout) writes only the record JSON; specs
+// are not indexed, so only the affected detail needs to re-read (never the list or
+// facets). Mirrors the doctor-repair rule: invalidate exactly what changed.
+export function useSetSpecs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      specs: Record<string, { value: unknown; source?: string; confidence?: string }>;
+      overwrite?: boolean;
+    }) => api.setSpecs(vars.id, vars.specs, vars.overwrite),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["part", vars.id] }),
+  });
+}
+
 // Enrichment is a lookup, not a write: it returns sourced candidates without
 // touching the record, so there is nothing to invalidate here. Applying a
 // candidate goes through useEditField, which does the read-after-write invalidation.
