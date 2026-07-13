@@ -6,10 +6,13 @@ sections 3, 5, 9).
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from stockroom.sexp.document import SexpDocument
 
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
@@ -42,6 +45,12 @@ _MIRROR_ON_EDIT = {
     "manufacturer": "Manufacturer",
     "description": "Description",
 }
+
+# suffixes/names the repair sweep must be able to re-parse before it commits a file;
+# mirrors the transaction's own validation set so a swept file that would abort the
+# whole transaction is caught (and reported) up front instead.
+_SEXP_SUFFIXES = {".kicad_sym", ".kicad_mod", ".kicad_sch", ".kicad_pcb"}
+_SEXP_TABLE_NAMES = {"sym-lib-table", "fp-lib-table"}
 
 
 @dataclass
@@ -399,6 +408,24 @@ class LibraryOps:
             out[rec.id] = rec
         return out
 
+    def _unparseable_reason(self, path: Path) -> str | None:
+        """Why a working-tree file cannot be committed by the repair (it would abort the
+        transaction's validation), or None if it is safe to sweep. A deletion (the path no
+        longer exists) is always safe; a KiCad or JSON file that no longer parses is not."""
+        if not path.exists():
+            return None
+        if path.suffix in _SEXP_SUFFIXES or path.name in _SEXP_TABLE_NAMES:
+            try:
+                SexpDocument.load(path)
+            except Exception:
+                return "the KiCad file does not parse"
+        elif path.suffix == ".json":
+            try:
+                json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                return "the JSON file does not parse"
+        return None
+
     def _model_path_action(self, record: PartRecord) -> tuple[RepairAction | None, RepairFinding | None]:
         """Inspect a part's footprint 3D-model link. Returns a fixable action when the
         link is non-portable but the model resolves under models/ (rewrite to the
@@ -416,6 +443,16 @@ class LibraryOps:
         canonical = f"${{SR_LIB}}/models/{basename}"
         model_present = bool(basename) and (self.lib.models_dir / basename).exists()
         if not model_present:
+            # The record's own model reference (record.model.file) is checked separately
+            # and reports the SAME missing file as a dangling_model. When both point at
+            # that file, let the record-level finding own it rather than double-reporting.
+            record_basename = (
+                re.split(r"[\\/]", record.model.file)[-1]
+                if record.model and record.model.file
+                else None
+            )
+            if record_basename == basename:
+                return None, None
             return None, RepairFinding(
                 kind="dangling_model_link",
                 part_id=record.id,
@@ -493,7 +530,23 @@ class LibraryOps:
             if finding is not None:
                 plan.manual.append(finding)
 
-        plan.uncommitted = self.repo.status_porcelain()
+        # Uncommitted working-tree changes, scoped to the ACTIVE profile so a shared repo
+        # never leaks (or sweeps) another profile's in-progress edits. A file that no
+        # longer parses can't be committed (it would abort the whole transaction), so it
+        # is surfaced as a manual finding instead of blocking the repair.
+        for path in self.repo.dirty_paths(self.lib.root):
+            reason = self._unparseable_reason(path)
+            if reason:
+                plan.manual.append(
+                    RepairFinding(
+                        kind="unparseable_file",
+                        part_id="",
+                        detail=f"{path.name}: {reason}",
+                        how_to_fix="fix or remove the malformed file, then repair again",
+                    )
+                )
+            else:
+                plan.uncommitted.append(str(path))
         return plan
 
     def apply_repairs(self) -> RepairResult:
@@ -538,24 +591,13 @@ class LibraryOps:
                 txn.track(fp_file)
                 result.fixed_paths += 1
 
-            # 3. sweep every uncommitted working-tree change into the same commit
-            for line in plan.uncommitted:
-                rel = self._porcelain_path(line)
-                if rel:
-                    txn.track(self.repo.root / rel)
-                    result.committed_files += 1
+            # 3. sweep every committable uncommitted change (scoped to the active
+            # profile; unparseable files already filtered into manual findings) into the
+            # same commit. dirty_paths already yields absolute paths and both sides of a
+            # rename, so the deletion of a renamed file's old name is staged too.
+            for path in plan.uncommitted:
+                txn.track(Path(path))
+                result.committed_files += 1
 
             result.commit = txn.commit("Repair library")
         return result
-
-    @staticmethod
-    def _porcelain_path(line: str) -> str:
-        """The path out of one `git status --porcelain` line (`XY <path>`), taking the
-        destination of a rename and unquoting a path git quoted for special chars."""
-        raw = line[3:] if len(line) > 3 else line
-        if " -> " in raw:
-            raw = raw.split(" -> ", 1)[1]
-        raw = raw.strip()
-        if raw.startswith('"') and raw.endswith('"'):
-            raw = raw[1:-1]
-        return raw
