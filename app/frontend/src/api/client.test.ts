@@ -120,7 +120,10 @@ describe("api client", () => {
 
     expect(body).toBe(fakeBody);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain("/api/jobs/job123/events");
+    expect(new URL(String(url)).pathname).toBe("/api/jobs/job123/events");
+    // The token rides the header only; it must never leak into the URL query
+    // string (which lands in logs) since the SSE route is header-auth only.
+    expect(new URL(String(url)).search).toBe("");
     expect((init as RequestInit).headers).toMatchObject({
       Authorization: "Bearer test-token",
     });

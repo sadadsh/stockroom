@@ -70,7 +70,16 @@ export function useJob<T = unknown>() {
         status: "error",
         error: err instanceof Error ? err.message : "the job stream broke",
       }));
+      return;
     }
+    // The stream ended cleanly but without a terminal result/error event (an
+    // abnormal EOF: the sidecar died or the host dropped the SSE body). Do not sit
+    // in "running" forever; surface an honest error instead.
+    setState((s) =>
+      s.status === "running"
+        ? { ...s, status: "error", error: "the job stream ended without a result" }
+        : s,
+    );
   }, []);
 
   return { ...state, run, reset };

@@ -37,6 +37,14 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         "manufacturer": c.manufacturer,
         "description": c.description,
         "tags": list(c.tags),
+        # Serialize purchase so the DTO is symmetric with dto_to_candidate: the
+        # frontend's StagingCandidate always has a purchase array (a missing key
+        # crashes the review card), and edited/scraped purchase links survive commit.
+        "purchase": [
+            {"vendor": p.vendor, "url": p.url, "price_breaks": list(p.price_breaks),
+             "stock": p.stock, "currency": p.currency, "fetched_at": p.fetched_at}
+            for p in c.purchase
+        ],
         "gaps": list(c.gaps),
     }
 

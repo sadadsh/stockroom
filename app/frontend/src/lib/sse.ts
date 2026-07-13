@@ -11,11 +11,15 @@ export interface SSEEvent {
   data: unknown;
 }
 
+// Frames and lines may be LF or CRLF terminated. sse_starlette (the real backend)
+// uses CRLF, so both the frame separator and the line split must tolerate \r.
+const FRAME_SEP = /\r?\n\r?\n/;
+
 function parseFrame(frame: string): SSEEvent | null {
   if (!frame.trim()) return null;
   let event = "message";
   const dataLines: string[] = [];
-  for (const line of frame.split("\n")) {
+  for (const line of frame.split(/\r?\n/)) {
     if (line.startsWith("event:")) {
       event = line.slice(6).trim();
     } else if (line.startsWith("data:")) {
@@ -43,11 +47,11 @@ export async function* streamEvents(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    let sep: number;
-    // Frames are separated by a blank line ("\n\n"); emit each complete one.
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const frame = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
+    // Frames are separated by a blank line (LF or CRLF); emit each complete one.
+    let m: RegExpExecArray | null;
+    while ((m = FRAME_SEP.exec(buffer)) !== null) {
+      const frame = buffer.slice(0, m.index);
+      buffer = buffer.slice(m.index + m[0].length);
       const ev = parseFrame(frame);
       if (ev) yield ev;
     }
