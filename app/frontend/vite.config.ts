@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -15,5 +16,15 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+  },
+  // Vitest runs the component + client tests in jsdom. This is the frontend TDD
+  // floor: every M6 slice ships with tests that run here (see the M6 plan).
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    css: false,
+    restoreMocks: true,
   },
 });
