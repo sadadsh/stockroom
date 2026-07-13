@@ -331,6 +331,61 @@ describe("ComponentsPage", () => {
     expect(screen.getByLabelText("Search Parts")).toHaveValue("");
   });
 
+  it("honors a palette part request on a FRESH mount with a warm parts cache (no auto-select clobber)", async () => {
+    // The palette pre-warms the shared parts cache via its enabled:open query, so a
+    // fresh ComponentsPage can mount with the list already settled (isFetching
+    // false) on its very first render. In that same commit the request-drain effect
+    // and the auto-select-first effect both run; the requested part (which is NOT
+    // first in the list) must still win. This is the warm-cache cross-page race the
+    // same-page test above cannot see (there a search filter forces isFetching true,
+    // which gates auto-select). Regression lock.
+    const R10K: PartSummary = {
+      id: "r10k",
+      display_name: "R 10k",
+      category: "Passives",
+      mpn: "RC0402-10K",
+      manufacturer: "Yageo",
+      is_complete: true,
+      missing: [],
+    };
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY, R10K], count: 2 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1, Passives: 1 },
+      by_manufacturer: {},
+      complete: 2,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockImplementation(async (id) =>
+      id === "r10k"
+        ? { ...DETAIL, id: "r10k", display_name: "R 10k", description: "Thick Film Resistor" }
+        : DETAIL,
+    );
+
+    // staleTime mirrors production (main.tsx uses 15s) so the warm cache is FRESH
+    // and does NOT refetch on mount -> isFetching is false on the first render,
+    // which is exactly the condition that makes the auto-select/drain race fire.
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    // Warm the exact shared key the palette's enabled:open query populates.
+    qc.setQueryData(["parts", "", "", false], { parts: [SUMMARY, R10K], count: 2 });
+    // The request was fired from another route, before this page mounted.
+    requestPart("r10k");
+
+    render(
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <ComponentsPage />
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+
+    // The requested (second) part is selected, not the first part in the list.
+    expect(await screen.findByText("Thick Film Resistor")).toBeInTheDocument();
+    expect(mockApi.partDetail).toHaveBeenCalledWith("r10k");
+    expect(screen.queryByText("Dual Operational Amplifier")).toBeNull();
+  });
+
   it("shows the honest empty state when the library has no parts", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
     mockApi.facets.mockResolvedValue({

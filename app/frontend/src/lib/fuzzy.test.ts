@@ -18,6 +18,15 @@ describe("fuzzyScore", () => {
     expect(fuzzyScore("sc", "Components")).toBeNull();
   });
 
+  it("prefers a tighter (shorter) candidate when the match is otherwise equal", () => {
+    // Both are a full, start-anchored, contiguous match; only length differs, so
+    // the length tie-breaker (score - t.length * k) is the only thing that can
+    // separate them. Load-bearing: drop the length penalty and the two scores tie.
+    const tight = fuzzyScore("op", "op")!;
+    const loose = fuzzyScore("op", "opamp")!;
+    expect(tight).toBeGreaterThan(loose);
+  });
+
   it("is case-insensitive", () => {
     expect(fuzzyScore("COMP", "components")).not.toBeNull();
     expect(fuzzyScore("comp", "COMPONENTS")).not.toBeNull();
@@ -41,9 +50,15 @@ describe("fuzzyScore", () => {
     expect(boundary).toBeGreaterThan(inWord);
   });
 
-  it("ranks a contiguous run above a scattered subsequence", () => {
-    const contiguous = fuzzyScore("set", "Settings")!;
-    const scattered = fuzzyScore("set", "Silent Threats")!;
+  it("rewards a contiguous run of matches, isolated from length", () => {
+    // Both candidates are the same length and both anchor the first char at the
+    // start, so the run bonus for adjacent hits is the ONLY thing that can
+    // separate their scores. This keeps the test load-bearing: drop the run bonus
+    // and the two scores tie exactly, so `toBeGreaterThan` fails. (A naive test
+    // comparing a short contiguous string to a long scattered one is a false
+    // green: the length penalty alone would carry it even with no run bonus.)
+    const contiguous = fuzzyScore("abc", "abcxx")!; // a-b-c adjacent
+    const scattered = fuzzyScore("abc", "axbxc")!; // a, b, c spread apart
     expect(contiguous).toBeGreaterThan(scattered);
   });
 });
