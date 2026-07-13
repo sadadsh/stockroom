@@ -232,6 +232,17 @@ describe("CommandPalette", () => {
     expect(screen.getByTestId("outside")).not.toHaveFocus();
   });
 
+  it("shows an honest error (not 'no match') when the parts fetch fails", async () => {
+    mockApi.listParts.mockRejectedValue(new Error("boom"));
+    const user = userEvent.setup();
+    renderPalette();
+    await open(user);
+    // A parts-only query whose fetch failed must not masquerade as "no match".
+    await user.type(screen.getByLabelText("Search Commands and Parts"), "yageo");
+    expect(await screen.findByText("Could not load parts.")).toBeInTheDocument();
+    expect(screen.queryByText("No commands or parts match.")).toBeNull();
+  });
+
   it("shows an honest empty state when nothing matches", async () => {
     const user = userEvent.setup();
     renderPalette();
