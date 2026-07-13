@@ -4,9 +4,57 @@ at thousands of parts (spec section 2.2); part detail loads the canonical record
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import EditFieldBody, FacetsDTO, MoveBody, PartSummary, SetSpecsBody
+from stockroom.verify.record_diff import extract_symbol_node, field_diff
+
+# How deep the per-part timeline reads. A part rarely accrues this many commits;
+# the same cap governs history and the diff rev-validation so the two agree on what
+# is reachable.
+_HISTORY_MAX = 100
+
+
+def _part_json_path(ctx, part_id: str):
+    return ctx.profile.library.parts_dir / f"{part_id}.json"
+
+
+def _record_at(ctx, rev: str, part_id: str) -> dict | None:
+    """The part's canonical JSON as a dict at `rev`, or None when the part did not
+    exist there (an empty `rev` means the earliest side of a diff)."""
+    if not rev:
+        return None
+    text = ctx.repo.show_file(rev, _part_json_path(ctx, part_id))
+    return json.loads(text) if text else None
+
+
+def _symbol_node_at(ctx, rev: str, rec: dict | None) -> str | None:
+    """This part's `(symbol ...)` block as it stood at `rev`, isolated from the shared
+    category lib so a diff compares only this part's geometry. The category and symbol
+    name are read from the record AT that rev (both can change over time)."""
+    if not rec or not rev:
+        return None
+    sym = rec.get("symbol") or {}
+    name, category = sym.get("name"), rec.get("category")
+    if not name or not category:
+        return None
+    text = ctx.repo.show_file(rev, ctx.profile.library.symbol_lib_path(category))
+    return extract_symbol_node(text, name) if text else None
+
+
+def _footprint_text_at(ctx, rev: str, rec: dict | None) -> str | None:
+    """This part's footprint file text at `rev` (footprints are per-part files, so no
+    isolation is needed), or None when absent."""
+    if not rec or not rev:
+        return None
+    fp = rec.get("footprint") or {}
+    name, category = fp.get("name"), rec.get("category")
+    if not name or not category:
+        return None
+    fp_file = ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
+    return ctx.repo.show_file(rev, fp_file)
 
 
 def library_router(require_token) -> APIRouter:
@@ -57,6 +105,53 @@ def library_router(require_token) -> APIRouter:
         rec = ctx.ops.set_specs(part_id, body.specs, overwrite=body.overwrite)
         ctx.rebuild_index()
         return rec.to_dict()
+
+    @r.get("/parts/{part_id}/history")
+    def part_history(request: Request, part_id: str) -> dict:
+        # The per-part timeline: every commit that touched this part's canonical JSON,
+        # newest first. The JSON is a stable path across the part's whole life (category
+        # is a field, not a directory), so it is the correct, noise-free anchor. Read
+        # straight from git; an uncommitted part honestly reports an empty timeline.
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        commits = ctx.repo.log_paths([_part_json_path(ctx, part_id)], max_count=_HISTORY_MAX)
+        return {
+            "commits": [
+                {"sha": c.sha, "subject": c.subject, "author": c.author, "iso_date": c.iso_date}
+                for c in commits
+            ],
+            "count": len(commits),
+        }
+
+    @r.get("/parts/{part_id}/diff")
+    def part_diff(request: Request, part_id: str, b: str, a: str = "") -> dict:
+        # A structured field-level diff of the part's JSON between two revisions, read
+        # from git blobs with no checkout, plus which asset kinds changed so the UI can
+        # offer an old/new SVG overlay. `a` empty means the earliest side (the part did
+        # not exist), so a first commit reads as every field added. Both revs must lie
+        # in this part's own history (a 400, never a blind blob read of an arbitrary rev).
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        known = {
+            c.sha
+            for c in ctx.repo.log_paths([_part_json_path(ctx, part_id)], max_count=_HISTORY_MAX)
+        }
+        if b not in known:
+            raise ValueError(f"unknown revision for this part: {b}")
+        if a and a not in known:
+            raise ValueError(f"unknown revision for this part: {a}")
+        before = _record_at(ctx, a, part_id)
+        after = _record_at(ctx, b, part_id)
+        fields = [c.to_dict() for c in field_diff(before, after)]
+        assets = {
+            "symbol": _symbol_node_at(ctx, a, before) != _symbol_node_at(ctx, b, after),
+            "footprint": _footprint_text_at(ctx, a, before) != _footprint_text_at(ctx, b, after),
+            "model": any(f["key"].startswith("model.") for f in fields),
+            "datasheet": any(f["key"].startswith("datasheet.") for f in fields),
+        }
+        return {"a": a, "b": b, "fields": fields, "assets": assets}
 
     @r.post("/parts/{part_id}/move")
     def move_category(request: Request, part_id: str, body: MoveBody) -> dict:

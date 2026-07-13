@@ -7,6 +7,7 @@ viewer requests the ?bw=true monochrome variant and re-colours it to the theme."
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 from pathlib import Path
 
@@ -34,6 +35,51 @@ def _cache_dir(ctx) -> Path:
     return d
 
 
+def _svg_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
+    """Render this part's symbol or footprint SVG as it stood at revision `rev`, read
+    from git blobs with no working-tree checkout (spec section 9), so the timeline can
+    overlay an old geometry against the current one. The category and asset name are
+    taken from the part record AT that rev (both can change over time). A rev is
+    content-immutable, so it alone content-addresses the cache."""
+    rec_text = ctx.repo.show_file(rev, ctx.profile.library.parts_dir / f"{part_id}.json")
+    if not rec_text:
+        raise FileNotFoundError(f"part {part_id} did not exist at {rev}")
+    rec = json.loads(rec_text)
+    category = rec.get("category")
+    variant = "_bw" if bw else ""
+    cached = _cache_dir(ctx) / f"{kind}_{part_id}_{rev}{variant}.svg"
+    if cached.exists():
+        return cached.read_text(encoding="utf-8")
+    with tempfile.TemporaryDirectory() as td:
+        tdp = Path(td)
+        if kind == "sym":
+            name = (rec.get("symbol") or {}).get("name")
+            if not name or not category:
+                raise FileNotFoundError(f"part {part_id} had no symbol at {rev}")
+            lib_text = ctx.repo.show_file(rev, ctx.profile.library.symbol_lib_path(category))
+            if lib_text is None:
+                raise FileNotFoundError(f"symbol library missing at {rev}")
+            hist_lib = tdp / "hist.kicad_sym"
+            hist_lib.write_text(lib_text, encoding="utf-8")
+            svgs = ctx.cli.sym_export_svg(hist_lib, name, tdp, black_and_white=bw)
+            text = Path(svgs[0]).read_text(encoding="utf-8")
+        else:  # footprint
+            name = (rec.get("footprint") or {}).get("name")
+            if not name or not category:
+                raise FileNotFoundError(f"part {part_id} had no footprint at {rev}")
+            fp_rel = ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
+            fp_text = ctx.repo.show_file(rev, fp_rel)
+            if fp_text is None:
+                raise FileNotFoundError(f"footprint file missing at {rev}")
+            hist_pretty = tdp / "hist.pretty"
+            hist_pretty.mkdir()
+            (hist_pretty / f"{name}.kicad_mod").write_text(fp_text, encoding="utf-8")
+            svg = ctx.cli.fp_export_svg(hist_pretty, name, tdp, black_and_white=bw)
+            text = Path(svg).read_text(encoding="utf-8")
+    cached.write_text(text, encoding="utf-8")
+    return text
+
+
 def previews_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/previews", dependencies=[Depends(require_token)])
 
@@ -41,10 +87,12 @@ def previews_router(require_token) -> APIRouter:
         return Response(content=text, media_type="image/svg+xml")
 
     @r.get("/symbol/{part_id}.svg")
-    def symbol_svg(request: Request, part_id: str, bw: bool = False) -> Response:
+    def symbol_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
+        if rev:
+            return _svg_response(_svg_at_rev(ctx, part_id, "sym", rev, bw))
         rec = ctx.ops.load_record(part_id)
         if rec.symbol is None or not rec.symbol.name:
             raise FileNotFoundError(f"part {part_id} has no symbol")
@@ -65,10 +113,12 @@ def previews_router(require_token) -> APIRouter:
         return _svg_response(text)
 
     @r.get("/footprint/{part_id}.svg")
-    def footprint_svg(request: Request, part_id: str, bw: bool = False) -> Response:
+    def footprint_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
+        if rev:
+            return _svg_response(_svg_at_rev(ctx, part_id, "fp", rev, bw))
         rec = ctx.ops.load_record(part_id)
         if rec.footprint is None or not rec.footprint.name:
             raise FileNotFoundError(f"part {part_id} has no footprint")

@@ -56,6 +56,41 @@ def test_log_paths(tmp_path):
     assert all(len(c.sha) == 40 for c in log)
 
 
+def test_show_file_reads_content_at_a_rev(tmp_path):
+    r = _repo(tmp_path)
+    f = tmp_path / "a.txt"
+    f.write_text("v1")
+    first = r.commit("first", [f])
+    f.write_text("v2")
+    r.commit("second", [f])
+    # the working tree now holds v2; show_file reads the blob at the old rev
+    assert r.show_file(first, f) == "v1"
+
+
+def test_show_file_accepts_a_subtree_path(tmp_path):
+    r = _repo(tmp_path)
+    sub = tmp_path / "parts"
+    sub.mkdir()
+    f = sub / "x.json"
+    f.write_text('{"k": 1}\n')
+    sha = r.commit("add x", [f])
+    assert r.show_file(sha, f) == '{"k": 1}\n'
+    # a relative path (repo-relative) resolves identically
+    assert r.show_file(sha, "parts/x.json") == '{"k": 1}\n'
+
+
+def test_show_file_returns_none_when_absent_at_rev(tmp_path):
+    r = _repo(tmp_path)
+    a = tmp_path / "a.txt"
+    a.write_text("a")
+    first = r.commit("first", [a])
+    b = tmp_path / "b.txt"
+    b.write_text("b")
+    r.commit("add b", [b])
+    # b did not exist at the first rev
+    assert r.show_file(first, b) is None
+
+
 def test_restore_reverts_tracked_modification(tmp_path):
     r = _repo(tmp_path)
     f = tmp_path / "a.txt"

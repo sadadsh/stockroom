@@ -158,6 +158,81 @@ def test_model_glb_reconverts_a_corrupt_cache_entry(app_ctx, monkeypatch):
     assert calls["n"] == 1  # the corrupt cache entry was NOT served; it re-converted
 
 
+# --- ?rev historical render (M6k visual diff) -------------------------------
+
+
+class _RevRecordingCli:
+    """A fake cli that records the exact input file text it was handed, so a test can
+    prove ?rev rendered the historical git blob, not the current working tree."""
+
+    def __init__(self):
+        self.sym_libs: list[str] = []
+        self.fp_texts: list[str] = []
+
+    def sym_export_svg(self, lib, symbol, out_dir, black_and_white=False):
+        from pathlib import Path as _P
+
+        self.sym_libs.append(_P(lib).read_text(encoding="utf-8"))
+        out = out_dir / f"{symbol}.svg"
+        out.write_text("<svg><!-- rev sym --></svg>", encoding="utf-8")
+        return [out]
+
+    def fp_export_svg(self, pretty_dir, footprint, out_dir, layers="F.Cu,F.SilkS,F.Fab", *, black_and_white=False):
+        from pathlib import Path as _P
+
+        self.fp_texts.append((_P(pretty_dir) / f"{footprint}.kicad_mod").read_text(encoding="utf-8"))
+        out = out_dir / f"{footprint}.svg"
+        out.write_text("<svg><!-- rev fp --></svg>", encoding="utf-8")
+        return out
+
+
+def _seed_sha(app_ctx, part_id="tps62130"):
+    path = app_ctx.profile.library.parts_dir / f"{part_id}.json"
+    return app_ctx.repo.log_paths([path])[0].sha
+
+
+def test_symbol_preview_at_rev_renders_the_historical_blob(app_ctx):
+    seed = _seed_sha(app_ctx)
+    # edit manufacturer: a new commit whose symbol lib now carries the NEWCO property
+    app_ctx.ops.edit_field("tps62130", "manufacturer", "NEWCO")
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get(f"/api/previews/symbol/tps62130.svg?rev={seed}").status_code == 200
+        assert c.get("/api/previews/symbol/tps62130.svg").status_code == 200
+    # the rev render read the seed blob (no NEWCO); the current render read the edit
+    assert "NEWCO" not in cli.sym_libs[0]
+    assert "NEWCO" in cli.sym_libs[1]
+
+
+def test_footprint_preview_at_rev_renders_the_historical_blob(app_ctx):
+    seed = _seed_sha(app_ctx)
+    fp = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp.write_text(fp.read_text(encoding="utf-8") + "\n; NEWPAD\n", encoding="utf-8")
+    app_ctx.repo.commit("edit footprint", [fp])
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get(f"/api/previews/footprint/tps62130.svg?rev={seed}").status_code == 200
+        assert c.get("/api/previews/footprint/tps62130.svg").status_code == 200
+    assert "NEWPAD" not in cli.fp_texts[0]
+    assert "NEWPAD" in cli.fp_texts[1]
+
+
+def test_symbol_preview_at_rev_404_when_part_absent_at_that_rev(app_ctx):
+    from stockroom.model.part import LibRef, PartRecord
+
+    seed = _seed_sha(app_ctx)  # before the latecomer existed
+    rec = PartRecord(id="latecomer", display_name="LATECOMER", category="ICs")
+    rec.symbol = LibRef(lib="SR-ICs", name="LATECOMER")
+    parts_dir = app_ctx.profile.library.parts_dir
+    (parts_dir / "latecomer.json").write_text(rec.dumps(), encoding="utf-8")
+    app_ctx.repo.commit("add latecomer", [parts_dir / "latecomer.json"])
+    app_ctx.rebuild_index()
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        r = c.get(f"/api/previews/symbol/latecomer.svg?rev={seed}")
+    assert r.status_code == 404
+
+
 # --- 3D model → GLB (M6d-2) -------------------------------------------------
 
 def _put_model_file(app_ctx, rel="models/x.step", data=b"dummy"):
