@@ -1,0 +1,399 @@
+/**
+ * The part detail panel (the mockup's renderDetail). Reads the full record from
+ * GET /api/library/parts/{id} and lays it out as: identity header with the
+ * completeness passport ring, a missing/complete block, the Files section
+ * (3D model, symbol, footprint), read-only identity fields, and Sourcing driven
+ * by the real purchase records. Everything degrades honestly when a field is
+ * absent, and no data is fabricated.
+ */
+import type { ReactNode } from "react";
+import type { PartDetail, PurchaseRef } from "../api/types";
+import { Badge, Card, Dot, Eyebrow } from "./primitives";
+import { CompletenessRing } from "./CompletenessRing";
+import {
+  CubeArt,
+  ExternalIcon,
+  FootprintArt,
+  SymbolArt,
+  UploadIcon,
+  WarnIcon,
+} from "./icons";
+
+// The passport has ten required fields (stockroom.model.part.REQUIRED_FIELDS).
+const PASSPORT_TOTAL = 10;
+
+interface Props {
+  detail: PartDetail | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  missing: string[];
+  isComplete: boolean;
+}
+
+export function DetailPanel({
+  detail,
+  isLoading,
+  error,
+  missing,
+  isComplete,
+}: Props) {
+  if (isLoading) {
+    return <PanelMessage>Loading part...</PanelMessage>;
+  }
+  if (error) {
+    return (
+      <PanelMessage tone="err">
+        Could not load this part. {error.message}
+      </PanelMessage>
+    );
+  }
+  if (!detail) {
+    return (
+      <PanelMessage>Select A Part To See Its Details.</PanelMessage>
+    );
+  }
+
+  const score = Math.max(0, PASSPORT_TOTAL - missing.length);
+  const subtitle = [detail.mpn || "No Part Number", detail.manufacturer || "Unknown Maker"].join(
+    "  ·  ",
+  );
+
+  return (
+    <div className="max-w-[760px] pb-10">
+      {/* header */}
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-title font-semibold text-t1">
+            <span className="min-w-0 break-words">{detail.display_name}</span>
+            {!isComplete ? (
+              <span className="flex-none text-err" title="Incomplete">
+                <WarnIcon />
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-1 text-sm text-t3">{subtitle}</div>
+        </div>
+        <CompletenessRing
+          score={score}
+          total={PASSPORT_TOTAL}
+          complete={isComplete}
+        />
+      </div>
+
+      {/* completeness block */}
+      <div className="mt-4">
+        {isComplete ? (
+          <Badge tone="ok">Complete</Badge>
+        ) : (
+          <div>
+            <div className="mb-2 block text-xs text-t3">Missing</div>
+            <div className="flex flex-wrap gap-1.5">
+              {missing.map((m) => (
+                <Badge key={m} tone="warn">
+                  {m}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* files */}
+      <Eyebrow className="mb-2.5 mt-6">Files</Eyebrow>
+      <div className="flex max-w-[600px] gap-3">
+        <FileCard
+          className="flex-[1.55]"
+          name="3D Model"
+          present={!!detail.model?.file}
+          art={<CubeArt />}
+        />
+        <div className="flex flex-1 flex-col gap-3">
+          <FileCard
+            name="Symbol"
+            present={!!detail.symbol?.name}
+            art={<SymbolArt />}
+          />
+          <FileCard
+            name="Footprint"
+            present={!!detail.footprint?.name}
+            art={<FootprintArt />}
+          />
+        </div>
+      </div>
+
+      {/* identity fields */}
+      <Eyebrow className="mb-2.5 mt-6">Component Fields</Eyebrow>
+      <div>
+        <IdRow label="Part Number" value={detail.mpn} mono />
+        <IdRow label="Manufacturer" value={detail.manufacturer} />
+        <IdRow label="Category" value={detail.category} />
+        <IdRow label="Description" value={detail.description} />
+        <IdRow
+          label="Datasheet"
+          value={detail.datasheet?.file || detail.datasheet?.source_url || ""}
+          mono
+          href={detail.datasheet?.source_url || undefined}
+        />
+        {detail.tags.length > 0 ? (
+          <IdRow label="Tags" value={detail.tags.join(", ")} />
+        ) : null}
+      </div>
+
+      {/* sourcing */}
+      <Eyebrow className="mb-2.5 mt-6">Sourcing</Eyebrow>
+      <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+    </div>
+  );
+}
+
+function PanelMessage({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone?: "err";
+}) {
+  return (
+    <div
+      className={
+        "flex h-full min-h-[300px] items-center justify-center px-6 text-center text-sm " +
+        (tone === "err" ? "text-err" : "text-t3")
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
+function IdRow({
+  label,
+  value,
+  mono,
+  href,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  href?: string;
+}) {
+  const empty = !value;
+  return (
+    <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
+      <span className="w-[116px] flex-none text-xs text-t3">{label}</span>
+      <span
+        className={
+          "flex min-w-0 flex-1 items-center gap-1.5 text-base " +
+          (empty ? "text-err" : "text-t1") +
+          (mono ? " tnum" : "")
+        }
+      >
+        {empty ? (
+          "Missing"
+        ) : href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-w-0 items-center gap-1.5 truncate text-t1 underline decoration-line2 underline-offset-2 hover:decoration-current"
+          >
+            <span className="truncate">{value}</span>
+            <ExternalIcon className="flex-none text-t3" />
+          </a>
+        ) : (
+          <span className="min-w-0 break-words">{value}</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function FileCard({
+  name,
+  present,
+  art,
+  className,
+}: {
+  name: string;
+  present: boolean;
+  art: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card
+      className={
+        "flex min-w-0 flex-col overflow-hidden shadow-file " + (className ?? "")
+      }
+    >
+      <div
+        className={
+          "flex flex-1 items-center justify-center " +
+          (present
+            ? "bg-[rgba(0,0,0,0.18)] min-h-[118px]"
+            : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[118px] text-t3")
+        }
+      >
+        {present ? (
+          art
+        ) : (
+          <>
+            <UploadIcon />
+            <span className="text-xs">No {name}</span>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <span className="text-xs font-medium text-t1">{name}</span>
+        <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
+          {present ? (
+            <>
+              <Dot tone="ok" />
+              Linked
+            </>
+          ) : (
+            <>
+              <Dot tone="warn" />
+              Not Linked
+            </>
+          )}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+function Sourcing({
+  purchase,
+  hasMpn,
+}: {
+  purchase: PurchaseRef[];
+  hasMpn: boolean;
+}) {
+  const orderable = purchase.filter((p) => p.url);
+  if (orderable.length === 0) {
+    return (
+      <Card className="flex items-center gap-3.5 px-4 py-3.5">
+        <span className="text-sm text-t2">
+          {hasMpn
+            ? "No purchase link on record yet."
+            : "Not orderable yet, this component has no part number."}
+        </span>
+      </Card>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      {orderable.map((p, i) => (
+        <VendorCard key={`${p.vendor}-${i}`} purchase={p} />
+      ))}
+    </div>
+  );
+}
+
+function VendorCard({ purchase }: { purchase: PurchaseRef }) {
+  const stats: Array<[string, string]> = [];
+  if (purchase.stock != null) {
+    stats.push(["In Stock", purchase.stock.toLocaleString()]);
+  }
+  const priceBreaks = normalizePriceBreaks(purchase.price_breaks);
+  const unit = priceBreaks.length > 0 ? priceBreaks[0] : null;
+  if (unit) {
+    stats.push([
+      "Unit Price",
+      formatPrice(unit.price, purchase.currency),
+    ]);
+  }
+
+  return (
+    <Card className="px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium text-t1">
+          {purchase.vendor || "Vendor"}
+        </span>
+        {purchase.fetched_at ? (
+          <span className="text-2xs text-t3">
+            Checked {purchase.fetched_at}
+          </span>
+        ) : null}
+        <a
+          href={purchase.url}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-control bg-raise2 px-3 py-1.5 text-xs font-medium text-t1 hover:brightness-110"
+        >
+          Open Listing
+          <ExternalIcon />
+        </a>
+      </div>
+
+      {stats.length > 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          {stats.map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-card border border-line bg-raise px-3 py-2.5"
+            >
+              <div className="text-2xs text-t3">{label}</div>
+              <div className="tnum mt-0.5 text-base font-semibold text-t1">
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {priceBreaks.length > 1 ? (
+        <div className="mt-3">
+          <div className="mb-2 text-xs font-semibold text-t3">
+            Price Breaks
+          </div>
+          <div className="flex max-w-[480px] flex-col gap-2">
+            {priceBreaks.map((b, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="tnum w-12 flex-none text-xs text-t3">
+                  {b.qty}+
+                </span>
+                <span className="tnum ml-auto w-16 text-right text-sm font-semibold text-t1">
+                  {formatPrice(b.price, purchase.currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+interface NormalizedBreak {
+  qty: number;
+  price: number;
+}
+
+// price_breaks come through as untyped lists; tolerate [qty, price] pairs or
+// {qty|quantity|moq, price|unit|unit_price} objects, and drop anything unusable.
+function normalizePriceBreaks(raw: unknown[]): NormalizedBreak[] {
+  const out: NormalizedBreak[] = [];
+  for (const item of raw) {
+    if (Array.isArray(item) && item.length >= 2) {
+      const qty = Number(item[0]);
+      const price = Number(item[1]);
+      if (Number.isFinite(qty) && Number.isFinite(price)) {
+        out.push({ qty, price });
+      }
+    } else if (item && typeof item === "object") {
+      const rec = item as Record<string, unknown>;
+      const qty = Number(rec.qty ?? rec.quantity ?? rec.moq);
+      const price = Number(rec.price ?? rec.unit ?? rec.unit_price);
+      if (Number.isFinite(qty) && Number.isFinite(price)) {
+        out.push({ qty, price });
+      }
+    }
+  }
+  return out.sort((a, b) => a.qty - b.qty);
+}
+
+function formatPrice(value: number, currency: string): string {
+  const symbol = currency === "USD" || !currency ? "$" : "";
+  const suffix = symbol ? "" : ` ${currency}`;
+  return `${symbol}${value.toFixed(2)}${suffix}`;
+}

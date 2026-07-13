@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The mockup's near-black canvas with two soft radial highlights (library-v2.html
+   .scroll). Kept as plain CSS because it is a fixed page backdrop, not a token. */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: #090909;
+    color: #f4f4f4;
+    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: -0.008em;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root {
+    background: radial-gradient(
+        1100px 560px at 12% -6%,
+        rgba(255, 255, 255, 0.05),
+        transparent 58%
+      ),
+      radial-gradient(
+        1000px 680px at 108% 8%,
+        rgba(255, 255, 255, 0.032),
+        transparent 56%
+      ),
+      #0b0b0b;
+  }
+
+  /* clean, unobtrusive scrollbars (from the mockup) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.13);
+    border-radius: 8px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+    background-clip: padding-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+/* tabular figures for stock counts and prices */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
