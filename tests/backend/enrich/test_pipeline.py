@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from stockroom.enrich.datasheet import extract_datasheet_specs
 from stockroom.enrich.pipeline import EnrichmentPipeline, ScrapeSource
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 from stockroom.ingest.staging import StagingCandidate
@@ -91,3 +92,21 @@ def test_enrich_result_is_cached_and_not_refetched(tmp_path):
     n_first = len(fetcher.urls)
     pipe.enrich("TPS62130RGTR", "ICs")  # second call served from cache
     assert len(fetcher.urls) == n_first  # no additional fetch
+
+
+def test_datasheet_field_is_preferred_over_a_scrape_field():
+    # datasheet gives the MPN at high confidence; a scrape gives a WRONG MPN.
+    ds = EnrichmentResult(category="ICs")
+    ds.mpn = Sourced("TPS62130RGTR", "datasheet", "high")
+    scrape = EnrichmentResult(category="ICs")
+    scrape.mpn = Sourced("WRONG-NEAR-MATCH", "scrape", "low")
+    # datasheet merged FIRST wins (the registry orders datasheet ahead by trust)
+    ds.merge_missing(scrape)
+    assert ds.mpn.value == "TPS62130RGTR"
+    assert ds.mpn.source == "datasheet"
+
+
+def test_extract_datasheet_specs_end_to_end_from_fixture():
+    r = extract_datasheet_specs(FIX / "sample_datasheet.pdf", known_mpn="TPS62130RGTR")
+    assert r.package.value == "VQFN-16"
+    assert r.manufacturer.value == "Texas Instruments"
