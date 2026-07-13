@@ -13,6 +13,7 @@ from pathlib import Path
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname, slugify
+from stockroom.model.category import category_footprint_lib, category_symbol_lib
 from stockroom.model.part import (
     Datasheet,
     LibRef,
@@ -29,6 +30,14 @@ from stockroom.mutation.placement import (
 from stockroom.mutation.transaction import Transaction
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
+
+
+# top-level record field -> KiCad property to re-mirror on edit (None => no mirror)
+_MIRROR_ON_EDIT = {
+    "mpn": "MPN",
+    "manufacturer": "Manufacturer",
+    "description": "Description",
+}
 
 
 @dataclass
@@ -128,3 +137,104 @@ class LibraryOps:
                        f"{'3D model, ' if model_ref else ''}"
                        f"{'datasheet, ' if datasheet else ''}record")
         return record
+
+    def load_record(self, part_id: str) -> PartRecord:
+        path = self.lib.parts_dir / f"{part_id}.json"
+        return PartRecord.loads(path.read_text(encoding="utf-8"))
+
+    def edit_field(self, part_id: str, field: str, value) -> PartRecord:
+        record = self.load_record(part_id)
+        if not hasattr(record, field):
+            raise ValueError(f"unknown field: {field}")
+        setattr(record, field, value)
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        sym_lib_path = self.lib.symbol_lib_path(record.category)
+        with Transaction(self.repo) as txn:
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            prop = _MIRROR_ON_EDIT.get(field)
+            if prop is not None or field == "tags":
+                sym_lib = SymbolLib.load(sym_lib_path)
+                sym = sym_lib.get_symbol(record.symbol.name)
+                if field == "tags":
+                    sym.set_property("ki_keywords", " ".join(record.tags))
+                else:
+                    sym.set_property(prop, str(value))
+                sym_lib.save(sym_lib_path)
+                txn.track(sym_lib_path)
+            txn.commit(f"Edit {part_id}: {field}")
+        return record
+
+    def _remove_symbol_node(self, sym_lib_path: Path, name: str) -> str:
+        """Remove the named symbol node from a lib and return the new file text."""
+        sym_lib = SymbolLib.load(sym_lib_path)
+        target = None
+        for node in sym_lib._doc.root.find_all("symbol"):
+            if node.children[1].value == name:
+                target = node
+                break
+        if target is None:
+            raise ValueError(f"symbol {name!r} not in {sym_lib_path.name}")
+        sym_lib._doc.root.remove_child(target)
+        return sym_lib.serialize()
+
+    def move_category(self, part_id: str, new_category: str) -> PartRecord:
+        record = self.load_record(part_id)
+        old_cat = record.category
+        if new_category == old_cat:
+            return record
+        name = record.symbol.name
+        old_sym = self.lib.symbol_lib_path(old_cat)
+        new_sym = self.lib.symbol_lib_path(new_category)
+        old_fp = self.lib.footprint_lib_path(old_cat) / f"{name}.kicad_mod"
+        new_pretty = self.lib.footprint_lib_path(new_category)
+        new_fp = new_pretty / f"{name}.kicad_mod"
+        new_nickname = category_nickname(new_category)
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+
+        with Transaction(self.repo) as txn:
+            # symbol: append to new lib (byte-preserving), then remove from old
+            merge_symbol_into_lib(new_sym, old_sym, name, name)
+            txn.track(new_sym)
+            old_sym.write_text(self._remove_symbol_node(old_sym, name), encoding="utf-8", newline="")
+            txn.track(old_sym)
+            # footprint: move file between .pretty dirs
+            new_pretty.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(old_fp), str(new_fp))
+            txn.track(old_fp, new_fp)
+            # symbol Footprint property + record fields
+            sym_lib = SymbolLib.load(new_sym)
+            sym_lib.get_symbol(name).set_property("Footprint", f"{new_nickname}:{name}")
+            sym_lib.save(new_sym)
+            record.category = new_category
+            record.symbol = LibRef(lib=new_nickname, name=name)
+            record.footprint = LibRef(lib=new_nickname, name=name)
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
+        return record
+
+    def delete_part(self, part_id: str) -> None:
+        record = self.load_record(part_id)
+        name = record.symbol.name
+        sym_lib_path = self.lib.symbol_lib_path(record.category)
+        fp_path = self.lib.footprint_lib_path(record.category) / f"{name}.kicad_mod"
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            sym_lib_path.write_text(self._remove_symbol_node(sym_lib_path, name), encoding="utf-8", newline="")
+            txn.track(sym_lib_path)
+            for p in (fp_path, json_path):
+                if p.exists():
+                    p.unlink()
+                    txn.track(p)
+            if record.model and record.model.file:
+                mp = self.lib.root / record.model.file
+                if mp.exists():
+                    mp.unlink()
+                    txn.track(mp)
+            if record.datasheet and record.datasheet.file:
+                dp = self.lib.datasheets_dir / record.datasheet.file
+                if dp.exists():
+                    dp.unlink()
+                    txn.track(dp)
+            txn.commit(f"Delete {part_id}")
