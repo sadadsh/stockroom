@@ -115,6 +115,44 @@ export interface ApiErrorBody {
   message?: string;
 }
 
+// GET /api/library/parts/{id}/history -> the per-part git timeline (M6k), newest
+// first, one entry per commit that touched the part's canonical JSON.
+export interface HistoryCommit {
+  sha: string;
+  subject: string;
+  author: string;
+  iso_date: string;
+}
+
+export interface HistoryResponse {
+  commits: HistoryCommit[];
+  count: number;
+}
+
+// GET /api/library/parts/{id}/diff -> a structured field-level diff of the part JSON
+// between two revs (M6k), plus which asset kinds changed so the UI can offer an
+// old/new SVG overlay. before/after are the raw JSON values (scalar, list, or null).
+export interface DiffField {
+  key: string;
+  before: unknown;
+  after: unknown;
+  status: "added" | "removed" | "changed";
+}
+
+export interface DiffAssets {
+  symbol: boolean;
+  footprint: boolean;
+  model: boolean;
+  datasheet: boolean;
+}
+
+export interface DiffResponse {
+  a: string;
+  b: string;
+  fields: DiffField[];
+  assets: DiffAssets;
+}
+
 // POST /api/enrich/part -> the canonical enrichment result (stockroom.enrich.schema).
 // Each single-valued field carries the source it came from and a confidence, or is
 // null when no source could fill it (a scrape miss is null, never an error).

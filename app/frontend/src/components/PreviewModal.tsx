@@ -5,8 +5,9 @@
  * model. Escape or a scrim click closes, Tab is trapped, and focus returns to where it
  * was so the modal never strands focus on inert background.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePreviewSvg } from "../api/queries";
+import { useModalDismiss } from "../lib/useModalDismiss";
 import { ModelViewer } from "./ModelViewer";
 import { SvgViewport } from "./SvgViewport";
 
@@ -36,50 +37,12 @@ export function PreviewModal({
   onClose,
 }: Props) {
   const [kind, setKind] = useState<PreviewKind>(initialKind);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-
-  // Every open starts on the card the user clicked, remembers where focus was, and
-  // focuses the dialog; every close returns focus.
+  // Every open starts on the card the user clicked; the shared hook handles focus
+  // capture/restore and Escape + Tab trapping.
   useEffect(() => {
-    if (open) {
-      setKind(initialKind);
-      restoreFocusRef.current =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      dialogRef.current?.focus();
-    } else {
-      restoreFocusRef.current?.focus();
-      restoreFocusRef.current = null;
-    }
+    if (open) setKind(initialKind);
   }, [open, initialKind]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key === "Tab") {
-        const nodes = dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        );
-        if (!nodes || nodes.length === 0) return;
-        const first = nodes[0];
-        const last = nodes[nodes.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const dialogRef = useModalDismiss(open, onClose);
 
   if (!open) return null;
 
@@ -160,7 +123,7 @@ function SvgPreview({
   kind: "symbol" | "footprint";
   partId: string;
 }) {
-  const query = usePreviewSvg(kind, partId, true);
+  const query = usePreviewSvg(kind, partId);
   if (query.isLoading) {
     return <Centered>Loading preview...</Centered>;
   }

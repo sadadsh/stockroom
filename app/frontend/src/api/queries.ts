@@ -44,6 +44,27 @@ export function usePartDetailQuery(id: string | null) {
   });
 }
 
+// The per-part git timeline (M6k). Read-only; a mutation invalidates the affected
+// detail, and any write also grows this timeline, so it is invalidated alongside the
+// detail after a write (see useInvalidateAfterWrite below).
+export function usePartHistory(id: string | null) {
+  return useQuery({
+    queryKey: ["part-history", id],
+    queryFn: () => api.partHistory(id as string),
+    enabled: !!id,
+  });
+}
+
+// The field-diff between two revs (M6k). `a` may be "" (the earliest side); `b` is
+// the commit being inspected, so the query is disabled until one is chosen.
+export function usePartDiff(id: string | null, a: string, b: string | null) {
+  return useQuery({
+    queryKey: ["part-diff", id, a, b],
+    queryFn: () => api.partDiff(id as string, a, b as string),
+    enabled: !!id && !!b,
+  });
+}
+
 // A mutation rebuilds the derived index server-side, so after any write we
 // invalidate the list, the facets, and the affected detail to read-after-write.
 function useInvalidateAfterWrite() {
@@ -53,6 +74,8 @@ function useInvalidateAfterWrite() {
     qc.invalidateQueries({ queryKey: ["facets"] });
     qc.invalidateQueries({ queryKey: ["duplicates"] });
     qc.invalidateQueries({ queryKey: ["part", id] });
+    // a write commits, so the part's git timeline (M6k) gained an entry
+    qc.invalidateQueries({ queryKey: ["part-history", id] });
   };
 }
 
@@ -83,6 +106,7 @@ export function useDeletePart() {
       qc.invalidateQueries({ queryKey: ["facets"] });
       qc.invalidateQueries({ queryKey: ["duplicates"] });
       qc.removeQueries({ queryKey: ["part", id] });
+      qc.removeQueries({ queryKey: ["part-history", id] });
     },
   });
 }
@@ -98,7 +122,11 @@ export function useSetSpecs() {
       specs: Record<string, { value: unknown; source?: string; confidence?: string }>;
       overwrite?: boolean;
     }) => api.setSpecs(vars.id, vars.specs, vars.overwrite),
-    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["part", vars.id] }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["part", vars.id] });
+      // persisting specs commits, so the part's git timeline (M6k) gained an entry
+      qc.invalidateQueries({ queryKey: ["part-history", vars.id] });
+    },
   });
 }
 
@@ -135,11 +163,15 @@ export function useIngestCommit() {
 export function usePreviewSvg(
   kind: "symbol" | "footprint",
   id: string,
-  enabled = true,
+  opts: { rev?: string; enabled?: boolean } = {},
 ) {
+  const rev = opts.rev ?? "";
+  const enabled = opts.enabled ?? true;
   return useQuery({
-    queryKey: ["preview-svg", kind, id],
-    queryFn: () => api.previewSvg(kind, id),
+    // rev is part of the key so an old-revision render (M6k overlay) caches apart from
+    // the current one and switching revs refetches.
+    queryKey: ["preview-svg", kind, id, rev],
+    queryFn: () => api.previewSvg(kind, id, rev || undefined),
     enabled: enabled && !!id,
     staleTime: 5 * 60_000,
     retry: false,

@@ -19,7 +19,7 @@ export function PreviewImage({
   partId: string;
   fallback: ReactNode;
 }) {
-  const query = usePreviewSvg(kind, partId, true);
+  const query = usePreviewSvg(kind, partId);
   const { theme } = useTheme();
   const url = useObjectUrl(query.data);
 
