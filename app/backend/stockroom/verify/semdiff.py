@@ -36,6 +36,8 @@ def _tokenize(text):
                 else:
                     buf.append(text[j])
                     j += 1
+            if j >= n:
+                raise SemDiffError(f"unterminated string at index {i}")
             yield "str", "".join(buf)
             i = j + 1
         else:
@@ -63,12 +65,16 @@ def _parse(text):
 
     def read():
         nonlocal pos
+        if pos >= len(toks):
+            raise SemDiffError("unexpected end of input")
         kind, val = toks[pos]
         if kind == "(":
             pos += 1
             lst = []
-            while toks[pos][0] != ")":
+            while pos < len(toks) and toks[pos][0] != ")":
                 lst.append(read())
+            if pos >= len(toks):
+                raise SemDiffError("missing close paren")
             pos += 1
             return tuple(lst)
         pos += 1
