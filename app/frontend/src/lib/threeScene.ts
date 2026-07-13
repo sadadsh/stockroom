@@ -13,7 +13,11 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-export function mountModelScene(container: HTMLElement, glb: ArrayBuffer): () => void {
+export function mountModelScene(
+  container: HTMLElement,
+  glb: ArrayBuffer,
+  onError?: () => void,
+): () => void {
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
@@ -63,7 +67,11 @@ export function mountModelScene(container: HTMLElement, glb: ArrayBuffer): () =>
       controls.update();
     },
     () => {
-      /* a parse failure leaves an empty scene; the component surfaces its own error. */
+      // GLTFLoader rejected the GLB (a format three does not accept, or a truncated
+      // cache file). This fires asynchronously, after mountModelScene has returned, so
+      // it is the only channel that can tell the component to show an honest message
+      // instead of leaving a lit, empty canvas.
+      onError?.();
     },
   );
 
@@ -98,6 +106,10 @@ export function mountModelScene(container: HTMLElement, glb: ArrayBuffer): () =>
       else mat?.dispose();
     });
     renderer.dispose();
+    // dispose() frees GPU caches but leaves the WebGL context alive until GC; browsers
+    // cap live contexts (~16), so without this every 3D-preview open would leak one and
+    // the viewer would eventually stop rendering. forceContextLoss releases it now.
+    renderer.forceContextLoss?.();
     if (renderer.domElement.parentNode === container) {
       container.removeChild(renderer.domElement);
     }

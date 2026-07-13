@@ -114,6 +114,50 @@ def test_bw_and_color_previews_cache_separately(app_ctx):
     assert cli.sym_bw == [True, False]
 
 
+def test_footprint_preview_rerenders_when_the_footprint_file_changes(app_ctx):
+    # The footprint cache key is content-addressed: after the .kicad_mod bytes change
+    # (a teammate edit + pull, or an fp upgrade), the endpoint must re-render, not serve
+    # the stale SVG. Same name + part id, different bytes.
+    cli = _RecordingCli()
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    with _client_with_cli(app_ctx, cli) as c:
+        c.get("/api/previews/footprint/tps62130.svg")  # renders + caches
+        c.get("/api/previews/footprint/tps62130.svg")  # cache hit, no re-render
+        assert len(cli.fp_bw) == 1
+        fp_file.write_text(fp_file.read_text(encoding="utf-8") + "\n; edited\n", encoding="utf-8")
+        c.get("/api/previews/footprint/tps62130.svg")  # content changed -> re-render
+    assert len(cli.fp_bw) == 2
+
+
+def test_model_glb_reconverts_a_corrupt_cache_entry(app_ctx, monkeypatch):
+    # A truncated/corrupt cache file (no glTF magic) must be treated as a miss and
+    # re-converted, never served as a 200 that the three.js loader parses to a blank canvas.
+    from stockroom.api.routers import previews as previews_mod
+    from stockroom.kicad.model_convert import GLB_MAGIC
+
+    src = _put_model_file(app_ctx)
+    # pre-seed the exact cache path with a corrupt (non-GLB) body
+    import hashlib
+
+    h = hashlib.sha256(src.read_bytes()).hexdigest()[:16]
+    cache_dir = app_ctx.libraries_root.parent / ".stockroom-previews"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / f"model_tps62130_{h}.glb").write_bytes(b"NOT-A-GLB truncated")
+
+    calls = {"n": 0}
+
+    def _convert(_src):
+        calls["n"] += 1
+        return GLB_MAGIC + b"\x02\x00\x00\x00good"
+
+    monkeypatch.setattr(previews_mod, "model_to_glb", _convert)
+    with _client_with_cli(app_ctx, app_ctx.cli) as c:
+        r = c.get("/api/previews/model/tps62130.glb")
+    assert r.status_code == 200
+    assert r.content[:4] == GLB_MAGIC
+    assert calls["n"] == 1  # the corrupt cache entry was NOT served; it re-converted
+
+
 # --- 3D model → GLB (M6d-2) -------------------------------------------------
 
 def _put_model_file(app_ctx, rel="models/x.step", data=b"dummy"):

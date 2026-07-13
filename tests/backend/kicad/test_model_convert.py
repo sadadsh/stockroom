@@ -42,6 +42,19 @@ def test_model_to_glb_converts_a_real_kicad_step(tmp_path):
     assert len(data) > 100
 
 
+def test_model_to_glb_gives_wrl_an_honest_message_not_install_cascadio(tmp_path):
+    # WRL is a format the library legitimately stores, but trimesh has no VRML loader.
+    # The failure must say STEP-only, NEVER tell the user to install cascadio (which is
+    # already present and cannot convert WRL).
+    wrl = tmp_path / "part.wrl"
+    wrl.write_text("#VRML V2.0 utf8\n", encoding="utf-8")
+    with pytest.raises(ModelConversionError) as exc:
+        model_to_glb(wrl)
+    msg = str(exc.value).lower()
+    assert "step" in msg
+    assert "cascadio" not in msg
+
+
 def test_model_to_glb_raises_on_an_unconvertible_file(tmp_path):
     # Tooling present → a garbage STEP is a ModelConversionError; tooling absent → a
     # ModelToolingMissing on import. Either way it is one of the two honest 502 errors,

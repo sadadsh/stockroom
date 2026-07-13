@@ -15,6 +15,7 @@ from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
 from stockroom.kicad.model_convert import (
+    GLB_MAGIC,
     ModelConversionError,
     ModelToolingMissing,
     model_to_glb,
@@ -74,8 +75,14 @@ def previews_router(require_token) -> APIRouter:
         pretty = ctx.profile.library.footprint_lib_path(rec.category)
         if not pretty.exists():
             raise FileNotFoundError(f"footprint library missing for {rec.category}")
+        fp_file = pretty / f"{rec.footprint.name}.kicad_mod"
+        if not fp_file.exists():
+            raise FileNotFoundError(f"footprint file missing: {rec.footprint.name}")
         variant = "_bw" if bw else ""
-        key = f"fp_{part_id}_{rec.footprint.name}{variant}.svg"
+        # Content-address the key (like the symbol + model endpoints) so an edited
+        # footprint re-renders and two profiles sharing a part_id + footprint name in
+        # the one shared cache dir never serve each other's geometry.
+        key = f"fp_{part_id}_{_hash_file(fp_file)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
@@ -103,9 +110,12 @@ def previews_router(require_token) -> APIRouter:
         key = f"model_{part_id}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():
-            return Response(
-                content=cached.read_bytes(), media_type="model/gltf-binary"
-            )
+            data = cached.read_bytes()
+            # only serve a cache entry that is a real GLB; a truncated write (killed
+            # mid-write, disk full) is treated as a miss and re-converted, never sent
+            # as a 200 the three.js loader would fail to parse into a blank canvas.
+            if data[:4] == GLB_MAGIC:
+                return Response(content=data, media_type="model/gltf-binary")
         try:
             data = model_to_glb(src)
         except ModelToolingMissing as exc:
