@@ -31,3 +31,7 @@ Thumbs.db
 
 # external tool instructions: local only, never pushed (owner directive)
 /local instructions
+
+# automation workflow design docs: local only, never pushed (owner directive)
+docs/work plans/
+docs/research/
