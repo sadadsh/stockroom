@@ -118,6 +118,13 @@ class PartRecord:
     provenance: Provenance | None = None
     hashes: Hashes | None = None
     enrichment: dict[str, EnrichmentField] = field(default_factory=dict)
+    # Canonical, high-confidence spec data persisted from enrichment (e.g. the
+    # pinout extracted from the datasheet) so a viewer reads the source of truth,
+    # not a transient enrich call. A free-form value bag keyed by spec name
+    # (specs["pinout"] is a list of {"pin", "name"} dicts); per-key provenance
+    # lives in `enrichment`. NOT a completion-gate field (spec section 6): a part
+    # without a pinout is still complete.
+    specs: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -136,6 +143,7 @@ class PartRecord:
             "provenance": asdict(self.provenance) if self.provenance else None,
             "hashes": asdict(self.hashes) if self.hashes else None,
             "enrichment": {k: asdict(v) for k, v in self.enrichment.items()},
+            "specs": dict(self.specs),
         }
 
     @classmethod
@@ -158,6 +166,7 @@ class PartRecord:
             enrichment={
                 k: EnrichmentField(**v) for k, v in d.get("enrichment", {}).items()
             },
+            specs=dict(d.get("specs", {})),
         )
 
     def dumps(self) -> str:

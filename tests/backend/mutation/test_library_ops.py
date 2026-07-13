@@ -220,6 +220,56 @@ def test_edit_field_updates_json_and_mirror(tmp_path, fixtures_dir):
     assert repo.is_clean()
 
 
+def test_set_specs_persists_value_and_provenance(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    before = repo.head()
+    pins = [{"pin": "1", "name": "VIN"}, {"pin": "2", "name": "GND"}]
+    rec = ops.set_specs(
+        "tps62130rgtr",
+        {"pinout": {"value": pins, "source": "datasheet", "confidence": "high"}},
+    )
+    # the value lands in record.specs; its provenance lands in record.enrichment
+    assert rec.specs["pinout"] == pins
+    assert rec.enrichment["pinout"].source == "datasheet"
+    assert rec.enrichment["pinout"].confidence == "high"
+    # persisted to disk (reload proves it) and committed atomically
+    assert ops.load_record("tps62130rgtr").specs["pinout"] == pins
+    assert repo.head() != before
+    assert repo.is_clean()
+
+
+def test_set_specs_does_not_clobber_without_overwrite(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    first = [{"pin": "1", "name": "VIN"}]
+    ops.set_specs("tps62130rgtr", {"pinout": {"value": first, "source": "datasheet"}})
+    second = [{"pin": "1", "name": "WRONG"}]
+    # merge (default): an existing key is kept, never silently overwritten
+    rec = ops.set_specs("tps62130rgtr", {"pinout": {"value": second, "source": "scrape"}})
+    assert rec.specs["pinout"] == first
+    # overwrite=True replaces it
+    rec = ops.set_specs(
+        "tps62130rgtr", {"pinout": {"value": second, "source": "scrape"}}, overwrite=True
+    )
+    assert rec.specs["pinout"] == second
+
+
+def test_set_specs_noop_writes_no_commit(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    pins = [{"pin": "1", "name": "VIN"}]
+    ops.set_specs("tps62130rgtr", {"pinout": {"value": pins, "source": "datasheet"}})
+    head_after_first = repo.head()
+    # re-applying the same specs without overwrite changes nothing -> no empty commit
+    ops.set_specs("tps62130rgtr", {"pinout": {"value": pins, "source": "datasheet"}})
+    assert repo.head() == head_after_first
+    assert repo.is_clean()
+
+
 def test_move_category_relocates_symbol_and_footprint(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     # also pre-create the destination category (Modules) libs

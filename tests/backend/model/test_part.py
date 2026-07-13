@@ -88,6 +88,35 @@ def test_defaults_are_empty_not_none():
     assert d["enrichment"] == {}
 
 
+def test_specs_defaults_to_empty_dict():
+    p = PartRecord(id="x", display_name="X", category="Other")
+    assert p.specs == {}
+    assert p.to_dict()["specs"] == {}
+
+
+def test_specs_round_trips():
+    p = _sample()
+    p.specs = {"pinout": [{"pin": "1", "name": "VIN"}, {"pin": "2", "name": "GND"}]}
+    again = PartRecord.from_dict(p.to_dict())
+    assert again == p
+    assert again.specs["pinout"][0]["name"] == "VIN"
+
+
+def test_specs_is_not_a_gate_field():
+    # a pinout (or any spec) is optional: adding it never changes completeness, and
+    # a complete part with no specs stays complete.
+    p = _sample()
+    p.model = ModelRef(file="models/x.step")
+    assert p.is_complete()
+    p.specs = {"pinout": [{"pin": "1", "name": "VIN"}]}
+    assert p.is_complete()
+    assert "pinout" not in " ".join(p.missing_fields())
+    incomplete = PartRecord(id="y", display_name="", category="ICs")
+    before = incomplete.missing_fields()
+    incomplete.specs = {"pinout": [{"pin": "1", "name": "A"}]}
+    assert incomplete.missing_fields() == before
+
+
 def test_new_part_id_slugifies(tmp_path):
     assert new_part_id(tmp_path, "TPS62130RGTR") == "tps62130rgtr"
 

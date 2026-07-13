@@ -20,6 +20,7 @@ from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
 from stockroom.model.part import (
     Datasheet,
+    EnrichmentField,
     LibRef,
     ModelRef,
     PartRecord,
@@ -295,6 +296,40 @@ class LibraryOps:
                 sym_lib.save(sym_lib_path)
                 txn.track(sym_lib_path)
             txn.commit(f"Edit {part_id}: {field}")
+        return record
+
+    def set_specs(self, part_id: str, specs: dict, *, overwrite: bool = False) -> PartRecord:
+        """Persist canonical spec data (e.g. the pinout extracted at enrich time) into
+        the record so a viewer reads the source of truth, not a transient enrich call.
+
+        Each incoming entry is {key: {"value": ..., "source": ..., "confidence": ...}};
+        the value lands in record.specs[key] and its provenance in record.enrichment[key]
+        (finally putting that field to work). Merges key-by-key: an existing key is kept
+        unless overwrite=True, mirroring EnrichmentResult.merge_missing so enrichment
+        never silently clobbers. Specs are NOT a completion-gate field, so completeness is
+        untouched. A change-free call is a true no-op (no empty commit)."""
+        record = self.load_record(part_id)
+        changed = False
+        for key, entry in specs.items():
+            if not overwrite and key in record.specs:
+                continue
+            value = entry.get("value") if isinstance(entry, dict) else entry
+            source = entry.get("source", "") if isinstance(entry, dict) else ""
+            confidence = entry.get("confidence", "") if isinstance(entry, dict) else ""
+            if record.specs.get(key) == value and record.enrichment.get(key) == EnrichmentField(
+                source=source, confidence=confidence
+            ):
+                continue
+            record.specs[key] = value
+            record.enrichment[key] = EnrichmentField(source=source, confidence=confidence)
+            changed = True
+        if not changed:
+            return record
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Set specs on {part_id}: {', '.join(sorted(specs))}")
         return record
 
     def _remove_symbol_node(self, sym_lib_path: Path, name: str) -> str:

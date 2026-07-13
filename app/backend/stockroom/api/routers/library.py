@@ -45,6 +45,21 @@ def library_router(require_token) -> APIRouter:
         ctx.rebuild_index()
         return rec.to_dict()
 
+    @r.post("/parts/{part_id}/specs")
+    def set_specs(request: Request, part_id: str, body: dict) -> dict:
+        # Persist canonical spec data (e.g. an enriched pinout) onto the record so a
+        # viewer reads the source of truth. body = {specs: {key: {value, source?,
+        # confidence?}}, overwrite?}. Specs are not indexed, but the record write goes
+        # through the same rebuild path as every other mutation to keep the index honest.
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        rec = ctx.ops.set_specs(
+            part_id, body.get("specs", {}), overwrite=bool(body.get("overwrite", False))
+        )
+        ctx.rebuild_index()
+        return rec.to_dict()
+
     @r.post("/parts/{part_id}/move")
     def move_category(request: Request, part_id: str, body: MoveBody) -> dict:
         ctx = request.app.state.ctx
