@@ -382,6 +382,24 @@ def test_set_value_on_unquoted_atom():
     doc = SexpDocument.parse(text)
     doc.root.children[3].set_value("180", quote=False)
     assert doc.serialize() == '(at 1.5 2.5 180)'
+
+
+def test_load_and_save_preserve_crlf(tmp_path):
+    text = '(symbol\r\n\t(property "V" "1")\r\n)'
+    src = tmp_path / "x.kicad_sym"
+    src.write_text(text, encoding="utf-8", newline="")
+    doc = SexpDocument.load(src)
+    out = tmp_path / "out.kicad_sym"
+    doc.save(out)
+    assert out.read_bytes() == src.read_bytes()
+
+
+def test_double_set_value_last_write_wins():
+    doc = SexpDocument.parse('(at 90)')
+    leaf = doc.root.children[1]
+    leaf.set_value("180", quote=False)
+    leaf.set_value("270", quote=False)
+    assert doc.serialize() == '(at 270)'
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -499,7 +517,10 @@ class SexpDocument:
 
     @classmethod
     def load(cls, path) -> "SexpDocument":
-        text = Path(path).read_text(encoding="utf-8", newline="")
+        # newline="" disables newline translation so CRLF is read back exactly.
+        # (Path.read_text does not accept newline on Python 3.12, so use open().)
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
         return cls(text)
 
     def _build(self) -> SexpNode:
@@ -526,11 +547,18 @@ class SexpDocument:
         return read()
 
     def replace_span(self, start: int, end: int, replacement: str) -> None:
+        # Last write wins for an identical span, so re-editing the same token
+        # supersedes the prior edit instead of splicing both against the
+        # original coordinates (which would corrupt the output).
+        self._edits = [e for e in self._edits if not (e[0] == start and e[1] == end)]
         self._edits.append((start, end, replacement))
 
     def serialize(self) -> str:
         text = self.text
-        for start, end, replacement in sorted(self._edits, reverse=True):
+        # Apply edits from the highest start offset down so earlier offsets stay
+        # valid. Spans are distinct leaf tokens (deduped in replace_span), so
+        # sorting by start alone is unambiguous.
+        for start, end, replacement in sorted(self._edits, key=lambda e: e[0], reverse=True):
             text = text[:start] + replacement + text[end:]
         return text
 
