@@ -25,3 +25,6 @@ Thumbs.db
 
 # Superpowers SDD scratch (ledger, task briefs, review packages)
 .superpowers/
+
+# Developer-local Claude Code settings + personal commands (ledger hook references a private path)
+.claude/
