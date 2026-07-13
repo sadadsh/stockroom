@@ -200,7 +200,7 @@ describe("PreviewModal", () => {
   it("closes on Escape, on the Close button, and on a scrim click", async () => {
     mockApi.previewSvg.mockResolvedValue(svgBlob());
     const onClose = vi.fn();
-    const { rerender } = wrap(
+    wrap(
       <PreviewModal
         open
         partId="x"
