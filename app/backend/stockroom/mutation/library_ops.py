@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
@@ -105,10 +106,11 @@ class DriftReport:
 
 
 class LibraryOps:
-    def __init__(self, profile: Profile, repo: GitRepo):
+    def __init__(self, profile: Profile, repo: GitRepo, cli=None):
         self.profile = profile
         self.repo = repo
         self.lib = profile.library
+        self.cli = cli
 
     def add_part(self, staged: StagedPart, require_complete: bool = True) -> PartRecord:
         # Complete-to-add gate (spec section 6): the primary library is complete-only.
@@ -129,6 +131,18 @@ class LibraryOps:
         pretty_dir = self.lib.footprint_lib_path(staged.category)
 
         with Transaction(self.repo) as txn:
+            # 0. ensure the category libraries exist (idempotent); a freshly
+            # created empty symbol lib is tracked so it commits atomically.
+            ensure_footprint_lib(pretty_dir)
+            if not sym_lib_path.exists():
+                if self.cli is None:
+                    raise ValueError(
+                        f"category symbol library {sym_lib_path.name} is missing and "
+                        "no kicad-cli was provided to create it"
+                    )
+                create_empty_symbol_lib(self.cli, sym_lib_path)
+                txn.track(sym_lib_path)
+
             # 1. merge the symbol (renamed to entry_name) into the category lib
             merge_symbol_into_lib(
                 sym_lib_path, staged.symbol_source, staged.symbol_source_name, staged.entry_name
