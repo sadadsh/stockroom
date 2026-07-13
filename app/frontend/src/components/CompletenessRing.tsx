@@ -16,7 +16,7 @@ export function CompletenessRing({ score, total, complete }: Props) {
   const c = 2 * Math.PI * r;
   const frac = total > 0 ? Math.max(0, Math.min(1, score / total)) : 0;
   const offset = c * (1 - frac);
-  const color = complete ? "#6cc08a" : "#e0b354";
+  const color = complete ? "var(--c-ok)" : "var(--c-warn)";
   return (
     <div className="relative h-14 w-14 flex-none">
       <svg width={size} height={size} viewBox="0 0 56 56">
@@ -25,7 +25,7 @@ export function CompletenessRing({ score, total, complete }: Props) {
           cy="28"
           r={r}
           fill="none"
-          stroke="#26272c"
+          style={{ stroke: "var(--c-ring-track)" }}
           strokeWidth="4"
         />
         <circle
@@ -33,7 +33,7 @@ export function CompletenessRing({ score, total, complete }: Props) {
           cy="28"
           r={r}
           fill="none"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={c.toFixed(1)}

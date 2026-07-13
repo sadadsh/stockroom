@@ -97,14 +97,14 @@ export function ExternalIcon({ className }: { className?: string }) {
 export function SymbolArt() {
   return (
     <svg viewBox="0 0 132 94" width="132" height="94">
-      <g stroke="#8b9099" strokeWidth="1.5" fill="none">
+      <g style={{ stroke: "var(--c-icon-line)" }} strokeWidth="1.5" fill="none">
         <rect x="40" y="20" width="52" height="54" rx="3" />
         <path d="M40 33H24M40 47H24M40 61H24M92 33h16M92 47h16M92 61h16" />
       </g>
       <text
         x="66"
         y="51"
-        fill="#c7ccd3"
+        style={{ fill: "var(--c-icon-faint)" }}
         fontSize="10"
         textAnchor="middle"
         fontFamily="monospace"
@@ -119,7 +119,7 @@ export function FootprintArt() {
   const pads = [34, 48, 62, 76, 90];
   return (
     <svg viewBox="0 0 132 94" width="132" height="94">
-      <g fill="#7f858e">
+      <g style={{ fill: "var(--c-icon-line)" }}>
         {pads.map((x) => (
           <rect key={`t${x}`} x={x} y="26" width="9" height="7" rx="1" />
         ))}
@@ -134,7 +134,7 @@ export function FootprintArt() {
         height="20"
         rx="2"
         fill="none"
-        stroke="#4b5057"
+        style={{ stroke: "var(--c-icon-edge)" }}
         strokeWidth="1.3"
       />
     </svg>
@@ -148,7 +148,7 @@ export function CubeArt() {
       width="70"
       height="70"
       fill="none"
-      stroke="#8a8f97"
+      style={{ stroke: "var(--c-icon-line)" }}
       strokeWidth="1.4"
     >
       <path d="M45 12l30 17v32L45 78 15 61V29z" />

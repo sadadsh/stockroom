@@ -59,7 +59,7 @@ function RailItem({
         "mb-px flex items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-sm transition-colors " +
         (selected
           ? "bg-raise2 text-t1"
-          : "text-t3 hover:bg-[rgba(255,255,255,0.03)] hover:text-t2")
+          : "text-t3 hover:bg-[var(--c-hover)] hover:text-t2")
       }
     >
       <span className="w-4 text-center text-sm opacity-85">{item.glyph}</span>

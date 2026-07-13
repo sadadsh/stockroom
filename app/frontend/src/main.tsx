@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { ToastProvider } from "./lib/toast";
+import { ThemeProvider } from "./lib/theme";
 import "./styles/index.css";
 
 // One shared client. Reads are cheap (served from the warm index) so a short
@@ -24,11 +25,13 @@ if (!rootEl) throw new Error("root element not found");
 createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <RouterProvider>
-          <App />
-        </RouterProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <RouterProvider>
+            <App />
+          </RouterProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

@@ -37,7 +37,7 @@ export function PartsList({ parts, selectedId, onSelect }: Props) {
     <div>
       {grouped.map(([category, items]) => (
         <div key={category}>
-          <div className="sticky top-0 z-[1] bg-[rgba(15,15,16,0.72)] px-2 pb-1.5 pt-3.5 text-2xs font-semibold text-t3 backdrop-blur">
+          <div className="sticky top-0 z-[1] bg-[var(--c-sticky)] px-2 pb-1.5 pt-3.5 text-2xs font-semibold text-t3 backdrop-blur">
             {category}
           </div>
           {items.map((p) => {
@@ -51,7 +51,7 @@ export function PartsList({ parts, selectedId, onSelect }: Props) {
                   "flex w-full items-start border-b border-line px-2.5 py-2.5 text-left transition-colors last:border-b-0 " +
                   (selected
                     ? "bg-raise2"
-                    : "hover:bg-[rgba(255,255,255,0.03)]")
+                    : "hover:bg-[var(--c-hover)]")
                 }
               >
                 <div className="min-w-0 flex-1">

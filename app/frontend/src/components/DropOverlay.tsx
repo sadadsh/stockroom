@@ -60,12 +60,14 @@ export function DropOverlay({ onDrop }: { onDrop: (paths: string[]) => void }) {
   if (!active) return null;
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.55)] backdrop-blur-sm">
-      <div className="rounded-card border-2 border-dashed border-acc bg-raise2 px-10 py-8 text-center">
-        <div className="flex justify-center text-t2">
+      {/* the scrim is dark in both themes, so this card is fixed light-on-dark
+          rather than theme-tokened (a light-theme accent would vanish here). */}
+      <div className="rounded-card border-2 border-dashed border-white/70 bg-white/5 px-10 py-8 text-center">
+        <div className="flex justify-center text-white/70">
           <UploadIcon />
         </div>
-        <div className="mt-2 text-sm font-medium text-t1">Drop To Add Parts</div>
-        <div className="mt-1 text-xs text-t3">Release a vendor ZIP to inspect it.</div>
+        <div className="mt-2 text-sm font-medium text-white">Drop To Add Parts</div>
+        <div className="mt-1 text-xs text-white/60">Release a vendor ZIP to inspect it.</div>
       </div>
     </div>
   );

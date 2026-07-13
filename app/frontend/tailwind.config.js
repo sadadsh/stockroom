@@ -9,26 +9,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        // surfaces (the mockup layers translucent whites over a near-black canvas)
-        canvas: "#0b0b0b",
-        rail: "rgba(255,255,255,0.022)",
-        surface: "rgba(23,23,24,0.5)",
-        raise: "rgba(255,255,255,0.055)",
-        raise2: "rgba(255,255,255,0.1)",
-        field: "rgba(0,0,0,0.2)",
-        line: "rgba(255,255,255,0.08)",
-        line2: "rgba(255,255,255,0.14)",
+        // Every token resolves to a CSS variable defined in styles/index.css, so
+        // the whole palette flips on [data-theme="light"] with no class changes.
+        // The dark values (the mockup palette) are the :root defaults.
+        canvas: "var(--c-canvas)",
+        rail: "var(--c-rail)",
+        surface: "var(--c-surface)",
+        raise: "var(--c-raise)",
+        raise2: "var(--c-raise2)",
+        field: "var(--c-field)",
+        line: "var(--c-line)",
+        line2: "var(--c-line2)",
+        // an opaque popover surface (menus/pops must not let content bleed through)
+        popover: "var(--c-popover)",
         // text tiers
-        t1: "#f4f4f4",
-        t2: "rgba(244,244,244,0.66)",
-        t3: "rgba(244,244,244,0.4)",
+        t1: "var(--c-t1)",
+        t2: "var(--c-t2)",
+        t3: "var(--c-t3)",
         // status
-        ok: "#6cc08a",
-        warn: "#e0b354",
-        err: "#e8756c",
-        // accent (light-on-dark pill)
-        acc: "#f3f3f3",
-        "acc-on": "#161616",
+        ok: "var(--c-ok)",
+        warn: "var(--c-warn)",
+        err: "var(--c-err)",
+        // accent (a high-contrast pill: light-on-dark in dark, dark-on-light in light)
+        acc: "var(--c-acc)",
+        "acc-on": "var(--c-acc-on)",
       },
       borderRadius: {
         // design contract: 8/6 radii (the 8px card, the 6px control)
@@ -54,8 +58,8 @@ export default {
         tightui: "-0.008em",
       },
       boxShadow: {
-        pop: "0 18px 44px rgba(0,0,0,0.5)",
-        file: "0 6px 20px rgba(0,0,0,0.16)",
+        pop: "var(--shadow-pop)",
+        file: "var(--shadow-file)",
       },
     },
   },
