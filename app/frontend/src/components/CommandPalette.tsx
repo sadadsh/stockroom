@@ -61,6 +61,9 @@ export function CommandPalette() {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // The element that had focus when the palette opened, so focus can return there
+  // on close instead of being lost to the body (the modal focus contract).
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   // Register the one genuinely global action. Its title tracks the current theme
   // (offer the theme you are not on), so re-register when the theme flips; drop it
@@ -89,12 +92,22 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Fresh every open: clear the query, reset the highlight, and focus the input.
+  // Fresh every open: remember where focus was, clear the query, reset the
+  // highlight, and focus the input. On close, return focus to where it was so the
+  // modal never leaves focus stranded on inert background content.
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setActive(0);
-    inputRef.current?.focus();
+    if (open) {
+      restoreFocusRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setQuery("");
+      setActive(0);
+      inputRef.current?.focus();
+    } else {
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    }
   }, [open]);
 
   // A new query re-ranks everything, so the highlight returns to the top match.
@@ -204,6 +217,11 @@ export function CommandPalette() {
     } else if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
+    } else if (e.key === "Tab") {
+      // Trap Tab: the input is the only tabbable control, and the results are
+      // driven by the arrow keys, so keep focus in the dialog rather than letting
+      // Tab escape to the inert background behind the scrim.
+      e.preventDefault();
     }
   }
 
@@ -220,7 +238,7 @@ export function CommandPalette() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line bg-raise shadow-pop"
+        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label="Command Palette"
@@ -252,7 +270,9 @@ export function CommandPalette() {
         >
           {flat.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-t3">
-              No commands or parts match.
+              {q && partsQuery.isLoading
+                ? "Searching..."
+                : "No commands or parts match."}
             </div>
           ) : (
             sections.map((section) => (

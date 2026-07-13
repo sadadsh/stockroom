@@ -43,10 +43,16 @@ const R10K: PartSummary = {
   missing: [],
 };
 
-// A probe that exposes the active route so navigation is observable in the DOM.
+// A probe that exposes the active route so navigation is observable in the DOM,
+// plus a focusable control outside the palette to test focus restore-on-close.
 function RouteProbe() {
   const { route } = useRouter();
-  return <div data-testid="route">{route}</div>;
+  return (
+    <>
+      <div data-testid="route">{route}</div>
+      <button data-testid="outside">Outside</button>
+    </>
+  );
 }
 
 function renderPalette() {
@@ -125,14 +131,30 @@ describe("CommandPalette", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("is keyboard-drivable: Arrow moves the highlight and Enter runs it", async () => {
+  it("moves the highlight with ArrowDown and ArrowUp, then Enter runs it", async () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
     // Empty query: [Components, Ingest, Duplicates, Settings, Switch Theme].
-    // Move to the second item (Ingest) and run it.
-    await user.keyboard("{ArrowDown}{Enter}");
+    // Down, down, up lands back on Ingest (index 1). This is load-bearing for BOTH
+    // arrows: a broken ArrowDown would keep the highlight on Components, and a
+    // broken ArrowUp would leave it on Duplicates, so either regression routes
+    // somewhere other than Ingest.
+    await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}{Enter}");
     expect(screen.getByTestId("route")).toHaveTextContent("ingest");
+  });
+
+  it("wraps ArrowUp from the first item to the last", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await open(user);
+    // From the first item (Components), one ArrowUp wraps to the last item (the
+    // theme action); running it flips the theme. A no-op or non-wrapping ArrowUp
+    // would run Components instead and leave the theme unchanged.
+    await user.keyboard("{ArrowUp}{Enter}");
+    await waitFor(() =>
+      expect(document.documentElement.dataset.theme).toBe("light"),
+    );
   });
 
   it("finds parts by any field and jumps to the part on Components when picked", async () => {
@@ -159,6 +181,55 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(mockApi.listParts).toHaveBeenCalled());
     expect(screen.queryByText("Parts")).toBeNull();
     expect(screen.queryByText("LM358")).toBeNull();
+  });
+
+  it("shows a searching state (not 'no match') while the parts fetch is in flight", async () => {
+    // Hold the parts fetch open so a parts-only query cannot resolve yet.
+    let release!: (v: { parts: PartSummary[]; count: number }) => void;
+    mockApi.listParts.mockReturnValue(
+      new Promise((r) => {
+        release = r;
+      }),
+    );
+    const user = userEvent.setup();
+    renderPalette();
+    await open(user);
+    // "yageo" matches no command, so parts are the only possible source; they are
+    // still loading, so the honest-negative must not be shown yet.
+    await user.type(screen.getByLabelText("Search Commands and Parts"), "yageo");
+    expect(screen.getByText("Searching...")).toBeInTheDocument();
+    expect(screen.queryByText("No commands or parts match.")).toBeNull();
+    // Once the fetch resolves with a match, the real result replaces the spinner.
+    release({ parts: [LM358, R10K], count: 2 });
+    expect(await screen.findByText("R 10k")).toBeInTheDocument();
+    expect(screen.queryByText("Searching...")).toBeNull();
+  });
+
+  it("restores focus to the previously focused element on close", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    const outside = screen.getByTestId("outside");
+    outside.focus();
+    expect(outside).toHaveFocus();
+
+    await open(user); // Ctrl+K captures the prior focus and moves it to the input
+    expect(screen.getByLabelText("Search Commands and Parts")).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(outside).toHaveFocus());
+  });
+
+  it("traps Tab so focus cannot escape to the background", async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await open(user);
+    const input = screen.getByLabelText("Search Commands and Parts");
+    expect(input).toHaveFocus();
+    // Tab is trapped (the results are arrow-driven), so focus stays on the input
+    // rather than leaking to the inert "Outside" button behind the scrim.
+    await user.tab();
+    expect(input).toHaveFocus();
+    expect(screen.getByTestId("outside")).not.toHaveFocus();
   });
 
   it("shows an honest empty state when nothing matches", async () => {
