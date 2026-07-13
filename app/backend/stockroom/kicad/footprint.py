@@ -20,6 +20,11 @@ class Footprint:
     def name(self) -> str:
         return self._doc.root.children[1].value
 
+    def set_name(self, name: str) -> None:
+        """Rename the footprint (the first string token after `footprint`),
+        byte-preserving everything else."""
+        self._doc.root.children[1].set_value(name, quote=True)
+
     def _model_node(self):
         return self._doc.root.find("model")
 
