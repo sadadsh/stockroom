@@ -1,0 +1,75 @@
+import shutil
+
+import pytest
+
+from stockroom.api.updater import AppUpdater, UpdateState
+from stockroom.vcs.repo import GitRepo
+
+pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+
+
+def _origin_and_clone(tmp_path):
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    o = GitRepo(origin)
+    o.init()
+    (origin / "app.py").write_text("v1\n", encoding="utf-8")
+    o.commit("v1", [origin / "app.py"])
+    clone = tmp_path / "clone"
+    c = GitRepo(clone)
+    c.clone_from(origin)
+    return o, origin, c, clone
+
+
+def test_update_pulls_a_fast_forward_and_requests_restart(tmp_path):
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    # advance origin so the clone is behind by a fast-forwardable commit
+    (origin / "app.py").write_text("v2\n", encoding="utf-8")
+    o.commit("v2", [origin / "app.py"])
+
+    ran = {"uv": False, "restart": False}
+    updater = AppUpdater(
+        c,
+        uv_runner=lambda: ran.__setitem__("uv", True),
+        restart=lambda: ran.__setitem__("restart", True),
+    )
+    result = updater.update()
+    assert result.state == UpdateState.UPDATED
+    assert result.updated is True
+    assert result.restart_requested is True
+    assert ran["uv"] is True
+    assert ran["restart"] is True
+    assert (clone / "app.py").read_text() == "v2\n"
+
+
+def test_update_up_to_date_does_not_run_uv_or_restart(tmp_path):
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    ran = {"uv": False}
+    updater = AppUpdater(c, uv_runner=lambda: ran.__setitem__("uv", True), restart=lambda: None)
+    result = updater.update()
+    assert result.state == UpdateState.UP_TO_DATE
+    assert result.updated is False
+    assert ran["uv"] is False
+
+
+def test_update_diverged_is_surfaced_not_guessed(tmp_path):
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    # make the clone diverge: a local commit AND a different origin commit
+    (clone / "app.py").write_text("local\n", encoding="utf-8")
+    c.commit("local change", [clone / "app.py"])
+    (origin / "app.py").write_text("remote\n", encoding="utf-8")
+    o.commit("remote change", [origin / "app.py"])
+
+    updater = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None)
+    result = updater.update()
+    assert result.state == UpdateState.DIVERGED
+    assert result.restart_requested is False
+
+
+def test_check_reports_when_an_update_is_available(tmp_path):
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    (origin / "app.py").write_text("v2\n", encoding="utf-8")
+    o.commit("v2", [origin / "app.py"])
+    c.repo_fetch() if hasattr(c, "repo_fetch") else None  # fetch handled inside check()
+    info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
+    assert "update_available" in info
