@@ -72,7 +72,7 @@ export function EnrichPanel({ mpn, category, current, onApply, busy = false }: P
 
         {enrich.isError ? (
           <div className="mt-3 text-sm text-err">
-            Lookup Failed.{" "}
+            Lookup failed.{" "}
             {enrich.error instanceof Error ? enrich.error.message : "Unknown error."}
           </div>
         ) : null}
