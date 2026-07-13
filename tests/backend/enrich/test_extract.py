@@ -57,3 +57,36 @@ def test_cascade_falls_back_to_heuristics_when_no_structured_data():
     r = extract_all(_html("no_structured.html"), "https://x/p")
     assert "MAX232" in (r.description.value or "")
     assert r.description.confidence == "low"  # heuristic is lowest trust
+
+
+def test_jsonld_captures_an_explicit_datasheet_url():
+    html = (
+        '<script type="application/ld+json">'
+        '{"@context":"https://schema.org","@type":"Product","mpn":"X",'
+        '"datasheet":"https://ti.com/lit/ds/x.pdf"}</script>'
+    )
+    r = extract_jsonld_product(html)
+    assert r.datasheet_url.value == "https://ti.com/lit/ds/x.pdf"
+    assert r.datasheet_url.source == "jsonld"
+
+
+def test_jsonld_datasheet_from_additional_property():
+    html = (
+        '<script type="application/ld+json">'
+        '{"@context":"https://schema.org","@type":"Product","mpn":"X",'
+        '"additionalProperty":[{"@type":"PropertyValue","name":"Datasheet",'
+        '"value":"https://example.com/parts/x-datasheet.pdf"}]}</script>'
+    )
+    r = extract_jsonld_product(html)
+    assert r.datasheet_url.value == "https://example.com/parts/x-datasheet.pdf"
+
+
+def test_jsonld_ignores_a_non_datasheet_url_in_the_datasheet_field():
+    # a product-page URL sneaking into the field must NOT be stored as a datasheet
+    html = (
+        '<script type="application/ld+json">'
+        '{"@context":"https://schema.org","@type":"Product","mpn":"X",'
+        '"datasheet":"https://lcsc.com/product-detail/C1.html"}</script>'
+    )
+    r = extract_jsonld_product(html)
+    assert r.datasheet_url is None
