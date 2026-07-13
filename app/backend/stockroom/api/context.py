@@ -34,6 +34,7 @@ class AppContext:
     enrich_cache_dir: Path
     token: str
     jobs: JobRunner = field(default_factory=JobRunner)
+    rendered_dom_fetcher: object | None = None  # RenderedDomFetcher; set by the host on Windows
 
     def rebuild_index(self) -> None:
         self.index.close()
