@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
@@ -19,6 +19,8 @@ vi.mock("../api/client", async (importActual) => {
       facets: vi.fn(),
       partDetail: vi.fn(),
       editField: vi.fn(),
+      moveCategory: vi.fn(),
+      deletePart: vi.fn(),
     },
   };
 });
@@ -104,6 +106,51 @@ describe("ComponentsPage", () => {
 
     expect(mockApi.editField).toHaveBeenCalledWith("lm358", "manufacturer", "TI Inc");
     expect(await screen.findByText("Saved")).toBeInTheDocument();
+  });
+
+  it("moves a part to another category through the select", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1, Passives: 3 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.moveCategory.mockResolvedValue({ ...DETAIL, category: "Passives" });
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    const select = await screen.findByLabelText("Category");
+    await user.selectOptions(select, "Passives");
+
+    expect(mockApi.moveCategory).toHaveBeenCalledWith("lm358", "Passives");
+    expect(await screen.findByText("Moved To Passives")).toBeInTheDocument();
+  });
+
+  it("deletes a part only after an in-window confirm", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.deletePart.mockResolvedValue(undefined);
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Delete Part" }));
+    const dialog = await screen.findByRole("dialog");
+    // Nothing deleted until the dialog's own confirm is clicked.
+    expect(mockApi.deletePart).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(mockApi.deletePart).toHaveBeenCalledWith("lm358");
+    expect(await screen.findByText("Part Deleted")).toBeInTheDocument();
   });
 
   it("shows the honest empty state when the library has no parts", async () => {

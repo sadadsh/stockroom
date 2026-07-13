@@ -54,3 +54,24 @@ export function useEditField() {
     onSuccess: (_data, vars) => invalidate(vars.id),
   });
 }
+
+export function useMoveCategory() {
+  const invalidate = useInvalidateAfterWrite();
+  return useMutation({
+    mutationFn: (vars: { id: string; category: string }) =>
+      api.moveCategory(vars.id, vars.category),
+    onSuccess: (_data, vars) => invalidate(vars.id),
+  });
+}
+
+export function useDeletePart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deletePart(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["facets"] });
+      qc.removeQueries({ queryKey: ["part", id] });
+    },
+  });
+}

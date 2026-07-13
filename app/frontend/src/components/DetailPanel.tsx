@@ -6,10 +6,11 @@
  * by the real purchase records. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef } from "../api/types";
-import { Badge, Card, Dot, Eyebrow } from "./primitives";
+import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
 import { EditableText } from "./EditableText";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
 import {
   CubeArt,
@@ -32,6 +33,12 @@ interface Props {
   // When provided, the identity fields become inline-editable and each save
   // routes through here (field name + new value). Omit it for a read-only panel.
   onEditField?: (field: string, value: unknown) => void;
+  // Category is not an inline edit (it relocates the symbol + footprint), so it
+  // moves through onMoveCategory, offered as a select over the known categories.
+  onMoveCategory?: (category: string) => void;
+  categories?: string[];
+  // Deleting confirms in-window, then routes here.
+  onDelete?: () => void;
   busy?: boolean;
 }
 
@@ -42,8 +49,12 @@ export function DetailPanel({
   missing,
   isComplete,
   onEditField,
+  onMoveCategory,
+  categories,
+  onDelete,
   busy = false,
 }: Props) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -91,11 +102,18 @@ export function DetailPanel({
           </div>
           <div className="mt-1 text-sm text-t3">{subtitle}</div>
         </div>
-        <CompletenessRing
-          score={score}
-          total={PASSPORT_TOTAL}
-          complete={isComplete}
-        />
+        <div className="flex flex-none items-center gap-3">
+          {onDelete ? (
+            <Button small onClick={() => setConfirmDelete(true)} disabled={busy}>
+              Delete Part
+            </Button>
+          ) : null}
+          <CompletenessRing
+            score={score}
+            total={PASSPORT_TOTAL}
+            complete={isComplete}
+          />
+        </div>
       </div>
 
       {/* completeness block */}
@@ -155,9 +173,18 @@ export function DetailPanel({
           onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
           busy={busy}
         />
-        {/* Category moves the symbol + footprint between libraries, so it is not
-            an inline field edit; the move flow lands in the next slice. */}
-        <IdRow label="Category" value={detail.category} />
+        {/* Category moves the symbol + footprint between libraries, so it is a
+            select over known categories, not an inline field edit. */}
+        {onMoveCategory && categories && categories.length > 0 ? (
+          <CategoryRow
+            value={detail.category}
+            categories={categories}
+            onMove={onMoveCategory}
+            busy={busy}
+          />
+        ) : (
+          <IdRow label="Category" value={detail.category} />
+        )}
         <IdRow
           label="Description"
           value={detail.description}
@@ -186,6 +213,64 @@ export function DetailPanel({
       {/* sourcing */}
       <Eyebrow className="mb-2.5 mt-6">Sourcing</Eyebrow>
       <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+
+      {onDelete ? (
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Delete This Part?"
+          body={
+            <>
+              This removes {detail.display_name}'s symbol, footprint, and record in
+              one commit. You can restore it from git history.
+            </>
+          }
+          confirmLabel="Delete"
+          danger
+          busy={busy}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CategoryRow({
+  value,
+  categories,
+  onMove,
+  busy,
+}: {
+  value: string;
+  categories: string[];
+  onMove: (category: string) => void;
+  busy?: boolean;
+}) {
+  // Always include the current category, even if the facets have not caught up.
+  const options = categories.includes(value) ? categories : [value, ...categories];
+  return (
+    <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
+      <span className="w-[116px] flex-none pt-1.5 text-xs text-t3">Category</span>
+      <span className="flex min-w-0 flex-1 items-center">
+        <select
+          aria-label="Category"
+          value={value}
+          disabled={busy}
+          onChange={(e) => {
+            if (e.target.value !== value) onMove(e.target.value);
+          }}
+          className="rounded-control border border-line2 bg-field px-2 py-1 text-base text-t1 outline-none focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {options.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </span>
     </div>
   );
 }

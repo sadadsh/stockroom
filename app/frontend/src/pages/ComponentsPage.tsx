@@ -13,6 +13,8 @@ import {
   useFacetsQuery,
   usePartDetailQuery,
   useEditField,
+  useMoveCategory,
+  useDeletePart,
 } from "../api/queries";
 import { ApiError } from "../api/client";
 import { useToast } from "../lib/toast";
@@ -32,9 +34,18 @@ export function ComponentsPage() {
   const facetsQuery = useFacetsQuery();
   const detailQuery = usePartDetailQuery(selectedId);
   const editField = useEditField();
+  const moveCategory = useMoveCategory();
+  const deletePart = useDeletePart();
   const { toast } = useToast();
 
   const parts = partsQuery.data?.parts ?? [];
+  const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
+  const detailBusy =
+    editField.isPending || moveCategory.isPending || deletePart.isPending;
+
+  function toastError(err: unknown, fallback: string) {
+    toast(err instanceof ApiError ? err.message : fallback, "err");
+  }
 
   function handleEditField(field: string, value: unknown) {
     if (!selectedId) return;
@@ -42,10 +53,33 @@ export function ComponentsPage() {
       { id: selectedId, field, value },
       {
         onSuccess: () => toast("Saved", "ok"),
-        onError: (err) =>
-          toast(err instanceof ApiError ? err.message : "Could not save", "err"),
+        onError: (err) => toastError(err, "Could not save"),
       },
     );
+  }
+
+  function handleMoveCategory(nextCategory: string) {
+    if (!selectedId) return;
+    moveCategory.mutate(
+      { id: selectedId, category: nextCategory },
+      {
+        onSuccess: () => toast(`Moved To ${nextCategory}`, "ok"),
+        onError: (err) => toastError(err, "Could not move"),
+      },
+    );
+  }
+
+  function handleDelete() {
+    if (!selectedId) return;
+    deletePart.mutate(selectedId, {
+      onSuccess: () => {
+        toast("Part Deleted", "ok");
+        // Drop the selection; the auto-select effect picks the next part once the
+        // invalidated list refetches.
+        setSelectedId(null);
+      },
+      onError: (err) => toastError(err, "Could not delete"),
+    });
   }
 
   // Auto-select the first part when the current selection falls out of the list
@@ -113,7 +147,10 @@ export function ComponentsPage() {
               missing={selectedSummary?.missing ?? []}
               isComplete={selectedSummary?.is_complete ?? false}
               onEditField={handleEditField}
-              busy={editField.isPending}
+              onMoveCategory={handleMoveCategory}
+              categories={categories}
+              onDelete={handleDelete}
+              busy={detailBusy}
             />
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
