@@ -6,6 +6,7 @@ import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { RouterProvider } from "./lib/router";
 import { ToastProvider } from "./lib/toast";
+import { ThemeProvider } from "./lib/theme";
 
 vi.mock("./api/client", async (importActual) => {
   const actual = await importActual<typeof import("./api/client")>();
@@ -59,11 +60,13 @@ describe("App shell", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <ToastProvider>
-          <RouterProvider initial="components">
-            <App />
-          </RouterProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <RouterProvider initial="components">
+              <App />
+            </RouterProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </QueryClientProvider>,
     );
 
@@ -85,11 +88,13 @@ describe("App shell", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
-        <ToastProvider>
-          <RouterProvider initial="components">
-            <App />
-          </RouterProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <RouterProvider initial="components">
+              <App />
+            </RouterProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </QueryClientProvider>,
     );
     const user = userEvent.setup();
