@@ -272,7 +272,9 @@ export function CommandPalette() {
             <div className="px-4 py-6 text-center text-sm text-t3">
               {q && partsQuery.isLoading
                 ? "Searching..."
-                : "No commands or parts match."}
+                : q && partsQuery.isError
+                  ? "Could not load parts."
+                  : "No commands or parts match."}
             </div>
           ) : (
             sections.map((section) => (
