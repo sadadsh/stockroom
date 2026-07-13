@@ -183,23 +183,45 @@ in one place:
 - Editing an existing part toward completeness is always allowed; the gate is on entry to the primary
   library, not on working toward it in staging.
 
-### 6.1 Scraper-first enrichment (reduce dependence on the limited API key)
-So that completeness does not bottleneck on the Mouser API cap (1000/day, 30/min), the enrichment cascade
-is scraper-first, with the API as one source among several rather than the sole path:
+### 6.1 Scrape-first enrichment (no dependence on distributor APIs)
+Owner decision (2026-07-13): enrichment is scrape-first and does NOT rely on the Mouser API, which is
+unreliable (the 1000/day, 30/min cap plus general flakiness). The KiCad ecosystem (KiCost's decade of
+scraping) warns that scrapers rot and get IP-banned, but that failure mode is specific to HTTP-client plus
+CSS-selector scraping. Stockroom's approach is structurally more robust and dodges it:
 
-1. **Purchase-link scrape (primary):** given a pasted purchase URL, fetch with a Chrome-impersonating client,
-   then cascade schema.org JSON-LD Product markup, OpenGraph/meta, per-site extractors, and embedded JS state
-   to extract MPN, manufacturer, description, price breaks, and the datasheet link. No API key consumed.
-2. **Datasheet-link scrape (primary):** follow the datasheet URL (real User-Agent, Referer set to the source
-   page, HTTP/1.1 retry when HTTP/2 fails), validate by `Content-Type` plus `%PDF-` magic bytes (reject HTML
-   viewer wrappers), store the PDF, and extract specs from it.
-3. **WebView2 rendered-DOM fallback:** for bot-protected sites (Cloudflare, Akamai) that defeat any HTTP
-   client, load the page in the real WebView2 engine the app already hosts and read the rendered DOM. User
-   initiated, one page at a time, never a crawler. This is the concrete payoff of the WebView2 shell decision.
-4. **Mouser API (supplement):** used when a key is present and helpful, not as the required path. The existing
-   rate-limit handling and SRC-04 cap countdown are reused so a capped key degrades honestly to the scraper.
+1. **Real browser, not an HTTP client.** Stockroom hosts a real WebView2 engine, so it loads the pasted page
+   in an actual browser context and reads the RENDERED DOM. This sails through the Cloudflare/Akamai JS
+   challenges that fingerprint and ban HTTP scrapers. User initiated, one page at a time, never a crawler.
+2. **Structured data first, CSS last.** The extraction cascade prioritizes machine-readable, SEO-stable
+   sources that barely change across redesigns: schema.org JSON-LD `Product` markup, then OpenGraph/meta,
+   then embedded JS state (`__NEXT_DATA__`-style), then per-site extractor modules, then heuristics. The
+   low-rot layers carry most fields; CSS scraping is the last resort, not the first.
+3. **The datasheet is a first-class, ban-proof source.** The datasheet PDF never rate-limits, never bans, and
+   never redesigns. Follow the datasheet link (real User-Agent, Referer, HTTP/1.1 retry), validate by
+   `Content-Type` plus `%PDF-` magic bytes, store it, and extract MPN/manufacturer/package/specs from it. This
+   is the most stable enrichment source and is preferred over any distributor page.
+4. **Mouser API is OPTIONAL and off by default.** Not the primary path, not a required floor, not enabled
+   unless the user explicitly opts in. If enabled, it is one more source in the cascade; if disabled or
+   capped, nothing breaks.
 
-Enrichment never silently overwrites a filled field; changes to existing values are per-field opt-in.
+Robustness so scraping holds up (patterns validated by the ecosystem research, section reference below):
+- **Polite pacing:** a sliding-window rate limiter (burst to N, then sleep `window - elapsed`) so Stockroom
+  never hammers a site into banning it.
+- **Per-part TTL cache** keyed on a filesystem-safe normalized MPN, so a part is never re-scraped needlessly.
+- **Exact-MPN match:** on a multi-result page, prefer the row whose MPN equals the query, never blindly the
+  first result (a classic wrong-part bug).
+- **Priority-registry fall-through:** sources are tried in order; each fills what it can; the next only handles
+  what is still missing.
+- **Own the schema:** scraped fields are normalized into Stockroom's own versioned, category-keyed canonical
+  schema, never a passthrough of a distributor's field names (which break silently when they change).
+
+**Source-agnostic completeness (critical):** the complete-to-add gate must NEVER hard-depend on any single
+source. A field a scraper misses is simply left for manual fill; a dead scraper can never wall a part off from
+reaching complete. Enrichment never silently overwrites a filled field; changes to existing values are
+per-field opt-in.
+
+(Ecosystem evidence and the reuse/license map behind these choices:
+`docs/research/2026-07-13-kicad-ecosystem-learnings.md`.)
 
 ## 7. Library archive and migration of the current library
 
