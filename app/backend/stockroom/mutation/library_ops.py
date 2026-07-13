@@ -12,8 +12,7 @@ from pathlib import Path
 
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.category import category_nickname, slugify
-from stockroom.model.category import category_footprint_lib, category_symbol_lib
+from stockroom.model.category import category_nickname
 from stockroom.model.part import (
     Datasheet,
     LibRef,
