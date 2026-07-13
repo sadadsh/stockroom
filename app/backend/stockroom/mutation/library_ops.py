@@ -23,6 +23,7 @@ from stockroom.model.part import (
     new_part_id,
 )
 from stockroom.mutation.placement import (
+    kicad_visible_properties,
     merge_symbol_into_lib,
     mirror_fields_to_symbol,
     place_footprint,
@@ -56,6 +57,20 @@ class StagedPart:
     datasheet_source: Path | None = None
     provenance: Provenance | None = None
     datasheet_meta: Datasheet | None = None
+
+
+@dataclass
+class DriftItem:
+    part_id: str
+    property: str
+    json_value: str
+    symbol_value: str
+
+
+@dataclass
+class DriftReport:
+    items: list[DriftItem] = field(default_factory=list)
+    missing_symbol: list[str] = field(default_factory=list)
 
 
 class LibraryOps:
@@ -238,3 +253,29 @@ class LibraryOps:
                     dp.unlink()
                     txn.track(dp)
             txn.commit(f"Delete {part_id}")
+
+    def detect_drift(self) -> DriftReport:
+        """Compare each part's JSON (the source of truth) against its symbol's
+        mirrored properties; report mismatches. Detection only: healing is the
+        M6 doctor UI (shows a diff before healing, spec section 3)."""
+        report = DriftReport()
+        parts_dir = self.lib.parts_dir
+        if not parts_dir.exists():
+            return report
+        for json_path in sorted(parts_dir.glob("*.json")):
+            record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
+            if record.symbol is None:
+                continue
+            sym_lib_path = self.lib.symbol_lib_path(record.category)
+            try:
+                sym = SymbolLib.load(sym_lib_path).get_symbol(record.symbol.name)
+            except Exception:
+                report.missing_symbol.append(record.id)
+                continue
+            for prop, expected in kicad_visible_properties(record).items():
+                actual = sym.get_property(prop)
+                if actual is not None and actual != expected:
+                    report.items.append(
+                        DriftItem(part_id=record.id, property=prop, json_value=expected, symbol_value=actual)
+                    )
+        return report

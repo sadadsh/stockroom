@@ -159,3 +159,31 @@ def test_delete_part_removes_everything(tmp_path, fixtures_dir):
     assert not (lib.models_dir / "TPS62130RGTR.step").exists()
     assert not (lib.datasheets_dir / "tps62130rgtr.pdf").exists()
     assert repo.is_clean()
+
+
+def test_detect_drift_clean_after_add(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    report = ops.detect_drift()
+    assert report.items == []
+    assert report.missing_symbol == []
+
+
+def test_detect_drift_finds_behind_the_back_edit(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    # scribble the symbol property directly, as if KiCad edited it
+    sym_lib_path = profile.library.symbol_lib_path("ICs")
+    lib = SymbolLib.load(sym_lib_path)
+    lib.get_symbol("TPS62130RGTR").set_property("Manufacturer", "WRONG")
+    lib.save(sym_lib_path)
+
+    report = ops.detect_drift()
+    assert len(report.items) == 1
+    item = report.items[0]
+    assert item.part_id == "tps62130rgtr"
+    assert item.property == "Manufacturer"
+    assert item.json_value == "TI"
+    assert item.symbol_value == "WRONG"
