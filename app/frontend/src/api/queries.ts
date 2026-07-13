@@ -100,3 +100,97 @@ export function useIngestCommit() {
     },
   });
 }
+
+// --- Settings page server state (M6g) ---
+
+export function useSettings() {
+  return useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
+}
+
+export function useUpdateSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: { mouser_api_key?: string }) => api.updateSettings(patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+  });
+}
+
+export function useProfiles() {
+  return useQuery({ queryKey: ["profiles"], queryFn: () => api.listProfiles() });
+}
+
+export function useSystemInfo() {
+  return useQuery({ queryKey: ["system"], queryFn: () => api.getSystemInfo() });
+}
+
+export function useCreateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { name: string; archive?: boolean }) =>
+      api.createProfile(vars.name, vars.archive),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
+
+// Activating a profile swaps the whole library, so the parts list, facets, and
+// the system readout (active_profile, part_count) all change under it. Refresh
+// them alongside the profile list rather than leaving a stale Components view.
+export function useActivateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.activateProfile(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profiles"] });
+      qc.invalidateQueries({ queryKey: ["system"] });
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["facets"] });
+    },
+  });
+}
+
+export function useDeleteProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.deleteProfile(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
+
+export function useSyncStatus() {
+  return useQuery({
+    queryKey: ["sync-status"],
+    queryFn: () => api.getSyncStatus(),
+  });
+}
+
+// A sync that pulled new commits changed the library on disk, so the parts view
+// must refresh; a no-op/up-to-date sync leaves the parts view untouched (only the
+// sync status changes). Either way the status readout is refreshed.
+export function useDoSync() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.doSync(),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["sync-status"] });
+      if (result.pulled) {
+        qc.invalidateQueries({ queryKey: ["parts"] });
+        qc.invalidateQueries({ queryKey: ["facets"] });
+      }
+    },
+  });
+}
+
+export function useUpdateCheck() {
+  return useQuery({
+    queryKey: ["update-check"],
+    queryFn: () => api.checkUpdate(),
+  });
+}
+
+export function useApplyUpdate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.applyUpdate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["update-check"] }),
+  });
+}

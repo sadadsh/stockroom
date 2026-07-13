@@ -21,7 +21,7 @@ export const NAV: NavEntry[] = [
   { route: "duplicates", title: "Duplicates", glyph: "⧉", group: "primary", available: false },
   { route: "projects", title: "Projects", glyph: "▧", group: "primary", available: false },
   { route: "doctor", title: "Doctor", glyph: "✚", group: "foot", available: false },
-  { route: "settings", title: "Settings", glyph: "⚙", group: "foot", available: false },
+  { route: "settings", title: "Settings", glyph: "⚙", group: "foot", available: true },
 ];
 
 export function availableNav(): NavEntry[] {
