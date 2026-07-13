@@ -55,6 +55,18 @@ def test_missing_window_is_an_honest_error_not_a_silent_empty():
         fetcher.rendered_html("https://x", timeout=0.1)
 
 
+def test_default_window_uses_the_dedicated_fetch_window_not_the_spa_window(monkeypatch):
+    # security + UX: the fetcher must use a DEDICATED hidden window, never the SPA
+    # window (which carries the token-injecting `loaded` handler) — so navigating to a
+    # bot-protected vendor page cannot leak the token nor hijack the user's app view.
+    import stockroom.host.window as win
+
+    monkeypatch.setattr(win, "_ACTIVE_WINDOW", "SPA-WINDOW")
+    monkeypatch.setattr(win, "fetch_window", lambda: "FETCH-WINDOW")
+    fetcher = WebViewRenderedDomFetcher()  # default provider
+    assert fetcher._window_provider() == "FETCH-WINDOW"
+
+
 @pytest.mark.windows_only
 def test_real_webview2_reads_a_rendered_dom():
     # Owner runs this on the Windows box against a real page; asserts the rendered

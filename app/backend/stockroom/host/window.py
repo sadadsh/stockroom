@@ -12,12 +12,39 @@ helpers (inject_script, dropped_paths_to_inspect_body, active_window) are Linux-
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit
 
 _ACTIVE_WINDOW = None
+_FETCH_WINDOW = None
 
 
 def active_window():
     return _ACTIVE_WINDOW
+
+
+def fetch_window():
+    """A DEDICATED hidden window for the RenderedDomFetcher, separate from the SPA
+    window. Created lazily on first use (Windows). It is distinct from active_window()
+    by construction and never gets the token-injecting `loaded` handler, so navigating
+    it to a bot-protected vendor page can neither leak the per-launch token to that
+    remote content nor hijack the user's visible app view."""
+    global _FETCH_WINDOW
+    if _FETCH_WINDOW is None:
+        import webview  # pywebview, WebView2 on Windows; lazy so Linux imports
+
+        _FETCH_WINDOW = webview.create_window("stockroom-fetch", hidden=True)
+    return _FETCH_WINDOW
+
+
+def should_inject(current_url: str | None, base_url: str) -> bool:
+    """Inject the token ONLY when the loaded page is the loopback SPA origin, never a
+    remote vendor page. The token is the sole guard on the local API (loopback + token,
+    defense in depth), so it must never be handed to remote web content. Fails CLOSED:
+    an unknown/blank current URL does not receive the token."""
+    if not current_url:
+        return False
+    a, b = urlsplit(current_url), urlsplit(base_url)
+    return (a.scheme, a.hostname, a.port) == (b.scheme, b.hostname, b.port)
 
 
 def dropped_paths_to_inspect_body(paths: list[str]) -> dict:
@@ -54,9 +81,16 @@ def run_window(base_url: str, token: str) -> None:
     _ACTIVE_WINDOW = window
 
     def _on_loaded():
-        # re-inject on EVERY load: after a self-update reload or an SPA route change
-        # the renderer must always carry the base + token.
-        window.evaluate_js(inject_script(base_url, token))
+        # Re-inject on every SPA load (after a self-update reload or route change the
+        # renderer must always carry the base + token), but ONLY when the loaded page
+        # is the loopback SPA origin — never a remote page, so the token can never leak
+        # to remote web content (defense in depth on top of the dedicated fetch window).
+        try:
+            current = window.get_current_url()
+        except Exception:  # noqa: BLE001 - a backend without get_current_url fails closed
+            current = None
+        if should_inject(current, base_url):
+            window.evaluate_js(inject_script(base_url, token))
 
     window.events.loaded += _on_loaded
     # Native drag/drop: pywebview exposes each dropped file's full path

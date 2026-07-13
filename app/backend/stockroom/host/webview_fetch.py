@@ -58,11 +58,11 @@ def _wait_for_settle(window, timeout: float) -> None:
 
 
 def _default_window():
-    # Resolve the running pywebview window (set by host.window at startup). Imported
-    # lazily so importing this module on Linux does not require pywebview.
-    from stockroom.host.window import active_window
+    # Use a DEDICATED hidden fetch window, NOT the SPA window: the SPA window carries
+    # the token-injecting `loaded` handler, so navigating IT to a bot-protected vendor
+    # page would leak the token and hijack the user's view. fetch_window() is created
+    # lazily (Windows) and is distinct by construction. Imported lazily so importing
+    # this module on Linux never requires pywebview.
+    from stockroom.host.window import fetch_window
 
-    win = active_window()
-    if win is None:
-        raise RuntimeError("no WebView2 window is running; cannot render a page")
-    return win
+    return fetch_window()
