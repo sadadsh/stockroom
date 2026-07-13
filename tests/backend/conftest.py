@@ -46,3 +46,19 @@ def _has_kicad_cli() -> bool:
 requires_kicad_cli = pytest.mark.skipif(
     not _has_kicad_cli(), reason="kicad-cli not installed"
 )
+
+
+def _has_glb_tooling() -> bool:
+    """trimesh (plus cascadio for STEP) drives the 3D model → GLB preview (M6d).
+    Optional tooling: an absent stack surfaces as an honest 502, so its real-model
+    integration test skips rather than fabricating a pass."""
+    try:
+        import trimesh  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+requires_glb_tooling = pytest.mark.skipif(
+    not _has_glb_tooling(), reason="trimesh/cascadio (3D GLB tooling) not installed"
+)

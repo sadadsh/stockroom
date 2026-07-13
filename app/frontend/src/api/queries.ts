@@ -112,6 +112,37 @@ export function useIngestCommit() {
   });
 }
 
+// --- Previews (M6d): symbol/footprint SVG + 3D model GLB ---
+
+// Read-only binary blobs rendered by the backend and cached there by content hash,
+// so the client keeps them a while and never retries an honest 404 (no symbol) or 502
+// (no 3D tooling). The viewer creates + revokes the object URL from the blob itself.
+export function usePreviewSvg(
+  kind: "symbol" | "footprint",
+  id: string,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["preview-svg", kind, id],
+    queryFn: () => api.previewSvg(kind, id),
+    enabled: enabled && !!id,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+// The 3D GLB is heavier (a STEP tessellation) so it is fetched only when the 3D view
+// is actually open (enabled), never eagerly with the detail panel.
+export function usePreviewGlb(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["preview-glb", id],
+    queryFn: () => api.modelGlb(id),
+    enabled: enabled && !!id,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
 // --- Settings page server state (M6g) ---
 
 export function useSettings() {

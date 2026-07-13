@@ -1,6 +1,6 @@
 import pytest
 
-from tests.backend.conftest import requires_kicad_cli
+from tests.backend.conftest import requires_glb_tooling, requires_kicad_cli
 
 
 def test_symbol_preview_404_when_part_absent(client):
@@ -48,3 +48,163 @@ def test_symbol_preview_end_to_end_with_real_cli(client):
     # marks the honest integration boundary. Skipped where kicad-cli is absent.
     r = client.get("/api/previews/symbol/tps62130.svg")
     assert r.status_code in (200, 404, 502)
+
+
+class _RecordingCli:
+    """A fake kicad-cli that records the black_and_white flag it was asked for, so a
+    test can prove the ?bw query param reaches the renderer."""
+
+    def __init__(self):
+        self.sym_bw: list[bool] = []
+        self.fp_bw: list[bool] = []
+
+    def sym_export_svg(self, lib, symbol, out_dir, black_and_white=False):
+        self.sym_bw.append(black_and_white)
+        out = out_dir / f"{symbol}_unit1.svg"
+        out.write_text(f"<svg data-bw='{black_and_white}'><!-- sym --></svg>", encoding="utf-8")
+        return [out]
+
+    def fp_export_svg(self, pretty_dir, footprint, out_dir, layers="F.Cu,F.SilkS,F.Fab", *, black_and_white=False):
+        self.fp_bw.append(black_and_white)
+        out = out_dir / f"{footprint}.svg"
+        out.write_text(f"<svg data-bw='{black_and_white}'><!-- fp --></svg>", encoding="utf-8")
+        return out
+
+
+def _client_with_cli(app_ctx, cli):
+    from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
+
+    app_ctx.cli = cli
+    app = create_app(app_ctx)
+    return TestClient(
+        app,
+        base_url="http://test",
+        raise_server_exceptions=False,
+        headers={"X-Stockroom-Token": "testtoken"},
+    )
+
+
+def test_symbol_preview_bw_param_reaches_the_renderer(app_ctx):
+    cli = _RecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get("/api/previews/symbol/tps62130.svg").status_code == 200
+        assert c.get("/api/previews/symbol/tps62130.svg?bw=true").status_code == 200
+    # the color request rendered with black_and_white False, the bw request with True
+    assert cli.sym_bw == [False, True]
+
+
+def test_footprint_preview_bw_param_reaches_the_renderer(app_ctx):
+    cli = _RecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get("/api/previews/footprint/tps62130.svg").status_code == 200
+        assert c.get("/api/previews/footprint/tps62130.svg?bw=true").status_code == 200
+    assert cli.fp_bw == [False, True]
+
+
+def test_bw_and_color_previews_cache_separately(app_ctx):
+    # A bw request must not be served the cached color SVG (and vice versa): distinct
+    # cache keys mean the renderer runs once per variant, not once total.
+    cli = _RecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        c.get("/api/previews/symbol/tps62130.svg?bw=true")
+        c.get("/api/previews/symbol/tps62130.svg?bw=true")  # served from cache
+        c.get("/api/previews/symbol/tps62130.svg")  # color: distinct key, renders
+    assert cli.sym_bw == [True, False]
+
+
+# --- 3D model → GLB (M6d-2) -------------------------------------------------
+
+def _put_model_file(app_ctx, rel="models/x.step", data=b"dummy"):
+    """Materialise the fixture part's model file on disk (tps62130's record points at
+    models/x.step but the fixture never wrote the bytes)."""
+    dst = app_ctx.profile.library.root / rel
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_bytes(data)
+    return dst
+
+
+def test_model_glb_404_when_part_absent(client):
+    assert client.get("/api/previews/model/nope.glb").status_code == 404
+
+
+def test_model_glb_404_when_part_has_no_model(client):
+    # the `mystery` fixture part carries no 3D model
+    assert client.get("/api/previews/model/mystery.glb").status_code == 404
+
+
+def test_model_glb_404_when_model_file_is_dangling(client):
+    # tps62130's record references models/x.step, but no such file exists on disk
+    assert client.get("/api/previews/model/tps62130.glb").status_code == 404
+
+
+def test_model_glb_502_when_conversion_tooling_absent(app_ctx, monkeypatch):
+    _put_model_file(app_ctx)
+    from stockroom.api.routers import previews as previews_mod
+    from stockroom.kicad.model_convert import ModelToolingMissing
+
+    def _no_tooling(_src):
+        raise ModelToolingMissing("trimesh not installed")
+
+    monkeypatch.setattr(previews_mod, "model_to_glb", _no_tooling)
+    with _client_with_cli(app_ctx, app_ctx.cli) as c:
+        r = c.get("/api/previews/model/tps62130.glb")
+    assert r.status_code == 502
+
+
+def test_model_glb_502_when_conversion_fails(app_ctx, monkeypatch):
+    _put_model_file(app_ctx)
+    from stockroom.api.routers import previews as previews_mod
+    from stockroom.kicad.model_convert import ModelConversionError
+
+    def _bad(_src):
+        raise ModelConversionError("empty mesh")
+
+    monkeypatch.setattr(previews_mod, "model_to_glb", _bad)
+    with _client_with_cli(app_ctx, app_ctx.cli) as c:
+        r = c.get("/api/previews/model/tps62130.glb")
+    assert r.status_code == 502
+
+
+def test_model_glb_returns_and_caches_glb(app_ctx, monkeypatch):
+    from stockroom.api.routers import previews as previews_mod
+    from stockroom.kicad.model_convert import GLB_MAGIC
+
+    _put_model_file(app_ctx)
+    calls = {"n": 0}
+
+    def _fake_convert(_src):
+        calls["n"] += 1
+        return GLB_MAGIC + b"\x02\x00\x00\x00rest"
+
+    monkeypatch.setattr(previews_mod, "model_to_glb", _fake_convert)
+    with _client_with_cli(app_ctx, app_ctx.cli) as c:
+        r1 = c.get("/api/previews/model/tps62130.glb")
+        r2 = c.get("/api/previews/model/tps62130.glb")
+    assert r1.status_code == 200
+    assert r1.headers["content-type"].startswith("model/gltf-binary")
+    assert r1.content[:4] == GLB_MAGIC
+    assert r2.content == r1.content
+    # second request is served from the on-disk cache: the converter runs once
+    assert calls["n"] == 1
+
+
+@requires_glb_tooling
+@requires_kicad_cli
+def test_model_glb_real_step_end_to_end(app_ctx):
+    import glob
+
+    steps = glob.glob("/usr/share/kicad/3dmodels/**/*.step", recursive=True)
+    if not steps:
+        import pytest as _pytest
+
+        _pytest.skip("no system KiCad STEP models to convert")
+    with open(steps[0], "rb") as fh:
+        _put_model_file(app_ctx, data=fh.read())
+    from stockroom.kicad.model_convert import GLB_MAGIC
+
+    with _client_with_cli(app_ctx, app_ctx.cli) as c:
+        r = c.get("/api/previews/model/tps62130.glb")
+    assert r.status_code == 200
+    assert r.content[:4] == GLB_MAGIC

@@ -13,6 +13,8 @@ import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
+import { PreviewImage } from "./PreviewImage";
+import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import {
   CubeArt,
   ExternalIcon,
@@ -56,6 +58,9 @@ export function DetailPanel({
   busy = false,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Which preview is expanded in the in-window modal (null = closed). The modal has
+  // tabs, so this is only the tab it opens on.
+  const [preview, setPreview] = useState<PreviewKind | null>(null);
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -143,20 +148,54 @@ export function DetailPanel({
           name="3D Model"
           present={!!detail.model?.file}
           art={<CubeArt />}
+          onOpen={detail.model?.file ? () => setPreview("model") : undefined}
         />
         <div className="flex flex-1 flex-col gap-3">
           <FileCard
             name="Symbol"
             present={!!detail.symbol?.name}
             art={<SymbolArt />}
+            thumb={
+              detail.symbol?.name ? (
+                <PreviewImage
+                  kind="symbol"
+                  partId={detail.id}
+                  fallback={<SymbolArt />}
+                />
+              ) : undefined
+            }
+            onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
           />
           <FileCard
             name="Footprint"
             present={!!detail.footprint?.name}
             art={<FootprintArt />}
+            thumb={
+              detail.footprint?.name ? (
+                <PreviewImage
+                  kind="footprint"
+                  partId={detail.id}
+                  fallback={<FootprintArt />}
+                />
+              ) : undefined
+            }
+            onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
           />
         </div>
       </div>
+
+      <PreviewModal
+        open={preview !== null}
+        partId={detail.id}
+        partName={detail.display_name}
+        available={{
+          model: !!detail.model?.file,
+          symbol: !!detail.symbol?.name,
+          footprint: !!detail.footprint?.name,
+        }}
+        initialKind={preview ?? "symbol"}
+        onClose={() => setPreview(null)}
+      />
 
       {/* identity fields */}
       <Eyebrow className="mb-2.5 mt-6">Component Fields</Eyebrow>
@@ -381,54 +420,79 @@ function FileCard({
   name,
   present,
   art,
+  thumb,
+  onOpen,
   className,
 }: {
   name: string;
   present: boolean;
   art: ReactNode;
+  // The live render shown when present (falls back to `art` internally on failure);
+  // omit it and `art` is shown directly (the 3D card keeps its glyph, viewed on open).
+  thumb?: ReactNode;
+  // When present and set, the whole card is a button that expands the preview.
+  onOpen?: () => void;
   className?: string;
 }) {
-  return (
-    <Card
+  const stage = (
+    <div
       className={
-        "flex min-w-0 flex-col overflow-hidden shadow-file " + (className ?? "")
+        "flex flex-1 items-center justify-center " +
+        (present
+          ? "bg-[rgba(0,0,0,0.18)] min-h-[118px]"
+          : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[118px] text-t3")
       }
     >
-      <div
-        className={
-          "flex flex-1 items-center justify-center " +
-          (present
-            ? "bg-[rgba(0,0,0,0.18)] min-h-[118px]"
-            : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[118px] text-t3")
-        }
-      >
+      {present ? (
+        thumb ?? art
+      ) : (
+        <>
+          <UploadIcon />
+          <span className="text-xs">No {name}</span>
+        </>
+      )}
+    </div>
+  );
+  const footer = (
+    <div className="flex items-center gap-2 px-3 py-2.5">
+      <span className="text-xs font-medium text-t1">{name}</span>
+      <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
         {present ? (
-          art
+          <>
+            <Dot tone="ok" />
+            {onOpen ? "View" : "Linked"}
+          </>
         ) : (
           <>
-            <UploadIcon />
-            <span className="text-xs">No {name}</span>
+            <Dot tone="warn" />
+            Not Linked
           </>
         )}
-      </div>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <span className="text-xs font-medium text-t1">{name}</span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
-          {present ? (
-            <>
-              <Dot tone="ok" />
-              Linked
-            </>
-          ) : (
-            <>
-              <Dot tone="warn" />
-              Not Linked
-            </>
-          )}
-        </span>
-      </div>
-    </Card>
+      </span>
+    </div>
   );
+  const cls =
+    "flex min-w-0 flex-col overflow-hidden shadow-file " + (className ?? "");
+  if (onOpen && present) {
+    // A card-styled button (Card is a div, not polymorphic) so the whole tile is one
+    // click target that expands the preview.
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Open ${name} Preview`}
+        className={
+          "rounded-card border border-line bg-raise " +
+          cls +
+          " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+        }
+      >
+        {stage}
+        {footer}
+      </button>
+    );
+  }
+  return <Card className={cls}>{stage}{footer}</Card>;
 }
 
 function Sourcing({
