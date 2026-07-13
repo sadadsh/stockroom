@@ -4,6 +4,8 @@ import zipfile
 import pytest
 
 from stockroom.ingest.pipeline import IngestPipeline
+from stockroom.ingest.staging import StagingCandidate
+from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
@@ -84,3 +86,25 @@ def test_failed_commit_leaves_zero_trace(tmp_path, fixtures_dir):
     assert pipe.repo.head() == head_before  # no commit
     # the category lib was never created/left behind
     assert not (pipe.profile.library.parts_dir / f"testpart.json").exists()
+
+
+def test_attach_model_to_existing_part(tmp_path, fixtures_dir):
+    pipe = _pipeline(tmp_path)
+    z = _snapeda_zip(tmp_path, fixtures_dir)
+    [c] = pipe.inspect(inputs=[z], workdir=tmp_path / "work")
+    c.category = "ICs"
+    c.entry_name = "TESTPART"
+    # Commit WITHOUT a model.
+    c.model_path = None
+    record = pipe.commit(c)
+
+    model = tmp_path / "late.step"
+    model.write_bytes(b"ISO-10303-21;\n")
+    partial = StagingCandidate(
+        vendor="partial", symbol_lib_path=None, symbol_name="",
+        footprint_variants=[], model_path=model,
+    )
+    updated = pipe.attach_model(record.id, partial)
+    assert updated.model is not None
+    fp_path = pipe.profile.library.footprint_lib_path("ICs") / "TESTPART.kicad_mod"
+    assert "models/" in (Footprint.load(fp_path).model_path or "")

@@ -5,16 +5,20 @@ part (spec section 5)."""
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
+from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import detect_source
 from stockroom.ingest.lcsc import fetch_lcsc
 from stockroom.ingest.sandbox import unpack_inputs
 from stockroom.ingest.staging import StagingCandidate, build_candidates
 from stockroom.kicad.cli import KiCadCli
-from stockroom.model.part import PartRecord, Provenance
+from stockroom.kicad.footprint import Footprint
+from stockroom.model.part import ModelRef, PartRecord, Provenance
 from stockroom.mutation.library_ops import LibraryOps
+from stockroom.mutation.transaction import Transaction
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
 
@@ -65,3 +69,30 @@ class IngestPipeline:
         # passport and a normal (non-ingest) add_part call is made.
         staged = candidate.to_staged_part()
         return self.ops.add_part(staged, require_complete=False)
+
+    def attach_model(self, part_id: str, candidate: StagingCandidate) -> PartRecord:
+        if candidate.model_path is None:
+            raise IngestError("candidate has no 3D model to attach")
+        record = self.ops.load_record(part_id)
+        if record.footprint is None:
+            raise IngestError(f"part {part_id} has no footprint to link a model to")
+        lib = self.profile.library
+        fp_path = lib.footprint_lib_path(record.category) / f"{record.footprint.name}.kicad_mod"
+        if not fp_path.exists():
+            raise IngestError(f"footprint file missing for {part_id}: {fp_path.name}")
+        lib.models_dir.mkdir(parents=True, exist_ok=True)
+        model_name = f"{record.footprint.name}{Path(candidate.model_path).suffix}"
+        model_dst = lib.models_dir / model_name
+        json_path = lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            shutil.copyfile(candidate.model_path, model_dst)
+            txn.track(model_dst)
+            fp = Footprint.load(fp_path)
+            fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
+            fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
+            txn.track(fp_path)
+            record.model = ModelRef(file=f"models/{model_name}")
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Attach 3D model to {part_id}")
+        return record
