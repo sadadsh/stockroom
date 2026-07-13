@@ -16,5 +16,19 @@ jobs:
         uses: astral-sh/setup-uv@v5
       - name: Sync
         run: uv sync
+      - name: Zero-Qt / zero-pywebview import gate
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          # the backend engine imports zero PyQt (it is a headless Qt-free engine)
+          if grep -REn 'import[[:space:]]+PyQt5|from[[:space:]]+PyQt5|QtCore|QtWidgets|QtGui' \
+              app/backend/stockroom/ ; then
+            echo "stockroom backend must not import PyQt (it is a Qt-free engine)"; exit 1
+          fi
+          # stockroom/api/ imports zero pywebview (host-only dependency, keeps the API headless-testable)
+          if grep -REn 'import[[:space:]]+webview|from[[:space:]]+webview|pywebview' \
+              app/backend/stockroom/api/ ; then
+            echo "stockroom/api must not import pywebview (host-only dependency)"; exit 1
+          fi
       - name: Run backend suite
         run: uv run pytest tests/backend -v
