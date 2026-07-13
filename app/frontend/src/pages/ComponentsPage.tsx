@@ -8,8 +8,14 @@
  * a genuinely empty library shows an empty state that names how to add parts.
  */
 import { useEffect, useState } from "react";
-import { usePartsQuery, useFacetsQuery, usePartDetailQuery } from "../api/queries";
+import {
+  usePartsQuery,
+  useFacetsQuery,
+  usePartDetailQuery,
+  useEditField,
+} from "../api/queries";
 import { ApiError } from "../api/client";
+import { useToast } from "../lib/toast";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
@@ -25,8 +31,22 @@ export function ComponentsPage() {
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
   const detailQuery = usePartDetailQuery(selectedId);
+  const editField = useEditField();
+  const { toast } = useToast();
 
   const parts = partsQuery.data?.parts ?? [];
+
+  function handleEditField(field: string, value: unknown) {
+    if (!selectedId) return;
+    editField.mutate(
+      { id: selectedId, field, value },
+      {
+        onSuccess: () => toast("Saved", "ok"),
+        onError: (err) =>
+          toast(err instanceof ApiError ? err.message : "Could not save", "err"),
+      },
+    );
+  }
 
   // Auto-select the first part when the current selection falls out of the list
   // (a new search, a category change, or the first successful load).
@@ -92,6 +112,8 @@ export function ComponentsPage() {
               error={detailQuery.error}
               missing={selectedSummary?.missing ?? []}
               isComplete={selectedSummary?.is_complete ?? false}
+              onEditField={handleEditField}
+              busy={editField.isPending}
             />
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">

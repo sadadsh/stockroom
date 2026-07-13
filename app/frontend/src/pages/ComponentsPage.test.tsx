@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import type { PartDetail, PartSummary } from "../api/types";
+import { ToastProvider } from "../lib/toast";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -16,6 +18,7 @@ vi.mock("../api/client", async (importActual) => {
       listParts: vi.fn(),
       facets: vi.fn(),
       partDetail: vi.fn(),
+      editField: vi.fn(),
     },
   };
 });
@@ -52,7 +55,11 @@ const DETAIL: PartDetail = {
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={qc}>
+      <ToastProvider>{ui}</ToastProvider>
+    </QueryClientProvider>,
+  );
 }
 
 describe("ComponentsPage", () => {
@@ -72,6 +79,31 @@ describe("ComponentsPage", () => {
     expect(await screen.findByText("1 Parts")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+  });
+
+  it("edits an identity field inline and reports a toast", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.editField.mockResolvedValue({ ...DETAIL, manufacturer: "TI Inc" });
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    const field = await screen.findByRole("button", { name: "Edit Manufacturer" });
+    await user.click(field);
+    const input = screen.getByLabelText("Manufacturer");
+    await user.clear(input);
+    await user.type(input, "TI Inc");
+    await user.keyboard("{Enter}");
+
+    expect(mockApi.editField).toHaveBeenCalledWith("lm358", "manufacturer", "TI Inc");
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
   it("shows the honest empty state when the library has no parts", async () => {
