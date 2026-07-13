@@ -35,6 +35,8 @@ def tokenize_spans(text: str) -> Iterator[Token]:
                     break
                 else:
                     j += 1
+            if j >= n:
+                raise ValueError(f"unterminated string starting at index {i}")
             yield Token("str", i, j + 1)
             i = j + 1
         else:

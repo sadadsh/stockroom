@@ -1,3 +1,5 @@
+import pytest
+
 from stockroom.sexp.tokens import Token, tokenize_spans
 
 
@@ -33,3 +35,13 @@ def test_crlf_and_tabs_are_whitespace():
     text = '(\r\n\t(y 1)\r\n)'
     result = toks(text)
     assert [t.kind for t in result] == ["(", "(", "atom", "atom", ")", ")"]
+
+
+def test_unterminated_string_raises():
+    with pytest.raises(ValueError):
+        list(tokenize_spans('(x "abc'))
+
+
+def test_string_ending_in_escape_raises():
+    with pytest.raises(ValueError):
+        list(tokenize_spans('("a\\'))
