@@ -1,4 +1,5 @@
 from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.sexp.document import SexpDocument
 from stockroom.verify.semdiff import assert_only_changed, semantic_diff
 
 
@@ -38,3 +39,15 @@ def test_version_stamp_is_preserved_on_edit(tmp_fixture):
     lib = SymbolLib.load(tmp_fixture("minimal.kicad_sym"))
     lib.get_symbol("R_0603").set_property("Value", "22k")
     assert "(version 20251024)" in lib.serialize()
+
+
+def test_two_absent_properties_insert_without_corruption(tmp_fixture):
+    lib = SymbolLib.load(tmp_fixture("minimal.kicad_sym"))
+    sym = lib.get_symbol("R_0603")
+    sym.set_property("MPN", "RC0603FR-0710KL")
+    sym.set_property("Manufacturer", "Yageo")
+    out = lib.serialize()
+    reparsed = SymbolLib(SexpDocument.parse(out)).get_symbol("R_0603")
+    assert reparsed.get_property("MPN") == "RC0603FR-0710KL"
+    assert reparsed.get_property("Manufacturer") == "Yageo"
+    assert "(version 20251024)" in out

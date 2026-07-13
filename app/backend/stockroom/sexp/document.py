@@ -116,13 +116,12 @@ class SexpNode:
     def insert_after(self, child: "SexpNode", sexp_text: str) -> None:
         if self._children is None:
             raise ValueError("insert_after is only valid on a list node")
+        if child._doc is not self._doc:
+            raise ValueError("cannot anchor an insert on a freshly inserted node")
         idx = self._children.index(child)
         indent = self._indent_before(idx)
         pos = child.span[1]
-        if indent:
-            self._doc.replace_span(pos, pos, f"{indent}{sexp_text}")
-        else:
-            self._doc.replace_span(pos, pos, f" {sexp_text}")
+        self._doc.insert_span(pos, f"{indent}{sexp_text}" if indent else f" {sexp_text}")
         # Attach a readable node so find/find_all/value see the insert. It parses
         # into its own mini-document, so its leaves read from the fragment text.
         # A freshly inserted node is read-only this session; re-editing its value
@@ -132,13 +131,23 @@ class SexpNode:
     def insert_child_text(self, sexp_text: str) -> None:
         if self._children is None:
             raise ValueError("insert_child_text is only valid on a list node")
-        if self._children:
-            last = self._children[-1]
-            self.insert_after(last, sexp_text)
-            return
-        # empty list: insert right before ')'
-        close = self._list_span[1] - 1
-        self._doc.replace_span(close, close, sexp_text)
+        # Anchor on the last ORIGINAL child (skip nodes inserted this session, whose
+        # spans point into their own fragment text, not the parent). This keeps the
+        # insert offset valid even after prior inserts on the same node.
+        anchor = None
+        for ch in reversed(self._children):
+            if ch._doc is self._doc:
+                anchor = ch
+                break
+        if anchor is not None:
+            idx = self._children.index(anchor)
+            indent = self._indent_before(idx)
+            pos = anchor.span[1]
+            self._doc.insert_span(pos, f"{indent}{sexp_text}" if indent else f" {sexp_text}")
+        else:
+            # no original child: insert right before ')'
+            close = self._list_span[1] - 1
+            self._doc.insert_span(close, sexp_text)
         self._children.append(SexpDocument.parse(sexp_text).root)
 
     def remove_child(self, child: "SexpNode") -> None:
@@ -154,7 +163,12 @@ class SexpNode:
 class SexpDocument:
     def __init__(self, text: str):
         self.text = text
-        self._edits: list[tuple[int, int, str]] = []
+        # each edit is (start, end, replacement, seq). start == end is a zero-width
+        # insertion (ordered, never deduped); start < end is a replacement of an
+        # existing span (deduped by span, last write wins). seq preserves the order
+        # of multiple insertions at the same anchor.
+        self._edits: list[tuple[int, int, str, int]] = []
+        self._seq = 0
         self.root = self._build()
 
     @classmethod
@@ -193,18 +207,29 @@ class SexpDocument:
         return read()
 
     def replace_span(self, start: int, end: int, replacement: str) -> None:
-        # Last write wins for an identical span, so re-editing the same token
-        # supersedes the prior edit instead of splicing both against the
-        # original coordinates (which would corrupt the output).
-        self._edits = [e for e in self._edits if not (e[0] == start and e[1] == end)]
-        self._edits.append((start, end, replacement))
+        # Replace an existing span (start < end). Last write wins for the same span
+        # so re-editing a token supersedes the prior edit instead of splicing both.
+        if start != end:
+            self._edits = [e for e in self._edits if not (e[0] == start and e[1] == end)]
+        self._edits.append((start, end, replacement, self._seq))
+        self._seq += 1
+
+    def insert_span(self, pos: int, text: str) -> None:
+        # Zero-width insertion at a real byte offset in self.text. Never deduped;
+        # multiple insertions at the same anchor keep their order via seq. Always
+        # anchored on original text (callers never anchor on an inserted node), so
+        # the offset stays valid.
+        self._edits.append((pos, pos, text, self._seq))
+        self._seq += 1
 
     def serialize(self) -> str:
         text = self.text
-        # Apply edits from the highest start offset down so earlier offsets stay
-        # valid. Spans are distinct leaf tokens (deduped in replace_span), so
-        # sorting by start alone is unambiguous.
-        for start, end, replacement in sorted(self._edits, key=lambda e: e[0], reverse=True):
+        # Apply from the highest start down so earlier offsets stay valid. For edits
+        # at the same start (insertions stacked at one anchor), apply the highest seq
+        # first so the earliest-inserted text ends up first in the output.
+        for start, end, replacement, _seq in sorted(
+            self._edits, key=lambda e: (e[0], e[3]), reverse=True
+        ):
             text = text[:start] + replacement + text[end:]
         return text
 
