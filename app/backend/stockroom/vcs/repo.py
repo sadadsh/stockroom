@@ -19,6 +19,29 @@ class GitError(Exception):
     pass
 
 
+def _parse_porcelain_z(out: str) -> list[str]:
+    """Split `git status --porcelain -z` output into repo-relative paths. Each record
+    is `XY <path>\\0`; a rename/copy adds the ORIGINAL path as the next NUL field, and
+    both sides are returned so the deletion of the old name is committed alongside the
+    new one."""
+    fields = out.split("\0")
+    paths: list[str] = []
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        if not entry:
+            i += 1
+            continue
+        xy = entry[:2]
+        paths.append(entry[3:])  # skip the 2-char status + its trailing space
+        if xy[:1] in ("R", "C") or (len(xy) > 1 and xy[1] in ("R", "C")):
+            i += 1
+            if i < len(fields) and fields[i]:
+                paths.append(fields[i])  # the rename/copy source
+        i += 1
+    return paths
+
+
 @dataclass
 class Commit:
     sha: str
@@ -97,6 +120,20 @@ class GitRepo:
         out = self._run("status", "--porcelain").stdout
         return [line for line in out.splitlines() if line.strip()]
 
+    def dirty_paths(self, scope: Path | None = None) -> list[Path]:
+        """Absolute paths of every uncommitted change, optionally scoped to a subtree.
+
+        Uses ``-z`` (NUL-terminated, never octal-quoted or truncated) so non-ASCII and
+        special-character paths survive intact, and yields BOTH sides of a rename so a
+        caller committing these paths stages the deletion of the old name too. Scoping
+        matters because one git repo backs every profile subdirectory, so an unscoped
+        status would leak another profile's in-progress edits."""
+        args = ["-c", "core.quotepath=false", "status", "--porcelain", "-z"]
+        if scope is not None:
+            args += ["--", str(scope)]
+        out = self._run(*args).stdout
+        return [self.root / rel for rel in _parse_porcelain_z(out)]
+
     def is_clean(self, paths: list[Path] | None = None) -> bool:
         args = ["status", "--porcelain"]
         if paths:
@@ -107,14 +144,25 @@ class GitRepo:
     def commit(self, message: str, paths: list[Path]) -> str:
         if not message.strip():
             raise GitError("commit message must not be empty")
-        # -A so a scoped commit also stages DELETIONS of tracked files that were
-        # removed from the working tree (profile/part deletion), not just adds/mods.
-        self._run("add", "-A", "--", *[str(p) for p in paths])
+        # -A so a scoped commit also stages DELETIONS of tracked files that were removed
+        # from the working tree (profile/part deletion), not just adds/mods. Only add
+        # paths git can still see (present on disk, or still tracked in the index): a path
+        # that is neither — e.g. the source of a rename already staged by `git mv` — would
+        # abort `git add` with "did not match any files". Its change is already staged, so
+        # --only below still carries it into the commit.
+        addable = [p for p in paths if Path(p).exists() or self._is_tracked(p)]
+        if addable:
+            self._run("add", "-A", "--", *[str(p) for p in addable])
         # nothing staged among these paths => no-op, return current head.
         if self._run("diff", "--cached", "--quiet", check=False).returncode == 0:
             return self.head()
         self._run("commit", "-m", message, "--only", "--", *[str(p) for p in paths])
         return self.head()
+
+    def _is_tracked(self, path: Path) -> bool:
+        return (
+            self._run("ls-files", "--error-unmatch", "--", str(path), check=False).returncode == 0
+        )
 
     def log_paths(self, paths: list[Path], max_count: int = 50) -> list[Commit]:
         fmt = "%H%x1f%s%x1f%an%x1f%aI"

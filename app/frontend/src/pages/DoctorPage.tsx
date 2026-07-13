@@ -41,6 +41,7 @@ const FINDING_LABEL: Record<RepairFinding["kind"], string> = {
   dangling_model: "Missing 3D Model",
   dangling_datasheet: "Missing Datasheet",
   dangling_model_link: "Broken Model Link",
+  unparseable_file: "Corrupt File",
 };
 
 function summarize(r: RepairResult): string {

@@ -235,7 +235,12 @@ export interface RepairAction {
 }
 
 export interface RepairFinding {
-  kind: "missing_symbol" | "dangling_model" | "dangling_datasheet" | "dangling_model_link";
+  kind:
+    | "missing_symbol"
+    | "dangling_model"
+    | "dangling_datasheet"
+    | "dangling_model_link"
+    | "unparseable_file";
   part_id: string;
   detail: string;
   how_to_fix: string;
