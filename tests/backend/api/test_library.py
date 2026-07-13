@@ -47,3 +47,30 @@ def test_missing_part_detail_is_404(client):
 
 def test_library_list_requires_a_token(anon_client):
     assert anon_client.get("/api/library/parts").status_code == 401
+
+
+def test_edit_field_updates_the_record_and_index(client):
+    r = client.patch("/api/library/parts/mystery",
+                     json={"field": "manufacturer", "value": "STMicro"})
+    assert r.status_code == 200
+    assert r.json()["manufacturer"] == "STMicro"
+    # the read surface reflects it immediately (index rebuilt)
+    detail = client.get("/api/library/parts/mystery").json()
+    assert detail["manufacturer"] == "STMicro"
+
+
+def test_move_category_changes_the_category(client):
+    r = client.post("/api/library/parts/tps62130/move", json={"category": "Modules"})
+    assert r.status_code == 200
+    assert r.json()["category"] == "Modules"
+
+
+def test_delete_part_removes_it(client):
+    assert client.delete("/api/library/parts/mystery").status_code == 204
+    assert client.get("/api/library/parts/mystery").status_code == 404
+    assert client.get("/api/library/parts").json()["count"] == 1
+
+
+def test_edit_unknown_part_is_404(client):
+    r = client.patch("/api/library/parts/nope", json={"field": "mpn", "value": "X"})
+    assert r.status_code == 404
