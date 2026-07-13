@@ -105,6 +105,66 @@ describe("EnrichPanel", () => {
     expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
   });
 
+  it("offers Apply Pinout when the lookup surfaces a pinout and applies it", async () => {
+    const pins = [
+      { pin: "1", name: "OUT1" },
+      { pin: "2", name: "IN1-" },
+    ];
+    mockApi.enrichPart.mockResolvedValue(
+      result({
+        specs: { pinout: { value: pins, source: "datasheet", confidence: "high" } },
+      }),
+    );
+    const onApplyPinout = vi.fn();
+    wrap(
+      <EnrichPanel
+        mpn="LM358DR"
+        category="ICs"
+        current={EMPTY_CURRENT}
+        onApply={vi.fn()}
+        onApplyPinout={onApplyPinout}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
+    // it reports how many pins it found
+    expect(await screen.findByText(/2 pins/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Apply Pinout" }));
+
+    expect(onApplyPinout).toHaveBeenCalledWith({
+      value: pins,
+      source: "datasheet",
+      confidence: "high",
+    });
+  });
+
+  it("shows Already Set for the pinout when the record already has one", async () => {
+    mockApi.enrichPart.mockResolvedValue(
+      result({
+        specs: {
+          pinout: { value: [{ pin: "1", name: "OUT1" }], source: "datasheet", confidence: "high" },
+        },
+      }),
+    );
+    wrap(
+      <EnrichPanel
+        mpn="LM358DR"
+        category="ICs"
+        current={EMPTY_CURRENT}
+        onApply={vi.fn()}
+        onApplyPinout={vi.fn()}
+        hasPinout
+      />,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
+
+    expect(await screen.findByText(/1 pin/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply Pinout" })).not.toBeInTheDocument();
+  });
+
   it("says so honestly when the lookup finds nothing new", async () => {
     mockApi.enrichPart.mockResolvedValue(result());
     wrap(

@@ -15,8 +15,10 @@ import {
   useEditField,
   useMoveCategory,
   useDeletePart,
+  useSetSpecs,
 } from "../api/queries";
 import { ApiError } from "../api/client";
+import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
 import { onRequestedPart } from "../lib/partSelection";
 import { Finder } from "../components/Finder";
@@ -44,12 +46,16 @@ export function ComponentsPage() {
   const editField = useEditField();
   const moveCategory = useMoveCategory();
   const deletePart = useDeletePart();
+  const setSpecs = useSetSpecs();
   const { toast } = useToast();
 
   const parts = partsQuery.data?.parts ?? [];
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
   const detailBusy =
-    editField.isPending || moveCategory.isPending || deletePart.isPending;
+    editField.isPending ||
+    moveCategory.isPending ||
+    deletePart.isPending ||
+    setSpecs.isPending;
 
   function toastError(err: unknown, fallback: string) {
     toast(err instanceof ApiError ? err.message : fallback, "err");
@@ -73,6 +79,26 @@ export function ComponentsPage() {
       {
         onSuccess: () => toast(`Moved To ${nextCategory}`, "ok"),
         onError: (err) => toastError(err, "Could not move"),
+      },
+    );
+  }
+
+  function handleApplyPinout(sourced: SourcedField) {
+    if (!selectedId) return;
+    setSpecs.mutate(
+      {
+        id: selectedId,
+        specs: {
+          pinout: {
+            value: sourced.value,
+            source: sourced.source,
+            confidence: sourced.confidence,
+          },
+        },
+      },
+      {
+        onSuccess: () => toast("Pinout Saved", "ok"),
+        onError: (err) => toastError(err, "Could not save the pinout"),
       },
     );
   }
@@ -192,6 +218,7 @@ export function ComponentsPage() {
               onMoveCategory={handleMoveCategory}
               categories={categories}
               onDelete={handleDelete}
+              onApplyPinout={handleApplyPinout}
               busy={detailBusy}
             />
           ) : (
