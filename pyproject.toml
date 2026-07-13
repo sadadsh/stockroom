@@ -3,7 +3,7 @@ name = "stockroom"
 version = "0.1.0"
 description = "KiCad V10 component-library manager"
 requires-python = ">=3.12"
-dependencies = ["easyeda2kicad>=1.0.1", "curl_cffi>=0.7"]
+dependencies = ["easyeda2kicad>=1.0.1", "curl_cffi>=0.7", "pypdf>=4.0"]
 
 [dependency-groups]
 dev = ["pytest>=8.2"]
