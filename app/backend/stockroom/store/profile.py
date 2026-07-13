@@ -17,7 +17,16 @@ _SUBDIRS = ("parts", "symbols", "footprints", "models", "datasheets")
 
 
 def _validate_name(name: str) -> None:
-    if not name or name in (".", "..") or "/" in name or "\\" in name:
+    # Reject empty, path traversal, separators, and any hidden (dot) name: a leading
+    # dot is reserved for engine bookkeeping (.git, .archive, .stockroom-*), never a
+    # profile, so .git can never be activated or deleted through the store.
+    if (
+        not name
+        or name in (".", "..")
+        or name.startswith(".")
+        or "/" in name
+        or "\\" in name
+    ):
         raise ValueError(f"unsafe profile name: {name!r}")
 
 
@@ -85,9 +94,19 @@ class ProfileStore:
     def list(self) -> list[str]:
         if not self.libraries_root.exists():
             return []
-        return sorted(p.name for p in self.libraries_root.iterdir() if p.is_dir())
+        # A profile is always a real subdirectory created by create(); the git repo
+        # backing the libraries root lives at <root>/.git, so hidden (dot) dirs are
+        # NEVER profiles. Excluding them keeps .git (and any future .stockroom-* dir)
+        # out of the profile list, the switcher, and the last-profile delete guard.
+        return sorted(
+            p.name
+            for p in self.libraries_root.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        )
 
     def exists(self, name: str) -> bool:
+        if name.startswith("."):
+            return False
         return (self.libraries_root / name).is_dir()
 
     def get(self, name: str) -> Profile:
