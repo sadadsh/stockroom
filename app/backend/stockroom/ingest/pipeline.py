@@ -13,7 +13,7 @@ from stockroom.ingest.lcsc import fetch_lcsc
 from stockroom.ingest.sandbox import unpack_inputs
 from stockroom.ingest.staging import StagingCandidate, build_candidates
 from stockroom.kicad.cli import KiCadCli
-from stockroom.model.part import Provenance
+from stockroom.model.part import PartRecord, Provenance
 from stockroom.mutation.library_ops import LibraryOps
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
@@ -56,3 +56,12 @@ class IngestPipeline:
                 candidates.append(c)
 
         return candidates
+
+    def commit(self, candidate: StagingCandidate) -> PartRecord:
+        # M3 ingestion stages a candidate before M4 enrichment exists (no purchase
+        # link field yet), so a freshly ingested part cannot yet satisfy the strict
+        # complete-to-add gate. Commit here is the "land it, flag the gaps" step;
+        # the gate applies again in full once M4 enrichment can complete the
+        # passport and a normal (non-ingest) add_part call is made.
+        staged = candidate.to_staged_part()
+        return self.ops.add_part(staged, require_complete=False)
