@@ -239,6 +239,44 @@ describe("ComponentsPage", () => {
     expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
 
+  it("shows Already Set (no Apply) when the record already holds the enriched value", async () => {
+    // Drives the real DetailPanel -> EnrichPanel `current` wire end to end: if that
+    // wire stops feeding the record's own manufacturer/description into the gate,
+    // Apply is wrongly offered for a value already on the record. The record here
+    // already holds the manufacturer the lookup returns, so the row must read
+    // "Already Set" and offer no Apply.
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "Analog Devices" });
+    mockApi.enrichPart.mockResolvedValue({
+      category: "ICs",
+      mpn: null,
+      manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
+      description: null,
+      datasheet_url: null,
+      stock: null,
+      package: null,
+      price_breaks: [],
+      specs: {},
+      schema_version: 1,
+    });
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Enrich From Distributor" }),
+    );
+
+    expect(await screen.findByText("Already Set")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
+
   it("shows the honest empty state when the library has no parts", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
     mockApi.facets.mockResolvedValue({
