@@ -1,0 +1,46 @@
+"""The FastAPI app factory. Installs the single exception handler, wires the
+AppContext into app.state, includes every router, and mounts the built frontend
+LAST so /api/* routes always win over the SPA's catch-all (spec section 4: the
+host is presentation, the API is the surface)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from stockroom.api.context import AppContext
+from stockroom.api.errors import error_body, status_for
+from stockroom.api.security import make_require_token
+from stockroom.api.routers import system as system_router
+
+_FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend-dist"
+
+
+def create_app(context: AppContext) -> FastAPI:
+    app = FastAPI(title="Stockroom", version="0.1.0")
+    app.state.ctx = context
+    require_token = make_require_token(context.token)
+
+    @app.exception_handler(Exception)
+    async def _handle(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=status_for(exc), content=error_body(exc))
+
+    # Register web MIME types before any static mount (the Windows mimetypes trap).
+    # Safe no-op on Linux; the assertion is exercised in Task 12.
+    from stockroom.host.mime import register_web_mime_types
+
+    register_web_mime_types()
+
+    app.include_router(system_router.router)
+    app.include_router(system_router.system_info_router(require_token))
+
+    # Routers added in later tasks are included here (library, previews, ingest,
+    # enrich, profiles, sync, doctor), each behind Depends(require_token).
+
+    if _FRONTEND_DIST.exists():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="spa")
+    return app
