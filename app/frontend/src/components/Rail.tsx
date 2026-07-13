@@ -12,8 +12,6 @@ interface NavItem {
 const PRIMARY: NavItem[] = [
   { glyph: "▤", label: "Components" },
   { glyph: "▧", label: "Projects" },
-  { glyph: "▥", label: "Bench" },
-  { glyph: "⎇", label: "Git" },
 ];
 
 const FOOT: NavItem[] = [
@@ -26,7 +24,7 @@ export function Rail() {
   return (
     <div className="flex w-[118px] flex-none flex-col border-r border-line bg-rail px-2.5 py-4">
       <div className="mx-1.5 mb-5 mt-0.5 text-xs font-bold text-t1">
-        NETDECK
+        Stockroom
       </div>
       {PRIMARY.map((item) => (
         <RailItem key={item.label} item={item} selected={item.label === "Components"} />
