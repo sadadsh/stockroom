@@ -1,0 +1,4 @@
+Reference,Value,Manufacturer Part Number,Footprint
+R1,10k,RC0402FR-0710KL,0402
+C1,100n,CL05B104KO5NNNC,0402
+U1,,TPS62130RGTR,VQFN-16
