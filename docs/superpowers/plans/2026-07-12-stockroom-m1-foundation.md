@@ -600,7 +600,7 @@ git commit -m "Add byte-preserving s-expression document and node tree"
 **Interfaces:**
 - Consumes: `SexpNode`, `SexpDocument` from Task 3.
 - Produces: on `SexpNode` (list nodes only):
-  - `.insert_child_text(sexp_text: str, *, before_close: bool = True) -> None` inserts a child just before the list's closing paren, matching sibling indentation.
+  - `.insert_child_text(sexp_text: str) -> None` inserts a child just before the list's closing paren, matching sibling indentation.
   - `.insert_after(child: SexpNode, sexp_text: str) -> None` inserts `sexp_text` on its own line after `child`, matching `child`'s indentation.
   - `.remove_child(child: SexpNode) -> None` deletes a child and the whitespace on its line.
   Indentation is inferred from the newline-prefixed whitespace preceding an existing child; when a list is single-line, insertion stays single-line with a leading space.
@@ -637,6 +637,24 @@ def test_remove_child_multiline():
     doc = SexpDocument.parse(text)
     doc.root.remove_child(doc.root.find("b"))
     assert doc.serialize() == '(x\n\t(a 1)\n)'
+
+
+def test_insert_child_preserves_crlf():
+    text = '(symbol\r\n\t(property "A" "1")\r\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.insert_child_text('(property "B" "2")')
+    out = doc.serialize()
+    assert out == '(symbol\r\n\t(property "A" "1")\r\n\t(property "B" "2")\r\n)'
+    assert "\n\t" not in out.replace("\r\n\t", "")  # no bare-LF indent introduced
+
+
+def test_remove_child_preserves_crlf():
+    text = '(x\r\n\t(a 1)\r\n\t(b 2)\r\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.remove_child(doc.root.find("b"))
+    out = doc.serialize()
+    assert out == '(x\r\n\t(a 1)\r\n)'
+    assert "\r\r" not in out  # no orphaned CR left behind
 ```
 
 - [ ] **Step 2: Run to verify it fails**
@@ -651,7 +669,8 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
 ```python
     def _indent_before(self, index: int) -> str:
         """Whitespace run (including a leading newline) before child `index`,
-        or None-equivalent empty string if the child is not newline-prefixed."""
+        or empty string if the child is not newline-prefixed. Captures the full
+        CRLF pair so inserting/removing on a Windows/KiCad file keeps CRLF."""
         child = self._children[index]
         start = child.span[0]
         text = self._text
@@ -659,9 +678,12 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
         while j > 0 and text[j - 1] in " \t":
             j -= 1
         if j > 0 and text[j - 1] == "\n":
-            return text[j - 1 : start]  # "\n" + indent
+            nl = j - 1
+            if nl > 0 and text[nl - 1] == "\r":
+                nl -= 1  # include the \r of a \r\n pair
+            return text[nl:start]
         if j > 0 and text[j - 1] == "\r":
-            return text[j - 1 : start]
+            return text[j - 1 : start]  # lone CR (old-Mac), defensive
         return ""
 
     def insert_after(self, child: "SexpNode", sexp_text: str) -> None:
@@ -675,7 +697,7 @@ Add these methods to `SexpNode` in `document.py` (and the helper below):
         else:
             self._doc.replace_span(pos, pos, f" {sexp_text}")
 
-    def insert_child_text(self, sexp_text: str, *, before_close: bool = True) -> None:
+    def insert_child_text(self, sexp_text: str) -> None:
         if self._children is None:
             raise ValueError("insert_child_text is only valid on a list node")
         if self._children:
