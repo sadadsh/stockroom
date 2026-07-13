@@ -74,7 +74,11 @@ class LibraryIndex:
 
     @classmethod
     def build(cls, parts_dir: Path, db_path: str | Path = ":memory:") -> "LibraryIndex":
-        conn = sqlite3.connect(str(db_path))
+        # check_same_thread=False so the warm index can be read from the API's
+        # threadpool worker threads (FastAPI runs sync route handlers off the
+        # thread that built the connection); reads stay serialized by the GIL and
+        # every write still goes through the M2 atomic engine, not this connection.
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(_SCHEMA)
         parts_dir = Path(parts_dir)

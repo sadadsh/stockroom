@@ -11,6 +11,8 @@ from __future__ import annotations
 import secrets
 from typing import Callable
 
+from fastapi import Request
+
 from stockroom.api.errors import ApiError
 
 
@@ -26,7 +28,7 @@ def _presented(request) -> str:
 
 
 def make_require_token(expected: str) -> Callable:
-    def require_token(request) -> None:
+    def require_token(request: Request) -> None:
         presented = _presented(request)
         if not presented or not secrets.compare_digest(presented, expected):
             raise ApiError(401, "missing or invalid API token")
