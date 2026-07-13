@@ -1,0 +1,23 @@
+[project]
+name = "stockroom"
+version = "0.1.0"
+description = "KiCad V10 component-library manager"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8.2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app/backend/stockroom"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["app/backend"]
+testpaths = ["tests/backend"]
+markers = [
+    "requires_kicad_cli: test needs the kicad-cli binary; skipped when absent",
+]
