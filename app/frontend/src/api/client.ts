@@ -94,6 +94,33 @@ function apiGet<T>(path: string, params?: Record<string, string>): Promise<T> {
   return request<T>("GET", path, { params });
 }
 
+// The preview endpoints return SVG text or GLB bytes, not JSON, and the guard needs
+// the bearer, so a plain <img src>/loader URL cannot reach them. Fetch the body as a
+// Blob with the token (the openJobStream idiom), mapping a non-2xx to an ApiError so
+// the viewer can tell "no symbol" (404) from "no 3D tooling" (502) apart.
+async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
+  const token = apiToken();
+  const headers: Record<string, string> = { Accept: accept };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(apiBase() + path, { headers });
+  } catch (err) {
+    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+  }
+  if (!res.ok) {
+    let msg = `request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      msg = body.error || body.detail || body.message || msg;
+    } catch {
+      /* non-JSON error body, keep the status message */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  return res.blob();
+}
+
 export interface ListPartsArgs {
   q?: string;
   category?: string | null;
@@ -121,6 +148,26 @@ export const api = {
 
   partDetail(id: string): Promise<PartDetail> {
     return apiGet<PartDetail>(`/api/library/parts/${encodeURIComponent(id)}`);
+  },
+
+  // Previews (M6d). The symbol/footprint SVG is requested in the monochrome (?bw)
+  // variant so the viewer can re-tint it to the active theme client-side; the 3D model
+  // arrives as a GLB (STEP/WRL converted server-side) for the three.js viewer. A part
+  // with no symbol/footprint/model is a 404, absent 3D tooling is a 502, both surfaced
+  // honestly by the viewer.
+  previewSvg(kind: "symbol" | "footprint", id: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/previews/${kind}/${encodeURIComponent(id)}.svg?bw=true`,
+      "image/svg+xml",
+    );
+  },
+
+  async modelGlb(id: string): Promise<ArrayBuffer> {
+    const blob = await fetchPreviewBlob(
+      `/api/previews/model/${encodeURIComponent(id)}.glb`,
+      "model/gltf-binary",
+    );
+    return blob.arrayBuffer();
   },
 
   // Edit one field (mirrored to the KiCad symbol where the field maps to a symbol

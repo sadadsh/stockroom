@@ -134,17 +134,24 @@ class KiCadCli:
         footprint: str,
         out_dir: Path,
         layers: str = "F.Cu,F.SilkS,F.Fab",
+        *,
+        black_and_white: bool = False,
     ) -> Path:
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         # kicad-cli requires the .pretty DIRECTORY plus --fp, never a bare .kicad_mod.
-        self._run(
+        args = [
             "fp", "export", "svg",
             "-o", str(out_dir),
             "--fp", footprint,
             "-l", layers,
-            str(Path(pretty_dir)),
-        )
+        ]
+        if black_and_white:
+            # monochrome black-on-transparent so the web viewer can re-tint it to the
+            # active theme (dark → inverted to near-white, light → black) client-side.
+            args.append("--black-and-white")
+        args.append(str(Path(pretty_dir)))
+        self._run(*args)
         svgs = sorted(out_dir.glob("*.svg"))
         if not svgs:
             raise KiCadCliError(f"no SVG produced for footprint {footprint}")

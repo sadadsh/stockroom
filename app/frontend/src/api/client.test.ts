@@ -20,6 +20,15 @@ function errJson(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
+function okBlob(bytes: Uint8Array, type: string): Response {
+  const blob = new Blob([bytes], { type });
+  return {
+    ok: true,
+    status: 200,
+    blob: async () => blob,
+  } as unknown as Response;
+}
+
 describe("api client", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -251,5 +260,52 @@ describe("api client", () => {
     const info = await api.getSystemInfo();
     expect(info.kicad_cli_available).toBe(true);
     expect(String(fetchMock.mock.calls[0][0])).toContain("/api/system/info");
+  });
+
+  // --- Previews (M6d) ---
+
+  it("requests the monochrome symbol SVG with the bearer and returns a blob", async () => {
+    fetchMock.mockResolvedValueOnce(okBlob(new Uint8Array([1, 2, 3]), "image/svg+xml"));
+    const blob = await api.previewSvg("symbol", "lm358");
+    expect(blob).toBeInstanceOf(Blob);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/previews/symbol/lm358.svg");
+    expect(String(url)).toContain("bw=true");
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+  });
+
+  it("requests the footprint SVG at the footprint path", async () => {
+    fetchMock.mockResolvedValueOnce(okBlob(new Uint8Array([1]), "image/svg+xml"));
+    await api.previewSvg("footprint", "r0402");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/previews/footprint/r0402.svg");
+  });
+
+  it("fetches the GLB model as an ArrayBuffer", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okBlob(new Uint8Array([0x67, 0x6c, 0x54, 0x46]), "model/gltf-binary"),
+    );
+    const buf = await api.modelGlb("tps62130");
+    expect(buf).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(buf).slice(0, 4)).toEqual(
+      new Uint8Array([0x67, 0x6c, 0x54, 0x46]),
+    );
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/api/previews/model/tps62130.glb");
+  });
+
+  it("surfaces a 502 (no 3D tooling) as an ApiError carrying the status", async () => {
+    fetchMock.mockResolvedValueOnce(errJson(502, { detail: "trimesh not installed" }));
+    await expect(api.modelGlb("tps62130")).rejects.toMatchObject({
+      status: 502,
+      message: "trimesh not installed",
+    });
+  });
+
+  it("surfaces a preview 404 as an ApiError with the status", async () => {
+    fetchMock.mockResolvedValueOnce(errJson(404, { detail: "no symbol" }));
+    await expect(api.previewSvg("symbol", "nope")).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

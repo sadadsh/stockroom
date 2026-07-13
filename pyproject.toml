@@ -10,6 +10,12 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn>=0.30",
     "sse-starlette>=2.1",
+    # The 3D model preview (M6d): trimesh reads the part's STEP/WRL model and exports
+    # a web-ready GLB for the three.js viewer; cascadio is trimesh's STEP loader
+    # (OpenCASCADE). Optional at runtime (an absent stack surfaces as an honest 502,
+    # never a crash), but declared so the shipped app renders 3D out of the box.
+    "trimesh>=4.0",
+    "cascadio>=0.0.14",
     # The WebView2 host window (stockroom.host). Windows-scoped: pywebview is only
     # imported on the Windows host path, so a Linux dev/CI env never pulls its GUI
     # backends, while `uv sync --frozen` on the owner's Windows box provisions it so
