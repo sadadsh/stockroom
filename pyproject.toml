@@ -3,10 +3,17 @@ name = "stockroom"
 version = "0.1.0"
 description = "KiCad V10 component-library manager"
 requires-python = ">=3.12"
-dependencies = ["easyeda2kicad>=1.0.1", "curl_cffi>=0.7", "pypdf>=4.0"]
+dependencies = [
+    "easyeda2kicad>=1.0.1",
+    "curl_cffi>=0.7",
+    "pypdf>=4.0",
+    "fastapi>=0.111",
+    "uvicorn>=0.30",
+    "sse-starlette>=2.1",
+]
 
 [dependency-groups]
-dev = ["pytest>=8.2"]
+dev = ["pytest>=8.2", "httpx>=0.27"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app/backend/stockroom"]
@@ -22,4 +29,5 @@ addopts = "-m 'not live_enrich'"
 markers = [
     "requires_kicad_cli: test needs the kicad-cli binary; skipped when absent",
     "live_enrich: hits the real network; deselected by default, opt-in only",
+    "windows_only: needs a real Windows machine (WebView2, KiCad config surgery); skipped elsewhere",
 ]
