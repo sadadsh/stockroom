@@ -90,6 +90,51 @@ class SexpNode:
         replacement = quote_kicad(new) if quote else new
         self._doc.replace_span(self._token.start, self._token.end, replacement)
 
+    def _indent_before(self, index: int) -> str:
+        """Whitespace run (including a leading newline) before child `index`,
+        or None-equivalent empty string if the child is not newline-prefixed."""
+        child = self._children[index]
+        start = child.span[0]
+        text = self._text
+        j = start
+        while j > 0 and text[j - 1] in " \t":
+            j -= 1
+        if j > 0 and text[j - 1] == "\n":
+            return text[j - 1 : start]  # "\n" + indent
+        if j > 0 and text[j - 1] == "\r":
+            return text[j - 1 : start]
+        return ""
+
+    def insert_after(self, child: "SexpNode", sexp_text: str) -> None:
+        if self._children is None:
+            raise ValueError("insert_after is only valid on a list node")
+        idx = self._children.index(child)
+        indent = self._indent_before(idx)
+        pos = child.span[1]
+        if indent:
+            self._doc.replace_span(pos, pos, f"{indent}{sexp_text}")
+        else:
+            self._doc.replace_span(pos, pos, f" {sexp_text}")
+
+    def insert_child_text(self, sexp_text: str, *, before_close: bool = True) -> None:
+        if self._children is None:
+            raise ValueError("insert_child_text is only valid on a list node")
+        if self._children:
+            last = self._children[-1]
+            self.insert_after(last, sexp_text)
+            return
+        # empty list: insert right before ')'
+        close = self._list_span[1] - 1
+        self._doc.replace_span(close, close, sexp_text)
+
+    def remove_child(self, child: "SexpNode") -> None:
+        if self._children is None:
+            raise ValueError("remove_child is only valid on a list node")
+        idx = self._children.index(child)
+        indent = self._indent_before(idx)
+        start = child.span[0] - len(indent) if indent else child.span[0]
+        self._doc.replace_span(start, child.span[1], "")
+
 
 class SexpDocument:
     def __init__(self, text: str):

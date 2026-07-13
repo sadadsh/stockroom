@@ -57,3 +57,32 @@ def test_double_set_value_last_write_wins():
     leaf.set_value("180", quote=False)
     leaf.set_value("270", quote=False)
     assert doc.serialize() == '(at 270)'
+
+
+def test_insert_child_multiline_matches_indent():
+    text = '(symbol\n\t(property "A" "1")\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.insert_child_text('(property "B" "2")')
+    assert doc.serialize() == '(symbol\n\t(property "A" "1")\n\t(property "B" "2")\n)'
+
+
+def test_insert_after_specific_child():
+    text = '(x\n\t(a 1)\n\t(c 3)\n)'
+    doc = SexpDocument.parse(text)
+    a = doc.root.find("a")
+    doc.root.insert_after(a, '(b 2)')
+    assert doc.serialize() == '(x\n\t(a 1)\n\t(b 2)\n\t(c 3)\n)'
+
+
+def test_insert_child_single_line():
+    text = '(pts (xy 0 0))'
+    doc = SexpDocument.parse(text)
+    doc.root.insert_child_text('(xy 1 1)')
+    assert doc.serialize() == '(pts (xy 0 0) (xy 1 1))'
+
+
+def test_remove_child_multiline():
+    text = '(x\n\t(a 1)\n\t(b 2)\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.remove_child(doc.root.find("b"))
+    assert doc.serialize() == '(x\n\t(a 1)\n)'
