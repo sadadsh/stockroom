@@ -422,13 +422,14 @@ def _unquote(text: str, tok: Token) -> str:
 
 
 class SexpNode:
-    __slots__ = ("_doc", "_token", "_children", "_text")
+    __slots__ = ("_doc", "_token", "_children", "_text", "_list_span")
 
     def __init__(self, doc, text, token=None, children=None):
         self._doc = doc
         self._text = text
         self._token = token  # set for leaves
         self._children = children  # set for lists
+        self._list_span = None  # (open, close) byte span; set for list nodes
 
     @property
     def is_atom(self) -> bool:
