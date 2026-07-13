@@ -69,7 +69,7 @@ export function Finder({
       </div>
 
       {open ? (
-        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-[#212329] p-3 shadow-pop">
+        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-2xs font-semibold text-t3">Show</div>
             <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
