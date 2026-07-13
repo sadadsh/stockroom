@@ -114,7 +114,9 @@ function DiffBody({
   if (beforeQ.isError || afterQ.isError || !beforeQ.data || !afterQ.data) {
     return <Centered>Could not render this {kind} diff.</Centered>;
   }
-  return <SvgDiffViewport before={beforeQ.data} after={afterQ.data} />;
+  return (
+    <SvgDiffViewport before={beforeQ.data} after={afterQ.data} label={KIND_LABEL[kind]} />
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

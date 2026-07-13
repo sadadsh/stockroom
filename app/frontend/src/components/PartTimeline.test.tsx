@@ -57,8 +57,9 @@ describe("PartTimeline", () => {
     const rows = await screen.findAllByRole("button", { expanded: false });
     expect(rows[0]).toHaveTextContent("Edit tps62130: manufacturer");
     expect(rows[1]).toHaveTextContent("Add tps62130");
-    // the 7-char short sha of the newest commit
+    // the 7-char short sha, AND the full 40-char sha is NOT rendered (shortSha truncates)
     expect(rows[0]).toHaveTextContent("bbbbbbb");
+    expect(rows[0]).not.toHaveTextContent(sha("b"));
   });
 
   it("shows an honest empty state for a part with no commits", async () => {
@@ -135,6 +136,63 @@ describe("PartTimeline", () => {
       expect(mockApi.previewSvg).toHaveBeenCalledWith("symbol", "tps62130", sha("a"));
       expect(mockApi.previewSvg).toHaveBeenCalledWith("symbol", "tps62130", sha("b"));
     });
+  });
+
+  it("keeps the selection on the same commit when a newer commit lands (sha-keyed, not index)", async () => {
+    const C1 = { sha: sha("a"), subject: "Add opamp", author: "Sadad", iso_date: "2026-07-13T12:00:00-04:00" };
+    const C2 = { sha: sha("b"), subject: "Edit opamp: mfr", author: "Sadad", iso_date: "2026-07-13T12:30:00-04:00" };
+    const C3 = { sha: sha("c"), subject: "Edit opamp: desc", author: "Sadad", iso_date: "2026-07-13T13:00:00-04:00" };
+    mockApi.partHistory.mockResolvedValue({ commits: [C2, C1], count: 2 });
+    // the diff shape depends on the args: only the earliest (a === "") reads as created
+    mockApi.partDiff.mockImplementation((_id, a, b) =>
+      Promise.resolve(
+        a === ""
+          ? { a, b, fields: [{ key: "mpn", before: null, after: "LM358", status: "added" }], assets: NO_ASSETS }
+          : { a, b, fields: [{ key: "description", before: "o", after: "n", status: "changed" }], assets: NO_ASSETS },
+      ),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <ThemeProvider>
+          <PartTimeline partId="opamp" />
+        </ThemeProvider>
+      </QueryClientProvider>,
+    );
+
+    // select the earliest commit (index 1 of the 2-commit list)
+    await userEvent.click(await screen.findByText("Add opamp"));
+    expect(await screen.findByText(/Part created/i)).toBeInTheDocument();
+
+    // a newer commit lands at the top; the history refetches and everything shifts down
+    mockApi.partHistory.mockResolvedValue({ commits: [C3, C2, C1], count: 3 });
+    await qc.invalidateQueries({ queryKey: ["part-history", "opamp"] });
+    expect(await screen.findByText("Edit opamp: desc")).toBeInTheDocument(); // refetched
+
+    // the ORIGINALLY selected commit (C1) is still the one shown: it is still the
+    // earliest, so "Part created" persists. An index-keyed selection would now point at
+    // C2 (no longer the earliest) and this would flip to a "Changed" field diff.
+    expect(screen.getByText(/Part created/i)).toBeInTheDocument();
+    expect(screen.queryByText("Changed")).toBeNull();
+  });
+
+  it("labels the overlay images by the diffed kind (footprint, not a hardcoded 'Symbol')", async () => {
+    mockApi.partHistory.mockResolvedValue(HISTORY);
+    mockApi.partDiff.mockResolvedValue({
+      a: sha("a"),
+      b: sha("b"),
+      fields: [{ key: "footprint.name", before: "SOIC-8", after: "SOIC-8-N", status: "changed" }],
+      assets: { ...NO_ASSETS, footprint: true },
+    });
+    wrap(<PartTimeline partId="tps62130" />);
+
+    await userEvent.click(await screen.findByText("Edit tps62130: manufacturer"));
+    await userEvent.click(await screen.findByRole("button", { name: "View Visual Diff" }));
+
+    // the overlay names the FOOTPRINT geometry, not "Symbol"
+    expect(await screen.findByAltText("Footprint Before")).toBeInTheDocument();
+    expect(screen.getByAltText("Footprint After")).toBeInTheDocument();
+    expect(screen.queryByAltText("Symbol Before")).toBeNull();
   });
 
   it("does not offer a visual diff when only metadata changed", async () => {

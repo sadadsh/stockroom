@@ -21,6 +21,7 @@ from stockroom.kicad.model_convert import (
     ModelToolingMissing,
     model_to_glb,
 )
+from stockroom.vcs.repo import GitError
 
 
 def _hash_file(path: Path) -> str:
@@ -40,7 +41,15 @@ def _svg_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
     from git blobs with no working-tree checkout (spec section 9), so the timeline can
     overlay an old geometry against the current one. The category and asset name are
     taken from the part record AT that rev (both can change over time). A rev is
-    content-immutable, so it alone content-addresses the cache."""
+    content-immutable, so it alone content-addresses the cache. A malformed rev (not a
+    real object name) is a client error (400), not a git-backend outage (503)."""
+    try:
+        return _render_at_rev(ctx, part_id, kind, rev, bw)
+    except GitError as exc:
+        raise ValueError(f"unknown revision: {rev}") from exc
+
+
+def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
     rec_text = ctx.repo.show_file(rev, ctx.profile.library.parts_dir / f"{part_id}.json")
     if not rec_text:
         raise FileNotFoundError(f"part {part_id} did not exist at {rev}")

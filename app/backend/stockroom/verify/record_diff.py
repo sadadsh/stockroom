@@ -48,16 +48,24 @@ def _is_empty(v: Any) -> bool:
 
 
 def _walk(before: Any, after: Any, prefix: str, out: list[FieldChange]) -> None:
-    # a dict on EITHER side => recurse key-by-key, treating the missing/None side
-    # as {} so a null-to-object transition flattens to its real leaf paths.
-    if isinstance(before, dict) or isinstance(after, dict):
-        b = before if isinstance(before, dict) else {}
-        a = after if isinstance(after, dict) else {}
-        for key in sorted(set(b) | set(a)):
-            child = f"{prefix}.{key}" if prefix else key
-            _walk(b.get(key), a.get(key), child, out)
-        return
-    # leaf: scalar, list, or None. == compares lists and scalars structurally.
+    b_dict = isinstance(before, dict)
+    a_dict = isinstance(after, dict)
+    if b_dict or a_dict:
+        # Recurse key-by-key ONLY when the other side is a dict too, or is empty
+        # (null/absent) so a null-to-object transition flattens to its real leaf paths.
+        # A dict opposite a REAL scalar/list is a genuine shape change (reachable via the
+        # free-form specs bag): report it as one leaf carrying both whole values, never
+        # silently drop the scalar side by recursing into only the dict.
+        other = after if (b_dict and not a_dict) else before if (a_dict and not b_dict) else None
+        if other is None or _is_empty(other):
+            b = before if b_dict else {}
+            a = after if a_dict else {}
+            for key in sorted(set(b) | set(a)):
+                child = f"{prefix}.{key}" if prefix else key
+                _walk(b.get(key), a.get(key), child, out)
+            return
+        # fall through: dict vs real value -> a single leaf change
+    # leaf: scalar, list, dict-vs-scalar, or None. == compares structurally.
     # both-empty (None vs "" vs [] vs absent) is not a change: a null field becoming
     # an empty string carries no information for the timeline.
     if before == after or (_is_empty(before) and _is_empty(after)):
