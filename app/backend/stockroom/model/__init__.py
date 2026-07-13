@@ -8,6 +8,18 @@ from stockroom.model.category import (
     is_valid_category,
     slugify,
 )
+from stockroom.model.part import (
+    KICAD_MIRROR_FIELDS,
+    Datasheet,
+    EnrichmentField,
+    Hashes,
+    LibRef,
+    ModelRef,
+    PartRecord,
+    Provenance,
+    Purchase,
+    new_part_id,
+)
 
 __all__ = [
     "CATEGORIES",
@@ -16,4 +28,14 @@ __all__ = [
     "category_symbol_lib",
     "is_valid_category",
     "slugify",
+    "KICAD_MIRROR_FIELDS",
+    "Datasheet",
+    "EnrichmentField",
+    "Hashes",
+    "LibRef",
+    "ModelRef",
+    "PartRecord",
+    "Provenance",
+    "Purchase",
+    "new_part_id",
 ]
