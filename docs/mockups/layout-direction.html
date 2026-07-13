@@ -1,0 +1,184 @@
+<title>NETDECK — Layout Direction</title>
+<style>
+  :root{
+    --nav:#191a1c;--canvas:#1c1d1f;--card:#232427;--inset:#2a2c30;--hair:#2e2f33;--hair2:#3a3b40;
+    --t1:#fff;--t2:rgba(255,255,255,.773);--t3:rgba(255,255,255,.529);
+    --ok:#5fb07a;--warn:#d9a441;--err:#d96b63;
+    --acc:#ededed;--acc-on:#1b1b1b;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;--page:#141517;
+  }
+  *{box-sizing:border-box}body{margin:0}
+  .wrap{background:var(--page);color:var(--t1);font-family:var(--sans);min-height:100vh;padding:26px 18px 76px;line-height:1.5}
+  .inner{max-width:960px;margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--t3);text-transform:uppercase;margin:0 0 8px}
+  h1{font-size:clamp(21px,4.5vw,28px);font-weight:600;margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:14.5px;color:var(--t2);max-width:68ch;margin:0 0 4px}
+  .block{margin:32px 0 0}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;margin-bottom:13px}
+  .tag.x{background:var(--inset);color:var(--t1)}.tag.y{background:var(--inset);color:var(--t1)}
+  /* the 7 requirements strip */
+  .req{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+  .req .r{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--hair);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--t2)}
+  .req .r b{color:var(--t1);font-weight:600}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
+  .d-ok{background:var(--ok)}.d-warn{background:var(--warn)}.d-err{background:var(--err)}
+  /* frame */
+  .frame{background:var(--canvas);border:1px solid var(--hair);border-radius:12px;overflow:hidden;display:flex;min-height:360px}
+  .rail{width:150px;flex:none;background:var(--nav);padding:13px 10px;display:flex;flex-direction:column;gap:2px}
+  .rail .brand{color:var(--t1);font-size:10px;font-weight:700;letter-spacing:.4px;margin-bottom:11px}
+  .rail .ri{display:flex;align-items:center;gap:7px;padding:6px 7px;border-radius:6px;font-size:11px;color:var(--t2)}
+  .rail .ri.sel{background:var(--inset);color:var(--t1)}
+  .rail .ri .meter{margin-left:auto;font-size:9px;color:var(--t3);font-family:var(--mono)}
+  .canvas{flex:1;min-width:0;padding:22px 26px;background:var(--canvas)}
+  .mono{font-family:var(--mono)}
+  .btn{display:inline-block;font-size:12px;padding:7px 14px;border-radius:6px;white-space:nowrap}
+  .btn.prim{background:var(--acc);color:var(--acc-on);font-weight:600}
+  .btn.ghost{background:transparent;border:1px solid var(--hair2);color:var(--t2)}
+  .btn.sm{font-size:11px;padding:5px 11px}
+  /* shared header */
+  .phead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .pname{font-size:24px;font-weight:600;color:var(--t1);line-height:1.1;letter-spacing:-.01em}
+  .psub{font-size:12.5px;color:var(--t3);margin-top:4px}
+  .pbar{margin:16px 0 4px}
+  .pbar .track{height:7px;border-radius:99px;background:var(--inset);overflow:hidden}
+  .pbar .fill{height:100%;width:71%;background:var(--ok);border-radius:99px}
+  .pbar .cap{font-size:12px;color:var(--t2);margin-top:7px}
+  .pbar .cap b{color:var(--t1)}
+  /* PASSPORT — checklist rows */
+  .grouplbl{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin:22px 0 9px}
+  .crow{display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:1px solid var(--hair)}
+  .crow .thumb{width:44px;height:44px;flex:none;border-radius:7px;background:var(--inset);display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:9px;text-align:center}
+  .crow .lab{flex:none;width:118px;font-size:12.5px;color:var(--t2)}
+  .crow .val{flex:1;min-width:0;font-size:13px;color:var(--t1);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crow .val.add{color:var(--t3);font-family:var(--sans)}
+  .crow.miss{background:linear-gradient(90deg,rgba(217,107,99,.05),transparent)}
+  .stat{width:16px;flex:none;text-align:center;font-size:13px}
+  .stat.ok{color:var(--ok)}.stat.no{color:var(--err)}
+  /* GALLERY */
+  .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 6px}
+  .gcard{background:var(--card);border-radius:9px;overflow:hidden}
+  .gcard .art{height:104px;background:var(--inset);display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:11px}
+  .gcard .art.empty{background:repeating-linear-gradient(45deg,#202226,#202226 8px,#1d1f22 8px,#1d1f22 16px);color:var(--t3)}
+  .gcard .cap{padding:9px 11px;font-size:11.5px;color:var(--t2);display:flex;justify-content:space-between;align-items:center}
+  .gcard .cap b{color:var(--t1);font-weight:600}
+  .idform{display:grid;grid-template-columns:1fr 1fr;gap:0 26px;margin-top:10px}
+  .idform .f{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px solid var(--hair)}
+  .idform .f .k{color:var(--t3)}.idform .f .v{color:var(--t1);font-family:var(--mono)}
+  .idform .f .v.add{color:var(--t3);font-family:var(--sans)}
+  .srcline{display:flex;gap:22px;align-items:center;margin-top:16px;font-size:12px;color:var(--t2);flex-wrap:wrap}
+  .srcline .n{color:var(--t1);font-family:var(--mono)}
+  .anno{margin:13px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--t2)}
+  .anno li{padding:5px 0 5px 22px;position:relative}
+  .anno li:before{content:"✓";position:absolute;left:3px;color:var(--ok);font-weight:700}
+  .options{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+  .opt{background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .13s,transform .13s,box-shadow .13s;-webkit-tap-highlight-color:transparent}
+  .opt:hover{transform:translateY(-2px)}.opt.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+  .opt h3{margin:0 0 5px;font-size:14px}.opt p{margin:0;font-size:12.5px;color:var(--t2)}
+  .pickbar{position:sticky;bottom:0;margin-top:22px;background:rgba(20,21,23,.94);border:1px solid var(--hair);border-radius:10px;padding:13px 16px;font-size:13.5px;color:var(--t2);backdrop-filter:blur(6px)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--inset);color:var(--t1);margin-left:4px}
+  @media(max-width:660px){.frame{flex-direction:column}.rail{width:auto;flex-direction:row;overflow-x:auto}.rail .brand{display:none}.gallery{grid-template-columns:1fr}.idform{grid-template-columns:1fr}.options{grid-template-columns:1fr}.crow .lab{width:92px}}
+  @media(prefers-reduced-motion:reduce){.opt{transition:none}}
+</style>
+
+<div class="wrap"><div class="inner">
+  <p class="eyebrow">NETDECK · Layout — Take 2</p>
+  <h1>Rebuilt around completeness, out of the cramped panes</h1>
+  <p class="lede">You were right: A and B just reshuffled the old 3-pane. Here's the reset. A part is <b>Complete</b> only when all seven of these are filled — that's now the whole point of the view:</p>
+  <div class="req">
+    <span class="r"><span class="dot d-ok"></span><b>Symbol</b></span>
+    <span class="r"><span class="dot d-ok"></span><b>Footprint</b></span>
+    <span class="r"><span class="dot d-err"></span><b>3D Model</b></span>
+    <span class="r"><span class="dot d-ok"></span><b>Part Number</b></span>
+    <span class="r"><span class="dot d-ok"></span><b>Manufacturer</b></span>
+    <span class="r"><span class="dot d-err"></span><b>Datasheet</b></span>
+    <span class="r"><span class="dot d-err"></span><b>Description</b></span>
+  </div>
+  <p class="lede" style="margin-top:12px">And the parts list shrinks to a slim rail (each part shows its own completeness), so the selected part gets the whole canvas — no more three cramped columns.</p>
+
+  <!-- PARADIGM X -->
+  <div class="block">
+    <span class="tag x">Direction X · Completion Passport</span>
+    <div class="frame">
+      <div class="rail"><div class="brand">NETDECK · Parts</div>
+        <div class="ri sel"><span class="dot d-warn"></span>ADG714BRUZ<span class="meter">5/7</span></div>
+        <div class="ri"><span class="dot d-ok"></span>STM32F103<span class="meter">7/7</span></div>
+        <div class="ri"><span class="dot d-err"></span>TPS62840<span class="meter">3/7</span></div>
+        <div class="ri"><span class="dot d-warn"></span>CC0402<span class="meter">4/7</span></div>
+      </div>
+      <div class="canvas">
+        <div class="phead">
+          <div><div class="pname">ADG714BRUZ</div><div class="psub">Quad SPST analog switch · Analog Devices · SOIC-16</div></div>
+          <span class="btn prim">▶ Complete This Part</span>
+        </div>
+        <div class="pbar"><div class="track"><div class="fill"></div></div><div class="cap"><b>5 of 7 complete</b> · 2 fields left: 3D model, datasheet, description</div></div>
+
+        <div class="grouplbl">Files</div>
+        <div class="crow"><span class="stat ok">✓</span><div class="thumb">▭ sym</div><div class="lab">Symbol</div><div class="val">ADG714BRUZ.kicad_sym</div></div>
+        <div class="crow"><span class="stat ok">✓</span><div class="thumb">▦ fp</div><div class="lab">Footprint</div><div class="val">FP_ADG714BRUZ</div></div>
+        <div class="crow miss"><span class="stat no">✗</span><div class="thumb">＋</div><div class="lab">3D Model</div><div class="val add">Add or link a .step / .wrl</div><span class="btn ghost sm">Add ▾</span></div>
+
+        <div class="grouplbl">Identity</div>
+        <div class="crow"><span class="stat ok">✓</span><div class="lab">Part Number</div><div class="val">ADG714BRUZ-REEL</div></div>
+        <div class="crow"><span class="stat ok">✓</span><div class="lab">Manufacturer</div><div class="val">Analog Devices</div></div>
+        <div class="crow miss"><span class="stat no">✗</span><div class="lab">Datasheet</div><div class="val add">Paste a URL, or…</div><span class="btn ghost sm">Find ▾</span></div>
+        <div class="crow miss"><span class="stat no">✗</span><div class="lab">Description</div><div class="val add">Type, or autofill from Mouser</div></div>
+      </div>
+    </div>
+    <ul class="anno">
+      <li>The whole screen IS the completeness checklist — fill the 7, it turns Complete</li>
+      <li>Progress bar + "what's left" is the focal point; done rows recede, missing rows glow</li>
+      <li>Every row is the same shape (status · label · value/action) — one calm rhythm, no mismatched blocks</li>
+      <li>Slim rail shows every part's score; the part owns the whole canvas</li>
+    </ul>
+  </div>
+
+  <!-- PARADIGM Y -->
+  <div class="block">
+    <span class="tag y">Direction Y · Visual Bench</span>
+    <div class="frame">
+      <div class="rail"><div class="brand">NETDECK · Parts</div>
+        <div class="ri sel"><span class="dot d-warn"></span>ADG714BRUZ<span class="meter">5/7</span></div>
+        <div class="ri"><span class="dot d-ok"></span>STM32F103<span class="meter">7/7</span></div>
+        <div class="ri"><span class="dot d-err"></span>TPS62840<span class="meter">3/7</span></div>
+        <div class="ri"><span class="dot d-warn"></span>CC0402<span class="meter">4/7</span></div>
+      </div>
+      <div class="canvas">
+        <div class="phead">
+          <div><div class="pname">ADG714BRUZ <span style="font-size:13px;color:var(--warn);font-weight:600">· 5 / 7</span></div><div class="psub">Quad SPST analog switch · Analog Devices · SOIC-16</div></div>
+          <span class="btn prim">▶ Complete This Part</span>
+        </div>
+        <div class="gallery">
+          <div class="gcard"><div class="art">▭ symbol</div><div class="cap"><b>Symbol</b><span class="dot d-ok"></span></div></div>
+          <div class="gcard"><div class="art">▦ footprint</div><div class="cap"><b>Footprint</b><span class="dot d-ok"></span></div></div>
+          <div class="gcard"><div class="art empty">＋ add 3D</div><div class="cap"><b>3D Model</b><span class="dot d-err"></span></div></div>
+        </div>
+        <div class="idform">
+          <div class="f"><span class="k">Part Number</span><span class="v">ADG714BRUZ-REEL</span></div>
+          <div class="f"><span class="k">Manufacturer</span><span class="v">Analog Devices</span></div>
+          <div class="f"><span class="k">Datasheet</span><span class="v add">Add · Find ▾</span></div>
+          <div class="f"><span class="k">Description</span><span class="v add">Add · autofill</span></div>
+        </div>
+        <div class="srcline">Sourcing: <span class="n">—</span> not looked up <span class="btn ghost sm">Mouser ▾</span></div>
+      </div>
+    </div>
+    <ul class="anno">
+      <li>The renders are the hero — big Symbol / Footprint / 3D you can actually SEE, missing ones a clear drop-in slot</li>
+      <li>Completeness score sits on the name; the empty 3D card reads as "the gap" at a glance</li>
+      <li>Identity + sourcing are a compact form beneath the visuals</li>
+      <li>Still one spacious canvas — the part, not three columns</li>
+    </ul>
+  </div>
+
+  <div class="options" id="opts">
+    <div class="opt" data-k="X · Completion Passport" onclick="pick(this)"><h3>X · Completion Passport</h3><p>The screen is the checklist. Fill 7 rows → Complete. Uniform rhythm, progress-driven, guided. Text/data-first.</p></div>
+    <div class="opt" data-k="Y · Visual Bench" onclick="pick(this)"><h3>Y · Visual Bench</h3><p>The renders are the hero, big and visual; fields are a compact form below. Completeness score on the name.</p></div>
+  </div>
+
+  <div class="pickbar" id="pickbar">Tap X or Y — or tell me what's still off and I'll go further (this is take 2; I'll keep pushing until it's right).<span id="picked"></span></div>
+</div></div>
+
+<script>
+  function pick(el){document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');
+    document.getElementById('picked').innerHTML=' — you tapped <span class="pill">'+el.dataset.k+'</span>, tell me in the terminal.';}
+</script>
