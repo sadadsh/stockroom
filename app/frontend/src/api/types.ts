@@ -221,6 +221,55 @@ export interface UpdateApply {
   restart_requested: boolean;
 }
 
+// GET /api/doctor/scan -> the library-health pass (stockroom.mutation.library_ops).
+// A `fixable` defect heals one-click (drift toward the JSON source of truth, or a
+// non-portable 3D-model link rewritten to ${SR_LIB}); a `manual` finding is real but
+// cannot be auto-fixed (a missing file cannot be fabricated) and carries how to
+// resolve it by hand; `uncommitted` lists working-tree changes the repair will commit.
+export interface RepairAction {
+  kind: "drift" | "model_path";
+  part_id: string;
+  detail: string;
+  before: string;
+  after: string;
+}
+
+export interface RepairFinding {
+  kind: "missing_symbol" | "dangling_model" | "dangling_datasheet" | "dangling_model_link";
+  part_id: string;
+  detail: string;
+  how_to_fix: string;
+}
+
+export interface DoctorScan {
+  fixable: RepairAction[];
+  manual: RepairFinding[];
+  uncommitted: string[];
+  healthy: boolean;
+}
+
+// POST /api/doctor/repair -> what the one-click pass actually did, plus the manual
+// findings it could not auto-fix (returned untouched, never silently resolved).
+export interface RepairResult {
+  healed_drift: number;
+  fixed_paths: number;
+  committed_files: number;
+  commit: string;
+  manual: RepairFinding[];
+}
+
+// POST /api/doctor/wire-kicad (a job) -> the KiCad wiring outcome. restart_needed is
+// true when KiCad was running while the library tables changed under it.
+export interface WiringReport {
+  sr_lib_value: string;
+  categories_registered: string[];
+  symbol_rows_added: number;
+  footprint_rows_added: number;
+  libs_created: string[];
+  kicad_running: boolean;
+  restart_needed: boolean;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

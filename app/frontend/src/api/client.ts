@@ -8,6 +8,7 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  DoctorScan,
   DuplicatesResponse,
   EnrichmentResult,
   Facets,
@@ -15,6 +16,7 @@ import type {
   PartDetail,
   PartsResponse,
   ProfilesResponse,
+  RepairResult,
   SettingsInfo,
   StagingCandidate,
   SyncResult,
@@ -242,5 +244,22 @@ export const api = {
 
   getSystemInfo(): Promise<SystemInfo> {
     return apiGet<SystemInfo>("/api/system/info");
+  },
+
+  // Doctor (M6f). A read-only health scan (what the repair would fix, so the diff is
+  // shown before healing); the one-click repair (a synchronous mutation like
+  // edit/move/delete that heals drift, rewrites non-portable model links and commits
+  // stray files atomically); and KiCad wiring, which registers the active profile into
+  // KiCad and runs as a job because it may rewrite the KiCad config.
+  scanDoctor(): Promise<DoctorScan> {
+    return apiGet<DoctorScan>("/api/doctor/scan");
+  },
+
+  repairLibrary(): Promise<RepairResult> {
+    return request<RepairResult>("POST", "/api/doctor/repair");
+  },
+
+  wireKicad(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/doctor/wire-kicad");
   },
 };

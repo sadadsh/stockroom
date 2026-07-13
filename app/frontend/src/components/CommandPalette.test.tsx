@@ -92,10 +92,10 @@ describe("CommandPalette", () => {
     expect(within(dialog).getByText("Components")).toBeInTheDocument();
     expect(within(dialog).getByText("Ingest")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
+    expect(within(dialog).getByText("Doctor")).toBeInTheDocument();
     expect(within(dialog).getByText("Settings")).toBeInTheDocument();
     // Unbuilt routes are never offered (they are not `available` in NAV).
     expect(within(dialog).queryByText("Projects")).toBeNull();
-    expect(within(dialog).queryByText("Doctor")).toBeNull();
     // Actions group: the one global action.
     expect(within(dialog).getByText("Actions")).toBeInTheDocument();
     expect(within(dialog).getByText("Switch to Light Theme")).toBeInTheDocument();
