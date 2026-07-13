@@ -121,18 +121,27 @@ class LibraryOps:
             missing = staged_missing_fields(staged)
             if missing:
                 raise IncompleteError(missing)
-        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
-        self.lib.models_dir.mkdir(parents=True, exist_ok=True)
-        self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
-
         part_id = new_part_id(self.lib.parts_dir, staged.mpn or staged.display_name)
         nickname = category_nickname(staged.category)
         sym_lib_path = self.lib.symbol_lib_path(staged.category)
         pretty_dir = self.lib.footprint_lib_path(staged.category)
 
+        # capture dirs that do not yet exist so a rollback prunes them; git cannot track
+        # an empty dir, so a brand-new category's .pretty (and the profile dirs, on the
+        # very first add) would otherwise survive a failed mutation (zero-trace, sec 2.2).
+        fresh_dirs = [
+            d
+            for d in (self.lib.parts_dir, self.lib.models_dir, self.lib.datasheets_dir, pretty_dir)
+            if not d.exists()
+        ]
+        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+        self.lib.models_dir.mkdir(parents=True, exist_ok=True)
+        self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
+
         with Transaction(self.repo) as txn:
-            # 0. ensure the category libraries exist (idempotent); a freshly
-            # created empty symbol lib is tracked so it commits atomically.
+            txn.track_dir(*fresh_dirs)
+            # 0. ensure the category libraries exist (idempotent); a freshly created
+            # empty symbol lib is tracked so it commits atomically.
             ensure_footprint_lib(pretty_dir)
             if not sym_lib_path.exists():
                 if self.cli is None:
