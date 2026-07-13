@@ -9,8 +9,6 @@ layer, so CRLF, tabs, and every untouched row survive exactly.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from stockroom.kicad.errors import KiCadFileError
 from stockroom.sexp.document import SexpDocument, quote_kicad
 
