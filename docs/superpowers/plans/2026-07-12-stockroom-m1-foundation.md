@@ -1316,7 +1316,7 @@ git commit -m "Add kicad-cli wrapper for version, symbol upgrade, and SVG export
 
 ```python
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.verify.semdiff import assert_only_changed
+from stockroom.verify.semdiff import assert_only_changed, semantic_diff
 
 
 def test_lists_symbols_and_version(fixtures_dir):
@@ -1345,9 +1345,7 @@ def test_set_absent_property_inserts(tmp_fixture):
     # a pure insert adds nodes; assert no existing node was lost or changed
     diffs = [
         d
-        for d in __import__(
-            "stockroom.verify.semdiff", fromlist=["semantic_diff"]
-        ).semantic_diff(original, lib.serialize())
+        for d in semantic_diff(original, lib.serialize())
         if d.startswith(("LOST", "CHANGED", "TYPE"))
     ]
     assert diffs == []
