@@ -58,15 +58,20 @@ const STATUS_LABEL = {
 
 export function PartTimeline({ partId }: { partId: string }) {
   const historyQ = usePartHistory(partId);
-  const [selected, setSelected] = useState<number | null>(null);
+  // Track the selection by sha, not array index: a write to this part invalidates the
+  // history and a new commit lands at the top, so an index would silently point at a
+  // different commit after the refetch. A sha still resolves to the intended commit
+  // (or to none, if it dropped out of the window).
+  const [selectedSha, setSelectedSha] = useState<string | null>(null);
   const [diffOpen, setDiffOpen] = useState(false);
 
   const commits = historyQ.data?.commits ?? [];
-  const selCommit = selected != null ? commits[selected] : null;
+  const selIndex = selectedSha ? commits.findIndex((c) => c.sha === selectedSha) : -1;
+  const selCommit = selIndex >= 0 ? commits[selIndex] : null;
   // the previous version of THIS part is the next-older entry in its own history;
   // "" when the selection is the earliest commit (the part was created there).
   const olderSha =
-    selected != null && selected + 1 < commits.length ? commits[selected + 1].sha : "";
+    selIndex >= 0 && selIndex + 1 < commits.length ? commits[selIndex + 1].sha : "";
   const diffQ = usePartDiff(partId, olderSha, selCommit?.sha ?? null);
   const assets = diffQ.data?.assets;
   const canVisualDiff =
@@ -86,14 +91,14 @@ export function PartTimeline({ partId }: { partId: string }) {
     <>
       <Card className="overflow-hidden">
         <ul>
-          {commits.map((c, i) => {
-            const active = selected === i;
+          {commits.map((c) => {
+            const active = selectedSha === c.sha;
             return (
               <li key={c.sha} className="border-b border-line last:border-b-0">
                 <button
                   type="button"
                   aria-expanded={active}
-                  onClick={() => setSelected(active ? null : i)}
+                  onClick={() => setSelectedSha(active ? null : c.sha)}
                   className={
                     "flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors " +
                     (active ? "bg-inset" : "hover:bg-inset")

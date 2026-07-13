@@ -217,6 +217,15 @@ def test_footprint_preview_at_rev_renders_the_historical_blob(app_ctx):
     assert "NEWPAD" in cli.fp_texts[1]
 
 
+def test_symbol_preview_at_rev_rejects_a_garbage_rev_as_400(app_ctx):
+    # a malformed (non-object-name) rev is a client error, not a git-backend outage:
+    # it must be a 4xx, never a 503 GitError.
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        r = c.get("/api/previews/symbol/tps62130.svg?rev=notarev")
+    assert r.status_code == 400
+
+
 def test_symbol_preview_at_rev_404_when_part_absent_at_that_rev(app_ctx):
     from stockroom.model.part import LibRef, PartRecord
 

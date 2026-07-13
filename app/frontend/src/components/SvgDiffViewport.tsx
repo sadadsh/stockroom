@@ -10,7 +10,17 @@ import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
 
-export function SvgDiffViewport({ before, after }: { before: Blob; after: Blob }) {
+export function SvgDiffViewport({
+  before,
+  after,
+  label,
+}: {
+  before: Blob;
+  after: Blob;
+  // the asset kind being diffed ("Symbol" | "Footprint"), so the alt text names the
+  // real geometry a screen reader is looking at, not a hardcoded "Symbol".
+  label: string;
+}) {
   const beforeUrl = useObjectUrl(before);
   const afterUrl = useObjectUrl(after);
   const { theme } = useTheme();
@@ -36,7 +46,7 @@ export function SvgDiffViewport({ before, after }: { before: Blob; after: Blob }
           {beforeUrl ? (
             <img
               src={beforeUrl}
-              alt="Symbol Before"
+              alt={`${label} Before`}
               draggable={false}
               className="absolute h-full w-full select-none object-contain p-10"
               style={layer(1 - blend)}
@@ -45,7 +55,7 @@ export function SvgDiffViewport({ before, after }: { before: Blob; after: Blob }
           {afterUrl ? (
             <img
               src={afterUrl}
-              alt="Symbol After"
+              alt={`${label} After`}
               draggable={false}
               className="absolute h-full w-full select-none object-contain p-10"
               style={layer(blend)}

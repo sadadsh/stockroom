@@ -60,6 +60,28 @@ def test_exclude_drops_internal_keys():
     assert set(c) == {"mpn"}
 
 
+def test_dict_to_scalar_shape_change_reports_one_leaf_carrying_both_values():
+    # a free-form specs value can toggle between a nested object and a scalar across
+    # revisions; the diff must surface the real before AND after, never silently drop
+    # the scalar side by recursing only into the dict.
+    before = {"specs": {"package": {"name": "SOT-23", "pins": 6}}}
+    after = {"specs": {"package": "QFN-16"}}
+    c = _changes(before, after)
+    assert "specs.package" in c
+    assert c["specs.package"] == ("changed", {"name": "SOT-23", "pins": 6}, "QFN-16")
+    # the dict-side leaves must NOT be reported as bare removals (that would hide the value)
+    assert "specs.package.name" not in c
+    assert "specs.package.pins" not in c
+
+
+def test_scalar_to_dict_shape_change_reports_one_leaf():
+    before = {"specs": {"package": "QFN-16"}}
+    after = {"specs": {"package": {"name": "SOT-23", "pins": 6}}}
+    c = _changes(before, after)
+    assert c["specs.package"] == ("changed", "QFN-16", {"name": "SOT-23", "pins": 6})
+    assert "specs.package.name" not in c
+
+
 def test_specs_pinout_reads_as_one_added_field():
     before = {"specs": {}}
     after = {"specs": {"pinout": [{"pin": "1", "name": "A"}, {"pin": "2", "name": "B"}]}}
