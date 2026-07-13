@@ -1,9 +1,13 @@
+import shutil
 from pathlib import Path
 
 import pytest
 
+from tests.backend.conftest import requires_kicad_cli
 from stockroom.ingest.errors import IngestError
-from stockroom.ingest.staging import StagingCandidate
+from stockroom.ingest.fingerprint import DetectedSource
+from stockroom.ingest.staging import StagingCandidate, build_candidates
+from stockroom.model.part import Provenance
 
 
 def _candidate(**kw):
@@ -54,3 +58,50 @@ def test_to_staged_part_rejects_missing_footprint():
     c = _candidate(footprint_variants=[])
     with pytest.raises(IngestError):
         c.to_staged_part()
+
+
+def _cli():
+    from stockroom.kicad.cli import KiCadCli
+    return KiCadCli()
+
+
+@requires_kicad_cli
+def test_build_candidates_from_snapeda(tmp_path, fixtures_dir):
+    sym = tmp_path / "MyPart.kicad_sym"
+    fp = tmp_path / "MyPart.kicad_mod"
+    model = tmp_path / "MyPart.step"
+    datasheet = tmp_path / "MyPart.pdf"
+    shutil.copyfile(fixtures_dir / "one_symbol.kicad_sym", sym)
+    shutil.copyfile(fixtures_dir / "one_footprint.kicad_mod", fp)
+    model.write_bytes(b"ISO-10303-21;\n")
+    datasheet.write_bytes(b"%PDF-1.4\n")
+    detected = DetectedSource("snapeda", sym, None, [fp], model, datasheet)
+    prov = Provenance(source="snapeda")
+    cands = build_candidates(_cli(), detected, tmp_path / "work", prov)
+    assert len(cands) == 1
+    c = cands[0]
+    assert c.symbol_name == "TESTPART"
+    assert c.entry_name == "TESTPART"
+    assert c.model_path == model
+    assert c.gaps == []  # symbol, footprint, and model all present
+
+
+@requires_kicad_cli
+def test_build_candidates_flags_missing_model(tmp_path, fixtures_dir):
+    sym = tmp_path / "MyPart.kicad_sym"
+    fp = tmp_path / "MyPart.kicad_mod"
+    shutil.copyfile(fixtures_dir / "one_symbol.kicad_sym", sym)
+    shutil.copyfile(fixtures_dir / "one_footprint.kicad_mod", fp)
+    detected = DetectedSource("snapeda", sym, None, [fp], None, None)
+    [c] = build_candidates(_cli(), detected, tmp_path / "work")
+    assert any("3D model" in g for g in c.gaps)
+
+
+def test_build_candidates_partial_is_model_only():
+    model = Path("/tmp/only.step")
+    detected = DetectedSource("partial", None, None, [], model, None)
+    # partial does not need kicad-cli; pass None safely.
+    [c] = build_candidates(None, detected, Path("/tmp"))
+    assert c.symbol_lib_path is None
+    assert c.model_path == model
+    assert any("only a 3D model" in g for g in c.gaps)

@@ -7,7 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from stockroom.ingest.convert import normalize_footprint, normalize_symbol, read_symbol_names
 from stockroom.ingest.errors import IngestError
+from stockroom.ingest.fingerprint import DetectedSource
+from stockroom.ingest.naming import propose_category, propose_display_name, propose_entry_name
+from stockroom.kicad.cli import KiCadCli
+from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.part import Datasheet, Provenance
 from stockroom.mutation.library_ops import StagedPart
 
@@ -65,3 +70,74 @@ class StagingCandidate:
             provenance=self.provenance,
             datasheet_meta=datasheet_meta,
         )
+
+
+def _symbol_metadata(sym_lib: SymbolLib, name: str) -> tuple[str, list[str]]:
+    sym = sym_lib.get_symbol(name)
+    description = sym.get_property("Description") or ""
+    keywords = sym.get_property("ki_keywords") or ""
+    tags = [t for t in keywords.split() if t]
+    return description, tags
+
+
+def build_candidates(
+    cli: KiCadCli | None,
+    detected: DetectedSource,
+    workdir: Path,
+    provenance: Provenance | None = None,
+) -> list[StagingCandidate]:
+    workdir = Path(workdir)
+
+    if detected.vendor == "partial" or detected.symbol_path is None:
+        return [
+            StagingCandidate(
+                vendor=detected.vendor,
+                symbol_lib_path=None,
+                symbol_name="",
+                footprint_variants=[],
+                model_path=detected.model_path,
+                datasheet_path=detected.datasheet_path,
+                gaps=["package contains only a 3D model; attach it to an existing part"],
+                provenance=provenance,
+            )
+        ]
+
+    sym_workdir = workdir / "symbol"
+    normalized_sym = normalize_symbol(cli, detected.symbol_path, detected.dcm_path, sym_workdir)
+    sym_lib = SymbolLib.load(normalized_sym)
+    names = read_symbol_names(normalized_sym)
+    if not names:
+        raise IngestError(f"no symbol found inside {detected.symbol_path.name}")
+
+    variants: list[Path] = []
+    for i, fp in enumerate(detected.footprint_paths):
+        variants.append(normalize_footprint(cli, fp, workdir / f"fp{i}"))
+
+    candidates: list[StagingCandidate] = []
+    for name in names:
+        description, tags = _symbol_metadata(sym_lib, name)
+        gaps: list[str] = []
+        if not variants:
+            gaps.append("no footprint in this package")
+        if detected.model_path is None:
+            gaps.append("no 3D model in this package")
+        if detected.datasheet_path is None:
+            gaps.append("no datasheet in this package")
+        candidates.append(
+            StagingCandidate(
+                vendor=detected.vendor,
+                symbol_lib_path=normalized_sym,
+                symbol_name=name,
+                footprint_variants=list(variants),
+                model_path=detected.model_path,
+                datasheet_path=detected.datasheet_path,
+                display_name=propose_display_name(name),
+                entry_name=propose_entry_name(name),
+                category=propose_category(f"{name} {description} {' '.join(tags)}"),
+                description=description,
+                tags=tags,
+                gaps=gaps,
+                provenance=provenance,
+            )
+        )
+    return candidates
