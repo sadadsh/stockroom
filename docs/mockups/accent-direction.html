@@ -1,0 +1,161 @@
+<title>NETDECK — Accent Direction</title>
+<style>
+  :root{
+    --nav:#191a1c; --canvas:#1c1d1f; --card:#232427; --inset:#2a2c30;
+    --hair:#2e2f33; --hair2:#3a3b40;
+    --t1:#ffffff; --t2:rgba(255,255,255,.773); --t3:rgba(255,255,255,.529);
+    --ok:#5fb07a;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono: ui-monospace,"Cascadia Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --page:#141517;
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{background:var(--page);color:var(--t1);font-family:var(--sans);
+        min-height:100vh;padding:28px 20px 64px;line-height:1.5}
+  .inner{max-width:1080px;margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--t3);text-transform:uppercase;margin:0 0 8px}
+  h1{font-size:clamp(22px,4.5vw,30px);font-weight:600;margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:15px;color:var(--t2);max-width:64ch;margin:0 0 8px}
+  .lede.small{font-size:13.5px;color:var(--t3);max-width:70ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin:26px 0 8px}
+  .tile{background:var(--card);border:1px solid var(--hair);border-radius:12px;overflow:hidden;
+        cursor:pointer;transition:border-color .14s ease,transform .14s ease,box-shadow .14s ease;
+        -webkit-tap-highlight-color:transparent}
+  .tile:hover{transform:translateY(-3px)}
+  .tile:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  .tile.sel{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+  /* faithful mini app panel */
+  .shot{display:flex;height:230px;background:var(--canvas)}
+  .nav{width:112px;flex:none;background:var(--nav);padding:14px 9px;display:flex;flex-direction:column;gap:3px}
+  .brand{color:var(--t1);font-size:10.5px;font-weight:700;letter-spacing:.4px;margin-bottom:12px}
+  .ni{color:var(--t3);font-size:11px;padding:6px 9px;border-radius:6px}
+  .ni.sel{color:var(--t1);background:var(--inset)}
+  .ni.sel.tint{background:var(--acc-wash);color:var(--acc-txt)}
+  .body{flex:1;min-width:0;padding:15px 17px;display:flex;flex-direction:column}
+  .tabrow{display:flex;gap:14px;font-size:10.5px;color:var(--t3);margin-bottom:3px}
+  .tabrow .on{color:var(--t1);font-weight:600}
+  .uline{height:2px;width:38px;background:var(--acc);border-radius:2px;margin:0 0 12px}
+  .pt{color:var(--t1);font-size:14px;font-weight:600;line-height:1.2}
+  .pm{color:var(--t2);font-family:var(--mono);font-size:10.5px;margin-bottom:11px}
+  .kv{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px solid var(--hair)}
+  .kv .k{color:var(--t2)}
+  .kv .v{color:var(--t1);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:6px}
+  .brow{display:flex;gap:8px;margin-top:auto;padding-top:13px}
+  .b{font-size:10.5px;padding:6px 11px;border-radius:6px;white-space:nowrap}
+  .b.prim{background:var(--acc);color:var(--acc-on);font-weight:600}
+  .b.ghost{background:transparent;border:1px solid var(--hair2);color:var(--t2)}
+  .cap{padding:14px 16px 16px}
+  .cap h3{margin:0 0 5px;font-size:14px;font-weight:600;color:var(--t1)}
+  .cap p{margin:0;font-size:12.5px;color:var(--t2);line-height:1.45}
+  .pick{position:sticky;bottom:0;margin-top:22px;background:rgba(20,21,23,.94);
+        border:1px solid var(--hair);border-radius:10px;padding:13px 16px;font-size:13.5px;color:var(--t2);
+        backdrop-filter:blur(6px)}
+  .pick b{color:var(--t1)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;
+        background:var(--inset);color:var(--t1);margin-left:4px}
+  @media (prefers-reduced-motion:reduce){.tile{transition:none}}
+</style>
+
+<div class="wrap">
+  <div class="inner">
+    <p class="eyebrow">NETDECK · Design Direction</p>
+    <h1>Color identity — pick the accent</h1>
+    <p class="lede">The app is a professional KiCad library manager, today pure neutral grey. We're evolving the look. The one decision that sets the whole tone: keep it hueless, or introduce a single restrained accent that rides <em>only</em> on interactive chrome — the primary button, the selected nav item, the subtab underline, focus rings — and never on data.</p>
+    <p class="lede small">Every tile below is the same Library panel, shown four ways. The pin-map/status colors (the green "Active" dot) stay exactly as they are regardless — those encode data, not brand.</p>
+
+    <div class="grid" id="grid">
+
+      <div class="tile sel" tabindex="0" data-k="A · Pure Neutral" onclick="pick(this)"
+           style="--acc:#ededed;--acc-on:#1b1b1b;--acc-wash:#2a2c30;--acc-txt:#ffffff">
+        <div class="shot">
+          <div class="nav"><div class="brand">NETDECK</div>
+            <div class="ni sel">Library</div><div class="ni">Projects</div><div class="ni">Bench</div><div class="ni">Git</div></div>
+          <div class="body">
+            <div class="tabrow"><span class="on">Parts</span><span>Sourcing Health</span></div><div class="uline"></div>
+            <div class="pt">ADG714BRUZ</div><div class="pm">ADG714BRUZ-REEL</div>
+            <div class="kv"><span class="k">Lifecycle</span><span class="v"><span class="dot"></span>Active</span></div>
+            <div class="kv"><span class="k">Stock</span><span class="v">4,213</span></div>
+            <div class="kv"><span class="k">Unit Price</span><span class="v">$1.86</span></div>
+            <div class="brow"><span class="b prim">Complete This Part</span><span class="b ghost">Mouser ▾</span></div>
+          </div>
+        </div>
+        <div class="cap"><h3>A · Pure Neutral <span style="color:var(--t3);font-weight:400;font-size:12px">(current)</span></h3>
+          <p>No hue anywhere. Identity from space, type, hierarchy alone. Primary button is near-white. Calmest, most restrained — the "Vercel" end. Nothing ever competes with the data colors.</p></div>
+      </div>
+
+      <div class="tile" tabindex="0" data-k="B · Restrained Azure" onclick="pick(this)"
+           style="--acc:#5c86c4;--acc-on:#0b1120;--acc-wash:rgba(92,134,196,.16);--acc-txt:#9db8e6">
+        <div class="shot">
+          <div class="nav"><div class="brand">NETDECK</div>
+            <div class="ni sel tint">Library</div><div class="ni">Projects</div><div class="ni">Bench</div><div class="ni">Git</div></div>
+          <div class="body">
+            <div class="tabrow"><span class="on">Parts</span><span>Sourcing Health</span></div><div class="uline"></div>
+            <div class="pt">ADG714BRUZ</div><div class="pm">ADG714BRUZ-REEL</div>
+            <div class="kv"><span class="k">Lifecycle</span><span class="v"><span class="dot"></span>Active</span></div>
+            <div class="kv"><span class="k">Stock</span><span class="v">4,213</span></div>
+            <div class="kv"><span class="k">Unit Price</span><span class="v">$1.86</span></div>
+            <div class="brow"><span class="b prim">Complete This Part</span><span class="b ghost">Mouser ▾</span></div>
+          </div>
+        </div>
+        <div class="cap"><h3>B · Restrained Azure</h3>
+          <p>A calm desaturated blue on chrome only — the Windows 11 / native-instrument feel. Familiar, trustworthy, quietly technical. (You retired a brighter azure before; this one is muted and chrome-only.)</p></div>
+      </div>
+
+      <div class="tile" tabindex="0" data-k="C · Restrained Indigo" onclick="pick(this)"
+           style="--acc:#7d7bd4;--acc-on:#0d0b1c;--acc-wash:rgba(125,123,212,.16);--acc-txt:#b3b1ea">
+        <div class="shot">
+          <div class="nav"><div class="brand">NETDECK</div>
+            <div class="ni sel tint">Library</div><div class="ni">Projects</div><div class="ni">Bench</div><div class="ni">Git</div></div>
+          <div class="body">
+            <div class="tabrow"><span class="on">Parts</span><span>Sourcing Health</span></div><div class="uline"></div>
+            <div class="pt">ADG714BRUZ</div><div class="pm">ADG714BRUZ-REEL</div>
+            <div class="kv"><span class="k">Lifecycle</span><span class="v"><span class="dot"></span>Active</span></div>
+            <div class="kv"><span class="k">Stock</span><span class="v">4,213</span></div>
+            <div class="kv"><span class="k">Unit Price</span><span class="v">$1.86</span></div>
+            <div class="brow"><span class="b prim">Complete This Part</span><span class="b ghost">Mouser ▾</span></div>
+          </div>
+        </div>
+        <div class="cap"><h3>C · Restrained Indigo</h3>
+          <p>A muted violet-blue — the "Linear" signature. A little more character and modernity than azure, still quiet, still chrome-only. Reads as a considered, contemporary tool.</p></div>
+      </div>
+
+      <div class="tile" tabindex="0" data-k="D · Restrained Teal" onclick="pick(this)"
+           style="--acc:#3f9e91;--acc-on:#03120f;--acc-wash:rgba(63,158,145,.16);--acc-txt:#79cabd">
+        <div class="shot">
+          <div class="nav"><div class="brand">NETDECK</div>
+            <div class="ni sel tint">Library</div><div class="ni">Projects</div><div class="ni">Bench</div><div class="ni">Git</div></div>
+          <div class="body">
+            <div class="tabrow"><span class="on">Parts</span><span>Sourcing Health</span></div><div class="uline"></div>
+            <div class="pt">ADG714BRUZ</div><div class="pm">ADG714BRUZ-REEL</div>
+            <div class="kv"><span class="k">Lifecycle</span><span class="v"><span class="dot"></span>Active</span></div>
+            <div class="kv"><span class="k">Stock</span><span class="v">4,213</span></div>
+            <div class="kv"><span class="k">Unit Price</span><span class="v">$1.86</span></div>
+            <div class="brow"><span class="b prim">Complete This Part</span><span class="b ghost">Mouser ▾</span></div>
+          </div>
+        </div>
+        <div class="cap"><h3>D · Restrained Teal</h3>
+          <p>A calm blue-green — warmer, less corporate than blue. Note: green already means "OK/Active" in status dots, so a teal accent needs care to stay distinct from data.</p></div>
+      </div>
+
+    </div>
+
+    <div class="pick" id="pickbar">
+      Tap a tile to preview it selected — then tell me your pick in the terminal.
+      <span id="picked"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  function pick(el){
+    document.querySelectorAll('.tile').forEach(t=>t.classList.remove('sel'));
+    el.classList.add('sel');
+    document.getElementById('picked').innerHTML =
+      'You tapped <span class="pill">'+el.dataset.k+'</span> — say the letter in the terminal to lock it.';
+  }
+  document.querySelectorAll('.tile').forEach(t=>t.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(t);}
+  }));
+</script>
