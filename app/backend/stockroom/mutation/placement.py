@@ -86,9 +86,9 @@ def _datasheet_value(record: PartRecord) -> str:
     return ""
 
 
-def mirror_fields_to_symbol(symbol: Symbol, record: PartRecord) -> None:
-    """Mirror the KiCad-visible subset into the symbol's properties so KiCad
-    shows a complete part even without Stockroom (spec section 3)."""
+def kicad_visible_properties(record: PartRecord) -> dict[str, str]:
+    """The KiCad-visible subset mirrored into a symbol, as {property: value}.
+    Single source of truth for both writing (mirror) and drift detection."""
     values = {
         "MPN": record.mpn,
         "Manufacturer": record.manufacturer,
@@ -98,6 +98,9 @@ def mirror_fields_to_symbol(symbol: Symbol, record: PartRecord) -> None:
     }
     if record.purchase and record.purchase[0].url:
         values["Purchase"] = record.purchase[0].url
-    for name, value in values.items():
-        if value:
-            symbol.set_property(name, value)
+    return {k: v for k, v in values.items() if v}
+
+
+def mirror_fields_to_symbol(symbol: Symbol, record: PartRecord) -> None:
+    for name, value in kicad_visible_properties(record).items():
+        symbol.set_property(name, value)
