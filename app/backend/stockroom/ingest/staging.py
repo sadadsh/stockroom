@@ -13,7 +13,7 @@ from stockroom.ingest.fingerprint import DetectedSource
 from stockroom.ingest.naming import propose_category, propose_display_name, propose_entry_name
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.part import Datasheet, Provenance
+from stockroom.model.part import Datasheet, Provenance, Purchase
 from stockroom.mutation.library_ops import StagedPart
 
 
@@ -33,6 +33,10 @@ class StagingCandidate:
     manufacturer: str = ""
     description: str = ""
     tags: list[str] = field(default_factory=list)
+    # Sourcing links a raw package never carries; filled by M4 enrichment or a
+    # manual review edit so the candidate can satisfy the complete-to-add gate
+    # (spec section 6, purchase link is a required passport field).
+    purchase: list[Purchase] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     provenance: Provenance | None = None
 
@@ -69,6 +73,7 @@ class StagingCandidate:
             datasheet_source=self.datasheet_path,
             provenance=self.provenance,
             datasheet_meta=datasheet_meta,
+            purchase=list(self.purchase),
         )
 
 

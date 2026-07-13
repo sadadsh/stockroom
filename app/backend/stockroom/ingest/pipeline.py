@@ -1,7 +1,8 @@
 """The ingestion pipeline: Inspect (unpack + fingerprint) and Convert + Stage
 produce review-ready candidates; Commit runs one atomic, zero-trace transaction
-through the M2 add_part seam. Partial (3D-only) packages attach to an existing
-part (spec section 5)."""
+through the M2 add_part seam and enforces the strict complete-to-add gate on
+entry to the primary library (spec sections 5 and 6). Partial (3D-only) packages
+attach to an existing part (spec section 5)."""
 
 from __future__ import annotations
 
@@ -29,6 +30,10 @@ class IngestPipeline:
         self.repo = repo
         self.cli = cli
         self.ops = LibraryOps(profile, repo, cli=cli)
+        # Tempdirs inspect() created itself (no workdir supplied); removed by
+        # cleanup() or on __exit__ so an inspect->commit cycle never orphans a
+        # sandbox tree in the system temp dir.
+        self._owned_workdirs: list[Path] = []
 
     def inspect(
         self,
@@ -36,7 +41,14 @@ class IngestPipeline:
         lcsc_ids: list[str] = (),
         workdir: Path | None = None,
     ) -> list[StagingCandidate]:
-        workdir = Path(workdir) if workdir is not None else Path(tempfile.mkdtemp(prefix="sr-ingest-"))
+        if workdir is not None:
+            workdir = Path(workdir)
+        else:
+            # A candidate's file paths point INTO this workdir and must survive
+            # until commit(), so the tree cannot be torn down when inspect returns.
+            # Own it and dispose of it in cleanup()/__exit__ instead of leaking it.
+            workdir = Path(tempfile.mkdtemp(prefix="sr-ingest-"))
+            self._owned_workdirs.append(workdir)
         workdir.mkdir(parents=True, exist_ok=True)
         candidates: list[StagingCandidate] = []
 
@@ -62,13 +74,16 @@ class IngestPipeline:
         return candidates
 
     def commit(self, candidate: StagingCandidate) -> PartRecord:
-        # M3 ingestion stages a candidate before M4 enrichment exists (no purchase
-        # link field yet), so a freshly ingested part cannot yet satisfy the strict
-        # complete-to-add gate. Commit here is the "land it, flag the gaps" step;
-        # the gate applies again in full once M4 enrichment can complete the
-        # passport and a normal (non-ingest) add_part call is made.
+        # Committing is ENTRY into the library, so the strict complete-to-add gate
+        # (spec section 6) applies here in full: an incomplete part is REJECTED with
+        # an honest per-field report (add_part raises IncompleteError.missing), never
+        # a silent partial add. Staging is where a candidate is worked toward
+        # completeness (edit its fields, attach a datasheet/model, paste a purchase
+        # URL); the gate fires only at commit. An archive profile is grandfathered
+        # (spec section 7) and add_part bypasses the gate for it automatically, so a
+        # legacy-library import still lands. This is a full gate, not a deferral.
         staged = candidate.to_staged_part()
-        return self.ops.add_part(staged, require_complete=False)
+        return self.ops.add_part(staged)
 
     def attach_model(self, part_id: str, candidate: StagingCandidate) -> PartRecord:
         if candidate.model_path is None:
@@ -96,3 +111,19 @@ class IngestPipeline:
             txn.track(json_path)
             txn.commit(f"Attach 3D model to {part_id}")
         return record
+
+    def cleanup(self) -> None:
+        """Remove every sandbox tree inspect() created for itself. Idempotent and
+        safe to call after commit(); the committed library files live under the
+        profile, never under these tempdirs. A caller-supplied workdir is left
+        alone (the caller owns it)."""
+        while self._owned_workdirs:
+            wd = self._owned_workdirs.pop()
+            shutil.rmtree(wd, ignore_errors=True)
+
+    def __enter__(self) -> "IngestPipeline":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        self.cleanup()
+        return False  # never suppress exceptions

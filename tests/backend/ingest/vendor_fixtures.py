@@ -12,26 +12,31 @@ def make_vendor_zip(dst_zip: Path, vendor: str, fixtures_dir: Path) -> Path:
     legacy = (fixtures_dir / "legacy.lib").read_bytes()
     fp = (fixtures_dir / "one_footprint.kicad_mod").read_bytes()
     step = b"ISO-10303-21;\n"
+    pdf = b"%PDF-1.4\n%%EOF\n"  # real packages ship the datasheet PDF alongside
     with zipfile.ZipFile(dst_zip, "w") as zf:
         if vendor == "octopart":
             zf.writestr("device.lib", legacy)
             zf.writestr("device.dcm", "EESchema-DOCLIB  Version 2.0\n#\n#End Doc Library\n")
             zf.writestr("MyPart.pretty/MyPart.kicad_mod", fp)
             zf.writestr("MyPart.step", step)
+            zf.writestr("MyPart.pdf", pdf)
         elif vendor == "samacsys":
             zf.writestr("KiCad/MyPart.kicad_sym", sym)
             zf.writestr("KiCad/MyPart.kicad_mod", fp)
             zf.writestr("MyPart.step", step)
+            zf.writestr("MyPart.pdf", pdf)
             zf.writestr("MyPart.epw", "pointer")  # junk, ignored
         elif vendor == "ultralibrarian":
             zf.writestr("KiCAD/2025-02-10_09-58-00.kicad_sym", sym)
             zf.writestr("KiCAD/MyPart.pretty/VarA.kicad_mod", fp)
             zf.writestr("KiCAD/MyPart.pretty/VarB.kicad_mod", fp)
             zf.writestr("3D/MyPart.stp", step)
+            zf.writestr("MyPart.pdf", pdf)
         elif vendor == "snapeda":
             zf.writestr("MyPart.kicad_sym", sym)
             zf.writestr("MyPart.kicad_mod", fp)
             zf.writestr("MyPart.step", step)
+            zf.writestr("MyPart.pdf", pdf)
             zf.writestr("how-to-import.htm", "<html></html>")  # junk marker
         else:
             raise ValueError(f"unknown vendor: {vendor}")

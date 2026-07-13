@@ -7,7 +7,7 @@ from tests.backend.conftest import requires_kicad_cli
 from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import DetectedSource
 from stockroom.ingest.staging import StagingCandidate, build_candidates
-from stockroom.model.part import Provenance
+from stockroom.model.part import Provenance, Purchase
 
 
 def _candidate(**kw):
@@ -46,6 +46,19 @@ def test_to_staged_part_maps_all_fields():
     assert sp.entry_name == "TPS62130RGTR"
     assert sp.model_source == Path("/tmp/m.step")
     assert sp.datasheet_source == Path("/tmp/d.pdf")
+
+
+def test_to_staged_part_projects_purchase_for_the_gate():
+    # A purchase link is a required passport field (spec section 6); the candidate
+    # must carry it through to the StagedPart or the gate is unsatisfiable via ingest.
+    c = _candidate(purchase=[Purchase(vendor="Mouser", url="https://mouser.com/p/1")])
+    sp = c.to_staged_part()
+    assert sp.purchase and sp.purchase[0].url == "https://mouser.com/p/1"
+
+
+def test_to_staged_part_purchase_defaults_empty():
+    sp = _candidate().to_staged_part()
+    assert sp.purchase == []
 
 
 def test_to_staged_part_rejects_missing_symbol():
