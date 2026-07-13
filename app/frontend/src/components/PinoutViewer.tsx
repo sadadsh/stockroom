@@ -35,18 +35,12 @@ interface SortState {
   dir: "asc" | "desc";
 }
 
-// Pin identifiers are usually numeric ("1".."64") but can be alphanumeric ("A1");
-// compare numerically when both sides parse as numbers, else fall back to a locale
-// compare so "10" never sorts before "2".
+// Pin identifiers are usually numeric ("1".."64") but can be alphanumeric ("A1").
+// Numeric-aware collation is the SINGLE mechanism: it orders "1","2","10" correctly
+// (not lexicographic "1","10","2") AND handles "A1".."A10", so the numeric-sort test
+// stays load-bearing — drop the `numeric` option and it goes red.
 function comparePins(a: PinoutPin, b: PinoutPin, key: SortKey): number {
-  const av = a[key];
-  const bv = b[key];
-  if (key === "pin") {
-    const an = Number(av);
-    const bn = Number(bv);
-    if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return an - bn;
-  }
-  return av.localeCompare(bv, undefined, { numeric: true });
+  return a[key].localeCompare(b[key], undefined, { numeric: true });
 }
 
 export function PinoutViewer({
@@ -119,7 +113,7 @@ export function PinoutViewer({
                 type="button"
                 aria-label="Sort By Pin"
                 onClick={() => toggleSort("pin")}
-                className="inline-flex items-center text-xs uppercase tracking-wide text-t3 hover:text-t1"
+                className="inline-flex items-center text-xs font-medium text-t3 hover:text-t1"
               >
                 Pin{indicator("pin")}
               </button>
@@ -129,7 +123,7 @@ export function PinoutViewer({
                 type="button"
                 aria-label="Sort By Name"
                 onClick={() => toggleSort("name")}
-                className="inline-flex items-center text-xs uppercase tracking-wide text-t3 hover:text-t1"
+                className="inline-flex items-center text-xs font-medium text-t3 hover:text-t1"
               >
                 Name{indicator("name")}
               </button>

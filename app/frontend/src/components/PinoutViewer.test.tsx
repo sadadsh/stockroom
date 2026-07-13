@@ -62,6 +62,14 @@ describe("PinoutViewer", () => {
     expect(names()).toEqual(["VIN", "GND", "VCC"]);
   });
 
+  it("renders column headers without letterspaced uppercase (design contract)", () => {
+    render(<PinoutViewer pins={PINS} />);
+    const pinHeader = screen.getByRole("button", { name: /sort by pin/i });
+    // The contract retires letterspaced UPPERCASE micro-labels; headers stay Title case.
+    expect(pinHeader.className).not.toMatch(/\buppercase\b/);
+    expect(pinHeader.className).not.toMatch(/tracking-wide/);
+  });
+
   it("sorts by name and toggles direction on a second click", async () => {
     render(<PinoutViewer pins={PINS} />);
     await userEvent.click(screen.getByRole("button", { name: /sort by name/i }));

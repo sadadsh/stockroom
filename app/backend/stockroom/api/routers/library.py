@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from stockroom.api.schemas import EditFieldBody, FacetsDTO, MoveBody, PartSummary
+from stockroom.api.schemas import EditFieldBody, FacetsDTO, MoveBody, PartSummary, SetSpecsBody
 
 
 def library_router(require_token) -> APIRouter:
@@ -46,17 +46,15 @@ def library_router(require_token) -> APIRouter:
         return rec.to_dict()
 
     @r.post("/parts/{part_id}/specs")
-    def set_specs(request: Request, part_id: str, body: dict) -> dict:
+    def set_specs(request: Request, part_id: str, body: SetSpecsBody) -> dict:
         # Persist canonical spec data (e.g. an enriched pinout) onto the record so a
-        # viewer reads the source of truth. body = {specs: {key: {value, source?,
-        # confidence?}}, overwrite?}. Specs are not indexed, but the record write goes
-        # through the same rebuild path as every other mutation to keep the index honest.
+        # viewer reads the source of truth. The typed body means a malformed specs
+        # container is a 422, not an opaque 500. Specs are not indexed, but the record
+        # write goes through the same rebuild path as every other mutation.
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
-        rec = ctx.ops.set_specs(
-            part_id, body.get("specs", {}), overwrite=bool(body.get("overwrite", False))
-        )
+        rec = ctx.ops.set_specs(part_id, body.specs, overwrite=body.overwrite)
         ctx.rebuild_index()
         return rec.to_dict()
 

@@ -4,6 +4,8 @@ the derived index (spec sections 5.1, 5.2)."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 from stockroom.store.index import Facets as _Facets
@@ -68,3 +70,13 @@ class EditFieldBody(BaseModel):
 
 class MoveBody(BaseModel):
     category: str
+
+
+class SetSpecsBody(BaseModel):
+    """Persist canonical spec data onto a record (M6i). `specs` maps a spec name to
+    {value, source?, confidence?}; a typed body means a malformed container (a list or
+    scalar instead of an object) is a clean 422, never an opaque 500 from set_specs
+    calling .items() on a non-mapping. Inner values stay Any (the value is free-form)."""
+
+    specs: dict[str, Any] = {}
+    overwrite: bool = False
