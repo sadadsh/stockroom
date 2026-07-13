@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import type { PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
+import { requestPart } from "../lib/partSelection";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -275,6 +276,59 @@ describe("ComponentsPage", () => {
 
     expect(await screen.findByText("Already Set")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
+
+  it("consumes a palette part request: clears filters and selects that part even when a search hid it", async () => {
+    const R10K: PartSummary = {
+      id: "r10k",
+      display_name: "R 10k",
+      category: "Passives",
+      mpn: "RC0402-10K",
+      manufacturer: "Yageo",
+      is_complete: true,
+      missing: [],
+    };
+    // listParts honors the q filter so a search can hide the requested part; the
+    // request must clear that filter so the part comes back and gets selected.
+    mockApi.listParts.mockImplementation(async (args) => {
+      const all = [SUMMARY, R10K];
+      const q = (args.q ?? "").toLowerCase();
+      const parts = q
+        ? all.filter(
+            (p) =>
+              p.display_name.toLowerCase().includes(q) ||
+              p.mpn.toLowerCase().includes(q),
+          )
+        : all;
+      return { parts, count: parts.length };
+    });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1, Passives: 1 },
+      by_manufacturer: {},
+      complete: 2,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockImplementation(async (id) =>
+      id === "r10k"
+        ? { ...DETAIL, id: "r10k", display_name: "R 10k", description: "Thick Film Resistor" }
+        : DETAIL,
+    );
+
+    wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    // Filter the list down to just LM358; R 10k is now hidden.
+    await screen.findByText("Dual Operational Amplifier");
+    const search = screen.getByLabelText("Search Parts");
+    await user.type(search, "LM358");
+    await waitFor(() => expect(screen.queryByText("R 10k")).toBeNull());
+
+    // A palette request for the hidden part clears the filter and selects it.
+    act(() => requestPart("r10k"));
+
+    expect(await screen.findByText("Thick Film Resistor")).toBeInTheDocument();
+    expect(mockApi.partDetail).toHaveBeenCalledWith("r10k");
+    expect(screen.getByLabelText("Search Parts")).toHaveValue("");
   });
 
   it("shows the honest empty state when the library has no parts", async () => {

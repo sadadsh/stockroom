@@ -18,6 +18,7 @@ import {
 } from "../api/queries";
 import { ApiError } from "../api/client";
 import { useToast } from "../lib/toast";
+import { onRequestedPart } from "../lib/partSelection";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
@@ -81,6 +82,19 @@ export function ComponentsPage() {
       onError: (err) => toastError(err, "Could not delete"),
     });
   }
+
+  // A cross-page "select this part" request (fired by the Ctrl+K palette on any
+  // route) arrives here. Clear the filters so the requested part is guaranteed to
+  // be in the list, then select it; the auto-select effect below leaves an
+  // in-list selection alone, so it will not clobber this pick once the list settles.
+  useEffect(() => {
+    return onRequestedPart((id) => {
+      setSearch("");
+      setCategory(null);
+      setCompleteOnly(false);
+      setSelectedId(id);
+    });
+  }, []);
 
   // Auto-select the first part when the current selection falls out of the list
   // (a new search, a category change, or the first successful load). Act only on
