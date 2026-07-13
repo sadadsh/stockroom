@@ -1,0 +1,14 @@
+{
+  "api": {
+    "enable_server": false
+  },
+  "environment": {
+    "vars": null
+  },
+  "meta": {
+    "version": 6
+  },
+  "system": {
+    "working_dir": "/home/sadad/git/stockroom"
+  }
+}
