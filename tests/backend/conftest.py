@@ -1,5 +1,4 @@
 import shutil
-import sys
 from pathlib import Path
 
 import pytest
@@ -8,14 +7,15 @@ FIXTURES = Path(__file__).parent / "fixtures" / "kicad"
 
 
 def pytest_collection_modifyitems(config, items):
-    """Honestly SKIP `windows_only` tests off Windows instead of letting a no-op
-    placeholder body report a misleading green: a real Windows machine (WebView2,
-    KiCad config surgery) is required, so on any other platform the test is skipped,
-    not silently passed."""
-    if sys.platform.startswith("win"):
-        return
+    """Honestly SKIP every `windows_only` test in automated pytest — on EVERY platform,
+    Windows CI included. These are manual Windows acceptance steps (WebView2, real KiCad
+    config surgery) with placeholder bodies; letting them run their no-op `...` bodies on
+    the windows-latest release gate would fabricate a green the owner forbids. The real
+    acceptance is the owner running each task's acceptance bar by hand and recording it in
+    the ledger, not an auto-passed empty test."""
     skip_win = pytest.mark.skip(
-        reason="windows_only: needs a real Windows machine (WebView2, KiCad config surgery)"
+        reason="windows_only: manual Windows acceptance step (WebView2 / real KiCad "
+        "config) — run by hand per the task acceptance bar, never auto-passed in pytest"
     )
     for item in items:
         if "windows_only" in item.keywords:

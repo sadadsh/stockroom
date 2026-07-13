@@ -6,6 +6,7 @@ from stockroom.host.window import (
     active_window,
     dropped_paths_to_inspect_body,
     inject_script,
+    should_inject,
 )
 
 
@@ -40,6 +41,21 @@ def test_inject_script_escapes_a_token_with_special_characters():
     js = inject_script("http://127.0.0.1:5123", 'tok"quote\\back')
     obj = js.split("window.__STOCKROOM__ = ", 1)[1].split(";", 1)[0]
     assert json.loads(obj) == {"base": "http://127.0.0.1:5123", "token": 'tok"quote\\back'}
+
+
+def test_should_inject_only_on_the_loopback_spa_origin():
+    base = "http://127.0.0.1:5123"
+    # the SPA itself (same loopback origin) gets the token
+    assert should_inject("http://127.0.0.1:5123/", base) is True
+    assert should_inject("http://127.0.0.1:5123/index.html", base) is True
+    # a remote vendor / anti-bot page NEVER receives the token (the leak the review found)
+    assert should_inject("https://www.digikey.com/en/products/x", base) is False
+    assert should_inject("https://challenges.cloudflare.com/turnstile", base) is False
+    # a different local port is a different origin -> also denied
+    assert should_inject("http://127.0.0.1:9999/", base) is False
+    # unknown / blank current url fails CLOSED (never hand out the token)
+    assert should_inject(None, base) is False
+    assert should_inject("", base) is False
 
 
 @pytest.mark.windows_only

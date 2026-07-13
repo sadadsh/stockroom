@@ -10,6 +10,11 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn>=0.30",
     "sse-starlette>=2.1",
+    # The WebView2 host window (stockroom.host). Windows-scoped: pywebview is only
+    # imported on the Windows host path, so a Linux dev/CI env never pulls its GUI
+    # backends, while `uv sync --frozen` on the owner's Windows box provisions it so
+    # the launcher's windowed entry can actually open a window (not ModuleNotFoundError).
+    "pywebview>=5 ; sys_platform == 'win32'",
 ]
 
 [dependency-groups]
