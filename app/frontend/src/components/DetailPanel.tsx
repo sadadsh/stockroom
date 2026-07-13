@@ -10,6 +10,7 @@ import { useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef } from "../api/types";
 import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
 import { EditableText } from "./EditableText";
+import { EnrichPanel } from "./EnrichPanel";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
 import {
@@ -209,6 +210,22 @@ export function DetailPanel({
           <IdRow label="Tags" value={detail.tags.join(", ")} />
         ) : null}
       </div>
+
+      {/* enrich-to-fill: only in editable mode, and only when there is an MPN to
+          look the part up by. Keyed by the MPN so switching parts starts fresh. */}
+      {onEditField && detail.mpn ? (
+        <EnrichPanel
+          key={detail.mpn}
+          mpn={detail.mpn}
+          category={detail.category}
+          current={{
+            manufacturer: detail.manufacturer,
+            description: detail.description,
+          }}
+          onApply={onEditField}
+          busy={busy}
+        />
+      ) : null}
 
       {/* sourcing */}
       <Eyebrow className="mb-2.5 mt-6">Sourcing</Eyebrow>

@@ -6,7 +6,7 @@
  * the caller invalidates the affected queries after a success.
  */
 import { apiBase, apiToken } from "../lib/runtime";
-import type { Facets, PartDetail, PartsResponse } from "./types";
+import type { EnrichmentResult, Facets, PartDetail, PartsResponse } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -111,5 +111,20 @@ export const api = {
 
   deletePart(id: string): Promise<void> {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
+  },
+
+  // Look up a part by its MPN through the enrichment pipeline (scrape-first, spec
+  // section 6.1). Returns the sourced candidate fields; the caller applies the ones
+  // it wants through editField. A scrape miss returns null fields, never an error,
+  // so completeness is never blocked by a dead source.
+  enrichPart(
+    mpn: string,
+    category?: string,
+    want?: string[],
+  ): Promise<EnrichmentResult> {
+    const body: Record<string, unknown> = { mpn };
+    if (category) body.category = category;
+    if (want && want.length > 0) body.want = want;
+    return request<EnrichmentResult>("POST", "/api/enrich/part", { body });
   },
 };

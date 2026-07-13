@@ -78,4 +78,32 @@ describe("api client", () => {
       message: "connection refused",
     });
   });
+
+  it("posts the mpn and category to enrich and returns the sourced result", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        category: "ICs",
+        mpn: { value: "LM358DR", source: "jsonld", confidence: "high" },
+        manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
+        description: null,
+        datasheet_url: null,
+        stock: null,
+        package: null,
+        price_breaks: [],
+        specs: {},
+        schema_version: 1,
+      }),
+    );
+
+    const res = await api.enrichPart("LM358DR", "ICs");
+
+    expect(res.manufacturer?.value).toBe("Texas Instruments");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/enrich/part");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      mpn: "LM358DR",
+      category: "ICs",
+    });
+  });
 });
