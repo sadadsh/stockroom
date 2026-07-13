@@ -41,3 +41,9 @@ def test_assert_only_changed_rejects_lost_node():
 def test_assert_only_changed_rejects_extra_change():
     with pytest.raises(SemDiffError):
         assert_only_changed('(p "10k" "1")', '(p "22k" "2")', allowed_changes=1)
+
+
+def test_malformed_input_raises_semdifferror():
+    for bad in ("", '(a "unterminated)', "(a (b 1)"):
+        with pytest.raises(SemDiffError):
+            semantic_diff(bad, "(a 1)")
