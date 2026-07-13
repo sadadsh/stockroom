@@ -24,13 +24,64 @@ def library_root(tmp_path):
 
     store = ProfileStore(root, repo)
     profile = store.create("Main")
-    parts = profile.library.parts_dir
-    parts.mkdir(parents=True, exist_ok=True)
+    lib = profile.library
+    lib.parts_dir.mkdir(parents=True, exist_ok=True)
     # one complete-ish and one incomplete part, written as canonical PartRecord JSON
-    _write_part(parts, "tps62130", complete=True)
-    _write_part(parts, "mystery", complete=False)
-    repo.commit("seed fixture parts", [parts])
+    _write_part(lib.parts_dir, "tps62130", complete=True)
+    _write_part(lib.parts_dir, "mystery", complete=False)
+    # real (kicad-cli-free) category libraries so mutations run the actual engine:
+    # the SR-ICs symbol lib holds both parts' symbols, each part has a footprint
+    # file keyed on its symbol name (what move/delete address on disk), and the
+    # SR-Modules destination is pre-created so a move can append into it.
+    _write_category_libs(lib)
+    repo.commit("seed fixture parts and category libraries", [root])
     return root
+
+
+# a symbol node named <NAME>, carrying the same properties move_category re-mirrors
+_SYMBOL_NODE = (
+    '\t(symbol "{name}"\n'
+    '\t\t(property "Reference" "U" (at 0 0 0))\n'
+    '\t\t(property "Value" "{name}" (at 0 0 0))\n'
+    '\t\t(property "Footprint" "SR-ICs:{name}" (at 0 0 0))\n'
+    '\t\t(property "Datasheet" "" (at 0 0 0))\n'
+    "\t)\n"
+)
+_SYMBOL_LIB_HEADER = (
+    "(kicad_symbol_lib\n"
+    "\t(version 20251024)\n"
+    '\t(generator "kicad_symbol_editor")\n'
+    '\t(generator_version "10.0")\n'
+)
+_FOOTPRINT = (
+    '(footprint "{name}"\n'
+    "\t(version 20240108)\n"
+    '\t(generator "pcbnew")\n'
+    '\t(layer "F.Cu")\n'
+    '\t(pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))\n'
+    ")\n"
+)
+
+
+def _write_category_libs(lib) -> None:
+    """Materialise the SR-ICs symbol lib + footprints holding both fixture parts,
+    plus the empty SR-Modules destination, so move_category and delete_part run the
+    real transaction path without kicad-cli."""
+    lib.symbols_dir.mkdir(parents=True, exist_ok=True)
+    names = ["TPS62130", "MYSTERY"]
+    ics_sym = _SYMBOL_LIB_HEADER + "".join(_SYMBOL_NODE.format(name=n) for n in names) + ")\n"
+    lib.symbol_lib_path("ICs").write_text(ics_sym, encoding="utf-8", newline="")
+    ics_pretty = lib.footprint_lib_path("ICs")
+    ics_pretty.mkdir(parents=True, exist_ok=True)
+    for n in names:
+        (ics_pretty / f"{n}.kicad_mod").write_text(
+            _FOOTPRINT.format(name=n), encoding="utf-8", newline=""
+        )
+    # empty destination category for the move test
+    lib.symbol_lib_path("Modules").write_text(
+        _SYMBOL_LIB_HEADER + ")\n", encoding="utf-8", newline=""
+    )
+    lib.footprint_lib_path("Modules").mkdir(parents=True, exist_ok=True)
 
 
 def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
@@ -50,9 +101,11 @@ def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
         mpn=part_id.upper() if complete else "",
         manufacturer="TI" if complete else "",
     )
+    # every fixture part has a real symbol + footprint on disk (see _write_category_libs);
+    # completeness is still driven by the passport fields below, so mystery stays incomplete.
+    rec.symbol = LibRef(lib="SR-ICs", name=part_id.upper())
+    rec.footprint = LibRef(lib="SR-ICs", name=part_id.upper())
     if complete:
-        rec.symbol = LibRef(lib="SR-ics", name=part_id.upper())
-        rec.footprint = LibRef(lib="SR-ics", name="VQFN-16")
         rec.model = ModelRef(file="models/x.step")
         rec.datasheet = Datasheet(file="datasheets/x.pdf")
         rec.purchase = [Purchase(vendor="LCSC", url="https://x/p")]

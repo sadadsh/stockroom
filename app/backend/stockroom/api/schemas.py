@@ -46,3 +46,12 @@ class FacetsDTO(BaseModel):
             complete=f.complete,
             incomplete=f.incomplete,
         )
+
+
+class EditFieldBody(BaseModel):
+    field: str
+    value: object
+
+
+class MoveBody(BaseModel):
+    category: str
