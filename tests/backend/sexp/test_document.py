@@ -1,3 +1,5 @@
+import pytest
+
 from stockroom.sexp.document import SexpDocument, quote_kicad
 
 
@@ -146,3 +148,45 @@ def test_two_inserts_preserve_crlf():
         '\r\n\t(property "B" "2")\r\n\t(property "C" "3")\r\n)'
     )
     assert "\r\r" not in out
+
+
+def test_remove_then_insert_at_same_anchor():
+    doc = SexpDocument.parse('(x\n\t(a 1)\n\t(b 2)\n)')
+    doc.root.remove_child(doc.root.find("b"))
+    doc.root.insert_child_text('(c 3)')
+    out = doc.serialize()
+    assert out == '(x\n\t(a 1)\n\t(c 3)\n)', repr(out)
+    SexpDocument.parse(out)
+
+
+def test_insert_then_remove_still_correct():
+    doc = SexpDocument.parse('(x\n\t(a 1)\n\t(b 2)\n)')
+    doc.root.insert_child_text('(c 3)')
+    doc.root.remove_child(doc.root.find("b"))
+    out = doc.serialize()
+    assert out == '(x\n\t(a 1)\n\t(c 3)\n)', repr(out)
+
+
+def test_remove_inserted_node_raises():
+    doc = SexpDocument.parse('(x\n\t(a 1)\n)')
+    doc.root.insert_child_text('(b 2)')
+    with pytest.raises(ValueError):
+        doc.root.remove_child(doc.root.children[-1])
+
+
+def test_overlapping_edits_raise():
+    doc = SexpDocument.parse('(x\n\t(p "V" "10k")\n\t(q 1)\n)')
+    doc.root.find("p").children[2].set_value("LONGER", quote=True)
+    doc.root.remove_child(doc.root.find("p"))
+    with pytest.raises(ValueError):
+        doc.serialize()
+
+
+def test_truncated_input_raises():
+    with pytest.raises(ValueError):
+        SexpDocument.parse('(a (b')
+
+
+def test_trailing_tokens_raise():
+    with pytest.raises(ValueError):
+        SexpDocument.parse('(a 1) (b 2)')

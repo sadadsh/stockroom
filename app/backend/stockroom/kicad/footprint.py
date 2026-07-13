@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from stockroom.kicad.errors import KiCadFileError
 from stockroom.sexp.document import SexpDocument, quote_kicad
 
@@ -45,4 +43,4 @@ class Footprint:
         return self._doc.serialize()
 
     def save(self, path) -> None:
-        Path(path).write_text(self.serialize(), encoding="utf-8", newline="")
+        self._doc.save(path)

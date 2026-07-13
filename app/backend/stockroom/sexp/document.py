@@ -156,6 +156,8 @@ class SexpNode:
     def remove_child(self, child: "SexpNode") -> None:
         if self._children is None:
             raise ValueError("remove_child is only valid on a list node")
+        if child._doc is not self._doc:
+            raise ValueError("cannot remove a freshly inserted node (reload to edit it)")
         idx = self._children.index(child)
         indent = self._indent_before(idx)
         start = child.span[0] - len(indent) if indent else child.span[0]
@@ -192,13 +194,17 @@ class SexpDocument:
 
         def read() -> SexpNode:
             nonlocal pos
+            if pos >= len(toks):
+                raise ValueError("unexpected end of s-expression input")
             tok = toks[pos]
             if tok.kind == "(":
                 open_start = tok.start
                 pos += 1
                 kids: list[SexpNode] = []
-                while toks[pos].kind != ")":
+                while pos < len(toks) and toks[pos].kind != ")":
                     kids.append(read())
+                if pos >= len(toks):
+                    raise ValueError("missing close paren in s-expression")
                 close_end = toks[pos].end
                 pos += 1
                 node = SexpNode(self, self.text, children=kids)
@@ -207,7 +213,10 @@ class SexpDocument:
             pos += 1
             return SexpNode(self, self.text, token=tok)
 
-        return read()
+        root = read()
+        if pos != len(toks):
+            raise ValueError("trailing tokens after top-level s-expression")
+        return root
 
     def replace_span(self, start: int, end: int, replacement: str) -> None:
         # Replace an existing span (start < end). Last write wins for the same span
@@ -228,12 +237,31 @@ class SexpDocument:
         self._seq += 1
 
     def serialize(self) -> str:
+        # This model assumes disjoint edit ranges. Fail loud on overlap rather than
+        # splice garbage: applying overlapping spans against a mutating string is
+        # ambiguous (e.g. set_value inside a subtree that is then removed).
+        replacements = sorted((s, e) for s, e, _r, _q in self._edits if s != e)
+        for i in range(len(replacements) - 1):
+            if replacements[i][1] > replacements[i + 1][0]:
+                raise ValueError(
+                    f"overlapping edits {replacements[i]} and {replacements[i + 1]}"
+                )
+        for s, e, _r, _q in self._edits:
+            if s == e:  # an insertion strictly inside a replaced span is ambiguous
+                for rs, re_ in replacements:
+                    if rs < s < re_:
+                        raise ValueError(
+                            f"insertion at {s} inside replaced span ({rs}, {re_})"
+                        )
         text = self.text
-        # Apply from the highest start down so earlier offsets stay valid. For edits
-        # at the same start (insertions stacked at one anchor), apply the highest seq
-        # first so the earliest-inserted text ends up first in the output.
+        # Apply from the highest start down so earlier offsets stay valid. At the same
+        # start, apply replacements (kind 1) before insertions (kind 0) so a removed
+        # span is cut from the original text before new text is inserted at that point;
+        # among insertions, highest seq first so the earliest-inserted ends up first.
         for start, end, replacement, _seq in sorted(
-            self._edits, key=lambda e: (e[0], e[3]), reverse=True
+            self._edits,
+            key=lambda e: (e[0], 0 if e[0] == e[1] else 1, e[3]),
+            reverse=True,
         ):
             text = text[:start] + replacement + text[end:]
         return text
