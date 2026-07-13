@@ -25,8 +25,10 @@ jobs:
               app/backend/stockroom/ ; then
             echo "stockroom backend must not import PyQt (it is a Qt-free engine)"; exit 1
           fi
-          # stockroom/api/ imports zero pywebview (host-only dependency, keeps the API headless-testable)
-          if grep -REn 'import[[:space:]]+webview|from[[:space:]]+webview|pywebview' \
+          # stockroom/api/ imports zero pywebview (host-only dependency, keeps the API headless-testable).
+          # Match IMPORTS only (import webview / from webview / import pywebview / from pywebview) so a
+          # mention of the word in a comment or docstring is not a false positive that breaks the gate.
+          if grep -REn '^[[:space:]]*(import|from)[[:space:]]+(py)?webview\b' \
               app/backend/stockroom/api/ ; then
             echo "stockroom/api must not import pywebview (host-only dependency)"; exit 1
           fi

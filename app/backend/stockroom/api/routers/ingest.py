@@ -91,6 +91,12 @@ def ingest_router(require_token) -> APIRouter:
     @r.get("/jobs/{job_id}/events")
     def job_events(request: Request, job_id: str) -> EventSourceResponse:
         ctx = request.app.state.ctx
+        # Resolve the job on the REQUEST path so an unknown/expired id is an honest
+        # 404 (KeyError -> 404 via the handler), not a silent 200 with an empty
+        # stream: the KeyError would otherwise fire inside the threadpool-wrapped
+        # generator after the response has started and be swallowed (spec 2.2: no
+        # swallowed errors).
+        ctx.jobs.get(job_id)
 
         def gen():
             for event in ctx.jobs.events(job_id):
