@@ -86,3 +86,21 @@ def test_remove_child_multiline():
     doc = SexpDocument.parse(text)
     doc.root.remove_child(doc.root.find("b"))
     assert doc.serialize() == '(x\n\t(a 1)\n)'
+
+
+def test_insert_child_preserves_crlf():
+    text = '(symbol\r\n\t(property "A" "1")\r\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.insert_child_text('(property "B" "2")')
+    out = doc.serialize()
+    assert out == '(symbol\r\n\t(property "A" "1")\r\n\t(property "B" "2")\r\n)'
+    assert "\n\t" not in out.replace("\r\n\t", "")  # no bare-LF indent introduced
+
+
+def test_remove_child_preserves_crlf():
+    text = '(x\r\n\t(a 1)\r\n\t(b 2)\r\n)'
+    doc = SexpDocument.parse(text)
+    doc.root.remove_child(doc.root.find("b"))
+    out = doc.serialize()
+    assert out == '(x\r\n\t(a 1)\r\n)'
+    assert "\r\r" not in out  # no orphaned CR left behind

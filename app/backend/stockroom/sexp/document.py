@@ -92,7 +92,8 @@ class SexpNode:
 
     def _indent_before(self, index: int) -> str:
         """Whitespace run (including a leading newline) before child `index`,
-        or None-equivalent empty string if the child is not newline-prefixed."""
+        or empty string if the child is not newline-prefixed. Captures the full
+        CRLF pair so inserting/removing on a Windows/KiCad file keeps CRLF."""
         child = self._children[index]
         start = child.span[0]
         text = self._text
@@ -100,9 +101,12 @@ class SexpNode:
         while j > 0 and text[j - 1] in " \t":
             j -= 1
         if j > 0 and text[j - 1] == "\n":
-            return text[j - 1 : start]  # "\n" + indent
+            nl = j - 1
+            if nl > 0 and text[nl - 1] == "\r":
+                nl -= 1  # include the \r of a \r\n pair
+            return text[nl:start]
         if j > 0 and text[j - 1] == "\r":
-            return text[j - 1 : start]
+            return text[j - 1 : start]  # lone CR (old-Mac), defensive
         return ""
 
     def insert_after(self, child: "SexpNode", sexp_text: str) -> None:
@@ -116,7 +120,7 @@ class SexpNode:
         else:
             self._doc.replace_span(pos, pos, f" {sexp_text}")
 
-    def insert_child_text(self, sexp_text: str, *, before_close: bool = True) -> None:
+    def insert_child_text(self, sexp_text: str) -> None:
         if self._children is None:
             raise ValueError("insert_child_text is only valid on a list node")
         if self._children:
