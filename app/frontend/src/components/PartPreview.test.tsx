@@ -60,7 +60,8 @@ describe("PreviewImage", () => {
       <PreviewImage kind="symbol" partId="lm358" fallback={<span>ART</span>} />,
     );
     expect(await screen.findByAltText("symbol preview")).toBeInTheDocument();
-    expect(mockApi.previewSvg).toHaveBeenCalledWith("symbol", "lm358");
+    // no rev for the current-tree thumbnail (the ?rev historical render is M6k)
+    expect(mockApi.previewSvg).toHaveBeenCalledWith("symbol", "lm358", undefined);
   });
 
   it("falls back to the art glyph when the render is unavailable", async () => {

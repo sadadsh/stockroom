@@ -12,7 +12,15 @@ vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
   return {
     ...actual,
-    api: { ...actual.api, previewSvg: vi.fn(), modelGlb: vi.fn() },
+    api: {
+      ...actual.api,
+      previewSvg: vi.fn(),
+      modelGlb: vi.fn(),
+      // the History section (M6k) fetches the part's timeline; mock it so nothing
+      // hits network and it renders its honest empty state by default.
+      partHistory: vi.fn(),
+      partDiff: vi.fn(),
+    },
   };
 });
 
@@ -25,6 +33,7 @@ const mockApi = vi.mocked(api);
 beforeEach(() => {
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
+  mockApi.partHistory.mockResolvedValue({ commits: [], count: 0 });
 });
 
 function detail(over: Partial<PartDetail> = {}): PartDetail {
@@ -101,6 +110,22 @@ describe("DetailPanel files previews (M6d)", () => {
     expect(
       screen.queryByRole("button", { name: "Open 3D Model Preview" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel git timeline (M6k)", () => {
+  it("renders the History section and mounts the part timeline", async () => {
+    mockApi.partHistory.mockResolvedValue({
+      commits: [
+        { sha: "c".repeat(40), subject: "Add lm358", author: "Sadad", iso_date: "2026-07-13T12:00:00-04:00" },
+      ],
+      count: 1,
+    });
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    expect(screen.getByText("History")).toBeInTheDocument();
+    // the timeline is wired to this part id, so its commit renders
+    expect(await screen.findByText("Add lm358")).toBeInTheDocument();
+    expect(mockApi.partHistory).toHaveBeenCalledWith("lm358");
   });
 });
 

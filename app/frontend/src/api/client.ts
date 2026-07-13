@@ -8,10 +8,12 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  DiffResponse,
   DoctorScan,
   DuplicatesResponse,
   EnrichmentResult,
   Facets,
+  HistoryResponse,
   JobRef,
   PartDetail,
   PartsResponse,
@@ -150,14 +152,38 @@ export const api = {
     return apiGet<PartDetail>(`/api/library/parts/${encodeURIComponent(id)}`);
   },
 
+  // The part's git timeline (M6k): commits that touched its canonical JSON, newest
+  // first. An uncommitted part honestly reports an empty list.
+  partHistory(id: string): Promise<HistoryResponse> {
+    return apiGet<HistoryResponse>(
+      `/api/library/parts/${encodeURIComponent(id)}/history`,
+    );
+  },
+
+  // A structured field-diff of the part JSON between two revs (M6k). `a` may be ""
+  // (the earliest side, the part did not exist) and is dropped from the query by the
+  // param serializer, so the backend applies its "" default and every field reads as
+  // added. Both revs must lie in this part's own history or the backend returns 400.
+  partDiff(id: string, a: string, b: string): Promise<DiffResponse> {
+    return apiGet<DiffResponse>(
+      `/api/library/parts/${encodeURIComponent(id)}/diff`,
+      { a, b },
+    );
+  },
+
   // Previews (M6d). The symbol/footprint SVG is requested in the monochrome (?bw)
   // variant so the viewer can re-tint it to the active theme client-side; the 3D model
   // arrives as a GLB (STEP/WRL converted server-side) for the three.js viewer. A part
   // with no symbol/footprint/model is a 404, absent 3D tooling is a 502, both surfaced
   // honestly by the viewer.
-  previewSvg(kind: "symbol" | "footprint", id: string): Promise<Blob> {
+  // When `rev` is given, the SVG is rendered from the git blob AS OF that revision
+  // (M6k) rather than the working tree, so the timeline can overlay an old geometry
+  // against the current one. A rev is content-immutable, so the backend caches it.
+  previewSvg(kind: "symbol" | "footprint", id: string, rev?: string): Promise<Blob> {
+    const params = new URLSearchParams({ bw: "true" });
+    if (rev) params.set("rev", rev);
     return fetchPreviewBlob(
-      `/api/previews/${kind}/${encodeURIComponent(id)}.svg?bw=true`,
+      `/api/previews/${kind}/${encodeURIComponent(id)}.svg?${params.toString()}`,
       "image/svg+xml",
     );
   },

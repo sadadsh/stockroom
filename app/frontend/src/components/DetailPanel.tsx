@@ -12,6 +12,7 @@ import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
+import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
 import { PreviewImage } from "./PreviewImage";
@@ -299,6 +300,13 @@ export function DetailPanel({
       {/* sourcing */}
       <Eyebrow className="mb-2.5 mt-6">Sourcing</Eyebrow>
       <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+
+      {/* git timeline (M6k): the part's commit history + per-commit field/visual diff.
+          Keyed by part id so the selected-commit state resets on a part switch. */}
+      <Eyebrow className="mb-2.5 mt-6">History</Eyebrow>
+      <div className="max-w-[600px]">
+        <PartTimeline key={detail.id} partId={detail.id} />
+      </div>
 
       {onDelete ? (
         <ConfirmDialog

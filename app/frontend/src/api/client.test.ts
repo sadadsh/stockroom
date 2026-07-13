@@ -311,4 +311,54 @@ describe("api client", () => {
       status: 404,
     });
   });
+
+  // --- Per-part git timeline (M6k) ---
+
+  it("reads the part git history at the history path", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        commits: [
+          { sha: "a".repeat(40), subject: "Edit tps: mpn", author: "Sadad", iso_date: "2026-07-13T12:00:00-04:00" },
+        ],
+        count: 1,
+      }),
+    );
+    const res = await api.partHistory("tps62130");
+    expect(res.count).toBe(1);
+    expect(res.commits[0].subject).toBe("Edit tps: mpn");
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe(
+      "/api/library/parts/tps62130/history",
+    );
+  });
+
+  it("requests the diff with both revs, dropping an empty 'a' (the earliest side)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ a: "", b: "def", fields: [], assets: { symbol: false, footprint: false, model: false, datasheet: false } }),
+    );
+    await api.partDiff("tps62130", "", "def456");
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/library/parts/tps62130/diff");
+    // an empty 'a' is dropped by the serializer, so the backend applies its "" default
+    expect(url.searchParams.has("a")).toBe(false);
+    expect(url.searchParams.get("b")).toBe("def456");
+  });
+
+  it("sends both revs when a real 'a' is given", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ a: "abc", b: "def", fields: [], assets: { symbol: true, footprint: false, model: false, datasheet: false } }),
+    );
+    await api.partDiff("tps62130", "abc123", "def456");
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get("a")).toBe("abc123");
+    expect(url.searchParams.get("b")).toBe("def456");
+  });
+
+  it("passes the rev to previewSvg for the historical render", async () => {
+    fetchMock.mockResolvedValueOnce(okBlob(new Uint8Array([1]), "image/svg+xml"));
+    await api.previewSvg("symbol", "tps62130", "abc123");
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain("/api/previews/symbol/tps62130.svg");
+    expect(url).toContain("rev=abc123");
+    expect(url).toContain("bw=true");
+  });
 });
