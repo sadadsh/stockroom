@@ -33,3 +33,11 @@ def test_inserts_model_when_absent(tmp_path):
         d for d in semantic_diff(original, fp.serialize()) if d.startswith(("LOST", "CHANGED", "TYPE"))
     ]
     assert structural == []
+
+
+def test_set_name(tmp_fixture):
+    fp = Footprint.load(tmp_fixture("minimal.kicad_mod"))
+    original = fp.serialize()
+    fp.set_name("R_0402")
+    assert fp.name == "R_0402"
+    assert_only_changed(original, fp.serialize(), allowed_changes=1)

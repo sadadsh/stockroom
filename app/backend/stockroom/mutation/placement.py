@@ -59,7 +59,7 @@ def merge_symbol_into_lib(
     if renamed == node_text and source_name != new_name:
         raise PlacementError(f"could not rename symbol {source_name!r}")
     before = lib.serialize()
-    lib._doc.root.insert_child_text(renamed)  # append the symbol node
+    lib.insert_symbol(renamed)  # append the symbol node (byte-preserving)
     after = lib.serialize()
     assert_only_added(before, after)
     Path(lib_path).write_text(after, encoding="utf-8", newline="")
@@ -73,7 +73,7 @@ def place_footprint(pretty_dir: Path, footprint_source: Path, new_name: str) -> 
     # rewrite the internal footprint name token to new_name (first string after
     # 'footprint'), byte-preserving everything else.
     fp = Footprint.load(dst)
-    fp._doc.root.children[1].set_value(new_name, quote=True)
+    fp.set_name(new_name)
     dst.write_text(fp.serialize(), encoding="utf-8", newline="")
     return dst
 

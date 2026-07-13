@@ -60,6 +60,19 @@ class SymbolLib:
                 return Symbol(s)
         raise KiCadFileError(f"symbol not found: {name}")
 
+    def insert_symbol(self, symbol_sexp: str) -> None:
+        """Append a complete `(symbol ...)` node, byte-preserving the rest of the
+        library. The caller supplies the full s-expression text of the node."""
+        self._doc.root.insert_child_text(symbol_sexp)
+
+    def remove_symbol(self, name: str) -> None:
+        """Remove the named `(symbol ...)` node, byte-preserving the rest."""
+        for s in self._doc.root.find_all("symbol"):
+            if s.children[1].value == name:
+                self._doc.root.remove_child(s)
+                return
+        raise KiCadFileError(f"symbol not found: {name}")
+
     def serialize(self) -> str:
         return self._doc.serialize()
 

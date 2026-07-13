@@ -183,14 +183,7 @@ class LibraryOps:
     def _remove_symbol_node(self, sym_lib_path: Path, name: str) -> str:
         """Remove the named symbol node from a lib and return the new file text."""
         sym_lib = SymbolLib.load(sym_lib_path)
-        target = None
-        for node in sym_lib._doc.root.find_all("symbol"):
-            if node.children[1].value == name:
-                target = node
-                break
-        if target is None:
-            raise ValueError(f"symbol {name!r} not in {sym_lib_path.name}")
-        sym_lib._doc.root.remove_child(target)
+        sym_lib.remove_symbol(name)
         return sym_lib.serialize()
 
     def move_category(self, part_id: str, new_category: str) -> PartRecord:
