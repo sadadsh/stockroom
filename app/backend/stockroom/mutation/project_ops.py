@@ -13,11 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from stockroom.kicad import conform, project_settings
+from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, settings_ops, standards
+from stockroom.projects import conform_ops, fab_ops, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
@@ -544,3 +544,155 @@ class ProjectOps:
                 s["_doc"].save(s["_abs"])
             sha = txn.commit(message)
         return {"project": rec.name, "committed": sha, "files": files_result, "total": total}
+
+    # --- M7f-C Editor: stackup / fab-preset ----------------------------------
+
+    def stackup_read(self, project_id: str) -> dict:
+        """The project's current physical layer stack read from its primary .kicad_pcb (structured
+        layers + copper_finish + dielectric_constraints), its copper layer names (physical order),
+        overall thickness, and the fab-preset catalog, for the Stackup editor's render (M7f-C).
+        Read-only. Raises FileNotFoundError for an unknown id; a project with no board is an honest
+        empty shape, never a crash."""
+        rec = self._require(project_id)
+        board_path = self._primary_board(rec)
+        current = None
+        copper_names: list[str] = []
+        thickness = None
+        if board_path is not None:
+            board = Board.load(board_path)
+            current = board.stackup()
+            copper_names = board.copper_layer_names()
+            thickness = board.thickness()
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_board": board_path is not None,
+            "stackup": current,
+            "copper_layers": copper_names,
+            "thickness": thickness,
+            "presets": fab_ops.preset_catalog(),
+        }
+
+    def _stage_stackup(self, board: Board, original: str, *, preset_key, copper_finish,
+                       dielectric_constraints, layer_edits):
+        """Validate a stackup request and apply it to `board` IN MEMORY (no save). A request is
+        EITHER a fab-preset apply (whole-block generate + board thickness) OR a set of per-field
+        edits, never both. Returns (preset_or_None, new_thickness). Raises ValueError (-> 400) for a
+        malformed / empty / mode-conflicting request, an unknown or layer-mismatched preset, or a
+        field edit on a board with no stackup. `original` is the board's pre-edit serialized text
+        (for whitespace-format detection)."""
+        is_preset = bool(preset_key)
+        is_fields = (
+            copper_finish is not None or dielectric_constraints is not None or bool(layer_edits)
+        )
+        if is_preset and is_fields:
+            raise ValueError("apply a fab preset or edit stackup fields in one action, not both")
+        if not is_preset and not is_fields:
+            raise ValueError("choose a fab preset to apply, or edit at least one stackup field")
+        current = board.stackup()
+        if is_fields:
+            if current is None:
+                raise ValueError(
+                    "this board has no stackup to edit; apply a fab preset first to create one"
+                )
+            fab_ops.validate_field_edits(copper_finish, dielectric_constraints, layer_edits)
+            # A per-field edit must name a layer that exists and a field that layer actually carries
+            # (update-if-present never manufactures an atom, so a wrong layer/field would silently
+            # no-op with committed:null); reject it as an honest 400 instead.
+            by_name = {lyr["name"]: lyr for lyr in current["layers"]}
+            for lname, fields in (layer_edits or {}).items():
+                lyr = by_name.get(lname)
+                if lyr is None:
+                    raise ValueError(f"no such stackup layer: {lname!r}")
+                for field, val in fields.items():
+                    if val is not None and field not in lyr:
+                        raise ValueError(f"the {lname} layer has no {field} to set")
+            board.set_stackup_fields(
+                copper_finish=copper_finish, dielectric_constraints=dielectric_constraints,
+                layers=layer_edits)
+            return None, board.thickness()
+        if is_preset:
+            if not board.has_setup():
+                raise ValueError(
+                    "this board has no (setup ...) block to hold a stackup; open it in KiCad first"
+                )
+            copper_names = board.copper_layer_names()
+            if not copper_names:
+                raise ValueError("this board declares no copper layers; a stackup cannot be applied")
+            preset = fab_ops.validate_preset_apply(preset_key, len(copper_names))
+            unit, nl = stackup.detect_format(original)
+            layers = stackup.build_preset_layers(
+                copper_names, preset["physical"], mask_color=preset["soldermask_color"])
+            block = stackup.render_stackup_block(
+                layers, copper_finish=preset["finish"], dielectric_constraints=False,
+                unit=unit, nl=nl)
+            board.apply_stackup_block(block)
+            # Set (general (thickness)) to the generated stack's own sum, not the preset's nominal
+            # label: KiCad keeps the board thickness equal to the sum of its stackup layers, so
+            # writing the sum makes the board internally consistent instead of a value KiCad would
+            # recompute away. (The nominal label is still shown in the preset picker.)
+            new_thickness = stackup.stackup_thickness_sum(layers)
+            board.set_thickness(new_thickness)
+            return preset, new_thickness
+        # unreachable: is_preset/is_fields are exhaustive (both-false is rejected above)
+        raise ValueError("choose a fab preset to apply, or edit at least one stackup field")
+
+    def stackup_preview(self, project_id: str, *, preset_key=None, copper_finish=None,
+                        dielectric_constraints=None, layer_edits=None) -> dict:
+        """A dry-run of a stackup change: the RESULTING structured stackup + new board thickness +
+        whether it differs from disk + (for a preset) the verify_note, computed WITHOUT writing or
+        touching git (M7f-C). Validates the request (bad/empty/conflicting mode, unknown or
+        mismatched preset, field edit on a stackless board -> ValueError -> 400). Raises
+        FileNotFoundError for an unknown id."""
+        rec = self._require(project_id)
+        board_path = self._primary_board(rec)
+        if board_path is None:
+            raise ValueError("this project has no .kicad_pcb to preview")
+        board = Board.load(board_path)
+        original = board.serialize()
+        preset, new_thickness = self._stage_stackup(
+            board, original, preset_key=preset_key, copper_finish=copper_finish,
+            dielectric_constraints=dielectric_constraints, layer_edits=layer_edits)
+        return {
+            "project": rec.name,
+            "stackup": board.stackup(),
+            "thickness": new_thickness,
+            "changed": board.serialize() != original,
+            "verify_note": preset["verify_note"] if preset else None,
+        }
+
+    def stackup_apply(self, project_id: str, *, preset_key=None, copper_finish=None,
+                      dielectric_constraints=None, layer_edits=None) -> dict:
+        """Apply a stackup change to the project's primary .kicad_pcb as ONE atomic commit on its own
+        git (M7f-C): a fab-preset apply (whole-block generate + board thickness) OR per-field edits,
+        in a single Transaction (track-before-write, one scoped commit, or the board restored and
+        zero trace). Validates before any git touch. A request that produces no byte change is an
+        honest no-commit no-op ({committed: None, changed: False}). Raises FileNotFoundError (unknown
+        id); ValueError for a bad request, no board, or a project not under git. Returns the re-read
+        stackup + the commit sha (or None)."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before editing"
+            )
+        board_path = self._primary_board(rec)
+        if board_path is None:
+            raise ValueError("this project has no .kicad_pcb to edit")
+        board = Board.load(board_path)
+        original = board.serialize()
+        preset, _new_thickness = self._stage_stackup(
+            board, original, preset_key=preset_key, copper_finish=copper_finish,
+            dielectric_constraints=dielectric_constraints, layer_edits=layer_edits)
+        if board.serialize() == original:
+            return {**self.stackup_read(project_id), "committed": None, "changed": False}
+
+        label = preset["label"] if preset else "fields"
+        message = f"Set {rec.name} stackup: {label}"
+        repo = GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            # Track BEFORE the write so a save that raises mid-write still rolls the board back to
+            # its committed bytes.
+            txn.track(board_path)
+            board.save(board_path)
+            sha = txn.commit(message)
+        return {**self.stackup_read(project_id), "committed": sha, "changed": True}

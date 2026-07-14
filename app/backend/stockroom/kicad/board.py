@@ -12,13 +12,16 @@ The overall board thickness lives in a DIFFERENT block, `(general (thickness N))
 `(setup)`; `thickness()`/`set_thickness()` edit it byte-preservingly through the same doc.
 
 All lengths are millimetres (KiCad's on-disk unit); `*_ratio` is a dimensionless fraction.
-Out of scope (a board editor, not a stackup editor): the physical `(setup (stackup ...))`
-layer stack, per-layer settings, the repeatable user via/track/diff-pair size lists, and the
-`(pcbplotparams ...)` plot block.
+The physical `(setup (stackup ...))` layer stack (M7f-C) lives in the sibling `kicad/stackup.py`
+module; this class exposes thin delegators (`stackup`, `copper_layer_names`, `apply_stackup_block`,
+`set_stackup_fields`) so one Board object edits setup scalars + thickness + the stackup on one doc.
+Out of scope here: per-layer non-stackup settings, the repeatable user via/track/diff-pair size
+lists, and the `(pcbplotparams ...)` plot block.
 """
 
 from __future__ import annotations
 
+from stockroom.kicad import stackup as _stackup
 from stockroom.kicad.errors import KiCadFileError
 from stockroom.sexp.document import SexpDocument
 
@@ -231,6 +234,39 @@ class Board:
         """The board's overall thickness in mm (from (general (thickness N))), or
         None when the board declares no thickness."""
         return self.general().get("thickness")
+
+    # -- stackup (M7f-C): thin delegators onto kicad/stackup.py, all on this doc --
+
+    def has_setup(self) -> bool:
+        """Whether the board carries a (setup ...) block (which holds the stackup). A real KiCad
+        board always does; a board without one cannot receive a stackup and is refused with a clean
+        error rather than a raw KiCadFileError."""
+        return self._doc.root.find("setup") is not None
+
+    def stackup(self) -> dict | None:
+        """The board's physical layer stack, structured (or None when it has no stackup).
+        See kicad/stackup.read_stackup."""
+        return _stackup.read_stackup(self._doc)
+
+    def copper_layer_names(self) -> list[str]:
+        """The board's copper layers in physical top->bottom order (from (layers ...))."""
+        return _stackup.copper_layer_names(self._doc)
+
+    def apply_stackup_block(self, block_text: str) -> bool:
+        """Replace the board's (stackup ...) block with `block_text` (byte-preserving scoped span
+        replace), or insert it when absent. Returns True when the bytes change."""
+        changed = _stackup.apply_stackup_block(self._doc, block_text)
+        if changed:
+            # a fresh insert (no prior stackup) attaches a fragment-spanned node; re-parse so any
+            # later find/edit on this doc targets the real text. A pure span replace needs no reload,
+            # but reloading is safe (it serializes the pending edit in) and keeps the seam uniform.
+            self._reload()
+        return changed
+
+    def set_stackup_fields(self, **kwargs) -> int:
+        """Edit individual stack fields in place (finish / dielectric constraints / per-layer). See
+        kicad/stackup.set_stackup_fields. Returns the count of atoms changed."""
+        return _stackup.set_stackup_fields(self._doc, **kwargs)
 
     # -- write ----------------------------------------------------------------
 

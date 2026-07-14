@@ -201,3 +201,19 @@ class ConformBody(BaseModel):
 
     def sch(self) -> dict:
         return {k: v.model_dump() for k, v in (self.sch_targets or {}).items()}
+
+
+class StackupBody(BaseModel):
+    """Preview or apply a stackup change (M7f-C): EITHER apply a fab preset via `preset_key` (a
+    whole-block generate that also sets board thickness), OR edit individual fields
+    (`copper_finish`, `dielectric_constraints`, and per-layer `layer_edits` =
+    {layer_name: {thickness?, material?, epsilon_r?, loss_tangent?}}). Exactly one mode per request;
+    the engine rejects both / neither, an unknown or layer-count-mismatched preset, and a bad field
+    value (blank finish, non-positive/non-finite number, a JSON bool where a number is expected) as
+    a 400. `layer_edits` values are left loosely typed so a bool reaches the validator (which rejects
+    it) instead of being silently coerced to a number."""
+
+    preset_key: str | None = None
+    copper_finish: str | None = None
+    dielectric_constraints: bool | None = None
+    layer_edits: dict[str, dict[str, Any]] | None = None

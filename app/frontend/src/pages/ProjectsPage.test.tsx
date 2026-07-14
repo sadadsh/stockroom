@@ -14,6 +14,7 @@ import type {
   ProjectSummary,
   RevisionsResult,
   BoardSettings,
+  StackupRead,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -45,6 +46,9 @@ vi.mock("../api/client", async (importActual) => {
       getConform: vi.fn(),
       previewConform: vi.fn(),
       applyConform: vi.fn(),
+      getStackup: vi.fn(),
+      previewStackup: vi.fn(),
+      applyStackup: vi.fn(),
     },
   };
 });
@@ -406,6 +410,51 @@ const CONFORM: ConformCatalog = {
   },
 };
 
+const STACKUP: StackupRead = {
+  project: "Netdeck",
+  under_git: true,
+  has_board: true,
+  copper_layers: ["F.Cu", "In1.Cu", "In2.Cu", "B.Cu"],
+  thickness: 1.51,
+  stackup: {
+    copper_finish: "None",
+    dielectric_constraints: false,
+    layers: [
+      { name: "F.Cu", type: "copper", thickness: 0.035 },
+      {
+        name: "dielectric 1",
+        type: "prepreg",
+        thickness: 0.1,
+        material: "FR4",
+        epsilon_r: 4.5,
+        loss_tangent: 0.02,
+      },
+      { name: "In1.Cu", type: "copper", thickness: 0.035 },
+      { name: "B.Cu", type: "copper", thickness: 0.035 },
+    ],
+  },
+  presets: [
+    {
+      key: "oshpark_2",
+      label: "OSH Park 2-Layer",
+      layers: 2,
+      board_thickness_mm: 1.6,
+      finish: "ENIG",
+      soldermask_color: "Purple",
+      verify_note: "OSH Park 2-layer verify note.",
+    },
+    {
+      key: "oshpark_4",
+      label: "OSH Park 4-Layer",
+      layers: 4,
+      board_thickness_mm: 1.6,
+      finish: "ENIG",
+      soldermask_color: "Purple",
+      verify_note: "OSH Park 4-layer verify note.",
+    },
+  ],
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -479,6 +528,19 @@ beforeEach(() => {
       { path: "board.kicad_sch", counts: { labels: 1 }, changed: 1 },
     ],
     total: 3,
+  });
+  mockApi.getStackup.mockResolvedValue(STACKUP);
+  mockApi.previewStackup.mockResolvedValue({
+    project: "Netdeck",
+    stackup: { ...STACKUP.stackup!, copper_finish: "ENIG" },
+    thickness: 1.5318,
+    changed: true,
+    verify_note: "OSH Park 4-layer verify note.",
+  });
+  mockApi.applyStackup.mockResolvedValue({
+    ...STACKUP,
+    committed: "ffffffff6666",
+    changed: true,
   });
 });
 
@@ -1527,5 +1589,138 @@ describe("ProjectsPage", () => {
     await screen.findByTestId("conform-form");
     expect(screen.queryByTestId("conform-enable-silk")).not.toBeInTheDocument();
     expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
+  });
+
+  // --- M7f-C stackup / fab-preset --------------------------------------------
+
+  it("shows the current stack, the fab-preset picker, and the field editor", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    expect(screen.getByTestId("stackup-current")).toHaveTextContent("F.Cu");
+    expect(screen.getByTestId("stackup-row-dielectric 1")).toHaveTextContent("FR4");
+    expect(screen.getByTestId("stackup-preset-select")).toBeInTheDocument();
+    expect(screen.getByTestId("stackup-field-finish")).toHaveValue("None");
+  });
+
+  it("shows the preset verify note and applies a compatible preset", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-preset-block"));
+    // Apply is disabled until a preset is chosen
+    expect(block.getByRole("button", { name: "Apply Preset" })).toBeDisabled();
+    await user.selectOptions(screen.getByTestId("stackup-preset-select"), "oshpark_4");
+    expect(screen.getByTestId("stackup-verify-note")).toHaveTextContent("OSH Park 4-layer");
+    expect(block.getByRole("button", { name: "Apply Preset" })).toBeEnabled();
+    await user.click(block.getByRole("button", { name: "Apply Preset" }));
+    await waitFor(() => expect(mockApi.applyStackup).toHaveBeenCalled());
+    expect(mockApi.applyStackup).toHaveBeenCalledWith("netdeck", { preset_key: "oshpark_4" });
+  });
+
+  it("refuses a layer-count-mismatched preset and disables its apply", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-preset-block"));
+    // the board has 4 copper layers; the 2-layer preset is incompatible
+    await user.selectOptions(screen.getByTestId("stackup-preset-select"), "oshpark_2");
+    expect(screen.getByTestId("stackup-preset-mismatch")).toHaveTextContent("2-layer");
+    expect(block.getByRole("button", { name: "Apply Preset" })).toBeDisabled();
+    await user.click(block.getByRole("button", { name: "Apply Preset" }));
+    expect(mockApi.applyStackup).not.toHaveBeenCalled();
+  });
+
+  it("sends only the changed copper finish from the field editor", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-field-block"));
+    // buttons are disabled until something differs from disk
+    expect(block.getByRole("button", { name: "Save Fields" })).toBeDisabled();
+    await user.clear(screen.getByTestId("stackup-field-finish"));
+    await user.type(screen.getByTestId("stackup-field-finish"), "ENIG");
+    expect(block.getByRole("button", { name: "Save Fields" })).toBeEnabled();
+    await user.click(block.getByRole("button", { name: "Save Fields" }));
+    await waitFor(() => expect(mockApi.applyStackup).toHaveBeenCalled());
+    expect(mockApi.applyStackup).toHaveBeenCalledWith("netdeck", { copper_finish: "ENIG" });
+  });
+
+  it("sends only a changed per-dielectric field", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-field-block"));
+    await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
+    await user.type(screen.getByTestId("stackup-thickness-dielectric 1"), "0.2");
+    await user.click(block.getByRole("button", { name: "Save Fields" }));
+    await waitFor(() => expect(mockApi.applyStackup).toHaveBeenCalled());
+    expect(mockApi.applyStackup).toHaveBeenCalledWith("netdeck", {
+      layer_edits: { "dielectric 1": { thickness: 0.2 } },
+    });
+  });
+
+  it("blocks a save when a stack field is non-positive", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-field-block"));
+    await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
+    await user.type(screen.getByTestId("stackup-thickness-dielectric 1"), "0");
+    await user.click(block.getByRole("button", { name: "Save Fields" }));
+    expect(mockApi.applyStackup).not.toHaveBeenCalled();
+    expect(await screen.findByText(/positive thickness/i)).toBeInTheDocument();
+  });
+
+  it("does not strand the Unsaved badge when a numeric field is only cleared", async () => {
+    // clearing a field is update-if-present (leaves it unchanged), so dirty() and buildBody agree:
+    // Save stays disabled and no "Unsaved" badge shows, instead of a false "No field changed".
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    const block = within(screen.getByTestId("stackup-field-block"));
+    await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
+    expect(block.getByRole("button", { name: "Save Fields" })).toBeDisabled();
+    expect(block.queryByText("Unsaved")).not.toBeInTheDocument();
+    expect(mockApi.applyStackup).not.toHaveBeenCalled();
+  });
+
+  it("shows a no-stackup note but still offers the preset picker", async () => {
+    mockApi.getStackup.mockResolvedValue({ ...STACKUP, stackup: null });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("stackup-form");
+    expect(screen.getByTestId("stackup-none")).toBeInTheDocument();
+    expect(screen.getByTestId("stackup-preset-block")).toBeInTheDocument();
+    // with no stackup there is nothing to field-edit
+    expect(screen.queryByTestId("stackup-field-block")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest no-board stackup state", async () => {
+    mockApi.getStackup.mockResolvedValue({
+      ...STACKUP, has_board: false, stackup: null, copper_layers: [], thickness: null,
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("stackup-no-board")).toBeInTheDocument();
+    expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest not-under-git stackup state", async () => {
+    mockApi.getStackup.mockResolvedValue({ ...STACKUP, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("stackup-no-git")).toBeInTheDocument();
+    expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
   });
 });

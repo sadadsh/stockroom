@@ -25,6 +25,7 @@ from stockroom.api.schemas import (
     SetDesignRulesBody,
     SetNetClassesBody,
     SetSettingsBody,
+    StackupBody,
 )
 from stockroom.kicad.errors import KiCadCliError
 
@@ -319,6 +320,40 @@ def projects_router(require_token) -> APIRouter:
         # evicted and the next check re-runs honestly.
         ctx = request.app.state.ctx
         result = ctx.project_ops.conform_apply(project_id, body.pcb(), body.sch())
+        ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/stackup")
+    def get_stackup(request: Request, project_id: str) -> dict:
+        # The project's current physical layer stack (structured layers + finish + constraints),
+        # its copper layer names, overall thickness, and the fab-preset catalog, for the Stackup
+        # editor's render (M7f-C). Read-only. Unknown id -> 404; a project with no board is an
+        # honest empty shape.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.stackup_read(project_id)
+
+    @r.post("/{project_id}/stackup/preview")
+    def preview_stackup(request: Request, project_id: str, body: StackupBody) -> dict:
+        # A dry-run of a stackup change: the resulting stackup + new thickness + whether it differs,
+        # WITHOUT writing or touching git (M7f-C). Unknown id -> 404; a bad/empty/conflicting mode,
+        # an unknown or layer-mismatched preset, or a bad field value -> 400.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.stackup_preview(
+            project_id, preset_key=body.preset_key, copper_finish=body.copper_finish,
+            dielectric_constraints=body.dielectric_constraints, layer_edits=body.layer_edits,
+        )
+
+    @r.patch("/{project_id}/stackup")
+    def apply_stackup(request: Request, project_id: str, body: StackupBody) -> dict:
+        # Apply a stackup change (fab preset OR per-field edits) as ONE atomic commit on the
+        # project's own git (M7f-C). Unknown id -> 404; a bad request, no board, or a project not
+        # under git -> 400; a GitError -> 503. A stackup/thickness change can affect DRC/impedance
+        # outcomes, so the stale cached ERC/DRC is evicted and the next check re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.stackup_apply(
+            project_id, preset_key=body.preset_key, copper_finish=body.copper_finish,
+            dielectric_constraints=body.dielectric_constraints, layer_edits=body.layer_edits,
+        )
         ctx.checks_cache.pop(project_id, None)
         return result
 

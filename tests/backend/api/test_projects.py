@@ -1132,3 +1132,156 @@ def test_patch_conform_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
     client.patch(f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 2.0}}})
     assert rec["id"] not in app_ctx.checks_cache
+
+
+# ---- M7f-C Editor: stackup / fab-preset --------------------------------------
+
+_PCB_STACKUP = (
+    "(kicad_pcb\n"
+    "\t(version 20260206)\n"
+    '\t(generator_version "10.0")\n'
+    "\t(general\n\t\t(thickness 1.51)\n\t)\n"
+    "\t(layers\n"
+    '\t\t(0 "F.Cu" signal)\n\t\t(2 "B.Cu" signal)\n\t\t(4 "In1.Cu" signal)\n\t\t(6 "In2.Cu" signal)\n'
+    "\t)\n"
+    "\t(setup\n"
+    "\t\t(stackup\n"
+    '\t\t\t(layer "F.Cu"\n\t\t\t\t(type "copper")\n\t\t\t\t(thickness 0.035)\n\t\t\t)\n'
+    '\t\t\t(layer "dielectric 1"\n\t\t\t\t(type "prepreg")\n\t\t\t\t(thickness 0.1)\n'
+    '\t\t\t\t(material "FR4")\n\t\t\t\t(epsilon_r 4.5)\n\t\t\t\t(loss_tangent 0.02)\n\t\t\t)\n'
+    '\t\t\t(layer "In1.Cu"\n\t\t\t\t(type "copper")\n\t\t\t\t(thickness 0.035)\n\t\t\t)\n'
+    '\t\t\t(layer "dielectric 2"\n\t\t\t\t(type "core")\n\t\t\t\t(thickness 1.24)\n'
+    '\t\t\t\t(material "FR4")\n\t\t\t\t(epsilon_r 4.5)\n\t\t\t\t(loss_tangent 0.02)\n\t\t\t)\n'
+    '\t\t\t(layer "In2.Cu"\n\t\t\t\t(type "copper")\n\t\t\t\t(thickness 0.035)\n\t\t\t)\n'
+    '\t\t\t(layer "dielectric 3"\n\t\t\t\t(type "prepreg")\n\t\t\t\t(thickness 0.1)\n'
+    '\t\t\t\t(material "FR4")\n\t\t\t\t(epsilon_r 4.5)\n\t\t\t\t(loss_tangent 0.02)\n\t\t\t)\n'
+    '\t\t\t(layer "B.Cu"\n\t\t\t\t(type "copper")\n\t\t\t\t(thickness 0.035)\n\t\t\t)\n'
+    '\t\t\t(copper_finish "None")\n\t\t\t(dielectric_constraints no)\n'
+    "\t\t)\n"
+    "\t)\n"
+    ")\n"
+)
+
+
+def _make_git_stackup_project(dir_path, pcb_text=_PCB_STACKUP):
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(pcb_text, encoding="utf-8")
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+        subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+    return dir_path, head
+
+
+def test_get_stackup_returns_stack_and_presets(client, tmp_path):
+    proj, _ = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/stackup").json()
+    assert body["under_git"] is True and body["has_board"] is True
+    assert body["copper_layers"] == ["F.Cu", "In1.Cu", "In2.Cu", "B.Cu"]
+    assert body["thickness"] == 1.51
+    assert body["stackup"]["copper_finish"] == "None"
+    assert {p["key"] for p in body["presets"]} == {"oshpark_2", "oshpark_4"}
+
+
+def test_get_stackup_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/stackup").status_code == 404
+
+
+def test_post_stackup_preview_preset_without_writing(client, tmp_path):
+    proj, head = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    before = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    r = client.post(f"/api/projects/{rec['id']}/stackup/preview", json={"preset_key": "oshpark_4"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["changed"] is True
+    assert body["thickness"] == 1.5318  # the generated stack's own sum, KiCad's invariant
+    assert body["stackup"]["copper_finish"] == "ENIG"
+    assert body["verify_note"]
+    assert (proj / "board.kicad_pcb").read_text(encoding="utf-8") == before  # nothing written
+
+
+def test_post_stackup_preview_layer_mismatch_is_400(client, tmp_path):
+    two_layer = _PCB_STACKUP.replace(
+        '\t\t(4 "In1.Cu" signal)\n\t\t(6 "In2.Cu" signal)\n', ""
+    )  # a board whose (layers) declares only F.Cu/B.Cu
+    proj, _ = _make_git_stackup_project(tmp_path / "board", pcb_text=two_layer)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/stackup/preview", json={"preset_key": "oshpark_4"})
+    assert r.status_code == 400
+
+
+def test_patch_stackup_applies_preset_and_commits(client, tmp_path):
+    proj, head = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup", json={"preset_key": "oshpark_4"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    after = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    assert '(copper_finish "ENIG")' in after
+    assert "(thickness 1.5318)" in after  # the generated stack's own sum
+
+
+def test_patch_stackup_field_edit_applies(client, tmp_path):
+    proj, _ = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup",
+                     json={"copper_finish": "ENIG", "dielectric_constraints": True})
+    assert r.status_code == 200, r.text
+    after = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    assert '(copper_finish "ENIG")' in after
+    assert "(dielectric_constraints yes)" in after
+
+
+def test_patch_stackup_both_modes_is_400(client, tmp_path):
+    proj, _ = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup",
+                     json={"preset_key": "oshpark_4", "copper_finish": "ENIG"})
+    assert r.status_code == 400
+
+
+def test_patch_stackup_bad_thickness_is_400(client, tmp_path):
+    proj, _ = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup",
+                     json={"layer_edits": {"dielectric 1": {"thickness": -1}}})
+    assert r.status_code == 400
+
+
+def test_patch_stackup_no_setup_block_is_400_not_500(client, tmp_path):
+    # a board with copper but no (setup ...) block: an honest 400, never a raw 500 (KiCadFileError)
+    no_setup = '(kicad_pcb\n\t(layers\n\t\t(0 "F.Cu" signal)\n\t\t(2 "B.Cu" signal)\n\t)\n)\n'
+    proj, _ = _make_git_stackup_project(tmp_path / "board", pcb_text=no_setup)
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup", json={"preset_key": "oshpark_2"})
+    assert r.status_code == 400
+
+
+def test_patch_stackup_non_git_is_400(client, tmp_path):
+    proj = tmp_path / "board"
+    proj.mkdir(parents=True)
+    (proj / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (proj / "board.kicad_pcb").write_text(_PCB_STACKUP, encoding="utf-8")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/stackup", json={"preset_key": "oshpark_4"})
+    assert r.status_code == 400
+
+
+def test_patch_stackup_unknown_project_is_404(client):
+    r = client.patch("/api/projects/nope/stackup", json={"preset_key": "oshpark_4"})
+    assert r.status_code == 404
+
+
+def test_patch_stackup_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
+    # a stackup / thickness change can alter DRC / impedance outcomes, so the cached ERC/DRC must
+    # be evicted and the next check re-run honestly.
+    proj, _ = _make_git_stackup_project(tmp_path / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/stackup", json={"preset_key": "oshpark_4"})
+    assert rec["id"] not in app_ctx.checks_cache
