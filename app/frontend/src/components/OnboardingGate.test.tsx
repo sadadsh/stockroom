@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OnboardingGate } from "./OnboardingGate";
-import { api } from "../api/client";
+import { ApiError, api } from "../api/client";
 import { ToastProvider } from "../lib/toast";
 import type { OnboardingStatus } from "../api/types";
 
@@ -102,5 +102,15 @@ describe("OnboardingGate", () => {
       screen.getByRole("button", { name: "Continue With the Default Library" }),
     );
     await waitFor(() => expect(mockApi.completeOnboarding).toHaveBeenCalled());
+  });
+
+  it("surfaces an error when continuing with the default fails", async () => {
+    mockApi.completeOnboarding.mockRejectedValue(new ApiError(503, "git is offline"));
+    renderGate();
+    const u = userEvent.setup();
+    await u.click(
+      screen.getByRole("button", { name: "Continue With the Default Library" }),
+    );
+    await waitFor(() => expect(screen.getByText("git is offline")).toBeInTheDocument());
   });
 });
