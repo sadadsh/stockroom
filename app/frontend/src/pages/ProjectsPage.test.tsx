@@ -46,6 +46,8 @@ vi.mock("../api/client", async (importActual) => {
       setNetclassPatterns: vi.fn(),
       getBoardSettings: vi.fn(),
       setBoardSettings: vi.fn(),
+      getFields: vi.fn(),
+      setFields: vi.fn(),
       getConform: vi.fn(),
       previewConform: vi.fn(),
       applyConform: vi.fn(),
@@ -395,6 +397,32 @@ const SETTINGS: BoardSettings = {
   ],
 };
 
+const FIELDS_GRID = {
+  project: "Netdeck",
+  under_git: true,
+  has_sch: true,
+  columns: ["Reference", "Value", "Footprint", "MPN"],
+  readonly_columns: ["Reference"],
+  rows: [
+    {
+      ref: "C1", sheet: "board.kicad_sch", lib_id: "Device:C", unannotated: false,
+      editable: true, conflicts: [], instances: 1,
+      fields: { Reference: "C1", Value: "100nF", Footprint: "C_0402", MPN: "" },
+    },
+    {
+      ref: "R1", sheet: "board.kicad_sch", lib_id: "Device:R", unannotated: false,
+      editable: true, conflicts: [], instances: 1,
+      fields: { Reference: "R1", Value: "10k", Footprint: "R_0402", MPN: "" },
+    },
+    {
+      ref: "R?", sheet: "board.kicad_sch", lib_id: "Device:R", unannotated: true,
+      editable: false, conflicts: [], instances: 1,
+      fields: { Reference: "R?", Value: "4k7", Footprint: "", MPN: "" },
+    },
+  ],
+  summary: { components: 3, editable: 2, unannotated: 1, duplicate: 0 },
+};
+
 const CONFORM: ConformCatalog = {
   project: "Netdeck",
   under_git: true,
@@ -585,6 +613,14 @@ beforeEach(() => {
   });
   mockApi.getBoardSettings.mockResolvedValue(SETTINGS);
   mockApi.setBoardSettings.mockResolvedValue({ ...SETTINGS, committed: "dddddddd4444" });
+  mockApi.getFields.mockResolvedValue(FIELDS_GRID);
+  mockApi.setFields.mockResolvedValue({
+    project: "Netdeck",
+    committed: "abcd1234ef56",
+    components: 1,
+    fields: 1,
+    files: [{ path: "board.kicad_sch", components: 1 }],
+  });
   mockApi.getConform.mockResolvedValue(CONFORM);
   mockApi.previewConform.mockResolvedValue({
     project: "Netdeck",
@@ -1161,6 +1197,57 @@ describe("ProjectsPage", () => {
     expect(classes).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Default", track_width: 0.15 })]),
     );
+  });
+
+  // -- M7h KiField bulk-field editor --
+
+  it("renders the component field grid with a read-only Reference column", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("fields-section");
+    expect(within(section).getByTestId("fields-table")).toBeInTheDocument();
+    expect(within(section).getByTestId("fields-row-R1")).toBeInTheDocument();
+    // an editable field renders an input; the read-only Reference column does not
+    expect(within(section).getByTestId("fields-cell-R1-Value")).toBeInTheDocument();
+    expect(within(section).queryByTestId("fields-cell-R1-Reference")).not.toBeInTheDocument();
+  });
+
+  it("keeps an unannotated component row read-only and explains why", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("fields-section");
+    // the unannotated R? row exposes no editable cell for its Value
+    expect(screen.getByTestId("fields-row-R?")).toBeInTheDocument();
+    expect(screen.queryByTestId("fields-cell-R?-Value")).not.toBeInTheDocument();
+    expect(screen.getByTestId("fields-readonly-note")).toHaveTextContent(/unannotated/i);
+  });
+
+  it("saves an edited field cell to the field endpoint", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("fields-section");
+    await user.type(within(section).getByTestId("fields-cell-R1-MPN"), "RC0402FR-0710KL");
+    await user.click(within(section).getByRole("button", { name: "Save Field Edits" }));
+    expect(mockApi.setFields).toHaveBeenCalledTimes(1);
+    const [id, edits] = mockApi.setFields.mock.calls[0];
+    expect(id).toBe("netdeck");
+    expect(edits).toEqual([{ ref: "R1", field: "MPN", value: "RC0402FR-0710KL" }]);
+  });
+
+  it("adds a new field column and saves it across a component", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("fields-section");
+    await user.type(within(section).getByTestId("fields-new-field"), "Tolerance");
+    await user.click(within(section).getByRole("button", { name: "Add Field" }));
+    await user.type(await within(section).findByTestId("fields-cell-R1-Tolerance"), "1%");
+    await user.click(within(section).getByRole("button", { name: "Save Field Edits" }));
+    const [, edits] = mockApi.setFields.mock.calls[0];
+    expect(edits).toEqual([{ ref: "R1", field: "Tolerance", value: "1%" }]);
   });
 
   it("adds a net class and includes it on save", async () => {

@@ -771,6 +771,50 @@ export interface SetNetclassPatternsResult {
   netclass_patterns: { netclass: string; pattern: string }[];
 }
 
+// --- M7h KiField bulk-field editor ---
+
+// One row of the field grid: a placed component keyed by reference. `fields` carries a value
+// for every column (blank when the component lacks that field). A row is not editable when its
+// reference is unannotated (ends "?") or it shares its designator with a differing component
+// (a duplicate anomaly, named in `conflicts`).
+export interface FieldRow {
+  ref: string;
+  sheet: string;
+  lib_id: string;
+  unannotated: boolean;
+  editable: boolean;
+  conflicts: string[];
+  instances: number;
+  fields: Record<string, string>;
+}
+
+// GET /api/projects/{id}/fields
+export interface FieldsGrid {
+  project: string;
+  under_git: boolean;
+  has_sch: boolean;
+  columns: string[];
+  readonly_columns: string[];
+  rows: FieldRow[];
+  summary: { components: number; editable: number; unannotated: number; duplicate: number };
+}
+
+// One field-cell edit the editor submits.
+export interface FieldEdit {
+  ref: string;
+  field: string;
+  value: string;
+}
+
+// PATCH /api/projects/{id}/fields
+export interface SetFieldsResult {
+  project: string;
+  committed: string | null;
+  components: number;
+  fields: number;
+  files: { path: string; components: number }[];
+}
+
 // One editable board-setup field the /settings endpoint describes so the form knows which
 // control to render for it (M7f-A). `kind` picks the input; `label` is a Title Case caption.
 export interface BoardSetupField {

@@ -17,7 +17,7 @@ from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, fab_ops, fill, settings_ops, standards
+from stockroom.projects import conform_ops, fab_ops, fields as fields_mod, fill, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
@@ -460,6 +460,88 @@ class ProjectOps:
         return {"project": rec.name, "committed": sha, "netclass_patterns": rows}
 
     # --- M7f Editor writes (board setup + thickness) -------------------------
+
+    # -- M7h KiField bulk-field editor ----------------------------------------
+
+    def _placed_components(self, rec: ProjectRecord) -> list[dict]:
+        """Every placed component across every existing sheet, each tagged with its relative
+        sheet path, for the field grid. Read-only."""
+        root = Path(rec.root).resolve()
+        comps: list[dict] = []
+        for path in self._sheet_abs(rec):
+            try:
+                rel = path.resolve().relative_to(root).as_posix()
+            except ValueError:
+                rel = path.name
+            for c in fill.read_components(SexpDocument.load(path)):
+                c["_sheet"] = rel
+                comps.append(c)
+        return comps
+
+    def fields(self, project_id: str) -> dict:
+        """The KiField bulk-field grid: every placed component across every sheet as a
+        rows-by-fields table, Reference read-only (M7h). Read-only. Raises FileNotFoundError for
+        an unknown id; a project with no schematic is an honest empty grid, never a crash."""
+        rec = self._require(project_id)
+        grid = fields_mod.build_field_grid(self._placed_components(rec))
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_sch": bool(self._sheet_abs(rec)),
+            **grid,
+        }
+
+    def set_fields(self, project_id: str, edits) -> dict:
+        """Apply a batch of {ref, field, value} field-cell edits across every sheet as ONE atomic
+        commit on the project's own git (M7h). The edits are validated against the CURRENT on-disk
+        grid (a read-only Reference field, an unknown or non-editable ref, or a blank field name is
+        a ValueError -> 400), each change is written byte-preservingly via fill_document, and only
+        the sheets that actually change are tracked + committed (minimal diff); an edit that changes
+        nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id); ValueError for a
+        project not under git or with uncommitted schematic changes (the same dirty-tree guard as
+        Prepare, so a user's in-progress sheet edits are never swept into the field commit)."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before editing fields"
+            )
+        repo = GitRepo(Path(rec.git_root))
+        sheets = self._sheet_abs(rec)
+        if sheets and not repo.is_clean(sheets):
+            raise ValueError(
+                "this project has uncommitted changes to a schematic; commit or discard them before editing fields"
+            )
+        grid = fields_mod.build_field_grid(self._placed_components(rec))
+        changes_by_ref = fields_mod.field_changes_by_ref(grid["rows"], edits)
+        empty = {"project": rec.name, "committed": None, "components": 0, "fields": 0, "files": []}
+        if not changes_by_ref:
+            return empty
+        root = Path(rec.root).resolve()
+        changed: list[tuple[Path, SexpDocument]] = []
+        files: list[dict] = []
+        for path in sheets:
+            doc = SexpDocument.load(path)
+            n = fill.fill_document(doc, changes_by_ref)
+            if n:
+                try:
+                    rel = path.resolve().relative_to(root).as_posix()
+                except ValueError:
+                    rel = path.name
+                changed.append((path, doc))
+                files.append({"path": rel, "components": n})
+        if not changed:  # every submitted value already matched on disk (byte no-op)
+            return empty
+        total_fields = sum(len(v) for v in changes_by_ref.values())
+        message = (f"Edit {rec.name} fields: {total_fields} value(s) on "
+                   f"{len(changes_by_ref)} component(s)")
+        with Transaction(repo) as txn:
+            for path, _doc in changed:
+                txn.track(path)
+            for path, doc in changed:
+                doc.save(path)
+            sha = txn.commit(message)
+        return {"project": rec.name, "committed": sha, "components": len(changes_by_ref),
+                "fields": total_fields, "files": files}
 
     def _primary_board(self, rec: ProjectRecord) -> Path | None:
         """The project's primary .kicad_pcb (board_paths[0], the alphabetically-first

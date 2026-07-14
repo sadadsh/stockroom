@@ -14,6 +14,7 @@ import {
 import type {
   ConformBody,
   DesignRules,
+  FieldEdit,
   ManualFillBody,
   NetClass,
   SetBoardSettingsBody,
@@ -529,6 +530,33 @@ export function useSetNetclassPatterns() {
       qc.invalidateQueries({ queryKey: ["project-design", vars.id] });
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
+// --- M7h KiField bulk-field editor ---
+
+// The project's derived rows-by-fields grid. Disabled until a project is selected.
+export function useProjectFields(id: string | null) {
+  return useQuery({
+    queryKey: ["project-fields", id],
+    queryFn: () => api.getFields(id as string),
+    enabled: !!id,
+  });
+}
+
+// A field write invalidates the grid read (re-reads the committed values), the project detail,
+// and the ERC/DRC + BOM reads: a field change (Value/Footprint/MPN) alters the netlist/BOM, and
+// the server evicts those caches, so the queries re-read the honest not-run / rebuild shape.
+export function useSetFields() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; edits: FieldEdit[] }) => api.setFields(vars.id, vars.edits),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-fields", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-bom", vars.id] });
     },
   });
 }

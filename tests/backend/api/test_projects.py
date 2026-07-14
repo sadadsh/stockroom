@@ -1104,6 +1104,8 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.patch("/api/projects/x/netclass-patterns", json={"patterns": []}).status_code == 401
     assert anon_client.get("/api/projects/x/settings").status_code == 401
     assert anon_client.patch("/api/projects/x/settings", json={"thickness": 1.2}).status_code == 401
+    assert anon_client.get("/api/projects/x/fields").status_code == 401
+    assert anon_client.patch("/api/projects/x/fields", json={"edits": []}).status_code == 401
 
 
 # ---- M7f-B Editor: object conform (font/thickness normalize) -----------------
@@ -1490,3 +1492,130 @@ def test_restore_nothing_to_restore_is_400(client, tmp_path):
 
 def test_restore_unknown_project_is_404(client):
     assert client.post("/api/projects/nope/restore").status_code == 404
+
+
+# ---- M7h KiField bulk-field editor -------------------------------------------
+
+_FIELDS_SHEET = (
+    "\t(symbol\n"
+    '\t\t(lib_id "Device:R")\n\t\t(at 10 10 0)\n\t\t(uuid "u-r1")\n'
+    '\t\t(property "Reference" "R1" (at 10 8 0))\n'
+    '\t\t(property "Value" "10k" (at 12 10 0))\n'
+    '\t\t(property "Footprint" "Resistor_SMD:R_0402" (at 10 10 0))\n'
+    '\t\t(property "MPN" "" (at 10 10 0))\n'
+    '\t\t(instances\n\t\t\t(project "board"\n'
+    '\t\t\t\t(path "/r1"\n\t\t\t\t\t(reference "R1")\n\t\t\t\t)\n\t\t\t)\n\t\t)\n'
+    "\t)\n"
+    "\t(symbol\n"
+    '\t\t(lib_id "Device:C")\n\t\t(at 20 10 0)\n\t\t(uuid "u-c1")\n'
+    '\t\t(property "Reference" "C1" (at 20 8 0))\n'
+    '\t\t(property "Value" "100nF" (at 22 10 0))\n'
+    '\t\t(property "Footprint" "Capacitor_SMD:C_0402" (at 20 10 0))\n'
+    '\t\t(instances\n\t\t\t(project "board"\n'
+    '\t\t\t\t(path "/c1"\n\t\t\t\t\t(reference "C1")\n\t\t\t\t)\n\t\t\t)\n\t\t)\n'
+    "\t)\n"
+)
+
+
+def test_get_fields_returns_the_grid(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/fields").json()
+    assert body["under_git"] is True and body["has_sch"] is True
+    assert [r["ref"] for r in body["rows"]] == ["C1", "R1"]  # natural sort, C before R
+    assert body["columns"][:3] == ["Reference", "Value", "Footprint"]
+    assert "MPN" in body["columns"]
+    assert body["readonly_columns"] == ["Reference"]
+    r1 = next(r for r in body["rows"] if r["ref"] == "R1")
+    assert r1["editable"] is True and r1["fields"]["Value"] == "10k"
+
+
+def test_get_fields_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/fields").status_code == 404
+
+
+def test_patch_fields_writes_only_the_edited_cells_and_commits(client, tmp_path):
+    proj, head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "MPN", "value": "RC0402FR-0710KL"},
+        {"ref": "R1", "field": "Value", "value": "22k"},
+        {"ref": "C1", "field": "Footprint", "value": "Capacitor_SMD:C_0603"},
+    ]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    assert body["components"] == 2 and body["fields"] == 3
+    after = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    assert '(property "MPN" "RC0402FR-0710KL"' in after
+    assert '(property "Value" "22k"' in after
+    assert '(property "Footprint" "Capacitor_SMD:C_0603"' in after
+    # the reference and the OTHER component's value are untouched
+    assert '(property "Reference" "R1"' in after
+    assert '(property "Value" "100nF"' in after
+
+
+def test_patch_fields_adds_a_new_field_column(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "Tolerance", "value": "1%"}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["committed"]
+    assert '(property "Tolerance" "1%"' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
+
+
+def test_patch_fields_editing_reference_is_400(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "Reference", "value": "R9"}]})
+    assert r.status_code == 400
+
+
+def test_patch_fields_blank_field_is_422(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "   ", "value": "x"}]})
+    assert r.status_code == 422
+
+
+def test_patch_fields_noop_does_not_commit(client, tmp_path):
+    proj, head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    # write the value already on disk -> byte no-op -> no commit, HEAD unchanged
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "Value", "value": "10k"}]})
+    assert r.status_code == 200 and r.json()["committed"] is None
+    now = subprocess.run(["git", "-C", str(proj), "rev-parse", "HEAD"],
+                         check=True, capture_output=True, text=True).stdout.strip()
+    assert now == head
+
+
+def test_patch_fields_non_git_is_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _FIELDS_SHEET))
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "MPN", "value": "x"}]})
+    assert r.status_code == 400
+
+
+def test_patch_fields_dirty_tree_is_400(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    sch = proj / "board.kicad_sch"
+    sch.write_text(sch.read_text(encoding="utf-8") + "\n", encoding="utf-8")  # dirty after register
+    r = client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "MPN", "value": "x"}]})
+    assert r.status_code == 400
+
+
+def test_patch_fields_evicts_stale_caches(client, app_ctx, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "flds", _FIELDS_SHEET)
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    app_ctx.bom_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/fields", json={"edits": [
+        {"ref": "R1", "field": "MPN", "value": "NEW"}]})
+    assert rec["id"] not in app_ctx.checks_cache
+    assert rec["id"] not in app_ctx.bom_cache

@@ -39,6 +39,9 @@ import type {
   ManualFillBody,
   ManualFillResult,
   RestoreResult,
+  FieldsGrid,
+  FieldEdit,
+  SetFieldsResult,
   Buildability,
   OnboardingStatus,
   ProfilesResponse,
@@ -599,6 +602,23 @@ export const api = {
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/netclass-patterns`,
       { body: { patterns } },
+    );
+  },
+
+  // The KiField bulk-field grid: every placed component across every sheet as a rows-by-fields
+  // table, Reference read-only (M7h). Read-only.
+  getFields(id: string): Promise<FieldsGrid> {
+    return apiGet<FieldsGrid>(`/api/projects/${encodeURIComponent(id)}/fields`);
+  },
+
+  // Apply a batch of field-cell edits across the project's schematic as ONE atomic commit on its
+  // own git (M7h). `edits` is the full set of changed cells; the engine validates each against
+  // the on-disk grid and refuses the read-only Reference field / a non-editable ref.
+  setFields(id: string, edits: FieldEdit[]): Promise<SetFieldsResult> {
+    return request<SetFieldsResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/fields`,
+      { body: { edits } },
     );
   },
 

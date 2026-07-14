@@ -195,6 +195,32 @@ class SetNetclassPatternsBody(BaseModel):
     patterns: list[NetclassPatternDTO]
 
 
+class FieldEditDTO(BaseModel):
+    """One field-cell edit the KiField bulk editor submits (M7h): set component `ref`'s `field`
+    to `value`. `ref` and `field` are required and non-blank (a blank one is a clean 422); `value`
+    is free text and may be empty (clearing the field). Editing the Reference field is refused by
+    the engine (annotation owns designators, which also syncs the netlist path reference), a 400."""
+
+    ref: str
+    field: str
+    value: str = ""
+
+    @field_validator("ref", "field")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a field edit's ref and field must not be blank")
+        return v
+
+
+class SetFieldsBody(BaseModel):
+    """Apply a batch of field-cell edits to a project's schematic components (M7h), all as ONE
+    atomic commit on the project's own git. `edits` is the full set of changed cells the editor
+    submits; an empty list is a no-op."""
+
+    edits: list[FieldEditDTO] = []
+
+
 class SetSettingsBody(BaseModel):
     """Edit a project's board setup + overall thickness (its .kicad_pcb) and/or its .kicad_pro
     settings: ERC/DRC rule severities, the ERC pin-conflict matrix, project text variables
