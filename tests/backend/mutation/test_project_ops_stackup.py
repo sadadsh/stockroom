@@ -186,6 +186,19 @@ def test_stackup_preview_rejects_both_modes_or_neither(tmp_path):
 
 # --- stackup_apply ------------------------------------------------------------
 
+def test_stackup_apply_refuses_a_dirty_board(tmp_path):
+    # roadmap #7: a dirty board's uncommitted edits must not be swept into the stackup commit
+    # (a Restore would then destroy them). Guard before any read; nothing is committed.
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    (proj / "board.kicad_pcb").write_text(_PCB + "\n(comment)\n", encoding="utf-8")  # uncommitted
+    head_before = prepo.head()
+    with pytest.raises(ValueError, match="uncommitted"):
+        ops.stackup_apply(rec.id, preset_key="oshpark_4")
+    assert prepo.head() == head_before  # nothing committed
+
+
 def test_stackup_apply_preset_writes_minimal_diff_and_commits_once(tmp_path):
     ops = _ops(tmp_path)
     proj, prepo = _git_project(tmp_path / "ext" / "board")
