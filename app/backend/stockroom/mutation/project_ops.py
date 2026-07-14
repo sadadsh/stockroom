@@ -13,11 +13,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from stockroom.kicad import project_settings
+from stockroom.kicad import conform, project_settings
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import settings_ops, standards
+from stockroom.projects import conform_ops, settings_ops, standards
+from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
@@ -432,3 +433,114 @@ class ProjectOps:
                 project_settings.apply_patch(pro_path, patch, replace_keys=replace_keys)
             sha = txn.commit(message)
         return {**self.board_settings(project_id), "committed": sha}
+
+    # --- M7f-B Editor: object conform (font/thickness normalize) --------------
+
+    def _kicad_files(self, rec: ProjectRecord) -> tuple[list[Path], list[Path]]:
+        """(boards, sheets) as absolute paths that exist on disk. A record path that moved after
+        registration is skipped (it cannot be conformed) rather than crashing the whole conform."""
+        root = Path(rec.root)
+        boards = [root / b for b in rec.board_paths if (root / b).exists()]
+        sheets = [root / s for s in rec.sheet_paths if (root / s).exists()]
+        return boards, sheets
+
+    def conform_catalog(self, project_id: str) -> dict:
+        """The object-conform category catalog (Title Case labels + suggested sizes) plus the
+        project's honest state (has a board / has a sheet / under git), for the editor's initial
+        render (M7f-B). Read-only. Raises FileNotFoundError for an unknown id."""
+        rec = self._require(project_id)
+        boards, sheets = self._kicad_files(rec)
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_pcb": bool(boards),
+            "has_sch": bool(sheets),
+            "pcb_categories": conform_ops.PCB_CONFORM_CATEGORIES,
+            "sch_categories": conform_ops.SCH_CONFORM_CATEGORIES,
+            "suggested": conform_ops.SUGGESTED,
+        }
+
+    def _stage_conform(self, rec: ProjectRecord, pcb_targets, sch_targets) -> list[dict]:
+        """Compute, per project file, the conform change counts WITHOUT writing (dry run): load
+        each board + sheet into a byte-preserving SexpDocument, apply the conform in memory, and
+        record {path (posix, display-safe), counts, changed, _abs, _doc}. Only a file with at least
+        one changed atom carries a live _doc to save; an unchanged file is left alone (minimal
+        diff). A change count > 0 is exactly equivalent to a real byte difference, since the writer
+        edits an atom only when its value actually differs."""
+        root = Path(rec.root)
+        boards, sheets = self._kicad_files(rec)
+        staged: list[dict] = []
+        for path in boards + sheets:
+            doc = SexpDocument.load(path)
+            counts = conform.conform_document(doc, pcb_targets or {}, sch_targets or {})
+            total = sum(counts.values())
+            try:
+                rel = path.resolve().relative_to(root.resolve()).as_posix()
+            except ValueError:
+                rel = path.name
+            staged.append({"path": rel, "counts": counts, "changed": total,
+                           "_abs": path, "_doc": doc if total else None})
+        return staged
+
+    @staticmethod
+    def _conform_summary(pcb_targets, sch_targets) -> str:
+        """A human commit-message tail naming the conformed types, e.g. 'silk text, net labels'."""
+        labels = {c["key"]: c["label"].lower()
+                  for c in conform_ops.PCB_CONFORM_CATEGORIES + conform_ops.SCH_CONFORM_CATEGORIES}
+        parts = [labels[k] for k in conform.PCB_CATEGORIES if k in (pcb_targets or {})]
+        parts += [labels[k] for k in conform.SCH_CATEGORIES if k in (sch_targets or {})]
+        return ", ".join(parts)
+
+    def conform_preview(self, project_id: str, pcb_targets, sch_targets) -> dict:
+        """A dry-run of an object conform: per-file change counts for the given targets, computed
+        WITHOUT writing or touching git (M7f-B). Validates the targets (unknown category / bad
+        size or thickness -> ValueError -> 400) and refuses an empty selection. Raises
+        FileNotFoundError for an unknown id."""
+        rec = self._require(project_id)
+        conform_ops.validate_targets(pcb_targets, sch_targets)
+        if not conform_ops.any_targets(pcb_targets, sch_targets):
+            raise ValueError("select at least one object type to conform")
+        staged = self._stage_conform(rec, pcb_targets, sch_targets)
+        return {
+            "project": rec.name,
+            "files": [{"path": s["path"], "counts": s["counts"], "changed": s["changed"]}
+                      for s in staged],
+            "total": sum(s["changed"] for s in staged),
+        }
+
+    def conform_apply(self, project_id: str, pcb_targets, sch_targets) -> dict:
+        """Apply an object conform across EVERY board + sheet of the project as ONE atomic commit
+        on the project's own git (M7f-B): only the files that actually change are tracked + written
+        (minimal diff), in a single Transaction (track-before-write, one scoped commit, or every
+        touched path restored and zero trace). Validates before any git touch. A selection that
+        produces no change is an honest no-commit no-op ({committed: None, total: 0}), never a
+        fabricated empty commit. Raises FileNotFoundError (unknown id); ValueError for an empty
+        selection, a bad target, or a project not under git. Returns the per-file counts + the
+        commit sha (or None)."""
+        rec = self._require(project_id)
+        conform_ops.validate_targets(pcb_targets, sch_targets)
+        if not conform_ops.any_targets(pcb_targets, sch_targets):
+            raise ValueError("select at least one object type to conform")
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before editing"
+            )
+        staged = self._stage_conform(rec, pcb_targets, sch_targets)
+        files_result = [{"path": s["path"], "counts": s["counts"], "changed": s["changed"]}
+                        for s in staged]
+        total = sum(s["changed"] for s in staged)
+        changed = [s for s in staged if s["_doc"] is not None]
+        if not changed:
+            return {"project": rec.name, "committed": None, "files": files_result, "total": 0}
+
+        message = f"Conform {rec.name}: " + self._conform_summary(pcb_targets, sch_targets)
+        repo = GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            # Track every file to be written BEFORE any write, so a save that raises mid-write (a
+            # later file failing after an earlier one already landed) rolls ALL of them back.
+            for s in changed:
+                txn.track(s["_abs"])
+            for s in changed:
+                s["_doc"].save(s["_abs"])
+            sha = txn.commit(message)
+        return {"project": rec.name, "committed": sha, "files": files_result, "total": total}

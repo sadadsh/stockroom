@@ -27,6 +27,10 @@ import type {
   PartsResponse,
   ProcurementExportOptions,
   ProcurementResult,
+  ConformBody,
+  ConformCatalog,
+  ConformPreview,
+  ConformResult,
   ProfilesResponse,
   ProjectDetail,
   ProjectSummary,
@@ -563,6 +567,32 @@ export const api = {
     return request<SetBoardSettingsResult>(
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/settings`,
+      { body },
+    );
+  },
+
+  // The object-conform category catalog (Title Case labels + suggested sizes) plus the project's
+  // honest state (has a board / a sheet / under git), for the editor's initial render (M7f-B).
+  getConform(id: string): Promise<ConformCatalog> {
+    return apiGet<ConformCatalog>(`/api/projects/${encodeURIComponent(id)}/conform`);
+  },
+
+  // A dry-run of an object conform: per-file change counts for the given targets, computed
+  // without writing or touching git (M7f-B).
+  previewConform(id: string, body: ConformBody): Promise<ConformPreview> {
+    return request<ConformPreview>(
+      "POST",
+      `/api/projects/${encodeURIComponent(id)}/conform/preview`,
+      { body },
+    );
+  },
+
+  // Apply the conform across every board + sheet as one atomic commit on the project's own git
+  // (M7f-B). `committed` is null when nothing changed (an honest no-commit no-op).
+  applyConform(id: string, body: ConformBody): Promise<ConformResult> {
+    return request<ConformResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/conform`,
       { body },
     );
   },

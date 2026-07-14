@@ -19,6 +19,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import (
+    ConformBody,
     ProjectSummary,
     RegisterProjectBody,
     SetDesignRulesBody,
@@ -290,6 +291,34 @@ def projects_router(require_token) -> APIRouter:
             erc_severities=body.erc_severities, drc_severities=body.drc_severities,
             erc_pin_map=body.erc_pin_map, text_variables=body.text_variables,
         )
+        ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/conform")
+    def get_conform(request: Request, project_id: str) -> dict:
+        # The object-conform category catalog (Title Case labels + suggested sizes) plus the
+        # project's honest state (has a board / has a sheet / under git), for the editor's
+        # initial render (M7f-B). Read-only. Unknown id -> 404.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.conform_catalog(project_id)
+
+    @r.post("/{project_id}/conform/preview")
+    def preview_conform(request: Request, project_id: str, body: ConformBody) -> dict:
+        # A dry-run of an object conform: per-file change counts for the given targets, computed
+        # WITHOUT writing or touching git (M7f-B). Unknown id -> 404; an empty selection or a bad
+        # size/thickness/category -> 400.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.conform_preview(project_id, body.pcb(), body.sch())
+
+    @r.patch("/{project_id}/conform")
+    def apply_conform(request: Request, project_id: str, body: ConformBody) -> dict:
+        # Apply the object conform across every board + sheet as ONE atomic commit on the
+        # project's own git (M7f-B). Unknown id -> 404; an empty selection, a bad target, or a
+        # project not under git -> 400; a GitError -> 503. Conforming text size/thickness can
+        # change DRC (text height/thickness, silk clearance), so the stale cached ERC/DRC is
+        # evicted and the next check re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.conform_apply(project_id, body.pcb(), body.sch())
         ctx.checks_cache.pop(project_id, None)
         return result
 

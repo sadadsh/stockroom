@@ -7,6 +7,7 @@ import type {
   BomDiffResult,
   BomResult,
   ChecksResult,
+  ConformCatalog,
   DesignResult,
   ProcurementResult,
   ProjectDetail,
@@ -41,6 +42,9 @@ vi.mock("../api/client", async (importActual) => {
       setDesignRules: vi.fn(),
       getBoardSettings: vi.fn(),
       setBoardSettings: vi.fn(),
+      getConform: vi.fn(),
+      previewConform: vi.fn(),
+      applyConform: vi.fn(),
     },
   };
 });
@@ -379,6 +383,29 @@ const SETTINGS: BoardSettings = {
   ],
 };
 
+const CONFORM: ConformCatalog = {
+  project: "Netdeck",
+  under_git: true,
+  has_pcb: true,
+  has_sch: true,
+  pcb_categories: [
+    { key: "silk", label: "Silk Text", hint: "Front and back silkscreen text (F/B.SilkS)" },
+    { key: "fab", label: "Fab Text", hint: "Front and back fabrication text (F/B.Fab)" },
+    { key: "copper", label: "Copper Text", hint: "Front and back copper text (F/B.Cu)" },
+  ],
+  sch_categories: [
+    { key: "text", label: "Schematic Text", hint: "Sheet graphic text notes" },
+    { key: "labels", label: "Net Labels", hint: "Local, global, and hierarchical labels" },
+  ],
+  suggested: {
+    silk: { size: 1.0, thickness: 0.15 },
+    fab: { size: 1.0, thickness: 0.15 },
+    copper: { size: 1.0, thickness: 0.15 },
+    text: { size: 1.27, thickness: null },
+    labels: { size: 1.27, thickness: null },
+  },
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -435,6 +462,24 @@ beforeEach(() => {
   });
   mockApi.getBoardSettings.mockResolvedValue(SETTINGS);
   mockApi.setBoardSettings.mockResolvedValue({ ...SETTINGS, committed: "dddddddd4444" });
+  mockApi.getConform.mockResolvedValue(CONFORM);
+  mockApi.previewConform.mockResolvedValue({
+    project: "Netdeck",
+    files: [
+      { path: "board.kicad_pcb", counts: { silk: 2 }, changed: 2 },
+      { path: "board.kicad_sch", counts: { labels: 1 }, changed: 1 },
+    ],
+    total: 3,
+  });
+  mockApi.applyConform.mockResolvedValue({
+    project: "Netdeck",
+    committed: "eeeeeeee5555",
+    files: [
+      { path: "board.kicad_pcb", counts: { silk: 2 }, changed: 2 },
+      { path: "board.kicad_sch", counts: { labels: 1 }, changed: 1 },
+    ],
+    total: 3,
+  });
 });
 
 describe("ProjectsPage", () => {
@@ -1370,5 +1415,117 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
     expect(await screen.findByTestId("prosettings-no-pro")).toBeInTheDocument();
     expect(screen.queryByTestId("severities-form")).not.toBeInTheDocument();
+  });
+
+  // --- M7f-B object conform: font/thickness normalize ------------------------
+
+  it("shows the conform categories with size and thickness controls", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    expect(screen.getByTestId("conform-enable-silk")).toBeInTheDocument();
+    expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
+    // size/thickness are disabled until the category is enabled
+    expect(screen.getByTestId("conform-size-silk")).toBeDisabled();
+  });
+
+  it("disables preview and apply until a category is selected", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    expect(screen.getByRole("button", { name: "Preview Changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Conform Objects" })).toBeDisabled();
+    await user.click(screen.getByTestId("conform-enable-silk"));
+    expect(screen.getByRole("button", { name: "Preview Changes" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Conform Objects" })).toBeEnabled();
+  });
+
+  it("previews the per-file change counts for the selected types", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    await user.click(screen.getByTestId("conform-enable-silk"));
+    await user.click(screen.getByTestId("conform-enable-labels"));
+    await user.click(screen.getByRole("button", { name: "Preview Changes" }));
+    await screen.findByTestId("conform-preview");
+    expect(mockApi.previewConform).toHaveBeenCalledWith("netdeck", {
+      pcb_targets: { silk: { size: 1, thickness: 0.15 } },
+      sch_targets: { labels: { size: 1.27 } },
+    });
+    expect(screen.getByTestId("conform-preview-total")).toHaveTextContent("3");
+  });
+
+  it("omits a blank thickness from the target (leaves it untouched)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    await user.click(screen.getByTestId("conform-enable-silk"));
+    await user.clear(screen.getByTestId("conform-thickness-silk")); // drop thickness
+    await user.click(screen.getByRole("button", { name: "Conform Objects" }));
+    await waitFor(() => expect(mockApi.applyConform).toHaveBeenCalled());
+    expect(mockApi.applyConform).toHaveBeenCalledWith("netdeck", {
+      pcb_targets: { silk: { size: 1 } },
+    });
+  });
+
+  it("applies the conform and clears a shown preview on success", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    await user.click(screen.getByTestId("conform-enable-silk"));
+    await user.click(screen.getByRole("button", { name: "Preview Changes" }));
+    await screen.findByTestId("conform-preview");
+    await user.click(screen.getByRole("button", { name: "Conform Objects" }));
+    await waitFor(() => expect(mockApi.applyConform).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByTestId("conform-preview")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("blocks the conform when an enabled type has a bad size", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    await user.click(screen.getByTestId("conform-enable-silk"));
+    await user.clear(screen.getByTestId("conform-size-silk"));
+    await user.type(screen.getByTestId("conform-size-silk"), "0");
+    await user.clear(screen.getByTestId("conform-thickness-silk"));
+    await user.click(screen.getByRole("button", { name: "Conform Objects" }));
+    expect(mockApi.applyConform).not.toHaveBeenCalled();
+    expect(await screen.findByText(/positive size/i)).toBeInTheDocument();
+  });
+
+  it("shows an honest no-board-or-sheet conform state", async () => {
+    mockApi.getConform.mockResolvedValue({ ...CONFORM, has_pcb: false, has_sch: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("conform-no-target")).toBeInTheDocument();
+    expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest not-under-git conform state", async () => {
+    mockApi.getConform.mockResolvedValue({ ...CONFORM, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("conform-no-git")).toBeInTheDocument();
+    expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
+  });
+
+  it("shows only schematic categories when the project has no board", async () => {
+    mockApi.getConform.mockResolvedValue({ ...CONFORM, has_pcb: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("conform-form");
+    expect(screen.queryByTestId("conform-enable-silk")).not.toBeInTheDocument();
+    expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
   });
 });

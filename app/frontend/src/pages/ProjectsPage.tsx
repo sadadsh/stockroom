@@ -31,6 +31,9 @@ import {
   useSetDesignRules,
   useProjectSettings,
   useSetProjectSettings,
+  useProjectConform,
+  usePreviewConform,
+  useApplyConform,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
@@ -47,6 +50,11 @@ import type {
   CheckFinding,
   CheckRun,
   ChecksResult,
+  ConformBody,
+  ConformCatalog,
+  ConformCategory,
+  ConformPreview,
+  ConformTarget,
   DesignResult,
   DesignRules,
   NetClass,
@@ -412,6 +420,7 @@ function ProjectDetailView({
       <EditorSection key={`editor-${project.id}`} projectId={project.id} />
       <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
       <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
+      <ConformSection key={`conform-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -2626,6 +2635,287 @@ function TextVarsForm({ projectId, data }: { projectId: string; data: BoardSetti
       >
         Add Variable
       </Button>
+    </div>
+  );
+}
+
+// The Object Conform editor (M7f-B): retroactively normalize the font size (and, where a font
+// carries one, its thickness) of existing text objects across the project to a house standard.
+// Preview shows exactly how many objects each type would change; Apply writes a minimal diff to
+// every touched sheet + board as one atomic commit on the project's own git. Honest states for a
+// project with no board/sheet or not under git.
+function ConformSection({ projectId }: { projectId: string }) {
+  const q = useProjectConform(projectId);
+  const data = q.data;
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="conform-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Object Conform</Eyebrow>
+        <p className="text-xs text-t3">
+          Normalize the font size and thickness of existing text objects across the project to a
+          standard. Preview the exact count each type would change, then apply it as a minimal
+          change committed to the project's own git history.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the conform options...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the conform options.")}</p>
+      ) : !data ? null : !data.has_pcb && !data.has_sch ? (
+        <p className="text-sm text-t3" data-testid="conform-no-target">
+          This project has no board or schematic files, so there are no text objects to conform.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="conform-no-git">
+          This project is not under git. Initialize a git repository for it to conform its objects,
+          so each change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <ConformForm projectId={projectId} data={data} />
+      )}
+    </div>
+  );
+}
+
+interface ConformDraftRow {
+  enabled: boolean;
+  size: string;
+  thickness: string;
+}
+
+function seedConformDraft(data: ConformCatalog): Record<string, ConformDraftRow> {
+  const out: Record<string, ConformDraftRow> = {};
+  for (const c of [...data.pcb_categories, ...data.sch_categories]) {
+    const s = data.suggested[c.key];
+    out[c.key] = {
+      enabled: false,
+      size: s?.size != null ? String(s.size) : "",
+      thickness: s?.thickness != null ? String(s.thickness) : "",
+    };
+  }
+  return out;
+}
+
+function ConformForm({ projectId, data }: { projectId: string; data: ConformCatalog }) {
+  const [draft, setDraft] = useState<Record<string, ConformDraftRow>>(() => seedConformDraft(data));
+  const [preview, setPreview] = useState<ConformPreview | null>(null);
+  const previewM = usePreviewConform();
+  const applyM = useApplyConform();
+  const { toast } = useToast();
+
+  // A project shows only the categories it can actually conform (a board's silk/fab/copper, a
+  // sheet's text/labels), so an enabled type always has a file to touch.
+  const pcbCats = data.has_pcb ? data.pcb_categories : [];
+  const schCats = data.has_sch ? data.sch_categories : [];
+  const allCats = [...pcbCats, ...schCats];
+  const anySelected = allCats.some((c) => draft[c.key]?.enabled);
+
+  // Any edit invalidates a shown preview (the counts would be stale), so it is cleared until the
+  // user previews again.
+  function update(key: string, patch: Partial<ConformDraftRow>) {
+    setDraft((d) => ({ ...d, [key]: { ...d[key], ...patch } }));
+    setPreview(null);
+  }
+
+  // A conform target for one enabled category, or null when it names no valid positive dimension
+  // (an enabled type with a blank/bad size and thickness is a clear input error, not a silent
+  // no-op). A blank dimension is omitted (that dimension is left untouched).
+  function targetOf(key: string, label: string): ConformTarget | null {
+    const row = draft[key];
+    const t: ConformTarget = {};
+    for (const [dim, raw] of [
+      ["size", row.size],
+      ["thickness", row.thickness],
+    ] as const) {
+      const s = raw.trim();
+      if (s === "") continue;
+      const n = Number(s);
+      if (!Number.isFinite(n) || n <= 0) {
+        toast(`Enter a positive ${dim} for ${label}, or leave it blank.`, "err");
+        return null;
+      }
+      t[dim] = n;
+    }
+    if (t.size === undefined && t.thickness === undefined) {
+      toast(`Set a size or thickness for ${label}.`, "err");
+      return null;
+    }
+    return t;
+  }
+
+  // The request body from the enabled categories, or null when a selected type has bad input.
+  function buildBody(): ConformBody | null {
+    const pcb: Record<string, ConformTarget> = {};
+    const sch: Record<string, ConformTarget> = {};
+    for (const c of pcbCats) {
+      if (!draft[c.key].enabled) continue;
+      const t = targetOf(c.key, c.label);
+      if (!t) return null;
+      pcb[c.key] = t;
+    }
+    for (const c of schCats) {
+      if (!draft[c.key].enabled) continue;
+      const t = targetOf(c.key, c.label);
+      if (!t) return null;
+      sch[c.key] = t;
+    }
+    const body: ConformBody = {};
+    if (Object.keys(pcb).length) body.pcb_targets = pcb;
+    if (Object.keys(sch).length) body.sch_targets = sch;
+    return body;
+  }
+
+  function onPreview() {
+    const body = buildBody();
+    if (!body) return;
+    previewM.mutate(
+      { id: projectId, ...body },
+      {
+        onSuccess: (result) => setPreview(result),
+        onError: (e) => toast(errMsg(e, "Could not preview the conform."), "err"),
+      },
+    );
+  }
+
+  function onApply() {
+    const body = buildBody();
+    if (!body) return;
+    applyM.mutate(
+      { id: projectId, ...body },
+      {
+        onSuccess: (result) => {
+          setPreview(null);
+          if (result.committed == null) {
+            toast("Nothing to change; every selected object already matches.");
+          } else {
+            toast(`Conformed ${result.total} ${result.total === 1 ? "object" : "objects"}.`);
+          }
+        },
+        onError: (e) => toast(errMsg(e, "Could not conform the objects."), "err"),
+      },
+    );
+  }
+
+  const busy = previewM.isPending || applyM.isPending;
+
+  return (
+    <div data-testid="conform-form">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-medium text-t1">Text Objects</h3>
+        <div className="flex items-center gap-2">
+          <Button variant="default" small onClick={onPreview} disabled={!anySelected || busy}>
+            {previewM.isPending ? "Previewing..." : "Preview Changes"}
+          </Button>
+          <Button variant="accent" small onClick={onApply} disabled={!anySelected || busy}>
+            {applyM.isPending ? "Conforming..." : "Conform Objects"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {pcbCats.length > 0 ? (
+          <ConformGroup title="Board Text" cats={pcbCats} draft={draft} onUpdate={update} />
+        ) : null}
+        {schCats.length > 0 ? (
+          <ConformGroup title="Schematic Text" cats={schCats} draft={draft} onUpdate={update} />
+        ) : null}
+      </div>
+
+      {preview ? (
+        <div className="mt-4 rounded-control border border-line2 bg-raise p-3" data-testid="conform-preview">
+          {preview.total === 0 ? (
+            <p className="text-xs text-t3">
+              Nothing to change; every selected object already matches the target.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <p className="text-2xs font-medium uppercase tracking-wide text-t3">
+                Objects To Change
+              </p>
+              {preview.files
+                .filter((f) => f.changed > 0)
+                .map((f) => (
+                  <div
+                    key={f.path}
+                    className="flex items-center justify-between gap-3 text-xs text-t2"
+                  >
+                    <span className="min-w-0 truncate" title={f.path}>
+                      {f.path}
+                    </span>
+                    <span className="text-t1" data-testid={`conform-file-${f.path}`}>
+                      {f.changed}
+                    </span>
+                  </div>
+                ))}
+              <p className="mt-1 text-xs text-t1" data-testid="conform-preview-total">
+                {preview.total} {preview.total === 1 ? "object" : "objects"} across the project.
+              </p>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ConformGroup({
+  title,
+  cats,
+  draft,
+  onUpdate,
+}: {
+  title: string;
+  cats: ConformCategory[];
+  draft: Record<string, ConformDraftRow>;
+  onUpdate: (key: string, patch: Partial<ConformDraftRow>) => void;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-t3">{title}</h4>
+      <div className="flex flex-col gap-2">
+        {cats.map((c) => {
+          const row = draft[c.key];
+          return (
+            <div key={c.key} className="flex flex-wrap items-center gap-3">
+              <label className="flex min-w-40 items-center gap-2 text-xs text-t2">
+                <input
+                  type="checkbox"
+                  data-testid={`conform-enable-${c.key}`}
+                  checked={row.enabled}
+                  onChange={(e) => onUpdate(c.key, { enabled: e.target.checked })}
+                />
+                <span title={c.hint}>{c.label}</span>
+              </label>
+              <label className="flex items-center gap-1 text-2xs text-t3">
+                Size
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className={`${INPUT_CLS} !w-20 !flex-none !py-1 text-xs`}
+                  data-testid={`conform-size-${c.key}`}
+                  value={row.size}
+                  disabled={!row.enabled}
+                  onChange={(e) => onUpdate(c.key, { size: e.target.value })}
+                />
+              </label>
+              <label className="flex items-center gap-1 text-2xs text-t3">
+                Thickness
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className={`${INPUT_CLS} !w-20 !flex-none !py-1 text-xs`}
+                  data-testid={`conform-thickness-${c.key}`}
+                  value={row.thickness}
+                  disabled={!row.enabled}
+                  onChange={(e) => onUpdate(c.key, { thickness: e.target.value })}
+                  placeholder="Keep"
+                />
+              </label>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
