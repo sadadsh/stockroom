@@ -182,10 +182,16 @@ def ensure_clone(
     clone: Callable[[str, Path], None] | None = None,
 ) -> None:
     """Clone the app repo into `workdir` on first run. Idempotent: a working copy that already
-    carries a `.git` is left untouched (self-update pulls it in place, never re-clones)."""
+    carries a `.git` is left untouched (self-update pulls it in place, never re-clones). A
+    LEFTOVER partial directory (an interrupted first-run clone, or a stray .venv from a failed
+    provision) is NOT a git repo, and `git clone` refuses a non-empty destination, so clear it
+    first: first run then always recovers instead of dying with 'already exists and is not an
+    empty directory'."""
     workdir = Path(workdir)
     if (workdir / ".git").exists():
         return
+    if workdir.exists():
+        shutil.rmtree(workdir, ignore_errors=True)
     (clone or _git_clone)(remote, workdir)
 
 
