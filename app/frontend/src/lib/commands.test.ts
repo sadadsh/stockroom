@@ -5,7 +5,7 @@ import {
   registeredCommands,
   unregisterCommand,
 } from "./commands";
-import { NAV, availableNav } from "./nav";
+import { availableNav, type NavEntry } from "./nav";
 
 describe("command registry", () => {
   it("derives a nav command for exactly the available destinations", () => {
@@ -18,11 +18,19 @@ describe("command registry", () => {
     // Built surfaces (including Projects, now shipped) are present.
     expect(ids).toContain("nav.components");
     expect(ids).toContain("nav.projects");
-    // An unavailable route, were there one, would be excluded.
-    const unavailable = NAV.filter((entry) => !entry.available);
-    for (const entry of unavailable) {
-      expect(ids).not.toContain(`nav.${entry.route}`);
-    }
+  });
+
+  it("excludes an unavailable destination so the palette never routes to a stub", () => {
+    // Every real route has shipped, so the live NAV has nothing unavailable to
+    // exercise the guard. Inject a NAV with one unavailable entry: it must not
+    // become a command. Load-bearing (drop the .filter(available) and this is red).
+    const nav: NavEntry[] = [
+      { route: "components", title: "Components", glyph: "", group: "primary", available: true },
+      { route: "settings", title: "Settings", glyph: "", group: "foot", available: false },
+    ];
+    const ids = navCommands(nav).map((c) => c.id);
+    expect(ids).toContain("nav.components");
+    expect(ids).not.toContain("nav.settings");
   });
 
   it("a nav command navigates to its route when run", () => {

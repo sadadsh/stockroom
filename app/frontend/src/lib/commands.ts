@@ -5,7 +5,7 @@
  * NAV so the palette and the rail can never offer different destinations;
  * feature pages register their own action commands (e.g. "Wire KiCad") here.
  */
-import { NAV } from "./nav";
+import { NAV, type NavEntry } from "./nav";
 import type { Route } from "./router";
 
 export interface CommandContext {
@@ -34,9 +34,11 @@ export function registeredCommands(): Command[] {
   return [...registry.values()];
 }
 
-/** Navigation commands, always fresh from NAV's available destinations. */
-export function navCommands(): Command[] {
-  return NAV.filter((entry) => entry.available).map((entry) => ({
+/** Navigation commands, always fresh from NAV's available destinations. The `nav`
+ * argument defaults to the live NAV; passing a list keeps the available-only
+ * derivation testable even once every real route has shipped. */
+export function navCommands(nav: NavEntry[] = NAV): Command[] {
+  return nav.filter((entry) => entry.available).map((entry) => ({
     id: `nav.${entry.route}`,
     title: `Go To ${entry.title}`,
     group: "Go To",

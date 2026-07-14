@@ -166,6 +166,16 @@ describe("ProjectsPage", () => {
     expect(screen.getByRole("button", { name: "Download Report" })).toBeInTheDocument();
   });
 
+  it("renders the findings-table headers without letterspaced uppercase (design contract)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const head = await screen.findByTestId("findings-head");
+    // no `uppercase` / `tracking-*` classes: Title Case labels, no letterspacing.
+    expect(head.className).not.toMatch(/uppercase|tracking/);
+    expect(within(head).getByText("Ref")).toBeInTheDocument();
+  });
+
   it("filters the findings table by kind when a breakdown chip is clicked", async () => {
     renderPage();
     const user = userEvent.setup();

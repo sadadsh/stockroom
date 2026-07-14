@@ -485,7 +485,7 @@ function FindingsTable({ findings }: { findings: AuditFinding[] }) {
     <Card className="overflow-hidden" data-testid="audit-findings">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-line text-2xs uppercase tracking-wide text-t3">
+          <tr data-testid="findings-head" className="border-b border-line text-2xs text-t3">
             <th className="px-4 py-2 font-medium">Ref</th>
             <th className="px-4 py-2 font-medium">Severity</th>
             <th className="px-4 py-2 font-medium">Detail</th>

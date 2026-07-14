@@ -15,7 +15,10 @@ def sync_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         result = ctx.sync.sync()
         if result.pulled:
+            # a pull can bring in part records AND project registrations (both are
+            # committed into this same library repo), so rebuild both derived indexes.
             ctx.rebuild_index()
+            ctx.rebuild_project_index()
         return {"state": result.state, "pulled": result.pulled,
                 "pushed": result.pushed, "detail": result.detail}
 
