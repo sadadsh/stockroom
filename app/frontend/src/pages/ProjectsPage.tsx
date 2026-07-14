@@ -22,6 +22,7 @@ import { ApiError, api } from "../api/client";
 import {
   useProjectsQuery,
   useProjectAudit,
+  useProjectBom,
   useProjectChecks,
   useRegisterProject,
   useDeleteProject,
@@ -29,6 +30,8 @@ import {
 import type {
   AuditFinding,
   AuditResult,
+  BomLine,
+  BomResult,
   CheckFinding,
   CheckRun,
   ChecksResult,
@@ -384,6 +387,7 @@ function ProjectDetailView({
       ) : null}
 
       <ChecksSection key={project.id} projectId={project.id} />
+      <BomSection key={`bom-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -814,4 +818,201 @@ function checkSeverityLabel(severity: CheckFinding["severity"]): string {
 // a caption).
 function countLabel(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+// -- Build And Cost (BOM grouping + cost, M7c) -------------------------------
+
+function formatMoney(n: number, currency: string): string {
+  const sym = currency === "USD" ? "$" : "";
+  return `${sym}${n.toFixed(2)}`;
+}
+
+function unitPriceLabel(line: BomLine): string {
+  if (line.unit_price === undefined || line.unit_price === null || line.unit_price === "") {
+    return "";
+  }
+  const n = typeof line.unit_price === "number" ? line.unit_price : Number(line.unit_price);
+  return Number.isFinite(n) ? `$${n.toFixed(4)}` : String(line.unit_price);
+}
+
+// The Build And Cost section: build a grouped, priced BOM as a job, then show the cached
+// result. Keyed by project id in the parent so its job state never leaks across a switch.
+// Honest states throughout: a project with no parts is "Nothing to Build", a build whose
+// parts could not be sourced is "Unpriced" (never a fabricated cost), and an unbuilt
+// project shows a "not built yet" prompt.
+function BomSection({ projectId }: { projectId: string }) {
+  const bomQuery = useProjectBom(projectId);
+  const job = useJob<BomResult>();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (job.status === "done") {
+      qc.invalidateQueries({ queryKey: ["project-bom", projectId] });
+    }
+  }, [job.status, projectId, qc]);
+
+  async function onRun() {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const { job_id } = await api.runBom(projectId);
+      job.run(job_id);
+    } catch (e) {
+      const msg = errMsg(e, "Could not start the BOM build.");
+      setStartError(msg);
+      toast(msg, "err");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  const busy = starting || job.status === "running";
+  const data: BomResult | null =
+    job.status === "done" && job.result ? job.result : (bomQuery.data ?? null);
+  const hasBuilt = data != null && data.ran_at != null;
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="bom-section">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-0.5">Build And Cost</Eyebrow>
+          <p className="text-xs text-t3">
+            Group the schematic into a Bill of Materials and price it through the enrich
+            layer.
+          </p>
+        </div>
+        <Button variant="accent" small onClick={onRun} disabled={busy}>
+          {busy ? "Building..." : hasBuilt ? "Rebuild BOM" : "Build And Cost"}
+        </Button>
+      </div>
+
+      {busy && job.progress?.message ? (
+        <p className="mb-2 text-xs text-t3">{job.progress.message}...</p>
+      ) : null}
+      {startError ? <p className="mb-2 text-sm text-err">{startError}</p> : null}
+      {job.status === "error" ? (
+        <p className="mb-2 text-sm text-err">{job.error ?? "The BOM build failed."}</p>
+      ) : null}
+
+      {bomQuery.isLoading && !hasBuilt && !busy ? (
+        <p className="text-sm text-t3">Loading the last build...</p>
+      ) : hasBuilt && data ? (
+        <BomResultView result={data} />
+      ) : !busy && !startError && job.status !== "error" ? (
+        <p className="text-sm text-t3">
+          The BOM has not been built yet. Build it to group and price the parts.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BomResultView({ result }: { result: BomResult }) {
+  const s = result.summary;
+  const sources = result.by_source?.sources ?? {};
+  const sourceNames = Object.keys(sources).filter((n) => n !== "Unsourced");
+  return (
+    <div className="flex flex-col gap-4" data-testid="bom-result">
+      <div className="flex flex-wrap items-center gap-2.5">
+        {s ? <BomVerdictBadge summary={s} /> : null}
+        {s ? (
+          <span className="text-xs text-t3">
+            {countLabel(s.line_count, "Line")}, {result.component_count} parts
+          </span>
+        ) : null}
+        {sourceNames.map((name) => (
+          <span key={name} className="text-2xs text-t3">
+            {name} {formatMoney(sources[name].total_cost, result.by_source?.currency ?? "USD")}
+          </span>
+        ))}
+      </div>
+
+      {result.lines.length === 0 ? (
+        <p className="text-xs text-t3">No parts to build a BOM from.</p>
+      ) : (
+        <BomLinesTable lines={result.lines} priced={result.priced} />
+      )}
+    </div>
+  );
+}
+
+function BomVerdictBadge({ summary }: { summary: NonNullable<BomResult["summary"]> }) {
+  const money = formatMoney(summary.total_cost, summary.currency);
+  switch (summary.state) {
+    case "empty":
+      return <Badge tone="neutral">Nothing to Build</Badge>;
+    case "built":
+      return <Badge tone="neutral">Not Priced</Badge>;
+    case "unpriced":
+      return <Badge tone="warn">Unpriced</Badge>;
+    case "partial":
+      return (
+        <>
+          <Badge tone="ok">{money} Costed</Badge>
+          <Badge tone="warn">{countLabel(summary.unpriced_lines, "Unpriced Line")}</Badge>
+        </>
+      );
+    case "costed":
+      return <Badge tone="ok">{money} Costed</Badge>;
+    default:
+      return null;
+  }
+}
+
+function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean }) {
+  return (
+    <Card className="overflow-hidden" data-testid="bom-lines">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-2xs text-t3">
+            <th className="px-4 py-2 font-medium">Qty</th>
+            <th className="px-4 py-2 font-medium">Value</th>
+            <th className="px-4 py-2 font-medium">Part</th>
+            <th className="px-4 py-2 font-medium">Footprint</th>
+            {priced ? <th className="px-4 py-2 font-medium">Unit</th> : null}
+            {priced ? <th className="px-4 py-2 font-medium">Ext</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line, i) => (
+            <tr key={`${line.mpn || line.value}-${i}`} className="border-b border-line last:border-b-0">
+              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
+              <td className="px-4 py-2 align-top text-t1">
+                {line.value || "-"}
+                <span className="mt-0.5 block text-2xs text-t3" title={line.refs.join(", ")}>
+                  {line.refs.join(", ")}
+                </span>
+              </td>
+              <td className="px-4 py-2 align-top">
+                {line.mpn ? (
+                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
+                ) : (
+                  <Badge tone="neutral">Basic</Badge>
+                )}
+                {line.manufacturer ? (
+                  <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>
+                ) : null}
+              </td>
+              <td className="px-4 py-2 align-top font-mono text-2xs text-t3">
+                {line.footprint || "-"}
+              </td>
+              {priced ? (
+                <td className="px-4 py-2 align-top text-t2">{unitPriceLabel(line) || "-"}</td>
+              ) : null}
+              {priced ? (
+                <td className="px-4 py-2 align-top text-t2">
+                  {line.extended !== undefined && line.extended !== null
+                    ? `$${line.extended.toFixed(2)}`
+                    : "-"}
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
 }
