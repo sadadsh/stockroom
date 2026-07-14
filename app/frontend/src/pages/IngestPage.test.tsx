@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
@@ -88,6 +88,19 @@ describe("IngestPage", () => {
     // Its gap is surfaced honestly.
     expect(screen.getByText(/no 3D model/i)).toBeInTheDocument();
     void user;
+  });
+
+  it("browses for a vendor ZIP via the host picker and inspects the chosen paths", async () => {
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
+    mockApi.openJobStream.mockResolvedValue(resultStream([]));
+    const pick = vi.fn().mockResolvedValue(["C:/dl/MyPart.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = { api: { pick_ingest_files: pick } };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Browse For ZIP" }));
+    await waitFor(() => expect(pick).toHaveBeenCalled());
+    expect(mockApi.ingestInspect).toHaveBeenCalledWith(["C:/dl/MyPart.zip"], []);
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
 
   it("commits a candidate and reports success", async () => {

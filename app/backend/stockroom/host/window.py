@@ -3,8 +3,8 @@
 pywebview is NOT Qt; it hosts the FastAPI-served frontend in a native WebView2. It
 injects the API base + per-launch token into the renderer so the SPA authenticates
 every request, disables service workers (stale-bundle risk after a self-update),
-routes native drag/drop full paths straight into the ingest endpoint (so large zips
-skip an HTTP upload), and stops uvicorn on close (the host supervisor that started
+exposes a native file picker to Ingest via js_api (window.pywebview.api.pick_ingest_files,
+so a vendor zip skips an HTTP upload), and stops uvicorn on close (the host supervisor that started
 the server thread does the stop after run_window returns). pywebview is imported
 lazily inside run_window, so this module imports on Linux without it; the pure
 helpers (inject_script, dropped_paths_to_inspect_body, active_window) are Linux-tested."""
@@ -54,8 +54,8 @@ def dropped_paths_to_inspect_body(paths: list[str]) -> dict:
 
 
 def inject_script(base_url: str, token: str) -> str:
-    """The renderer bootstrap: set the two globals the SPA actually reads — the
-    frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__ —
+    """The renderer bootstrap: set the two globals the SPA actually reads: the
+    frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__,
     so the SPA authenticates every request, and unregister any service worker so a
     self-update never serves a stale bundle. Values are JSON-encoded so a token with a
     quote or backslash cannot break out of the JS string (defense in depth)."""
@@ -72,6 +72,27 @@ def inject_script(base_url: str, token: str) -> str:
     )
 
 
+class _HostApi:
+    """The js_api pywebview exposes to the renderer as `window.pywebview.api`. It gives Ingest a
+    NATIVE file picker for vendor ZIPs, so adding a part never depends on pywebview's drag-drop
+    path injection (which only fires when a drop handler is registered through pywebview's own
+    Python DOM API, and otherwise silently yields NO paths in WebView2). Returns real filesystem
+    paths straight to the frontend, which runs its normal inspect flow."""
+
+    def pick_ingest_files(self) -> list[str]:
+        import webview
+
+        win = active_window()
+        if win is None:
+            return []
+        result = win.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=True,
+            file_types=("Vendor packages (*.zip)", "All files (*.*)"),
+        )
+        return list(result) if result else []
+
+
 def run_window(base_url: str, token: str) -> None:
     """Open the WebView2 window onto the FastAPI-served frontend and block until it
     closes. Injects the base+token on every load (so an SPA reload after self-update
@@ -80,13 +101,15 @@ def run_window(base_url: str, token: str) -> None:
     global _ACTIVE_WINDOW
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
-    window = webview.create_window("Stockroom", url=base_url, width=1400, height=900)
+    window = webview.create_window(
+        "Stockroom", url=base_url, width=1400, height=900, js_api=_HostApi()
+    )
     _ACTIVE_WINDOW = window
 
     def _on_loaded():
         # Re-inject on every SPA load (after a self-update reload or route change the
         # renderer must always carry the base + token), but ONLY when the loaded page
-        # is the loopback SPA origin — never a remote page, so the token can never leak
+        # is the loopback SPA origin (never a remote page), so the token can never leak
         # to remote web content (defense in depth on top of the dedicated fetch window).
         try:
             current = window.get_current_url()
@@ -96,10 +119,11 @@ def run_window(base_url: str, token: str) -> None:
             window.evaluate_js(inject_script(base_url, token))
 
     window.events.loaded += _on_loaded
-    # Native drag/drop: pywebview exposes each dropped file's full path
-    # (pywebviewFullPath) to the renderer; the frontend (M6) POSTs those paths to
-    # /api/ingest/inspect with the token, using the dropped_paths_to_inspect_body
-    # contract. The full path stays out of any HTTP upload (spec section 3.7).
+    # Adding a vendor ZIP goes through the native file picker exposed as
+    # window.pywebview.api.pick_ingest_files (js_api above): the frontend Ingest page gets real
+    # filesystem paths and runs its normal inspect flow. Plain-DOM drag-drop is NOT relied on:
+    # pywebview only injects a dropped file's full path when a drop handler is registered through
+    # its own Python DOM API, so a browser-style window.addEventListener('drop') yields no paths.
     try:
         webview.start()  # blocks until the window closes
     finally:
