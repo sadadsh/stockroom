@@ -47,6 +47,31 @@ export function IngestPage() {
     [job, toast],
   );
 
+  // Native file picker for vendor ZIPs (the reliable path): the host exposes
+  // window.pywebview.api.pick_ingest_files, which returns real filesystem paths straight into
+  // the normal inspect flow. Drag-drop needs pywebview's own DOM registration to deliver paths
+  // and silently yields none otherwise, so Browse is the dependable way to add a ZIP.
+  const browseForZip = useCallback(async () => {
+    const hostApi = (
+      window as unknown as {
+        pywebview?: { api?: { pick_ingest_files?: () => Promise<string[]> } };
+      }
+    ).pywebview?.api;
+    if (!hostApi?.pick_ingest_files) {
+      toast(
+        "Open Stockroom as the app to browse for a ZIP (a web browser cannot read file paths).",
+        "neutral",
+      );
+      return;
+    }
+    try {
+      const paths = await hostApi.pick_ingest_files();
+      if (paths && paths.length > 0) inspect(paths, []);
+    } catch {
+      // the picker was cancelled or is unavailable; nothing to do
+    }
+  }, [inspect, toast]);
+
   // Load the job's result into editable local state once it settles, tagging each
   // with a stable id so a commit/remove never remounts its siblings.
   useEffect(() => {
@@ -109,9 +134,13 @@ export function IngestPage() {
                 {busy ? "Inspecting..." : "Inspect"}
               </Button>
             </div>
-            <div className="mt-2.5 flex items-center gap-1.5 text-xs text-t3">
-              <UploadIcon />
-              Or drop a vendor ZIP anywhere in the window to add a part.
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+                Browse For ZIP
+              </Button>
+              <span className="text-xs text-t3">
+                Pick one or more vendor ZIP files to inspect and add.
+              </span>
             </div>
           </Card>
 
