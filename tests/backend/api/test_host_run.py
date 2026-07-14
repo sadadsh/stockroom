@@ -55,6 +55,19 @@ def test_run_windowed_wires_the_default_webview2_fetcher_when_absent(app_ctx):
     assert captured["is_webview"] is True
 
 
+def test_run_windowed_returns_true_when_a_restart_is_requested(app_ctx):
+    # The self-updater calls ctx.request_restart() after a git pull + uv sync; run_windowed
+    # must report that so main() exits EXIT_RESTART and the launcher relaunches (M9d).
+    def window_requests_restart(base_url: str, token: str) -> None:
+        app_ctx.request_restart()
+
+    assert run_windowed(ctx=app_ctx, open_window=window_requests_restart) is True
+
+
+def test_run_windowed_returns_false_on_a_normal_close(app_ctx):
+    assert run_windowed(ctx=app_ctx, open_window=lambda base_url, token: None) is False
+
+
 def test_run_windowed_stops_the_server_even_if_the_window_raises(app_ctx):
     base = {}
 

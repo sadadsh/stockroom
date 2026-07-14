@@ -4,7 +4,7 @@ window into one running app (spec section 3.7; the launcher's uv_run_app target)
 It builds the app context, starts uvicorn on a loopback ephemeral port on a worker
 thread, wires the real WebView2 RenderedDomFetcher onto the context (closing the M4
 enrichment seam at runtime), opens the WebView2 window onto the FastAPI-served
-frontend, and — the moment the window closes — stops the server so no orphaned
+frontend, and, the moment the window closes, stops the server so no orphaned
 process lingers. The window is injectable (open_window) so the whole seam is
 integration-tested on Linux with a real uvicorn server; only the actual WebView2
 window is Windows-verified.
@@ -20,6 +20,12 @@ from pathlib import Path
 from typing import Callable
 
 from stockroom.api.context import AppContext
+from stockroom.launcher.exit_codes import EXIT_RESTART
+
+# EXIT_RESTART (the self-update restart exit code the launcher relaunches on) lives in the
+# leaf module stockroom.launcher.exit_codes so the frozen launcher can import it without
+# dragging this whole host/API module into the bundle (M9d). Re-exported here for the host.
+__all__ = ["EXIT_RESTART", "run_windowed", "main"]
 
 
 def _serve_in_thread(app, port: int, timeout: float = 15.0):
@@ -66,7 +72,9 @@ def run_windowed(
     libraries_root: Path | None = None,
     kicad_dir: Path | None = None,
     open_window: Callable[[str, str], None] | None = None,
-) -> None:
+) -> bool:
+    """Run the app until the window closes. Returns True if the app requested a self-update
+    restart (the launcher relaunches on the freshly pulled code), False on a normal close."""
     from stockroom.api.app import create_app
     from stockroom.api.serve import build_context, pick_free_port
     from stockroom.host.webview_fetch import WebViewRenderedDomFetcher
@@ -77,8 +85,17 @@ def run_windowed(
     # live WebView2 engine (resolved lazily from the running window on Windows).
     if ctx.rendered_dom_fetcher is None:
         ctx.rendered_dom_fetcher = WebViewRenderedDomFetcher()
-    # Give the self-updater a real restart hook instead of the no-op default.
-    ctx.request_restart = _close_active_window
+    # Give the self-updater a real restart hook instead of the no-op default: the updater
+    # (updater.py) calls this AFTER a successful git pull + uv sync, so flag the restart
+    # intent, then close the window. run_windowed then returns True and main() exits
+    # EXIT_RESTART, which the frozen launcher recognizes and relaunches on (M9d).
+    restart_requested = {"value": False}
+
+    def _request_restart() -> None:
+        restart_requested["value"] = True
+        _close_active_window()
+
+    ctx.request_restart = _request_restart
 
     app = create_app(ctx)
     port = pick_free_port()
@@ -90,10 +107,12 @@ def run_windowed(
     finally:
         server.should_exit = True
         thread.join(timeout=5.0)
+    return restart_requested["value"]
 
 
 def main() -> None:  # pragma: no cover - the real Windows-run entry (uv run target)
-    run_windowed()
+    if run_windowed():
+        raise SystemExit(EXIT_RESTART)
 
 
 if __name__ == "__main__":  # pragma: no cover

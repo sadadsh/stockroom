@@ -1,0 +1,45 @@
+name: release
+
+# Build the portable Stockroom.exe on Windows (M9f). PyInstaller does not cross-compile and
+# pywebview/WebView2 are Windows-only, so the release binary is produced here, on windows-latest,
+# never on the Linux dev box. On a version tag it is attached to the GitHub Release; on a manual
+# dispatch it is uploaded as a downloadable build artifact.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create / upload release assets
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync (provision the importable stockroom package the launcher freezes)
+        run: uv sync
+
+      - name: Build the launcher exe
+        run: uv run --with pyinstaller pyinstaller packaging/stockroom.spec --noconfirm --clean
+
+      - name: Verify the exe was produced
+        shell: pwsh
+        run: if (-not (Test-Path dist/Stockroom.exe)) { throw "Stockroom.exe was not built" }
+
+      - name: Upload as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stockroom-exe
+          path: dist/Stockroom.exe
+
+      - name: Attach to the GitHub Release (on a version tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Stockroom.exe
