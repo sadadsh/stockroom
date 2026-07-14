@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow
+from stockroom.store.project_index import ProjectIndexRow
 
 
 class PartSummary(BaseModel):
@@ -70,6 +71,40 @@ class EditFieldBody(BaseModel):
 
 class MoveBody(BaseModel):
     category: str
+
+
+class ProjectSummary(BaseModel):
+    """The list shape for a registered KiCad project (M7), served from the derived
+    project index. board_count/sheet_count and has_git are the digest fields the
+    Projects list renders; the full record (paths, git_root, audit_digest) loads on
+    detail. A presentation shape, never a second schema of record."""
+
+    id: str
+    name: str
+    root: str
+    board_count: int
+    sheet_count: int
+    has_git: bool
+    registered_at: str
+
+    @classmethod
+    def from_row(cls, row: ProjectIndexRow) -> "ProjectSummary":
+        return cls(
+            id=row.id,
+            name=row.name,
+            root=row.root,
+            board_count=row.board_count,
+            sheet_count=row.sheet_count,
+            has_git=row.has_git,
+            registered_at=row.registered_at,
+        )
+
+
+class RegisterProjectBody(BaseModel):
+    """Register an external KiCad project by its directory path (absolute). A bad or
+    non-project dir raises ValueError in the store, mapped to 400 by the error layer."""
+
+    root: str
 
 
 class SetSpecsBody(BaseModel):

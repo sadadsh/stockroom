@@ -53,7 +53,9 @@ class Transaction:
                     SexpDocument.load(p)
                 except Exception as exc:
                     raise TransactionError(f"invalid KiCad file {p.name}: {exc}") from exc
-            elif p.suffix == ".json":
+            elif p.suffix in (".json", ".kicad_pro"):
+                # A .kicad_pro is JSON: a malformed one must abort + roll back exactly
+                # like a bad .json record, never commit a project file KiCad can't read.
                 try:
                     json.loads(p.read_text(encoding="utf-8"))
                 except Exception as exc:
