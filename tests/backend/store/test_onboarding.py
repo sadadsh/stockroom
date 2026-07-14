@@ -33,6 +33,52 @@ def _library(root, profile="Main"):
     return root
 
 
+# -- in-repo library (lives inside the app repo) -------------------------------
+
+
+def test_ensure_git_does_not_nest_inside_an_existing_repo(tmp_path):
+    # A library committed inside the app repo must NOT get its own nested .git (a nested repo is
+    # ignored by the parent, so a clone would not carry the library). _ensure_git uses the
+    # enclosing repo instead.
+    outer = tmp_path / "app"
+    outer.mkdir()
+    GitRepo(outer).init()
+    lib = outer / "libraries"
+    lib.mkdir()
+    repo = onboarding._ensure_git(lib)
+    assert not (lib / ".git").exists()  # no nested repo created
+    assert repo.is_git_repo()  # but it IS under git (the enclosing app repo)
+
+
+def test_bootstrap_prefers_in_repo_over_a_placeholder_config(tmp_path, monkeypatch):
+    # A machine whose config only holds the auto-created bootstrap placeholder (never onboarded)
+    # repoints at the library that ships in the app repo, so the app opens straight on it.
+    in_repo = _library(tmp_path / "libraries")
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", in_repo)
+    placeholder = str(onboarding._bootstrap_dir())
+    cfg = MachineConfig(libraries_root=placeholder, onboarded=False)
+    root = onboarding.bootstrap_library(cfg)
+    assert root == in_repo
+    assert cfg.libraries_root == str(in_repo)
+
+
+def test_bootstrap_prefers_in_repo_when_config_is_unset(tmp_path, monkeypatch):
+    in_repo = _library(tmp_path / "libraries")
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", in_repo)
+    cfg = MachineConfig()  # unset
+    assert onboarding.bootstrap_library(cfg) == in_repo
+
+
+def test_bootstrap_does_not_override_a_real_configured_library(tmp_path, monkeypatch):
+    # A config pointing at a REAL library (not the placeholder) is respected even if the in-repo
+    # library also exists and onboarding was not completed.
+    in_repo = _library(tmp_path / "libraries")
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", in_repo)
+    chosen = _library(tmp_path / "chosen", "Bench")
+    cfg = MachineConfig(active_profile="Bench", libraries_root=str(chosen), onboarded=False)
+    assert onboarding.bootstrap_library(cfg) == chosen
+
+
 # -- create --------------------------------------------------------------------
 
 

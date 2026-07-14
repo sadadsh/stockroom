@@ -7,11 +7,13 @@ onboard before any library feature works. A source/dev checkout falls back to th
 
 from __future__ import annotations
 
+from stockroom.store import library_location as libloc
 from stockroom.store.library_location import (
     IN_REPO_DEFAULT,
     library_is_initialized,
     needs_onboarding,
     resolve_libraries_root,
+    ships_in_repo,
 )
 from stockroom.store.machine_config import MachineConfig
 
@@ -21,6 +23,24 @@ def _profile_lib(root):
     root.mkdir(parents=True, exist_ok=True)
     (root / "Main").mkdir()
     return root
+
+
+def test_ships_in_repo_true_only_for_the_initialized_in_repo_library(tmp_path, monkeypatch):
+    # ships_in_repo is the signal the library came WITH the app repo (so no onboarding needed).
+    in_repo = _profile_lib(tmp_path / "libraries")
+    monkeypatch.setattr(libloc, "IN_REPO_DEFAULT", in_repo)
+    assert ships_in_repo(in_repo) is True
+    # a DIFFERENT path (a user-chosen or placeholder library) is not the shipped one
+    other = _profile_lib(tmp_path / "elsewhere")
+    assert ships_in_repo(other) is False
+    assert ships_in_repo(None) is False
+
+
+def test_ships_in_repo_false_when_in_repo_dir_has_no_profile(tmp_path, monkeypatch):
+    empty = tmp_path / "libraries"
+    empty.mkdir()
+    monkeypatch.setattr(libloc, "IN_REPO_DEFAULT", empty)
+    assert ships_in_repo(empty) is False
 
 
 def test_configured_root_wins(tmp_path):

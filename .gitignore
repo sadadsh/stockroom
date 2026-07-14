@@ -42,3 +42,7 @@ Thumbs.db
 # AI-workflow design docs: local only, never pushed (owner directive)
 docs/superpowers/
 docs/research/
+
+# Derived, never-committed library artifacts (the SQLite indexes are in-memory; the enrich
+# cache is the one on-disk derived dir, written beside the in-repo library at <repo>/)
+/.stockroom-enrich-cache/

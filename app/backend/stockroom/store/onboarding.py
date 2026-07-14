@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from stockroom.store import library_location as _libloc
 from stockroom.store.library_location import library_is_initialized, resolve_libraries_root
 from stockroom.store.machine_config import MachineConfig, config_dir
 from stockroom.store.profile import ProfileStore
@@ -44,11 +45,23 @@ def _bootstrap_dir() -> Path:
     return config_dir() / ".bootstrap-library"
 
 
+def _same_path(a, b) -> bool:
+    """Whether two paths point at the same location, resolving symlinks / separators. Falls back
+    to a string compare if resolve() cannot stat (a nonexistent or malformed path)."""
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except OSError:
+        return str(a) == str(b)
+
+
 def _ensure_git(root: Path) -> GitRepo:
-    """A git repo at `root` (init if absent; idempotent on an existing repo). Sync + the
-    project editors need git, so every onboarded library is git-backed."""
+    """A git repo backing `root` (init a standalone repo only if `root` is not already inside
+    one; idempotent). When `root` lives INSIDE an existing repo, the library committed in the app
+    repo, that enclosing repo is used and NO nested repo is created (a nested .git would be ignored
+    by the parent, so a clone would not carry the library). Sync + the project editors need git, so
+    every library is git-backed."""
     repo = GitRepo(root)
-    if not (root / ".git").exists():
+    if not repo.is_git_repo():
         repo.init()
     return repo
 
@@ -85,6 +98,18 @@ def bootstrap_library(config: MachineConfig) -> Path:
     usable configured / in-repo library if there is one, else creates a placeholder library
     (at the configured path if one was set, else the internal boot dir) so the app can serve
     the onboarding UI."""
+    # The library committed inside the app repo wins over an UNSET or bootstrap-PLACEHOLDER config
+    # when onboarding was never completed: a fresh clone (config unset), or a machine whose config
+    # only holds the auto-created placeholder, repoints at the shipped libraries/ and skips the
+    # setup screen, so the app opens straight on whatever parts were committed to the repo. A REAL
+    # configured library, or a COMPLETED onboarding choice, is never overridden. Referenced via the
+    # module so a test that monkeypatches IN_REPO_DEFAULT (to simulate no in-repo library) is honored.
+    if not config.onboarded and library_is_initialized(_libloc.IN_REPO_DEFAULT):
+        chosen = (config.libraries_root or "").strip()
+        in_repo = str(_libloc.IN_REPO_DEFAULT)
+        if (not chosen or _same_path(chosen, _bootstrap_dir())) and chosen != in_repo:
+            config.libraries_root = in_repo
+            config.save()
     resolved = resolve_libraries_root(config)
     if library_is_initialized(resolved):
         # An already-usable library: repair a drifted active_profile (a cloned / pulled
