@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from stockroom.model.project import ProjectRecord
+from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
 from stockroom.store.project_store import ProjectStore
 
@@ -48,3 +49,18 @@ class ProjectOps:
         au = audit_project(sheet_paths, footprint_dirs=footprint_dirs, model_dirs=model_dirs)
         au["project"] = rec.name
         return au
+
+    def checks(self, project_id: str, progress=None) -> dict:
+        """Run structured ERC (root schematic) + DRC (each board) via kicad-cli (M7b).
+        Returns the combined {erc, drc, summary, ran_at} result the Overview and the
+        Buildability verdict read. Raises FileNotFoundError for an unknown id. A missing
+        kicad-cli surfaces an honest per-check cli-absent result rather than a fabricated
+        pass; the router gates on cli availability first for an immediate honest 502."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        cli = getattr(self.cli, "binary", self.cli)
+        return project_checks(
+            rec.root, rec.pro_path, rec.board_paths, rec.sheet_paths,
+            cli, name=rec.name, progress=progress,
+        )

@@ -44,6 +44,11 @@ class AppContext:
     project_store: ProjectStore
     project_index: ProjectIndex
     project_ops: ProjectOps
+    # The last ERC/DRC run per project id (M7b), cached in-memory (never committed to
+    # the library repo: an external project's check results are not library records, and
+    # a git commit per check run is churn). Read by the checks GET, Overview, and the
+    # Buildability verdict (M7g) so those surfaces can never disagree; cleared on delete.
+    checks_cache: dict = field(default_factory=dict)
     jobs: JobRunner = field(default_factory=JobRunner)
     rendered_dom_fetcher: object | None = None  # RenderedDomFetcher; set by the host on Windows
     # App-repo self-update (updater.py): the CODE/UI/DATA repo (distinct from the
