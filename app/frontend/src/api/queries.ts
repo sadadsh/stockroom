@@ -303,3 +303,54 @@ export function useRepairLibrary() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["doctor-scan"] }),
   });
 }
+
+// --- Projects page server state (M7a) ---
+
+// The registered-project list, served warm from the derived project index. Register
+// and delete rebuild that index server-side, so both mutations invalidate ["projects"].
+export function useProjectsQuery() {
+  return useQuery({ queryKey: ["projects"], queryFn: () => api.listProjects() });
+}
+
+// The full canonical record for one project. Disabled until a project is selected.
+export function useProjectQuery(id: string | null) {
+  return useQuery({
+    queryKey: ["project", id],
+    queryFn: () => api.getProject(id as string),
+    enabled: !!id,
+  });
+}
+
+// The read-only health audit for one project. Disabled until a project is selected;
+// it reads against the ACTIVE profile's footprint/model dirs at request time.
+export function useProjectAudit(id: string | null) {
+  return useQuery({
+    queryKey: ["project-audit", id],
+    queryFn: () => api.projectAudit(id as string),
+    enabled: !!id,
+  });
+}
+
+// Registering a project rebuilds the project index server-side, so the list must
+// re-read to show the new project. Nothing else in the app reads project state.
+export function useRegisterProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (root: string) => api.registerProject(root),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+// Deleting a project rebuilds the index (invalidate the list) and removes the now-gone
+// project's detail + audit caches so a stale selection never reads a deleted record.
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteProject(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.removeQueries({ queryKey: ["project", id] });
+      qc.removeQueries({ queryKey: ["project-audit", id] });
+    },
+  });
+}

@@ -323,6 +323,64 @@ export interface WiringReport {
   restart_needed: boolean;
 }
 
+// --- Projects (M7a) ---
+
+// GET /api/projects -> the derived project index, one row per registered project,
+// sorted by name. A registered KiCad project is external to Stockroom: it is
+// referenced by its root path, never owned. board_count/sheet_count/has_git are the
+// digest fields the list renders; the full record loads on detail.
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  root: string;
+  board_count: number;
+  sheet_count: number;
+  has_git: boolean;
+  registered_at: string;
+}
+
+// GET /api/projects/{id} and POST /api/projects -> the full canonical ProjectRecord.
+// A None git_root means an edit would be an honest refuse (external files are never
+// touched here); audit_digest caches the last health summary.
+export interface ProjectDetail {
+  id: string;
+  name: string;
+  root: string;
+  pro_path: string;
+  board_paths: string[];
+  sheet_paths: string[];
+  git_root: string | null;
+  audit_digest: Record<string, unknown> | null;
+  registered_at: string;
+}
+
+// One row of the project health audit (GET /api/projects/{id}/audit). severity is
+// error | warning | info; kind is the machine reason (unannotated, duplicate_ref,
+// no_footprint, no_mpn, no_3d_model, ...) that the breakdown chips filter by.
+export interface AuditFinding {
+  ref: string;
+  severity: "error" | "warning" | "info";
+  kind: string;
+  detail: string;
+}
+
+// GET /api/projects/{id}/audit -> a read-only health pass over the registered sheets
+// (against the ACTIVE profile's footprint/model dirs), plus a shareable markdown report.
+export interface AuditResult {
+  project: string;
+  components: number;
+  healthy: number;
+  counts: {
+    by_severity: { error: number; warning: number; info: number };
+    by_kind: Record<string, number>;
+  };
+  findings: AuditFinding[];
+  checked_footprints: number;
+  unresolved_footprints: number;
+  sheets: number;
+  markdown: string;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

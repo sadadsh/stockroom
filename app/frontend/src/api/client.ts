@@ -8,6 +8,7 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  AuditResult,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
@@ -18,6 +19,8 @@ import type {
   PartDetail,
   PartsResponse,
   ProfilesResponse,
+  ProjectDetail,
+  ProjectSummary,
   RepairResult,
   SettingsInfo,
   StagingCandidate,
@@ -350,5 +353,34 @@ export const api = {
 
   wireKicad(): Promise<JobRef> {
     return request<JobRef>("POST", "/api/doctor/wire-kicad");
+  },
+
+  // Projects (M7a). A registered project is external to Stockroom (referenced by
+  // path, never owned); only its registration record lives in the library repo.
+  // List reads the warm project index; register/delete rebuild it server-side, so
+  // the caller invalidates ["projects"] (and the affected ["project", id]) after.
+  listProjects(): Promise<ProjectSummary[]> {
+    return apiGet<ProjectSummary[]>("/api/projects");
+  },
+
+  // Register an external project directory by its absolute path. A bad/nonexistent
+  // dir, a dir with no KiCad files, or an already-registered root each returns 400.
+  registerProject(root: string): Promise<ProjectDetail> {
+    return request<ProjectDetail>("POST", "/api/projects", { body: { root } });
+  },
+
+  getProject(id: string): Promise<ProjectDetail> {
+    return apiGet<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`);
+  },
+
+  // Unregister a project (its external files are never touched). 204 on success.
+  deleteProject(id: string): Promise<void> {
+    return request<void>("DELETE", `/api/projects/${encodeURIComponent(id)}`);
+  },
+
+  // The read-only health audit over the registered sheets, resolved against the
+  // ACTIVE profile's footprint/model dirs, plus a shareable markdown report.
+  projectAudit(id: string): Promise<AuditResult> {
+    return apiGet<AuditResult>(`/api/projects/${encodeURIComponent(id)}/audit`);
   },
 };

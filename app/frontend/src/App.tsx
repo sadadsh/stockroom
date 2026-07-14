@@ -3,6 +3,7 @@ import { ComponentsPage } from "./pages/ComponentsPage";
 import { DoctorPage } from "./pages/DoctorPage";
 import { DuplicatesPage } from "./pages/DuplicatesPage";
 import { IngestPage } from "./pages/IngestPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useRouter, type Route } from "./lib/router";
 
@@ -21,6 +22,8 @@ function renderRoute(route: Route) {
       return <IngestPage />;
     case "duplicates":
       return <DuplicatesPage />;
+    case "projects":
+      return <ProjectsPage />;
     case "doctor":
       return <DoctorPage />;
     case "settings":
