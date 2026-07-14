@@ -80,6 +80,34 @@ class AppContext:
         self.config.save()
         self.rebuild_index()
 
+    def switch_library(self, new_root: Path) -> None:
+        """Repoint the whole engine at a different library root (M9b onboarding / switch),
+        rebuilding every root-derived field IN PLACE while preserving the token, the
+        host-wired hooks (request_restart, uv_sync, app_repo, rendered_dom_fetcher), and the
+        job runner. The old library's per-project caches are dropped (they belong to the old
+        library). Mirrors switch_profile but at the library root, so app.state.ctx keeps
+        pointing at THIS same object: no pointer swap, no in-flight-request race, and the
+        require_token closure (which captured this token) keeps authenticating.
+
+        The target library must already be usable (a git-backed dir with the active profile);
+        onboarding.set_library guarantees that before calling this."""
+        new_root = Path(new_root)
+        fresh = build_context(
+            new_root, kicad_dir=self.kicad_dir, config=self.config, token=self.token
+        )
+        old_index, old_project_index = self.index, self.project_index
+        for name in (
+            "libraries_root", "repo", "profile_store", "profile", "ops", "index", "sync",
+            "enrich_cache_dir", "project_store", "project_index", "project_ops",
+        ):
+            setattr(self, name, getattr(fresh, name))
+        old_index.close()
+        old_project_index.close()
+        self.checks_cache.clear()
+        self.bom_cache.clear()
+        self.config.libraries_root = str(new_root)
+        self.config.save()
+
 
 def build_context(
     libraries_root: Path,

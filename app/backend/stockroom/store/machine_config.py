@@ -36,12 +36,19 @@ def config_dir() -> Path:
 @dataclass
 class MachineConfig:
     active_profile: str = "Main"
+    # Where the library repo lives on this machine (M9a). Blank on a fresh install, so the
+    # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
+    # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
+    libraries_root: str = ""
     mouser_api_key: str = ""
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.
     kicad_cli_override: str = ""
     sync_enabled: bool = True
+    # Set once the user completes first-run onboarding (picked / cloned / created a library,
+    # or chose to continue with the default). Drives the one-time welcome screen (M9b).
+    onboarded: bool = False
     window: dict = field(default_factory=dict)
 
     @classmethod

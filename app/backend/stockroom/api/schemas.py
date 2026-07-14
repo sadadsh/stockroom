@@ -107,6 +107,19 @@ class RegisterProjectBody(BaseModel):
     root: str
 
 
+class SetLibraryBody(BaseModel):
+    """First-run onboarding: point the app at a library (M9b). `mode` is open / create /
+    clone; `path` (open, or an explicit create/clone dir), `url` (clone source), and `dest`
+    (clone destination) are used per mode. A bad mode or a bad path raises ValueError in the
+    onboarding layer, mapped to 400 by the error layer, so a stray value never fabricates a
+    library. `mode` is required; the rest default blank."""
+
+    mode: str
+    path: str = ""
+    url: str = ""
+    dest: str = ""
+
+
 class SetSpecsBody(BaseModel):
     """Persist canonical spec data onto a record (M6i). `specs` maps a spec name to
     {value, source?, confidence?}; a typed body means a malformed container (a list or
