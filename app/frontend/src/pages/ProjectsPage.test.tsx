@@ -523,6 +523,28 @@ describe("ProjectsPage", () => {
     expect(within(result).queryByText(/Costed/)).toBeNull();
   });
 
+  it("labels an MPN-less non-basic part No MPN, not Basic (honest basic field)", async () => {
+    // A connector J1 has no MPN and is NOT a basic passive (basic:false); it must read
+    // "No MPN", never a false "Basic" badge keyed off the missing MPN.
+    mockApi.getBom.mockResolvedValue({
+      ...BUILT,
+      lines: [
+        {
+          refs: ["J1"], qty: 1, value: "Conn_01x04", mpn: "", manufacturer: "",
+          has_real_mpn: false, footprint: "Connector:Conn_01x04", datasheet: "",
+          description: "", basic: false,
+        },
+        BUILT.lines[0], // the real basic passive, still "Basic"
+      ],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const lines = within(await screen.findByTestId("bom-result")).getByTestId("bom-lines");
+    expect(within(lines).getByText("No MPN")).toBeInTheDocument();
+    expect(within(lines).getByText("Basic")).toBeInTheDocument(); // the true passive keeps it
+  });
+
   it("renders a previously cached build on select without rebuilding", async () => {
     mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();

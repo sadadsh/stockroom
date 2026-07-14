@@ -989,8 +989,10 @@ function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean })
               <td className="px-4 py-2 align-top">
                 {line.mpn ? (
                   <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                ) : (
+                ) : line.basic ? (
                   <Badge tone="neutral">Basic</Badge>
+                ) : (
+                  <Badge tone="neutral">No MPN</Badge>
                 )}
                 {line.manufacturer ? (
                   <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>

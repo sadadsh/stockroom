@@ -452,7 +452,9 @@ def _row_cost_at_qty(r, boards):
         per_board = 0
     order_qty = per_board * boards
     ladder = r.get("price_breaks")
-    unit = price_at_qty(ladder, order_qty) if ladder else None
+    # Coerce the ladder-read price the same way line_extended / bom_cost_summary do, so a
+    # string ladder price ('$0.10') costs instead of raising on round(str * qty).
+    unit = _coerce_price(price_at_qty(ladder, order_qty)) if ladder else None
     if unit is None:
         unit = _coerce_price(r.get("unit_price"))
     ext = round(unit * order_qty, 4) if (unit is not None and order_qty) else None
@@ -707,6 +709,15 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
 
     n = _board_count(boards)
     summary = bom_cost_summary(rows)
+    # For a run of more than one board, project the headline total at the run quantity so
+    # it agrees with by_source and cost_at_qty (which scale to n boards and re-read the
+    # volume break). bom_cost_summary alone rolls up the stored per-board (qty-1) extended,
+    # which would contradict the per-source split by the board multiplier.
+    if priced and n > 1:
+        at_qty = bom_cost_at_qty(rows, n)
+        summary["total_cost"] = at_qty["total_cost"]
+        summary["priced_lines"] = at_qty["priced_lines"]
+        summary["unpriced_lines"] = at_qty["unpriced_lines"]
     summary["state"] = _bom_state(built["line_count"], priced, summary)
     summary["priced"] = priced
 

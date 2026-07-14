@@ -91,7 +91,10 @@ def projects_router(require_token) -> APIRouter:
 
         def work(progress):
             result = ctx.project_ops.checks(project_id, progress=progress)
-            ctx.checks_cache[project_id] = result
+            # A DELETE may have landed (and evicted the cache) while this ran; do not
+            # resurrect a cache entry for a now-gone id (project ids are reusable slugs).
+            if ctx.project_ops.get(project_id) is not None:
+                ctx.checks_cache[project_id] = result
             return result
 
         return {"job_id": ctx.jobs.submit(work)}
@@ -127,7 +130,11 @@ def projects_router(require_token) -> APIRouter:
             result = ctx.project_ops.bom(
                 project_id, boards=boards, price_lookup=price_lookup, progress=progress
             )
-            ctx.bom_cache[project_id] = result
+            # A DELETE may have landed (and evicted the cache) during this network-bound
+            # build; do not resurrect a cache entry for a now-gone id (ids are reusable
+            # name-slugs, so a re-registered same-named project would surface stale data).
+            if ctx.project_ops.get(project_id) is not None:
+                ctx.bom_cache[project_id] = result
             return result
 
         return {"job_id": ctx.jobs.submit(work)}

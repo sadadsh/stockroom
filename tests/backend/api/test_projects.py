@@ -380,6 +380,28 @@ def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
     assert rec["id"] not in app_ctx.bom_cache
 
 
+def test_bom_job_does_not_resurrect_cache_for_a_deleted_project(client, app_ctx, tmp_path, monkeypatch):
+    # A DELETE landing while a BOM job runs evicts the cache; the job's write-back must
+    # NOT re-insert a stale entry for the now-gone id (project ids are reusable slugs).
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
+    )
+    proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
+    rec = _register(client, proj)
+    real_bom = app_ctx.project_ops.bom
+
+    def deleting_bom(pid, **kw):
+        result = real_bom(pid, **kw)
+        # simulate a concurrent DELETE landing mid-job (evicts the cache before write-back)
+        app_ctx.project_ops.delete(pid)
+        app_ctx.bom_cache.pop(pid, None)
+        return result
+
+    monkeypatch.setattr(app_ctx.project_ops, "bom", deleting_bom)
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
+    assert rec["id"] not in app_ctx.bom_cache  # the existence re-check prevented resurrection
+
+
 # ---- auth -------------------------------------------------------------------
 
 
