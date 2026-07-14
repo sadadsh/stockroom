@@ -56,6 +56,17 @@ def test_serialize_reproduces_kicad_format_byte_for_byte():
     assert ps.serialize(ps.parse(CANONICAL)) == CANONICAL
 
 
+def test_serialize_orders_an_insertion_ordered_dict_like_kicad():
+    # KiCad stores objects in a sorted map, but a dict Stockroom BUILDS (a reconciled net
+    # class, a new class from defaults) is in insertion order. The serializer must reorder
+    # its keys to KiCad's alphabetical order, else a new class's block lands unsorted and
+    # KiCad re-sorts it on the next save, breaking the minimal diff. A round-trip of already
+    # sorted text cannot catch this, so feed a deliberately UNSORTED dict.
+    out = ps.serialize({"name": "PWR", "via_drill": 0.3, "clearance": 0.2, "bus_width": 12})
+    keys = [ln.split('"')[1] for ln in out.splitlines() if ln.startswith('  "')]
+    assert keys == ["bus_width", "clearance", "name", "via_drill"]  # alphabetical, not insertion
+
+
 def test_apply_empty_patch_is_byte_identical():
     # a no-op edit must leave the file byte-for-byte unchanged (zero-diff invariant).
     assert ps.apply_patch_text(CANONICAL, {}) == CANONICAL
