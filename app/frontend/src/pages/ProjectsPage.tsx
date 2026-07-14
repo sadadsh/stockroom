@@ -1099,6 +1099,12 @@ function BomSection({ projectId }: { projectId: string }) {
   );
 }
 
+// A BOM cost source ("library" / "mouser" / "digikey") as a Title Case chip label. "library" is
+// your own combined library, priced offline from its stored data before any distributor.
+function titleCaseSource(name: string): string {
+  return name.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function BomResultView({ result }: { result: BomResult }) {
   const s = result.summary;
   const sources = result.by_source?.sources ?? {};
@@ -1114,7 +1120,8 @@ function BomResultView({ result }: { result: BomResult }) {
         ) : null}
         {sourceNames.map((name) => (
           <span key={name} className="text-2xs text-t3">
-            {name} {formatMoney(sources[name].total_cost, result.by_source?.currency ?? "USD")}
+            {titleCaseSource(name)}{" "}
+            {formatMoney(sources[name].total_cost, result.by_source?.currency ?? "USD")}
           </span>
         ))}
       </div>

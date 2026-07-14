@@ -80,17 +80,21 @@ class ProjectOps:
             cli, name=rec.name, progress=progress,
         )
 
-    def bom(self, project_id: str, boards=1, price_lookup=None, progress=None) -> dict:
-        """Build a grouped, optionally priced BOM for the registered project (M7c).
-        Grouping is offline (no kicad-cli); `price_lookup` (injected by the router from
-        Stockroom's enrich layer) prices each MPN line, and a miss leaves the line
-        honestly unpriced. Raises FileNotFoundError for an unknown id."""
+    def bom(self, project_id: str, boards=1, library_parts=None, price_lookup=None,
+            progress=None) -> dict:
+        """Build a grouped, optionally priced BOM for the registered project, COMBINING the KiCad
+        schematic with the Stockroom library (M7c). `library_parts` (the active profile's
+        PartRecords, injected by the router) fills each component's blank identity from its matching
+        library part and prices it from the library's stored prices first; `price_lookup` (the
+        enrich layer) prices whatever the library cannot. Grouping is offline (no kicad-cli); a miss
+        leaves the line honestly unpriced. Raises FileNotFoundError for an unknown id."""
         rec = self.store.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         return project_bom(
             rec.root, rec.pro_path, rec.sheet_paths,
-            name=rec.name, boards=boards, price_lookup=price_lookup, progress=progress,
+            name=rec.name, boards=boards, library_parts=_resolve_parts(library_parts),
+            price_lookup=price_lookup, progress=progress,
         )
 
     def revisions(self, project_id: str, max_count: int = 50) -> dict:

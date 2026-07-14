@@ -152,9 +152,11 @@ def _token_is_yes(node: SexpNode | None) -> bool:
 
 
 def _bom_components(sch_path) -> list:
-    """Every real BOM component (ref, props) in one .kicad_sch. Skips power / virtual
+    """Every real BOM component (ref, lib_id, props) in one .kicad_sch. Skips power / virtual
     symbols, in_bom=no / exclude_from_bom / dnp=yes parts, and the KiBoM exclude set
-    (testpoints, fiducials, mounting holes, do-not-fit). [] for a non-schematic file."""
+    (testpoints, fiducials, mounting holes, do-not-fit). [] for a non-schematic file. lib_id is
+    carried so the library-combining step can match a component to its library part by symbol
+    name, not just by an MPN the schematic may not carry."""
     root = _read_root(sch_path)
     if root is None:
         return []
@@ -187,7 +189,7 @@ def _bom_components(sch_path) -> list:
             continue
         if kibom.is_do_not_fit(props):
             continue
-        out.append((ref, props))
+        out.append((ref, lib_id, props))
     return out
 
 
@@ -207,7 +209,10 @@ def _bom_from_components(comps, lookup=None,
     KiBoM-normalized so 4.7k and 4700 merge (Decision 5). Two parts of the same value
     but different manufacturers stay distinct lines."""
     groups: dict = {}
-    for ref, props in comps:
+    for comp in comps:
+        # Accept either (ref, props) or (ref, lib_id, props): the library-combining path enriches
+        # to (ref, props), the plain path passes (ref, lib_id, props) straight from _bom_components.
+        ref, props = comp[0], comp[-1]
         ident = part_identity(props, fallback=props.get("Value", ""))
         value = (props.get("Value") or "").strip()
         smpn = strict_mpn(props)
@@ -260,17 +265,121 @@ def _bom_from_components(comps, lookup=None,
     return out
 
 
+# -- library combining: enrich components + price from the library ------------
+#
+# The KiCad schematic supplies the component list, refs, and quantities; the Stockroom library
+# supplies the canonical part data (MPN, manufacturer, datasheet, footprint) AND, when a part was
+# enriched at add time, its stored price breaks + stock. Combining the two produces a BOM that is
+# complete and priced FROM YOUR OWN LIBRARY, offline, before ever touching a distributor.
+
+
+def library_match_index(library_parts):
+    """The fill match index (by symbol name + MPN) from the active profile's PartRecords, so a
+    schematic component can be matched to its library part for the BOM."""
+    from stockroom.projects import fill
+
+    return fill.library_match_records(list(library_parts or ()))
+
+
+def library_enrich(comps, match_index):
+    """Fill each component's BLANK identity fields (MPN / Manufacturer / Datasheet / Description /
+    Footprint) from its matching library part, so the BOM combines the KiCad schematic with the
+    library. `comps` are (ref, lib_id, props) triples; returns (ref, props) pairs with blanks
+    filled (never overwriting a value the schematic already carries, so a deliberate schematic
+    override stands). An unmatched component passes through unchanged (honest)."""
+    from stockroom.projects import fill
+
+    out = []
+    for ref, lib_id, props in comps:
+        enriched = dict(props)
+        if match_index:
+            match = fill.match_component({"ref": ref, "lib_id": lib_id, "props": props}, match_index)
+            if match["part"] is not None:
+                for ch in fill.proposed_changes(match["part"], props):
+                    if ch["kind"] == "fill":  # blanks only, never an overwrite
+                        enriched[ch["prop"]] = ch["new"]
+        out.append((ref, enriched))
+    return out
+
+
+def library_price_index(library_parts) -> dict:
+    """mpn -> the flat {price_breaks, unit_price, stock, manufacturer, datasheet, description, url,
+    source} dict from a library part's STORED purchase data, so the BOM prices OFFLINE from the
+    library. Only a part carrying price breaks or a stock figure is indexed; a part with identity
+    but no price is skipped so the enrich layer can still fill it. Prefers a purchase that carries
+    price breaks."""
+    index: dict = {}
+    for p in (library_parts or ()):
+        mpn = (getattr(p, "mpn", "") or "").strip()
+        if not mpn:
+            continue
+        purchases = list(getattr(p, "purchase", None) or [])
+        best = next((pu for pu in purchases if getattr(pu, "price_breaks", None)), None)
+        if best is None:
+            best = purchases[0] if purchases else None
+        breaks = []
+        if best is not None:
+            for b in (getattr(best, "price_breaks", None) or []):
+                try:
+                    breaks.append({"qty": int(b["qty"]), "price": float(b["price"])})
+                except (KeyError, TypeError, ValueError):
+                    continue
+        stock = getattr(best, "stock", None) if best is not None else None
+        if not breaks and stock is None:
+            continue  # nothing priceable to contribute; leave it for the enrich layer
+        entry: dict = {"source": "library"}
+        if breaks:
+            breaks.sort(key=lambda b: b["qty"])
+            entry["price_breaks"] = breaks
+            entry["unit_price"] = breaks[0]["price"]
+        if stock is not None:
+            entry["stock"] = stock
+        if getattr(p, "manufacturer", ""):
+            entry["manufacturer"] = p.manufacturer
+        ds = getattr(p, "datasheet", None)
+        if ds is not None and (ds.source_url or ds.file):
+            entry["datasheet"] = ds.source_url or ds.file
+        if getattr(p, "description", ""):
+            entry["description"] = p.description
+        if best is not None and getattr(best, "url", ""):
+            entry["url"] = best.url
+        index[mpn] = entry
+    return index
+
+
+def combined_price_lookup(library_parts, enrich_lookup=None):
+    """A price_lookup(mpn) that prices from the LIBRARY first (offline, instant), then falls back
+    to `enrich_lookup` (the network enrich layer) for an MPN the library cannot price. So the BOM
+    combines the library's stored prices with live distributor data, never a fabricated price.
+    Returns None when neither source can price anything, so `priced` stays honestly False."""
+    lib = library_price_index(library_parts)
+    if not lib and enrich_lookup is None:
+        return None
+
+    def lookup(mpn):
+        hit = lib.get((mpn or "").strip())
+        if hit is not None:
+            return hit
+        return enrich_lookup(mpn) if enrich_lookup is not None else None
+
+    return lookup
+
+
 def bom_from_project(sch_paths, lookup=None,
                      enrich_fields=("manufacturer", "datasheet", "description"),
-                     price_lookup=None) -> dict:
+                     price_lookup=None, library_index=None) -> dict:
     """A single BOM merged across EVERY sheet of a project (not just the root),
-    grouping identical parts with summed quantity. Priced when `price_lookup` is given."""
+    grouping identical parts with summed quantity. Priced when `price_lookup` is given.
+    When `library_index` is given, each component's blank identity fields are first filled
+    from its matching library part (combining the schematic with the library)."""
     comps = []
     for p in (sch_paths or []):
         try:
             comps.extend(_bom_components(p))
         except Exception:  # noqa: BLE001 - an unreadable sheet drops out, never crashes the build
             continue
+    if library_index:
+        comps = library_enrich(comps, library_index)
     return _bom_from_components(comps, lookup, enrich_fields, price_lookup=price_lookup)
 
 
@@ -743,14 +852,16 @@ def _bom_state(line_count: int, priced: bool, summary: dict) -> str:
 
 
 def project_bom(root, pro_path, sheet_paths, name="", boards=1,
-                price_lookup=None, progress=None) -> dict:
-    """Build a grouped, optionally priced BOM for a registered project (M7c).
+                price_lookup=None, progress=None, library_parts=None) -> dict:
+    """Build a grouped, optionally priced BOM for a registered project (M7c), combining the KiCad
+    schematic with the Stockroom library (M7c library-combining).
 
     Reads every schematic sheet through Stockroom's byte-preserving sexp reader (offline,
-    no kicad-cli), groups identical parts with KiBoM value-normalization + DNF/testpoint
-    exclusion, and, when `price_lookup` is given, prices each line with an MPN and rolls
-    up a cost summary at 1 and `boards` copies. Honest: with no price_lookup, or when a
-    lookup misses, lines stay unpriced and a price is never invented. Returns
+    no kicad-cli), fills each component's blank identity fields from its matching library part
+    (`library_parts`), groups identical parts with KiBoM value-normalization + DNF/testpoint
+    exclusion, and prices each line from the LIBRARY's stored prices first then `price_lookup`
+    (the enrich layer) as a fallback, rolling up a cost summary at 1 and `boards` copies. Honest:
+    when neither source can price a line it stays unpriced and a price is never invented. Returns
     {project, ran_at, boards, priced, line_count, component_count, lines, summary,
     by_source, cost_at_qty}."""
     root = Path(root)
@@ -763,7 +874,11 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
     abs_sheets = [str(root / s) for s in (sheet_paths or [])]
 
     _p(40, "Grouping components")
-    priced = price_lookup is not None
+    parts = list(library_parts or ())
+    match_index = library_match_index(parts) if parts else None
+    # Price from the library first (offline), then the enrich layer; None only if neither can price.
+    combined = combined_price_lookup(parts, price_lookup) if parts else price_lookup
+    priced = combined is not None
 
     def _priced_progress(mpn_lookup):
         # Report progress as unique MPNs are priced (the slow, network-bound half).
@@ -776,8 +891,8 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
 
         return wrapped
 
-    lookup = _priced_progress(price_lookup) if priced else None
-    built = bom_from_project(abs_sheets, price_lookup=lookup)
+    lookup = _priced_progress(combined) if priced else None
+    built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index)
     rows = built["rows"]
 
     n = _board_count(boards)
