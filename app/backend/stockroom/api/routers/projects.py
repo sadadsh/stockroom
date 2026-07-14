@@ -18,7 +18,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from stockroom.api.schemas import ProjectSummary, RegisterProjectBody
+from stockroom.api.schemas import (
+    ProjectSummary,
+    RegisterProjectBody,
+    SetDesignRulesBody,
+    SetNetClassesBody,
+)
 from stockroom.kicad.errors import KiCadCliError
 
 
@@ -221,6 +226,45 @@ def projects_router(require_token) -> APIRouter:
         cached = ctx.bom_cache.get(project_id)
         current_rows = cached["lines"] if (cached and cached.get("ran_at")) else None
         return ctx.project_ops.bom_diff(project_id, a, b, current_rows=current_rows)
+
+    @r.get("/{project_id}/design")
+    def get_design(request: Request, project_id: str, floor: str = "none") -> dict:
+        # The project's current net classes + design rules read straight from its
+        # .kicad_pro, plus a fab-floor validation and the fab-floor catalog for the
+        # picker (M7e). Read-only. Unknown id -> 404; a project with no .kicad_pro is an
+        # honest empty shape, never a crash.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.design_settings(project_id, floor=floor)
+
+    @r.patch("/{project_id}/net-classes")
+    def patch_net_classes(request: Request, project_id: str, body: SetNetClassesBody) -> dict:
+        # Edit the project's net classes: reconcile the submitted set onto the on-disk
+        # classes and write net_settings.classes back as a minimal diff, one scoped commit
+        # on the project's OWN git (M7e). A class with no name is a clean 422; an unknown id
+        # -> 404; a project not under git (or without a .kicad_pro) -> 400; a GitError -> 503.
+        # A net-class change can alter DRC, so the stale cached ERC/DRC is evicted (never a
+        # fabricated pass) and the next check re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.set_net_classes(
+            project_id, [c.model_dump() for c in body.classes],
+            deleted=body.deleted, floor=body.floor,
+        )
+        ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.patch("/{project_id}/design-rules")
+    def patch_design_rules(request: Request, project_id: str, body: SetDesignRulesBody) -> dict:
+        # Edit the board design-rule constraints (and, when given, the track/via/diff-pair
+        # size lists), one scoped commit on the project's own git (M7e). Unknown id -> 404;
+        # a project not under git (or without a .kicad_pro) -> 400; a GitError -> 503. The
+        # stale cached ERC/DRC is evicted since a design-rule change can alter DRC outcomes.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.set_design_rules(
+            project_id, body.rules, track_widths=body.track_widths,
+            via_dimensions=body.via_dimensions, diff_pair_dimensions=body.diff_pair_dimensions,
+        )
+        ctx.checks_cache.pop(project_id, None)
+        return result
 
     return r
 

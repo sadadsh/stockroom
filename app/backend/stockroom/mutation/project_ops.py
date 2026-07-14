@@ -13,11 +13,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from stockroom.kicad import project_settings
 from stockroom.model.project import ProjectRecord
+from stockroom.mutation.transaction import Transaction
+from stockroom.projects import standards
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
 from stockroom.store.project_store import ProjectStore
+from stockroom.vcs.repo import GitRepo
 
 
 class ProjectOps:
@@ -131,3 +135,103 @@ class ProjectOps:
         )
         result["project"] = rec.name
         return result
+
+    # --- M7e Editor writes (design rules + net classes) ----------------------
+
+    def _require(self, project_id: str) -> ProjectRecord:
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return rec
+
+    def _pro_path(self, rec: ProjectRecord) -> Path:
+        if not rec.pro_path:
+            raise ValueError("this project has no .kicad_pro to edit")
+        return Path(rec.root) / rec.pro_path
+
+    def design_settings(self, project_id: str, floor="none") -> dict:
+        """The project's current net classes + design rules read straight from its
+        .kicad_pro, plus a fab-floor validation of the classes (M7e). Raises
+        FileNotFoundError for an unknown id; a project with no .kicad_pro is an honest
+        empty shape, never a crash."""
+        rec = self._require(project_id)
+        data = {}
+        if rec.pro_path:
+            pro = Path(rec.root) / rec.pro_path
+            if pro.exists():
+                data = project_settings.parse(pro.read_text(encoding="utf-8"))
+        net = data.get("net_settings") or {}
+        ds = ((data.get("board") or {}).get("design_settings")) or {}
+        classes = net.get("classes") or []
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_pro": bool(rec.pro_path),
+            "net_classes": classes,
+            "netclass_patterns": net.get("netclass_patterns") or [],
+            "design_rules": ds.get("rules") or {},
+            "track_widths": ds.get("track_widths") or [],
+            "via_dimensions": ds.get("via_dimensions") or [],
+            "diff_pair_dimensions": ds.get("diff_pair_dimensions") or [],
+            "fab_floors": standards.FAB_FLOORS,
+            "validation": standards.validate_classes(classes, floor),
+        }
+
+    def _write_pro(self, rec: ProjectRecord, patch: dict, message: str) -> str:
+        """Apply a partial-merge patch to the project's .kicad_pro inside a Transaction
+        bound to the project's OWN git repo: a single scoped commit, or every touched
+        path restored and zero trace. Refuses a project not under git (the atomic commit
+        + the commit-time asset gate need it, Decision 1)."""
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before editing"
+            )
+        pro = self._pro_path(rec)
+        repo = GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            project_settings.apply_patch(pro, patch)
+            txn.track(pro)
+            return txn.commit(message)
+
+    def set_net_classes(self, project_id: str, classes, deleted=None, floor="none") -> dict:
+        """Reconcile the submitted net classes onto the project's on-disk classes
+        (safe-merge, Default + unmanaged preserved) and write net_settings.classes back
+        as a minimal diff, one scoped commit on the project's own git (M7e). Returns the
+        reconciled classes + a fab-floor validation. Raises FileNotFoundError (unknown id)
+        / ValueError (no .kicad_pro or not under git)."""
+        rec = self._require(project_id)
+        pro = self._pro_path(rec)
+        existing = []
+        if pro.exists():
+            data = project_settings.parse(pro.read_text(encoding="utf-8"))
+            existing = (data.get("net_settings") or {}).get("classes") or []
+        reconciled = standards.reconcile_classes(existing, classes, deleted=deleted)
+        sha = self._write_pro(
+            rec, {"net_settings": {"classes": reconciled}}, f"Edit {rec.name}: net classes"
+        )
+        return {
+            "project": rec.name,
+            "committed": sha,
+            "net_classes": reconciled,
+            "validation": standards.validate_classes(reconciled, floor),
+        }
+
+    def set_design_rules(self, project_id: str, rules, track_widths=None,
+                         via_dimensions=None, diff_pair_dimensions=None) -> dict:
+        """Partial-merge the board design-rule constraints (and, when given, the
+        track/via/diff-pair size lists) into board.design_settings, one scoped commit on
+        the project's own git (M7e). The size lists are replaced wholesale (the editor
+        sends the full list); rules are field-merged so an unspecified rule is preserved.
+        Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro or not under git)."""
+        rec = self._require(project_id)
+        ds: dict = {"rules": dict(rules)}
+        if track_widths is not None:
+            ds["track_widths"] = list(track_widths)
+        if via_dimensions is not None:
+            ds["via_dimensions"] = list(via_dimensions)
+        if diff_pair_dimensions is not None:
+            ds["diff_pair_dimensions"] = list(diff_pair_dimensions)
+        sha = self._write_pro(
+            rec, {"board": {"design_settings": ds}}, f"Edit {rec.name}: design rules"
+        )
+        return {"project": rec.name, "committed": sha, "design_rules": dict(rules)}

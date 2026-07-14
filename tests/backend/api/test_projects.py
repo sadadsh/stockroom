@@ -612,6 +612,129 @@ def test_revisions_and_diff_for_an_unknown_project_are_404(client):
 # ---- auth -------------------------------------------------------------------
 
 
+# ---- M7e Editor: design rules + net classes ---------------------------------
+
+_PRO_FULL = (
+    "{\n"
+    '  "board": {\n'
+    '    "design_settings": {\n'
+    '      "rules": {\n'
+    '        "min_clearance": 0.2,\n'
+    '        "min_track_width": 0.2\n'
+    "      },\n"
+    '      "track_widths": []\n'
+    "    }\n"
+    "  },\n"
+    '  "net_settings": {\n'
+    '    "classes": [\n'
+    "      {\n"
+    '        "bus_width": 12,\n'
+    '        "clearance": 0.2,\n'
+    '        "name": "Default",\n'
+    '        "track_width": 0.2,\n'
+    '        "via_diameter": 0.6,\n'
+    '        "via_drill": 0.3,\n'
+    '        "wire_width": 6\n'
+    "      }\n"
+    "    ],\n"
+    '    "netclass_patterns": []\n'
+    "  }\n"
+    "}\n"
+)
+
+
+def _make_git_pro_project(dir_path, pro_text=_PRO_FULL):
+    """A project dir that is its own git repo with a real-shaped .kicad_pro committed."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text(pro_text, encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text("(kicad_sch)\n", encoding="utf-8")
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+        subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+    return dir_path, head
+
+
+def test_get_design_returns_current_classes_rules_and_floors(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/design").json()
+    assert body["under_git"] is True
+    assert [c["name"] for c in body["net_classes"]] == ["Default"]
+    assert body["design_rules"]["min_track_width"] == 0.2
+    assert "jlcpcb" in body["fab_floors"]
+    assert body["validation"] == []
+
+
+def test_get_design_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/design").status_code == 404
+
+
+def test_patch_net_classes_edits_the_kicad_pro_and_commits(client, tmp_path):
+    proj, head = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
+                     json={"classes": [{"name": "Default", "track_width": 0.15}]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    on_disk = (proj / "board.kicad_pro").read_text(encoding="utf-8")
+    assert '"track_width": 0.15' in on_disk
+    # the design-settings block is untouched by a net-class edit
+    assert '"min_track_width": 0.2' in on_disk
+
+
+def test_patch_net_classes_returns_fab_validation(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
+                     json={"classes": [{"name": "Default", "track_width": 0.05}], "floor": "oshpark_2"})
+    assert any("track" in f["issue"] for f in r.json()["validation"])
+
+
+def test_patch_design_rules_edits_the_rules(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/design-rules",
+                     json={"rules": {"min_track_width": 0.13}})
+    assert r.status_code == 200, r.text
+    on_disk = (proj / "board.kicad_pro").read_text(encoding="utf-8")
+    assert '"min_track_width": 0.13' in on_disk
+    assert '"min_clearance": 0.2' in on_disk  # sibling rule preserved
+
+
+def test_patch_net_classes_class_without_name_is_422(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
+                     json={"classes": [{"track_width": 0.15}]})  # no name
+    assert r.status_code == 422
+
+
+def test_patch_net_classes_on_a_non_git_project_is_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
+    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
+                     json={"classes": [{"name": "Default", "track_width": 0.15}]})
+    assert r.status_code == 400
+
+
+def test_patch_net_classes_unknown_project_is_404(client):
+    r = client.patch("/api/projects/nope/net-classes",
+                     json={"classes": [{"name": "Default"}]})
+    assert r.status_code == 404
+
+
+def test_patch_design_rules_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
+    # a design-rule change can change DRC outcomes, so the cached ERC/DRC must not
+    # linger as a fabricated pass. The write evicts it, forcing an honest re-run.
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/design-rules", json={"rules": {"min_track_width": 0.13}})
+    assert rec["id"] not in app_ctx.checks_cache
+
+
 def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects").status_code == 401
     assert anon_client.post("/api/projects/x/checks").status_code == 401
@@ -621,3 +744,6 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects/x/bom/export").status_code == 401
     assert anon_client.get("/api/projects/x/revisions").status_code == 401
     assert anon_client.get("/api/projects/x/bom/diff").status_code == 401
+    assert anon_client.get("/api/projects/x/design").status_code == 401
+    assert anon_client.patch("/api/projects/x/net-classes", json={"classes": []}).status_code == 401
+    assert anon_client.patch("/api/projects/x/design-rules", json={"rules": {}}).status_code == 401
