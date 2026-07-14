@@ -22,6 +22,7 @@ Work = Callable[[Callable[[str], None]], int]
 
 _PHASE_TEXT = {
     "clone": "Downloading Stockroom...",
+    "update": "Getting the latest updates...",
     "webview2": "Preparing the display runtime...",
     "sync": "Installing components (first run can take a few minutes)...",
     "starting": "Starting Stockroom...",

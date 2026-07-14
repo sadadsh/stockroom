@@ -202,10 +202,10 @@ def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
 def test_supervise_emits_progress_phases_in_order(tmp_path):
     phases = []
     supervise(
-        tmp_path, ensure=lambda _wd: None, webview2=lambda: None,
+        tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
         uv_sync=lambda _wd: None, spawn=lambda _wd: 0, progress=phases.append,
     )
-    assert phases == ["clone", "webview2", "sync", "starting"]
+    assert phases == ["clone", "update", "webview2", "sync", "starting"]
 
 
 def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
@@ -217,11 +217,37 @@ def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
         return EXIT_RESTART if calls["n"] < 2 else 0  # one self-update restart, then quit
 
     supervise(
-        tmp_path, ensure=lambda _wd: None, webview2=lambda: None,
+        tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
         uv_sync=lambda _wd: None, spawn=spawn, progress=phases.append,
     )
     assert phases.count("starting") == 1  # only before the FIRST spawn
-    assert phases == ["clone", "webview2", "sync", "starting", "sync"]
+    assert phases == ["clone", "update", "webview2", "sync", "starting", "sync"]
+
+
+def test_supervise_updates_on_every_launch_after_clone(tmp_path):
+    order = []
+    supervise(
+        tmp_path,
+        ensure=lambda _wd: order.append("clone"),
+        update=lambda _wd: order.append("update"),
+        webview2=lambda: order.append("webview2"),
+        uv_sync=lambda _wd: order.append("sync"),
+        spawn=lambda _wd: (order.append("spawn"), 0)[1],
+    )
+    assert order == ["clone", "update", "webview2", "sync", "spawn"]
+
+
+def test_update_to_latest_pulls_when_a_checkout_exists(tmp_path):
+    (tmp_path / ".git").mkdir()
+    calls = []
+    launch.update_to_latest(tmp_path, pull=lambda wd: calls.append(wd))
+    assert calls == [tmp_path]
+
+
+def test_update_to_latest_skips_before_the_first_clone(tmp_path):
+    calls = []
+    launch.update_to_latest(tmp_path, pull=lambda wd: calls.append(wd))
+    assert calls == []  # no .git yet: the fresh clone in ensure_clone already got latest
 
 
 def test_splash_run_falls_back_to_plain_run_when_no_display(monkeypatch):

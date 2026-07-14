@@ -189,12 +189,24 @@ def ensure_clone(
     (clone or _git_clone)(remote, workdir)
 
 
+def update_to_latest(workdir: Path, *, pull: Callable[[Path], None] | None = None) -> None:
+    """Fast-forward the managed app checkout to the latest pushed code, so an update hits the exe
+    the moment it is opened (not only via the in-app Update button). No-op before the first clone.
+    A failed pull (offline, or a diverged checkout that ff cannot advance) is NON-FATAL: the
+    last-good checkout still runs, so an update problem never blocks the launch (honest degradation)."""
+    workdir = Path(workdir)
+    if not (workdir / ".git").exists():
+        return
+    (pull or _git_pull)(workdir)
+
+
 def supervise(
     workdir: Path,
     *,
     spawn: Callable[[Path], int] | None = None,
     uv_sync: Callable[[Path], None] | None = None,
     ensure: Callable[[Path], None] | None = None,
+    update: Callable[[Path], None] | None = None,
     webview2: Callable[[], None] | None = None,
     progress: Callable[[str], None] | None = None,
     remote: str = APP_REPO_REMOTE,
@@ -209,12 +221,15 @@ def supervise(
     is signalled 'starting' right before the FIRST host spawn so the splash can close."""
     workdir = Path(workdir)
     _ensure = ensure or (lambda wd: ensure_clone(wd, remote=remote, clone=clone))
+    _update = update or update_to_latest
     _webview2 = webview2 or ensure_webview2
     _uv = uv_sync or _uv_sync
     _spawn = spawn or _spawn_host
     _progress = progress or (lambda _phase: None)
     _progress("clone")
     _ensure(workdir)
+    _progress("update")
+    _update(workdir)  # ff-pull to the latest pushed code on EVERY launch, so updates hit right away
     _progress("webview2")
     _webview2()  # guarantee the runtime the host's window needs BEFORE any host spawn
     started = False
@@ -242,6 +257,15 @@ def _git_clone(remote: str, workdir: Path) -> None:  # pragma: no cover - real s
     )
     if proc.returncode != 0:
         raise RuntimeError(f"could not clone the Stockroom app repo: {proc.stderr.strip()}")
+
+
+def _git_pull(workdir: Path) -> None:  # pragma: no cover - real shell-out
+    # ff-only so a diverged checkout is never silently reset; a failure (offline, non-ff) is
+    # swallowed on purpose so the launch always proceeds on the last-good checkout.
+    subprocess.run(
+        [_git_bin(), "-C", str(workdir), "pull", "--ff-only", "--quiet"],
+        capture_output=True, text=True, creationflags=_NO_WINDOW,
+    )
 
 
 def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
