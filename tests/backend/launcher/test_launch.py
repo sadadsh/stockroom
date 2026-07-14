@@ -4,6 +4,8 @@ host) are injected, so the relaunch-on-self-update loop is fully testable on Lin
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -68,6 +70,61 @@ def test_ensure_clone_clears_a_partial_non_git_dir_then_clones(tmp_path):
     assert calls == [dest]
     assert not (dest / ".venv").exists()  # the partial contents were cleared before cloning
     assert not (dest / "leftover.txt").exists()
+
+
+def test_ensure_clone_preserves_added_library_parts_across_a_recovery(tmp_path):
+    # review #5: a corrupt checkout (no .git) that carries in-tree library parts must NOT lose them
+    # on the re-clone; the part FILES are overlaid back onto the fresh (seed-only) clone.
+    dest = tmp_path / "app"
+    parts = dest / "libraries" / "Main" / "parts"
+    parts.mkdir(parents=True)
+    (parts / "myR.json").write_text('{"id":"myR"}', encoding="utf-8")
+    (parts / ".gitkeep").write_text("", encoding="utf-8")
+
+    def fake_clone(_remote, workdir):
+        p = Path(workdir) / "libraries" / "Main" / "parts"  # a fresh clone ships only the seed
+        p.mkdir(parents=True)
+        (p / ".gitkeep").write_text("", encoding="utf-8")
+        (Path(workdir) / ".git").mkdir(parents=True)
+
+    ensure_clone(dest, remote="R", clone=fake_clone)
+    assert (parts / "myR.json").read_text(encoding="utf-8") == '{"id":"myR"}'  # part survived
+    assert not (tmp_path / ".stockroom-recovered-library").exists()  # backup cleaned up
+
+
+def test_reconcile_pull_rebases_local_library_commits_onto_remote_app_updates(tmp_path):
+    # review #4 (HIGH): once a part is added locally, a remote app-code update must STILL apply.
+    # ff-only would get permanently stuck; the rebase reconcile replays the local library commit
+    # (libraries/, a disjoint path) on top of the new app code so BOTH survive.
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git not installed")
+
+    def g(repo, *args):
+        return subprocess.run([git, "-C", str(repo), *args], capture_output=True, text=True)
+
+    origin = tmp_path / "origin.git"
+    subprocess.run([git, "init", "--bare", "-b", "main", str(origin)], check=True, capture_output=True)
+    seed = tmp_path / "seed"
+    subprocess.run([git, "clone", str(origin), str(seed)], check=True, capture_output=True)
+    g(seed, "config", "user.email", "t@t"); g(seed, "config", "user.name", "t")
+    (seed / "app").mkdir()
+    (seed / "app" / "main.py").write_text("v1", encoding="utf-8")
+    g(seed, "add", "."); g(seed, "commit", "-m", "app v1"); g(seed, "push", "-u", "origin", "main")
+
+    managed = tmp_path / "A"
+    subprocess.run([git, "clone", str(origin), str(managed)], check=True, capture_output=True)
+    g(managed, "config", "user.email", "a@a"); g(managed, "config", "user.name", "a")
+    (managed / "libraries" / "Main" / "parts").mkdir(parents=True)
+    (managed / "libraries" / "Main" / "parts" / "r10k.json").write_text('{"id":"r10k"}', encoding="utf-8")
+    g(managed, "add", "."); g(managed, "commit", "-m", "add r10k")
+
+    (seed / "app" / "main.py").write_text("v2", encoding="utf-8")  # a remote app-code update
+    g(seed, "add", "."); g(seed, "commit", "-m", "app v2"); g(seed, "push")
+
+    launch._reconcile_pull(managed, git)
+    assert (managed / "app" / "main.py").read_text(encoding="utf-8") == "v2"  # remote update applied
+    assert (managed / "libraries" / "Main" / "parts" / "r10k.json").exists()  # local part preserved
 
 
 # -- supervise (the self-update relaunch loop) ---------------------------------

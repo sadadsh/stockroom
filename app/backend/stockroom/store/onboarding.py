@@ -55,13 +55,14 @@ def _same_path(a, b) -> bool:
 
 
 def _ensure_git(root: Path) -> GitRepo:
-    """A git repo backing `root` (init a standalone repo only if `root` is not already inside
-    one; idempotent). When `root` lives INSIDE an existing repo, the library committed in the app
-    repo, that enclosing repo is used and NO nested repo is created (a nested .git would be ignored
-    by the parent, so a clone would not carry the library). Sync + the project editors need git, so
-    every library is git-backed."""
+    """A git repo at `root` (init its OWN repo if it has no `.git`; idempotent). An ONBOARDED
+    library (open / create / clone) is its own repo even when its dir happens to sit inside an
+    unrelated git checkout, so its part commits + sync never leak into that unrelated repo. The
+    library committed inside the app repo is a DIFFERENT path (bootstrap_library's already-usable
+    branch): it is backed by the enclosing app repo and never reaches _ensure_git, so it never
+    gets a nested repo."""
     repo = GitRepo(root)
-    if not repo.is_git_repo():
+    if not (root / ".git").exists():
         repo.init()
     return repo
 

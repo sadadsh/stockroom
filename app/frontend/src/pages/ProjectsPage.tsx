@@ -1784,11 +1784,14 @@ function FieldsSection({ projectId }: { projectId: string }) {
   function addField() {
     const name = newField.trim();
     if (!name) return;
-    if (readonlyCols.has(name)) {
+    const lc = name.toLowerCase();
+    if ([...readonlyCols].some((c) => c.toLowerCase() === lc)) {
       toast(`The ${name} field is set by annotation, not the field editor.`, "err");
       return;
     }
-    if (!columns.includes(name)) setExtraCols((cs) => [...cs, name]);
+    // Case-insensitive: adding "mpn" when an "MPN" column exists edits that column, never a
+    // second duplicate (the backend snaps the edit to the existing column too).
+    if (!columns.some((c) => c.toLowerCase() === lc)) setExtraCols((cs) => [...cs, name]);
     setNewField("");
   }
 
