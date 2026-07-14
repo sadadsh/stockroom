@@ -8,9 +8,13 @@ friendly-name aliases, KiCad number formatting) is ported by-behavior from the r
 `SexpDocument` (the one and only `.kicad_*` editor), and this adds the KiCad-10 nested
 via-protection family (tenting / covering / plugging) that nd_board_setup predated.
 
+The overall board thickness lives in a DIFFERENT block, `(general (thickness N))`, not
+`(setup)`; `thickness()`/`set_thickness()` edit it byte-preservingly through the same doc.
+
 All lengths are millimetres (KiCad's on-disk unit); `*_ratio` is a dimensionless fraction.
-Out of scope (a board editor, not a stackup editor): layer stackup, per-layer settings, the
-repeatable user via/track/diff-pair size lists, and the `(pcbplotparams ...)` plot block.
+Out of scope (a board editor, not a stackup editor): the physical `(setup (stackup ...))`
+layer stack, per-layer settings, the repeatable user via/track/diff-pair size lists, and the
+`(pcbplotparams ...)` plot block.
 """
 
 from __future__ import annotations
@@ -81,6 +85,10 @@ _PREAMBLE_PRIORITY = (
     "generator",
     "version",
 )
+
+# A fresh (general ...) block is placed right after the preamble (version/generator),
+# before (paper)/(title_block)/(layers)/(setup) - KiCad's canonical (general) position.
+_GENERAL_ANCHOR_PRIORITY = ("generator_version", "generator", "version")
 
 _SIDED_FRIENDLY = {
     f"{key}_{side}": (key, side)
@@ -203,6 +211,27 @@ class Board:
                     out[alias] = out[real]
         return out
 
+    def general(self) -> dict:
+        """Scalar children of the board's (general ...) block. Currently exposes
+        `thickness` (the overall board thickness in mm, KiCad's `(thickness N)`
+        atom); other (general) children (e.g. legacy_teardrops) are preserved on
+        write but not surfaced here. Returns {} when there is no (general) block."""
+        gen = self._doc.root.find("general")
+        if gen is None:
+            return {}
+        out: dict = {}
+        node = gen.find("thickness")
+        if node is not None and len(node.children) >= 2:
+            v = _to_float(node.children[1].value)
+            if v is not None:
+                out["thickness"] = v
+        return out
+
+    def thickness(self) -> float | None:
+        """The board's overall thickness in mm (from (general (thickness N))), or
+        None when the board declares no thickness."""
+        return self.general().get("thickness")
+
     # -- write ----------------------------------------------------------------
 
     def set_setup_key(self, key: str, value) -> None:
@@ -259,6 +288,47 @@ class Board:
 
         if inserted:
             self._reload()
+
+    def set_thickness(self, value) -> None:
+        """Set the board's overall thickness (mm) in (general (thickness N)),
+        editing the (thickness) atom in place when present, inserting one into an
+        existing (general) block, or creating a (general) block (right after the
+        preamble, before any (paper)/(layers)/(setup)) when the board has none.
+        Byte-preserving: only the thickness value (or the new block) changes."""
+        gen = self._doc.root.find("general")
+        if gen is None:
+            self._create_general_block(value)
+            return
+        node = gen.find("thickness")
+        if node is not None and len(node.children) >= 2:
+            node.children[1].set_value(_fmt_num(value), quote=False)
+        elif node is not None:
+            # Malformed thickness node (unexpected arity): replace its whole span.
+            self._doc.replace_span(*node.span, f"(thickness {_fmt_num(value)})")
+            self._reload()
+        else:
+            gen.insert_child_text(f"(thickness {_fmt_num(value)})")
+            self._reload()
+
+    def _create_general_block(self, thickness) -> None:
+        text = self._doc.text
+        unit = _indent_unit(text)
+        nl = "\r\n" if "\r\n" in text else "\n"
+        block = (
+            "(general" + nl + unit * 2 + f"(thickness {_fmt_num(thickness)})" + nl + unit + ")"
+        )
+        root = self._doc.root
+        anchor = None
+        for name in _GENERAL_ANCHOR_PRIORITY:
+            nodes = root.find_all(name)
+            if nodes:
+                anchor = nodes[-1]
+                break
+        if anchor is not None:
+            root.insert_after(anchor, block)
+        else:  # no reachable preamble child: place it inside the root
+            root.insert_child_text(block)
+        self._reload()
 
     def _set_flat_in_place(self, node, key: str, val) -> None:
         kids = node.children

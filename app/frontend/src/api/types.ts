@@ -701,6 +701,32 @@ export interface SetDesignRulesResult {
   design_rules: DesignRules;
 }
 
+// One editable board-setup field the /settings endpoint describes so the form knows which
+// control to render for it (M7f-A). `kind` picks the input; `label` is a Title Case caption.
+export interface BoardSetupField {
+  key: string;
+  kind: "length" | "ratio" | "bool" | "coord";
+  label: string;
+}
+
+// A board-setup value: a length/ratio number, a bool, or an [x, y] origin pair.
+export type BoardSetupValue = number | boolean | [number, number];
+
+// GET /api/projects/{id}/settings
+export interface BoardSettings {
+  project: string;
+  under_git: boolean;
+  has_board: boolean;
+  board_setup: Record<string, BoardSetupValue>;
+  thickness: number | null;
+  fields: BoardSetupField[];
+}
+
+// PATCH /api/projects/{id}/settings
+export interface SetBoardSettingsResult extends BoardSettings {
+  committed: string;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

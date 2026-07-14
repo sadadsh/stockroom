@@ -12,6 +12,7 @@ import type {
   ProjectDetail,
   ProjectSummary,
   RevisionsResult,
+  BoardSettings,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -38,6 +39,8 @@ vi.mock("../api/client", async (importActual) => {
       getDesign: vi.fn(),
       setNetClasses: vi.fn(),
       setDesignRules: vi.fn(),
+      getBoardSettings: vi.fn(),
+      setBoardSettings: vi.fn(),
     },
   };
 });
@@ -315,6 +318,47 @@ const DESIGN: DesignResult = {
   validation: [{ netclass: "HS", issue: "track width 0.1 below fab min 0.1524" }],
 };
 
+const SETTINGS: BoardSettings = {
+  project: "Netdeck",
+  under_git: true,
+  has_board: true,
+  board_setup: {
+    pad_to_mask_clearance: 0.0508,
+    allow_soldermask_bridges_in_footprints: false,
+    tenting_front: true,
+    tenting_back: true,
+    covering_front: false,
+    covering_back: false,
+    plugging_front: false,
+    plugging_back: false,
+    capping: false,
+    filling: false,
+    aux_axis_origin: [140, 115.5],
+  },
+  thickness: 1.6,
+  fields: [
+    { key: "pad_to_mask_clearance", kind: "length", label: "Solder Mask Clearance" },
+    { key: "solder_mask_min_width", kind: "length", label: "Solder Mask Minimum Width" },
+    { key: "pad_to_paste_clearance", kind: "length", label: "Solder Paste Clearance" },
+    { key: "pad_to_paste_clearance_ratio", kind: "ratio", label: "Solder Paste Clearance Ratio" },
+    {
+      key: "allow_soldermask_bridges_in_footprints",
+      kind: "bool",
+      label: "Allow Soldermask Bridges In Footprints",
+    },
+    { key: "tenting_front", kind: "bool", label: "Tent Vias Front" },
+    { key: "tenting_back", kind: "bool", label: "Tent Vias Back" },
+    { key: "covering_front", kind: "bool", label: "Cover Vias Front" },
+    { key: "covering_back", kind: "bool", label: "Cover Vias Back" },
+    { key: "plugging_front", kind: "bool", label: "Plug Vias Front" },
+    { key: "plugging_back", kind: "bool", label: "Plug Vias Back" },
+    { key: "capping", kind: "bool", label: "Cap Vias" },
+    { key: "filling", kind: "bool", label: "Fill Vias" },
+    { key: "aux_axis_origin", kind: "coord", label: "Auxiliary Axis Origin" },
+    { key: "grid_origin", kind: "coord", label: "Grid Origin" },
+  ],
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -369,6 +413,8 @@ beforeEach(() => {
   mockApi.setDesignRules.mockResolvedValue({
     project: "Netdeck", committed: "cccccccc3333", design_rules: DESIGN.design_rules,
   });
+  mockApi.getBoardSettings.mockResolvedValue(SETTINGS);
+  mockApi.setBoardSettings.mockResolvedValue({ ...SETTINGS, committed: "dddddddd4444" });
 });
 
 describe("ProjectsPage", () => {
@@ -997,5 +1043,159 @@ describe("ProjectsPage", () => {
     await user.click(screen.getByRole("button", { name: "Save Design Rules" }));
     expect(mockApi.setDesignRules).not.toHaveBeenCalled(); // no silent 0 written
     expect(await screen.findByText(/valid number/i)).toBeInTheDocument();
+  });
+
+  // --- M7f-A Board Setup editor ---
+
+  it("shows the board setup with its current values", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    expect(screen.getByTestId("bs-pad_to_mask_clearance")).toHaveValue("0.0508");
+    expect(screen.getByTestId("bs-thickness")).toHaveValue("1.6");
+    expect(screen.getByTestId("bs-tenting_front")).toBeChecked(); // effective default ON
+    expect(screen.getByTestId("bs-capping")).not.toBeChecked();
+    expect(screen.getByTestId("bs-aux_axis_origin-x")).toHaveValue("140");
+  });
+
+  it("saves an edited board-setup clearance to the settings endpoint", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const input = screen.getByTestId("bs-pad_to_mask_clearance");
+    await user.clear(input);
+    await user.type(input, "0.1");
+    await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      board_setup: { pad_to_mask_clearance: 0.1 },
+      thickness: undefined,
+    });
+  });
+
+  it("saves the board thickness alone without re-writing untouched board setup", async () => {
+    // the anti-flip guarantee: editing only thickness must NOT resend the via-protection
+    // defaults (which would flip an absent-defaults-ON tenting to a written OFF).
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const input = screen.getByTestId("bs-thickness");
+    await user.clear(input);
+    await user.type(input, "0.8");
+    await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      board_setup: undefined,
+      thickness: 0.8,
+    });
+  });
+
+  it("toggles a via-protection checkbox and saves just that field", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    await user.click(screen.getByTestId("bs-tenting_front")); // ON -> OFF
+    await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      board_setup: { tenting_front: false },
+      thickness: undefined,
+    });
+  });
+
+  it("marks the board setup dirty on edit and disables Save until then", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const save = screen.getByRole("button", { name: "Save Board Setup" });
+    expect(save).toBeDisabled();
+    const input = screen.getByTestId("bs-thickness");
+    await user.clear(input);
+    await user.type(input, "0.8");
+    expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeEnabled();
+  });
+
+  it("blocks the save and warns on a non-numeric clearance", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const input = screen.getByTestId("bs-pad_to_mask_clearance");
+    await user.clear(input);
+    await user.type(input, "wide");
+    await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
+    expect(mockApi.setBoardSettings).not.toHaveBeenCalled();
+    expect(await screen.findByText(/valid number/i)).toBeInTheDocument();
+  });
+
+  it("shows an honest no-board state", async () => {
+    mockApi.getBoardSettings.mockResolvedValue({
+      ...SETTINGS, has_board: false, board_setup: {}, thickness: null,
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("board-setup-no-board")).toBeInTheDocument();
+    expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest not-under-git state for the board setup", async () => {
+    mockApi.getBoardSettings.mockResolvedValue({ ...SETTINGS, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("board-setup-no-git")).toBeInTheDocument();
+    expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
+  });
+
+  it("does not mark dirty when a number is re-typed in an equal but different format", async () => {
+    // "1.60" is numerically 1.6; a string-only diff would strand the form permanently Unsaved.
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const input = screen.getByTestId("bs-thickness");
+    await user.clear(input);
+    await user.type(input, "1.60");
+    expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled();
+  });
+
+  it("does not strand the form dirty when a field is cleared", async () => {
+    // a blanked length cannot be sent (KiCad has no delete-key), so it must count as no change
+    // rather than leaving Save enabled on a body that would be rejected as "nothing to write".
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    await user.clear(screen.getByTestId("bs-pad_to_mask_clearance"));
+    expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled();
+  });
+
+  it("returns to a clean state after a successful save", async () => {
+    // the post-save refetch reads back the committed value, which re-seeds the form to clean.
+    mockApi.getBoardSettings
+      .mockReset()
+      .mockResolvedValueOnce(SETTINGS) // initial load: thickness 1.6
+      .mockResolvedValue({ ...SETTINGS, thickness: 0.8 }); // refetch after save: 0.8
+    mockApi.setBoardSettings.mockResolvedValue({
+      ...SETTINGS, thickness: 0.8, committed: "dddddddd4444",
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("board-setup-form");
+    const input = screen.getByTestId("bs-thickness");
+    await user.clear(input);
+    await user.type(input, "0.8");
+    await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled(),
+    );
+    expect(screen.queryByText("Unsaved")).not.toBeInTheDocument();
   });
 });

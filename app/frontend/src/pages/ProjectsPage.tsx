@@ -29,6 +29,8 @@ import {
   useProjectDesign,
   useSetNetClasses,
   useSetDesignRules,
+  useProjectSettings,
+  useSetProjectSettings,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
@@ -36,6 +38,8 @@ import {
 import type {
   AuditFinding,
   AuditResult,
+  BoardSetupField,
+  BoardSetupValue,
   BomDiffResult,
   BomExportKind,
   BomLine,
@@ -50,6 +54,7 @@ import type {
   ProcurementLine,
   ProcurementResult,
   ProjectSummary,
+  BoardSettings,
 } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
@@ -405,6 +410,7 @@ function ProjectDetailView({
       <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
       <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
       <EditorSection key={`editor-${project.id}`} projectId={project.id} />
+      <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -1910,6 +1916,269 @@ function DesignRulesEditor({ projectId, data }: { projectId: string; data: Desig
             </label>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// -- Editor: board setup + thickness (M7f-A) ----------------------------------
+
+// The board-setup draft holds numeric/coord fields as strings (so decimals type cleanly)
+// and bools as booleans; a coord is an [x, y] string pair. Values coerce at save time, and
+// only fields the user CHANGED are sent, so an untouched via-protection default is never
+// re-written (which would flip an absent-defaults-ON tenting to OFF).
+interface SetupDraft {
+  fields: Record<string, string | boolean | [string, string]>;
+  thickness: string;
+}
+
+function seedSetup(data: BoardSettings): SetupDraft {
+  const fields: Record<string, string | boolean | [string, string]> = {};
+  for (const f of data.fields) {
+    const v = data.board_setup[f.key];
+    if (f.kind === "bool") fields[f.key] = v === true;
+    else if (f.kind === "coord")
+      fields[f.key] = Array.isArray(v) ? [String(v[0]), String(v[1])] : ["", ""];
+    else fields[f.key] = v != null && !Array.isArray(v) ? String(v) : "";
+  }
+  return { fields, thickness: data.thickness != null ? String(data.thickness) : "" };
+}
+
+// A numeric field counts as changed only when it is non-blank AND its NUMBER differs from the
+// seed (so "1.60" equals "1.6" and never strands the form Unsaved). A blanked field cannot be
+// sent (KiCad has no delete-key), so it is treated as no change, not a permanent dirty state.
+function numChanged(cur: string, orig: string): boolean {
+  const s = cur.trim();
+  if (s === "") return false;
+  const o = orig.trim();
+  if (o === "") return true; // was absent, now has a value
+  return Number(s) !== Number(o);
+}
+
+function fieldChanged(
+  f: BoardSetupField,
+  cur: string | boolean | [string, string],
+  orig: string | boolean | [string, string],
+): boolean {
+  if (f.kind === "bool") return cur !== orig;
+  if (f.kind === "coord") {
+    const [cx, cy] = cur as [string, string];
+    const [ox, oy] = orig as [string, string];
+    if (cx.trim() === "" || cy.trim() === "") return false; // a partial coord cannot be sent
+    return numChanged(cx, ox) || numChanged(cy, oy);
+  }
+  return numChanged(cur as string, orig as string);
+}
+
+// The Board Setup editor: edit a project's solder mask/paste clearances, via protection,
+// origins, and overall thickness, written as a minimal-diff scoped commit on the project's
+// own git (M7f-A). Honest states for a project with no .kicad_pcb or not under git.
+function BoardSetupSection({ projectId }: { projectId: string }) {
+  const q = useProjectSettings(projectId);
+  const data = q.data;
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="board-setup-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Board Setup</Eyebrow>
+        <p className="text-xs text-t3">
+          Edit the board solder mask and paste clearances, via protection, origins, and overall
+          thickness. Each save writes a minimal change to the board file and commits it to the
+          project's own git history.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the board setup...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the board setup.")}</p>
+      ) : !data ? null : !data.has_board ? (
+        <p className="text-sm text-t3" data-testid="board-setup-no-board">
+          This project has no .kicad_pcb file, so there is no board setup to edit.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="board-setup-no-git">
+          This project is not under git. Initialize a git repository for it to edit its board
+          setup, so each change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <BoardSetupForm projectId={projectId} data={data} />
+      )}
+    </div>
+  );
+}
+
+function BoardSetupForm({ projectId, data }: { projectId: string; data: BoardSettings }) {
+  const [draft, setDraft] = useState<SetupDraft>(() => seedSetup(data));
+  const save = useSetProjectSettings();
+  const { toast } = useToast();
+
+  // Re-seed on the settings CONTENT (not the reference) so a background re-read that returns
+  // identical content does not clobber the user's unsaved edits (mirrors the M7e editor).
+  const sig = JSON.stringify([data.board_setup, data.thickness]);
+  useEffect(() => {
+    setDraft(seedSetup(data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of the settings
+  }, [sig]);
+
+  const seed = seedSetup(data);
+  const dirty =
+    data.fields.some((f) => fieldChanged(f, draft.fields[f.key], seed.fields[f.key])) ||
+    numChanged(draft.thickness, seed.thickness);
+
+  const lengthFields = data.fields.filter((f) => f.kind === "length" || f.kind === "ratio");
+  const boolFields = data.fields.filter((f) => f.kind === "bool");
+  const coordFields = data.fields.filter((f) => f.kind === "coord");
+
+  function setField(key: string, value: string | boolean | [string, string]) {
+    setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }));
+  }
+
+  function onSave() {
+    // Send only genuinely-changed fields (numeric equality, blanks skipped) so an untouched
+    // via-protection default is never re-written (which would flip an effectively-ON tenting).
+    const board_setup: Record<string, BoardSetupValue> = {};
+    for (const f of data.fields) {
+      const cur = draft.fields[f.key];
+      if (!fieldChanged(f, cur, seed.fields[f.key])) continue;
+      if (f.kind === "bool") {
+        board_setup[f.key] = cur as boolean;
+      } else if (f.kind === "coord") {
+        const [cx, cy] = cur as [string, string];
+        if (![cx, cy].every((s) => Number.isFinite(Number(s)))) {
+          toast(`Enter both coordinates for ${f.label}.`, "err");
+          return;
+        }
+        board_setup[f.key] = [Number(cx), Number(cy)];
+      } else {
+        const s = String(cur).trim();
+        if (!Number.isFinite(Number(s))) {
+          toast(`Enter a valid number for ${f.label}.`, "err");
+          return;
+        }
+        board_setup[f.key] = Number(s);
+      }
+    }
+
+    let thickness: number | undefined;
+    if (numChanged(draft.thickness, seed.thickness)) {
+      const t = draft.thickness.trim();
+      if (!Number.isFinite(Number(t)) || Number(t) <= 0) {
+        toast("Enter a positive number for board thickness.", "err");
+        return;
+      }
+      thickness = Number(t);
+    }
+
+    const hasSetup = Object.keys(board_setup).length > 0;
+    // dirty (numeric) implies a real change, so this is only a defensive guard, never a
+    // user-facing error on a blanked field (which counts as no change and disables Save).
+    if (!hasSetup && thickness === undefined) return;
+    save.mutate(
+      { id: projectId, board_setup: hasSetup ? board_setup : undefined, thickness },
+      {
+        // The mutation invalidates the settings query; the refetch's fresh content re-seeds the
+        // draft (content-keyed effect below), so the form returns to clean after a real save.
+        onSuccess: () => toast("Board setup saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the board setup."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="board-setup-form">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Physical Setup</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving..." : "Save Board Setup"}
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        <div>
+          <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-t3">Clearances</h4>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            {lengthFields.map((f) => (
+              <label key={f.key} className="flex flex-col gap-0.5 text-2xs text-t3">
+                {f.label}
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className={`${INPUT_CLS} !py-1 text-xs`}
+                  data-testid={`bs-${f.key}`}
+                  value={String(draft.fields[f.key] ?? "")}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                />
+              </label>
+            ))}
+            <label className="flex flex-col gap-0.5 text-2xs text-t3">
+              Board Thickness
+              <input
+                type="text"
+                inputMode="decimal"
+                className={`${INPUT_CLS} !py-1 text-xs`}
+                data-testid="bs-thickness"
+                value={draft.thickness}
+                onChange={(e) => setDraft((d) => ({ ...d, thickness: e.target.value }))}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-t3">
+            Via Protection
+          </h4>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            {boolFields.map((f) => (
+              <label key={f.key} className="flex items-center gap-2 text-2xs text-t2">
+                <input
+                  type="checkbox"
+                  data-testid={`bs-${f.key}`}
+                  checked={draft.fields[f.key] === true}
+                  onChange={(e) => setField(f.key, e.target.checked)}
+                />
+                {f.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-t3">Origins</h4>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+            {coordFields.map((f) => {
+              const [x, y] = (draft.fields[f.key] as [string, string]) ?? ["", ""];
+              return (
+                <div key={f.key} className="flex flex-col gap-0.5 text-2xs text-t3">
+                  {f.label}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={`${INPUT_CLS} !py-1 text-xs`}
+                      data-testid={`bs-${f.key}-x`}
+                      placeholder="X"
+                      value={x}
+                      onChange={(e) => setField(f.key, [e.target.value, y])}
+                    />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={`${INPUT_CLS} !py-1 text-xs`}
+                      data-testid={`bs-${f.key}-y`}
+                      placeholder="Y"
+                      value={y}
+                      onChange={(e) => setField(f.key, [x, e.target.value])}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
