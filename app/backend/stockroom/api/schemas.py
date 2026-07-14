@@ -155,3 +155,14 @@ class SetDesignRulesBody(BaseModel):
     track_widths: list[Any] | None = None
     via_dimensions: list[Any] | None = None
     diff_pair_dimensions: list[Any] | None = None
+
+
+class SetSettingsBody(BaseModel):
+    """Edit a project's board setup + overall thickness (M7f-A). Both are optional so the
+    editor can save either concern alone; whichever are given land in one atomic commit on
+    the project's .kicad_pcb. `board_setup` names the real (setup) keys the editor edits
+    (per-side via-protection expanded to tenting_front, ...); an unsupported key or a
+    non-positive thickness is validated in the engine and surfaces as a 400."""
+
+    board_setup: dict[str, Any] | None = None
+    thickness: float | None = None

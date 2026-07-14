@@ -247,4 +247,217 @@ def test_failed_write_leaves_zero_trace(tmp_path, monkeypatch):
 
     assert pro.read_text(encoding="utf-8") == original  # restored byte-for-byte
     assert prepo.head() == head_before  # no commit landed
+
+
+# --- M7f-A Editor: board setup + thickness -----------------------------------
+
+# A canonical KiCad-10 .kicad_pcb with a (general (thickness)) and a (setup ...) so a
+# board-setup / thickness edit is provably minimal and byte-preserving.
+_PCB = (
+    "(kicad_pcb\n"
+    "\t(version 20260206)\n"
+    '\t(generator "pcbnew")\n'
+    '\t(generator_version "10.0")\n'
+    "\t(general\n\t\t(thickness 1.6)\n\t)\n"
+    '\t(paper "A4")\n'
+    "\t(setup\n"
+    "\t\t(pad_to_mask_clearance 0.0508)\n"
+    "\t\t(allow_soldermask_bridges_in_footprints no)\n"
+    "\t)\n"
+    '\t(net 0 "")\n'
+    ")\n"
+)
+
+
+def _git_project_with_board(dir_path, pro_text=_PRO, pcb_text=_PCB):
+    """A project dir that is its own git repo with a committed .kicad_pro AND a
+    .kicad_pcb, so a board-setup / thickness write commits into the project's own
+    history (M7f-A). board_paths[0] is the primary board the settings edit targets."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    prepo = GitRepo(dir_path)
+    prepo.init()
+    (dir_path / "board.kicad_pro").write_text(pro_text, encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text("(kicad_sch)\n", encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(pcb_text, encoding="utf-8")
+    prepo.commit("init project", [
+        dir_path / "board.kicad_pro",
+        dir_path / "board.kicad_sch",
+        dir_path / "board.kicad_pcb",
+    ])
+    return dir_path, prepo
+
+
+def test_board_settings_reads_setup_and_thickness(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    bs = ops.board_settings(rec.id)
+    assert bs["under_git"] is True
+    assert bs["has_board"] is True
+    assert bs["board_setup"]["pad_to_mask_clearance"] == 0.0508
+    assert bs["thickness"] == 1.6
+    # the editor schema travels with the read so the frontend can render every field
+    assert any(f["key"] == "pad_to_mask_clearance" for f in bs["fields"])
+    # an absent via-protection block reads as its KiCad effective default (tenting ON), so
+    # the form shows the true state and a save never silently flips it (_PCB has no tenting)
+    assert bs["board_setup"]["tenting_front"] is True
+    assert bs["board_setup"]["capping"] is False
+
+
+def test_board_settings_is_honest_when_the_project_has_no_board(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "board")  # no .kicad_pcb
+    rec = ops.register(proj)
+    bs = ops.board_settings(rec.id)
+    assert bs["has_board"] is False
+    assert bs["board_setup"] == {}
+    assert bs["thickness"] is None
+
+
+def test_board_settings_missing_project_raises(tmp_path):
+    ops = _ops(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        ops.board_settings("nope")
+
+
+def test_set_settings_writes_board_setup_minimal_diff_and_commits(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    pcb = proj / "board.kicad_pcb"
+
+    result = ops.set_settings(rec.id, board_setup={"pad_to_mask_clearance": 0.1})
+
+    after = pcb.read_text(encoding="utf-8")
+    assert "(pad_to_mask_clearance 0.1)" in after
+    # a sibling setup key the edit did not name survived untouched
+    assert "(allow_soldermask_bridges_in_footprints no)" in after
+    # exactly one new commit on the project's OWN repo, and it is clean
+    assert prepo.head() != head_before
+    assert result["committed"] == prepo.head()
+    assert prepo.is_clean()
+    assert result["board_setup"]["pad_to_mask_clearance"] == 0.1
+
+
+def test_set_settings_writes_thickness(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    ops.set_settings(rec.id, thickness=0.8)
+    assert ops.board_settings(rec.id)["thickness"] == 0.8
+
+
+def test_set_settings_board_setup_and_thickness_are_one_atomic_commit(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    ops.set_settings(rec.id, board_setup={"tenting_front": False}, thickness=1.2)
+    # both edits landed in ONE commit (not two)
+    assert len(prepo.log_paths([proj / "board.kicad_pcb"])) >= 1
+    assert prepo.head() != head_before
+    bs = ops.board_settings(rec.id)
+    assert bs["board_setup"]["tenting_front"] is False
+    assert bs["thickness"] == 1.2
+    # only one commit was added
+    log = prepo._run("rev-list", "--count", f"{head_before}..HEAD").stdout.strip()
+    assert log == "1"
+
+
+def test_set_settings_refuses_a_project_not_under_git(tmp_path):
+    ops = _ops(tmp_path)
+    proj = _make_project(tmp_path / "nogit" / "board", _UNANNOTATED)
+    (proj / "board.kicad_pcb").write_text(_PCB, encoding="utf-8")
+    rec = ops.register(proj)
+    assert rec.git_root is None
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, thickness=0.8)
+
+
+def test_set_settings_refuses_when_there_is_no_board(tmp_path):
+    # a board-setup / thickness edit needs a .kicad_pcb; a schematic-only project is an
+    # honest ValueError, never a silent no-op that fabricates success.
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "board")  # no .kicad_pcb
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, board_setup={"pad_to_mask_clearance": 0.1})
+
+
+def test_set_settings_rejects_an_unsupported_key(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, board_setup={"not_a_real_key": 1})
+
+
+def test_set_settings_rejects_a_bad_thickness(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, thickness=0)
+
+
+def test_set_settings_with_nothing_to_write_is_rejected(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id)
+
+
+def test_set_settings_failed_write_leaves_zero_trace(tmp_path, monkeypatch):
+    # a corrupt .kicad_pcb write must abort the Transaction and roll the board back to its
+    # committed bytes, project git left clean (the atomic write contract).
+    from stockroom.kicad import board as board_mod
+
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    pcb = proj / "board.kicad_pcb"
+    original = pcb.read_text(encoding="utf-8")
+    head_before = prepo.head()
+
+    def _corrupt(self, path):
+        from pathlib import Path as _P
+        _P(path).write_text("(this is not a valid kicad_pcb", encoding="utf-8")
+
+    monkeypatch.setattr(board_mod.Board, "save", _corrupt)
+    with pytest.raises(Exception):
+        ops.set_settings(rec.id, thickness=0.8)
+
+    assert pcb.read_text(encoding="utf-8") == original  # restored byte-for-byte
+    assert prepo.head() == head_before  # no commit landed
+    assert prepo.is_clean()
+
+
+def test_set_settings_raising_write_leaves_zero_trace(tmp_path, monkeypatch):
+    # a save that RAISES mid-write (disk full, lock, permission revoked) must still roll the
+    # board back: the path is tracked BEFORE the write, so the Transaction restores it even
+    # though the write threw. (The corrupt-and-return case above exercises the validate path;
+    # this exercises the raising path, which a track-after-write ordering would leave dirty.)
+    from stockroom.kicad import board as board_mod
+
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    pcb = proj / "board.kicad_pcb"
+    original = pcb.read_text(encoding="utf-8")
+    head_before = prepo.head()
+
+    def _partial_then_raise(self, path):
+        from pathlib import Path as _P
+        _P(path).write_text("(kicad_pcb\n\t(version 2026", encoding="utf-8")  # truncated
+        raise OSError("disk full mid-write")
+
+    monkeypatch.setattr(board_mod.Board, "save", _partial_then_raise)
+    with pytest.raises(OSError):
+        ops.set_settings(rec.id, thickness=0.8)
+
+    assert pcb.read_text(encoding="utf-8") == original  # restored despite the raising write
+    assert prepo.head() == head_before
+    assert prepo.is_clean()
     assert prepo.is_clean()

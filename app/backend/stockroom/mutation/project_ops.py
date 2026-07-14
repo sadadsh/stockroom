@@ -14,9 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from stockroom.kicad import project_settings
+from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import standards
+from stockroom.projects import settings_ops, standards
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
@@ -193,8 +194,10 @@ class ProjectOps:
             raise ValueError("this project's .kicad_pro is missing on disk; re-register the project")
         repo = GitRepo(Path(rec.git_root))
         with Transaction(repo) as txn:
-            project_settings.apply_patch(pro, patch)
+            # Track BEFORE the write so a save that raises mid-write is still rolled back to
+            # its committed bytes (track only records the path; the write may partly land).
             txn.track(pro)
+            project_settings.apply_patch(pro, patch)
             return txn.commit(message)
 
     def set_net_classes(self, project_id: str, classes, deleted=None, floor="none") -> dict:
@@ -239,3 +242,76 @@ class ProjectOps:
             rec, {"board": {"design_settings": ds}}, f"Edit {rec.name}: design rules"
         )
         return {"project": rec.name, "committed": sha, "design_rules": dict(rules)}
+
+    # --- M7f Editor writes (board setup + thickness) -------------------------
+
+    def _primary_board(self, rec: ProjectRecord) -> Path | None:
+        """The project's primary .kicad_pcb (board_paths[0], the alphabetically-first
+        board KiCad emits), resolved to an absolute path, or None when the project has no
+        board on disk. Board setup + thickness are per-.kicad_pcb; a multi-board project
+        edits this primary board (a per-board selector is a future add, logged)."""
+        for rel in rec.board_paths:
+            path = Path(rec.root) / rel
+            if path.exists():
+                return path
+        return None
+
+    def board_settings(self, project_id: str) -> dict:
+        """The project's current board setup (mask/paste clearances, tenting, origins) and
+        overall thickness, read straight from its primary .kicad_pcb (M7f-A), plus the
+        editable-field schema the frontend renders. Read-only. Raises FileNotFoundError for
+        an unknown id; a project with no board is an honest empty shape, never a crash."""
+        rec = self._require(project_id)
+        board_path = self._primary_board(rec)
+        setup: dict = {}
+        thickness = None
+        if board_path is not None:
+            board = Board.load(board_path)
+            setup = settings_ops.effective_board_setup(board.setup(include_aliases=False))
+            thickness = board.thickness()
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_board": board_path is not None,
+            "board_setup": setup,
+            "thickness": thickness,
+            "fields": settings_ops.BOARD_SETUP_FIELDS,
+        }
+
+    def set_settings(self, project_id: str, *, board_setup=None, thickness=None) -> dict:
+        """Write the project's board setup keys and/or overall thickness to its primary
+        .kicad_pcb as a minimal byte-preserving diff, one scoped commit on the project's
+        OWN git (M7f-A). Both edits, when given, land in a SINGLE atomic Transaction (one
+        commit or zero trace). Validated before any git touch: an unsupported key or a
+        non-positive thickness is a ValueError (-> 400). Raises FileNotFoundError (unknown
+        id); ValueError for a project not under git, with no board, or with nothing to write.
+        Returns the re-read settings plus the commit sha."""
+        rec = self._require(project_id)
+        if not board_setup and thickness is None:
+            raise ValueError("no settings to write")
+        if board_setup:
+            settings_ops.validate_board_setup(board_setup)
+        if thickness is not None:
+            settings_ops.validate_thickness(thickness)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before editing"
+            )
+        board_path = self._primary_board(rec)
+        if board_path is None:
+            raise ValueError("this project has no .kicad_pcb to edit")
+
+        repo = GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            board = Board.load(board_path)
+            if board_setup:
+                board.set_setup(board_setup)
+            if thickness is not None:
+                board.set_thickness(thickness)
+            # Track BEFORE the write: a save that raises mid-write (disk full, a lock, revoked
+            # permission) must still be rolled back to its committed bytes. track only records
+            # the path, so a partial write is restored via git even though save threw.
+            txn.track(board_path)
+            board.save(board_path)
+            sha = txn.commit(f"Edit {rec.name}: board setup")
+        return {**self.board_settings(project_id), "committed": sha}

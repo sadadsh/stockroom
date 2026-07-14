@@ -745,6 +745,128 @@ def test_patch_design_rules_evicts_the_stale_checks_cache(client, tmp_path, app_
     assert rec["id"] not in app_ctx.checks_cache
 
 
+# ---- M7f-A Editor: board setup + thickness ----------------------------------
+
+_PCB_FULL = (
+    "(kicad_pcb\n"
+    "\t(version 20260206)\n"
+    '\t(generator "pcbnew")\n'
+    '\t(generator_version "10.0")\n'
+    "\t(general\n\t\t(thickness 1.6)\n\t)\n"
+    '\t(paper "A4")\n'
+    "\t(setup\n"
+    "\t\t(pad_to_mask_clearance 0.0508)\n"
+    "\t\t(allow_soldermask_bridges_in_footprints no)\n"
+    "\t)\n"
+    '\t(net 0 "")\n'
+    ")\n"
+)
+
+
+def _make_git_pcb_project(dir_path, pro_text=_PRO_FULL, pcb_text=_PCB_FULL):
+    """A git-backed project dir with a committed .kicad_pro AND .kicad_pcb (so the
+    board-setup / thickness editor has a real board to write)."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text(pro_text, encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text("(kicad_sch)\n", encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(pcb_text, encoding="utf-8")
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+        subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+    return dir_path, head
+
+
+def test_get_settings_returns_board_setup_thickness_and_fields(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/settings").json()
+    assert body["under_git"] is True
+    assert body["has_board"] is True
+    assert body["board_setup"]["pad_to_mask_clearance"] == 0.0508
+    assert body["thickness"] == 1.6
+    assert any(f["key"] == "pad_to_mask_clearance" for f in body["fields"])
+
+
+def test_get_settings_no_board_is_honest(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")  # .kicad_pro only, no board
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/settings").json()
+    assert body["has_board"] is False
+    assert body["board_setup"] == {}
+    assert body["thickness"] is None
+
+
+def test_get_settings_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/settings").status_code == 404
+
+
+def test_patch_settings_edits_the_kicad_pcb_and_commits(client, tmp_path):
+    proj, head = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings",
+                     json={"board_setup": {"pad_to_mask_clearance": 0.1}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    on_disk = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    assert "(pad_to_mask_clearance 0.1)" in on_disk
+    assert "(allow_soldermask_bridges_in_footprints no)" in on_disk  # sibling preserved
+
+
+def test_patch_settings_writes_thickness(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"thickness": 0.8})
+    assert r.status_code == 200, r.text
+    assert r.json()["thickness"] == 0.8
+
+
+def test_patch_settings_bad_key_is_400(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings",
+                     json={"board_setup": {"not_a_real_key": 1}})
+    assert r.status_code == 400
+
+
+def test_patch_settings_bad_thickness_is_400(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"thickness": 0})
+    assert r.status_code == 400
+
+
+def test_patch_settings_no_board_is_400(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")  # no .kicad_pcb
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"thickness": 1.2})
+    assert r.status_code == 400
+
+
+def test_patch_settings_non_git_is_400(client, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")
+    (proj / "board.kicad_pcb").write_text(_PCB_FULL, encoding="utf-8")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"thickness": 1.2})
+    assert r.status_code == 400
+
+
+def test_patch_settings_unknown_project_is_404(client):
+    r = client.patch("/api/projects/nope/settings", json={"thickness": 1.2})
+    assert r.status_code == 404
+
+
+def test_patch_settings_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
+    # a board-setup change can change DRC outcomes, so the cached ERC/DRC must be evicted.
+    proj, _ = _make_git_pcb_project(tmp_path / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/settings", json={"thickness": 1.2})
+    assert rec["id"] not in app_ctx.checks_cache
+
+
 def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects").status_code == 401
     assert anon_client.post("/api/projects/x/checks").status_code == 401
@@ -757,3 +879,5 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects/x/design").status_code == 401
     assert anon_client.patch("/api/projects/x/net-classes", json={"classes": []}).status_code == 401
     assert anon_client.patch("/api/projects/x/design-rules", json={"rules": {}}).status_code == 401
+    assert anon_client.get("/api/projects/x/settings").status_code == 401
+    assert anon_client.patch("/api/projects/x/settings", json={"thickness": 1.2}).status_code == 401

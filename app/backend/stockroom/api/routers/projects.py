@@ -23,6 +23,7 @@ from stockroom.api.schemas import (
     RegisterProjectBody,
     SetDesignRulesBody,
     SetNetClassesBody,
+    SetSettingsBody,
 )
 from stockroom.kicad.errors import KiCadCliError
 
@@ -262,6 +263,29 @@ def projects_router(require_token) -> APIRouter:
         result = ctx.project_ops.set_design_rules(
             project_id, body.rules, track_widths=body.track_widths,
             via_dimensions=body.via_dimensions, diff_pair_dimensions=body.diff_pair_dimensions,
+        )
+        ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/settings")
+    def get_settings(request: Request, project_id: str) -> dict:
+        # The project's current board setup (mask/paste clearances, tenting, origins) +
+        # overall thickness, read from its primary .kicad_pcb, plus the editable-field
+        # schema the editor renders (M7f-A). Read-only. Unknown id -> 404; a project with
+        # no board is an honest empty shape, never a crash.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.board_settings(project_id)
+
+    @r.patch("/{project_id}/settings")
+    def patch_settings(request: Request, project_id: str, body: SetSettingsBody) -> dict:
+        # Write board setup and/or thickness to the primary .kicad_pcb as a minimal diff,
+        # one scoped commit on the project's OWN git (M7f-A). Unknown id -> 404; a project
+        # not under git, with no board, with nothing to write, or with a bad key/thickness
+        # -> 400; a GitError -> 503. A board-setup change can alter DRC outcomes, so the
+        # stale cached ERC/DRC is evicted and the next check re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.set_settings(
+            project_id, board_setup=body.board_setup, thickness=body.thickness,
         )
         ctx.checks_cache.pop(project_id, None)
         return result

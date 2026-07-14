@@ -10,7 +10,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { DesignRules, NetClass } from "./types";
+import type { BoardSetupValue, DesignRules, NetClass } from "./types";
 import { api, type ListPartsArgs } from "./client";
 
 export function usePartsQuery(args: ListPartsArgs) {
@@ -409,6 +409,7 @@ export function useDeleteProject() {
       qc.removeQueries({ queryKey: ["project-procurement", id] });
       qc.removeQueries({ queryKey: ["project-revisions", id] });
       qc.removeQueries({ queryKey: ["project-design", id] });
+      qc.removeQueries({ queryKey: ["project-settings", id] });
     },
   });
 }
@@ -464,6 +465,39 @@ export function useSetDesignRules() {
       }),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["project-design", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
+// --- Editor: board setup + thickness (M7f-A) ---
+
+// The project's current board setup + overall thickness read from its primary .kicad_pcb,
+// with the effective via-protection defaults filled server-side. Disabled until a project
+// is selected.
+export function useProjectSettings(id: string | null) {
+  return useQuery({
+    queryKey: ["project-settings", id],
+    queryFn: () => api.getBoardSettings(id as string),
+    enabled: !!id,
+  });
+}
+
+// A board-setup / thickness write re-reads the committed settings and the project detail,
+// and evicts the cached ERC/DRC server-side (a board-setup change can alter DRC), so the
+// checks query is invalidated to re-read the honest not-run shape rather than a stale pass.
+export function useSetProjectSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      board_setup?: Record<string, BoardSetupValue>;
+      thickness?: number;
+    }) =>
+      api.setBoardSettings(vars.id, { board_setup: vars.board_setup, thickness: vars.thickness }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-settings", vars.id] });
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
     },

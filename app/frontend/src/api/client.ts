@@ -30,8 +30,11 @@ import type {
   ProfilesResponse,
   ProjectDetail,
   ProjectSummary,
+  BoardSettings,
+  BoardSetupValue,
   RepairResult,
   RevisionsResult,
+  SetBoardSettingsResult,
   SetDesignRulesResult,
   SetNetClassesResult,
   SettingsInfo,
@@ -543,6 +546,26 @@ export const api = {
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/design-rules`,
       { body: { rules, ...opts } },
+    );
+  },
+
+  // The project's current board setup (mask/paste clearances, via protection, origins) +
+  // overall thickness read from its primary .kicad_pcb, plus the editable-field schema the
+  // form renders (M7f-A). Read-only.
+  getBoardSettings(id: string): Promise<BoardSettings> {
+    return apiGet<BoardSettings>(`/api/projects/${encodeURIComponent(id)}/settings`);
+  },
+
+  // Edit the project's board setup and/or overall thickness (M7f-A). Both optional; whichever
+  // are given write a minimal diff to the .kicad_pcb as one scoped commit on the project's git.
+  setBoardSettings(
+    id: string,
+    body: { board_setup?: Record<string, BoardSetupValue>; thickness?: number },
+  ): Promise<SetBoardSettingsResult> {
+    return request<SetBoardSettingsResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/settings`,
+      { body },
     );
   },
 };

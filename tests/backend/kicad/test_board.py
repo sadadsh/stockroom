@@ -270,6 +270,89 @@ def test_set_setup_key_convenience(tmp_fixture):
     assert "(filling yes)" in b.serialize()
 
 
+# ------------------------------------------------ (general) / thickness ----
+
+# A .kicad_pcb whose (general) block carries both thickness and a sibling key, so
+# a thickness edit is provably minimal (the sibling must survive untouched).
+_GENERAL_TWO = (
+    '(kicad_pcb\n\t(version 20260206)\n\t(generator "pcbnew")\n'
+    '\t(generator_version "10.0")\n'
+    "\t(general\n\t\t(thickness 1.6)\n\t\t(legacy_teardrops no)\n\t)\n"
+    '\t(paper "A4")\n)\n'
+)
+
+
+def test_reads_board_thickness(tmp_fixture):
+    assert Board.load(tmp_fixture("minimal.kicad_pcb")).thickness() == 1.6
+
+
+def test_general_returns_thickness(tmp_fixture):
+    assert Board.load(tmp_fixture("minimal.kicad_pcb")).general()["thickness"] == 1.6
+
+
+def test_thickness_is_none_when_no_general_block():
+    b = _board(_STUB)
+    assert b.general() == {}
+    assert b.thickness() is None
+
+
+def test_set_thickness_in_place_is_minimal(tmp_fixture):
+    b = Board.load(tmp_fixture("minimal.kicad_pcb"))
+    original = b.serialize()
+    b.set_thickness(0.8)
+    out = b.serialize()
+    assert "(thickness 0.8)" in out
+    assert Board(SexpDocument.parse(out)).thickness() == 0.8
+    assert_only_changed(original, out, allowed_changes=1)
+
+
+def test_set_thickness_integral_formatting():
+    b = _board(_GENERAL_TWO)
+    b.set_thickness(2)
+    assert "(thickness 2)" in b.serialize()
+
+
+def test_set_thickness_preserves_sibling_general_keys():
+    b = _board(_GENERAL_TWO)
+    original = b.serialize()
+    b.set_thickness(1.2)
+    out = b.serialize()
+    assert "(legacy_teardrops no)" in out  # sibling untouched
+    assert Board(SexpDocument.parse(out)).thickness() == 1.2
+    assert_only_changed(original, out, allowed_changes=1)
+
+
+def test_set_thickness_inserts_into_a_general_without_thickness():
+    text = (
+        '(kicad_pcb\n\t(version 20260206)\n\t(generator "pcbnew")\n'
+        '\t(generator_version "10.0")\n'
+        "\t(general\n\t\t(legacy_teardrops no)\n\t)\n)\n"
+    )
+    b = _board(text)
+    b.set_thickness(1.6)
+    out = b.serialize()
+    assert Board(SexpDocument.parse(out)).thickness() == 1.6
+    assert "(legacy_teardrops no)" in out
+
+
+def test_set_thickness_creates_a_general_block_when_none_exists():
+    b = _board(_STUB)
+    b.set_thickness(1.6)
+    out = b.serialize()
+    assert "(general" in out
+    assert Board(SexpDocument.parse(out)).thickness() == 1.6
+    # (general) must precede a (setup) that a later edit could add (KiCad's order).
+    assert out.index("generator_version") < out.index("(general")
+
+
+def test_can_edit_thickness_after_a_fresh_general(tmp_fixture):
+    b = _board(_STUB)
+    b.set_thickness(1.6)  # creates the block (needs a reload)
+    b.set_thickness(0.8)  # re-edits it
+    assert b.thickness() == 0.8
+    assert b.serialize().count("(thickness") == 1  # not duplicated
+
+
 # --------------------------------------------------------- validation ------
 
 
