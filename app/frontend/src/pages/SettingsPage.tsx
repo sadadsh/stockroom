@@ -76,6 +76,7 @@ export function SettingsPage() {
           <AppearanceSection />
           <ProfilesSection />
           <SyncSection />
+          <GitHubSection />
           <KiCadSection />
           <DistributorSection />
           <UpdateSection />
@@ -446,6 +447,89 @@ function DistributorSection() {
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
             Clear
+          </Button>
+        ) : null}
+      </div>
+    </Section>
+  );
+}
+
+// The GitHub sign-in: paste a fine-grained personal access token so the app can auto-push a part
+// add to the library repo and pull collaborators' changes. Each collaborator connects their own
+// token; the repo owner grants them write access on GitHub. The token is stored per machine and
+// never shown again.
+function GitHubSection() {
+  const settings = useSettings();
+  const save = useUpdateSettings();
+  const { toast } = useToast();
+  const [tokenInput, setTokenInput] = useState("");
+  const isSet = settings.data?.github_token_set ?? false;
+
+  function onSave() {
+    const token = tokenInput.trim();
+    if (!token || save.isPending) return;
+    save.mutate(
+      { github_token: token },
+      {
+        onSuccess: () => {
+          setTokenInput("");
+          toast("Connected to GitHub. Your part changes will push automatically.", "ok");
+        },
+        onError: (e) => toast(errMsg(e), "err"),
+      },
+    );
+  }
+
+  function onClear() {
+    save.mutate(
+      { github_token: "" },
+      {
+        onSuccess: () => {
+          setTokenInput("");
+          toast("Disconnected from GitHub.", "ok");
+        },
+        onError: (e) => toast(errMsg(e), "err"),
+      },
+    );
+  }
+
+  return (
+    <Section
+      title="GitHub"
+      hint="Connect a GitHub personal access token so adding or editing a part pushes it to the library repo automatically, and collaborators' changes pull in on launch. Create a fine-grained token with Contents: write on the library repo. Each collaborator connects their own token (and needs write access, granted by the repo owner). Stored per machine, never shown again."
+    >
+      <StatusRow
+        label="Connection"
+        value={
+          settings.isLoading
+            ? "Loading..."
+            : isSet
+              ? `Connected (token ending ${settings.data?.github_token_hint})`
+              : "Not connected"
+        }
+      />
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+        <label htmlFor="github-token" className="sr-only">
+          GitHub Personal Access Token
+        </label>
+        <input
+          id="github-token"
+          type="password"
+          autoComplete="off"
+          value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+          }}
+          placeholder={isSet ? "Paste a new token to replace it" : "Paste a token to connect"}
+          className={INPUT_CLS}
+        />
+        <Button onClick={onSave} disabled={!tokenInput.trim() || save.isPending}>
+          Connect
+        </Button>
+        {isSet ? (
+          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
+            Disconnect
           </Button>
         ) : null}
       </div>

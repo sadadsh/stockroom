@@ -276,6 +276,28 @@ class GitRepo:
             return PullResult(ok=False, updated=False, reason=reason)
         return PullResult(ok=True, updated=self.head() != before, reason="")
 
+    def pull_rebase(self) -> PullResult:
+        """Pull, REBASING local commits onto the upstream. For the in-repo library (which shares
+        one repo with the app code), a local part commit + a remote app-code commit touch DISJOINT
+        paths, so a rebase replays the part commit on top of the update cleanly, reconciling what a
+        fast-forward could not. A real conflict aborts the half-applied rebase and reports honestly."""
+        before = self.head()
+        proc = self._run("pull", "--rebase", check=False)
+        if proc.returncode != 0:
+            self._run("rebase", "--abort", check=False)  # leave the tree clean on a conflict
+            text = (proc.stderr + proc.stdout).lower()
+            reason = "not fast-forwardable (diverged)" if "conflict" in text else proc.stderr.strip()
+            return PullResult(ok=False, updated=False, reason=reason)
+        return PullResult(ok=True, updated=self.head() != before, reason="")
+
+    def set_config(self, key: str, value: str) -> None:
+        """Set a LOCAL git config key on this repo (in .git/config, never committed)."""
+        self._run("config", key, value)
+
+    def unset_config(self, key: str) -> None:
+        """Remove a local git config key (idempotent: absent is not an error)."""
+        self._run("config", "--unset-all", key, check=False)
+
     def has_remote(self) -> bool:
         return bool(self._run("remote", check=False).stdout.strip())
 

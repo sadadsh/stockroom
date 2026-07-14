@@ -236,7 +236,8 @@ export function useSettings() {
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (patch: { mouser_api_key?: string }) => api.updateSettings(patch),
+    mutationFn: (patch: { mouser_api_key?: string; github_token?: string }) =>
+      api.updateSettings(patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
   });
 }

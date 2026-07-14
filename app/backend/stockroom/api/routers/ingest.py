@@ -94,6 +94,7 @@ def ingest_router(require_token) -> APIRouter:
         candidate = dto_to_candidate(body)
         record = pipeline.commit(candidate)  # IncompleteError -> 422 via the handler
         ctx.rebuild_index()
+        ctx.auto_push()  # adding a part auto-pushes it to git so collaborators get it on next launch
         return record.to_dict()
 
     @r.get("/jobs/{job_id}/events")

@@ -368,7 +368,7 @@ export const api = {
     return apiGet<SettingsInfo>("/api/settings");
   },
 
-  updateSettings(patch: { mouser_api_key?: string }): Promise<SettingsInfo> {
+  updateSettings(patch: { mouser_api_key?: string; github_token?: string }): Promise<SettingsInfo> {
     return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
   },
 

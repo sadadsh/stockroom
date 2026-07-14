@@ -224,6 +224,8 @@ export interface JobRef {
 export interface SettingsInfo {
   mouser_api_key_set: boolean;
   mouser_api_key_hint: string;
+  github_token_set: boolean;
+  github_token_hint: string;
 }
 
 // GET /api/profiles, POST /api/profiles

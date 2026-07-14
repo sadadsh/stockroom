@@ -50,6 +50,8 @@ beforeEach(() => {
   mockApi.getSettings.mockResolvedValue({
     mouser_api_key_set: false,
     mouser_api_key_hint: "",
+    github_token_set: false,
+    github_token_hint: "",
   });
   mockApi.listProfiles.mockResolvedValue({
     profiles: ["Main", "Archive"],
@@ -79,6 +81,8 @@ beforeEach(() => {
   mockApi.updateSettings.mockResolvedValue({
     mouser_api_key_set: true,
     mouser_api_key_hint: "Y123",
+    github_token_set: true,
+    github_token_hint: "1234",
   });
   mockApi.doSync.mockResolvedValue({
     state: "synced",
@@ -202,13 +206,15 @@ describe("SettingsPage — distributor key", () => {
     await userEvent.type(input, "MOUSERKEY123");
     await userEvent.type(input, "{Enter}{Enter}");
     expect(mockApi.updateSettings).toHaveBeenCalledTimes(1);
-    resolve({ mouser_api_key_set: true, mouser_api_key_hint: "Y123" });
+    resolve({ mouser_api_key_set: true, mouser_api_key_hint: "Y123", github_token_set: false, github_token_hint: "" });
   });
 
   it("shows the hint when a key is set and can clear it", async () => {
     mockApi.getSettings.mockResolvedValue({
       mouser_api_key_set: true,
       mouser_api_key_hint: "1234",
+      github_token_set: false,
+      github_token_hint: "",
     });
     renderPage();
     expect(await screen.findByText(/1234/)).toBeInTheDocument();
@@ -289,3 +295,19 @@ describe("SettingsPage — sync + kicad + update", () => {
     ).toBeNull();
   });
 });
+
+  it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
+    mockApi.getSettings.mockResolvedValue({
+      mouser_api_key_set: false,
+      mouser_api_key_hint: "",
+      github_token_set: false,
+      github_token_hint: "",
+    });
+    renderPage();
+    await screen.findByText("GitHub");
+    const input = screen.getByLabelText("GitHub Personal Access Token");
+    expect((input as HTMLInputElement).type).toBe("password"); // the token is never shown
+    await userEvent.type(input, "ghp_TESTTOKEN");
+    await userEvent.click(screen.getByRole("button", { name: "Connect" }));
+    expect(mockApi.updateSettings).toHaveBeenCalledWith({ github_token: "ghp_TESTTOKEN" });
+  });
