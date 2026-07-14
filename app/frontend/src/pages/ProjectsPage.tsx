@@ -41,6 +41,8 @@ import {
   useApplyStackup,
   useProjectPrepare,
   useInvalidateAfterPrepare,
+  useProjectFields,
+  useSetFields,
   useManualFill,
   useRestore,
   usePartsQuery,
@@ -77,6 +79,8 @@ import type {
   CompletionRoll,
   DesignResult,
   DesignRules,
+  FieldRow,
+  FieldEdit,
   NetClass,
   ProcurementExportOptions,
   ProcurementLine,
@@ -445,6 +449,7 @@ function ProjectDetailView({
       <StackupSection key={`stackup-${project.id}`} projectId={project.id} />
       <ConformSection key={`conform-${project.id}`} projectId={project.id} />
       <PrepareSection key={`prepare-${project.id}`} projectId={project.id} />
+      <FieldsSection key={`fields-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -1735,6 +1740,227 @@ function seedRules(rules: DesignRules): Record<string, string | boolean> {
 // The Editor: edit a project's net classes + board design rules and write each as a
 // minimal-diff, one scoped commit on the project's own git (M7e). Honest states for a
 // project not under git or with no .kicad_pro (neither is editable, never a crash).
+// M7h KiField bulk-field editor: the project's placed components as a rows-by-fields grid.
+// Every editable cell is an input; Reference and non-editable rows (unannotated, or a duplicate
+// designator) render as plain read-only text. A Save writes only the changed cells to the
+// schematic and commits them to the project's own git in one atomic commit. Adding a field
+// introduces a new editable column across the editable rows.
+function FieldsSection({ projectId }: { projectId: string }) {
+  const fields = useProjectFields(projectId);
+  const save = useSetFields();
+  const { toast } = useToast();
+  const data = fields.data;
+
+  // drafts[ref][field] overrides the on-disk value; extraCols are user-added field columns.
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
+  const [extraCols, setExtraCols] = useState<string[]>([]);
+  const [newField, setNewField] = useState("");
+
+  // Clear the pending edits only when the on-disk grid actually CHANGES (a save commit re-reads
+  // it), keyed on a content signature so an unrelated refetch never clobbers in-progress edits.
+  const sig = data ? JSON.stringify(data.rows.map((r) => [r.ref, r.fields])) : "";
+  useEffect(() => {
+    setDrafts({});
+    setExtraCols([]);
+    setNewField("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of the grid
+  }, [sig]);
+
+  const readonlyCols = new Set(data?.readonly_columns ?? []);
+  const columns = data
+    ? [...data.columns, ...extraCols.filter((c) => !data.columns.includes(c))]
+    : [];
+
+  function cellValue(row: FieldRow, col: string): string {
+    const d = drafts[row.ref];
+    if (d && col in d) return d[col];
+    return row.fields[col] ?? "";
+  }
+
+  function editCell(ref: string, col: string, value: string) {
+    setDrafts((ds) => ({ ...ds, [ref]: { ...(ds[ref] ?? {}), [col]: value } }));
+  }
+
+  function addField() {
+    const name = newField.trim();
+    if (!name) return;
+    if (readonlyCols.has(name)) {
+      toast(`The ${name} field is set by annotation, not the field editor.`, "err");
+      return;
+    }
+    if (!columns.includes(name)) setExtraCols((cs) => [...cs, name]);
+    setNewField("");
+  }
+
+  // The edits = every draft cell on an EDITABLE row whose value differs from the on-disk value
+  // (a new-column cell has on-disk "", so any non-blank is an edit). Read-only columns skipped.
+  const edits: FieldEdit[] = [];
+  if (data) {
+    for (const row of data.rows) {
+      if (!row.editable) continue;
+      const d = drafts[row.ref];
+      if (!d) continue;
+      for (const [field, value] of Object.entries(d)) {
+        if (readonlyCols.has(field)) continue;
+        if (value !== (row.fields[field] ?? "")) edits.push({ ref: row.ref, field, value });
+      }
+    }
+  }
+  const dirty = edits.length > 0;
+
+  function onSave() {
+    if (!dirty) return;
+    save.mutate(
+      { id: projectId, edits },
+      {
+        onSuccess: (res) =>
+          toast(
+            res.committed
+              ? `Saved ${res.fields} field value(s) on ${res.components} component(s).`
+              : "Those values already match the schematic, so nothing changed.",
+            res.committed ? "ok" : "neutral",
+          ),
+        onError: (e) => toast(errMsg(e, "Could not save the field changes."), "err"),
+      },
+    );
+  }
+
+  const canEdit = !!data && data.has_sch && data.under_git;
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="fields-section">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Eyebrow className="mb-0.5">Fields</Eyebrow>
+            {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+          </div>
+          <p className="text-xs text-t3">
+            Edit component fields in bulk. Each save writes only the changed cells to the schematic
+            and commits them to the project's own git history in one atomic commit.
+          </p>
+        </div>
+        {canEdit ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              className={`${INPUT_CLS} w-40 !py-1 text-xs`}
+              data-testid="fields-new-field"
+              placeholder="Add A Field"
+              value={newField}
+              onChange={(e) => setNewField(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addField();
+              }}
+            />
+            <Button small onClick={addField} disabled={!newField.trim()}>
+              Add Field
+            </Button>
+            <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+              {save.isPending ? "Saving..." : "Save Field Edits"}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {fields.isLoading ? (
+        <p className="text-sm text-t3">Loading the component fields...</p>
+      ) : fields.isError ? (
+        <p className="text-sm text-err">
+          {errMsg(fields.error, "Could not read the component fields.")}
+        </p>
+      ) : !data ? null : !data.has_sch ? (
+        <p className="text-sm text-t3">
+          This project has no schematic sheets, so there are no component fields to edit.
+        </p>
+      ) : data.rows.length === 0 ? (
+        <p className="text-sm text-t3">This project's schematic has no placed components.</p>
+      ) : (
+        <>
+          {!data.under_git ? (
+            <p className="mb-3 text-sm text-t3" data-testid="fields-no-git">
+              This project is not under git, so its fields are read-only here. Initialize a git
+              repository for it to edit fields, so each change is committed atomically and can be
+              undone.
+            </p>
+          ) : null}
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-xs" data-testid="fields-table">
+              <thead>
+                <tr className="border-b border-line text-left text-2xs text-t3">
+                  {columns.map((col) => (
+                    <th key={col} className="whitespace-nowrap px-2 py-1.5 font-medium text-t2">
+                      {col}
+                      {readonlyCols.has(col) ? (
+                        <span className="ml-1 font-normal text-t4">(read only)</span>
+                      ) : null}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row) => (
+                  <tr
+                    key={row.ref}
+                    className="border-b border-line"
+                    data-testid={`fields-row-${row.ref}`}
+                  >
+                    {columns.map((col) => {
+                      const ro = readonlyCols.has(col) || !row.editable || !data.under_git;
+                      const conflict = row.conflicts.includes(col);
+                      const changed = cellValue(row, col) !== (row.fields[col] ?? "");
+                      return (
+                        <td key={col} className="px-1 py-0.5 align-top">
+                          {ro ? (
+                            <span
+                              className={`block px-2 py-1 ${
+                                conflict ? "text-warn" : col === "Reference" ? "text-t1" : "text-t3"
+                              }`}
+                              title={
+                                col === "Reference"
+                                  ? "The reference designator is set by annotation"
+                                  : row.unannotated
+                                    ? "Annotate this component before editing its fields"
+                                    : conflict
+                                      ? "This designator is shared by another component; resolve the duplicate first"
+                                      : undefined
+                              }
+                            >
+                              {cellValue(row, col)}
+                            </span>
+                          ) : (
+                            <input
+                              type="text"
+                              className={`${INPUT_CLS} !px-2 !py-1 text-xs ${changed ? "border-acc" : ""}`}
+                              data-testid={`fields-cell-${row.ref}-${col}`}
+                              value={cellValue(row, col)}
+                              onChange={(e) => editCell(row.ref, col, e.target.value)}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {data.summary.unannotated > 0 || data.summary.duplicate > 0 ? (
+            <p className="mt-2 text-2xs text-t3" data-testid="fields-readonly-note">
+              {data.summary.unannotated > 0
+                ? `${data.summary.unannotated} unannotated component(s) are read-only here; run Prepare to annotate them first. `
+                : ""}
+              {data.summary.duplicate > 0
+                ? `${data.summary.duplicate} component(s) share a designator with a different component and stay read-only until the duplicate is resolved.`
+                : ""}
+            </p>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function EditorSection({ projectId }: { projectId: string }) {
   const [floor, setFloor] = useState("none");
   const design = useProjectDesign(projectId, floor);

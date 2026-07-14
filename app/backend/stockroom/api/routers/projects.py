@@ -24,6 +24,7 @@ from stockroom.api.schemas import (
     ProjectSummary,
     RegisterProjectBody,
     SetDesignRulesBody,
+    SetFieldsBody,
     SetNetclassPatternsBody,
     SetNetClassesBody,
     SetSettingsBody,
@@ -324,6 +325,27 @@ def projects_router(require_token) -> APIRouter:
             erc_pin_map=body.erc_pin_map, text_variables=body.text_variables,
         )
         ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/fields")
+    def get_fields(request: Request, project_id: str) -> dict:
+        # The KiField bulk-field grid: every placed component across every sheet as a
+        # rows-by-fields table, Reference read-only (M7h). Read-only. Unknown id -> 404; a
+        # project with no schematic is an honest empty grid.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.fields(project_id)
+
+    @r.patch("/{project_id}/fields")
+    def patch_fields(request: Request, project_id: str, body: SetFieldsBody) -> dict:
+        # Apply a batch of field-cell edits across the project's schematic as ONE atomic commit
+        # on its own git (M7h). Unknown id -> 404; editing the Reference field, an unknown or
+        # non-editable ref, a project not under git, or uncommitted schematic changes -> 400; a
+        # GitError -> 503. A field change alters the netlist/BOM, so the stale cached ERC/DRC + BOM
+        # are evicted and the next check/build re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.set_fields(project_id, [e.model_dump() for e in body.edits])
+        ctx.checks_cache.pop(project_id, None)
+        ctx.bom_cache.pop(project_id, None)
         return result
 
     @r.get("/{project_id}/conform")
