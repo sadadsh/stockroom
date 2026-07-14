@@ -146,6 +146,142 @@ class ProjectOps:
         result["project"] = rec.name
         return result
 
+    def buildability(self, project_id: str, checks=None, bom=None) -> dict:
+        """Fuse the readiness signals into ONE ready-to-build verdict (M7g). READ-only: no
+        Transaction, no commit, no cache eviction. `checks` / `bom` are the CACHED results the
+        router injects (ctx.checks_cache.get(id) / ctx.bom_cache.get(id)); a cold cache is an
+        honest 'not run yet' HARD blocker, NEVER a fabricated pass (a false READY is worse than
+        a false NOT-READY). Completeness is computed LIVE (no library needed), so it agrees with
+        the Prepare section by construction. Separation of concerns: completeness owns the
+        physical board (annotation + footprint), the BOM owns orderability (priced + stock +
+        lifecycle). Returns {project, ready, signals, blockers, warnings}; `ready` is True only
+        when there are ZERO hard blockers. Raises FileNotFoundError for an unknown id."""
+        rec = self._require(project_id)
+        blockers: list[dict] = []
+        warnings: list[dict] = []
+
+        # -- completeness (live read; no library) --
+        sheets = self._sheet_abs(rec)
+        has_sch = bool(sheets)
+        comps: list[dict] = []
+        for p in sheets:
+            with open(p, encoding="utf-8", newline="") as fh:
+                comps.extend(fill.read_components(SexpDocument.parse(fh.read())))
+        cr = fill.project_readiness(comps)
+        comp_state = "pass"
+        if not has_sch:
+            comp_state = "fail"
+            blockers.append({"kind": "no_schematic",
+                             "detail": "this project has no schematic to build from",
+                             "next_step": "register a project that has a .kicad_sch"})
+        else:
+            if cr["unannotated"]:
+                comp_state = "fail"
+                blockers.append({"kind": "unannotated",
+                                 "detail": f"{cr['unannotated']} reference(s) are not annotated",
+                                 "next_step": "Prepare the project (Prepare section)"})
+            if cr["missing_footprint"]:
+                comp_state = "fail"
+                blockers.append({"kind": "missing_footprint",
+                                 "detail": f"{cr['missing_footprint']} component(s) have no footprint",
+                                 "next_step": "assign footprints (Prepare, or in KiCad)"})
+            incomplete = cr["total"] - cr["complete"]
+            if incomplete:
+                warnings.append({"kind": "identity_incomplete",
+                                 "detail": f"{incomplete} component(s) have incomplete library identity",
+                                 "next_step": "Prepare the project (Prepare section)"})
+        completeness = {"state": comp_state, "has_sch": has_sch, "total": cr["total"],
+                        "complete": cr["complete"], "unannotated": cr["unannotated"],
+                        "missing_footprint": cr["missing_footprint"],
+                        "incomplete_refs": cr["incomplete_refs"], "missing_counts": cr["missing_counts"]}
+
+        # -- ERC/DRC (cached; cold cache = not run = HARD blocker, never a pass) --
+        if not checks or checks.get("ran_at") is None:
+            checks_signal = {"state": "not_run", "ran_at": None, "errors": 0,
+                             "warnings": 0, "checked": 0, "ok": False}
+            blockers.append({"kind": "checks_not_run",
+                             "detail": "ERC and DRC have not been run",
+                             "next_step": "run the checks (Checks section)"})
+        else:
+            summ = checks.get("summary") or {}
+            errors, warns = summ.get("errors", 0), summ.get("warnings", 0)
+            checked, ok = summ.get("checked", 0), bool(summ.get("ok"))
+            checks_signal = {"state": "pass", "ran_at": checks.get("ran_at"), "errors": errors,
+                             "warnings": warns, "checked": checked, "ok": ok}
+            if errors > 0 or not ok:
+                checks_signal["state"] = "fail"
+                detail = (f"{errors} ERC/DRC error(s)" if errors > 0
+                          else "the last ERC/DRC run did not complete cleanly")
+                blockers.append({"kind": "checks_failed", "detail": detail,
+                                 "next_step": "fix the errors and re-run (Checks section)"})
+            elif warns > 0:
+                warnings.append({"kind": "checks_warnings",
+                                 "detail": f"{warns} ERC/DRC warning(s)",
+                                 "next_step": "review the warnings (Checks section)"})
+
+        # -- BOM (cached; cold cache = not built = HARD blocker, never a fabricated cost) --
+        if not bom or bom.get("ran_at") is None:
+            bom_signal = {"state": "not_built", "ran_at": None, "priced": False,
+                          "line_count": 0, "unpriced_lines": 0, "risks": None}
+            blockers.append({"kind": "bom_not_built",
+                             "detail": "the BOM has not been built",
+                             "next_step": "build the BOM (BOM section)"})
+        else:
+            from stockroom.projects.procurement import project_procurement
+
+            proc = project_procurement(bom)
+            risks = proc["risks"]
+            unpriced = (bom.get("summary") or {}).get("unpriced_lines", 0)
+            bom_signal = {"state": "pass", "ran_at": bom.get("ran_at"), "priced": bool(proc["priced"]),
+                          "line_count": len(proc["lines"]), "unpriced_lines": unpriced, "risks": risks}
+            soft = False
+            if unpriced:
+                soft = True
+                warnings.append({"kind": "bom_unpriced",
+                                 "detail": f"{unpriced} BOM line(s) are unpriced",
+                                 "next_step": "price the BOM (BOM section)"})
+            short = risks.get("no_stock", 0) + risks.get("insufficient_stock", 0)
+            if short:
+                soft = True
+                warnings.append({"kind": "bom_stock",
+                                 "detail": f"{short} BOM line(s) are out of or short on stock",
+                                 "next_step": "review sourcing (Procurement)"})
+            if risks.get("not_active"):
+                soft = True
+                warnings.append({"kind": "bom_lifecycle",
+                                 "detail": f"{risks['not_active']} BOM line(s) are NRND or EOL",
+                                 "next_step": "review sourcing (Procurement)"})
+            if soft:
+                bom_signal["state"] = "warn"
+
+        # -- git working tree (scoped to THIS project's files) --
+        if not rec.git_root:
+            git_signal = {"state": "not_git", "under_git": False, "dirty": False}
+            warnings.append({"kind": "not_git",
+                             "detail": "this project is not under version control",
+                             "next_step": "initialize a git repo for it"})
+        else:
+            root = Path(rec.root)
+            proj_files = [root / rel for rel in
+                          (list(rec.sheet_paths) + list(rec.board_paths)
+                           + ([rec.pro_path] if rec.pro_path else []))
+                          if (root / rel).exists()]
+            clean = GitRepo(Path(rec.git_root)).is_clean(proj_files) if proj_files else True
+            git_signal = {"state": "clean" if clean else "dirty", "under_git": True, "dirty": not clean}
+            if not clean:
+                warnings.append({"kind": "dirty_tree",
+                                 "detail": "there are uncommitted changes; this build will not match a commit",
+                                 "next_step": "commit or discard your changes"})
+
+        return {
+            "project": rec.name,
+            "ready": len(blockers) == 0,
+            "signals": {"completeness": completeness, "checks": checks_signal,
+                        "bom": bom_signal, "git": git_signal},
+            "blockers": blockers,
+            "warnings": warnings,
+        }
+
     # --- M7e Editor writes (design rules + net classes) ----------------------
 
     def _require(self, project_id: str) -> ProjectRecord:

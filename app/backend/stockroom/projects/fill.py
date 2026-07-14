@@ -271,6 +271,19 @@ def project_completion(components: list[dict]) -> dict:
     }
 
 
+def project_readiness(components: list[dict]) -> dict:
+    """`project_completion` extended for the M7g Buildability verdict: adds `unannotated`
+    (references still on a `<prefix>?` placeholder) and `missing_footprint` (components with
+    no footprint). Those two are the PHYSICAL-BOARD hard blockers Buildability gates READY on,
+    kept separate from orderability (MPN / stock), which the BOM signal owns. Pure; the current
+    residual needs no library, so the verdict agrees with the Prepare section by construction."""
+    comp = project_completion(components)
+    comps = components or []
+    comp["unannotated"] = sum(1 for c in comps if _UNANNOTATED.match((c.get("ref") or "")))
+    comp["missing_footprint"] = comp["missing_counts"].get("Footprint", 0)
+    return comp
+
+
 # -- schematic read (placed instances only) -----------------------------------
 
 

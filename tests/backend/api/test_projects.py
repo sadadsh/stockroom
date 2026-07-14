@@ -156,6 +156,43 @@ def test_audit_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/audit").status_code == 404
 
 
+# ---- buildability (M7g) -----------------------------------------------------
+
+_BUILD_CHECKS_OK = {"ran_at": "2026-07-14T00:00:00Z",
+                    "summary": {"ok": True, "errors": 0, "warnings": 0, "checked": 1}}
+_BUILD_BOM_OK = {"ran_at": "2026-07-14T00:00:00Z", "boards": 1, "priced": True,
+                 "lines": [{"mpn": "X", "qty": 1, "stock": 100, "unit_price": 0.1,
+                            "extended": 0.1, "lifecycle": "Active"}],
+                 "summary": {"unpriced_lines": 0}}
+
+
+def test_buildability_cold_caches_are_honest_blockers(client, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")  # R? with an empty footprint
+    rec = _register(client, proj)
+    v = client.get(f"/api/projects/{rec['id']}/buildability").json()
+    assert v["ready"] is False
+    kinds = {b["kind"] for b in v["blockers"]}
+    assert {"unannotated", "missing_footprint", "checks_not_run", "bom_not_built"} <= kinds
+    # a cold cache is surfaced as its honest state, never a fabricated pass
+    assert v["signals"]["checks"]["state"] == "not_run"
+    assert v["signals"]["bom"]["state"] == "not_built"
+
+
+def test_buildability_reads_the_injected_caches(client, app_ctx, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = _BUILD_CHECKS_OK
+    app_ctx.bom_cache[rec["id"]] = _BUILD_BOM_OK
+    v = client.get(f"/api/projects/{rec['id']}/buildability").json()
+    assert v["signals"]["checks"]["state"] == "pass"  # the router injected the cached run
+    assert v["signals"]["bom"]["state"] == "pass"
+    assert v["ready"] is False  # still blocked on the unannotated/no-footprint sheet
+
+
+def test_buildability_unknown_id_is_404(client):
+    assert client.get("/api/projects/nope/buildability").status_code == 404
+
+
 # A 2-pin symbol plus a footprint the active profile resolves to 3 pads: the pin/pad
 # mismatch only surfaces if the router passes the profile's footprint dir to the audit.
 _MISMATCH_SHEET = (

@@ -387,6 +387,17 @@ export function useProjectBom(id: string | null) {
   });
 }
 
+// The M7g ready-to-build verdict: completeness + ERC/DRC + BOM + git fused. Read-only; the
+// section reactively refetches it when the checks/BOM caches change so it never disagrees
+// with the sections below.
+export function useBuildability(id: string | null) {
+  return useQuery({
+    queryKey: ["project-buildability", id],
+    queryFn: () => api.getBuildability(id as string),
+    enabled: !!id,
+  });
+}
+
 // The procurement view (M7d) over the cached BOM: per-line orderability + sourcing/stock
 // risk + lead time. Disabled until a project is selected; an honest not-built shape before a
 // build. Invalidated when the BOM (re)builds so it re-reads the fresh sourcing data.

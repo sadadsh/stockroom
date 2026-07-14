@@ -195,6 +195,32 @@ def test_project_completion_rolls_up_missing_counts():
     assert roll["missing_counts"]["MPN"] == 1
 
 
+def test_project_readiness_adds_unannotated_and_missing_footprint():
+    # M7g: the buildability verdict gates on the physical-board signals (annotation + footprint),
+    # so project_readiness extends the completion roll-up with those two counts.
+    comps = [
+        {"ref": "R?", "footprint": "", "props": {"Reference": "R?"}},  # unannotated + no footprint
+        {"ref": "U1", "footprint": "SR:x", "props": {
+            "MPN": "m", "Manufacturer": "t", "Datasheet": "d", "Description": "z", "Footprint": "SR:x"}},
+    ]
+    r = fill.project_readiness(comps)
+    assert r["total"] == 2 and r["complete"] == 1
+    assert r["unannotated"] == 1  # R?
+    assert r["missing_footprint"] == 1  # R? carries no footprint
+
+
+def test_project_readiness_clean_when_annotated_and_footprinted():
+    comps = [{"ref": "U1", "footprint": "SR:x", "props": {
+        "MPN": "m", "Manufacturer": "t", "Datasheet": "d", "Description": "z", "Footprint": "SR:x"}}]
+    r = fill.project_readiness(comps)
+    assert r["unannotated"] == 0 and r["missing_footprint"] == 0
+
+
+def test_project_readiness_empty_project():
+    r = fill.project_readiness([])
+    assert r["total"] == 0 and r["unannotated"] == 0 and r["missing_footprint"] == 0
+
+
 # -- annotation (byte-preserving, both forms) ----------------------------------
 
 

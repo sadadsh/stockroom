@@ -39,6 +39,7 @@ import type {
   ManualFillBody,
   ManualFillResult,
   RestoreResult,
+  Buildability,
   OnboardingStatus,
   ProfilesResponse,
   SetLibraryBody,
@@ -404,6 +405,14 @@ export const api = {
   // First-run library onboarding (M9b/M9c): point the app at a library (open an existing
   // one, clone a git URL, or create a fresh one) and repoint the running engine at it live.
   // A set/complete changes which library EVERY other query reads, so callers invalidate all.
+  // One ready-to-build verdict per project (M7g): completeness + ERC/DRC + BOM + git fused,
+  // with honest cold-cache states (read-only; the caches are read, never re-run here).
+  getBuildability(projectId: string): Promise<Buildability> {
+    return apiGet<Buildability>(
+      `/api/projects/${encodeURIComponent(projectId)}/buildability`,
+    );
+  },
+
   getOnboarding(): Promise<OnboardingStatus> {
     return apiGet<OnboardingStatus>("/api/onboarding");
   },

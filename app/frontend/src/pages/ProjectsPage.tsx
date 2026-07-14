@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import {
   useProjectsQuery,
+  useBuildability,
   useProjectAudit,
   useProjectBom,
   useProjectChecks,
@@ -50,6 +51,7 @@ import {
 import type {
   AuditFinding,
   AuditResult,
+  Buildability,
   BoardSetupField,
   BoardSetupValue,
   BomDiffResult,
@@ -84,7 +86,7 @@ import type {
 } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Eyebrow } from "../components/primitives";
+import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const INPUT_CLS =
@@ -413,6 +415,8 @@ function ProjectDetailView({
         </Button>
       </div>
 
+      <BuildabilitySection key={`build-${project.id}`} projectId={project.id} />
+
       {auditQuery.isLoading ? (
         <Card className="px-4 py-3.5">
           <p className="py-1 text-sm text-t3">Auditing the project...</p>
@@ -625,6 +629,130 @@ const CHECK_SEVERITY_TONE: Record<CheckFinding["severity"], "err" | "warn" | "ne
 // the cached result. Keyed by project id in the parent so its job state never leaks
 // across a project switch. Honest states throughout: a missing kicad-cli is an inline
 // error (never a fabricated pass), and an unrun project shows a "not run yet" prompt.
+const BUILD_SIGNAL_LABEL: Record<string, string> = {
+  pass: "Pass",
+  clean: "Clean",
+  fail: "Issues",
+  warn: "Warnings",
+  not_run: "Not Run",
+  not_built: "Not Built",
+  dirty: "Uncommitted",
+  not_git: "No Git",
+};
+
+function buildSignalTone(state: string): "ok" | "warn" | "err" {
+  if (state === "pass" || state === "clean") return "ok";
+  if (state === "fail" || state === "not_run" || state === "not_built") return "err";
+  return "warn"; // warn / dirty / not_git
+}
+
+function BuildabilitySection({ projectId }: { projectId: string }) {
+  const build = useBuildability(projectId);
+  const checks = useProjectChecks(projectId);
+  const bom = useProjectBom(projectId);
+  const qc = useQueryClient();
+  // Keep the verdict live: refetch it whenever the checks / BOM caches change (a run, a
+  // build, or an editor write that evicts them), so it never disagrees with the sections
+  // below. Those queries are always mounted in the detail.
+  const checksAt = checks.dataUpdatedAt;
+  const bomAt = bom.dataUpdatedAt;
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ["project-buildability", projectId] });
+  }, [checksAt, bomAt, projectId, qc]);
+
+  if (build.isLoading) {
+    return (
+      <Card className="mb-5 px-4 py-3.5" data-testid="buildability-section">
+        <p className="py-1 text-sm text-t3">Checking buildability...</p>
+      </Card>
+    );
+  }
+  if (build.isError || !build.data) {
+    return (
+      <Card className="mb-5 px-4 py-3.5" data-testid="buildability-section">
+        <p className="py-1 text-sm text-err">
+          {errMsg(build.error, "Could not compute buildability.")}
+        </p>
+      </Card>
+    );
+  }
+  const v: Buildability = build.data;
+  const signals: { key: string; label: string; state: string }[] = [
+    { key: "completeness", label: "Completeness", state: v.signals.completeness.state },
+    { key: "checks", label: "Rules Check", state: v.signals.checks.state },
+    { key: "bom", label: "BOM", state: v.signals.bom.state },
+    { key: "git", label: "Version Control", state: v.signals.git.state },
+  ];
+  return (
+    <Card className="mb-5 p-4" data-testid="buildability-section">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-0.5">Buildability</Eyebrow>
+          <p className="text-xs text-t3">
+            One verdict across completeness, rules, sourcing, and version control.
+          </p>
+        </div>
+        <Badge tone={v.ready ? "ok" : "err"} className="text-sm">
+          {v.ready ? "Ready to Build" : "Not Ready"}
+        </Badge>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {signals.map((s) => (
+          <div
+            key={s.key}
+            className="rounded-control border border-line bg-raise px-2.5 py-2"
+          >
+            <div className="text-xs text-t3">{s.label}</div>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <Dot tone={buildSignalTone(s.state)} />
+              <span className="text-sm font-medium text-t1">
+                {BUILD_SIGNAL_LABEL[s.state] ?? s.state}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {v.blockers.length > 0 ? (
+        <div className="mt-3.5">
+          <div className="mb-1 text-xs font-semibold text-t2">Blockers</div>
+          <ul className="space-y-1">
+            {v.blockers.map((b, i) => (
+              <li key={`b-${i}`} className="flex items-start gap-2 text-sm text-t1">
+                <span className="mt-1.5">
+                  <Dot tone="err" />
+                </span>
+                <span>
+                  {b.detail}. <span className="text-t3">{b.next_step}.</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {v.warnings.length > 0 ? (
+        <div className="mt-3.5">
+          <div className="mb-1 text-xs font-semibold text-t2">Warnings</div>
+          <ul className="space-y-1">
+            {v.warnings.map((w, i) => (
+              <li key={`w-${i}`} className="flex items-start gap-2 text-sm text-t2">
+                <span className="mt-1.5">
+                  <Dot tone="warn" />
+                </span>
+                <span>
+                  {w.detail}. <span className="text-t3">{w.next_step}.</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 function ChecksSection({ projectId }: { projectId: string }) {
   const checksQuery = useProjectChecks(projectId);
   const job = useJob<ChecksResult>();
