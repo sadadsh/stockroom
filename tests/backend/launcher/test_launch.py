@@ -292,6 +292,17 @@ def test_splash_run_uses_the_splash_result_when_available(monkeypatch):
     assert ran == []  # work is NOT double-run when the splash path handled it
 
 
+def test_single_instance_lock_blocks_a_second_holder(tmp_path):
+    first = launch.acquire_single_instance(tmp_path)
+    assert first is not None
+    second = launch.acquire_single_instance(tmp_path)
+    assert second is None  # the first launch holds the lock; a second must not race it
+    first.close()  # first exits -> lock released
+    third = launch.acquire_single_instance(tmp_path)
+    assert third is not None  # now free again
+    third.close()
+
+
 def test_supervise_ensures_before_first_run(tmp_path):
     order = []
     supervise(

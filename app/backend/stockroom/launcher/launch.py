@@ -175,6 +175,30 @@ def app_workdir() -> Path:
     return Path(xdg) / "stockroom" / "app"
 
 
+def acquire_single_instance(lock_dir: Path):
+    """Take an exclusive OS lock so a SECOND launch of the exe does not race the FIRST over the
+    same app working copy: two concurrent clones / uv syncs corrupt a half-provisioned checkout
+    (exactly the 'destination already exists and is not empty' failure a partial dir causes).
+    Returns an open file handle to HOLD for the process lifetime, or None if another instance
+    already holds the lock. The OS releases the lock automatically when the process exits."""
+    lock_dir = Path(lock_dir)
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    handle = open(lock_dir / "stockroom.lock", "w", encoding="utf-8")
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None  # another instance holds the lock
+    return handle
+
+
 def ensure_clone(
     workdir: Path,
     *,
@@ -299,6 +323,10 @@ def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
 
 
 def main() -> int:  # pragma: no cover - the frozen exe entry point
+    # Refuse to race a second launch over the same working copy (a concurrent clone/sync corrupts
+    # it); if another Stockroom already holds the lock, exit quietly rather than start a fight.
+    if acquire_single_instance(app_workdir().parent) is None:
+        return 0
     # Show a first-run progress splash during the slow provision (clone + WebView2 + uv sync); it
     # degrades to a plain run if a splash cannot be shown, so it never blocks the launch.
     from stockroom.launcher import splash
