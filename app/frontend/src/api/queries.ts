@@ -331,6 +331,16 @@ export function useProjectAudit(id: string | null) {
   });
 }
 
+// The cached last ERC/DRC run for one project (M7b). Disabled until a project is
+// selected; it returns an honest not-run shape (ran_at null) before the first run.
+export function useProjectChecks(id: string | null) {
+  return useQuery({
+    queryKey: ["project-checks", id],
+    queryFn: () => api.getChecks(id as string),
+    enabled: !!id,
+  });
+}
+
 // Registering a project rebuilds the project index server-side, so the list must
 // re-read to show the new project. Nothing else in the app reads project state.
 export function useRegisterProject() {
@@ -351,6 +361,7 @@ export function useDeleteProject() {
       qc.invalidateQueries({ queryKey: ["projects"] });
       qc.removeQueries({ queryKey: ["project", id] });
       qc.removeQueries({ queryKey: ["project-audit", id] });
+      qc.removeQueries({ queryKey: ["project-checks", id] });
     },
   });
 }

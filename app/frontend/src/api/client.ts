@@ -9,6 +9,7 @@ import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
   AuditResult,
+  ChecksResult,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
@@ -382,5 +383,17 @@ export const api = {
   // ACTIVE profile's footprint/model dirs, plus a shareable markdown report.
   projectAudit(id: string): Promise<AuditResult> {
     return apiGet<AuditResult>(`/api/projects/${encodeURIComponent(id)}/audit`);
+  },
+
+  // Run structured ERC + DRC (M7b) off the request path as a job (findings arrive on
+  // the job's SSE result event, openJobStream). A missing kicad-cli is an honest 502.
+  runChecks(id: string): Promise<JobRef> {
+    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/checks`);
+  },
+
+  // The cached last ERC/DRC run, or an honest not-run shape (ran_at null) before the
+  // first run. Read on selecting a project so a prior run renders without re-running.
+  getChecks(id: string): Promise<ChecksResult> {
+    return apiGet<ChecksResult>(`/api/projects/${encodeURIComponent(id)}/checks`);
   },
 };

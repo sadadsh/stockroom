@@ -381,6 +381,52 @@ export interface AuditResult {
   markdown: string;
 }
 
+// One ERC or DRC finding (POST /api/projects/{id}/checks). severity is
+// error | warning | exclusion | info; rule is the KiCad violation type; where is a
+// best-effort location string.
+export interface CheckFinding {
+  severity: "error" | "warning" | "exclusion" | "info";
+  rule: string;
+  message: string;
+  where: string;
+}
+
+// The result of ONE check: ERC on the root schematic, or DRC on a board. ok=false
+// means the check could not produce a valid report (never a clean pass); error carries
+// why. `sheet` is set on the ERC run, `board` on each DRC run.
+export interface CheckRun {
+  ok: boolean;
+  findings: CheckFinding[];
+  summary: {
+    total: number;
+    errors: number;
+    warnings: number;
+    by_severity: Record<string, number>;
+    by_rule: Record<string, number>;
+  };
+  error: string;
+  returncode?: number;
+  sheet?: string;
+  board?: string;
+}
+
+// POST/GET /api/projects/{id}/checks -> a full ERC + DRC run (M7b). ran_at is null (and
+// erc/summary null) before the first run: an honest "not checked yet" state, never a
+// fabricated pass. summary.ok=false means a check failed to complete.
+export interface ChecksResult {
+  project: string;
+  erc: CheckRun | null;
+  drc: CheckRun[];
+  summary: {
+    ok: boolean;
+    errors: number;
+    warnings: number;
+    total: number;
+    checked: number;
+  } | null;
+  ran_at: string | null;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;
