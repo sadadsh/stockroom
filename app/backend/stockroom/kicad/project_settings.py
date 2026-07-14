@@ -60,16 +60,29 @@ def merge(base: dict, patch: dict) -> dict:
     return out
 
 
-def apply_patch_text(text: str, patch: dict) -> str:
+def apply_patch_text(text: str, patch: dict, replace_keys: tuple = ()) -> str:
     """Load .kicad_pro text, partial-merge the patch, re-serialize in KiCad's format.
-    An empty patch returns byte-identical text."""
-    return serialize(merge(parse(text), patch))
+    An empty patch returns byte-identical text.
+
+    `replace_keys` names TOP-LEVEL keys whose merged value is then overwritten WHOLESALE
+    by the patch value (deep-copied), instead of being deep-merged. The merge can only
+    add or update keys, so it can never DELETE one; a wholesale replace is how a caller
+    expresses the full desired state of a map (e.g. text_variables) where a key absent
+    from the desired map means "delete it". A replace_key the patch does not carry is
+    left as merged (no KeyError), so a caller can pass a fixed tuple without guarding
+    each key's presence."""
+    out = merge(parse(text), patch)
+    for key in replace_keys:
+        if key in patch:
+            out[key] = copy.deepcopy(patch[key])
+    return serialize(out)
 
 
-def apply_patch(path, patch: dict) -> None:
-    """Read the .kicad_pro at `path`, apply the partial-merge, write it back (utf-8).
-    The caller wraps this in a Transaction, which tracks the path, re-parses it to
-    validate, commits it, and rolls it back on any failure.
+def apply_patch(path, patch: dict, replace_keys: tuple = ()) -> None:
+    """Read the .kicad_pro at `path`, apply the partial-merge (with any `replace_keys`
+    overwritten wholesale), write it back (utf-8). The caller wraps this in a Transaction,
+    which tracks the path, re-parses it to validate, commits it, and rolls it back on any
+    failure.
 
     newline="" on the write disables newline translation so KiCad's LF-terminated
     .kicad_pro is not rewritten to CRLF on Windows (which would defeat the minimal
@@ -78,4 +91,4 @@ def apply_patch(path, patch: dict) -> None:
     with open(p, encoding="utf-8", newline="") as fh:
         text = fh.read()
     with open(p, "w", encoding="utf-8", newline="") as fh:
-        fh.write(apply_patch_text(text, patch))
+        fh.write(apply_patch_text(text, patch, replace_keys=replace_keys))

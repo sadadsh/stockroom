@@ -256,11 +256,27 @@ class ProjectOps:
                 return path
         return None
 
+    def _read_pro(self, rec: ProjectRecord) -> tuple[dict, bool]:
+        """Parse the project's .kicad_pro (M7f-A2), returning (data, has_pro). A project with
+        no .kicad_pro, or one whose file moved after registration, is ({}, False) so the read
+        stays honest and never crashes."""
+        if not rec.pro_path:
+            return {}, False
+        pro = Path(rec.root) / rec.pro_path
+        if not pro.exists():
+            return {}, False
+        return project_settings.parse(pro.read_text(encoding="utf-8")), True
+
     def board_settings(self, project_id: str) -> dict:
         """The project's current board setup (mask/paste clearances, tenting, origins) and
-        overall thickness, read straight from its primary .kicad_pcb (M7f-A), plus the
-        editable-field schema the frontend renders. Read-only. Raises FileNotFoundError for
-        an unknown id; a project with no board is an honest empty shape, never a crash."""
+        overall thickness read from its primary .kicad_pcb (M7f-A), PLUS its .kicad_pro
+        settings (ERC/DRC rule severities, the ERC pin-conflict matrix, project text variables)
+        and the editor catalogs (M7f-A2). Read-only. Raises FileNotFoundError for an unknown id;
+        a project with no board and/or no .kicad_pro is an honest empty shape, never a crash.
+
+        erc_pin_map is the file's matrix or None when absent: it is NEVER fabricated as an
+        all-OK matrix, since that would silently disable every pin-conflict check KiCad's real
+        default enforces (the editor only offers the matrix when the file already carries one)."""
         rec = self._require(project_id)
         board_path = self._primary_board(rec)
         setup: dict = {}
@@ -269,49 +285,150 @@ class ProjectOps:
             board = Board.load(board_path)
             setup = settings_ops.effective_board_setup(board.setup(include_aliases=False))
             thickness = board.thickness()
+
+        pro_data, has_pro = self._read_pro(rec)
+        erc = pro_data.get("erc") or {}
+        ds = ((pro_data.get("board") or {}).get("design_settings")) or {}
+        erc_sev = erc.get("rule_severities")
+        drc_sev = ds.get("rule_severities")
+        pin_map = erc.get("pin_map")
+        text_vars = pro_data.get("text_variables")
         return {
             "project": rec.name,
             "under_git": bool(rec.git_root),
             "has_board": board_path is not None,
+            "has_pro": has_pro,
             "board_setup": setup,
             "thickness": thickness,
             "fields": settings_ops.BOARD_SETUP_FIELDS,
+            # .kicad_pro surfaces (M7f-A2). Values are coerced defensively so a malformed entry
+            # cannot break the editor; an absent map reads as {} / None (never a fabricated one).
+            "erc_severities": {str(k): v for k, v in erc_sev.items() if isinstance(v, str)}
+            if isinstance(erc_sev, dict) else {},
+            "drc_severities": {str(k): v for k, v in drc_sev.items() if isinstance(v, str)}
+            if isinstance(drc_sev, dict) else {},
+            "erc_pin_map": [[int(x) for x in row] for row in pin_map]
+            if isinstance(pin_map, list) and pin_map and all(isinstance(r, list) for r in pin_map)
+            else None,
+            "text_variables": {str(k): str(v) for k, v in text_vars.items()}
+            if isinstance(text_vars, dict) else {},
+            "severity_levels": list(settings_ops.SEVERITY_LEVELS),
+            "erc_pin_types": list(settings_ops.ERC_PIN_TYPES),
         }
 
-    def set_settings(self, project_id: str, *, board_setup=None, thickness=None) -> dict:
-        """Write the project's board setup keys and/or overall thickness to its primary
-        .kicad_pcb as a minimal byte-preserving diff, one scoped commit on the project's
-        OWN git (M7f-A). Both edits, when given, land in a SINGLE atomic Transaction (one
-        commit or zero trace). Validated before any git touch: an unsupported key or a
-        non-positive thickness is a ValueError (-> 400). Raises FileNotFoundError (unknown
-        id); ValueError for a project not under git, with no board, or with nothing to write.
-        Returns the re-read settings plus the commit sha."""
+    def set_settings(self, project_id: str, *, board_setup=None, thickness=None,
+                     erc_severities=None, drc_severities=None, erc_pin_map=None,
+                     text_variables=None) -> dict:
+        """Write the project's board setup / overall thickness (to its .kicad_pcb) and/or its
+        .kicad_pro settings (ERC/DRC rule severities, the ERC pin-conflict matrix, project text
+        variables), one scoped commit on the project's OWN git (M7f-A + A2). Whichever concerns
+        are given land in a SINGLE atomic Transaction that touches only the files it edits (one
+        commit, or every touched path restored and zero trace).
+
+        Everything is validated BEFORE any git touch (unsupported board key, non-positive
+        thickness, an unknown severity rule id, a malformed pin map, a blank text-var name are
+        each a ValueError -> 400). Severities merge per-rule (a sibling rule is preserved); the
+        pin map replaces its list wholesale; text_variables replaces wholesale so a var absent
+        from the submitted map is DELETED. Raises FileNotFoundError (unknown id); ValueError for
+        a project not under git, a board edit with no .kicad_pcb, a .kicad_pro edit with no
+        .kicad_pro, or nothing to write. Returns the re-read settings plus the commit sha.
+
+        `erc_severities`/`drc_severities`/`erc_pin_map` treat an empty/None value as 'not
+        submitted'; `text_variables` uses None for 'not submitted' so an empty {} is still a
+        legitimate 'clear all vars'."""
         rec = self._require(project_id)
-        if not board_setup and thickness is None:
+
+        has_board_edit = bool(board_setup) or thickness is not None
+        has_erc_sev = bool(erc_severities)
+        has_drc_sev = bool(drc_severities)
+        has_pin_map = erc_pin_map is not None
+        has_text_vars = text_variables is not None
+        has_pro_edit = has_erc_sev or has_drc_sev or has_pin_map or has_text_vars
+        if not has_board_edit and not has_pro_edit:
             raise ValueError("no settings to write")
+
+        # Validate every submitted concern before touching git (a clean 400, not a partial commit).
         if board_setup:
             settings_ops.validate_board_setup(board_setup)
         if thickness is not None:
             settings_ops.validate_thickness(thickness)
+
+        desired_text_vars = None
+        pro_path = None
+        if has_pro_edit:
+            pro_path = self._pro_path(rec)  # ValueError if the project has no .kicad_pro
+            if not pro_path.exists():
+                raise ValueError("this project's .kicad_pro is missing on disk; re-register the project")
+            pro_data = project_settings.parse(pro_path.read_text(encoding="utf-8"))
+            erc = pro_data.get("erc") or {}
+            ds = ((pro_data.get("board") or {}).get("design_settings")) or {}
+            cur_erc = erc.get("rule_severities") if isinstance(erc.get("rule_severities"), dict) else {}
+            cur_drc = ds.get("rule_severities") if isinstance(ds.get("rule_severities"), dict) else {}
+            if has_erc_sev:
+                settings_ops.validate_severity_map(
+                    erc_severities, allowed=set(cur_erc) | set(settings_ops.ERC_RULE_IDS))
+            if has_drc_sev:
+                settings_ops.validate_severity_map(
+                    drc_severities, allowed=set(cur_drc) | set(settings_ops.DRC_RULE_IDS))
+            if has_pin_map:
+                settings_ops.validate_pin_map(erc_pin_map)
+            if has_text_vars:
+                desired_text_vars = settings_ops.reconcile_text_variables(text_variables)
+
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing"
             )
-        board_path = self._primary_board(rec)
-        if board_path is None:
+        board_path = self._primary_board(rec) if has_board_edit else None
+        if has_board_edit and board_path is None:
             raise ValueError("this project has no .kicad_pcb to edit")
+
+        # Build the .kicad_pro partial-merge patch. Severities merge per-rule; pin_map replaces
+        # as a list; text_variables goes through replace_keys so a deletion (a key absent from
+        # the desired map) actually lands (a plain merge could only add/update).
+        patch: dict = {}
+        replace_keys: tuple = ()
+        if has_erc_sev:
+            patch.setdefault("erc", {})["rule_severities"] = dict(erc_severities)
+        if has_pin_map:
+            patch.setdefault("erc", {})["pin_map"] = [[int(x) for x in row] for row in erc_pin_map]
+        if has_drc_sev:
+            patch.setdefault("board", {}).setdefault("design_settings", {})["rule_severities"] = dict(
+                drc_severities
+            )
+        if has_text_vars:
+            patch["text_variables"] = desired_text_vars
+            replace_keys = ("text_variables",)
+
+        concerns = []
+        if board_setup:
+            concerns.append("board setup")
+        if thickness is not None:
+            concerns.append("thickness")
+        if has_erc_sev or has_drc_sev:
+            concerns.append("rule severities")
+        if has_pin_map:
+            concerns.append("ERC pin map")
+        if has_text_vars:
+            concerns.append("text variables")
+        message = f"Edit {rec.name}: " + ", ".join(concerns)
 
         repo = GitRepo(Path(rec.git_root))
         with Transaction(repo) as txn:
-            board = Board.load(board_path)
-            if board_setup:
-                board.set_setup(board_setup)
-            if thickness is not None:
-                board.set_thickness(thickness)
-            # Track BEFORE the write: a save that raises mid-write (disk full, a lock, revoked
-            # permission) must still be rolled back to its committed bytes. track only records
-            # the path, so a partial write is restored via git even though save threw.
-            txn.track(board_path)
-            board.save(board_path)
-            sha = txn.commit(f"Edit {rec.name}: board setup")
+            # Track BOTH edited files BEFORE any write: a save that raises mid-write (disk full,
+            # a lock, revoked permission) must still roll BOTH back to their committed bytes.
+            if has_board_edit:
+                txn.track(board_path)
+            if has_pro_edit:
+                txn.track(pro_path)
+            if has_board_edit:
+                board = Board.load(board_path)
+                if board_setup:
+                    board.set_setup(board_setup)
+                if thickness is not None:
+                    board.set_thickness(thickness)
+                board.save(board_path)
+            if has_pro_edit:
+                project_settings.apply_patch(pro_path, patch, replace_keys=replace_keys)
+            sha = txn.commit(message)
         return {**self.board_settings(project_id), "committed": sha}

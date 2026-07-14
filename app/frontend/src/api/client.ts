@@ -31,9 +31,9 @@ import type {
   ProjectDetail,
   ProjectSummary,
   BoardSettings,
-  BoardSetupValue,
   RepairResult,
   RevisionsResult,
+  SetBoardSettingsBody,
   SetBoardSettingsResult,
   SetDesignRulesResult,
   SetNetClassesResult,
@@ -556,12 +556,10 @@ export const api = {
     return apiGet<BoardSettings>(`/api/projects/${encodeURIComponent(id)}/settings`);
   },
 
-  // Edit the project's board setup and/or overall thickness (M7f-A). Both optional; whichever
-  // are given write a minimal diff to the .kicad_pcb as one scoped commit on the project's git.
-  setBoardSettings(
-    id: string,
-    body: { board_setup?: Record<string, BoardSetupValue>; thickness?: number },
-  ): Promise<SetBoardSettingsResult> {
+  // Edit the project's board setup / thickness (its .kicad_pcb) and/or its .kicad_pro settings
+  // (ERC/DRC severities, ERC pin map, text variables) (M7f-A + A2). Every field is optional;
+  // whichever are given write a minimal diff as one atomic scoped commit on the project's git.
+  setBoardSettings(id: string, body: SetBoardSettingsBody): Promise<SetBoardSettingsResult> {
     return request<SetBoardSettingsResult>(
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/settings`,

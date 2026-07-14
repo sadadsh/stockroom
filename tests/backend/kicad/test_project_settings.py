@@ -153,3 +153,82 @@ def test_apply_patch_writes_the_file(tmp_path):
     text = p.read_text(encoding="utf-8")
     assert '"min_track_width": 0.15' in text
     assert json.loads(text)["board"]["design_settings"]["rules"]["min_clearance"] == 0.2
+
+
+# A canonical .kicad_pro fragment WITH a top-level text_variables map (KiCad's real
+# home for project text variables), used to prove the wholesale-replace path a
+# deletion needs (the deep-merge alone can only add/update, never remove a key).
+CANONICAL_TV = (
+    "{\n"
+    '  "meta": {\n'
+    '    "version": 3\n'
+    "  },\n"
+    '  "text_variables": {\n'
+    '    "KEEP": "one",\n'
+    '    "REMOVE": "two"\n'
+    "  }\n"
+    "}\n"
+)
+
+
+def test_merge_alone_cannot_delete_a_text_variable():
+    # This is WHY replace_keys exists: a plain partial-merge of the desired map keeps a
+    # key the caller wanted removed (merge only adds/updates), so a UI "Remove" would not
+    # actually drop the var from the file.
+    out = ps.apply_patch_text(CANONICAL_TV, {"text_variables": {"KEEP": "one"}})
+    assert '"REMOVE": "two"' in out  # merge could not delete it
+
+
+def test_replace_keys_replaces_a_top_level_key_wholesale():
+    # With the key named in replace_keys, the desired map REPLACES the on-disk one wholesale,
+    # so a var absent from the desired map (REMOVE) is deleted while KEEP survives.
+    out = ps.apply_patch_text(
+        CANONICAL_TV, {"text_variables": {"KEEP": "one"}}, replace_keys=("text_variables",)
+    )
+    assert json.loads(out)["text_variables"] == {"KEEP": "one"}
+    assert "REMOVE" not in out
+
+
+def test_replace_keys_can_clear_a_map_to_empty():
+    # deleting every var yields an empty desired map, which must write text_variables: {}
+    # (matching KiCad, which keeps the empty key), not leave the old vars behind.
+    out = ps.apply_patch_text(
+        CANONICAL_TV, {"text_variables": {}}, replace_keys=("text_variables",)
+    )
+    assert json.loads(out)["text_variables"] == {}
+
+
+def test_replace_keys_updates_a_value_as_a_minimal_diff():
+    # changing one var's value (no deletions) is still a minimal diff: only that line differs.
+    out = ps.apply_patch_text(
+        CANONICAL_TV,
+        {"text_variables": {"KEEP": "one", "REMOVE": "changed"}},
+        replace_keys=("text_variables",),
+    )
+    assert out == CANONICAL_TV.replace('"two"', '"changed"')
+
+
+def test_replace_keys_wholesale_identical_map_is_byte_identical():
+    # replacing with the SAME content KiCad wrote must churn nothing (zero-diff invariant),
+    # because the serializer sorts keys exactly as KiCad does.
+    out = ps.apply_patch_text(
+        CANONICAL_TV,
+        {"text_variables": {"KEEP": "one", "REMOVE": "two"}},
+        replace_keys=("text_variables",),
+    )
+    assert out == CANONICAL_TV
+
+
+def test_replace_keys_ignores_a_key_absent_from_the_patch():
+    # a replace_key the patch does not carry is simply not replaced (no KeyError), so callers
+    # can pass a fixed replace_keys tuple without guarding every key's presence.
+    out = ps.apply_patch_text(CANONICAL_TV, {"meta": {"version": 4}}, replace_keys=("text_variables",))
+    assert json.loads(out)["text_variables"] == {"KEEP": "one", "REMOVE": "two"}
+    assert '"version": 4' in out
+
+
+def test_apply_patch_threads_replace_keys_to_the_file(tmp_path):
+    p = tmp_path / "board.kicad_pro"
+    p.write_text(CANONICAL_TV, encoding="utf-8")
+    ps.apply_patch(p, {"text_variables": {"KEEP": "one"}}, replace_keys=("text_variables",))
+    assert json.loads(p.read_text(encoding="utf-8"))["text_variables"] == {"KEEP": "one"}

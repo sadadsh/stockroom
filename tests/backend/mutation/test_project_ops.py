@@ -461,3 +461,173 @@ def test_set_settings_raising_write_leaves_zero_trace(tmp_path, monkeypatch):
     assert prepo.head() == head_before
     assert prepo.is_clean()
     assert prepo.is_clean()
+
+
+# --- M7f-A2 Editor: .kicad_pro severities + ERC pin-map + text-variables ------
+
+# A canonical KiCad-10 .kicad_pro carrying the A2 surfaces (ERC + DRC rule severities, the
+# 12x12 ERC pin-conflict matrix, top-level text variables). Built through the serializer so it
+# is byte-canonical (2-space, sorted keys, trailing newline) and a minimal-diff edit is provable.
+def _pro_a2_text():
+    from stockroom.kicad import project_settings as _ps
+
+    pin_map = [[0] * 12 for _ in range(12)]
+    pin_map[1][1] = 2  # output vs output = error, a real KiCad default
+    pin_map[6][0] = pin_map[0][6] = 1  # unspecified vs input = warning (symmetric)
+    data = {
+        "board": {
+            "design_settings": {
+                "defaults": {"copper_line_width": 0.2},
+                "rule_severities": {"clearance": "error", "silk_overlap": "warning"},
+                "rules": {"min_clearance": 0.2, "min_track_width": 0.2},
+            }
+        },
+        "erc": {
+            "pin_map": pin_map,
+            "rule_severities": {"pin_not_connected": "error", "wire_dangling": "warning"},
+        },
+        "meta": {"filename": "board.kicad_pro", "version": 3},
+        "net_settings": {"classes": [{"name": "Default"}], "meta": {"version": 5}},
+        "text_variables": {"REV": "A", "OLD": "drop"},
+    }
+    return _ps.serialize(data)
+
+
+def test_board_settings_reads_pro_severities_pin_map_and_text_vars(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    bs = ops.board_settings(rec.id)
+    assert bs["has_pro"] is True
+    assert bs["erc_severities"] == {"pin_not_connected": "error", "wire_dangling": "warning"}
+    assert bs["drc_severities"] == {"clearance": "error", "silk_overlap": "warning"}
+    assert bs["erc_pin_map"][1][1] == 2 and bs["erc_pin_map"][6][0] == 1
+    assert bs["text_variables"] == {"REV": "A", "OLD": "drop"}
+    # the editor catalogs travel with the read so the frontend renders without a hardcoded list
+    assert bs["severity_levels"] == ["error", "warning", "ignore"]
+    assert len(bs["erc_pin_types"]) == 12 and bs["erc_pin_types"][0] == "input"
+
+
+def test_board_settings_pin_map_absent_is_none_never_fabricated(tmp_path):
+    # a project whose .kicad_pro has no erc.pin_map reads as None, NOT a fabricated all-OK
+    # matrix (which would silently disable every pin-conflict check the real default enforces).
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board")  # plain _PRO, no erc block
+    rec = ops.register(proj)
+    bs = ops.board_settings(rec.id)
+    assert bs["erc_pin_map"] is None
+    assert bs["erc_severities"] == {} and bs["drc_severities"] == {}
+    assert bs["text_variables"] == {}
+
+
+def test_set_settings_writes_erc_and_drc_severities_minimal_diff(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    pro = proj / "board.kicad_pro"
+
+    ops.set_settings(
+        rec.id,
+        erc_severities={"pin_not_connected": "warning"},
+        drc_severities={"clearance": "ignore"},
+    )
+
+    after = pro.read_text(encoding="utf-8")
+    assert '"pin_not_connected": "warning"' in after
+    assert '"clearance": "ignore"' in after
+    # sibling severities the edit did not name survived untouched (per-rule merge, not wholesale)
+    assert '"wire_dangling": "warning"' in after
+    assert '"silk_overlap": "warning"' in after
+    assert prepo.head() != head_before and prepo.is_clean()
+
+
+def test_set_settings_writes_pin_map_wholesale(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    new_map = [[0] * 12 for _ in range(12)]
+    new_map[2][2] = 2
+    ops.set_settings(rec.id, erc_pin_map=new_map)
+    assert ops.board_settings(rec.id)["erc_pin_map"] == new_map
+
+
+def test_set_settings_writes_and_deletes_text_variables(tmp_path):
+    # the desired map is authoritative: REV is updated, NEW is added, OLD (absent from it) is
+    # deleted via the wholesale-replace path (a plain merge could never drop OLD).
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    ops.set_settings(rec.id, text_variables={"REV": "B", "NEW": "x"})
+    tv = ops.board_settings(rec.id)["text_variables"]
+    assert tv == {"REV": "B", "NEW": "x"}
+    assert "OLD" not in tv
+
+
+def test_set_settings_rejects_an_unknown_severity_rule(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, erc_severities={"not_a_rule_xyz": "error"})
+
+
+def test_set_settings_rejects_a_bad_pin_map(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, erc_pin_map=[[0] * 12 for _ in range(11)])  # 11 rows
+
+
+def test_set_settings_rejects_a_blank_text_var_name(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_settings(rec.id, text_variables={"  ": "x"})
+
+
+def test_set_settings_board_and_pro_edits_are_one_atomic_commit(tmp_path):
+    # a board-setup (.kicad_pcb) edit AND a pro-severity (.kicad_pro) edit submitted together
+    # land in ONE commit that touches BOTH files (the atomic-across-files contract).
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    head_before = prepo.head()
+
+    ops.set_settings(
+        rec.id,
+        board_setup={"pad_to_mask_clearance": 0.1},
+        erc_severities={"pin_not_connected": "warning"},
+    )
+
+    added = prepo._run("rev-list", "--count", f"{head_before}..HEAD").stdout.strip()
+    assert added == "1"  # exactly one commit, not two
+    names = prepo._run("show", "--name-only", "--format=", "HEAD").stdout.split()
+    assert "board.kicad_pcb" in names and "board.kicad_pro" in names  # both files in it
+    bs = ops.board_settings(rec.id)
+    assert bs["board_setup"]["pad_to_mask_clearance"] == 0.1
+    assert bs["erc_severities"]["pin_not_connected"] == "warning"
+
+
+def test_set_settings_failed_pro_write_leaves_zero_trace(tmp_path, monkeypatch):
+    from stockroom.kicad import project_settings
+
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_with_board(tmp_path / "ext" / "board", pro_text=_pro_a2_text())
+    rec = ops.register(proj)
+    pro = proj / "board.kicad_pro"
+    original = pro.read_text(encoding="utf-8")
+    head_before = prepo.head()
+
+    def _corrupt(path, patch, replace_keys=()):
+        from pathlib import Path as _P
+        _P(path).write_text("{ this is not valid json", encoding="utf-8")
+
+    monkeypatch.setattr(project_settings, "apply_patch", _corrupt)
+    with pytest.raises(Exception):
+        ops.set_settings(rec.id, erc_severities={"pin_not_connected": "warning"})
+
+    assert pro.read_text(encoding="utf-8") == original  # restored byte-for-byte
+    assert prepo.head() == head_before and prepo.is_clean()
