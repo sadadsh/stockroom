@@ -28,6 +28,25 @@ def test_commit_returns_sha_and_advances_head(tmp_path):
     assert r.is_clean()
 
 
+def test_commit_sets_a_fallback_identity_when_none_is_configured(tmp_path, monkeypatch):
+    # The library committed inside the app repo is cloned by the launcher's RAW `git clone` (never
+    # GitRepo.init/clone_from, which set the fallback identity), so on a fresh machine with no global
+    # git identity its first part commit must still work. Null the global + system config so only a
+    # LOCAL identity (which commit() now sets when missing) can satisfy git.
+    import subprocess
+
+    empty = tmp_path / "empty-gitconfig"
+    empty.write_text("", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(empty))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(empty))
+    root = tmp_path / "lib"
+    root.mkdir()
+    subprocess.run(["git", "init", "-b", "main", str(root)], check=True, capture_output=True)  # no identity
+    (root / "p.json").write_text("{}", encoding="utf-8")
+    sha = GitRepo(root).commit("Add p", [root / "p.json"])  # must not raise "who are you"
+    assert len(sha) == 40
+
+
 def test_commit_only_stages_listed_paths(tmp_path):
     r = _repo(tmp_path)
     (tmp_path / "a.txt").write_text("a")
