@@ -30,6 +30,7 @@ vi.mock("../api/client", async (importActual) => {
       getProject: vi.fn(),
       deleteProject: vi.fn(),
       projectAudit: vi.fn(),
+      getBuildability: vi.fn(),
       runChecks: vi.fn(),
       getChecks: vi.fn(),
       runBom: vi.fn(),
@@ -532,12 +533,39 @@ const DIFF: BomDiffResult = {
   b_sheets_found: null,
 };
 
+const BUILDABILITY_NOT_READY = {
+  project: "NETDECK",
+  ready: false,
+  signals: {
+    completeness: {
+      state: "fail",
+      has_sch: true,
+      total: 3,
+      complete: 1,
+      unannotated: 2,
+      missing_footprint: 0,
+      incomplete_refs: ["R?", "C?"],
+      missing_counts: { MPN: 2 },
+    },
+    checks: { state: "not_run", ran_at: null, errors: 0, warnings: 0, checked: 0, ok: false },
+    bom: { state: "not_built", ran_at: null, priced: false, line_count: 0, unpriced_lines: 0, risks: null },
+    git: { state: "clean", under_git: true, dirty: false },
+  },
+  blockers: [
+    { kind: "unannotated", detail: "2 reference(s) are not annotated", next_step: "Prepare the project (Prepare section)" },
+    { kind: "checks_not_run", detail: "ERC and DRC have not been run", next_step: "run the checks (Checks section)" },
+    { kind: "bom_not_built", detail: "the BOM has not been built", next_step: "build the BOM (BOM section)" },
+  ],
+  warnings: [],
+};
+
 beforeEach(() => {
   mockApi.listProjects.mockResolvedValue([NETDECK, BENCH]);
   mockApi.getProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.projectAudit.mockResolvedValue(AUDIT);
   mockApi.registerProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.deleteProject.mockResolvedValue(undefined);
+  mockApi.getBuildability.mockResolvedValue(BUILDABILITY_NOT_READY);
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
   mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
@@ -680,6 +708,40 @@ describe("ProjectsPage", () => {
     expect(screen.getByText("R5")).toBeInTheDocument();
     // the report download affordance
     expect(screen.getByRole("button", { name: "Download Report" })).toBeInTheDocument();
+  });
+
+  it("shows the buildability verdict with honest cold-cache states (M7g)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    const section = await screen.findByTestId("buildability-section");
+    expect(within(section).getByText("Not Ready")).toBeInTheDocument();
+    // cold caches are surfaced as their honest states, never fabricated passes
+    expect(within(section).getByText("Not Run")).toBeInTheDocument();
+    expect(within(section).getByText("Not Built")).toBeInTheDocument();
+    expect(within(section).getByText(/2 reference\(s\) are not annotated/)).toBeInTheDocument();
+  });
+
+  it("shows Ready to Build when every signal passes (M7g)", async () => {
+    mockApi.getBuildability.mockResolvedValue({
+      ...BUILDABILITY_NOT_READY,
+      ready: true,
+      signals: {
+        completeness: { ...BUILDABILITY_NOT_READY.signals.completeness, state: "pass" },
+        checks: { state: "pass", ran_at: "t", errors: 0, warnings: 0, checked: 2, ok: true },
+        bom: { state: "pass", ran_at: "t", priced: true, line_count: 3, unpriced_lines: 0, risks: {} },
+        git: { state: "clean", under_git: true, dirty: false },
+      },
+      blockers: [],
+      warnings: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    const section = await screen.findByTestId("buildability-section");
+    expect(within(section).getByText("Ready to Build")).toBeInTheDocument();
   });
 
   it("renders the findings-table headers without letterspaced uppercase (design contract)", async () => {

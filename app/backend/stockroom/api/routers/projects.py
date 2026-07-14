@@ -84,6 +84,19 @@ def projects_router(require_token) -> APIRouter:
         au["markdown"] = audit_report_markdown(au)
         return au
 
+    @r.get("/{project_id}/buildability")
+    def buildability(request: Request, project_id: str) -> dict:
+        # Fuse completeness (computed live) + the cached ERC/DRC + the cached BOM + the git
+        # working tree into ONE ready-to-build verdict (M7g). Read-only, no cache eviction. A
+        # cold checks/BOM cache is an honest 'not run yet' hard blocker, NEVER a fabricated
+        # pass (a false READY is worse than a false NOT-READY). Unknown id -> 404.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.buildability(
+            project_id,
+            checks=ctx.checks_cache.get(project_id),
+            bom=ctx.bom_cache.get(project_id),
+        )
+
     @r.post("/{project_id}/checks")
     def run_checks(request: Request, project_id: str) -> dict:
         # Structured ERC (root schematic) + DRC (each board) via kicad-cli, run off the

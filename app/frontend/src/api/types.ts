@@ -257,6 +257,50 @@ export interface SetLibraryBody {
   dest?: string;
 }
 
+// GET /api/projects/{id}/buildability (M7g): one ready-to-build verdict fusing
+// completeness + ERC/DRC + BOM + git, with honest cold-cache states.
+export interface BuildabilityEntry {
+  kind: string;
+  detail: string;
+  next_step: string;
+}
+
+export interface Buildability {
+  project: string;
+  ready: boolean;
+  signals: {
+    completeness: {
+      state: string;
+      has_sch: boolean;
+      total: number;
+      complete: number;
+      unannotated: number;
+      missing_footprint: number;
+      incomplete_refs: string[];
+      missing_counts: Record<string, number>;
+    };
+    checks: {
+      state: string;
+      ran_at: string | null;
+      errors: number;
+      warnings: number;
+      checked: number;
+      ok: boolean;
+    };
+    bom: {
+      state: string;
+      ran_at: string | null;
+      priced: boolean;
+      line_count: number;
+      unpriced_lines: number;
+      risks: Record<string, number> | null;
+    };
+    git: { state: string; under_git: boolean; dirty: boolean };
+  };
+  blockers: BuildabilityEntry[];
+  warnings: BuildabilityEntry[];
+}
+
 // GET /api/sync/status
 export interface SyncStatus {
   has_remote: boolean;
