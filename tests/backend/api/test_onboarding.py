@@ -5,6 +5,7 @@ to the test's tmp dir)."""
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -29,6 +30,18 @@ def test_status_reports_current_library(client):
     assert d["under_git"] is True
     assert set(d) >= {"onboarded", "first_run", "libraries_root", "profiles",
                       "under_git", "default_dir"}
+
+
+def test_status_onboarded_when_library_ships_in_repo(client, app_ctx, monkeypatch):
+    # The library committed inside the app repo counts as onboarded even if this machine never
+    # ran the setup screen (a clone of the app already carries it), so the welcome gate is skipped.
+    app_ctx.config.onboarded = False
+    monkeypatch.setattr(
+        "stockroom.store.library_location.IN_REPO_DEFAULT", Path(app_ctx.libraries_root)
+    )
+    d = client.get("/api/onboarding").json()
+    assert d["onboarded"] is True and d["first_run"] is False
+    assert d["under_git"] is True
 
 
 def test_status_requires_token(anon_client):
