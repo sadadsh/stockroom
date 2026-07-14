@@ -456,6 +456,59 @@ def test_get_procurement_for_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/procurement").status_code == 404
 
 
+# ---- exports (M7d) ----------------------------------------------------------
+
+
+def _build_bom(client, monkeypatch, tmp_path, pipeline_cls):
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: pipeline_cls()
+    )
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
+    return rec
+
+
+def test_export_csv_kinds_download_with_a_named_attachment(client, tmp_path, monkeypatch):
+    rec = _build_bom(client, monkeypatch, tmp_path, _FakePipeline)
+    for kind in ("csv", "priced", "cart", "jlcpcb"):
+        r = client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": kind})
+        assert r.status_code == 200, (kind, r.text)
+        assert r.headers["content-type"].startswith("text/csv")
+        assert "attachment" in r.headers["content-disposition"]
+        assert ".csv" in r.headers["content-disposition"]
+        assert r.text  # non-empty CSV body
+
+
+def test_export_xlsx_kinds_are_valid_binary_workbooks(client, tmp_path, monkeypatch):
+    import io
+    import zipfile
+
+    rec = _build_bom(client, monkeypatch, tmp_path, _FakePipeline)
+    for kind in ("xlsx", "procurement"):
+        r = client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": kind})
+        assert r.status_code == 200, (kind, r.text)
+        assert r.headers["content-type"].startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        assert ".xlsx" in r.headers["content-disposition"]
+        assert not zipfile.ZipFile(io.BytesIO(r.content)).testzip()  # a valid workbook
+
+
+def test_export_an_unknown_kind_is_a_400(client, tmp_path, monkeypatch):
+    rec = _build_bom(client, monkeypatch, tmp_path, _FakePipeline)
+    assert client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": "pdf"}).status_code == 400
+
+
+def test_export_before_a_build_is_an_honest_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
+    r = client.get(f"/api/projects/{rec['id']}/bom/export", params={"kind": "csv"})
+    assert r.status_code == 400  # nothing built yet to export
+
+
+def test_export_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/bom/export", params={"kind": "csv"}).status_code == 404
+
+
 # ---- auth -------------------------------------------------------------------
 
 
@@ -465,3 +518,4 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.post("/api/projects/x/bom").status_code == 401
     assert anon_client.get("/api/projects/x/bom").status_code == 401
     assert anon_client.get("/api/projects/x/procurement").status_code == 401
+    assert anon_client.get("/api/projects/x/bom/export").status_code == 401
