@@ -173,6 +173,37 @@ def projects_router(require_token) -> APIRouter:
         proc["project"] = rec.name
         return proc
 
+    @r.get("/{project_id}/bom/export")
+    def export_bom(request: Request, project_id: str, kind: str = "csv",
+                   boards: int | None = None, spares_pct: float = 0.0,
+                   pcb_multiple: int = 3, tax_rate: float = 0.0, shipping: float = 0.0,
+                   labour_per_board: float = 0.0, assembly_surcharge_rate: float = 0.0):
+        # Render the CACHED BOM into a downloadable export (M7d): kind is one of
+        # csv/priced/cart/jlcpcb/xlsx/procurement. Read-only, offline. An unknown kind is a
+        # ValueError -> 400; an unbuilt project is a 400 (nothing to export yet, never an
+        # empty/fabricated file); an unknown id -> 404. The procurement knobs (spares,
+        # pcb_multiple, tax, shipping, assembly) pass through to the procurement sheet.
+        from stockroom.projects.bom_export import project_bom_export
+
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        cached = ctx.bom_cache.get(project_id)
+        if cached is None or cached.get("ran_at") is None:
+            raise ValueError("build the BOM before exporting it")
+        out = project_bom_export(
+            cached, kind, boards=boards, spares_pct=spares_pct, pcb_multiple=pcb_multiple,
+            tax_rate=tax_rate, shipping=shipping, labour_per_board=labour_per_board,
+            assembly_surcharge_rate=assembly_surcharge_rate,
+        )
+        data = out["data"]
+        body = data.encode("utf-8") if isinstance(data, str) else data
+        return Response(
+            content=body, media_type=out["content_type"],
+            headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
+        )
+
     return r
 
 
