@@ -156,6 +156,41 @@ def test_audit_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/audit").status_code == 404
 
 
+# A 2-pin symbol plus a footprint the active profile resolves to 3 pads: the pin/pad
+# mismatch only surfaces if the router passes the profile's footprint dir to the audit.
+_MISMATCH_SHEET = (
+    "  (lib_symbols\n"
+    '    (symbol "Device:R"\n'
+    '      (symbol "R_0_1" (pin passive line (at 0 0 0)) (pin passive line (at 0 0 0)))\n'
+    "    )\n"
+    "  )\n"
+    "  (symbol\n"
+    '    (lib_id "Device:R")\n'
+    '    (property "Reference" "R1" (at 0 0 0))\n'
+    '    (property "Value" "10k" (at 0 0 0))\n'
+    '    (property "Footprint" "SR-ICs:TESTFP" (at 0 0 0))\n'
+    '    (property "MPN" "RC0402" (at 0 0 0))\n'
+    "  )\n"
+)
+
+
+def test_audit_uses_the_active_profile_footprints_for_the_pin_pad_check(client, app_ctx, tmp_path):
+    # Seed a 3-pad footprint into the active profile; the 2-pin symbol references it,
+    # so a pin_pad_mismatch is produced ONLY because the router wires the profile's
+    # footprint dir into the audit. Load-bearing for that wiring (drop it -> red).
+    fp_dir = app_ctx.profile.library.footprint_lib_path("ICs")
+    fp_dir.mkdir(parents=True, exist_ok=True)
+    (fp_dir / "TESTFP.kicad_mod").write_text(
+        '(footprint "TESTFP" (pad "1" smd rect) (pad "2" smd rect) (pad "3" smd rect))',
+        encoding="utf-8",
+    )
+    rec = _register(client, _make_project(tmp_path / "mismatch", _MISMATCH_SHEET))
+    au = client.get(f"/api/projects/{rec['id']}/audit").json()
+    kinds = {(f["ref"], f["kind"]) for f in au["findings"]}
+    assert ("R1", "pin_pad_mismatch") in kinds
+    assert au["checked_footprints"] >= 1
+
+
 # ---- auth -------------------------------------------------------------------
 
 
