@@ -693,17 +693,28 @@ function ChecksVerdictBadge({
     );
   }
   if (badges.length === 0) {
-    badges.push(
-      summary.ok ? (
+    // A green "Clean" requires that a check actually ran (checked > 0) and passed; a run
+    // that verified nothing (a project with no schematic or board) is an honest "Nothing
+    // Checked", never a fabricated pass. A ran-but-failed check is "No Results".
+    if (summary.checked === 0) {
+      badges.push(
+        <Badge key="n" tone="neutral">
+          Nothing Checked
+        </Badge>,
+      );
+    } else if (summary.ok) {
+      badges.push(
         <Badge key="c" tone="ok">
           Clean
-        </Badge>
-      ) : (
+        </Badge>,
+      );
+    } else {
+      badges.push(
         <Badge key="x" tone="neutral">
           No Results
-        </Badge>
-      ),
-    );
+        </Badge>,
+      );
+    }
   }
   return <>{badges}</>;
 }

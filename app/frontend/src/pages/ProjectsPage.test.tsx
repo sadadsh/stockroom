@@ -356,6 +356,24 @@ describe("ProjectsPage", () => {
     expect(screen.queryByTestId("checks-result")).toBeNull();
   });
 
+  it("shows Nothing Checked (never a green Clean) when a run verified no files", async () => {
+    // A .kicad_pro-only project: ERC/DRC ran on nothing (checked 0). That must read as
+    // an honest "Nothing Checked", not a fabricated green pass.
+    mockApi.getChecks.mockResolvedValue({
+      project: "Netdeck",
+      erc: null,
+      drc: [],
+      summary: { ok: false, errors: 0, warnings: 0, total: 0, checked: 0 },
+      ran_at: "2026-07-13T15:00:00Z",
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const result = await screen.findByTestId("checks-result");
+    expect(within(result).getByText("Nothing Checked")).toBeInTheDocument();
+    expect(within(result).queryByText("Clean")).toBeNull();
+  });
+
   it("renders a previously cached run on select without re-running", async () => {
     mockApi.getChecks.mockResolvedValue(RAN);
     renderPage();

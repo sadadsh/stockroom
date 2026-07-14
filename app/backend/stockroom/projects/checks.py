@@ -177,12 +177,14 @@ def root_sheet(pro_path: str, sheet_paths: List[str], board_paths: List[str]) ->
 
 
 def _combine_summary(erc: dict | None, drc: List[dict]) -> dict:
-    """One verdict over ERC + every board's DRC. `ok` means every check produced a
-    valid report (a failed run is never a clean pass); errors/warnings count violations
-    across the checks that ran."""
+    """One verdict over ERC + every board's DRC. `ok` means at least one check actually
+    ran AND every check that ran produced a valid report; errors/warnings count
+    violations across those checks. A run that verified nothing (checked == 0, e.g. a
+    project with no schematic or board) is NEVER a clean pass, so ok is False there:
+    that keeps the badge and the M7g Buildability verdict from calling nothing Clean."""
     parts = ([erc] if erc is not None else []) + list(drc)
     errors = warnings = total = 0
-    ok = True
+    ok = len(parts) > 0  # nothing checked is not a pass
     for p in parts:
         if not p.get("ok"):
             ok = False

@@ -109,7 +109,9 @@ def test_project_checks_runs_erc_on_the_root_sheet_matching_the_pro_stem(monkeyp
         root="/ext/board",
         pro_path="board.kicad_pro",
         board_paths=["board.kicad_pcb"],
-        sheet_paths=["board.kicad_sch", "power.kicad_sch"],  # power is a sub-sheet
+        # The root (board, stem == pro stem) is deliberately NOT first, so a regression
+        # to "always the first sheet" runs on power and turns this test red.
+        sheet_paths=["power.kicad_sch", "board.kicad_sch"],
         cli="/fake/kicad-cli",
         name="board",
     )
@@ -132,6 +134,21 @@ def test_project_checks_falls_back_to_the_first_sheet_when_no_pro_stem_matches(m
     assert result["drc"] == [] and result["summary"]["checked"] == 1
 
 
+def test_project_checks_over_a_project_with_no_checkable_files_is_not_a_clean_pass(monkeypatch):
+    # A .kicad_pro-only project (no schematic, no board) registers fine, but running
+    # checks verifies NOTHING. That must never read as a clean pass: checked==0 forces
+    # summary.ok False, so no consumer (the badge, the M7g verdict) can call it Clean.
+    seen = _fake_runs(monkeypatch, _clean(), {})
+    result = checks.project_checks(
+        root="/ext/x", pro_path="x.kicad_pro", board_paths=[],
+        sheet_paths=[], cli="c", name="x",
+    )
+    assert seen["erc"] == [] and seen["drc"] == []  # nothing was actually run
+    assert result["erc"] is None and result["drc"] == []
+    assert result["summary"]["checked"] == 0
+    assert result["summary"]["ok"] is False  # nothing checked is not a pass
+
+
 def test_project_checks_marks_the_run_not_ok_when_a_check_fails_to_produce_a_report(monkeypatch):
     # A failed kicad-cli run (ok:false) must NOT read as a clean board: the combined
     # ok is false, and the failed check's (absent) counts are excluded.
@@ -147,3 +164,56 @@ def test_project_checks_marks_the_run_not_ok_when_a_check_fails_to_produce_a_rep
     assert result["summary"]["ok"] is False
     assert result["summary"]["errors"] == 3  # only the DRC that ran contributes
     assert result["erc"]["ok"] is False
+
+
+# ---- _run_json_check honest-completion guard (real runner, faked kicad-cli) --
+# These exercise the REAL run_erc/run_drc (NOT monkeypatched away): the guard that a
+# missing/empty/corrupt report is never a clean board. Faking subprocess.run keeps them
+# deterministic and cross-platform while still running the guard + parser dispatch.
+import types as _types  # noqa: E402
+
+
+def _fake_cli(monkeypatch, *, writes=None, returncode=0, stdout="", raises=None):
+    def fake_run(cmd, **kw):
+        if raises is not None:
+            raise raises
+        if writes is not None:
+            out = __import__("pathlib").Path(cmd[cmd.index("--output") + 1])
+            out.write_text(writes, encoding="utf-8")
+        return _types.SimpleNamespace(returncode=returncode, stdout=stdout)
+
+    monkeypatch.setattr(checks.subprocess, "run", fake_run)
+
+
+def test_run_erc_with_no_cli_is_not_a_clean_board():
+    r = checks.run_erc("/x/board.kicad_sch", "")
+    assert r["ok"] is False and "not found" in r["error"] and r["findings"] == []
+
+
+def test_run_erc_with_no_report_written_is_not_a_clean_board(monkeypatch):
+    # kicad-cli ran but wrote no report (a crash / bad file). NOT a clean board.
+    _fake_cli(monkeypatch, writes=None, returncode=1, stdout="could not open board")
+    r = checks.run_erc("/x/board.kicad_sch", "/fake/kicad-cli")
+    assert r["ok"] is False and r["findings"] == []
+    assert "could not open board" in r["error"]
+
+
+def test_run_drc_with_a_corrupt_report_is_not_a_clean_board(monkeypatch):
+    # A truncated/garbage report is a failure, not a clean board with zero findings.
+    _fake_cli(monkeypatch, writes="this is not json{", returncode=0)
+    r = checks.run_drc("/x/board.kicad_pcb", "/fake/kicad-cli")
+    assert r["ok"] is False and "valid JSON" in r["error"]
+
+
+def test_run_erc_when_the_spawn_fails_is_not_a_clean_board(monkeypatch):
+    _fake_cli(monkeypatch, raises=OSError("no such executable"))
+    r = checks.run_erc("/x/board.kicad_sch", "/fake/kicad-cli")
+    assert r["ok"] is False and "no such executable" in r["error"]
+
+
+def test_run_erc_parses_a_valid_report_as_ok(monkeypatch):
+    doc = {"sheets": [{"violations": [
+        {"severity": "error", "type": "power", "description": "input not driven"}]}]}
+    _fake_cli(monkeypatch, writes=json.dumps(doc), returncode=0)
+    r = checks.run_erc("/x/board.kicad_sch", "/fake/kicad-cli")
+    assert r["ok"] is True and len(r["findings"]) == 1 and r["findings"][0]["rule"] == "power"
