@@ -178,7 +178,8 @@ def test_bom_components_skips_power_and_hash_refs(tmp_path):
                    _sym("R1", "10k"),
                    _sym("#PWR01", "GND", lib="power:GND"))
     comps = _bom_components(str(f))
-    assert [ref for ref, _ in comps] == ["R1"]
+    assert [ref for ref, _lib, _props in comps] == ["R1"]
+    assert comps[0][1] == "Device:R"  # lib_id is carried for library matching
 
 
 # -- cost roll-up --------------------------------------------------------------
@@ -464,3 +465,88 @@ def test_consolidated_bom_sums_across_boards(tmp_path):
     r = con["rows"][0]
     assert r["total_qty"] == 2 and r["extended"] == 16.0
     assert con["cost"]["total_cost"] == 16.0
+
+
+# -- library combining (schematic + library) -----------------------------------
+
+from stockroom.model.part import Datasheet, LibRef, PartRecord, Purchase  # noqa: E402
+from stockroom.projects.bom import (  # noqa: E402
+    combined_price_lookup,
+    library_enrich,
+    library_match_index,
+    library_price_index,
+)
+
+
+def _lib_resistor():
+    return PartRecord(
+        id="r10k", display_name="10k 0402", category="Resistors",
+        description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
+        symbol=LibRef(lib="SR-Resistors", name="R_10k"),
+        footprint=LibRef(lib="SR-Resistors", name="R_0402"),
+        datasheet=Datasheet(file="r.pdf", source_url="https://yageo.com/r.pdf"),
+        purchase=[Purchase(vendor="Mouser", url="https://mouser.com/r10k",
+                           price_breaks=[{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.02}],
+                           stock=50000)],
+    )
+
+
+def test_library_enrich_fills_blank_identity_from_the_matched_part():
+    # a schematic component carrying ONLY a lib_id (no MPN) gets its MPN + manufacturer from the
+    # library, matched by symbol name.
+    index = library_match_index([_lib_resistor()])
+    comps = [("R1", "SR-Resistors:R_10k", {"Reference": "R1", "Value": "10k"})]
+    _ref, props = library_enrich(comps, index)[0]
+    assert props["MPN"] == "RC0402FR-0710KL" and props["Manufacturer"] == "Yageo"
+
+
+def test_library_enrich_never_overwrites_a_schematic_value():
+    index = library_match_index([_lib_resistor()])
+    comps = [("R1", "SR-Resistors:R_10k",
+              {"Reference": "R1", "Value": "10k", "MPN": "USER-CHOSEN"})]
+    _ref, props = library_enrich(comps, index)[0]
+    assert props["MPN"] == "USER-CHOSEN"  # a deliberate schematic override stands
+
+
+def test_library_enrich_passes_an_unmatched_component_through(tmp_path):
+    index = library_match_index([_lib_resistor()])
+    comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]  # no library match
+    _ref, props = library_enrich(comps, index)[0]
+    assert "MPN" not in props  # nothing fabricated
+
+
+def test_library_price_index_maps_mpn_to_stored_price():
+    idx = library_price_index([_lib_resistor()])
+    entry = idx["RC0402FR-0710KL"]
+    assert entry["source"] == "library" and entry["unit_price"] == 0.10 and entry["stock"] == 50000
+    assert entry["price_breaks"] == [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.02}]
+
+
+def test_library_price_index_skips_a_part_with_no_price_or_stock():
+    bare = PartRecord(id="x", display_name="x", category="Resistors", mpn="NOPRICE")
+    assert "NOPRICE" not in library_price_index([bare])
+
+
+def test_combined_price_lookup_prefers_library_then_enrich():
+    def enrich(mpn):
+        return {"unit_price": 9.99, "source": "mouser"} if mpn == "OTHER" else None
+
+    lookup = combined_price_lookup([_lib_resistor()], enrich)
+    assert lookup("RC0402FR-0710KL")["source"] == "library"  # library wins
+    assert lookup("OTHER")["source"] == "mouser"             # falls back to the enrich layer
+    assert lookup("UNKNOWN") is None                         # neither can price it
+
+
+def test_project_bom_combines_library_identity_and_price(tmp_path):
+    # end to end: two schematic resistors carrying ONLY a lib_id become one complete, quantity-2,
+    # library-priced line, with the manufacturer + price pulled from the library.
+    _write_sch(tmp_path / "b.kicad_sch",
+               _sym("R1", "10k", lib="SR-Resistors:R_10k"),
+               _sym("R2", "10k", lib="SR-Resistors:R_10k"))
+    result = project_bom(str(tmp_path), None, ["b.kicad_sch"], name="B", boards=1,
+                         library_parts=[_lib_resistor()])
+    assert result["priced"] is True
+    line = next(r for r in result["lines"] if r.get("mpn") == "RC0402FR-0710KL")
+    assert line["qty"] == 2 and line["manufacturer"] == "Yageo"
+    assert line["source"] == "library" and line["unit_price"] == 0.10
+    assert result["by_source"]["sources"].get("library") is not None

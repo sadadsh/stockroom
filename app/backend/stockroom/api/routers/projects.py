@@ -151,8 +151,12 @@ def projects_router(require_token) -> APIRouter:
 
         def work(progress):
             price_lookup = _bom_price_lookup(ctx)
+            # Combine the schematic with the active profile's library: fill blank identity + price
+            # from the library's stored prices first, the enrich layer second.
+            library_parts = _library_parts(ctx)
             result = ctx.project_ops.bom(
-                project_id, boards=boards, price_lookup=price_lookup, progress=progress
+                project_id, boards=boards, library_parts=library_parts,
+                price_lookup=price_lookup, progress=progress,
             )
             # A DELETE may have landed (and evicted the cache) during this network-bound
             # build; do not resurrect a cache entry for a now-gone id (ids are reusable
