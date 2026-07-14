@@ -423,6 +423,10 @@ export function useProjectDesign(id: string | null, floor: string) {
     queryKey: ["project-design", id, floor],
     queryFn: () => api.getDesign(id as string, floor),
     enabled: !!id,
+    // The floor is part of the key, so switching it is a DIFFERENT cache entry, not a
+    // refetch. keepPreviousData holds the prior floor's data on screen while the new one
+    // loads, so the Editor never unmounts (and never re-seeds) mid-fetch on a floor change.
+    placeholderData: keepPreviousData,
   });
 }
 

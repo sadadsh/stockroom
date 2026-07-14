@@ -1629,13 +1629,17 @@ function NetClassEditor({
   const save = useSetNetClasses();
   const { toast } = useToast();
 
-  // Re-seed only when the on-disk classes actually change (a save commit), NOT when the
-  // fab floor changes (that only re-reads validation): react-query structural sharing keeps
-  // net_classes' identity stable across a floor-only refetch, so unsaved edits survive.
+  // Re-seed only when the on-disk classes actually CHANGE (a save commit), NOT when the fab
+  // floor changes. The design read is keyed on the floor, so a floor change yields a new
+  // DesignResult whose net_classes is a fresh reference with identical content; keying the
+  // effect on the content signature (not the reference) means a floor-only refetch does not
+  // clobber the user's unsaved edits. keepPreviousData on the query prevents an unmount flash.
+  const netSig = JSON.stringify(data.net_classes);
   useEffect(() => {
     setDrafts(seedDrafts(data.net_classes));
     setDeleted([]);
-  }, [data.net_classes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- netSig is the content of data.net_classes
+  }, [netSig]);
 
   const dirty = deleted.length > 0 || JSON.stringify(drafts) !== JSON.stringify(seedDrafts(data.net_classes));
 
@@ -1670,19 +1674,35 @@ function NetClassEditor({
   }
 
   function onSave() {
-    const classes: NetClass[] = drafts
-      .filter((d) => d.name.trim() !== "")
-      .map((d) => ({
-        name: d.name.trim(),
-        ...Object.fromEntries(
-          NC_DIMS.filter((f) => d.dims[f.key] !== "" && d.dims[f.key] != null).map((f) => [
-            f.key,
-            Number(d.dims[f.key]),
-          ]),
-        ),
-      }));
+    const named = drafts.filter((d) => d.name.trim() !== "");
+    // A dimension field is free text (so decimals type cleanly), so guard against a
+    // non-numeric value: a NaN would serialize to JSON null and be written as a fabricated
+    // "saved". Block + warn instead, never write garbage.
+    for (const d of named) {
+      for (const f of NC_DIMS) {
+        const raw = d.dims[f.key];
+        if (raw != null && raw !== "" && !Number.isFinite(Number(raw))) {
+          toast(`Enter a valid number for ${d.name.trim()} ${f.label}.`, "err");
+          return;
+        }
+      }
+    }
+    const classes: NetClass[] = named.map((d) => ({
+      name: d.name.trim(),
+      ...Object.fromEntries(
+        NC_DIMS.filter((f) => d.dims[f.key] !== "" && d.dims[f.key] != null).map((f) => [
+          f.key,
+          Number(d.dims[f.key]),
+        ]),
+      ),
+    }));
+    // A class re-added under a name that was also deleted must NOT be sent in both lists:
+    // reconcile lets a delete win, so the re-added class would silently vanish. Drop any
+    // deleted name that is present in the submitted set.
+    const submittedNames = new Set(classes.map((c) => c.name));
+    const effectiveDeleted = deleted.filter((n) => !submittedNames.has(n));
     save.mutate(
-      { id: projectId, classes, deleted, floor },
+      { id: projectId, classes, deleted: effectiveDeleted, floor },
       {
         onSuccess: () => toast("Net classes saved."),
         onError: (e) => toast(errMsg(e, "Could not save the net classes."), "err"),
@@ -1813,17 +1833,33 @@ function DesignRulesEditor({ projectId, data }: { projectId: string; data: Desig
   const save = useSetDesignRules();
   const { toast } = useToast();
 
+  // Re-seed on the rules CONTENT, not the reference, so a floor-only refetch (which returns
+  // an identical-content design_rules with a fresh reference) does not clobber unsaved edits.
+  const rulesSig = JSON.stringify(data.design_rules);
   useEffect(() => {
     setDraft(seedRules(data.design_rules));
-  }, [data.design_rules]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rulesSig is the content of data.design_rules
+  }, [rulesSig]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(seedRules(data.design_rules));
   const keys = Object.keys(data.design_rules).sort();
 
   function onSave() {
-    const rules: DesignRules = Object.fromEntries(
-      Object.entries(draft).map(([k, v]) => [k, typeof v === "boolean" ? v : Number(v)]),
-    );
+    // The form re-sends the whole rules record, so a cleared field would otherwise be
+    // written as Number("") === 0 (a fabricated value). Block + warn on any blank/non-numeric
+    // field instead of silently committing a 0.
+    const rules: DesignRules = {};
+    for (const [k, v] of Object.entries(draft)) {
+      if (typeof v === "boolean") {
+        rules[k] = v;
+        continue;
+      }
+      if (String(v).trim() === "" || !Number.isFinite(Number(v))) {
+        toast(`Enter a valid number for ${k}.`, "err");
+        return;
+      }
+      rules[k] = Number(v);
+    }
     save.mutate(
       { id: projectId, rules },
       {

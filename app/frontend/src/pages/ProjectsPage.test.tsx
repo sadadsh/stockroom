@@ -938,4 +938,64 @@ describe("ProjectsPage", () => {
     expect(editor).toHaveTextContent(/not under git/i);
     expect(screen.queryByRole("button", { name: "Save Net Classes" })).not.toBeInTheDocument();
   });
+
+  it("keeps unsaved net-class edits when the fab floor changes", async () => {
+    // each design fetch returns a FRESH object (new references, same content), as the real
+    // backend does per floor. Picking a floor to validate an edit must NOT reset the edit.
+    mockApi.getDesign.mockImplementation(() =>
+      Promise.resolve(JSON.parse(JSON.stringify(DESIGN))),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const input = screen.getByTestId("nc-Default-track_width");
+    await user.clear(input);
+    await user.type(input, "0.15");
+    await user.selectOptions(screen.getByTestId("fab-floor-select"), "oshpark_2");
+    await waitFor(() =>
+      expect(mockApi.getDesign).toHaveBeenCalledWith("netdeck", "oshpark_2"),
+    );
+    expect(screen.getByTestId("nc-Default-track_width")).toHaveValue("0.15"); // edit survived
+    expect(screen.getByRole("button", { name: "Save Net Classes" })).toBeEnabled();
+  });
+
+  it("does not send a re-added class in both classes and deleted", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Add Net Class" }));
+    await user.type(screen.getByTestId("nc-new-name"), "HS");
+    await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
+    const call = mockApi.setNetClasses.mock.calls[0]!;
+    expect(call[1].some((c: { name: string }) => c.name === "HS")).toBe(true); // re-added
+    expect(call[2]?.deleted).not.toContain("HS"); // and not also deleted (reconcile would drop it)
+  });
+
+  it("blocks the save and warns when a net-class dimension is not a number", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const input = screen.getByTestId("nc-Default-track_width");
+    await user.clear(input);
+    await user.type(input, "abc");
+    await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
+    expect(mockApi.setNetClasses).not.toHaveBeenCalled(); // no NaN -> null written
+    expect(await screen.findByText(/valid number/i)).toBeInTheDocument();
+  });
+
+  it("blocks the save and warns when a design-rule field is cleared", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const input = screen.getByTestId("dr-min_track_width");
+    await user.clear(input);
+    await user.click(screen.getByRole("button", { name: "Save Design Rules" }));
+    expect(mockApi.setDesignRules).not.toHaveBeenCalled(); // no silent 0 written
+    expect(await screen.findByText(/valid number/i)).toBeInTheDocument();
+  });
 });

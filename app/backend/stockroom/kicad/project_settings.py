@@ -6,7 +6,13 @@ as the s-expression layer keeps .kicad_pcb/.kicad_sch byte-preserving. KiCad
 serializes the file with nlohmann::json (2-space indent, alphabetically-sorted keys,
 one trailing newline); `serialize` reproduces that format byte-for-byte (verified
 against a real KiCad 10 project, version 20260206), so re-writing an unchanged file
-yields zero diff.
+KiCad itself wrote yields zero diff and an edit changes only the edited value.
+
+The minimal-diff guarantee holds for a file already in KiCad's canonical format (the
+normal case: KiCad wrote it). A .kicad_pro that is NOT canonical (hand-edited, a git
+merge artifact, a different indent or key order) is rewritten into the canonical format
+on the first save. That is correct (KiCad would canonicalize it on its own next save too)
+and never loses data, but that one save is a larger diff, not a single-value change.
 
 `merge` is a KinJector-style recursive partial-merge: a patch touches only the keys
 it names, recursing into nested objects so editing net classes never rewrites the
@@ -19,6 +25,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -35,17 +42,21 @@ def serialize(data: dict) -> str:
 
 
 def merge(base: dict, patch: dict) -> dict:
-    """Return a new dict = base with patch deep-merged in. A key whose value is a
-    dict in BOTH is recursed (so a partial patch preserves sibling keys); anything
-    else (scalar, list, or a type change) is replaced by the patch value. The base
-    argument is never mutated."""
-    out = dict(base)
+    """Return a NEW dict = base with patch deep-merged in. A key whose value is a dict
+    in BOTH is recursed (so a partial patch preserves sibling keys); anything else
+    (scalar, list, or a type change) is replaced by the patch value.
+
+    The result shares NO mutable state with either argument: a container preserved from
+    base (a list, or a nested dict on a key the patch does not touch) is deep-copied, as
+    is a container taken from the patch, so a later caller mutating the result cannot
+    reach back into base or patch. This is what makes the no-mutation contract real."""
+    out = copy.deepcopy(base)
     for key, pval in patch.items():
         bval = out.get(key)
         if isinstance(bval, dict) and isinstance(pval, dict):
             out[key] = merge(bval, pval)
         else:
-            out[key] = pval
+            out[key] = copy.deepcopy(pval)
     return out
 
 

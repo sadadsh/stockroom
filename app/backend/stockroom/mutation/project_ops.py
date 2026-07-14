@@ -187,6 +187,10 @@ class ProjectOps:
                 "this project is not under git; initialize a git repo for it before editing"
             )
         pro = self._pro_path(rec)
+        if not pro.exists():
+            # pro_path is set but the file moved/was deleted after registration. An honest
+            # 400 (re-register), never a raw FileNotFoundError that 404s and leaks the path.
+            raise ValueError("this project's .kicad_pro is missing on disk; re-register the project")
         repo = GitRepo(Path(rec.git_root))
         with Transaction(repo) as txn:
             project_settings.apply_patch(pro, patch)

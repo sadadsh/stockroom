@@ -213,6 +213,18 @@ def test_write_missing_project_raises(tmp_path):
         ops.set_net_classes("nope", [{"name": "Default"}])
 
 
+def test_write_refuses_when_the_kicad_pro_is_gone_from_disk(tmp_path):
+    # pro_path is set but the file was moved/deleted after registration: the write must be
+    # an honest ValueError (-> 400 "re-register"), never a raw FileNotFoundError that 404s
+    # and leaks the absolute path (GET /design already tolerates a missing .kicad_pro).
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    (proj / "board.kicad_pro").unlink()
+    with pytest.raises(ValueError):
+        ops.set_net_classes(rec.id, [{"name": "Default", "track_width": 0.15}])
+
+
 def test_failed_write_leaves_zero_trace(tmp_path, monkeypatch):
     # if the write produces an invalid .kicad_pro, the Transaction validate aborts and
     # rolls the file back to its committed bytes with the project's git left clean.
