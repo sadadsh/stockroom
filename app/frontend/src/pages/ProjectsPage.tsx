@@ -1552,6 +1552,10 @@ function FabSection({ projectId }: { projectId: string }) {
 
       {query.isLoading ? (
         <p className="text-sm text-t3">Loading fab prep...</p>
+      ) : query.isError ? (
+        <p className="text-sm text-err" data-testid="fab-error">
+          {errMsg(query.error, "Could not load fab prep.")}
+        </p>
       ) : !data?.has_board ? (
         <p className="text-sm text-t3" data-testid="fab-no-board">
           This project has no .kicad_pcb to fabricate. Add a board to the project to export

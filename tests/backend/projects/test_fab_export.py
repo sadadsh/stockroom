@@ -191,6 +191,49 @@ def test_protel_ext_true_default_does_not_pass_no_protel_ext(tmp_path, monkeypat
     assert "--no-protel-ext" not in gerbers
 
 
+def test_pos_gerber_emits_two_sided_files_not_a_broken_side_both(tmp_path, monkeypatch):
+    # kicad-cli rejects --side both for Gerber placement, so the gerber format must plot front
+    # and back separately; a single default run would always 502 and make the option a stub.
+    record = []
+    _fake_cli(monkeypatch, record=record)
+    bundle = fab_export.build_fab_bundle(_board(tmp_path), "/c", pos_format="gerber")
+    pos_runs = [cmd for cmd in record if "pos" in cmd]
+    assert len(pos_runs) == 2
+    sides = {cmd[cmd.index("--side") + 1] for cmd in pos_runs}
+    assert sides == {"front", "back"}
+    assert all("both" not in cmd for cmd in pos_runs)
+    names = _names(bundle)
+    assert "board-pos-front.gbr" in names and "board-pos-back.gbr" in names
+
+
+def test_run_decodes_kicad_cli_output_as_utf8_replace(tmp_path, monkeypatch):
+    # kicad-cli emits UTF-8; on a non-English Windows the OS default codec (cp1252) would raise
+    # UnicodeDecodeError on its output. Pin encoding=utf-8/errors=replace (checks.py convention)
+    # so a decode never breaks a successful export nor mislabels a failure.
+    seen = {}
+
+    def capture(cmd, **kw):
+        seen.update(kw)
+        _emit(cmd)
+        return types.SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(fab_export.subprocess, "run", capture)
+    fab_export.build_fab_bundle(_board(tmp_path), "/c")
+    assert seen.get("encoding") == "utf-8"
+    assert seen.get("errors") == "replace"
+
+
+def test_a_decode_error_is_a_kicadcli_error_not_a_500(tmp_path, monkeypatch):
+    # Belt and suspenders: even a surprise decode/other error from the spawn is a labeled
+    # KiCadCliError (-> 502), never an unmapped 500 / a ValueError mislabeled 400.
+    def boom(cmd, **kw):
+        raise UnicodeDecodeError("utf-8", b"\x81", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(fab_export.subprocess, "run", boom)
+    with pytest.raises(KiCadCliError):
+        fab_export.build_fab_bundle(_board(tmp_path), "/fake/kicad-cli")
+
+
 # ---- a real kicad-cli smoke test (skipped where the cli is absent, e.g. Windows CI) --
 
 
@@ -205,3 +248,17 @@ def test_real_cli_produces_a_gerber_drill_and_job(tmp_path):
     assert any(n.endswith(".drl") for n in names), names
     assert any(n.endswith((".gtl", ".gbl", ".gbr")) for n in names), names
     assert bundle["filename"] == "smoke-fab.zip"
+
+
+@pytest.mark.skipif(shutil.which("kicad-cli") is None, reason="kicad-cli not installed")
+def test_real_cli_leaves_the_project_tree_untouched(tmp_path):
+    # READ-ONLY guarantee: kicad-cli writes a <board>.kicad_prl next to the board it opens, so a
+    # naive run would drop that (and dirty a git-tracked project). The export must run against a
+    # copy and leave the project dir holding ONLY the original board.
+    fixture = Path(__file__).parent.parent / "fixtures" / "kicad" / "minimal.kicad_pcb"
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    board = proj / "board.kicad_pcb"
+    board.write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
+    fab_export.build_fab_bundle(board, shutil.which("kicad-cli"))
+    assert [p.name for p in proj.iterdir()] == ["board.kicad_pcb"]
