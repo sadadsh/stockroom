@@ -55,6 +55,21 @@ def test_run_windowed_wires_the_default_webview2_fetcher_when_absent(app_ctx):
     assert captured["is_webview"] is True
 
 
+def test_run_windowed_serves_index_with_the_token_injected(app_ctx):
+    # The SPA must be authenticated from its FIRST byte, not only via the on-loaded evaluate_js
+    # (which lands after the initial queries and would 401 a no-retry query like onboarding,
+    # hiding the first-run screen). The served index carries the base + token globals.
+    seen: dict = {}
+
+    def fake_window(base_url: str, token: str) -> None:
+        seen["index"] = httpx.get(f"{base_url}/").text
+
+    run_windowed(ctx=app_ctx, open_window=fake_window)
+    assert "__STOCKROOM_TOKEN__" in seen["index"]
+    assert "testtoken" in seen["index"]
+    assert "__API_BASE__" in seen["index"]
+
+
 def test_run_windowed_returns_true_when_a_restart_is_requested(app_ctx):
     # The self-updater calls ctx.request_restart() after a git pull + uv sync; run_windowed
     # must report that so main() exits EXIT_RESTART and the launcher relaunches (M9d).

@@ -67,6 +67,34 @@ def _close_active_window() -> None:
         win.destroy()
 
 
+def _install_injected_index(app, base_url: str, token: str) -> None:
+    """Insert a route that serves index.html with window.__API_BASE__ + __STOCKROOM_TOKEN__
+    already injected, taking precedence over the SPA static mount, so the SPA is authenticated
+    from its very first byte. Without this the token arrives only via the window's on-loaded
+    evaluate_js, which lands AFTER the SPA's initial queries fire, so a no-retry query like
+    onboarding 401s once and never recovers (hiding the first-run setup screen). No-op if the
+    built frontend is absent."""
+    from stockroom.api.app import _FRONTEND_DIST
+    from stockroom.host.window import inject_script
+
+    index = _FRONTEND_DIST / "index.html"
+    if not index.exists():
+        return
+    from starlette.responses import HTMLResponse
+    from starlette.routing import Route
+
+    html = index.read_text(encoding="utf-8")
+    injected = html.replace(
+        "<head>", "<head>\n<script>" + inject_script(base_url, token) + "</script>", 1
+    )
+
+    async def _index(_request):
+        return HTMLResponse(injected)
+
+    app.router.routes.insert(0, Route("/", _index))
+    app.router.routes.insert(1, Route("/index.html", _index))
+
+
 def run_windowed(
     ctx: AppContext | None = None,
     libraries_root: Path | None = None,
@@ -100,6 +128,7 @@ def run_windowed(
     app = create_app(ctx)
     port = pick_free_port()
     base_url = f"http://127.0.0.1:{port}"
+    _install_injected_index(app, base_url, ctx.token)  # authenticate the SPA from its first byte
     server, thread = _serve_in_thread(app, port)
     opener = open_window or _open_window
     try:
