@@ -218,6 +218,11 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         "category": r.category,
         "mpn": s(r.mpn), "manufacturer": s(r.manufacturer), "description": s(r.description),
         "datasheet_url": s(r.datasheet_url), "stock": s(r.stock), "package": s(r.package),
+        # M7d procurement fields: persist them so a cache hit keeps a part's lifecycle, lead
+        # time, product page and distributor P/Ns (otherwise a re-build silently drops the
+        # sourcing risk + lead the first fresh lookup found).
+        "lifecycle": s(r.lifecycle), "lead_time": s(r.lead_time), "product_url": s(r.product_url),
+        "dist_pns": dict(r.dist_pns),
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
     }
@@ -231,6 +236,8 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r = EnrichmentResult(category=d.get("category", category))
     r.mpn, r.manufacturer, r.description = s(d.get("mpn")), s(d.get("manufacturer")), s(d.get("description"))
     r.datasheet_url, r.stock, r.package = s(d.get("datasheet_url")), s(d.get("stock")), s(d.get("package"))
+    r.lifecycle, r.lead_time, r.product_url = s(d.get("lifecycle")), s(d.get("lead_time")), s(d.get("product_url"))
+    r.dist_pns = dict(d.get("dist_pns", {}))
     r.price_breaks = [PriceBreak(**b) for b in d.get("price_breaks", [])]
     r.specs = {k: Sourced(v["value"], v["source"], v["confidence"]) for k, v in d.get("specs", {}).items()}
     return r

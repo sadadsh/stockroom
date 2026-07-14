@@ -94,6 +94,23 @@ def test_enrich_result_is_cached_and_not_refetched(tmp_path):
     assert len(fetcher.urls) == n_first  # no additional fetch
 
 
+def test_cache_round_trips_the_procurement_fields():  # M7d: lifecycle/lead/product/dist P/N
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+
+    r = EnrichmentResult(category="ICs")
+    r.mpn = Sourced("TPS62130RGTR", "mouser", "high")
+    r.lifecycle = Sourced("NRND", "mouser", "high")
+    r.lead_time = Sourced("16 Weeks", "mouser", "high")
+    r.product_url = Sourced("http://x/p", "mouser", "high")
+    r.dist_pns = {"mouser": "595-TPS62130RGTR"}
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    # Without persisting these, a cache hit would silently drop procurement risk + lead.
+    assert back.lifecycle.value == "NRND"
+    assert back.lead_time.value == "16 Weeks"
+    assert back.product_url.value == "http://x/p"
+    assert back.dist_pns == {"mouser": "595-TPS62130RGTR"}
+
+
 def test_datasheet_field_is_preferred_over_a_scrape_field():
     # datasheet gives the MPN at high confidence; a scrape gives a WRONG MPN.
     ds = EnrichmentResult(category="ICs")
