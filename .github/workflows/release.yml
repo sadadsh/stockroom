@@ -27,8 +27,12 @@ jobs:
 
       - name: Fetch portable git (MinGit) to bundle into the exe
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $rel = Invoke-RestMethod -Headers @{ 'User-Agent' = 'stockroom-ci' } https://api.github.com/repos/git-for-windows/git/releases/latest
+          # Authenticate the API call so it uses the 1000/hr limit, not the 60/hr anonymous one.
+          $headers = @{ 'User-Agent' = 'stockroom-ci'; 'Authorization' = "Bearer $env:GH_TOKEN" }
+          $rel = Invoke-RestMethod -Headers $headers https://api.github.com/repos/git-for-windows/git/releases/latest
           $asset = $rel.assets | Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' -and $_.name -notmatch 'busybox' } | Select-Object -First 1
           if (-not $asset) { throw "MinGit 64-bit asset not found in the latest git-for-windows release" }
           Write-Host "Downloading $($asset.name)"
