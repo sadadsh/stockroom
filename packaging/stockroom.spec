@@ -42,7 +42,12 @@ a = Analysis(
     pathex=[os.path.join(SPECPATH, "..", "app", "backend")],  # noqa: F821 (SPECPATH is injected)
     binaries=[],
     datas=_datas,
-    hiddenimports=["stockroom.launcher.launch", "stockroom.launcher.exit_codes"],
+    # splash + tkinter are imported lazily (inside functions), so name them explicitly to force
+    # PyInstaller to bundle Tcl/Tk for the first-run progress window.
+    hiddenimports=[
+        "stockroom.launcher.launch", "stockroom.launcher.exit_codes",
+        "stockroom.launcher.splash", "tkinter", "tkinter.ttk",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

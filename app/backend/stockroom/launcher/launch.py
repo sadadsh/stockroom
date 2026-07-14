@@ -196,6 +196,7 @@ def supervise(
     uv_sync: Callable[[Path], None] | None = None,
     ensure: Callable[[Path], None] | None = None,
     webview2: Callable[[], None] | None = None,
+    progress: Callable[[str], None] | None = None,
     remote: str = APP_REPO_REMOTE,
     clone: Callable[[str, Path], None] | None = None,
 ) -> int:
@@ -203,16 +204,26 @@ def supervise(
     in-app updater has already pulled + synced, so the loop just re-runs on the new code).
     Returns the host's final non-restart exit code. The shell-outs are injected for testing;
     the defaults clone / guarantee WebView2 / `uv sync --frozen` / `uv run python -m
-    stockroom.host.run`."""
+    stockroom.host.run`. `progress(phase)` (a splash callback: clone / webview2 / sync /
+    starting) lets the first-run splash show what is happening during the slow provision, and
+    is signalled 'starting' right before the FIRST host spawn so the splash can close."""
     workdir = Path(workdir)
     _ensure = ensure or (lambda wd: ensure_clone(wd, remote=remote, clone=clone))
     _webview2 = webview2 or ensure_webview2
     _uv = uv_sync or _uv_sync
     _spawn = spawn or _spawn_host
+    _progress = progress or (lambda _phase: None)
+    _progress("clone")
     _ensure(workdir)
+    _progress("webview2")
     _webview2()  # guarantee the runtime the host's window needs BEFORE any host spawn
+    started = False
     while True:
+        _progress("sync")
         _uv(workdir)
+        if not started:
+            _progress("starting")  # provisioning done; the splash closes, the host window appears
+            started = True
         code = _spawn(workdir)
         if code != EXIT_RESTART:
             return code
@@ -258,4 +269,8 @@ def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
 
 
 def main() -> int:  # pragma: no cover - the frozen exe entry point
-    return supervise(app_workdir())
+    # Show a first-run progress splash during the slow provision (clone + WebView2 + uv sync); it
+    # degrades to a plain run if a splash cannot be shown, so it never blocks the launch.
+    from stockroom.launcher import splash
+
+    return splash.run(lambda progress: supervise(app_workdir(), progress=progress))
