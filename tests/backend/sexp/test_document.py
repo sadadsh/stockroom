@@ -190,3 +190,19 @@ def test_truncated_input_raises():
 def test_trailing_tokens_raise():
     with pytest.raises(ValueError):
         SexpDocument.parse('(a 1) (b 2)')
+
+
+def test_iter_descendants_walks_every_nested_list_node_pre_order():
+    # The shared bulk-edit traversal (roadmap #6/#7): every descendant LIST node, pre-order,
+    # at any depth. Atoms and the node itself are excluded; a nested match is reached.
+    doc = SexpDocument.parse('(root (a (b 1) (c (b 2))) (b 3))')
+    names = [n.name for n in doc.root.iter_descendants()]
+    assert names == ["a", "b", "c", "b", "b"]  # a, a/b, a/c, a/c/b, root/b
+    # a fp_text buried inside a footprint is reachable, a bare atom is never yielded
+    twos = [n for n in doc.root.iter_descendants() if n.name == "b"]
+    assert [t.children[1].value for t in twos] == ["1", "2", "3"]
+
+
+def test_iter_descendants_on_a_leaf_is_empty():
+    doc = SexpDocument.parse('(root 1 "x")')
+    assert list(doc.root.children[1].iter_descendants()) == []

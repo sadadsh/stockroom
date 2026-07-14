@@ -10,7 +10,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { DesignRules, NetClass, SetBoardSettingsBody } from "./types";
+import type { ConformBody, DesignRules, NetClass, SetBoardSettingsBody } from "./types";
 import { api, type ListPartsArgs } from "./client";
 
 export function usePartsQuery(args: ListPartsArgs) {
@@ -496,6 +496,43 @@ export function useSetProjectSettings() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["project-settings", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
+// The object-conform catalog + honest state for a project (M7f-B), read once for the editor.
+export function useProjectConform(id: string | null) {
+  return useQuery({
+    queryKey: ["project-conform", id],
+    queryFn: () => api.getConform(id as string),
+    enabled: !!id,
+  });
+}
+
+// A conform preview is a pure dry-run: no cache is touched (it neither writes nor commits).
+export function usePreviewConform() {
+  return useMutation({
+    mutationFn: (vars: { id: string } & ConformBody) => {
+      const { id, ...body } = vars;
+      return api.previewConform(id, body);
+    },
+  });
+}
+
+// Applying a conform re-reads the catalog/state and the project detail, and evicts the cached
+// ERC/DRC server-side (a text size/thickness change can alter DRC), so the checks query is
+// invalidated to re-read the honest not-run shape rather than a stale pass.
+export function useApplyConform() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string } & ConformBody) => {
+      const { id, ...body } = vars;
+      return api.applyConform(id, body);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-conform", vars.id] });
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
     },

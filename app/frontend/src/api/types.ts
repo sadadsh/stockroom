@@ -746,6 +746,66 @@ export interface SetBoardSettingsResult extends BoardSettings {
   committed: string;
 }
 
+// --- M7f-B object conform (font/thickness normalize) -------------------------
+
+// One conform category the editor offers (silk/fab/copper for the PCB, text/labels for the sheets).
+export interface ConformCategory {
+  key: string;
+  label: string;
+  hint: string;
+}
+
+// The suggested starting size/thickness (mm) for a category (thickness null where labels carry none).
+export interface ConformSuggestion {
+  size: number;
+  thickness: number | null;
+}
+
+// GET /api/projects/{id}/conform
+export interface ConformCatalog {
+  project: string;
+  under_git: boolean;
+  has_pcb: boolean;
+  has_sch: boolean;
+  pcb_categories: ConformCategory[];
+  sch_categories: ConformCategory[];
+  suggested: Record<string, ConformSuggestion>;
+}
+
+// A per-category target the editor sends (either dimension may be omitted to leave it untouched).
+export interface ConformTarget {
+  size?: number;
+  thickness?: number;
+}
+
+// POST /conform/preview and PATCH /conform body: only the selected categories are present.
+export interface ConformBody {
+  pcb_targets?: Record<string, ConformTarget>;
+  sch_targets?: Record<string, ConformTarget>;
+}
+
+// One file's per-category change counts in a preview or apply result.
+export interface ConformFile {
+  path: string;
+  counts: Record<string, number>;
+  changed: number;
+}
+
+// POST /api/projects/{id}/conform/preview
+export interface ConformPreview {
+  project: string;
+  files: ConformFile[];
+  total: number;
+}
+
+// PATCH /api/projects/{id}/conform (committed is null when nothing changed: a no-commit no-op)
+export interface ConformResult {
+  project: string;
+  committed: string | null;
+  files: ConformFile[];
+  total: number;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

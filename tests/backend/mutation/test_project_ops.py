@@ -631,3 +631,193 @@ def test_set_settings_failed_pro_write_leaves_zero_trace(tmp_path, monkeypatch):
 
     assert pro.read_text(encoding="utf-8") == original  # restored byte-for-byte
     assert prepo.head() == head_before and prepo.is_clean()
+
+
+# --- M7f-B Editor: object conform (font/thickness normalize) ------------------
+
+# A board with a silk gr_text + a footprint fp_text and a fab fp_text (so a conform is provably
+# multi-object + layer-scoped) and a physical (general (thickness)) that a font conform never touches.
+_PCB_TEXT = (
+    "(kicad_pcb\n"
+    "\t(version 20260206)\n"
+    "\t(general\n\t\t(thickness 1.6)\n\t)\n"
+    '\t(gr_text "BRD"\n\t\t(at 5 5 0)\n\t\t(layer "F.SilkS")\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 1.5 1.5)\n\t\t\t\t(thickness 0.3)\n\t\t\t)\n\t\t)\n\t)\n"
+    '\t(footprint "R"\n'
+    '\t\t(property "Reference" "R1"\n\t\t\t(at 0 0 0)\n\t\t\t(layer "F.SilkS")\n'
+    "\t\t\t(effects\n\t\t\t\t(font\n\t\t\t\t\t(size 1 1)\n\t\t\t\t)\n\t\t\t)\n\t\t)\n"
+    '\t\t(fp_text user "FAB"\n\t\t\t(at 0 1 0)\n\t\t\t(layer "F.Fab")\n'
+    "\t\t\t(effects\n\t\t\t\t(font\n\t\t\t\t\t(size 0.8 0.8)\n\t\t\t\t)\n\t\t\t)\n\t\t)\n"
+    "\t)\n)\n"
+)
+# A sheet with a top-level graphic text + a label (both conformable) and a lib_symbols cache text
+# that must never be touched.
+_SCH_TEXT = (
+    "(kicad_sch\n"
+    "\t(version 20260306)\n"
+    '\t(lib_symbols\n\t\t(symbol "Device:R"\n\t\t\t(text "CACHE"\n\t\t\t\t(at 0 0 0)\n'
+    "\t\t\t\t(effects\n\t\t\t\t\t(font\n\t\t\t\t\t\t(size 1.27 1.27)\n\t\t\t\t\t)\n\t\t\t\t)\n\t\t\t)\n\t\t)\n\t)\n"
+    '\t(text "NOTE"\n\t\t(at 10 10 0)\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 2.54 2.54)\n\t\t\t)\n\t\t)\n\t)\n"
+    '\t(label "NET1"\n\t\t(at 20 20 0)\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 1.27 1.27)\n\t\t\t)\n\t\t)\n\t)\n)\n"
+)
+
+
+def _git_project_conformable(dir_path):
+    """A git-backed project whose board AND sheet both carry conformable text objects."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    prepo = GitRepo(dir_path)
+    prepo.init()
+    (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text(_SCH_TEXT, encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(_PCB_TEXT, encoding="utf-8")
+    prepo.commit("init project", [
+        dir_path / "board.kicad_pro", dir_path / "board.kicad_sch", dir_path / "board.kicad_pcb",
+    ])
+    return dir_path, prepo
+
+
+def test_conform_catalog_reports_honest_state_and_catalogs(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    cat = ops.conform_catalog(rec.id)
+    assert cat["under_git"] is True
+    assert cat["has_pcb"] is True and cat["has_sch"] is True
+    assert {c["key"] for c in cat["pcb_categories"]} == {"silk", "fab", "copper"}
+    assert {c["key"] for c in cat["sch_categories"]} == {"text", "labels"}
+    assert cat["suggested"]["silk"]["size"] > 0
+
+
+def test_conform_catalog_missing_project_raises(tmp_path):
+    ops = _ops(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        ops.conform_catalog("nope")
+
+
+def test_conform_preview_counts_without_writing_or_committing(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    pcb_before = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+
+    prev = ops.conform_preview(
+        rec.id, {"silk": {"size": 2.0, "thickness": None}}, {"labels": {"size": 2.0, "thickness": None}}
+    )
+    by_path = {f["path"]: f for f in prev["files"]}
+    assert by_path["board.kicad_pcb"]["counts"]["silk"] == 2  # gr_text + fp_text on silk
+    assert by_path["board.kicad_sch"]["counts"]["labels"] == 1
+    assert prev["total"] == 3
+    # a preview writes nothing and commits nothing
+    assert (proj / "board.kicad_pcb").read_text(encoding="utf-8") == pcb_before
+    assert prepo.head() == head_before
+
+
+def test_conform_apply_writes_minimal_diff_and_commits_once(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+
+    result = ops.conform_apply(
+        rec.id, {"silk": {"size": 2.0, "thickness": None}}, {"labels": {"size": 2.0, "thickness": None}}
+    )
+    pcb = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    sch = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    assert pcb.count("(size 2 2)") == 2  # both silk objects
+    assert "(size 0.8 0.8)" in pcb  # the fab text untouched (not selected)
+    assert "(size 2 2)" in sch  # the label
+    assert "CACHE" in sch and sch.count("(size 1.27 1.27)") == 1  # lib_symbols cache untouched
+    assert result["committed"] == prepo.head()
+    assert result["total"] == 3
+    assert prepo.is_clean()
+    added = prepo._run("rev-list", "--count", f"{head_before}..HEAD").stdout.strip()
+    assert added == "1"  # ONE commit for both files
+
+
+def test_conform_apply_is_one_atomic_commit_over_board_and_sheet(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    ops.conform_apply(rec.id, {"silk": {"size": 2.0}}, {"labels": {"size": 2.0}})
+    names = prepo._run("show", "--name-only", "--format=", "HEAD").stdout.split()
+    assert "board.kicad_pcb" in names and "board.kicad_sch" in names
+
+
+def test_conform_apply_nothing_to_change_is_a_no_commit_noop(tmp_path):
+    # a copper conform on a board with no copper text (and no other selection) changes nothing:
+    # an honest no-commit no-op, never a fabricated empty commit.
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    result = ops.conform_apply(rec.id, {"copper": {"size": 1.0}}, {})
+    assert result["committed"] is None
+    assert result["total"] == 0
+    assert prepo.head() == head_before  # no commit landed
+
+
+def test_conform_apply_refuses_a_project_not_under_git(tmp_path):
+    ops = _ops(tmp_path)
+    proj = _make_project(tmp_path / "nogit" / "board", _UNANNOTATED)
+    (proj / "board.kicad_pcb").write_text(_PCB_TEXT, encoding="utf-8")
+    rec = ops.register(proj)
+    assert rec.git_root is None
+    with pytest.raises(ValueError):
+        ops.conform_apply(rec.id, {"silk": {"size": 2.0}}, {})
+
+
+def test_conform_apply_empty_selection_is_rejected(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.conform_apply(rec.id, {}, {})
+
+
+def test_conform_apply_rejects_an_unknown_category(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.conform_apply(rec.id, {"bogus": {"size": 2.0}}, {})
+
+
+def test_conform_apply_missing_project_raises(tmp_path):
+    ops = _ops(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        ops.conform_apply("nope", {"silk": {"size": 2.0}}, {})
+
+
+def test_conform_apply_raising_write_leaves_zero_trace(tmp_path, monkeypatch):
+    # a save that raises mid-write (after some files are already written) must roll EVERY tracked
+    # file back to its committed bytes and land no commit (the atomicity contract).
+    from stockroom.sexp.document import SexpDocument
+
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    pcb = proj / "board.kicad_pcb"
+    sch = proj / "board.kicad_sch"
+    pcb_before, sch_before = pcb.read_text(encoding="utf-8"), sch.read_text(encoding="utf-8")
+    head_before = prepo.head()
+
+    real_save = SexpDocument.save
+    calls = {"n": 0}
+
+    def _flaky_save(self, path):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            real_save(self, path)  # first file lands on disk
+            raise OSError("disk full")  # second write never happens; rollback must undo the first
+        real_save(self, path)
+
+    monkeypatch.setattr(SexpDocument, "save", _flaky_save)
+    with pytest.raises(Exception):
+        ops.conform_apply(rec.id, {"silk": {"size": 2.0}}, {"labels": {"size": 2.0}})
+
+    assert pcb.read_text(encoding="utf-8") == pcb_before  # restored byte-for-byte
+    assert sch.read_text(encoding="utf-8") == sch_before
+    assert prepo.head() == head_before and prepo.is_clean()

@@ -90,6 +90,19 @@ class SexpNode:
             if not ch.is_atom and ch.name == name
         ]
 
+    def iter_descendants(self):
+        """Pre-order generator over every descendant LIST node (self and atoms excluded).
+
+        The shared bulk-edit traversal (roadmap #6/#7): it reaches a matching node at any
+        depth (e.g. an fp_text buried inside a footprint), so a caller can filter by name and
+        splice a token on each via set_value while staying byte-preserving and minimal-diff.
+        Yields nodes from the ORIGINAL parse (their spans are valid), so it must not be used
+        to walk over freshly inserted nodes."""
+        for ch in self._children or []:
+            if not ch.is_atom:
+                yield ch
+                yield from ch.iter_descendants()
+
     def set_value(self, new: str, *, quote: bool) -> None:
         if not self._token:
             raise ValueError("set_value is only valid on a leaf node")

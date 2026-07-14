@@ -1008,3 +1008,127 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.patch("/api/projects/x/design-rules", json={"rules": {}}).status_code == 401
     assert anon_client.get("/api/projects/x/settings").status_code == 401
     assert anon_client.patch("/api/projects/x/settings", json={"thickness": 1.2}).status_code == 401
+
+
+# ---- M7f-B Editor: object conform (font/thickness normalize) -----------------
+
+_PCB_CONFORM = (
+    "(kicad_pcb\n"
+    "\t(version 20260206)\n"
+    "\t(general\n\t\t(thickness 1.6)\n\t)\n"
+    '\t(gr_text "BRD"\n\t\t(at 5 5 0)\n\t\t(layer "F.SilkS")\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 1.5 1.5)\n\t\t\t\t(thickness 0.3)\n\t\t\t)\n\t\t)\n\t)\n"
+    '\t(footprint "R"\n\t\t(property "Reference" "R1"\n\t\t\t(at 0 0 0)\n\t\t\t(layer "F.SilkS")\n'
+    "\t\t\t(effects\n\t\t\t\t(font\n\t\t\t\t\t(size 1 1)\n\t\t\t\t)\n\t\t\t)\n\t\t)\n\t)\n)\n"
+)
+_SCH_CONFORM = (
+    "(kicad_sch\n"
+    "\t(version 20260306)\n"
+    '\t(text "NOTE"\n\t\t(at 10 10 0)\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 2.54 2.54)\n\t\t\t)\n\t\t)\n\t)\n"
+    '\t(label "NET1"\n\t\t(at 20 20 0)\n'
+    "\t\t(effects\n\t\t\t(font\n\t\t\t\t(size 1.27 1.27)\n\t\t\t)\n\t\t)\n\t)\n)\n"
+)
+
+
+def _make_git_conform_project(dir_path):
+    """A git-backed project whose board + sheet both carry conformable text objects."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text(_SCH_CONFORM, encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(_PCB_CONFORM, encoding="utf-8")
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "init"]):
+        subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+    return dir_path, head
+
+
+def test_get_conform_returns_catalog_and_state(client, tmp_path):
+    proj, _ = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/conform").json()
+    assert body["under_git"] is True
+    assert body["has_pcb"] is True and body["has_sch"] is True
+    assert {c["key"] for c in body["pcb_categories"]} == {"silk", "fab", "copper"}
+    assert {c["key"] for c in body["sch_categories"]} == {"text", "labels"}
+    assert body["suggested"]["silk"]["size"] > 0
+
+
+def test_get_conform_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/conform").status_code == 404
+
+
+def test_post_conform_preview_counts_without_writing(client, tmp_path):
+    proj, head = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/conform/preview",
+                    json={"pcb_targets": {"silk": {"size": 2.0}},
+                          "sch_targets": {"labels": {"size": 2.0}}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 3  # 2 silk + 1 label
+    on_disk = (proj / "board.kicad_pcb").read_text(encoding="utf-8")
+    assert "(size 1.5 1.5)" in on_disk  # unchanged: a preview writes nothing
+
+
+def test_post_conform_preview_empty_selection_is_400(client, tmp_path):
+    proj, _ = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/conform/preview", json={})
+    assert r.status_code == 400
+
+
+def test_patch_conform_applies_and_commits(client, tmp_path):
+    proj, head = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/conform",
+                     json={"pcb_targets": {"silk": {"size": 2.0}},
+                           "sch_targets": {"labels": {"size": 2.0}}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    assert body["total"] == 3
+    assert (proj / "board.kicad_pcb").read_text(encoding="utf-8").count("(size 2 2)") == 2
+    assert "(size 2 2)" in (proj / "board.kicad_sch").read_text(encoding="utf-8")
+
+
+def test_patch_conform_bad_size_is_400(client, tmp_path):
+    proj, _ = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/conform",
+                     json={"pcb_targets": {"silk": {"size": 0}}})
+    assert r.status_code == 400
+
+
+def test_patch_conform_unknown_category_is_400(client, tmp_path):
+    proj, _ = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/conform",
+                     json={"pcb_targets": {"bogus": {"size": 1.0}}})
+    assert r.status_code == 400
+
+
+def test_patch_conform_non_git_is_400(client, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")
+    (proj / "board.kicad_pcb").write_text(_PCB_CONFORM, encoding="utf-8")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/conform",
+                     json={"pcb_targets": {"silk": {"size": 2.0}}})
+    assert r.status_code == 400
+
+
+def test_patch_conform_unknown_project_is_404(client):
+    r = client.patch("/api/projects/nope/conform", json={"pcb_targets": {"silk": {"size": 2.0}}})
+    assert r.status_code == 404
+
+
+def test_patch_conform_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
+    # conforming text size/thickness can change DRC (text height/thickness, silk clearance), so
+    # the cached ERC/DRC must be evicted and the next check re-run honestly.
+    proj, _ = _make_git_conform_project(tmp_path / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/conform", json={"pcb_targets": {"silk": {"size": 2.0}}})
+    assert rec["id"] not in app_ctx.checks_cache

@@ -176,3 +176,28 @@ class SetSettingsBody(BaseModel):
     drc_severities: dict[str, Any] | None = None
     erc_pin_map: list[list[int]] | None = None
     text_variables: dict[str, Any] | None = None
+
+
+class ConformTarget(BaseModel):
+    """The target size/thickness (mm) for one object-conform category (M7f-B). Either may be None
+    to leave that dimension untouched; the engine rejects a category that sets neither, and a
+    non-positive or non-finite value, as a 400."""
+
+    size: float | None = None
+    thickness: float | None = None
+
+
+class ConformBody(BaseModel):
+    """Preview or apply an object conform (M7f-B): normalize the font size (and, where a font
+    carries one, its thickness) of existing text objects to a house standard. `pcb_targets` keys
+    are silk/fab/copper; `sch_targets` keys are text/labels; only the categories present are
+    conformed. An empty selection is a 400."""
+
+    pcb_targets: dict[str, ConformTarget] | None = None
+    sch_targets: dict[str, ConformTarget] | None = None
+
+    def pcb(self) -> dict:
+        return {k: v.model_dump() for k, v in (self.pcb_targets or {}).items()}
+
+    def sch(self) -> dict:
+        return {k: v.model_dump() for k, v in (self.sch_targets or {}).items()}
