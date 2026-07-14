@@ -2,8 +2,8 @@ import shutil
 
 import pytest
 
-from stockroom.vcs.repo import GitRepo
-from stockroom.vcs.sync import SyncEngine, SyncState
+from stockroom.vcs.repo import GitRepo, PullResult, PushResult
+from stockroom.vcs.sync import SyncEngine, SyncState, _classify_failure
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
@@ -53,6 +53,54 @@ def test_pull_when_behind(tmp_path):
     res = SyncEngine(b).sync()
     assert res.pulled is True
     assert (b.root / "f").read_text() == "v2"
+
+
+@pytest.mark.parametrize("reason", [
+    "remote: Repository not found.\nfatal: repository 'https://github.com/x/y.git/' not found",
+    "fatal: Authentication failed for 'https://github.com/x/y.git/'",
+    "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+    "git@github.com: Permission denied (publickey).",
+    "fatal: unable to access 'https://...': The requested URL returned error: 403 Forbidden",
+])
+def test_auth_failure_classifies_as_denied_not_diverged_or_offline(reason):
+    # An authentication / private-repo failure must be its own honest state, never mislabeled a
+    # divergence (the library did not diverge) or an offline outage.
+    assert _classify_failure(reason) == SyncState.DENIED
+
+
+def test_network_failure_still_classifies_as_offline():
+    assert _classify_failure("fatal: unable to access '...': Could not resolve host: github.com") \
+        == SyncState.OFFLINE
+
+
+def test_true_conflict_still_classifies_as_diverged():
+    assert _classify_failure("fatal: Not possible to fast-forward, aborting.") == SyncState.DIVERGED
+
+
+class _StubRepo:
+    """A minimal repo whose pull/push report a given failure reason, to drive SyncEngine's
+    classification without a real remote."""
+    def __init__(self, reason):
+        self._reason = reason
+
+    def has_remote(self):
+        return True
+
+    def has_upstream(self):
+        return True
+
+    def pull_ff(self):
+        return PullResult(ok=False, updated=False, reason=self._reason)
+
+    def ahead_behind(self):
+        return (0, 0)
+
+
+def test_sync_reports_denied_on_an_auth_pull_failure():
+    repo = _StubRepo("remote: Repository not found.\nfatal: repository not found")
+    res = SyncEngine(repo).sync()
+    assert res.state == SyncState.DENIED
+    assert "not found" in res.detail.lower()
 
 
 def test_divergence_is_surfaced_not_clobbered(tmp_path):

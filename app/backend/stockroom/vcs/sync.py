@@ -19,6 +19,7 @@ class SyncState:
     PULLED = "pulled"
     OFFLINE = "offline"
     DIVERGED = "diverged"
+    DENIED = "denied"
     NO_REMOTE = "no_remote"
 
 
@@ -30,6 +31,24 @@ class SyncResult:
     detail: str = ""
 
 
+def _looks_denied(reason: str) -> bool:
+    """An authentication / authorization failure, distinct from a network outage or a genuine
+    divergence: a private repo the bundled git cannot log in to, or a missing / rejected
+    credential. GitHub answers a private repo with 'repository not found' to an unauthenticated
+    client, so that phrase is an auth failure here (not a missing remote). Checked BEFORE
+    _looks_offline because a 403 also reads as 'unable to access'."""
+    r = reason.lower()
+    return any(
+        tok in r
+        for tok in (
+            "authentication failed", "could not read username", "could not read password",
+            "terminal prompts disabled", "permission denied", "repository not found",
+            "invalid username or password", "support for password authentication",
+            "403 forbidden", "error: 403",
+        )
+    )
+
+
 def _looks_offline(reason: str) -> bool:
     r = reason.lower()
     return any(
@@ -37,6 +56,16 @@ def _looks_offline(reason: str) -> bool:
         for tok in ("could not resolve host", "connection", "timed out",
                     "network", "unable to access", "no route")
     )
+
+
+def _classify_failure(reason: str) -> str:
+    """The honest state for a failed pull/push reason: an auth failure is DENIED, a network
+    outage is OFFLINE, anything else is a genuine DIVERGED (history conflict)."""
+    if _looks_denied(reason):
+        return SyncState.DENIED
+    if _looks_offline(reason):
+        return SyncState.OFFLINE
+    return SyncState.DIVERGED
 
 
 class SyncEngine:
@@ -55,9 +84,7 @@ class SyncEngine:
         if has_upstream:
             pull = self.repo.pull_ff()
             if not pull.ok:
-                if _looks_offline(pull.reason):
-                    return SyncResult(state=SyncState.OFFLINE, detail=pull.reason)
-                return SyncResult(state=SyncState.DIVERGED, detail=pull.reason)
+                return SyncResult(state=_classify_failure(pull.reason), detail=pull.reason)
             pulled = pull.updated
 
         # decide whether we have local commits to push
@@ -72,9 +99,8 @@ class SyncEngine:
         if need_push:
             push = self.repo.push()
             if not push.ok:
-                if _looks_offline(push.reason):
-                    return SyncResult(state=SyncState.OFFLINE, pulled=pulled, detail=push.reason)
-                return SyncResult(state=SyncState.DIVERGED, pulled=pulled, detail=push.reason)
+                return SyncResult(state=_classify_failure(push.reason), pulled=pulled,
+                                  detail=push.reason)
             pushed = True
 
         if pushed:

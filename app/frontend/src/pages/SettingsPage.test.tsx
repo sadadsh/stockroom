@@ -239,6 +239,20 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(screen.queryByText(/already up to date/i)).toBeNull();
   });
 
+  it("surfaces an auth-denied sync as a credential problem, not a divergence", async () => {
+    mockApi.doSync.mockResolvedValue({
+      state: "denied",
+      pulled: false,
+      pushed: false,
+      detail: "remote: Repository not found.",
+    });
+    renderPage();
+    await screen.findByText("Archive");
+    await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
+    expect(await screen.findByText(/cannot sign in to the library remote/i)).toBeInTheDocument();
+    expect(screen.queryByText(/diverged/i)).toBeNull();
+  });
+
   it("surfaces a no-remote sync honestly, not as up to date", async () => {
     mockApi.doSync.mockResolvedValue({
       state: "no_remote",
