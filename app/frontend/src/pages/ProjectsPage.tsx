@@ -411,6 +411,7 @@ function ProjectDetailView({
       <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
       <EditorSection key={`editor-${project.id}`} projectId={project.id} />
       <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
+      <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -2180,6 +2181,451 @@ function BoardSetupForm({ projectId, data }: { projectId: string; data: BoardSet
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// -- Editor: .kicad_pro settings (severities + ERC pin-map + text-vars) (M7f-A2) --
+
+// "pin_not_connected" -> "Pin Not Connected": a readable label for a KiCad rule id / pin type.
+function humanizeId(id: string): string {
+  return id
+    .split("_")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+// The .kicad_pro settings editor: ERC/DRC rule severities, the ERC pin-conflict matrix, and
+// project text variables. Each save is a minimal-diff scoped commit on the project's own git.
+// Reads from the same settings query as the board setup; honest states for no .kicad_pro / no git.
+function ProSettingsSection({ projectId }: { projectId: string }) {
+  const q = useProjectSettings(projectId);
+  const data = q.data;
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="pro-settings-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Design Checks and Variables</Eyebrow>
+        <p className="text-xs text-t3">
+          Edit the ERC and DRC rule severities, the ERC pin conflict matrix, and the project text
+          variables. Each save writes a minimal change to the project file and commits it to the
+          project's own git history.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the project settings...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">
+          {errMsg(q.error, "Could not read the project settings.")}
+        </p>
+      ) : !data ? null : !data.has_pro ? (
+        <p className="text-sm text-t3" data-testid="prosettings-no-pro">
+          This project has no .kicad_pro file, so there are no rule severities, pin map, or text
+          variables to edit.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="prosettings-no-git">
+          This project is not under git. Initialize a git repository for it to edit these settings,
+          so each change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-7">
+          <SeveritiesForm projectId={projectId} data={data} />
+          <PinMapForm projectId={projectId} data={data} />
+          <TextVarsForm projectId={projectId} data={data} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+type SevMap = Record<string, string>;
+
+// The changed entries between a current severity map and its seed (send-only-changed, so an
+// untouched rule is never re-written and the per-rule merge stays a minimal diff).
+function changedSeverities(cur: SevMap, seed: SevMap): SevMap {
+  const out: SevMap = {};
+  for (const k of Object.keys(cur)) if (cur[k] !== seed[k]) out[k] = cur[k];
+  return out;
+}
+
+function SeveritiesForm({ projectId, data }: { projectId: string; data: BoardSettings }) {
+  const seedErc = data.erc_severities;
+  const seedDrc = data.drc_severities;
+  const [erc, setErc] = useState<SevMap>(() => ({ ...seedErc }));
+  const [drc, setDrc] = useState<SevMap>(() => ({ ...seedDrc }));
+  const save = useSetProjectSettings();
+  const { toast } = useToast();
+
+  // Re-seed on content (not reference) so a background re-read of identical content never
+  // clobbers unsaved edits (mirrors the M7e/A editors).
+  const sig = JSON.stringify([seedErc, seedDrc]);
+  useEffect(() => {
+    setErc({ ...seedErc });
+    setDrc({ ...seedDrc });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of the seed maps
+  }, [sig]);
+
+  const chErc = changedSeverities(erc, seedErc);
+  const chDrc = changedSeverities(drc, seedDrc);
+  const dirty = Object.keys(chErc).length > 0 || Object.keys(chDrc).length > 0;
+
+  function onSave() {
+    if (!dirty) return;
+    const vars: { id: string; erc_severities?: SevMap; drc_severities?: SevMap } = { id: projectId };
+    if (Object.keys(chErc).length) vars.erc_severities = chErc;
+    if (Object.keys(chDrc).length) vars.drc_severities = chDrc;
+    save.mutate(vars, {
+      onSuccess: () => toast("Rule severities saved."),
+      onError: (e) => toast(errMsg(e, "Could not save the rule severities."), "err"),
+    });
+  }
+
+  return (
+    <div data-testid="severities-form">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Rule Severities</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving..." : "Save Severities"}
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <SeverityGroup
+          title="Electrical Rules (ERC)"
+          prefix="erc"
+          map={erc}
+          levels={data.severity_levels}
+          onChange={(k, v) => setErc((m) => ({ ...m, [k]: v }))}
+        />
+        <SeverityGroup
+          title="Design Rules (DRC)"
+          prefix="drc"
+          map={drc}
+          levels={data.severity_levels}
+          onChange={(k, v) => setDrc((m) => ({ ...m, [k]: v }))}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SeverityGroup({
+  title,
+  prefix,
+  map,
+  levels,
+  onChange,
+}: {
+  title: string;
+  prefix: string;
+  map: SevMap;
+  levels: string[];
+  onChange: (rule: string, level: string) => void;
+}) {
+  const keys = Object.keys(map).sort();
+  return (
+    <div>
+      <h4 className="mb-2 text-2xs font-medium uppercase tracking-wide text-t3">{title}</h4>
+      {keys.length === 0 ? (
+        <p className="text-xs text-t3">This project defines no rules here.</p>
+      ) : (
+        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto rounded-control border border-line2 p-2">
+          {keys.map((k) => (
+            <label key={k} className="flex items-center justify-between gap-2 text-xs text-t2">
+              <span className="min-w-0 truncate" title={k}>
+                {humanizeId(k)}
+              </span>
+              <select
+                data-testid={`sev-${prefix}-${k}`}
+                className="rounded-control border border-line2 bg-field px-1 py-0.5 text-xs text-t1 outline-none focus:border-acc"
+                value={map[k]}
+                onChange={(e) => onChange(k, e.target.value)}
+              >
+                {levels.map((lv) => (
+                  <option key={lv} value={lv}>
+                    {humanizeId(lv)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One ERC pin-conflict cell's classes/glyph/label by severity (0 OK, 1 warning, 2 error, 3 is
+// KiCad's unconnected sentinel, preserved on read). Tinted backgrounds mirror the Badge palette.
+function pinSevCls(sev: number): string {
+  if (sev === 2) return "bg-[rgba(215,108,98,0.15)] text-err";
+  if (sev === 1) return "bg-[rgba(211,162,76,0.15)] text-warn";
+  if (sev === 3) return "bg-raise2 text-t3";
+  return "bg-field text-t3";
+}
+function pinSevGlyph(sev: number): string {
+  return sev === 2 ? "E" : sev === 1 ? "W" : sev === 3 ? "-" : "";
+}
+function pinSevLabel(sev: number): string {
+  return sev === 2 ? "Error" : sev === 1 ? "Warning" : sev === 3 ? "Unconnected" : "OK";
+}
+
+function PinMapForm({ projectId, data }: { projectId: string; data: BoardSettings }) {
+  // A project whose .kicad_pro carries no matrix reads as null: never fabricate an all-OK matrix
+  // (that would silently disable every pin-conflict check KiCad's real default enforces).
+  if (data.erc_pin_map == null) {
+    return (
+      <p className="text-sm text-t3" data-testid="pinmap-absent">
+        This project has no ERC pin conflict matrix yet. Open it in KiCad once to initialize the
+        matrix, then it can be edited here (Stockroom never fabricates one, which would silently
+        disable pin conflict checks).
+      </p>
+    );
+  }
+  return <PinMapGrid projectId={projectId} data={data} initial={data.erc_pin_map} />;
+}
+
+function PinMapGrid({
+  projectId,
+  data,
+  initial,
+}: {
+  projectId: string;
+  data: BoardSettings;
+  initial: number[][];
+}) {
+  const [matrix, setMatrix] = useState<number[][]>(() => initial.map((r) => [...r]));
+  const save = useSetProjectSettings();
+  const { toast } = useToast();
+
+  const sig = JSON.stringify(initial);
+  useEffect(() => {
+    setMatrix(initial.map((r) => [...r]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of the matrix
+  }, [sig]);
+
+  const dirty = JSON.stringify(matrix) !== sig;
+  const types = data.erc_pin_types;
+
+  function cycle(i: number, j: number) {
+    setMatrix((m) => {
+      const next = m.map((r) => [...r]);
+      const c = next[i][j];
+      const v = c === 0 ? 1 : c === 1 ? 2 : 0; // 0 -> 1 -> 2 -> 0 (a 3 sentinel resets to 0 on edit)
+      next[i][j] = v;
+      next[j][i] = v; // the matrix is symmetric, so mirror the pair
+      return next;
+    });
+  }
+
+  function onSave() {
+    if (!dirty) return;
+    save.mutate(
+      { id: projectId, erc_pin_map: matrix },
+      {
+        onSuccess: () => toast("ERC pin map saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the pin map."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="pinmap-grid">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">ERC Pin Conflict Matrix</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving..." : "Save Pin Map"}
+        </Button>
+      </div>
+      <p className="mb-2 text-2xs text-t3">
+        Click a cell to cycle its severity: OK, Warning, Error. The matrix is symmetric, so both
+        pairings update together.
+      </p>
+      <div className="overflow-x-auto">
+        <table className="border-collapse text-2xs">
+          <thead>
+            <tr>
+              <th className="p-1"></th>
+              {types.map((t, j) => (
+                <th key={j} className="p-1 font-normal text-t3" title={humanizeId(t)}>
+                  {j + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((t, i) => (
+              <tr key={i}>
+                <th
+                  scope="row"
+                  className="whitespace-nowrap p-1 text-right font-normal text-t3"
+                  title={humanizeId(t)}
+                >
+                  {i + 1} {humanizeId(t)}
+                </th>
+                {types.map((c, j) => {
+                  const sev = matrix[i][j];
+                  return (
+                    <td key={j} className="p-0.5">
+                      <button
+                        type="button"
+                        data-testid={`pm-${i}-${j}`}
+                        data-sev={sev}
+                        onClick={() => cycle(i, j)}
+                        title={`${humanizeId(t)} / ${humanizeId(c)}: ${pinSevLabel(sev)}`}
+                        className={`h-5 w-5 rounded-control border border-line2 text-center font-medium leading-none ${pinSevCls(
+                          sev,
+                        )}`}
+                      >
+                        {pinSevGlyph(sev)}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface TvRow {
+  name: string;
+  value: string;
+}
+
+// True when two string maps hold the same key/value pairs regardless of key order (text_variables
+// is unordered; the backend stores it sorted, so an order-sensitive compare would mis-flag dirty).
+function sameStringMap(a: Record<string, string>, b: Record<string, string>): boolean {
+  const ak = Object.keys(a);
+  if (ak.length !== Object.keys(b).length) return false;
+  return ak.every((k) => Object.prototype.hasOwnProperty.call(b, k) && a[k] === b[k]);
+}
+
+function TextVarsForm({ projectId, data }: { projectId: string; data: BoardSettings }) {
+  const seed = data.text_variables;
+  const [rows, setRows] = useState<TvRow[]>(() =>
+    Object.entries(seed).map(([name, value]) => ({ name, value })),
+  );
+  const save = useSetProjectSettings();
+  const { toast } = useToast();
+
+  const sig = JSON.stringify(seed);
+  useEffect(() => {
+    setRows(Object.entries(seed).map(([name, value]) => ({ name, value })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of the seed map
+  }, [sig]);
+
+  // The complete desired map from the current rows (a blank-name row is ignored, matching the
+  // "a variable needs a name" rule). It is authoritative on save: a var absent from it is deleted.
+  function buildDesired(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const r of rows) {
+      const n = r.name.trim();
+      if (n) out[n] = r.value;
+    }
+    return out;
+  }
+  const desired = buildDesired();
+  // Compare the maps ORDER-INDEPENDENTLY: text_variables is unordered and the backend re-serializes
+  // it sorted (sort_keys=True), so seed comes back alphabetical while rows keep edit order. A
+  // JSON.stringify compare would strand Save permanently Unsaved after a delete-then-re-add that
+  // only reorders identical content (the re-seed cannot clear it: a no-op save is byte-identical).
+  const dirty = !sameStringMap(desired, seed);
+
+  function onSave() {
+    // A row with a value but no name, or a duplicate name, is a clear error the user must fix
+    // (the desired map would otherwise silently drop or collide the entry).
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const n = r.name.trim();
+      if (!n) {
+        if (r.value.trim()) {
+          toast("Enter a name for every text variable.", "err");
+          return;
+        }
+        continue;
+      }
+      if (seen.has(n)) {
+        toast(`Duplicate text variable name: ${n}.`, "err");
+        return;
+      }
+      seen.add(n);
+    }
+    if (!dirty) return;
+    save.mutate(
+      { id: projectId, text_variables: desired },
+      {
+        onSuccess: () => toast("Text variables saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the text variables."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="textvars-form">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Text Variables</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving..." : "Save Text Variables"}
+        </Button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mb-2 text-xs text-t3">This project defines no text variables yet.</p>
+      ) : (
+        <div className="mb-2 flex flex-col gap-2">
+          {rows.map((r, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                type="text"
+                data-testid={`tv-name-${idx}`}
+                className={`${INPUT_CLS} !py-1 text-xs`}
+                placeholder="Name"
+                value={r.name}
+                onChange={(e) =>
+                  setRows((rs) => rs.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))
+                }
+              />
+              <input
+                type="text"
+                data-testid={`tv-value-${idx}`}
+                className={`${INPUT_CLS} !py-1 text-xs`}
+                placeholder="Value"
+                value={r.value}
+                onChange={(e) =>
+                  setRows((rs) => rs.map((x, i) => (i === idx ? { ...x, value: e.target.value } : x)))
+                }
+              />
+              <Button
+                variant="default"
+                small
+                data-testid={`tv-del-${idx}`}
+                onClick={() => setRows((rs) => rs.filter((_, i) => i !== idx))}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <Button
+        variant="default"
+        small
+        onClick={() => setRows((rs) => [...rs, { name: "", value: "" }])}
+      >
+        Add Variable
+      </Button>
     </div>
   );
 }

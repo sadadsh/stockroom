@@ -720,6 +720,25 @@ export interface BoardSettings {
   board_setup: Record<string, BoardSetupValue>;
   thickness: number | null;
   fields: BoardSetupField[];
+  // .kicad_pro settings (M7f-A2). erc_pin_map is null when the file has no matrix (never a
+  // fabricated all-OK one, which would silently disable every pin-conflict check).
+  has_pro: boolean;
+  erc_severities: Record<string, string>;
+  drc_severities: Record<string, string>;
+  erc_pin_map: number[][] | null;
+  text_variables: Record<string, string>;
+  severity_levels: string[];
+  erc_pin_types: string[];
+}
+
+// The body a settings PATCH sends: any concern alone, or several together in one atomic commit.
+export interface SetBoardSettingsBody {
+  board_setup?: Record<string, BoardSetupValue>;
+  thickness?: number;
+  erc_severities?: Record<string, string>;
+  drc_severities?: Record<string, string>;
+  erc_pin_map?: number[][];
+  text_variables?: Record<string, string>;
 }
 
 // PATCH /api/projects/{id}/settings

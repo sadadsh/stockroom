@@ -158,11 +158,21 @@ class SetDesignRulesBody(BaseModel):
 
 
 class SetSettingsBody(BaseModel):
-    """Edit a project's board setup + overall thickness (M7f-A). Both are optional so the
-    editor can save either concern alone; whichever are given land in one atomic commit on
-    the project's .kicad_pcb. `board_setup` names the real (setup) keys the editor edits
-    (per-side via-protection expanded to tenting_front, ...); an unsupported key or a
-    non-positive thickness is validated in the engine and surfaces as a 400."""
+    """Edit a project's board setup + overall thickness (its .kicad_pcb) and/or its .kicad_pro
+    settings: ERC/DRC rule severities, the ERC pin-conflict matrix, project text variables
+    (M7f-A + A2). Every field is optional so the editor can save any concern alone; whichever
+    are given land in one atomic commit on the project's own git. The engine validates each and
+    surfaces a bad value (unsupported key, non-positive thickness, unknown severity rule id,
+    malformed pin map, blank text-var name) as a 400.
+
+    `erc_severities`/`drc_severities` are {rule_id: level} maps merged per-rule (a sibling rule
+    is preserved); `erc_pin_map` is the full 12x12 matrix; `text_variables` is the COMPLETE
+    desired map (a key absent from it is deleted). text_variables uses None for 'not submitted'
+    so an empty {} still means 'clear all vars'."""
 
     board_setup: dict[str, Any] | None = None
     thickness: float | None = None
+    erc_severities: dict[str, Any] | None = None
+    drc_severities: dict[str, Any] | None = None
+    erc_pin_map: list[list[int]] | None = None
+    text_variables: dict[str, Any] | None = None

@@ -318,10 +318,30 @@ const DESIGN: DesignResult = {
   validation: [{ netclass: "HS", issue: "track width 0.1 below fab min 0.1524" }],
 };
 
+function pinMapFixture(): number[][] {
+  const m = Array.from({ length: 12 }, () => Array(12).fill(0));
+  m[1][1] = 2; // output vs output = error
+  m[6][0] = 1;
+  m[0][6] = 1; // symmetric warning
+  return m;
+}
+
+const ERC_PIN_TYPES = [
+  "input", "output", "bidirectional", "tri_state", "passive", "free",
+  "unspecified", "power_in", "power_out", "open_collector", "open_emitter", "no_connect",
+];
+
 const SETTINGS: BoardSettings = {
   project: "Netdeck",
   under_git: true,
   has_board: true,
+  has_pro: true,
+  erc_severities: { pin_not_connected: "error", wire_dangling: "warning" },
+  drc_severities: { clearance: "error", silk_overlap: "warning" },
+  erc_pin_map: pinMapFixture(),
+  text_variables: { REV: "A", OLD: "drop" },
+  severity_levels: ["error", "warning", "ignore"],
+  erc_pin_types: ERC_PIN_TYPES,
   board_setup: {
     pad_to_mask_clearance: 0.0508,
     allow_soldermask_bridges_in_footprints: false,
@@ -1197,5 +1217,158 @@ describe("ProjectsPage", () => {
       expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled(),
     );
     expect(screen.queryByText("Unsaved")).not.toBeInTheDocument();
+  });
+
+  // --- M7f-A2 .kicad_pro editor: severities + ERC pin-map + text-variables ---
+
+  it("shows the current ERC and DRC rule severities", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("severities-form");
+    expect(screen.getByTestId("sev-erc-pin_not_connected")).toHaveValue("error");
+    expect(screen.getByTestId("sev-erc-wire_dangling")).toHaveValue("warning");
+    expect(screen.getByTestId("sev-drc-clearance")).toHaveValue("error");
+  });
+
+  it("saves only the changed severities", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("severities-form");
+    await user.selectOptions(screen.getByTestId("sev-erc-pin_not_connected"), "warning");
+    await user.selectOptions(screen.getByTestId("sev-drc-clearance"), "ignore");
+    await user.click(screen.getByRole("button", { name: "Save Severities" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      erc_severities: { pin_not_connected: "warning" },
+      drc_severities: { clearance: "ignore" },
+    });
+  });
+
+  it("disables the severities Save until a change", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("severities-form");
+    expect(screen.getByRole("button", { name: "Save Severities" })).toBeDisabled();
+    await user.selectOptions(screen.getByTestId("sev-erc-wire_dangling"), "ignore");
+    expect(screen.getByRole("button", { name: "Save Severities" })).toBeEnabled();
+  });
+
+  it("shows the ERC pin-conflict matrix with its severities", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("pinmap-grid");
+    // output vs output (index 1,1) is an error in the fixture
+    expect(screen.getByTestId("pm-1-1")).toHaveAttribute("data-sev", "2");
+    expect(screen.getByTestId("pm-0-6")).toHaveAttribute("data-sev", "1");
+  });
+
+  it("cycles a pin-map cell and mirrors it symmetrically, sending the full matrix", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("pinmap-grid");
+    await user.click(screen.getByTestId("pm-0-1")); // 0 -> 1 (warning), mirrors to [1][0]
+    expect(screen.getByTestId("pm-0-1")).toHaveAttribute("data-sev", "1");
+    expect(screen.getByTestId("pm-1-0")).toHaveAttribute("data-sev", "1"); // symmetric
+    await user.click(screen.getByRole("button", { name: "Save Pin Map" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    const sent = mockApi.setBoardSettings.mock.calls[0][1].erc_pin_map!;
+    expect(sent[0][1]).toBe(1);
+    expect(sent[1][0]).toBe(1);
+    expect(sent[1][1]).toBe(2); // untouched cell preserved
+  });
+
+  it("shows an honest state when the project has no ERC pin map", async () => {
+    mockApi.getBoardSettings.mockResolvedValue({ ...SETTINGS, erc_pin_map: null });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("pinmap-absent")).toBeInTheDocument();
+    expect(screen.queryByTestId("pinmap-grid")).not.toBeInTheDocument();
+  });
+
+  it("shows the current text variables", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("textvars-form");
+    expect(screen.getByTestId("tv-name-0")).toHaveValue("REV");
+    expect(screen.getByTestId("tv-value-0")).toHaveValue("A");
+  });
+
+  it("deletes a text variable and saves the complete remaining map", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("textvars-form");
+    await user.click(screen.getByTestId("tv-del-1")); // remove OLD
+    await user.click(screen.getByRole("button", { name: "Save Text Variables" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      text_variables: { REV: "A" },
+    });
+  });
+
+  it("adds a text variable and saves it", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("textvars-form");
+    await user.click(screen.getByRole("button", { name: "Add Variable" }));
+    await user.type(screen.getByTestId("tv-name-2"), "BATCH");
+    await user.type(screen.getByTestId("tv-value-2"), "42");
+    await user.click(screen.getByRole("button", { name: "Save Text Variables" }));
+    await waitFor(() => expect(mockApi.setBoardSettings).toHaveBeenCalled());
+    expect(mockApi.setBoardSettings).toHaveBeenCalledWith("netdeck", {
+      text_variables: { REV: "A", OLD: "drop", BATCH: "42" },
+    });
+  });
+
+  it("does not strand Save dirty after a delete-then-re-add that only reorders identical content", async () => {
+    // text_variables is an unordered map the backend re-sorts (sort_keys=True), so seed comes
+    // back alphabetical. A delete-then-re-add that changes only ROW ORDER (not content) must not
+    // leave Save permanently enabled on a no-op (a JSON.stringify compare would strand it).
+    mockApi.getBoardSettings.mockResolvedValue({
+      ...SETTINGS, text_variables: { A: "1", B: "2" },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("textvars-form");
+    await user.click(screen.getByTestId("tv-del-0")); // remove A -> rows [B]
+    await user.click(screen.getByRole("button", { name: "Add Variable" })); // -> [B, blank]
+    await user.type(screen.getByTestId("tv-name-1"), "A");
+    await user.type(screen.getByTestId("tv-value-1"), "1"); // rows now [B=2, A=1], content == seed
+    expect(screen.getByRole("button", { name: "Save Text Variables" })).toBeDisabled();
+    expect(screen.queryByText("Unsaved")).not.toBeInTheDocument();
+  });
+
+  it("warns on a duplicate text-variable name and blocks the save", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("textvars-form");
+    await user.click(screen.getByRole("button", { name: "Add Variable" }));
+    await user.type(screen.getByTestId("tv-name-2"), "REV"); // duplicate
+    await user.type(screen.getByTestId("tv-value-2"), "x");
+    await user.click(screen.getByRole("button", { name: "Save Text Variables" }));
+    expect(mockApi.setBoardSettings).not.toHaveBeenCalled();
+    expect(await screen.findByText(/duplicate/i)).toBeInTheDocument();
+  });
+
+  it("shows an honest no-.kicad_pro state for the pro settings", async () => {
+    mockApi.getBoardSettings.mockResolvedValue({
+      ...SETTINGS, has_pro: false, erc_severities: {}, drc_severities: {},
+      erc_pin_map: null, text_variables: {},
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("prosettings-no-pro")).toBeInTheDocument();
+    expect(screen.queryByTestId("severities-form")).not.toBeInTheDocument();
   });
 });

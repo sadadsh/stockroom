@@ -269,23 +269,26 @@ def projects_router(require_token) -> APIRouter:
 
     @r.get("/{project_id}/settings")
     def get_settings(request: Request, project_id: str) -> dict:
-        # The project's current board setup (mask/paste clearances, tenting, origins) +
-        # overall thickness, read from its primary .kicad_pcb, plus the editable-field
-        # schema the editor renders (M7f-A). Read-only. Unknown id -> 404; a project with
-        # no board is an honest empty shape, never a crash.
+        # The project's board setup + thickness (from its .kicad_pcb) AND its .kicad_pro
+        # settings (ERC/DRC rule severities, the ERC pin-conflict matrix, project text variables)
+        # plus the editor catalogs (M7f-A + A2). Read-only. Unknown id -> 404; a project with no
+        # board and/or no .kicad_pro is an honest empty shape (pin_map None, never fabricated).
         ctx = request.app.state.ctx
         return ctx.project_ops.board_settings(project_id)
 
     @r.patch("/{project_id}/settings")
     def patch_settings(request: Request, project_id: str, body: SetSettingsBody) -> dict:
-        # Write board setup and/or thickness to the primary .kicad_pcb as a minimal diff,
-        # one scoped commit on the project's OWN git (M7f-A). Unknown id -> 404; a project
-        # not under git, with no board, with nothing to write, or with a bad key/thickness
-        # -> 400; a GitError -> 503. A board-setup change can alter DRC outcomes, so the
-        # stale cached ERC/DRC is evicted and the next check re-runs honestly.
+        # Write board setup / thickness (to the .kicad_pcb) and/or ERC/DRC severities, the ERC
+        # pin map, project text variables (to the .kicad_pro) as a minimal diff, one atomic
+        # commit on the project's OWN git (M7f-A + A2). Unknown id -> 404; a project not under
+        # git, with no board (for a board edit) or no .kicad_pro (for a pro edit), nothing to
+        # write, or a bad value -> 400; a GitError -> 503. A severity/board change can alter
+        # ERC/DRC outcomes, so the stale cached ERC/DRC is evicted and the next check re-runs.
         ctx = request.app.state.ctx
         result = ctx.project_ops.set_settings(
             project_id, board_setup=body.board_setup, thickness=body.thickness,
+            erc_severities=body.erc_severities, drc_severities=body.drc_severities,
+            erc_pin_map=body.erc_pin_map, text_variables=body.text_variables,
         )
         ctx.checks_cache.pop(project_id, None)
         return result

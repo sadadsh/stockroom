@@ -867,6 +867,133 @@ def test_patch_settings_evicts_the_stale_checks_cache(client, tmp_path, app_ctx)
     assert rec["id"] not in app_ctx.checks_cache
 
 
+# ---- M7f-A2 Editor: .kicad_pro severities + ERC pin-map + text-variables -----
+
+
+def _pro_a2_text():
+    """A canonical .kicad_pro carrying the A2 surfaces (ERC + DRC severities, a 12x12 ERC
+    pin-conflict matrix, top-level text variables), built through the serializer so it is
+    byte-canonical and a minimal-diff edit is provable."""
+    from stockroom.kicad import project_settings as _ps
+
+    pin_map = [[0] * 12 for _ in range(12)]
+    pin_map[1][1] = 2
+    pin_map[6][0] = pin_map[0][6] = 1
+    data = {
+        "board": {
+            "design_settings": {
+                "rule_severities": {"clearance": "error", "silk_overlap": "warning"},
+                "rules": {"min_clearance": 0.2, "min_track_width": 0.2},
+            }
+        },
+        "erc": {
+            "pin_map": pin_map,
+            "rule_severities": {"pin_not_connected": "error", "wire_dangling": "warning"},
+        },
+        "net_settings": {"classes": [{"name": "Default"}], "netclass_patterns": []},
+        "text_variables": {"REV": "A", "OLD": "drop"},
+    }
+    return _ps.serialize(data)
+
+
+def test_get_settings_returns_pro_severities_pin_map_and_catalogs(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/settings").json()
+    assert body["has_pro"] is True
+    assert body["erc_severities"]["pin_not_connected"] == "error"
+    assert body["drc_severities"]["clearance"] == "error"
+    assert body["erc_pin_map"][1][1] == 2
+    assert body["text_variables"] == {"REV": "A", "OLD": "drop"}
+    assert body["severity_levels"] == ["error", "warning", "ignore"]
+    assert len(body["erc_pin_types"]) == 12
+
+
+def test_patch_settings_edits_severities_and_commits(client, tmp_path):
+    proj, head = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings",
+        json={"erc_severities": {"pin_not_connected": "warning"},
+              "drc_severities": {"clearance": "ignore"}},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["committed"] != head
+    on_disk = (proj / "board.kicad_pro").read_text(encoding="utf-8")
+    assert '"pin_not_connected": "warning"' in on_disk
+    assert '"clearance": "ignore"' in on_disk
+    assert '"wire_dangling": "warning"' in on_disk  # sibling severity preserved
+
+
+def test_patch_settings_writes_pin_map(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    new_map = [[0] * 12 for _ in range(12)]
+    new_map[3][3] = 2
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"erc_pin_map": new_map})
+    assert r.status_code == 200, r.text
+    assert r.json()["erc_pin_map"] == new_map
+
+
+def test_patch_settings_writes_and_deletes_text_variables(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings",
+                     json={"text_variables": {"REV": "B", "NEW": "x"}})
+    assert r.status_code == 200, r.text
+    tv = r.json()["text_variables"]
+    assert tv == {"REV": "B", "NEW": "x"} and "OLD" not in tv
+
+
+def test_patch_settings_unknown_severity_rule_is_400(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings",
+                     json={"erc_severities": {"not_a_rule_xyz": "error"}})
+    assert r.status_code == 400
+
+
+def test_patch_settings_bad_pin_map_is_400(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings",
+                     json={"erc_pin_map": [[0] * 12 for _ in range(11)]})  # 11 rows
+    assert r.status_code == 400
+
+
+def test_patch_settings_blank_text_var_name_is_400(client, tmp_path):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/settings", json={"text_variables": {"  ": "x"}})
+    assert r.status_code == 400
+
+
+def test_patch_settings_board_and_pro_land_in_one_commit(client, tmp_path):
+    proj, head = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    r = client.patch(
+        f"/api/projects/{rec['id']}/settings",
+        json={"board_setup": {"pad_to_mask_clearance": 0.1},
+              "erc_severities": {"pin_not_connected": "warning"}},
+    )
+    assert r.status_code == 200, r.text
+    added = subprocess.run(["git", "-C", str(proj), "rev-list", "--count", f"{head}..HEAD"],
+                           check=True, capture_output=True, text=True).stdout.strip()
+    assert added == "1"  # both edits in a single commit
+    names = subprocess.run(["git", "-C", str(proj), "show", "--name-only", "--format=", "HEAD"],
+                           check=True, capture_output=True, text=True).stdout.split()
+    assert "board.kicad_pcb" in names and "board.kicad_pro" in names
+
+
+def test_patch_settings_severity_change_evicts_the_checks_cache(client, tmp_path, app_ctx):
+    proj, _ = _make_git_pcb_project(tmp_path / "board", pro_text=_pro_a2_text())
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/settings",
+                 json={"erc_severities": {"pin_not_connected": "warning"}})
+    assert rec["id"] not in app_ctx.checks_cache
+
+
 def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects").status_code == 401
     assert anon_client.post("/api/projects/x/checks").status_code == 401

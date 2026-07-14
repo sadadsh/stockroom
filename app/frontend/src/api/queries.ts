@@ -10,7 +10,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { BoardSetupValue, DesignRules, NetClass } from "./types";
+import type { DesignRules, NetClass, SetBoardSettingsBody } from "./types";
 import { api, type ListPartsArgs } from "./client";
 
 export function usePartsQuery(args: ListPartsArgs) {
@@ -490,12 +490,10 @@ export function useProjectSettings(id: string | null) {
 export function useSetProjectSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: {
-      id: string;
-      board_setup?: Record<string, BoardSetupValue>;
-      thickness?: number;
-    }) =>
-      api.setBoardSettings(vars.id, { board_setup: vars.board_setup, thickness: vars.thickness }),
+    mutationFn: (vars: { id: string } & SetBoardSettingsBody) => {
+      const { id, ...body } = vars;
+      return api.setBoardSettings(id, body);
+    },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["project-settings", vars.id] });
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
