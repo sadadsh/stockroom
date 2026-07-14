@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from stockroom.model.project import ProjectRecord
+from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
 from stockroom.store.project_store import ProjectStore
@@ -63,4 +64,17 @@ class ProjectOps:
         return project_checks(
             rec.root, rec.pro_path, rec.board_paths, rec.sheet_paths,
             cli, name=rec.name, progress=progress,
+        )
+
+    def bom(self, project_id: str, boards=1, price_lookup=None, progress=None) -> dict:
+        """Build a grouped, optionally priced BOM for the registered project (M7c).
+        Grouping is offline (no kicad-cli); `price_lookup` (injected by the router from
+        Stockroom's enrich layer) prices each MPN line, and a miss leaves the line
+        honestly unpriced. Raises FileNotFoundError for an unknown id."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        return project_bom(
+            rec.root, rec.pro_path, rec.sheet_paths,
+            name=rec.name, boards=boards, price_lookup=price_lookup, progress=progress,
         )

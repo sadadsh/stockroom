@@ -270,9 +270,121 @@ def test_get_checks_for_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/checks").status_code == 404
 
 
+# ---- bom (M7c) --------------------------------------------------------------
+
+# a sheet with one MPN'd IC and one bare passive: the IC prices, the passive stays
+# unpriced (no purchasable part number), so a build is a "partial" cost verdict.
+_IC_AND_PASSIVE = (
+    "  (symbol\n"
+    '    (lib_id "Device:U")\n'
+    '    (property "Reference" "U1" (at 0 0 0))\n'
+    '    (property "Value" "TPS2121" (at 0 0 0))\n'
+    '    (property "MPN" "TPS2121RUXR" (at 0 0 0))\n'
+    '    (property "MANUFACTURER" "TI" (at 0 0 0))\n'
+    "  )\n"
+    "  (symbol\n"
+    '    (lib_id "Device:R")\n'
+    '    (property "Reference" "R1" (at 0 0 0))\n'
+    '    (property "Value" "10k" (at 0 0 0))\n'
+    '    (property "Footprint" "Resistor_SMD:R_0402" (at 0 0 0))\n'
+    "  )\n"
+)
+
+
+class _FakePipeline:
+    """A stand-in for the enrich pipeline so BOM pricing never touches the network."""
+
+    def enrich(self, mpn, category, want=None):
+        from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+        r = EnrichmentResult()
+        if mpn == "TPS2121RUXR":
+            r.mpn = Sourced(mpn, "mouser", "high")
+            r.stock = Sourced(5000, "mouser", "high")
+            r.price_breaks = [PriceBreak(qty=1, price=1.25)]
+        return r
+
+
+def _stream_job_result(client, job_id):
+    import json as _j
+
+    result = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            if line.startswith("data:") and '"result"' in line:
+                result = _j.loads(line[5:].strip())["result"]
+    return result
+
+
+def test_run_bom_prices_and_caches_the_result(client, app_ctx, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
+    )
+    proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
+    rec = _register(client, proj)
+
+    r = client.post(f"/api/projects/{rec['id']}/bom")
+    assert r.status_code == 200
+    result = _stream_job_result(client, r.json()["job_id"])
+    assert result is not None and result["priced"] is True
+    by_mpn = {ln["mpn"]: ln for ln in result["lines"]}
+    assert by_mpn["TPS2121RUXR"]["unit_price"] == 1.25
+    assert by_mpn["TPS2121RUXR"]["source"] == "Mouser"
+    assert result["summary"]["total_cost"] == 1.25
+    assert result["summary"]["priced_lines"] == 1 and result["summary"]["unpriced_lines"] == 1
+    assert result["summary"]["state"] == "partial"
+    assert result["by_source"]["sources"]["Mouser"]["total_cost"] == 1.25
+
+    # cached: GET serves the same build without rebuilding.
+    got = client.get(f"/api/projects/{rec['id']}/bom")
+    assert got.status_code == 200
+    assert got.json()["summary"]["total_cost"] == 1.25
+
+
+def test_run_bom_does_not_require_kicad_cli(client, app_ctx, tmp_path):
+    # The BOM is built offline from the schematic, so a missing kicad-cli is NOT a 502:
+    # grouping still works, and a passive-only project needs no pricing lookup at all.
+    app_ctx.cli.binary = None
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    r = client.post(f"/api/projects/{rec['id']}/bom")
+    assert r.status_code == 200
+    result = _stream_job_result(client, r.json()["job_id"])
+    assert result is not None and result["line_count"] == 1
+    # priced was attempted but the lone passive has no MPN -> honestly unpriced.
+    assert result["summary"]["state"] == "unpriced"
+
+
+def test_run_bom_for_an_unknown_project_is_a_404(client):
+    assert client.post("/api/projects/nope/bom").status_code == 404
+
+
+def test_get_bom_before_a_build_is_an_honest_not_built_shape(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    body = client.get(f"/api/projects/{rec['id']}/bom").json()
+    assert body["ran_at"] is None and body["summary"] is None and body["lines"] == []
+
+
+def test_get_bom_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/bom").status_code == 404
+
+
+def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
+    )
+    proj = _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE)
+    rec = _register(client, proj)
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
+    assert rec["id"] in app_ctx.bom_cache
+    client.delete(f"/api/projects/{rec['id']}")
+    assert rec["id"] not in app_ctx.bom_cache
+
+
 # ---- auth -------------------------------------------------------------------
 
 
 def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects").status_code == 401
     assert anon_client.post("/api/projects/x/checks").status_code == 401
+    assert anon_client.post("/api/projects/x/bom").status_code == 401
+    assert anon_client.get("/api/projects/x/bom").status_code == 401

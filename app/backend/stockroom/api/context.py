@@ -49,6 +49,10 @@ class AppContext:
     # a git commit per check run is churn). Read by the checks GET, Overview, and the
     # Buildability verdict (M7g) so those surfaces can never disagree; cleared on delete.
     checks_cache: dict = field(default_factory=dict)
+    # The last built BOM per project id (M7c), cached in-memory like checks_cache (never
+    # committed: a BOM is derived, and pricing is network-bound, so the cache lets a
+    # re-open render instantly). Read by the BOM GET; cleared on delete.
+    bom_cache: dict = field(default_factory=dict)
     jobs: JobRunner = field(default_factory=JobRunner)
     rendered_dom_fetcher: object | None = None  # RenderedDomFetcher; set by the host on Windows
     # App-repo self-update (updater.py): the CODE/UI/DATA repo (distinct from the
