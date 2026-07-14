@@ -122,11 +122,34 @@ def test_validate_flags_diff_pair_width_without_gap():
     assert any("gap" in f["issue"] for f in findings)
 
 
-def test_validate_flags_duplicate_priority():
+def test_validate_does_not_flag_shared_priority():
+    # KiCad-10 does NOT require unique net-class priorities: priority is a resolution-order
+    # tiebreaker whose default is 0, so many classes legitimately share it. Flagging a shared
+    # priority produced huge bogus findings on real projects (e.g. "duplicate priority 0" over
+    # 200+ classes) and self-triggered on every new class (NETCLASS_DEFAULTS priority is 0).
     findings = st.validate_classes(
-        [_sound_class("A", priority=3), _sound_class("B", priority=3)], st.FAB_FLOORS["none"]
+        [_sound_class("A", priority=0), _sound_class("B", priority=0)], st.FAB_FLOORS["none"]
     )
-    assert any("priority" in f["issue"] for f in findings)
+    assert not any("priority" in f["issue"] for f in findings)
+
+
+def test_validate_ignores_absent_wire_and_bus_on_a_minimal_class():
+    # Real KiCad-10 omits wire_width/bus_width (and priority/diff-pair) from a class when they
+    # equal the schematic-editor default: the on-disk Default class is literally just
+    # {name, clearance, track_width, via_diameter, via_drill}. An omitted key is valid data,
+    # NOT a below-floor risk, so validation must not fabricate a "non-positive wire/bus stroke"
+    # finding on it (this ran on the editor open path, so it hit every real project).
+    minimal_default = {
+        "name": "Default", "clearance": 0.2, "track_width": 0.2,
+        "via_diameter": 0.6, "via_drill": 0.3,
+    }
+    assert st.validate_classes([minimal_default], st.FAB_FLOORS["none"]) == []
+
+
+def test_validate_still_flags_a_present_non_positive_stroke():
+    # a class that DOES carry wire_width/bus_width and sets one to 0 is still a real defect.
+    findings = st.validate_classes([_sound_class(wire_width=0)], st.FAB_FLOORS["none"])
+    assert any("stroke" in f["issue"] for f in findings)
 
 
 def test_validate_accepts_a_floor_key_string():

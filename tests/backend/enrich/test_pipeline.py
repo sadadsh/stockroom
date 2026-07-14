@@ -217,3 +217,28 @@ def test_datasheet_url_survives_the_cache_round_trip(tmp_path):
     r2 = pipe.enrich("TPS62130RGTR", "ICs")  # from cache
     assert r2.datasheet_url.value == "https://ti.com/lit/ds/tps62130.pdf"
     assert r2.package.value == "VQFN-16"  # datasheet-extracted package cached too
+
+
+def test_mouser_source_paces_the_api_with_its_limiter():
+    # The Mouser API path must be rate-limited (the ban scenario the KiCost limiter exists to
+    # prevent): a limiter of 2/window must sleep on the 3rd lookup inside the window. Before the
+    # fix _MouserSource had no limiter and called the adapter unthrottled.
+    from stockroom.enrich.pipeline import _MouserSource
+    from stockroom.enrich.ratelimit import SlidingWindowLimiter
+
+    class _Adapter:
+        def lookup(self, mpn):
+            return None
+
+    t = [0.0]
+    slept: list[float] = []
+
+    def _sleep(s):
+        slept.append(s)
+        t[0] += s
+
+    lim = SlidingWindowLimiter(limit=2, window=60.0, clock=lambda: t[0], sleeper=_sleep)
+    src = _MouserSource(_Adapter(), lim)
+    for _ in range(3):
+        src.enrich("STM32", "ICs", set())
+    assert slept, "the 3rd Mouser lookup within the window must sleep (be rate-limited)"
