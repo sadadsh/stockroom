@@ -472,4 +472,47 @@ describe("api client", () => {
       "/api/projects/proj1/audit",
     );
   });
+
+  // --- Editor: design rules + net classes (M7e) ---
+
+  it("reads the project design settings with the fab floor as a query param", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        project: "netdeck", under_git: true, has_pro: true, net_classes: [], netclass_patterns: [],
+        design_rules: {}, track_widths: [], via_dimensions: [], diff_pair_dimensions: [],
+        fab_floors: {}, validation: [],
+      }),
+    );
+    await api.getDesign("proj1", "oshpark_2");
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/projects/proj1/design");
+    expect(url.searchParams.get("floor")).toBe("oshpark_2");
+  });
+
+  it("PATCHes net classes with the edited set, deletes and floor", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ project: "netdeck", committed: "abc", net_classes: [], validation: [] }),
+    );
+    await api.setNetClasses("proj1", [{ name: "Default", track_width: 0.15 }], {
+      deleted: ["OLD"], floor: "oshpark_2",
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/projects/proj1/net-classes");
+    expect((init as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      classes: [{ name: "Default", track_width: 0.15 }], deleted: ["OLD"], floor: "oshpark_2",
+    });
+  });
+
+  it("PATCHes design rules (defaulting the size lists to omitted)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ project: "netdeck", committed: "abc", design_rules: { min_track_width: 0.13 } }),
+    );
+    await api.setDesignRules("proj1", { min_track_width: 0.13 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/projects/proj1/design-rules");
+    expect((init as RequestInit).method).toBe("PATCH");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.rules).toEqual({ min_track_width: 0.13 });
+  });
 });

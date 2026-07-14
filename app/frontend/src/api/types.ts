@@ -632,6 +632,75 @@ export interface BomDiffResult {
   b_sheets_found: number | null;
 }
 
+// --- Editor: design rules + net classes (M7e) ---
+
+// A KiCad net class as stored in net_settings.classes[]. The routing dimensions the
+// Editor edits are typed; KiCad-internal fields (colors, line_style, wire/bus stroke,
+// tuning_profile) pass through the index signature and are preserved on save.
+export interface NetClass {
+  name: string;
+  clearance?: number;
+  track_width?: number;
+  via_diameter?: number;
+  via_drill?: number;
+  microvia_diameter?: number;
+  microvia_drill?: number;
+  diff_pair_width?: number;
+  diff_pair_gap?: number;
+  priority?: number;
+  [key: string]: unknown;
+}
+
+// A fab-house dimension floor (mm), for validate-on-save.
+export interface FabFloor {
+  label: string;
+  min_clearance: number;
+  min_track: number;
+  min_via: number;
+  min_drill: number;
+  min_annular: number;
+}
+
+// A below-floor / inconsistent net-class finding (non-blocking amber).
+export interface NetClassValidation {
+  netclass: string;
+  issue: string;
+}
+
+// The board design-rule constraints (board.design_settings.rules): min_* floats plus a
+// couple of booleans. Kept a loose record so every rule KiCad writes is editable.
+export type DesignRules = Record<string, number | boolean>;
+
+// GET /api/projects/{id}/design
+export interface DesignResult {
+  project: string;
+  under_git: boolean;
+  has_pro: boolean;
+  net_classes: NetClass[];
+  netclass_patterns: { netclass: string; pattern: string }[];
+  design_rules: DesignRules;
+  track_widths: unknown[];
+  via_dimensions: unknown[];
+  diff_pair_dimensions: unknown[];
+  fab_floors: Record<string, FabFloor>;
+  validation: NetClassValidation[];
+}
+
+// PATCH /api/projects/{id}/net-classes
+export interface SetNetClassesResult {
+  project: string;
+  committed: string;
+  net_classes: NetClass[];
+  validation: NetClassValidation[];
+}
+
+// PATCH /api/projects/{id}/design-rules
+export interface SetDesignRulesResult {
+  project: string;
+  committed: string;
+  design_rules: DesignRules;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

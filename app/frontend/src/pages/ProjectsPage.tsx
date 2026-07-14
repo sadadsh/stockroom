@@ -26,6 +26,9 @@ import {
   useProjectChecks,
   useProjectProcurement,
   useProjectRevisions,
+  useProjectDesign,
+  useSetNetClasses,
+  useSetDesignRules,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
@@ -40,6 +43,9 @@ import type {
   CheckFinding,
   CheckRun,
   ChecksResult,
+  DesignResult,
+  DesignRules,
+  NetClass,
   ProcurementExportOptions,
   ProcurementLine,
   ProcurementResult,
@@ -398,6 +404,7 @@ function ProjectDetailView({
       <BomSection key={`bom-${project.id}`} projectId={project.id} />
       <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
       <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
+      <EditorSection key={`editor-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -1508,5 +1515,366 @@ function DiffRow({
       <td className="px-4 py-2 align-top text-t2">{from}</td>
       <td className="px-4 py-2 align-top text-t2">{to}</td>
     </tr>
+  );
+}
+
+// -- Editor: design rules + net classes (M7e) ---------------------------------
+
+// The routing dimensions the Editor edits per net class. KiCad-internal fields
+// (colors, line/wire/bus stroke, tuning_profile) are preserved by the backend
+// reconcile and never surfaced here, so a save touches only the dims the UI shows.
+const NC_DIMS: { key: string; label: string }[] = [
+  { key: "clearance", label: "Clearance" },
+  { key: "track_width", label: "Track" },
+  { key: "via_diameter", label: "Via" },
+  { key: "via_drill", label: "Via Drill" },
+  { key: "microvia_diameter", label: "uVia" },
+  { key: "microvia_drill", label: "uVia Drill" },
+  { key: "diff_pair_width", label: "DP Width" },
+  { key: "diff_pair_gap", label: "DP Gap" },
+  { key: "priority", label: "Priority" },
+];
+
+// A brand-new class's starting dims (the backend fills the rest of the KiCad-10 fields).
+const NEW_CLASS_DIMS: Record<string, string> = {
+  clearance: "0.2", track_width: "0.2", via_diameter: "0.6", via_drill: "0.3",
+  microvia_diameter: "0.3", microvia_drill: "0.1", diff_pair_width: "0.2",
+  diff_pair_gap: "0.25", priority: "0",
+};
+
+// The Editor draft holds every dim as a string so decimals type cleanly (a number
+// input reports "" mid-decimal); values coerce to numbers only at save time.
+interface DraftClass {
+  rowId: string;
+  isNew: boolean;
+  name: string;
+  dims: Record<string, string>;
+}
+
+function seedDrafts(classes: NetClass[]): DraftClass[] {
+  return classes.map((c) => ({
+    rowId: c.name,
+    isNew: false,
+    name: c.name,
+    dims: Object.fromEntries(
+      NC_DIMS.map((d) => [d.key, c[d.key] != null ? String(c[d.key]) : ""]),
+    ),
+  }));
+}
+
+function seedRules(rules: DesignRules): Record<string, string | boolean> {
+  return Object.fromEntries(
+    Object.entries(rules).map(([k, v]) => [k, typeof v === "boolean" ? v : String(v)]),
+  );
+}
+
+// The Editor: edit a project's net classes + board design rules and write each as a
+// minimal-diff, one scoped commit on the project's own git (M7e). Honest states for a
+// project not under git or with no .kicad_pro (neither is editable, never a crash).
+function EditorSection({ projectId }: { projectId: string }) {
+  const [floor, setFloor] = useState("none");
+  const design = useProjectDesign(projectId, floor);
+  const data = design.data;
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="editor-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Editor</Eyebrow>
+        <p className="text-xs text-t3">
+          Edit the board net classes and design rules. Each save writes a minimal change to
+          the project file and commits it to the project's own git history.
+        </p>
+      </div>
+
+      {design.isLoading ? (
+        <p className="text-sm text-t3">Loading the project settings...</p>
+      ) : design.isError ? (
+        <p className="text-sm text-err">
+          {errMsg(design.error, "Could not read the project settings.")}
+        </p>
+      ) : !data ? null : !data.has_pro ? (
+        <p className="text-sm text-t3">
+          This project has no .kicad_pro file, so there are no net classes or design rules to
+          edit.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="editor-no-git">
+          This project is not under git. Initialize a git repository for it to edit its net
+          classes and design rules, so each change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-7">
+          <NetClassEditor projectId={projectId} data={data} floor={floor} onFloor={setFloor} />
+          <DesignRulesEditor projectId={projectId} data={data} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NetClassEditor({
+  projectId,
+  data,
+  floor,
+  onFloor,
+}: {
+  projectId: string;
+  data: DesignResult;
+  floor: string;
+  onFloor: (f: string) => void;
+}) {
+  const [drafts, setDrafts] = useState<DraftClass[]>(() => seedDrafts(data.net_classes));
+  const [deleted, setDeleted] = useState<string[]>([]);
+  const [newCount, setNewCount] = useState(0);
+  const save = useSetNetClasses();
+  const { toast } = useToast();
+
+  // Re-seed only when the on-disk classes actually change (a save commit), NOT when the
+  // fab floor changes (that only re-reads validation): react-query structural sharing keeps
+  // net_classes' identity stable across a floor-only refetch, so unsaved edits survive.
+  useEffect(() => {
+    setDrafts(seedDrafts(data.net_classes));
+    setDeleted([]);
+  }, [data.net_classes]);
+
+  const dirty = deleted.length > 0 || JSON.stringify(drafts) !== JSON.stringify(seedDrafts(data.net_classes));
+
+  function editDim(rowId: string, key: string, value: string) {
+    setDrafts((ds) =>
+      ds.map((d) => (d.rowId === rowId ? { ...d, dims: { ...d.dims, [key]: value } } : d)),
+    );
+  }
+
+  function editName(rowId: string, name: string) {
+    setDrafts((ds) => ds.map((d) => (d.rowId === rowId ? { ...d, name } : d)));
+  }
+
+  function addClass() {
+    const rowId = `new-${newCount}`;
+    setNewCount((n) => n + 1);
+    setDrafts((ds) => [...ds, { rowId, isNew: true, name: "", dims: { ...NEW_CLASS_DIMS } }]);
+  }
+
+  function duplicate(dc: DraftClass) {
+    const rowId = `new-${newCount}`;
+    setNewCount((n) => n + 1);
+    setDrafts((ds) => [
+      ...ds,
+      { rowId, isNew: true, name: `${dc.name}_copy`, dims: { ...dc.dims } },
+    ]);
+  }
+
+  function removeRow(dc: DraftClass) {
+    setDrafts((ds) => ds.filter((d) => d.rowId !== dc.rowId));
+    if (!dc.isNew) setDeleted((del) => (del.includes(dc.name) ? del : [...del, dc.name]));
+  }
+
+  function onSave() {
+    const classes: NetClass[] = drafts
+      .filter((d) => d.name.trim() !== "")
+      .map((d) => ({
+        name: d.name.trim(),
+        ...Object.fromEntries(
+          NC_DIMS.filter((f) => d.dims[f.key] !== "" && d.dims[f.key] != null).map((f) => [
+            f.key,
+            Number(d.dims[f.key]),
+          ]),
+        ),
+      }));
+    save.mutate(
+      { id: projectId, classes, deleted, floor },
+      {
+        onSuccess: () => toast("Net classes saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the net classes."), "err"),
+      },
+    );
+  }
+
+  const issuesByClass = new Map<string, string[]>();
+  for (const v of data.validation) {
+    const list = issuesByClass.get(v.netclass) ?? [];
+    list.push(v.issue);
+    issuesByClass.set(v.netclass, list);
+  }
+
+  return (
+    <div data-testid="net-class-editor">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Net Classes</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5 text-2xs text-t3">
+            Fab Floor
+            <select
+              className={`${INPUT_CLS} w-40`}
+              data-testid="fab-floor-select"
+              value={floor}
+              onChange={(e) => onFloor(e.target.value)}
+            >
+              {Object.entries(data.fab_floors).map(([key, f]) => (
+                <option key={key} value={key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button small onClick={addClass}>
+            Add Net Class
+          </Button>
+          <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+            {save.isPending ? "Saving..." : "Save Net Classes"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px]">
+          <div className="flex gap-2 border-b border-line pb-1.5 text-2xs text-t3">
+            <div className="w-28 shrink-0">Name</div>
+            {NC_DIMS.map((d) => (
+              <div key={d.key} className="w-16 shrink-0 text-right">
+                {d.label}
+              </div>
+            ))}
+            <div className="w-16 shrink-0" />
+          </div>
+          {drafts.map((dc) => {
+            const rid = dc.isNew ? dc.rowId : dc.name;
+            const issues = issuesByClass.get(dc.name) ?? [];
+            return (
+              <div key={dc.rowId} className="border-b border-line py-1.5" data-testid={`nc-row-${rid}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-28 shrink-0">
+                    {dc.isNew ? (
+                      <input
+                        type="text"
+                        className={`${INPUT_CLS} !py-1 text-xs`}
+                        data-testid="nc-new-name"
+                        placeholder="Name"
+                        value={dc.name}
+                        onChange={(e) => editName(dc.rowId, e.target.value)}
+                      />
+                    ) : (
+                      <span className="text-xs text-t1">{dc.name}</span>
+                    )}
+                  </div>
+                  {NC_DIMS.map((d) => (
+                    <input
+                      key={d.key}
+                      type="text"
+                      inputMode="decimal"
+                      className={`${INPUT_CLS} w-16 shrink-0 !px-2 !py-1 text-right text-xs`}
+                      data-testid={`nc-${rid}-${d.key}`}
+                      value={dc.dims[d.key] ?? ""}
+                      onChange={(e) => editDim(dc.rowId, d.key, e.target.value)}
+                    />
+                  ))}
+                  <div className="flex w-16 shrink-0 justify-end gap-1">
+                    <button
+                      type="button"
+                      className="text-2xs text-t3 hover:text-t1"
+                      onClick={() => duplicate(dc)}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      className="text-2xs text-err hover:opacity-80"
+                      onClick={() => removeRow(dc)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                {issues.length > 0 ? (
+                  <p className="mt-1 pl-1 text-2xs text-warn">{issues.join("; ")}</p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {data.validation.length > 0 ? (
+        <p className="mt-2 text-2xs text-t3">
+          Amber rows are below the selected fab floor. They are warnings, not blockers, so you
+          can still save.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function DesignRulesEditor({ projectId, data }: { projectId: string; data: DesignResult }) {
+  const [draft, setDraft] = useState<Record<string, string | boolean>>(() =>
+    seedRules(data.design_rules),
+  );
+  const save = useSetDesignRules();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setDraft(seedRules(data.design_rules));
+  }, [data.design_rules]);
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(seedRules(data.design_rules));
+  const keys = Object.keys(data.design_rules).sort();
+
+  function onSave() {
+    const rules: DesignRules = Object.fromEntries(
+      Object.entries(draft).map(([k, v]) => [k, typeof v === "boolean" ? v : Number(v)]),
+    );
+    save.mutate(
+      { id: projectId, rules },
+      {
+        onSuccess: () => toast("Design rules saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the design rules."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="design-rules-editor">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Design Rules</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+          {save.isPending ? "Saving..." : "Save Design Rules"}
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+        {keys.map((key) => {
+          const v = draft[key];
+          if (typeof v === "boolean") {
+            return (
+              <label key={key} className="flex items-center gap-2 text-2xs text-t2">
+                <input
+                  type="checkbox"
+                  data-testid={`dr-${key}`}
+                  checked={v}
+                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.checked }))}
+                />
+                {key}
+              </label>
+            );
+          }
+          return (
+            <label key={key} className="flex flex-col gap-0.5 text-2xs text-t3">
+              {key}
+              <input
+                type="text"
+                inputMode="decimal"
+                className={`${INPUT_CLS} !py-1 text-xs`}
+                data-testid={`dr-${key}`}
+                value={String(v ?? "")}
+                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+              />
+            </label>
+          );
+        })}
+      </div>
+    </div>
   );
 }
