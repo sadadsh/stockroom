@@ -1619,3 +1619,98 @@ def test_patch_fields_evicts_stale_caches(client, app_ctx, tmp_path):
         {"ref": "R1", "field": "MPN", "value": "NEW"}]})
     assert rec["id"] not in app_ctx.checks_cache
     assert rec["id"] not in app_ctx.bom_cache
+
+
+# ---- fab-prep (M7i) ---------------------------------------------------------
+from pathlib import Path as _Path  # noqa: E402
+
+_FIXTURE_PCB = _Path(__file__).parent.parent / "fixtures" / "kicad" / "minimal.kicad_pcb"
+
+
+def _make_board_project(dir_path):
+    """A project dir with a real .kicad_pcb (the minimal fixture) so register() discovers a
+    board and fab export has something to plot."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (dir_path / "board.kicad_pcb").write_text(
+        _FIXTURE_PCB.read_text(encoding="utf-8"), encoding="utf-8")
+    return dir_path
+
+
+def test_fab_status_reports_a_board_and_cli_availability(client, tmp_path):
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    st = client.get(f"/api/projects/{rec['id']}/fab").json()
+    assert st["has_board"] is True
+    assert st["boards"] == ["board.kicad_pcb"]
+    assert "cli_available" in st
+
+
+def test_fab_status_no_board_is_honest(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "sch"))  # .kicad_pro + .kicad_sch only
+    st = client.get(f"/api/projects/{rec['id']}/fab").json()
+    assert st["has_board"] is False and st["boards"] == []
+
+
+def test_fab_status_unknown_id_is_404(client):
+    assert client.get("/api/projects/nope/fab").status_code == 404
+
+
+def test_fab_export_streams_the_zip(client, tmp_path, monkeypatch):
+    from stockroom.projects import fab_export as fx
+
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+
+    def fake_bundle(pcb, cli, **kw):
+        return {"data": b"PK\x03\x04zip", "filename": "board-fab.zip",
+                "content_type": "application/zip", "files": ["board-F_Cu.gtl"]}
+
+    monkeypatch.setattr(fx, "build_fab_bundle", fake_bundle)
+    r = client.get(f"/api/projects/{rec['id']}/fab/export")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/zip"
+    assert 'filename="board-fab.zip"' in r.headers["content-disposition"]
+    assert r.content == b"PK\x03\x04zip"
+
+
+def test_fab_export_no_board_is_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "sch"))
+    assert client.get(f"/api/projects/{rec['id']}/fab/export").status_code == 400
+
+
+def test_fab_export_unknown_id_is_404(client):
+    assert client.get("/api/projects/nope/fab/export").status_code == 404
+
+
+def test_fab_export_missing_cli_is_502(client, tmp_path, monkeypatch):
+    from stockroom.kicad.errors import KiCadCliError
+    from stockroom.projects import fab_export as fx
+
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+
+    def no_cli(pcb, cli, **kw):
+        raise KiCadCliError("kicad-cli was not found")
+
+    monkeypatch.setattr(fx, "build_fab_bundle", no_cli)
+    r = client.get(f"/api/projects/{rec['id']}/fab/export")
+    assert r.status_code == 502
+    assert "not found" in r.json()["detail"]
+
+
+def test_fab_export_passes_options_through(client, tmp_path, monkeypatch):
+    from stockroom.projects import fab_export as fx
+
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    seen = {}
+
+    def capture(pcb, cli, **kw):
+        seen.update(kw)
+        return {"data": b"z", "filename": "board-fab.zip",
+                "content_type": "application/zip", "files": []}
+
+    monkeypatch.setattr(fx, "build_fab_bundle", capture)
+    client.get(f"/api/projects/{rec['id']}/fab/export"
+               "?drill_format=gerber&drill_map=false&include_pos=false&protel_ext=false")
+    assert seen["drill_format"] == "gerber"
+    assert seen["drill_map"] is False
+    assert seen["include_pos"] is False
+    assert seen["protel_ext"] is False

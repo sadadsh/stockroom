@@ -17,7 +17,7 @@ from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, fab_ops, fields as fields_mod, fill, settings_ops, standards
+from stockroom.projects import conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
@@ -95,6 +95,50 @@ class ProjectOps:
             rec.root, rec.pro_path, rec.sheet_paths,
             name=rec.name, boards=boards, library_parts=_resolve_parts(library_parts),
             price_lookup=price_lookup, progress=progress,
+        )
+
+    def fab_preview(self, project_id: str) -> dict:
+        """The honest state the Fab panel gates on (M7i): whether the project has a board to
+        fabricate and whether kicad-cli is available, plus the board file names for the
+        picker. Read-only, no shell-out. Raises FileNotFoundError for an unknown id."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        cli = getattr(self.cli, "binary", self.cli)
+        boards = [Path(b).name for b in rec.board_paths]
+        return {
+            "project": rec.name,
+            "cli_available": bool(cli),
+            "has_board": bool(boards),
+            "boards": boards,
+        }
+
+    def fab_export(self, project_id: str, *, board: str | None = None,
+                   drill_format: str = "excellon", drill_map: bool = True,
+                   include_pos: bool = True, pos_format: str = "csv",
+                   protel_ext: bool = True) -> dict:
+        """Plot the fab set (gerbers + drill + placement) for the project's board via kicad-cli
+        and return the zipped bundle {data, filename, content_type, files} the download
+        endpoint streams (M7i). Read-only. Raises FileNotFoundError (unknown id), ValueError
+        (no board / an unknown board name) and KiCadCliError (missing cli / failed plot).
+        `board` selects one board file by name when the project has more than one; the first
+        board is the default."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if not rec.board_paths:
+            raise ValueError("this project has no .kicad_pcb to fabricate")
+        if board:
+            chosen = next((b for b in rec.board_paths if Path(b).name == board), None)
+            if chosen is None:
+                raise ValueError(f"no such board in this project: {board}")
+        else:
+            chosen = rec.board_paths[0]
+        cli = getattr(self.cli, "binary", self.cli)
+        return fab_export_mod.build_fab_bundle(
+            Path(rec.root) / chosen, cli,
+            drill_format=drill_format, drill_map=drill_map,
+            include_pos=include_pos, pos_format=pos_format, protel_ext=protel_ext,
         )
 
     def revisions(self, project_id: str, max_count: int = 50) -> dict:

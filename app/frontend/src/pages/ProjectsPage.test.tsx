@@ -9,6 +9,7 @@ import type {
   ChecksResult,
   ConformCatalog,
   DesignResult,
+  FabStatus,
   ProcurementResult,
   ProjectDetail,
   ProjectSummary,
@@ -36,6 +37,8 @@ vi.mock("../api/client", async (importActual) => {
       runBom: vi.fn(),
       getBom: vi.fn(),
       getProcurement: vi.fn(),
+      getFab: vi.fn(),
+      downloadFabExport: vi.fn(),
       getRevisions: vi.fn(),
       getBomDiff: vi.fn(),
       downloadBomExport: vi.fn(),
@@ -265,6 +268,13 @@ const PROC_NOT_BUILT: ProcurementResult = {
   risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
   lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
   summary: "",
+};
+
+const FAB_READY: FabStatus = {
+  project: "Netdeck",
+  has_board: true,
+  cli_available: true,
+  boards: ["netdeck.kicad_pcb"],
 };
 
 const PROC_BUILT: ProcurementResult = {
@@ -597,6 +607,8 @@ beforeEach(() => {
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
   mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
+  mockApi.getFab.mockResolvedValue(FAB_READY);
+  mockApi.downloadFabExport.mockResolvedValue(undefined);
   mockApi.getRevisions.mockResolvedValue(REVS_NONE);
   mockApi.getBomDiff.mockResolvedValue(DIFF);
   mockApi.downloadBomExport.mockResolvedValue(undefined);
@@ -2225,5 +2237,64 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
     expect(await screen.findByTestId("prepare-no-sch")).toBeInTheDocument();
+  });
+});
+
+describe("Fab Prep (M7i)", () => {
+  it("prompts to add a board when the project has none", async () => {
+    mockApi.getFab.mockResolvedValue({
+      project: "Netdeck", has_board: false, cli_available: true, boards: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("fab-section");
+    expect(await within(section).findByTestId("fab-no-board")).toBeInTheDocument();
+    expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
+  });
+
+  it("prompts to install kicad-cli when it is not available", async () => {
+    mockApi.getFab.mockResolvedValue({
+      project: "Netdeck", has_board: true, cli_available: false, boards: ["netdeck.kicad_pcb"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("fab-no-cli")).toBeInTheDocument();
+    expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
+  });
+
+  it("exports the fab bundle with the default options through the authed download client", async () => {
+    renderPage(); // beforeEach seeds FAB_READY (board present + kicad-cli available)
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByTestId("fab-export"));
+    expect(mockApi.downloadFabExport).toHaveBeenCalledWith("netdeck", {
+      drillFormat: "excellon",
+      drillMap: true,
+      includePos: true,
+      posFormat: "csv",
+      protelExt: true,
+      board: undefined,
+    });
+  });
+
+  it("threads the toggled options into the export", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("fab-options");
+    await user.click(screen.getByTestId("fab-include-pos")); // placement off (default on)
+    await user.click(screen.getByTestId("fab-protel-ext")); // protel ext off (default on)
+    await user.selectOptions(screen.getByTestId("fab-drill-format"), "gerber");
+    await user.click(screen.getByTestId("fab-export"));
+    expect(mockApi.downloadFabExport).toHaveBeenCalledWith("netdeck", {
+      drillFormat: "gerber",
+      drillMap: true,
+      includePos: false,
+      posFormat: "csv",
+      protelExt: false,
+      board: undefined,
+    });
   });
 });

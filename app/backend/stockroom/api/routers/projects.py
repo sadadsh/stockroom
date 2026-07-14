@@ -232,6 +232,31 @@ def projects_router(require_token) -> APIRouter:
             headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
         )
 
+    @r.get("/{project_id}/fab")
+    def fab_status(request: Request, project_id: str) -> dict:
+        # The Fab panel's honest gate (M7i): has this project a board to fabricate, and is
+        # kicad-cli available. Read-only, no shell-out. Unknown id -> 404.
+        return request.app.state.ctx.project_ops.fab_preview(project_id)
+
+    @r.get("/{project_id}/fab/export")
+    def fab_export(request: Request, project_id: str, board: str = "",
+                   drill_format: str = "excellon", drill_map: bool = True,
+                   include_pos: bool = True, pos_format: str = "csv",
+                   protel_ext: bool = True):
+        # Plot the manufacturing bundle (gerbers + drill + placement) via kicad-cli and stream
+        # it as a downloadable zip (M7i). Read-only: nothing is written into the project tree.
+        # A project with no board is a ValueError -> 400; a missing/failed kicad-cli is a
+        # KiCadCliError -> 502 (never a fabricated or empty zip); an unknown id -> 404.
+        out = request.app.state.ctx.project_ops.fab_export(
+            project_id, board=board or None, drill_format=drill_format,
+            drill_map=drill_map, include_pos=include_pos, pos_format=pos_format,
+            protel_ext=protel_ext,
+        )
+        return Response(
+            content=out["data"], media_type=out["content_type"],
+            headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
+        )
+
     @r.get("/{project_id}/revisions")
     def project_revisions(request: Request, project_id: str) -> dict:
         # The project's git history, for the revision-diff pickers (M7d). A project not under

@@ -26,6 +26,7 @@ import {
   useProjectBom,
   useProjectChecks,
   useProjectProcurement,
+  useProjectFab,
   useProjectRevisions,
   useProjectDesign,
   useSetNetClasses,
@@ -79,6 +80,8 @@ import type {
   CompletionRoll,
   DesignResult,
   DesignRules,
+  FabExportOptions,
+  FabStatus,
   FieldRow,
   FieldEdit,
   NetClass,
@@ -442,6 +445,7 @@ function ProjectDetailView({
       <ChecksSection key={project.id} projectId={project.id} />
       <BomSection key={`bom-${project.id}`} projectId={project.id} />
       <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
+      <FabSection key={`fab-${project.id}`} projectId={project.id} />
       <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
       <EditorSection key={`editor-${project.id}`} projectId={project.id} />
       <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
@@ -1499,6 +1503,180 @@ function StockCell({ line }: { line: ProcurementLine }) {
         <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
       ) : null}
     </span>
+  );
+}
+
+// -- Fab prep (gerbers + drill + placement, plotted via kicad-cli into a downloadable zip, M7i) --
+
+const DEFAULT_FAB_OPTS: FabExportOptions = {
+  drillFormat: "excellon",
+  drillMap: true,
+  includePos: true,
+  posFormat: "csv",
+  protelExt: true,
+};
+
+// The Fab Prep section plots the manufacturing bundle straight from the board through
+// kicad-cli. Honest gates: a schematic-only project (no board) or a machine without kicad-cli
+// each get their own prompt instead of a dead button; nothing is ever written into the project.
+function FabSection({ projectId }: { projectId: string }) {
+  const query = useProjectFab(projectId);
+  const { toast } = useToast();
+  const [opts, setOpts] = useState<FabExportOptions>(DEFAULT_FAB_OPTS);
+  const [board, setBoard] = useState<string>("");
+  const [downloading, setDownloading] = useState(false);
+
+  const data: FabStatus | null = query.data ?? null;
+
+  async function onExport() {
+    setDownloading(true);
+    try {
+      await api.downloadFabExport(projectId, { ...opts, board: board || undefined });
+      toast("Saved the fab bundle.", "ok");
+    } catch (e) {
+      toast(errMsg(e, "Could not export the fab files."), "err");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="fab-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Fab Prep</Eyebrow>
+        <p className="text-xs text-t3">
+          Plot the manufacturing bundle (gerbers, drill files and the placement file) straight
+          from the board with kicad-cli, saved as one zip for your fab house.
+        </p>
+      </div>
+
+      {query.isLoading ? (
+        <p className="text-sm text-t3">Loading fab prep...</p>
+      ) : !data?.has_board ? (
+        <p className="text-sm text-t3" data-testid="fab-no-board">
+          This project has no .kicad_pcb to fabricate. Add a board to the project to export
+          gerbers and drill files.
+        </p>
+      ) : !data.cli_available ? (
+        <p className="text-sm text-t3" data-testid="fab-no-cli">
+          kicad-cli was not found. Install KiCad on this machine to plot fab files.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4" data-testid="fab-result">
+          <FabOptionsForm
+            opts={opts}
+            onChange={setOpts}
+            boards={data.boards}
+            board={board}
+            onBoard={setBoard}
+          />
+          <div>
+            <Button
+              variant="accent"
+              onClick={onExport}
+              disabled={downloading}
+              data-testid="fab-export"
+            >
+              {downloading ? "Plotting..." : "Export Fab Bundle"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FabOptionsForm({
+  opts,
+  onChange,
+  boards,
+  board,
+  onBoard,
+}: {
+  opts: FabExportOptions;
+  onChange: (o: FabExportOptions) => void;
+  boards: string[];
+  board: string;
+  onBoard: (b: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-4" data-testid="fab-options">
+      {boards.length > 1 ? (
+        <label className="flex flex-col gap-1 text-2xs text-t3">
+          Board
+          <select
+            className={`${INPUT_CLS} w-56`}
+            data-testid="fab-board"
+            value={board}
+            onChange={(e) => onBoard(e.target.value)}
+          >
+            <option value="">First board ({boards[0]})</option>
+            {boards.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <label className="flex flex-col gap-1 text-2xs text-t3">
+        Drill Format
+        <select
+          className={`${INPUT_CLS} w-36`}
+          data-testid="fab-drill-format"
+          value={opts.drillFormat}
+          onChange={(e) =>
+            onChange({ ...opts, drillFormat: e.target.value as FabExportOptions["drillFormat"] })
+          }
+        >
+          <option value="excellon">Excellon</option>
+          <option value="gerber">Gerber</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-2xs text-t3">
+        Placement Format
+        <select
+          className={`${INPUT_CLS} w-36`}
+          data-testid="fab-pos-format"
+          value={opts.posFormat}
+          disabled={!opts.includePos}
+          onChange={(e) =>
+            onChange({ ...opts, posFormat: e.target.value as FabExportOptions["posFormat"] })
+          }
+        >
+          <option value="csv">CSV</option>
+          <option value="ascii">ASCII</option>
+          <option value="gerber">Gerber</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-2xs text-t2">
+        <input
+          type="checkbox"
+          data-testid="fab-drill-map"
+          checked={opts.drillMap}
+          onChange={(e) => onChange({ ...opts, drillMap: e.target.checked })}
+        />
+        Drill Map
+      </label>
+      <label className="flex items-center gap-2 text-2xs text-t2">
+        <input
+          type="checkbox"
+          data-testid="fab-include-pos"
+          checked={opts.includePos}
+          onChange={(e) => onChange({ ...opts, includePos: e.target.checked })}
+        />
+        Placement File
+      </label>
+      <label className="flex items-center gap-2 text-2xs text-t2">
+        <input
+          type="checkbox"
+          data-testid="fab-protel-ext"
+          checked={opts.protelExt}
+          onChange={(e) => onChange({ ...opts, protelExt: e.target.checked })}
+        />
+        Protel Extensions
+      </label>
+    </div>
   );
 }
 

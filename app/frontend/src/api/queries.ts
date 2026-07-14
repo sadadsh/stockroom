@@ -411,6 +411,16 @@ export function useProjectProcurement(id: string | null) {
   });
 }
 
+// The Fab panel's honest gate (M7i): board presence + kicad-cli availability. Disabled until a
+// project is selected.
+export function useProjectFab(id: string | null) {
+  return useQuery({
+    queryKey: ["project-fab", id],
+    queryFn: () => api.getFab(id as string),
+    enabled: !!id,
+  });
+}
+
 // The project's git history (M7d) for the revision-diff pickers. Disabled until a project is
 // selected; under_git false / empty for a project not under git.
 export function useProjectRevisions(id: string | null) {
