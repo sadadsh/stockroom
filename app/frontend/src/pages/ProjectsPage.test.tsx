@@ -15,6 +15,7 @@ import type {
   RevisionsResult,
   BoardSettings,
   StackupRead,
+  PrepareRead,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -49,6 +50,11 @@ vi.mock("../api/client", async (importActual) => {
       getStackup: vi.fn(),
       previewStackup: vi.fn(),
       applyStackup: vi.fn(),
+      getPrepare: vi.fn(),
+      runPrepare: vi.fn(),
+      manualFill: vi.fn(),
+      restore: vi.fn(),
+      listParts: vi.fn(),
     },
   };
 });
@@ -455,6 +461,42 @@ const STACKUP: StackupRead = {
   ],
 };
 
+const PREPARE: PrepareRead = {
+  project: "Netdeck",
+  under_git: true,
+  has_sch: true,
+  annotate: 2,
+  fill_fields: 3,
+  files: [{ path: "root.kicad_sch", annotated: 2, filled: 3 }],
+  plan: {
+    items: [
+      {
+        ref: "U1",
+        sheet: "root.kicad_sch",
+        confidence: "symbol",
+        part_id: "lm358",
+        changes: [{ prop: "MPN", old: "", new: "LM358DR", kind: "fill" }],
+        default_selected: true,
+      },
+    ],
+    summary: { components: 3, matched: 1, no_match: 2, fields: 3 },
+  },
+  // the CURRENT on-disk residual (disk designators the manual-fill picker offers)
+  completion: {
+    total: 3,
+    complete: 0,
+    incomplete_refs: ["R51", "C22", "U7"],
+    missing_counts: { MPN: 3, Footprint: 2 },
+  },
+  // the projected residual once Prepare runs
+  completion_after: {
+    total: 3,
+    complete: 1,
+    incomplete_refs: ["R51", "C22"],
+    missing_counts: { MPN: 2, Footprint: 2 },
+  },
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -541,6 +583,35 @@ beforeEach(() => {
     ...STACKUP,
     committed: "ffffffff6666",
     changed: true,
+  });
+  mockApi.getPrepare.mockResolvedValue(PREPARE);
+  mockApi.runPrepare.mockResolvedValue({ job_id: "prep-1" });
+  mockApi.manualFill.mockResolvedValue({
+    project: "Netdeck",
+    committed: "aaaa1111bbbb",
+    ref: "R5",
+    part_id: "r10k",
+  });
+  mockApi.restore.mockResolvedValue({
+    project: "Netdeck",
+    restored: "cccc2222dddd",
+    short: "cccc222",
+    subject: "Prepare Netdeck: annotate 2, fill 3",
+    committed: "eeee3333ffff",
+  });
+  mockApi.listParts.mockResolvedValue({
+    parts: [
+      {
+        id: "r10k",
+        display_name: "10k 0402",
+        category: "Resistors",
+        mpn: "RC0402FR-0710KL",
+        manufacturer: "Yageo",
+        is_complete: true,
+        missing: [],
+      },
+    ],
+    count: 1,
   });
 });
 
@@ -1722,5 +1793,146 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
     expect(await screen.findByTestId("stackup-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
+  });
+});
+
+describe("Prepare / Complete-All (M7f-D)", () => {
+  async function openPrepare(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    return await screen.findByTestId("prepare-form");
+  }
+
+  it("previews the annotate + fill counts and the completion residual", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const form = await openPrepare(user);
+    expect(within(form).getByTestId("prepare-summary")).toHaveTextContent(
+      "would annotate 2 references and fill 3 fields",
+    );
+    // the CURRENT on-disk residual (disk designators the picker can act on)
+    const residual = within(form).getByTestId("prepare-residual");
+    expect(residual).toHaveTextContent("0 / 3 Complete");
+    expect(residual).toHaveTextContent("3 Missing MPN");
+    // the unmatched refs offer a manual link
+    expect(within(form).getByTestId("manual-fill-panel")).toBeInTheDocument();
+  });
+
+  it("runs Prepare as a job and shows the prepared result", async () => {
+    mockApi.openJobStream.mockResolvedValue(
+      sseStream([
+        `event: result\r\ndata: ${JSON.stringify({
+          result: {
+            project: "Netdeck",
+            committed: "1234abcd",
+            annotated: 2,
+            fill_fields: 3,
+            files: [{ path: "root.kicad_sch", annotated: 2, filled: 3 }],
+            completion: { total: 3, complete: 1, incomplete_refs: ["R51", "C22"], missing_counts: { MPN: 2 } },
+          },
+        })}`,
+        `event: done\r\ndata: {}`,
+      ]),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await openPrepare(user);
+    await user.click(screen.getByRole("button", { name: "Prepare / Complete All" }));
+    await waitFor(() => expect(mockApi.runPrepare).toHaveBeenCalledWith("netdeck"));
+    expect(
+      await screen.findByText(/Prepared: annotated 2 references and filled 3 fields/i),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces an honest error when Prepare cannot start", async () => {
+    mockApi.runPrepare.mockRejectedValue(new ApiError(400, "this project is not under git"));
+    renderPage();
+    const user = userEvent.setup();
+    await openPrepare(user);
+    await user.click(screen.getByRole("button", { name: "Prepare / Complete All" }));
+    expect(await screen.findAllByText(/not under git/i)).not.toHaveLength(0);
+  });
+
+  it("restores the last Prepare", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await openPrepare(user);
+    await user.click(screen.getByTestId("prepare-restore"));
+    await waitFor(() => expect(mockApi.restore).toHaveBeenCalledWith("netdeck"));
+  });
+
+  it("manually links an unmatched component to a chosen library part", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const form = await openPrepare(user);
+    // pick the ref, search + select the library part, then Link
+    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
+    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await waitFor(() =>
+      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+    );
+    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
+    await user.click(within(form).getByTestId("manual-fill-link"));
+    await waitFor(() =>
+      expect(mockApi.manualFill).toHaveBeenCalledWith("netdeck", { ref: "R51", part_id: "r10k" }),
+    );
+  });
+
+  it("clears the armed library part when the target component changes", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const form = await openPrepare(user);
+    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
+    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await waitFor(() =>
+      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+    );
+    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
+    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("r10k");
+    // switching the target component must disarm the part (never Link a part chosen for another ref)
+    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "C22");
+    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("");
+  });
+
+  it("re-reads the residual from the live query after a manual link (not the frozen job result)", async () => {
+    // first render shows 3 incomplete; after the link + invalidation the refetch returns fewer
+    mockApi.getPrepare
+      .mockResolvedValueOnce(PREPARE)
+      .mockResolvedValue({
+        ...PREPARE,
+        completion: { total: 3, complete: 1, incomplete_refs: ["C22"], missing_counts: { MPN: 2 } },
+      });
+    renderPage();
+    const user = userEvent.setup();
+    const form = await openPrepare(user);
+    expect(within(form).getByTestId("prepare-residual")).toHaveTextContent("0 / 3 Complete");
+    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
+    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await waitFor(() =>
+      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+    );
+    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
+    await user.click(within(form).getByTestId("manual-fill-link"));
+    await waitFor(() => expect(mockApi.manualFill).toHaveBeenCalled());
+    // the residual follows the refetched query, not a frozen result
+    await waitFor(() =>
+      expect(screen.getByTestId("prepare-residual")).toHaveTextContent("1 / 3 Complete"),
+    );
+  });
+
+  it("shows an honest no-git state and hides the form", async () => {
+    mockApi.getPrepare.mockResolvedValue({ ...PREPARE, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("prepare-no-git")).toBeInTheDocument();
+    expect(screen.queryByTestId("prepare-form")).not.toBeInTheDocument();
+  });
+
+  it("shows an honest no-schematic state", async () => {
+    mockApi.getPrepare.mockResolvedValue({ ...PREPARE, has_sch: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("prepare-no-sch")).toBeInTheDocument();
   });
 });

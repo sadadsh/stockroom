@@ -35,6 +35,10 @@ import type {
   StackupPreview,
   StackupRead,
   StackupResult,
+  PrepareRead,
+  ManualFillBody,
+  ManualFillResult,
+  RestoreResult,
   ProfilesResponse,
   ProjectDetail,
   ProjectSummary,
@@ -625,5 +629,32 @@ export const api = {
       `/api/projects/${encodeURIComponent(id)}/stackup`,
       { body },
     );
+  },
+
+  // A dry-run of Prepare / Complete-All: what a Prepare would annotate + auto-fill (from the shared
+  // library) + leave incomplete, computed without writing or touching git (M7f-D).
+  getPrepare(id: string): Promise<PrepareRead> {
+    return apiGet<PrepareRead>(`/api/projects/${encodeURIComponent(id)}/prepare`);
+  },
+
+  // Prepare / Complete-All off the request path as a job (the counts + residual arrive on the job's
+  // SSE result event, openJobStream). Annotate + auto-fill blank identity in one atomic commit (M7f-D).
+  runPrepare(id: string): Promise<JobRef> {
+    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/prepare`);
+  },
+
+  // Manually link one placed component to a chosen library part (the residual filler), one atomic
+  // commit (M7f-D). `committed` is null when nothing changed.
+  manualFill(id: string, body: ManualFillBody): Promise<ManualFillResult> {
+    return request<ManualFillResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(id)}/prepare/fill`,
+      { body },
+    );
+  },
+
+  // Undo the project's last Prepare / Fill by git-reverting that commit as a new commit (M7f-D).
+  restore(id: string): Promise<RestoreResult> {
+    return request<RestoreResult>("POST", `/api/projects/${encodeURIComponent(id)}/restore`);
   },
 };

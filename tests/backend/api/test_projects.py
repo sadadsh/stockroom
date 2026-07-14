@@ -1285,3 +1285,112 @@ def test_patch_stackup_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
     app_ctx.checks_cache[rec["id"]] = {"stale": True}
     client.patch(f"/api/projects/{rec['id']}/stackup", json={"preset_key": "oshpark_4"})
     assert rec["id"] not in app_ctx.checks_cache
+
+
+# ---- M7f-D Editor: Library Fill + Prepare/Complete-All + Restore ------------
+
+# An unannotated component whose lib_id is the fixture library's TPS62130 (so Prepare annotates it
+# U? -> U1 AND fills its blank identity from the library), with both reference forms.
+_PREPARE_SHEET = (
+    "\t(symbol\n"
+    '\t\t(lib_id "SR-ICs:TPS62130")\n'
+    '\t\t(at 10 10 0)\n\t\t(unit 1)\n\t\t(uuid "u-prep")\n'
+    '\t\t(property "Reference" "U?" (at 10 8 0))\n'
+    '\t\t(property "Value" "TPS62130" (at 12 10 0))\n'
+    '\t\t(property "Footprint" "" (at 10 10 0))\n'
+    '\t\t(property "Datasheet" "" (at 10 10 0))\n'
+    '\t\t(instances\n\t\t\t(project "board"\n'
+    '\t\t\t\t(path "/root-uuid"\n\t\t\t\t\t(reference "U?")\n\t\t\t\t\t(unit 1)\n\t\t\t\t)\n\t\t\t)\n\t\t)\n'
+    "\t)\n"
+)
+
+
+def test_get_prepare_previews_annotate_fill_and_residual(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "prep", _PREPARE_SHEET)
+    rec = _register(client, proj)
+    r = client.get(f"/api/projects/{rec['id']}/prepare")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["under_git"] is True and body["has_sch"] is True
+    assert body["annotate"] == 1
+    assert body["fill_fields"] >= 2  # MPN + Manufacturer (+ Description + Footprint) from the library
+    assert any(i["part_id"] == "tps62130" for i in body["plan"]["items"])
+    # a preview never commits: the file is unchanged
+    assert '"U?"' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
+
+
+def test_get_prepare_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/prepare").status_code == 404
+
+
+def test_post_prepare_runs_a_job_and_commits(client, app_ctx, tmp_path):
+    proj, head = _make_git_project(tmp_path / "prep", _PREPARE_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/prepare")
+    assert r.status_code == 200
+    result = _stream_job_result(client, r.json()["job_id"])
+    assert result is not None and result["committed"]
+    after = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    assert '(property "Reference" "U1"' in after
+    assert '(property "MPN" "TPS62130"' in after
+
+
+def test_post_prepare_non_git_is_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _PREPARE_SHEET))
+    assert client.post(f"/api/projects/{rec['id']}/prepare").status_code == 400
+
+
+def test_post_prepare_unknown_project_is_404(client):
+    assert client.post("/api/projects/nope/prepare").status_code == 404
+
+
+def test_manual_fill_links_a_component(client, tmp_path):
+    # an annotated generic resistor manually linked to the fixture library IC (by part id)
+    sheet = (
+        "\t(symbol\n"
+        '\t\t(lib_id "Device:R")\n\t\t(at 10 10 0)\n\t\t(uuid "u-mf")\n'
+        '\t\t(property "Reference" "R1" (at 10 8 0))\n'
+        '\t\t(property "Value" "10k" (at 12 10 0))\n'
+        '\t\t(property "Footprint" "" (at 10 10 0))\n'
+        '\t\t(instances\n\t\t\t(project "board"\n'
+        '\t\t\t\t(path "/r"\n\t\t\t\t\t(reference "R1")\n\t\t\t\t)\n\t\t\t)\n\t\t)\n'
+        "\t)\n"
+    )
+    proj, _head = _make_git_project(tmp_path / "mf", sheet)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/prepare/fill",
+                    json={"ref": "R1", "part_id": "tps62130"})
+    assert r.status_code == 200, r.text
+    assert r.json()["committed"]
+    assert '(lib_id "SR-ICs:TPS62130")' in (proj / "board.kicad_sch").read_text(encoding="utf-8")
+
+
+def test_manual_fill_unknown_part_is_400(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "mf", _PREPARE_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/prepare/fill",
+                    json={"ref": "U?", "part_id": "nope"})
+    assert r.status_code == 400
+
+
+def test_restore_reverts_the_last_prepare(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "prep", _PREPARE_SHEET)
+    rec = _register(client, proj)
+    before = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/prepare").json()["job_id"])
+    assert (proj / "board.kicad_sch").read_text(encoding="utf-8") != before
+
+    r = client.post(f"/api/projects/{rec['id']}/restore")
+    assert r.status_code == 200, r.text
+    assert r.json()["restored"]
+    assert (proj / "board.kicad_sch").read_text(encoding="utf-8") == before
+
+
+def test_restore_nothing_to_restore_is_400(client, tmp_path):
+    proj, _head = _make_git_project(tmp_path / "prep", _PREPARE_SHEET)
+    rec = _register(client, proj)
+    assert client.post(f"/api/projects/{rec['id']}/restore").status_code == 400
+
+
+def test_restore_unknown_project_is_404(client):
+    assert client.post("/api/projects/nope/restore").status_code == 404

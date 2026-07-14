@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import (
     ConformBody,
+    ManualFillBody,
     ProjectSummary,
     RegisterProjectBody,
     SetDesignRulesBody,
@@ -357,7 +358,90 @@ def projects_router(require_token) -> APIRouter:
         ctx.checks_cache.pop(project_id, None)
         return result
 
+    @r.get("/{project_id}/prepare")
+    def get_prepare(request: Request, project_id: str) -> dict:
+        # A dry-run of Prepare / Complete-All: the annotate count, the fill plan (per-ref proposed
+        # changes matched against the ACTIVE profile's library), and the completion residual before and
+        # after the auto-fill, computed WITHOUT writing (M7f-D). Read-only. Unknown id -> 404. The
+        # library is loaded lazily (a thunk) so an unknown id 404s before the whole library is read.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.prepare_read(project_id, library_parts=lambda: _library_parts(ctx))
+
+    @r.post("/{project_id}/prepare")
+    def run_prepare(request: Request, project_id: str) -> dict:
+        # Prepare / Complete-All: annotate every unannotated reference and auto-fill every blank
+        # identity field from the shared library, as ONE atomic commit on the project's own git, run
+        # off the request path as a job with SSE progress (M7f-D). The unknown-id 404 and the
+        # not-under-git 400 are resolved before the job is submitted (an immediate honest error, not an
+        # async one). A Prepare changes the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before preparing"
+            )
+
+        def work(progress):
+            parts = _library_parts(ctx)
+            result = ctx.project_ops.prepare_apply(project_id, library_parts=parts, progress=progress)
+            # A DELETE may have landed (and evicted the caches) while this ran; do not resurrect a
+            # cache entry for a now-gone id. Evict the stale ERC/DRC + BOM either way.
+            if ctx.project_ops.get(project_id) is not None:
+                ctx.checks_cache.pop(project_id, None)
+                ctx.bom_cache.pop(project_id, None)
+            return result
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.post("/{project_id}/prepare/fill")
+    def manual_fill(request: Request, project_id: str, body: ManualFillBody) -> dict:
+        # Manually link one placed component to a chosen library part (the residual filler for a
+        # component Prepare could not match), one atomic commit on the project's own git (M7f-D).
+        # Unknown id -> 404; a project not under git, an unknown part, or a missing ref -> 400; a
+        # GitError -> 503. A fill changes the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
+        # The library is loaded lazily (a thunk) so an unknown id 404 / a non-git 400 is returned
+        # before the whole shared library is read from disk.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.manual_fill(
+            project_id, body.ref, body.part_id, library_parts=lambda: _library_parts(ctx)
+        )
+        ctx.checks_cache.pop(project_id, None)
+        ctx.bom_cache.pop(project_id, None)
+        return result
+
+    @r.post("/{project_id}/restore")
+    def restore(request: Request, project_id: str) -> dict:
+        # Undo the project's last Prepare / Fill by git-reverting that commit as a new commit
+        # (non-destructive) (M7f-D). Unknown id -> 404; a project not under git, a dirty tree, or
+        # nothing to restore -> 400; a revert conflict (GitError) -> 503. A restore changes the
+        # netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.restore(project_id)
+        ctx.checks_cache.pop(project_id, None)
+        ctx.bom_cache.pop(project_id, None)
+        return result
+
     return r
+
+
+def _library_parts(ctx) -> list:
+    """The active profile's shared-library PartRecords, the match library for Prepare / fill. A
+    malformed record is skipped (a corrupt library file is a library-side problem surfaced by the
+    doctor, and must never crash a Prepare); an absent parts dir yields []."""
+    from stockroom.model.part import PartRecord
+
+    parts_dir = ctx.profile.library.parts_dir
+    if not parts_dir.exists():
+        return []
+    out = []
+    for json_path in sorted(parts_dir.glob("*.json")):
+        try:
+            out.append(PartRecord.loads(json_path.read_text(encoding="utf-8")))
+        except Exception:  # noqa: BLE001 - a corrupt record drops from the match index, never crashes
+            continue
+    return out
 
 
 def _bom_price_lookup(ctx):

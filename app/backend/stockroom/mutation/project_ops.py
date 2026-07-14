@@ -17,13 +17,21 @@ from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, fab_ops, settings_ops, standards
+from stockroom.projects import conform_ops, fab_ops, fill, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_project
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
+
+
+def _resolve_parts(library_parts):
+    """Resolve `library_parts` to a concrete list. It may be a THUNK (a zero-arg callable) so the
+    router can defer reading the whole shared library from disk until AFTER an unknown-id 404 / a
+    non-git 400 has been ruled out (never load a large library just to reject a request)."""
+    parts = library_parts() if callable(library_parts) else library_parts
+    return list(parts or ())
 
 
 class ProjectOps:
@@ -696,3 +704,262 @@ class ProjectOps:
             board.save(board_path)
             sha = txn.commit(message)
         return {**self.stackup_read(project_id), "committed": sha, "changed": True}
+
+    # --- M7f-D Editor: Library Fill + Prepare/Complete-All + reversible Restore ---
+
+    def _sheet_abs(self, rec: ProjectRecord) -> list[Path]:
+        """The project's schematic sheets that exist on disk, as absolute paths in sorted (registered)
+        order. A sheet that moved after registration is skipped (it cannot be prepared)."""
+        root = Path(rec.root)
+        return [root / s for s in rec.sheet_paths if (root / s).exists()]
+
+    def _stage_prepare(self, rec: ProjectRecord, index: list[dict]):
+        """Compute a Prepare across every sheet WITHOUT writing: seed the project-wide used-reference
+        set, then per sheet (in registered order so annotation is deterministic and project-unique)
+        annotate every unannotated reference and auto-fill every BLANK identity field of a confidently
+        matched component (never an overwrite, so a user-set value is never clobbered). Returns
+        (staged, plan, completion_current, completion_after):
+
+          - staged: per-sheet {path, _abs, annotated, filled, _doc} (a live doc only when it changed);
+          - plan:   the reviewable fill plan (proposed changes of ALL kinds), keyed on the CURRENT
+                    on-disk designators so the preview + the manual-fill picker name refs that exist;
+          - completion_current: the completion passport residual as the project is ON DISK RIGHT NOW
+                    (disk designators, so a manual fill always names a real component);
+          - completion_after:   the projected residual AFTER the auto-fill (annotated designators = what
+                    those refs will be on disk once Prepare is applied).
+
+        Every edit lands on a byte-preserving SexpDocument in memory; the caller saves the changed docs
+        in one atomic Transaction (apply) or discards them (preview)."""
+        root = Path(rec.root)
+        sheets = self._sheet_abs(rec)
+        texts: list[str] = []
+        for p in sheets:
+            with open(p, encoding="utf-8", newline="") as fh:
+                texts.append(fh.read())
+        used = fill.used_references(texts)  # seed project-wide before any sheet is numbered
+        staged: list[dict] = []
+        pre_comps: list[dict] = []      # current on-disk designators (for the plan + current residual)
+        final_comps: list[dict] = []    # post-annotate + post-fill (for the projected residual)
+        for path, text in zip(sheets, texts):
+            try:
+                rel = path.resolve().relative_to(root.resolve()).as_posix()
+            except ValueError:
+                rel = path.name
+            doc = SexpDocument.parse(text)
+            # Read the CURRENT on-disk components (disk designators) BEFORE annotation, so the plan and
+            # the manual-fill picker name refs that actually exist on disk (a manual fill matches disk,
+            # not the projected annotated ref). Matching is designator-independent (by lib_id / MPN).
+            for c in fill.read_components(doc):
+                c["_sheet"] = rel
+                pre_comps.append(c)
+            annotated = fill.annotate_document(doc, used)
+            # Read AFTER annotation so the auto-fill keys off the FINAL designators annotation just
+            # assigned (the doc it will save), not the R? placeholders.
+            changes_by_ref: dict[str, dict[str, str]] = {}
+            for c in fill.read_components(doc):
+                m = fill.match_component(c, index)
+                if m["part"] is None:
+                    continue
+                fills = {ch["prop"]: ch["new"]
+                         for ch in fill.proposed_changes(m["part"], c["props"]) if ch["kind"] == "fill"}
+                if fills:
+                    changes_by_ref[c["ref"]] = fills
+            # fill_document returns the count of INSTANCES touched (the byte-level change gate);
+            # the reported "fill_fields" is the number of property fields filled (its own count).
+            filled_comps = fill.fill_document(doc, changes_by_ref)
+            filled_fields = sum(len(v) for v in changes_by_ref.values())
+            for c in fill.read_components(doc):
+                final_comps.append(c)
+            changed = (annotated + filled_comps) > 0
+            staged.append({"path": rel, "_abs": path, "annotated": annotated,
+                           "filled": filled_fields, "components": filled_comps,
+                           "_doc": doc if changed else None})
+        plan = fill.build_fill_plan(pre_comps, index,
+                                    {c["ref"]: c["_sheet"] for c in pre_comps})
+        return (staged, plan,
+                fill.project_completion(pre_comps), fill.project_completion(final_comps))
+
+    def prepare_read(self, project_id: str, library_parts=()) -> dict:
+        """A dry-run of Prepare / Complete-All: the annotate count, the fill plan (per-ref proposed
+        changes), and the completion residual before and after the auto-fill, computed WITHOUT writing
+        or touching git (M7f-D). `library_parts` (the active profile's PartRecords, passed by the
+        router) is the match library. Read-only. Raises FileNotFoundError for an unknown id; a project
+        with no sheets is an honest empty shape, never a crash."""
+        rec = self._require(project_id)  # 404 before the (possibly large) library is loaded
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        staged, plan, current, after = self._stage_prepare(rec, index)
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "has_sch": bool(self._sheet_abs(rec)),
+            "annotate": sum(s["annotated"] for s in staged),
+            "fill_fields": sum(s["filled"] for s in staged),
+            "files": [{"path": s["path"], "annotated": s["annotated"], "filled": s["filled"]}
+                      for s in staged],
+            "plan": plan,
+            # The CURRENT on-disk residual: its incomplete_refs are real disk designators, so the
+            # manual-fill picker never offers a ref that a fill would fail to find. `completion_after`
+            # is the projection once Complete-All is applied (the annotated designators).
+            "completion": current,
+            "completion_after": after,
+        }
+
+    def prepare_apply(self, project_id: str, library_parts=(), progress=None) -> dict:
+        """Prepare / Complete-All: annotate every unannotated reference and auto-fill every blank
+        identity field of a confidently matched component across EVERY sheet, as ONE atomic commit on
+        the project's own git (M7f-D). Only the sheets that actually change are tracked + written
+        (minimal diff), in a single Transaction (track-before-write, one scoped commit, or every touched
+        path restored and zero trace). A Prepare that changes nothing is an honest no-commit no-op
+        ({committed: None}). `progress` (an SSE callback) reports the phase. Raises FileNotFoundError
+        (unknown id); ValueError for a project not under git. Returns the counts + the residual passport
+        + the commit sha (or None)."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before preparing"
+            )
+
+        def _p(pct, msg):
+            if progress:
+                progress({"pct": pct, "message": msg})
+
+        repo = GitRepo(Path(rec.git_root))
+        sheets = self._sheet_abs(rec)
+        # Refuse a sheet with uncommitted changes: Prepare saves + commits the whole sheet, so a dirty
+        # sheet's in-progress user edits would be swept into the Prepare commit and then destroyed by a
+        # Restore that reverts it. Guard before any read so the tree is committed-clean first.
+        if sheets and not repo.is_clean(sheets):
+            raise ValueError(
+                "this project has uncommitted changes to a schematic; commit or discard them before preparing"
+            )
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        _p(15, "Reading schematics")
+        staged, plan, _current, after = self._stage_prepare(rec, index)
+        _p(70, "Matching library and filling")
+        annotated = sum(s["annotated"] for s in staged)
+        filled = sum(s["filled"] for s in staged)
+        files = [{"path": s["path"], "annotated": s["annotated"], "filled": s["filled"]}
+                 for s in staged]
+        changed = [s for s in staged if s["_doc"] is not None]
+        result = {"project": rec.name, "annotated": annotated, "fill_fields": filled,
+                  "files": files, "completion": after}
+        if not changed:
+            _p(100, "Nothing to prepare")
+            return {**result, "committed": None}
+        message = f"Prepare {rec.name}: annotate {annotated}, fill {filled}"
+        _p(85, "Committing")
+        with Transaction(repo) as txn:
+            for s in changed:
+                txn.track(s["_abs"])
+            for s in changed:
+                s["_doc"].save(s["_abs"])
+            sha = txn.commit(message)
+        _p(100, "Prepared")
+        return {**result, "committed": sha}
+
+    def manual_fill(self, project_id: str, ref: str, part_id: str, library_parts=()) -> dict:
+        """Link a specific placed component `ref` to the library part `part_id`, filling ALL its
+        identity fields (overwrite allowed, since this is an explicit user choice, unlike the
+        conservative auto pass) and repointing its `(lib_id ...)`, as ONE atomic commit on the
+        project's own git (M7f-D). The residual filler for a component the auto pass could not match.
+        A link that changes nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id);
+        ValueError for a project not under git, an unknown library part, or no such component `ref`."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before filling"
+            )
+        repo = GitRepo(Path(rec.git_root))
+        sheets = self._sheet_abs(rec)
+        # Same dirty-tree guard as Prepare: a fill saves + commits the whole sheet, so a dirty sheet's
+        # in-progress user edits must not be swept into the Fill commit (a later Restore would revert
+        # them). Require the sheets committed-clean first.
+        if sheets and not repo.is_clean(sheets):
+            raise ValueError(
+                "this project has uncommitted changes to a schematic; commit or discard them before filling"
+            )
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        part = next((p for p in index if p["id"] == part_id), None)
+        if part is None:
+            raise ValueError(f"no such library part: {part_id}")
+        lib_id = fill.lib_id_for(part)
+        found = False
+        changed: list[tuple[Path, SexpDocument]] = []
+        for path in sheets:
+            doc = SexpDocument.load(path)
+            comps = {c["ref"]: c for c in fill.read_components(doc)}
+            comp = comps.get(ref)
+            if comp is None:
+                continue
+            found = True
+            changes = {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comp["props"])}
+            n = fill.fill_document(doc, {ref: changes} if changes else {},
+                                   lib_id_by_ref={ref: lib_id} if lib_id else None)
+            if n:
+                changed.append((path, doc))
+        if not found:
+            raise ValueError(f"no component {ref!r} in this project")
+        if not changed:
+            return {"project": rec.name, "committed": None, "ref": ref, "part_id": part_id}
+        message = f"Fill {rec.name}: {ref} from library"
+        with Transaction(repo) as txn:
+            for path, _doc in changed:
+                txn.track(path)
+            for path, doc in changed:
+                doc.save(path)
+            sha = txn.commit(message)
+        return {"project": rec.name, "committed": sha, "ref": ref, "part_id": part_id}
+
+    def restore(self, project_id: str) -> dict:
+        """Undo the project's last Prepare / Fill by git-reverting that commit as a new commit
+        (non-destructive; history and any later commits stand) (M7f-D). Since Prepare/Fill is ONE
+        atomic commit on the project's own git, Restore leans on git rather than a hand-rolled backup.
+        Refuses when the project has uncommitted changes in its KiCad files (a revert on a dirty tree is
+        unsafe) or when no Prepare/Fill commit exists. Raises FileNotFoundError (unknown id); ValueError
+        for a project not under git, a dirty tree, or nothing to restore; GitError (-> 503) when a later
+        commit conflicts with the revert."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError("this project is not under git; there is nothing to restore")
+        repo = GitRepo(Path(rec.git_root))
+        root, git_root = Path(rec.root).resolve(), Path(rec.git_root).resolve()
+        rels: list[Path] = []
+        abs_paths: list[Path] = []
+        for rel in list(rec.sheet_paths) + list(rec.board_paths) + (
+                [rec.pro_path] if rec.pro_path else []):
+            ap = (root / rel)
+            if not ap.exists():
+                continue
+            abs_paths.append(ap)
+            try:
+                rels.append(ap.resolve().relative_to(git_root))
+            except ValueError:
+                continue
+        if not repo.is_clean(abs_paths):
+            raise ValueError(
+                "this project has uncommitted changes; commit or discard them before restoring"
+            )
+        # Match Stockroom's OWN prepare/fill commits specifically ("Prepare <name>:" / "Fill <name>:",
+        # exactly what prepare_apply/manual_fill write) rather than a bare "Prepare "/"Fill " prefix,
+        # so a user's own commit (e.g. "Prepare the board for fab") is never mistaken for one to revert.
+        prefixes = (f"Prepare {rec.name}:", f"Fill {rec.name}:")
+        commits = repo.log_paths(rels, max_count=100) if rels else []
+        # A git revert leaves a `Revert "<subject>"` commit; a prepare/fill already undone that way must
+        # be skipped so a REPEATED Restore steps back to the PRIOR prepare/fill instead of re-reverting
+        # the same commit (which git would refuse as an empty/conflicting revert). This makes Restore
+        # walk the prepare/fill history one step per call.
+        already_reverted = {
+            c.subject[len('Revert "'):-1]
+            for c in commits
+            if c.subject.startswith('Revert "') and c.subject.endswith('"')
+        }
+        target = next(
+            (c for c in commits
+             if c.subject.startswith(prefixes) and c.subject not in already_reverted),
+            None,
+        )
+        if target is None:
+            raise ValueError("nothing to restore: this project has no Prepare or Fill commit to undo")
+        new_head = repo.revert(target.sha)  # GitError on a conflict -> 503
+        return {"project": rec.name, "restored": target.sha, "short": target.sha[:7],
+                "subject": target.subject, "committed": new_head}
