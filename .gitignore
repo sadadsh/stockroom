@@ -27,6 +27,7 @@ Thumbs.db
 /dist/
 /build/
 /packaging/mingit/
+/packaging/webview2/
 /mingit.zip
 
 # work plans SDD scratch (ledger, task briefs, review packages)

@@ -37,6 +37,14 @@ jobs:
           if (-not (Test-Path packaging/mingit/cmd/git.exe)) { throw "MinGit git.exe missing after extract" }
           Write-Host "MinGit ready at packaging/mingit"
 
+      - name: Fetch the WebView2 Evergreen Bootstrapper to bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path packaging/webview2 | Out-Null
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile packaging/webview2/MicrosoftEdgeWebview2Setup.exe
+          if (-not (Test-Path packaging/webview2/MicrosoftEdgeWebview2Setup.exe)) { throw "WebView2 bootstrapper download failed" }
+          Write-Host "WebView2 bootstrapper ready at packaging/webview2"
+
       - name: Build the launcher exe
         run: uv run --with pyinstaller pyinstaller packaging/stockroom.spec --noconfirm --clean
 

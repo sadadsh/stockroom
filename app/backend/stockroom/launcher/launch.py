@@ -89,6 +89,72 @@ def _require_git() -> None:
         )
 
 
+# The Edge WebView2 runtime's stable client GUID (same across the Evergreen distributions).
+_WEBVIEW2_GUID = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+
+
+def webview2_installed() -> bool:
+    """Whether the Microsoft Edge WebView2 runtime is present (pywebview needs it to open the
+    window). True (no-op) off Windows. On Windows, reads the runtime's `pv` version under the
+    per-machine (incl. WOW6432Node) and per-user Edge Update client keys; a present, non-zero pv
+    means installed."""
+    if os.name != "nt":
+        return True
+    try:
+        import winreg  # Windows-only, imported lazily
+    except ImportError:  # pragma: no cover - non-Windows
+        return True
+    roots = [
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+        (winreg.HKEY_CURRENT_USER, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+    ]
+    for hive, path in roots:  # pragma: no cover - real Windows registry read
+        try:
+            with winreg.OpenKey(hive, path) as key:
+                pv, _ = winreg.QueryValueEx(key, "pv")
+                if pv and pv not in ("", "0.0.0.0"):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def _webview2_setup_bin() -> str | None:
+    """The bundled Evergreen Bootstrapper (~2 MB), or None on a source run / when not bundled."""
+    return _bundled("webview2", "MicrosoftEdgeWebview2Setup.exe")
+
+
+def ensure_webview2(*, installed=None, install=None) -> None:
+    """Guarantee the WebView2 runtime before the host opens its window. No-op off Windows and
+    when already present. On a bare Windows box it silently installs the runtime (per-user, no
+    UAC) via the bundled Evergreen Bootstrapper. Fails LOUD with a clear message, never a stub.
+    `installed` / `install` are injected for testing."""
+    if (installed or webview2_installed)():
+        return
+    (install or _install_webview2)()
+
+
+def _install_webview2() -> None:  # pragma: no cover - real Windows shell-out
+    setup = _webview2_setup_bin()
+    if setup is None:
+        raise RuntimeError(
+            "The Microsoft Edge WebView2 runtime is required to display Stockroom and was not "
+            "found. Install it from https://developer.microsoft.com/microsoft-edge/webview2/ "
+            "then relaunch."
+        )
+    proc = subprocess.run(
+        [setup, "/silent", "/install"], capture_output=True, text=True, creationflags=_NO_WINDOW,
+    )
+    # Do not trust the exit code alone: the bootstrapper can exit 0 on a partial/no-op install.
+    if proc.returncode != 0 or not webview2_installed():
+        raise RuntimeError(
+            "Could not install the Microsoft Edge WebView2 runtime automatically (exit "
+            f"{proc.returncode}). This device may be offline or the install was blocked. Install "
+            "WebView2 from https://developer.microsoft.com/microsoft-edge/webview2/ then relaunch."
+        )
+
+
 def _os_name() -> str:
     return os.name
 
@@ -129,18 +195,22 @@ def supervise(
     spawn: Callable[[Path], int] | None = None,
     uv_sync: Callable[[Path], None] | None = None,
     ensure: Callable[[Path], None] | None = None,
+    webview2: Callable[[], None] | None = None,
     remote: str = APP_REPO_REMOTE,
     clone: Callable[[str, Path], None] | None = None,
 ) -> int:
     """Run the host, relaunching whenever it exits with EXIT_RESTART (a self-update: the
     in-app updater has already pulled + synced, so the loop just re-runs on the new code).
     Returns the host's final non-restart exit code. The shell-outs are injected for testing;
-    the defaults clone / `uv sync --frozen` / `uv run python -m stockroom.host.run`."""
+    the defaults clone / guarantee WebView2 / `uv sync --frozen` / `uv run python -m
+    stockroom.host.run`."""
     workdir = Path(workdir)
     _ensure = ensure or (lambda wd: ensure_clone(wd, remote=remote, clone=clone))
+    _webview2 = webview2 or ensure_webview2
     _uv = uv_sync or _uv_sync
     _spawn = spawn or _spawn_host
     _ensure(workdir)
+    _webview2()  # guarantee the runtime the host's window needs BEFORE any host spawn
     while True:
         _uv(workdir)
         code = _spawn(workdir)
@@ -164,15 +234,24 @@ def _git_clone(remote: str, workdir: Path) -> None:  # pragma: no cover - real s
 
 
 def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
-    subprocess.run(
-        [_uv_bin(), "sync", "--frozen"], cwd=str(workdir), check=True,
-        env=_child_env(), creationflags=_NO_WINDOW,
+    # Capture output so a failure (offline, proxy, cert) surfaces as a readable message the
+    # entry-point dialog can show, not a bare CalledProcessError into a windowed void.
+    proc = subprocess.run(
+        [_uv_bin(), "sync", "--frozen"], cwd=str(workdir),
+        capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
     )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "could not set up the Stockroom environment: "
+            + ((proc.stderr or proc.stdout) or "").strip()
+        )
 
 
 def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
+    # --frozen --no-sync: supervise() already ran `uv sync --frozen`, so do NOT let `uv run`
+    # re-validate against the network on every launch (that would break offline relaunch).
     proc = subprocess.run(
-        [_uv_bin(), "run", "python", "-m", "stockroom.host.run"],
+        [_uv_bin(), "run", "--frozen", "--no-sync", "python", "-m", "stockroom.host.run"],
         cwd=str(workdir), env=_child_env(), creationflags=_NO_WINDOW,
     )
     return proc.returncode
