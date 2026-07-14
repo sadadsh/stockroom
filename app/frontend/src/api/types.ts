@@ -448,6 +448,13 @@ export interface BomLine {
   stock?: number;
   source?: string;
   price_breaks?: { qty: number; price: number }[];
+  // M7d procurement fields, present only when the enrich layer carried them.
+  lifecycle?: string;
+  lead_time?: string;
+  url?: string;
+  mouser_pn?: string;
+  lcsc_pn?: string;
+  digikey_pn?: string;
 }
 
 // The BOM cost roll-up. state is the honest verdict: "empty" (no lines), "built"
@@ -487,6 +494,129 @@ export interface BomResult {
     unpriced_lines: number;
     currency: string;
   } | null;
+}
+
+// --- Procurement (M7d) ---
+
+// Per-line stock coverage for the current run. kind is "err" (0 stock), "warn" (short of
+// the run), or null (covered, or stock unknown so never a warning); available is null when
+// the line was never priced (unknown, not a risk).
+export interface StockRisk {
+  kind: "err" | "warn" | null;
+  required: number;
+  available: number | null;
+  short: boolean;
+}
+
+// A BOM line enriched with its procurement verdict (GET /api/projects/{id}/procurement).
+export interface ProcurementLine extends BomLine {
+  stock_risk: StockRisk;
+  orderable: boolean;
+}
+
+// The sourcing-risk roll-up: counts of the failures worth catching before ordering.
+export interface SourcingRisks {
+  not_active: number;
+  no_stock: number;
+  insufficient_stock: number;
+  risky_mpns: string[];
+  any: boolean;
+}
+
+// The critical-path lead time across the build.
+export interface LeadTime {
+  max_weeks: number | null;
+  critical_mpn: string | null;
+  with_lead: number;
+  any: boolean;
+}
+
+// GET /api/projects/{id}/procurement -> the per-line + rolled-up procurement view over the
+// cached BOM. built is false before a build (nothing to procure); priced is false for an
+// unpriced build (lines list with unknown, never-a-risk stock).
+export interface ProcurementResult {
+  project?: string;
+  built: boolean;
+  priced: boolean;
+  boards: number;
+  lines: ProcurementLine[];
+  risks: SourcingRisks;
+  lead: LeadTime;
+  summary: string;
+}
+
+// The BOM export formats (GET /api/projects/{id}/bom/export?kind=). csv/priced/cart/jlcpcb
+// are CSV; xlsx/procurement are Excel workbooks.
+export type BomExportKind = "csv" | "priced" | "cart" | "jlcpcb" | "xlsx" | "procurement";
+
+// --- Revision diff (M7d) ---
+
+// One commit in a project's git history (GET /api/projects/{id}/revisions).
+export interface RevisionInfo {
+  sha: string;
+  short: string;
+  subject: string;
+  author: string;
+  date: string;
+}
+
+export interface RevisionsResult {
+  project?: string;
+  under_git: boolean;
+  revisions: RevisionInfo[];
+}
+
+export interface BomDiffLine {
+  mpn: string;
+  value: string;
+  footprint: string;
+  qty: number;
+}
+
+export interface BomDiffChange {
+  mpn: string;
+  value: string;
+  footprint: string;
+  from_qty: number;
+  to_qty: number;
+  delta: number;
+}
+
+export interface BomDiffCost {
+  delta: number;
+  added_cost: number;
+  changed_cost: number;
+  removed_unpriced: number;
+  priced: boolean;
+  currency: string;
+}
+
+export interface BomDiffLead {
+  added_max_weeks: number | null;
+  added_critical_mpn: string | null;
+  build_max_weeks: number | null;
+  build_critical_mpn: string | null;
+  on_critical_path: boolean;
+  removed_unassessed: number;
+  any: boolean;
+}
+
+// GET /api/projects/{id}/bom/diff?a=&b= -> the BOM change between revision a (reconstructed
+// from the project's git) and b (blank = the current build). cost/lead deltas are meaningful
+// only when the current build is priced (rev_b == "current").
+export interface BomDiffResult {
+  project?: string;
+  rev_a: string;
+  rev_b: string;
+  added: BomDiffLine[];
+  removed: BomDiffLine[];
+  changed: BomDiffChange[];
+  unchanged: number;
+  cost: BomDiffCost;
+  lead: BomDiffLead;
+  csv: string;
+  a_sheets_found: number;
+  b_sheets_found: number | null;
 }
 
 // GET /api/system/info

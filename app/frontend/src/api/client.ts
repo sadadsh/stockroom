@@ -9,6 +9,8 @@ import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
   AuditResult,
+  BomDiffResult,
+  BomExportKind,
   BomResult,
   ChecksResult,
   DiffResponse,
@@ -20,10 +22,12 @@ import type {
   JobRef,
   PartDetail,
   PartsResponse,
+  ProcurementResult,
   ProfilesResponse,
   ProjectDetail,
   ProjectSummary,
   RepairResult,
+  RevisionsResult,
   SettingsInfo,
   StagingCandidate,
   SyncResult,
@@ -126,6 +130,52 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
     throw new ApiError(res.status, msg);
   }
   return res.blob();
+}
+
+// Fetch a download endpoint (with the bearer) as {blob, filename}, reading the filename from
+// the Content-Disposition header the export endpoint sets. Mirrors fetchPreviewBlob's error
+// mapping so a 400 (nothing built) / 404 surfaces as an ApiError, not a corrupt file.
+async function fetchDownload(
+  path: string,
+  params: Record<string, string>,
+): Promise<{ blob: Blob; filename: string }> {
+  const token = apiToken();
+  const url = new URL(apiBase() + path);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { headers });
+  } catch (err) {
+    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+  }
+  if (!res.ok) {
+    let msg = `request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      msg = body.error || body.detail || body.message || msg;
+    } catch {
+      /* non-JSON error body, keep the status message */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const cd = res.headers.get("Content-Disposition") || "";
+  const m = /filename="?([^";]+)"?/.exec(cd);
+  return { blob: await res.blob(), filename: m ? m[1] : "export" };
+}
+
+// Save a blob to disk via a temporary object URL and a synthetic anchor click (the standard
+// no-dependency browser download idiom). Runs in the WebView2 host; no-op-safe in tests.
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export interface ListPartsArgs {
@@ -409,5 +459,35 @@ export const api = {
   // build. Read on selecting a project so a prior build renders without rebuilding.
   getBom(id: string): Promise<BomResult> {
     return apiGet<BomResult>(`/api/projects/${encodeURIComponent(id)}/bom`);
+  },
+
+  // The per-line orderability + sourcing/stock risk + lead time computed over the cached
+  // BOM (M7d). Honest not-built shape (built false) before a build; never a fabricated risk.
+  getProcurement(id: string): Promise<ProcurementResult> {
+    return apiGet<ProcurementResult>(`/api/projects/${encodeURIComponent(id)}/procurement`);
+  },
+
+  // The project's git history for the revision-diff pickers (M7d). under_git false / empty
+  // for a project not under git.
+  getRevisions(id: string): Promise<RevisionsResult> {
+    return apiGet<RevisionsResult>(`/api/projects/${encodeURIComponent(id)}/revisions`);
+  },
+
+  // Diff the BOM between revision `a` (from the project's git) and `b` (blank = the current
+  // build) (M7d). The current build's prices feed the cost/lead deltas.
+  getBomDiff(id: string, a: string, b = ""): Promise<BomDiffResult> {
+    const params: Record<string, string> = { a };
+    if (b) params.b = b;
+    return apiGet<BomDiffResult>(`/api/projects/${encodeURIComponent(id)}/bom/diff`, params);
+  },
+
+  // Download a BOM export (M7d). Fetches the named binary with the bearer token and saves it
+  // via a temporary object URL, so a CSV / XLSX / cart / JLCPCB sheet lands as a file.
+  async downloadBomExport(id: string, kind: BomExportKind): Promise<void> {
+    const { blob, filename } = await fetchDownload(
+      `/api/projects/${encodeURIComponent(id)}/bom/export`,
+      { kind },
+    );
+    triggerDownload(blob, filename);
   },
 };

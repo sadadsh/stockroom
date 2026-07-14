@@ -24,17 +24,24 @@ import {
   useProjectAudit,
   useProjectBom,
   useProjectChecks,
+  useProjectProcurement,
+  useProjectRevisions,
+  useBomDiff,
   useRegisterProject,
   useDeleteProject,
 } from "../api/queries";
 import type {
   AuditFinding,
   AuditResult,
+  BomDiffResult,
+  BomExportKind,
   BomLine,
   BomResult,
   CheckFinding,
   CheckRun,
   ChecksResult,
+  ProcurementLine,
+  ProcurementResult,
   ProjectSummary,
 } from "../api/types";
 import { useJob } from "../lib/useJob";
@@ -388,6 +395,8 @@ function ProjectDetailView({
 
       <ChecksSection key={project.id} projectId={project.id} />
       <BomSection key={`bom-${project.id}`} projectId={project.id} />
+      <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
+      <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -851,6 +860,9 @@ function BomSection({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (job.status === "done") {
       qc.invalidateQueries({ queryKey: ["project-bom", projectId] });
+      // A fresh build changes the sourcing data and the diff's cost side, so both re-read.
+      qc.invalidateQueries({ queryKey: ["project-procurement", projectId] });
+      qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
     }
   }, [job.status, projectId, qc]);
 
@@ -1016,5 +1028,383 @@ function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean })
         </tbody>
       </table>
     </Card>
+  );
+}
+
+// -- Procurement (sourcing/stock risk + lead + orderability + exports, M7d) ----
+
+// The BOM export kinds, in the order a buyer reaches for them: the full BOM, the priced
+// purchasing sheet, then the vendor-specific uploads.
+const EXPORT_KINDS: { kind: BomExportKind; label: string }[] = [
+  { kind: "csv", label: "BOM CSV" },
+  { kind: "xlsx", label: "BOM Excel" },
+  { kind: "priced", label: "Priced Sheet" },
+  { kind: "procurement", label: "Procurement Sheet" },
+  { kind: "cart", label: "Mouser Cart" },
+  { kind: "jlcpcb", label: "JLCPCB BOM" },
+];
+
+// Save an already-fetched text body (the diff CSV) as a file, client-side. The export
+// endpoints stream binary through the authed client; this is only for text already in hand.
+function saveText(filename: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// The Procurement section reads the cached BOM's sourcing view: a risk headline (NRND / no
+// stock / short lines / critical-path lead), a per-line orderability table, and the export
+// bar. Honest: before a build it prompts to build; an unpriced build lists lines with
+// unknown (never-a-risk) stock and no cost.
+function ProcurementSection({ projectId }: { projectId: string }) {
+  const query = useProjectProcurement(projectId);
+  const { toast } = useToast();
+  const [downloading, setDownloading] = useState<BomExportKind | null>(null);
+
+  async function onExport(kind: BomExportKind) {
+    setDownloading(kind);
+    try {
+      await api.downloadBomExport(projectId, kind);
+    } catch (e) {
+      toast(errMsg(e, "Could not export the BOM."), "err");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  const data = query.data ?? null;
+  const built = data != null && data.built;
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="procurement-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Procurement</Eyebrow>
+        <p className="text-xs text-t3">
+          Sourcing risk, lead time and per-line orderability from the priced BOM, plus the
+          purchasing exports.
+        </p>
+      </div>
+
+      {query.isLoading ? (
+        <p className="text-sm text-t3">Loading procurement...</p>
+      ) : !built ? (
+        <p className="text-sm text-t3">
+          Build the BOM to see sourcing risk, lead time and export the purchasing sheets.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4" data-testid="procurement-result">
+          <ProcurementRollup data={data as ProcurementResult} />
+          <ExportBar onExport={onExport} downloading={downloading} />
+          <ProcurementLinesTable lines={(data as ProcurementResult).lines} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProcurementRollup({ data }: { data: ProcurementResult }) {
+  const { risks, lead } = data;
+  return (
+    <div className="flex flex-wrap items-center gap-2.5" data-testid="procurement-rollup">
+      {!risks.any ? (
+        <Badge tone="ok">No Sourcing Risks</Badge>
+      ) : (
+        <>
+          {risks.not_active > 0 ? (
+            <Badge tone="warn">{countLabel(risks.not_active, "Not Active")}</Badge>
+          ) : null}
+          {risks.no_stock > 0 ? (
+            <Badge tone="err">{countLabel(risks.no_stock, "No Stock Line")}</Badge>
+          ) : null}
+          {risks.insufficient_stock > 0 ? (
+            <Badge tone="warn">{countLabel(risks.insufficient_stock, "Short Line")}</Badge>
+          ) : null}
+        </>
+      )}
+      {lead.any && lead.max_weeks != null ? (
+        <span className="text-xs text-t3">
+          Critical path {lead.max_weeks} wk{lead.critical_mpn ? ` (${lead.critical_mpn})` : ""}
+        </span>
+      ) : null}
+      {!data.priced ? (
+        <span className="text-2xs text-t3">Unpriced build: stock is unknown, not a risk.</span>
+      ) : null}
+    </div>
+  );
+}
+
+function ExportBar({
+  onExport,
+  downloading,
+}: {
+  onExport: (kind: BomExportKind) => void;
+  downloading: BomExportKind | null;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" data-testid="export-bar">
+      {EXPORT_KINDS.map(({ kind, label }) => (
+        <Button
+          key={kind}
+          small
+          onClick={() => onExport(kind)}
+          disabled={downloading != null}
+        >
+          {downloading === kind ? "Saving..." : label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function ProcurementLinesTable({ lines }: { lines: ProcurementLine[] }) {
+  return (
+    <Card className="overflow-hidden" data-testid="procurement-lines">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-2xs text-t3">
+            <th className="px-4 py-2 font-medium">Part</th>
+            <th className="px-4 py-2 font-medium">Qty</th>
+            <th className="px-4 py-2 font-medium">Stock</th>
+            <th className="px-4 py-2 font-medium">Lifecycle</th>
+            <th className="px-4 py-2 font-medium">Lead</th>
+            <th className="px-4 py-2 font-medium">Orderable</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line, i) => (
+            <tr
+              key={`${line.mpn || line.value}-${i}`}
+              className="border-b border-line last:border-b-0"
+            >
+              <td className="px-4 py-2 align-top">
+                {line.mpn ? (
+                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
+                ) : (
+                  <span className="text-t2">{line.value || "-"}</span>
+                )}
+                <span className="mt-0.5 block text-2xs text-t3">{line.refs.join(", ")}</span>
+              </td>
+              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
+              <td className="px-4 py-2 align-top">
+                <StockCell line={line} />
+              </td>
+              <td className="px-4 py-2 align-top text-2xs">
+                {line.lifecycle ? (
+                  <span
+                    className={
+                      line.lifecycle.toLowerCase() === "active" ? "text-t3" : "text-warn"
+                    }
+                  >
+                    {line.lifecycle}
+                  </span>
+                ) : (
+                  <span className="text-t3">-</span>
+                )}
+              </td>
+              <td className="px-4 py-2 align-top text-2xs text-t3">{line.lead_time || "-"}</td>
+              <td className="px-4 py-2 align-top">
+                {line.orderable ? (
+                  <Badge tone="ok">Yes</Badge>
+                ) : (
+                  <Badge tone="neutral">No</Badge>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function StockCell({ line }: { line: ProcurementLine }) {
+  const risk = line.stock_risk;
+  if (risk.available == null) {
+    return <span className="text-2xs text-t3">Unknown</span>;
+  }
+  const tone = risk.kind === "err" ? "text-err" : risk.kind === "warn" ? "text-warn" : "text-t2";
+  return (
+    <span className={`text-xs ${tone}`}>
+      {risk.available.toLocaleString()}
+      {risk.short ? (
+        <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
+      ) : null}
+    </span>
+  );
+}
+
+// -- Revision diff (compare the BOM at a git revision to the current build, M7d) --
+
+// The value the "Current build" option carries in the Revision B picker: the backend reads a
+// blank b as the current build (its cached priced rows), so cost/lead deltas are meaningful.
+const CURRENT_BUILD = "";
+
+function RevisionDiffSection({ projectId }: { projectId: string }) {
+  const revs = useProjectRevisions(projectId);
+  const [revA, setRevA] = useState<string | null>(null);
+  const [revB, setRevB] = useState<string>(CURRENT_BUILD);
+  const diff = useBomDiff(projectId, revA, revB);
+
+  const underGit = revs.data?.under_git ?? false;
+  const revisions = revs.data?.revisions ?? [];
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="diff-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Revision Diff</Eyebrow>
+        <p className="text-xs text-t3">
+          Compare the BOM at an older commit to the current build: what changed, what it costs,
+          and how it moves the lead time.
+        </p>
+      </div>
+
+      {revs.isLoading ? (
+        <p className="text-sm text-t3">Loading revisions...</p>
+      ) : !underGit ? (
+        <p className="text-sm text-t3">
+          This project is not under git, so there is no revision history to diff.
+        </p>
+      ) : revisions.length === 0 ? (
+        <p className="text-sm text-t3">No commits touch this project's schematics yet.</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-end gap-3" data-testid="diff-pickers">
+            <label className="flex flex-col gap-1 text-2xs text-t3">
+              Compare Revision
+              <select
+                className={INPUT_CLS}
+                data-testid="diff-rev-a"
+                value={revA ?? ""}
+                onChange={(e) => setRevA(e.target.value || null)}
+              >
+                <option value="">Select a commit</option>
+                {revisions.map((r) => (
+                  <option key={r.sha} value={r.sha}>
+                    {r.short} {r.subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-2xs text-t3">
+              Against
+              <select
+                className={INPUT_CLS}
+                data-testid="diff-rev-b"
+                value={revB}
+                onChange={(e) => setRevB(e.target.value)}
+              >
+                <option value={CURRENT_BUILD}>Current build</option>
+                {revisions.map((r) => (
+                  <option key={r.sha} value={r.sha}>
+                    {r.short} {r.subject}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {revA == null ? (
+            <p className="text-sm text-t3">Choose a commit to compare against the current build.</p>
+          ) : diff.isLoading ? (
+            <p className="text-sm text-t3">Computing the diff...</p>
+          ) : diff.isError ? (
+            <p className="text-sm text-err">{errMsg(diff.error, "Could not diff the revisions.")}</p>
+          ) : diff.data ? (
+            <BomDiffView result={diff.data} />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BomDiffView({ result }: { result: BomDiffResult }) {
+  const { added, removed, changed, cost, lead } = result;
+  const noChange = added.length === 0 && removed.length === 0 && changed.length === 0;
+  const filename = `${(result.project || "project").replace(/[^A-Za-z0-9._-]+/g, "_")}_bom_diff.csv`;
+
+  return (
+    <div className="flex flex-col gap-4" data-testid="diff-result">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Badge tone="neutral">{countLabel(added.length, "Added")}</Badge>
+        <Badge tone="neutral">{countLabel(removed.length, "Removed")}</Badge>
+        <Badge tone="neutral">{countLabel(changed.length, "Changed")}</Badge>
+        {cost.priced ? (
+          <Badge tone={cost.delta > 0 ? "warn" : "ok"}>
+            {cost.delta >= 0 ? "+" : "-"}
+            {formatMoney(Math.abs(cost.delta), cost.currency)}/board
+          </Badge>
+        ) : null}
+        {lead.on_critical_path && lead.added_critical_mpn ? (
+          <span className="text-2xs text-warn">
+            New part on the critical path ({lead.added_critical_mpn}, {lead.added_max_weeks} wk)
+          </span>
+        ) : null}
+        <Button small onClick={() => saveText(filename, result.csv)}>
+          Download Diff CSV
+        </Button>
+      </div>
+
+      {noChange ? (
+        <p className="text-xs text-t3">No BOM change between these revisions.</p>
+      ) : (
+        <Card className="overflow-hidden" data-testid="diff-lines">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-line text-2xs text-t3">
+                <th className="px-4 py-2 font-medium">Change</th>
+                <th className="px-4 py-2 font-medium">Part</th>
+                <th className="px-4 py-2 font-medium">From</th>
+                <th className="px-4 py-2 font-medium">To</th>
+              </tr>
+            </thead>
+            <tbody>
+              {added.map((r, i) => (
+                <DiffRow key={`a-${i}`} change="Added" tone="ok" label={r.mpn || r.value}
+                  from={0} to={r.qty} />
+              ))}
+              {removed.map((r, i) => (
+                <DiffRow key={`r-${i}`} change="Removed" tone="err" label={r.mpn || r.value}
+                  from={r.qty} to={0} />
+              ))}
+              {changed.map((r, i) => (
+                <DiffRow key={`c-${i}`} change="Changed" tone="warn" label={r.mpn || r.value}
+                  from={r.from_qty} to={r.to_qty} />
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function DiffRow({
+  change,
+  tone,
+  label,
+  from,
+  to,
+}: {
+  change: string;
+  tone: "ok" | "err" | "warn";
+  label: string;
+  from: number;
+  to: number;
+}) {
+  return (
+    <tr className="border-b border-line last:border-b-0">
+      <td className="px-4 py-2 align-top">
+        <Badge tone={tone}>{change}</Badge>
+      </td>
+      <td className="px-4 py-2 align-top text-t1">{label || "-"}</td>
+      <td className="px-4 py-2 align-top text-t2">{from}</td>
+      <td className="px-4 py-2 align-top text-t2">{to}</td>
+    </tr>
   );
 }
