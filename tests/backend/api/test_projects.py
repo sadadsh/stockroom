@@ -191,8 +191,88 @@ def test_audit_uses_the_active_profile_footprints_for_the_pin_pad_check(client, 
     assert au["checked_footprints"] >= 1
 
 
+# ---- checks (ERC + DRC, M7b) ------------------------------------------------
+
+
+def _add_board(proj):
+    """Give a fixture project a .kicad_pcb so DRC has a board to run on."""
+    (proj / "board.kicad_pcb").write_text("(kicad_pcb)\n", encoding="utf-8")
+    return proj
+
+
+def test_run_checks_without_kicad_cli_is_an_honest_502(client, app_ctx, tmp_path):
+    # cli-absent must be an honest 502, never a fabricated clean pass (Decision 8).
+    proj = _make_project(tmp_path / "ext" / "board")
+    rec = _register(client, proj)
+    app_ctx.cli.binary = None
+    r = client.post(f"/api/projects/{rec['id']}/checks")
+    assert r.status_code == 502
+    assert "kicad-cli" in r.json()["detail"].lower()
+
+
+def test_run_checks_for_an_unknown_project_is_a_404_before_any_cli_check(client, app_ctx):
+    # 404 is resolved before the cli gate, so an unknown id 404s even with no cli.
+    app_ctx.cli.binary = None
+    assert client.post("/api/projects/nope/checks").status_code == 404
+
+
+def test_run_checks_returns_a_job_and_caches_the_result(client, app_ctx, tmp_path, monkeypatch):
+    from stockroom.projects import checks as checks_mod
+
+    proj = _add_board(_make_project(tmp_path / "ext" / "board"))
+    rec = _register(client, proj)
+    app_ctx.cli.binary = "/fake/kicad-cli"  # deterministic: never a real subprocess
+
+    def fake_erc(path, cli):
+        return {"ok": True, "findings": [{"severity": "warning", "rule": "unconnected",
+                "message": "pin floating", "where": "U1"}],
+                "summary": checks_mod.summarize([{"severity": "warning", "rule": "unconnected"}]),
+                "error": ""}
+
+    def fake_drc(path, cli):
+        return {"ok": True, "findings": [{"severity": "error", "rule": "clearance",
+                "message": "too close", "where": ""}],
+                "summary": checks_mod.summarize([{"severity": "error", "rule": "clearance"}]),
+                "error": ""}
+
+    monkeypatch.setattr(checks_mod, "run_erc", fake_erc)
+    monkeypatch.setattr(checks_mod, "run_drc", fake_drc)
+
+    r = client.post(f"/api/projects/{rec['id']}/checks")
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+    result = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            if line.startswith("data:") and '"result"' in line:
+                import json as _j
+                result = _j.loads(line[5:].strip())["result"]
+    assert result is not None
+    assert result["summary"] == {"ok": True, "errors": 1, "warnings": 1, "total": 2, "checked": 2}
+    assert result["erc"]["sheet"] == "board.kicad_sch"
+    assert result["drc"][0]["board"] == "board.kicad_pcb"
+
+    # cached: GET serves the same result without re-running.
+    got = client.get(f"/api/projects/{rec['id']}/checks")
+    assert got.status_code == 200
+    assert got.json()["summary"] == result["summary"]
+
+
+def test_get_checks_before_a_run_is_an_honest_not_run_shape(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    r = client.get(f"/api/projects/{rec['id']}/checks")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ran_at"] is None and body["summary"] is None and body["erc"] is None
+
+
+def test_get_checks_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/checks").status_code == 404
+
+
 # ---- auth -------------------------------------------------------------------
 
 
 def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects").status_code == 401
+    assert anon_client.post("/api/projects/x/checks").status_code == 401
