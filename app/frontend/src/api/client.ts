@@ -17,6 +17,8 @@ import type {
   DoctorScan,
   DuplicatesResponse,
   EnrichmentResult,
+  FabExportOptions,
+  FabStatus,
   Facets,
   HistoryResponse,
   JobRef,
@@ -516,6 +518,32 @@ export const api = {
   // BOM (M7d). Honest not-built shape (built false) before a build; never a fabricated risk.
   getProcurement(id: string): Promise<ProcurementResult> {
     return apiGet<ProcurementResult>(`/api/projects/${encodeURIComponent(id)}/procurement`);
+  },
+
+  // The Fab panel's honest gate (M7i): whether the project has a board to fabricate and
+  // whether kicad-cli is available, plus the board file names. Read-only, no shell-out.
+  getFab(id: string): Promise<FabStatus> {
+    return apiGet<FabStatus>(`/api/projects/${encodeURIComponent(id)}/fab`);
+  },
+
+  // Download the manufacturing bundle (gerbers + drill + placement) plotted via kicad-cli as
+  // a zip (M7i). Fetches with the bearer token and saves via a temporary object URL. Options
+  // map straight to the export query params; a missing/failed kicad-cli surfaces as an
+  // ApiError (502), never a corrupt/empty file.
+  async downloadFabExport(id: string, opts: FabExportOptions): Promise<void> {
+    const params: Record<string, string> = {
+      drill_format: opts.drillFormat,
+      drill_map: String(opts.drillMap),
+      include_pos: String(opts.includePos),
+      pos_format: opts.posFormat,
+      protel_ext: String(opts.protelExt),
+    };
+    if (opts.board) params.board = opts.board;
+    const { blob, filename } = await fetchDownload(
+      `/api/projects/${encodeURIComponent(id)}/fab/export`,
+      params,
+    );
+    triggerDownload(blob, filename);
   },
 
   // The project's git history for the revision-diff pickers (M7d). under_git false / empty

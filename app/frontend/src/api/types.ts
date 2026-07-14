@@ -614,6 +614,25 @@ export interface ProcurementResult {
 // are CSV; xlsx/procurement are Excel workbooks.
 export type BomExportKind = "csv" | "priced" | "cart" | "jlcpcb" | "xlsx" | "procurement";
 
+// The Fab panel's honest gate (GET /api/projects/{id}/fab, M7i): has_board is false for a
+// schematic-only project; cli_available is false when kicad-cli is not installed.
+export interface FabStatus {
+  project?: string;
+  has_board: boolean;
+  cli_available: boolean;
+  boards: string[];
+}
+
+// Options for the fab bundle download (GET /api/projects/{id}/fab/export, M7i).
+export interface FabExportOptions {
+  drillFormat: "excellon" | "gerber";
+  drillMap: boolean;
+  includePos: boolean;
+  posFormat: "csv" | "ascii" | "gerber";
+  protelExt: boolean;
+  board?: string;
+}
+
 // The buy-side knobs for the Procurement Sheet export (and spares for the Mouser Cart). Sent
 // as query params; tax_rate / assembly_surcharge_rate are FRACTIONS (0.1 = 10%), spares_pct is
 // a whole percent (10 = 10%), matching the backend procurement_xlsx signature.
