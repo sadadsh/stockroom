@@ -38,8 +38,25 @@ jobs:
           name: Stockroom-exe
           path: dist/Stockroom.exe
 
-      - name: Attach to the GitHub Release (on a version tag)
+      - name: Publish the GitHub Release (on a version tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/Stockroom.exe
+          name: Stockroom ${{ github.ref_name }}
+          prerelease: true
+          body: |
+            Portable frozen-once launcher for Stockroom, the KiCad component-library and PCB-project manager.
+
+            Download `Stockroom.exe` below and run it. On first launch it clones the app repo to
+            `%LOCALAPPDATA%\Stockroom\app`, provisions the environment with uv, opens the WebView2
+            window, and shows the onboarding screen (open, clone, or create your library). Updates are a
+            git pull from the in-app Update control; the exe itself never re-downloads.
+
+            Requirements on the target machine: git and uv (https://astral.sh/uv) on PATH, the WebView2
+            runtime (bundled with current Windows), internet on first run, and 64-bit Windows. KiCad 10
+            for the ERC/DRC and preview features.
+
+            Marked pre-release: the exe is built and its launcher chain is tested on Linux, but the actual
+            Windows launch (the WebView2 window, first-run onboarding, and a self-update cycle) has not
+            yet been verified on a real Windows machine. Promote to a full release once that passes.
