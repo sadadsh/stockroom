@@ -65,6 +65,9 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import settings as settings_router_mod
     app.include_router(settings_router_mod.settings_router(require_token))
 
+    from stockroom.api.routers import projects as projects_router_mod
+    app.include_router(projects_router_mod.projects_router(require_token))
+
     if _FRONTEND_DIST.exists():
         from fastapi.staticfiles import StaticFiles
 
