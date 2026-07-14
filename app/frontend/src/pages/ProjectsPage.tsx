@@ -34,6 +34,9 @@ import {
   useProjectConform,
   usePreviewConform,
   useApplyConform,
+  useProjectStackup,
+  usePreviewStackup,
+  useApplyStackup,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
@@ -55,6 +58,12 @@ import type {
   ConformCategory,
   ConformPreview,
   ConformTarget,
+  Stackup,
+  StackupBody,
+  StackupLayer,
+  StackupLayerEdit,
+  StackupPreview,
+  StackupRead,
   DesignResult,
   DesignRules,
   NetClass,
@@ -420,6 +429,7 @@ function ProjectDetailView({
       <EditorSection key={`editor-${project.id}`} projectId={project.id} />
       <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
       <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
+      <StackupSection key={`stackup-${project.id}`} projectId={project.id} />
       <ConformSection key={`conform-${project.id}`} projectId={project.id} />
     </div>
   );
@@ -2916,6 +2926,525 @@ function ConformGroup({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// --- M7f-C stackup / fab-preset ----------------------------------------------
+
+const DIELECTRIC_TYPES = ["prepreg", "core"];
+
+function isCopperLayer(l: StackupLayer): boolean {
+  return l.type === "copper";
+}
+
+function isDielectricLayer(l: StackupLayer): boolean {
+  return (
+    !isCopperLayer(l) &&
+    (l.material !== undefined ||
+      l.epsilon_r !== undefined ||
+      (l.type != null && DIELECTRIC_TYPES.includes(l.type)))
+  );
+}
+
+function StackupSection({ projectId }: { projectId: string }) {
+  const q = useProjectStackup(projectId);
+  const data = q.data;
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="stackup-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Stackup</Eyebrow>
+        <p className="text-xs text-t3">
+          Snap the board's physical layer stack to a fab house standard, or edit individual stack
+          fields. Each change is written to the board's own git history as a minimal, byte-preserving
+          commit.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the stackup...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the stackup.")}</p>
+      ) : !data ? null : !data.has_board ? (
+        <p className="text-sm text-t3" data-testid="stackup-no-board">
+          This project has no board file, so there is no layer stack to edit.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="stackup-no-git">
+          This project is not under git. Initialize a git repository for it to edit its stackup, so
+          each change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <StackupForm projectId={projectId} data={data} />
+      )}
+    </div>
+  );
+}
+
+function StackupForm({ projectId, data }: { projectId: string; data: StackupRead }) {
+  const stack = data.stackup;
+  return (
+    <div data-testid="stackup-form" className="flex flex-col gap-5">
+      {stack ? (
+        <CurrentStackTable stack={stack} thickness={data.thickness} />
+      ) : (
+        <p className="text-sm text-t3" data-testid="stackup-none">
+          This board has no layer stack yet. Apply a fab preset to generate one.
+        </p>
+      )}
+      <StackupPresetBlock projectId={projectId} data={data} />
+      {stack ? <StackupFieldBlock projectId={projectId} stack={stack} /> : null}
+    </div>
+  );
+}
+
+function fmtNum(v: number | undefined): string {
+  return v != null ? String(v) : "";
+}
+
+function CurrentStackTable({
+  stack,
+  thickness,
+}: {
+  stack: Stackup;
+  thickness: number | null;
+}) {
+  return (
+    <div data-testid="stackup-current">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-medium text-t1">Current Stack</h3>
+        <Badge tone="neutral">
+          {thickness != null ? `${thickness} mm` : "No thickness"}
+        </Badge>
+        <Badge tone="neutral">Finish: {stack.copper_finish ?? "None"}</Badge>
+        <Badge tone="neutral">
+          Constraints: {stack.dielectric_constraints ? "On" : "Off"}
+        </Badge>
+      </div>
+      <div className="overflow-x-auto rounded-control border border-line2">
+        <table className="w-full min-w-[28rem] text-left text-xs">
+          <thead className="text-2xs uppercase tracking-wide text-t3">
+            <tr className="border-b border-line2">
+              <th className="px-3 py-1.5 font-medium">Layer</th>
+              <th className="px-3 py-1.5 font-medium">Type</th>
+              <th className="px-3 py-1.5 font-medium">Thickness</th>
+              <th className="px-3 py-1.5 font-medium">Material</th>
+              <th className="px-3 py-1.5 font-medium">Dk / Df</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stack.layers.map((l, i) => (
+              <tr
+                key={`${l.name}-${i}`}
+                className="border-b border-line2/50 last:border-0"
+                data-testid={`stackup-row-${l.name}`}
+              >
+                <td className="px-3 py-1.5 text-t1">{l.name}</td>
+                <td className="px-3 py-1.5 text-t3">{l.type ?? ""}</td>
+                <td className="px-3 py-1.5 text-t2">{fmtNum(l.thickness)}</td>
+                <td className="px-3 py-1.5 text-t2">{l.material ?? ""}</td>
+                <td className="px-3 py-1.5 text-t3">
+                  {l.epsilon_r != null || l.loss_tangent != null
+                    ? `${fmtNum(l.epsilon_r) || "?"} / ${fmtNum(l.loss_tangent) || "?"}`
+                    : ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function stackSummary(s: Stackup | null): string {
+  if (!s) return "no stackup";
+  const copper = s.layers.filter(isCopperLayer).length;
+  return `${copper}-layer, finish ${s.copper_finish ?? "None"}, constraints ${
+    s.dielectric_constraints ? "on" : "off"
+  }`;
+}
+
+function StackupPresetBlock({ projectId, data }: { projectId: string; data: StackupRead }) {
+  const [presetKey, setPresetKey] = useState("");
+  const [preview, setPreview] = useState<StackupPreview | null>(null);
+  const previewM = usePreviewStackup();
+  const applyM = useApplyStackup();
+  const { toast } = useToast();
+
+  const copperCount = data.copper_layers.length;
+  const selected = data.presets.find((p) => p.key === presetKey) ?? null;
+  const compatible = selected ? selected.layers === copperCount : false;
+  const busy = previewM.isPending || applyM.isPending;
+
+  function choose(k: string) {
+    setPresetKey(k);
+    setPreview(null);
+  }
+
+  function onPreview() {
+    if (!selected || !compatible) return;
+    previewM.mutate(
+      { id: projectId, preset_key: presetKey },
+      {
+        onSuccess: (r) => setPreview(r),
+        onError: (e) => toast(errMsg(e, "Could not preview the preset."), "err"),
+      },
+    );
+  }
+
+  function onApply() {
+    if (!selected || !compatible) return;
+    applyM.mutate(
+      { id: projectId, preset_key: presetKey },
+      {
+        onSuccess: (r) => {
+          setPreview(null);
+          toast(
+            r.committed == null
+              ? "Nothing to change; the board already matches this preset."
+              : `Applied the ${selected.label} stackup.`,
+          );
+        },
+        onError: (e) => toast(errMsg(e, "Could not apply the preset."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="stackup-preset-block">
+      <h3 className="mb-2 text-sm font-medium text-t1">Apply a Fab Preset</h3>
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          data-testid="stackup-preset-select"
+          className="rounded-control border border-line2 bg-field px-2 py-1.5 text-sm text-t1 outline-none focus:border-acc"
+          value={presetKey}
+          onChange={(e) => choose(e.target.value)}
+        >
+          <option value="">Select a preset...</option>
+          {data.presets.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label} ({p.layers}-layer, {p.board_thickness_mm} mm)
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="default"
+          small
+          onClick={onPreview}
+          disabled={!selected || !compatible || busy}
+        >
+          {previewM.isPending ? "Previewing..." : "Preview"}
+        </Button>
+        <Button
+          variant="accent"
+          small
+          onClick={onApply}
+          disabled={!selected || !compatible || busy}
+        >
+          {applyM.isPending ? "Applying..." : "Apply Preset"}
+        </Button>
+      </div>
+
+      {selected && !compatible ? (
+        <p className="mt-2 text-xs text-err" data-testid="stackup-preset-mismatch">
+          The {selected.label} preset is {selected.layers}-layer but this board has {copperCount}{" "}
+          copper layer{copperCount === 1 ? "" : "s"}. Pick a preset that matches the board.
+        </p>
+      ) : null}
+
+      {selected && compatible ? (
+        <div className="mt-2 rounded-control border border-line2 bg-raise p-3">
+          <p className="text-xs text-t2" data-testid="stackup-verify-note">
+            {selected.verify_note}
+          </p>
+          {preview ? (
+            <p className="mt-2 text-xs text-t1" data-testid="stackup-preset-preview">
+              {preview.changed
+                ? `Would set the stack to ${stackSummary(preview.stackup)} and the board to ${
+                    preview.thickness ?? "?"
+                  } mm.`
+                : "The board already matches this preset; applying it changes nothing."}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface StackupLayerRowDraft {
+  thickness: string;
+  material: string;
+  epsilon_r: string;
+  loss_tangent: string;
+}
+
+interface StackupFieldDraft {
+  copper_finish: string;
+  dielectric_constraints: boolean;
+  layers: Record<string, StackupLayerRowDraft>;
+}
+
+function seedFieldDraft(stack: Stackup): StackupFieldDraft {
+  const layers: Record<string, StackupLayerRowDraft> = {};
+  for (const l of stack.layers) {
+    if (!isCopperLayer(l) && !isDielectricLayer(l)) continue;
+    layers[l.name] = {
+      thickness: fmtNum(l.thickness),
+      material: l.material ?? "",
+      epsilon_r: fmtNum(l.epsilon_r),
+      loss_tangent: fmtNum(l.loss_tangent),
+    };
+  }
+  return {
+    copper_finish: stack.copper_finish ?? "",
+    dielectric_constraints: stack.dielectric_constraints ?? false,
+    layers,
+  };
+}
+
+function StackupFieldBlock({ projectId, stack }: { projectId: string; stack: Stackup }) {
+  // Content-key re-seed: when the underlying stack changes (a save re-reads it), the draft resets
+  // to the new on-disk values rather than showing stale edits (mirrors the other editor forms).
+  const sig = JSON.stringify(stack);
+  const [draft, setDraft] = useState<StackupFieldDraft>(() => seedFieldDraft(stack));
+  const [seededSig, setSeededSig] = useState(sig);
+  if (sig !== seededSig) {
+    setDraft(seedFieldDraft(stack));
+    setSeededSig(sig);
+  }
+  const [preview, setPreview] = useState<StackupPreview | null>(null);
+  const previewM = usePreviewStackup();
+  const applyM = useApplyStackup();
+  const { toast } = useToast();
+
+  const editable = stack.layers.filter((l) => isCopperLayer(l) || isDielectricLayer(l));
+  const byName: Record<string, StackupLayer> = {};
+  for (const l of stack.layers) byName[l.name] = l;
+
+  function updateGlobal(patch: Partial<Pick<StackupFieldDraft, "copper_finish" | "dielectric_constraints">>) {
+    setDraft((d) => ({ ...d, ...patch }));
+    setPreview(null);
+  }
+  function updateLayer(name: string, patch: Partial<StackupLayerRowDraft>) {
+    setDraft((d) => ({ ...d, layers: { ...d.layers, [name]: { ...d.layers[name], ...patch } } }));
+    setPreview(null);
+  }
+
+  // A per-layer field counts as changed only when it is NON-BLANK and differs from disk: a numeric
+  // or material atom is update-if-present (blank leaves it untouched), so buildBody drops a blanked
+  // field. dirty() must agree, or clearing a field would light the "Unsaved" badge yet a Save would
+  // report a false "No field changed".
+  function fieldChanged(raw: string, current: string): boolean {
+    const s = raw.trim();
+    return s !== "" && s !== current;
+  }
+
+  // Whether any field differs from the on-disk stack (enables the buttons without toasting).
+  function dirty(): boolean {
+    // copper_finish blank-vs-set is a real (if invalid) change attempt, surfaced by buildBody with
+    // its own "cannot be blank" message, so a blanked finish still counts as dirty here.
+    if (draft.copper_finish.trim() !== (stack.copper_finish ?? "")) return true;
+    if (draft.dielectric_constraints !== (stack.dielectric_constraints ?? false)) return true;
+    for (const l of editable) {
+      const row = draft.layers[l.name];
+      if (fieldChanged(row.thickness, fmtNum(l.thickness))) return true;
+      if (isDielectricLayer(l)) {
+        if (fieldChanged(row.material, l.material ?? "")) return true;
+        if (fieldChanged(row.epsilon_r, fmtNum(l.epsilon_r))) return true;
+        if (fieldChanged(row.loss_tangent, fmtNum(l.loss_tangent))) return true;
+      }
+    }
+    return false;
+  }
+
+  // The request body from only the changed fields, or null when a changed value is bad input.
+  function buildBody(): StackupBody | null {
+    const body: StackupBody = {};
+    const cf = draft.copper_finish.trim();
+    if (cf !== (stack.copper_finish ?? "")) {
+      if (cf === "") {
+        toast("Copper finish cannot be blank.", "err");
+        return null;
+      }
+      body.copper_finish = cf;
+    }
+    if (draft.dielectric_constraints !== (stack.dielectric_constraints ?? false)) {
+      body.dielectric_constraints = draft.dielectric_constraints;
+    }
+    const edits: Record<string, StackupLayerEdit> = {};
+    for (const l of editable) {
+      const row = draft.layers[l.name];
+      const e: StackupLayerEdit = {};
+      const numFields: [keyof StackupLayerEdit, string, number | undefined][] = [
+        ["thickness", row.thickness, l.thickness],
+      ];
+      if (isDielectricLayer(l)) {
+        numFields.push(["epsilon_r", row.epsilon_r, l.epsilon_r]);
+        numFields.push(["loss_tangent", row.loss_tangent, l.loss_tangent]);
+      }
+      for (const [field, raw, cur] of numFields) {
+        const s = raw.trim();
+        if (s === fmtNum(cur)) continue; // unchanged
+        if (s === "") continue; // blank leaves it (a numeric atom cannot be cleared)
+        const n = Number(s);
+        if (!Number.isFinite(n) || n <= 0) {
+          toast(`Enter a positive ${field} for ${l.name}.`, "err");
+          return null;
+        }
+        (e[field] as number) = n;
+      }
+      if (isDielectricLayer(l)) {
+        const mat = row.material.trim();
+        if (mat !== (l.material ?? "") && mat !== "") e.material = mat;
+      }
+      if (Object.keys(e).length) edits[l.name] = e;
+    }
+    if (Object.keys(edits).length) body.layer_edits = edits;
+    if (
+      body.copper_finish === undefined &&
+      body.dielectric_constraints === undefined &&
+      body.layer_edits === undefined
+    ) {
+      toast("No field changed.", "err");
+      return null;
+    }
+    return body;
+  }
+
+  function onPreview() {
+    const body = buildBody();
+    if (!body) return;
+    previewM.mutate(
+      { id: projectId, ...body },
+      {
+        onSuccess: (r) => setPreview(r),
+        onError: (e) => toast(errMsg(e, "Could not preview the changes."), "err"),
+      },
+    );
+  }
+  function onApply() {
+    const body = buildBody();
+    if (!body) return;
+    applyM.mutate(
+      { id: projectId, ...body },
+      {
+        onSuccess: (r) => {
+          setPreview(null);
+          toast(
+            r.committed == null
+              ? "Nothing to change; every field already matches."
+              : "Saved the stackup fields.",
+          );
+        },
+        onError: (e) => toast(errMsg(e, "Could not save the changes."), "err"),
+      },
+    );
+  }
+
+  const busy = previewM.isPending || applyM.isPending;
+  const isDirty = dirty();
+
+  return (
+    <div data-testid="stackup-field-block">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-medium text-t1">Edit Stack Fields</h3>
+        <div className="flex items-center gap-2">
+          {isDirty ? <Badge tone="warn">Unsaved</Badge> : null}
+          <Button variant="default" small onClick={onPreview} disabled={!isDirty || busy}>
+            {previewM.isPending ? "Previewing..." : "Preview"}
+          </Button>
+          <Button variant="accent" small onClick={onApply} disabled={!isDirty || busy}>
+            {applyM.isPending ? "Saving..." : "Save Fields"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-1 text-2xs text-t3">
+          Copper Finish
+          <input
+            type="text"
+            className={`${INPUT_CLS} !w-28 !flex-none !py-1 text-xs`}
+            data-testid="stackup-field-finish"
+            value={draft.copper_finish}
+            onChange={(e) => updateGlobal({ copper_finish: e.target.value })}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-t2">
+          <input
+            type="checkbox"
+            data-testid="stackup-field-constraints"
+            checked={draft.dielectric_constraints}
+            onChange={(e) => updateGlobal({ dielectric_constraints: e.target.checked })}
+          />
+          Dielectric constraints
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2">
+        {editable.map((l) => (
+          <div key={l.name} className="flex flex-wrap items-center gap-3">
+            <span className="min-w-28 text-xs text-t2">{l.name}</span>
+            <label className="flex items-center gap-1 text-2xs text-t3">
+              Thickness
+              <input
+                type="text"
+                inputMode="decimal"
+                className={`${INPUT_CLS} !w-20 !flex-none !py-1 text-xs`}
+                data-testid={`stackup-thickness-${l.name}`}
+                value={draft.layers[l.name].thickness}
+                onChange={(e) => updateLayer(l.name, { thickness: e.target.value })}
+              />
+            </label>
+            {isDielectricLayer(l) ? (
+              <>
+                <label className="flex items-center gap-1 text-2xs text-t3">
+                  Material
+                  <input
+                    type="text"
+                    className={`${INPUT_CLS} !w-24 !flex-none !py-1 text-xs`}
+                    data-testid={`stackup-material-${l.name}`}
+                    value={draft.layers[l.name].material}
+                    onChange={(e) => updateLayer(l.name, { material: e.target.value })}
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-2xs text-t3">
+                  Dk
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={`${INPUT_CLS} !w-16 !flex-none !py-1 text-xs`}
+                    data-testid={`stackup-dk-${l.name}`}
+                    value={draft.layers[l.name].epsilon_r}
+                    onChange={(e) => updateLayer(l.name, { epsilon_r: e.target.value })}
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-2xs text-t3">
+                  Df
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={`${INPUT_CLS} !w-16 !flex-none !py-1 text-xs`}
+                    data-testid={`stackup-df-${l.name}`}
+                    value={draft.layers[l.name].loss_tangent}
+                    onChange={(e) => updateLayer(l.name, { loss_tangent: e.target.value })}
+                  />
+                </label>
+              </>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {preview ? (
+        <p className="mt-3 text-xs text-t1" data-testid="stackup-field-preview">
+          {preview.changed
+            ? `Would update the stack to ${stackSummary(preview.stackup)}.`
+            : "Every field already matches; saving changes nothing."}
+        </p>
+      ) : null}
     </div>
   );
 }

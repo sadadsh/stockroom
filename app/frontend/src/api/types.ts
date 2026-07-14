@@ -806,6 +806,80 @@ export interface ConformResult {
   total: number;
 }
 
+// --- M7f-C stackup / fab-preset ----------------------------------------------
+
+// One physical layer in a board's stackup (a copper / dielectric / silk / paste / mask layer). Only
+// the fields present on disk are set (a mask with no colour has no color).
+export interface StackupLayer {
+  name: string;
+  type?: string;
+  thickness?: number;
+  material?: string;
+  epsilon_r?: number;
+  loss_tangent?: number;
+  color?: string;
+}
+
+// A board's physical layer stack (or null when the board declares no stackup).
+export interface Stackup {
+  layers: StackupLayer[];
+  copper_finish: string | null;
+  dielectric_constraints: boolean | null;
+}
+
+// One fab preset the editor offers (a physical-stackup snap). verify_note is the honesty caveat.
+export interface FabPreset {
+  key: string;
+  label: string;
+  layers: number;
+  board_thickness_mm: number;
+  finish: string;
+  soldermask_color: string | null;
+  verify_note: string;
+}
+
+// GET /api/projects/{id}/stackup
+export interface StackupRead {
+  project: string;
+  under_git: boolean;
+  has_board: boolean;
+  stackup: Stackup | null;
+  copper_layers: string[];
+  thickness: number | null;
+  presets: FabPreset[];
+}
+
+// A per-layer field edit (any subset; an omitted field is left untouched).
+export interface StackupLayerEdit {
+  thickness?: number;
+  material?: string;
+  epsilon_r?: number;
+  loss_tangent?: number;
+}
+
+// POST /stackup/preview and PATCH /stackup body: EITHER preset_key OR the field edits, never both.
+export interface StackupBody {
+  preset_key?: string;
+  copper_finish?: string;
+  dielectric_constraints?: boolean;
+  layer_edits?: Record<string, StackupLayerEdit>;
+}
+
+// POST /api/projects/{id}/stackup/preview (the resulting stack + whether it differs from disk)
+export interface StackupPreview {
+  project: string;
+  stackup: Stackup | null;
+  thickness: number | null;
+  changed: boolean;
+  verify_note: string | null;
+}
+
+// PATCH /api/projects/{id}/stackup (committed is null when nothing changed: a no-commit no-op)
+export interface StackupResult extends StackupRead {
+  committed: string | null;
+  changed: boolean;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

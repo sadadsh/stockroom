@@ -31,6 +31,10 @@ import type {
   ConformCatalog,
   ConformPreview,
   ConformResult,
+  StackupBody,
+  StackupPreview,
+  StackupRead,
+  StackupResult,
   ProfilesResponse,
   ProjectDetail,
   ProjectSummary,
@@ -593,6 +597,32 @@ export const api = {
     return request<ConformResult>(
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/conform`,
+      { body },
+    );
+  },
+
+  // The project's current physical layer stack + copper layer names + thickness + the fab-preset
+  // catalog, for the Stackup editor's render (M7f-C).
+  getStackup(id: string): Promise<StackupRead> {
+    return apiGet<StackupRead>(`/api/projects/${encodeURIComponent(id)}/stackup`);
+  },
+
+  // A dry-run of a stackup change (a fab preset OR per-field edits): the resulting stack + new
+  // thickness + whether it differs, computed without writing or touching git (M7f-C).
+  previewStackup(id: string, body: StackupBody): Promise<StackupPreview> {
+    return request<StackupPreview>(
+      "POST",
+      `/api/projects/${encodeURIComponent(id)}/stackup/preview`,
+      { body },
+    );
+  },
+
+  // Apply a stackup change as one atomic commit on the project's own git (M7f-C). `committed` is
+  // null when nothing changed (an honest no-commit no-op).
+  applyStackup(id: string, body: StackupBody): Promise<StackupResult> {
+    return request<StackupResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/stackup`,
       { body },
     );
   },

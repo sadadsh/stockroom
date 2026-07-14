@@ -10,7 +10,13 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { ConformBody, DesignRules, NetClass, SetBoardSettingsBody } from "./types";
+import type {
+  ConformBody,
+  DesignRules,
+  NetClass,
+  SetBoardSettingsBody,
+  StackupBody,
+} from "./types";
 import { api, type ListPartsArgs } from "./client";
 
 export function usePartsQuery(args: ListPartsArgs) {
@@ -533,6 +539,43 @@ export function useApplyConform() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["project-conform", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
+// The stackup + copper layers + thickness + fab-preset catalog for a project (M7f-C).
+export function useProjectStackup(id: string | null) {
+  return useQuery({
+    queryKey: ["project-stackup", id],
+    queryFn: () => api.getStackup(id as string),
+    enabled: !!id,
+  });
+}
+
+// A stackup preview is a pure dry-run: no cache is touched (it neither writes nor commits).
+export function usePreviewStackup() {
+  return useMutation({
+    mutationFn: (vars: { id: string } & StackupBody) => {
+      const { id, ...body } = vars;
+      return api.previewStackup(id, body);
+    },
+  });
+}
+
+// Applying a stackup change re-reads the stackup + project detail and evicts the cached ERC/DRC
+// (a stackup/thickness change can alter DRC/impedance), so the checks query is invalidated to
+// re-read the honest not-run shape rather than a stale pass.
+export function useApplyStackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string } & StackupBody) => {
+      const { id, ...body } = vars;
+      return api.applyStackup(id, body);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-stackup", vars.id] });
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
     },
