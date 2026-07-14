@@ -5,6 +5,7 @@
    "ProductDetailUrl": "http://x/near"},
   {"ManufacturerPartNumber": "TPS62130RGTR", "Manufacturer": "Texas Instruments",
    "Description": "3A step-down converter VQFN-16", "DataSheetUrl": "http://x/exact.pdf",
-   "AvailabilityInStock": "4200", "PriceBreaks": [{"Quantity": 1, "Price": "$1.23"},
+   "AvailabilityInStock": "4200", "LifecycleStatus": "Active", "LeadTime": "16 Weeks",
+   "MouserPartNumber": "595-TPS62130RGTR", "PriceBreaks": [{"Quantity": 1, "Price": "$1.23"},
    {"Quantity": 100, "Price": "$0.98"}], "ProductDetailUrl": "http://x/exact"}
 ]}}
