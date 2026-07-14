@@ -42,6 +42,7 @@ vi.mock("../api/client", async (importActual) => {
       getDesign: vi.fn(),
       setNetClasses: vi.fn(),
       setDesignRules: vi.fn(),
+      setNetclassPatterns: vi.fn(),
       getBoardSettings: vi.fn(),
       setBoardSettings: vi.fn(),
       getConform: vi.fn(),
@@ -550,6 +551,9 @@ beforeEach(() => {
   });
   mockApi.setDesignRules.mockResolvedValue({
     project: "Netdeck", committed: "cccccccc3333", design_rules: DESIGN.design_rules,
+  });
+  mockApi.setNetclassPatterns.mockResolvedValue({
+    project: "Netdeck", committed: "cccccccc3333", netclass_patterns: DESIGN.netclass_patterns,
   });
   mockApi.getBoardSettings.mockResolvedValue(SETTINGS);
   mockApi.setBoardSettings.mockResolvedValue({ ...SETTINGS, committed: "dddddddd4444" });
@@ -1241,6 +1245,93 @@ describe("ProjectsPage", () => {
     await user.click(screen.getByRole("button", { name: "Save Design Rules" }));
     expect(mockApi.setDesignRules).not.toHaveBeenCalled(); // no silent 0 written
     expect(await screen.findByText(/valid number/i)).toBeInTheDocument();
+  });
+
+  // --- roadmap #4 Netclass-pattern editor ---
+
+  it("renders the project netclass patterns", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const editor = await screen.findByTestId("netclass-pattern-editor");
+    expect((within(editor).getByTestId("ncp-0-pattern") as HTMLInputElement).value).toBe("*USB*");
+    expect((within(editor).getByTestId("ncp-0-netclass") as HTMLSelectElement).value).toBe("HS");
+  });
+
+  it("saves an edited netclass pattern to the right endpoint", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    const input = screen.getByTestId("ncp-0-pattern");
+    await user.clear(input);
+    await user.type(input, "*3V3");
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    expect(mockApi.setNetclassPatterns).toHaveBeenCalledTimes(1);
+    const [id, patterns] = mockApi.setNetclassPatterns.mock.calls[0]!;
+    expect(id).toBe("netdeck");
+    expect(patterns).toEqual([{ netclass: "HS", pattern: "*3V3" }]);
+  });
+
+  it("changes a row's net class via the select", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    await user.selectOptions(screen.getByTestId("ncp-0-netclass"), "Default");
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    const [, patterns] = mockApi.setNetclassPatterns.mock.calls[0]!;
+    expect(patterns).toEqual([{ netclass: "Default", pattern: "*USB*" }]);
+  });
+
+  it("adds a netclass pattern and includes it on save", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    await user.click(screen.getByRole("button", { name: "Add Pattern" }));
+    await user.type(screen.getByTestId("ncp-1-pattern"), "*GND");
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    const [, patterns] = mockApi.setNetclassPatterns.mock.calls[0]!;
+    expect(patterns).toEqual(
+      expect.arrayContaining([{ netclass: "Default", pattern: "*GND" }]),
+    );
+  });
+
+  it("deletes the only netclass pattern, sending an empty list", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    await user.click(within(screen.getByTestId("ncp-row-0")).getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    const [, patterns] = mockApi.setNetclassPatterns.mock.calls[0]!;
+    expect(patterns).toEqual([]);
+  });
+
+  it("drops an incomplete blank-pattern row on save", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    await user.click(screen.getByRole("button", { name: "Add Pattern" }));
+    // the new row's pattern is left blank; only the existing complete row is sent
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    const [, patterns] = mockApi.setNetclassPatterns.mock.calls[0]!;
+    expect(patterns).toEqual([{ netclass: "HS", pattern: "*USB*" }]);
+  });
+
+  it("marks the netclass-pattern section dirty on edit and disables Save until then", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
+    expect(save).toBeDisabled(); // clean on load
+    const input = screen.getByTestId("ncp-0-pattern");
+    await user.clear(input);
+    await user.type(input, "*3V3");
+    expect(save).toBeEnabled(); // dirty after an edit
   });
 
   // --- M7f-A Board Setup editor ---

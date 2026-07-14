@@ -249,6 +249,95 @@ def test_failed_write_leaves_zero_trace(tmp_path, monkeypatch):
     assert prepo.head() == head_before  # no commit landed
 
 
+# --- roadmap #4 Editor: netclass patterns ------------------------------------
+
+
+def test_set_netclass_patterns_writes_and_commits(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+
+    result = ops.set_netclass_patterns(rec.id, [{"pattern": "*GND", "netclass": "Default"}])
+
+    pro = proj / "board.kicad_pro"
+    after = pro.read_text(encoding="utf-8")
+    assert '"pattern": "*GND"' in after
+    assert '"netclass": "Default"' in after
+    # exactly one new commit on the project's OWN repo, tree clean
+    assert prepo.head() != head_before
+    assert result["committed"] == prepo.head()
+    assert prepo.is_clean()
+    # the design read now surfaces the written row
+    ds = ops.design_settings(rec.id)
+    assert ds["netclass_patterns"] == [{"netclass": "Default", "pattern": "*GND"}]
+
+
+def test_set_netclass_patterns_empty_list_clears_all(tmp_path):
+    # the editor sends the FULL list, so an empty list must clear every pattern (a plain
+    # merge replaces a list value wholesale, so no replace_keys is needed here).
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    ops.set_netclass_patterns(rec.id, [{"pattern": "*3V3", "netclass": "Default"}])
+    assert ops.design_settings(rec.id)["netclass_patterns"] != []
+
+    ops.set_netclass_patterns(rec.id, [])
+    assert ops.design_settings(rec.id)["netclass_patterns"] == []
+
+
+def test_set_netclass_patterns_rejects_an_unknown_netclass(tmp_path):
+    # a row referencing a net class the project does not define is a ValueError (-> 400),
+    # validated BEFORE any git touch so no commit lands.
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    head_before = prepo.head()
+    with pytest.raises(ValueError):
+        ops.set_netclass_patterns(rec.id, [{"pattern": "*X", "netclass": "Nonexistent"}])
+    assert prepo.head() == head_before  # validate-before-git: nothing committed
+
+
+def test_set_netclass_patterns_rejects_a_blank_pattern(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.set_netclass_patterns(rec.id, [{"pattern": "   ", "netclass": "Default"}])
+
+
+def test_set_netclass_patterns_leaves_classes_and_board_byte_identical(tmp_path):
+    # a patterns-only edit must not touch the design-settings block, the net classes, or the
+    # net_settings.meta: everything BEFORE netclass_patterns is byte-identical (minimal diff).
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    pro = proj / "board.kicad_pro"
+    before = pro.read_text(encoding="utf-8")
+
+    ops.set_netclass_patterns(rec.id, [{"pattern": "*GND", "netclass": "Default"}])
+
+    after = pro.read_text(encoding="utf-8")
+    key = '"netclass_patterns"'
+    assert after[: after.index(key)] == before[: before.index(key)]
+    assert prepo.is_clean()
+
+
+def test_set_netclass_patterns_refuses_a_project_not_under_git(tmp_path):
+    ops = _ops(tmp_path)
+    proj = _make_project(tmp_path / "nogit" / "board", _UNANNOTATED)
+    rec = ops.register(proj)
+    assert rec.git_root is None
+    with pytest.raises(ValueError):
+        ops.set_netclass_patterns(rec.id, [{"pattern": "*GND", "netclass": "Default"}])
+
+
+def test_set_netclass_patterns_missing_project_raises(tmp_path):
+    ops = _ops(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        ops.set_netclass_patterns("nope", [{"pattern": "*GND", "netclass": "Default"}])
+
+
 # --- M7f-A Editor: board setup + thickness -----------------------------------
 
 # A canonical KiCad-10 .kicad_pcb with a (general (thickness)) and a (setup ...) so a

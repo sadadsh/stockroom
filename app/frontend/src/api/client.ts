@@ -48,6 +48,7 @@ import type {
   SetBoardSettingsBody,
   SetBoardSettingsResult,
   SetDesignRulesResult,
+  SetNetclassPatternsResult,
   SetNetClassesResult,
   SettingsInfo,
   StagingCandidate,
@@ -558,6 +559,20 @@ export const api = {
       "PATCH",
       `/api/projects/${encodeURIComponent(id)}/design-rules`,
       { body: { rules, ...opts } },
+    );
+  },
+
+  // Replace the project's netclass-pattern assignments (roadmap #4): the FULL edited list
+  // (an empty list clears every pattern). Writes a minimal diff, one scoped commit on the
+  // project's own git.
+  setNetclassPatterns(
+    id: string,
+    patterns: { netclass: string; pattern: string }[],
+  ): Promise<SetNetclassPatternsResult> {
+    return request<SetNetclassPatternsResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/netclass-patterns`,
+      { body: { patterns } },
     );
   },
 

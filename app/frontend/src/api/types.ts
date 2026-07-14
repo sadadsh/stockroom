@@ -701,6 +701,13 @@ export interface SetDesignRulesResult {
   design_rules: DesignRules;
 }
 
+// PATCH /api/projects/{id}/netclass-patterns
+export interface SetNetclassPatternsResult {
+  project: string;
+  committed: string;
+  netclass_patterns: { netclass: string; pattern: string }[];
+}
+
 // One editable board-setup field the /settings endpoint describes so the form knows which
 // control to render for it (M7f-A). `kind` picks the input; `label` is a Title Case caption.
 export interface BoardSetupField {
