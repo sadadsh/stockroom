@@ -228,6 +228,18 @@ class GitRepo:
                 elif path.exists():
                     path.unlink()
 
+    def revert(self, sha: str) -> str:
+        """Revert commit `sha` as a NEW commit (git-native, non-destructive undo, spec section 9):
+        history is preserved and any later commits stand. On a conflict (a later commit changed the
+        same lines), abort the half-applied revert and raise GitError so the caller reports honestly
+        rather than leaving the tree in a conflicted state. Returns the new HEAD."""
+        self._set_test_identity_if_missing()
+        proc = self._run("revert", "--no-edit", sha, check=False)
+        if proc.returncode != 0:
+            self._run("revert", "--abort", check=False)  # best-effort cleanup of a conflicted revert
+            raise GitError(f"git revert {sha} failed: {(proc.stderr or proc.stdout).strip()}")
+        return self.head()
+
     def add_remote(self, name: str, url: str) -> None:
         self._run("remote", "add", name, url)
 

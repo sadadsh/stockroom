@@ -37,6 +37,11 @@ import {
   useProjectStackup,
   usePreviewStackup,
   useApplyStackup,
+  useProjectPrepare,
+  useInvalidateAfterPrepare,
+  useManualFill,
+  useRestore,
+  usePartsQuery,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
@@ -64,6 +69,9 @@ import type {
   StackupLayerEdit,
   StackupPreview,
   StackupRead,
+  PrepareRead,
+  PrepareResult,
+  CompletionRoll,
   DesignResult,
   DesignRules,
   NetClass,
@@ -431,6 +439,7 @@ function ProjectDetailView({
       <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
       <StackupSection key={`stackup-${project.id}`} projectId={project.id} />
       <ConformSection key={`conform-${project.id}`} projectId={project.id} />
+      <PrepareSection key={`prepare-${project.id}`} projectId={project.id} />
     </div>
   );
 }
@@ -3445,6 +3454,263 @@ function StackupFieldBlock({ projectId, stack }: { projectId: string; stack: Sta
             : "Every field already matches; saving changes nothing."}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+// M7f-D Prepare / Complete-All + Restore + manual library fill.
+function PrepareSection({ projectId }: { projectId: string }) {
+  const q = useProjectPrepare(projectId);
+  const data = q.data;
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="prepare-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Prepare</Eyebrow>
+        <p className="text-xs text-t3">
+          Annotate every unnumbered reference and auto-fill each component's blank identity fields from
+          the shared library, as one byte-preserving commit on the project's own git. Any component the
+          library cannot match stays untouched and can be linked by hand.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the prepare plan...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the prepare plan.")}</p>
+      ) : !data ? null : !data.has_sch ? (
+        <p className="text-sm text-t3" data-testid="prepare-no-sch">
+          This project has no schematic sheet, so there is nothing to annotate or fill.
+        </p>
+      ) : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="prepare-no-git">
+          This project is not under git. Initialize a git repository for it to prepare it, so each
+          change is committed atomically and can be undone.
+        </p>
+      ) : (
+        <PrepareForm projectId={projectId} data={data} />
+      )}
+    </div>
+  );
+}
+
+function PrepareForm({ projectId, data }: { projectId: string; data: PrepareRead }) {
+  const job = useJob<PrepareResult>();
+  const invalidate = useInvalidateAfterPrepare();
+  const restore = useRestore();
+  const { toast } = useToast();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  // When a Prepare finishes, refresh the dry-run + derived caches so the residual re-reads.
+  useEffect(() => {
+    if (job.status === "done") invalidate(projectId);
+  }, [job.status, projectId, invalidate]);
+
+  async function onPrepare() {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const { job_id } = await api.runPrepare(projectId);
+      job.run(job_id);
+    } catch (e) {
+      const msg = errMsg(e, "Could not start Prepare.");
+      setStartError(msg);
+      toast(msg, "err");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  function onRestore() {
+    restore.mutate(projectId, {
+      onSuccess: (r) => toast(`Restored: reverted ${r.short}.`, "ok"),
+      onError: (e) => toast(errMsg(e, "Could not restore."), "err"),
+    });
+  }
+
+  const busy = starting || job.status === "running";
+  const result = job.status === "done" ? job.result : null;
+  // The residual always follows the LIVE query (`data.completion`), never the frozen job result: a
+  // Prepare / manual Link / Restore each invalidates the prepare query, so after any of them the
+  // residual + the manual-fill picker re-read the current on-disk state (disk designators the picker
+  // can act on). `result` is used only for the one-time "Prepared: ..." summary line.
+  const residual: CompletionRoll = data.completion;
+  const nothingToPrepare = !result && data.annotate === 0 && data.fill_fields === 0;
+
+  return (
+    <div data-testid="prepare-form" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-t2" data-testid="prepare-summary">
+          {result
+            ? result.committed
+              ? `Prepared: annotated ${result.annotated} references and filled ${result.fill_fields} fields.`
+              : "Prepared: nothing needed annotating or filling."
+            : nothingToPrepare
+              ? "Nothing to prepare: every reference is numbered and no blank field has a library match."
+              : `Prepare would annotate ${data.annotate} references and fill ${data.fill_fields} fields.`}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="accent"
+            small
+            onClick={onPrepare}
+            disabled={busy || (nothingToPrepare && !result)}
+          >
+            {busy ? "Preparing..." : "Prepare / Complete All"}
+          </Button>
+          <Button
+            variant="default"
+            small
+            onClick={onRestore}
+            disabled={restore.isPending}
+            data-testid="prepare-restore"
+          >
+            {restore.isPending ? "Restoring..." : "Restore Last"}
+          </Button>
+        </div>
+      </div>
+
+      {busy && job.progress?.message ? (
+        <p className="text-xs text-t3" data-testid="prepare-progress">{job.progress.message}...</p>
+      ) : null}
+      {startError ? <p className="text-sm text-err">{startError}</p> : null}
+      {job.status === "error" ? (
+        <p className="text-sm text-err">{job.error ?? "Prepare failed."}</p>
+      ) : null}
+
+      <CompletionResidual roll={residual} />
+      {residual.incomplete_refs.length > 0 ? (
+        <ManualFillPanel projectId={projectId} incompleteRefs={residual.incomplete_refs} />
+      ) : (
+        <p className="text-xs text-ok" data-testid="prepare-all-complete">
+          Every component carries a full identity.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CompletionResidual({ roll }: { roll: CompletionRoll }) {
+  const missing = Object.entries(roll.missing_counts).sort((a, b) => b[1] - a[1]);
+  return (
+    <div data-testid="prepare-residual" className="flex flex-wrap items-center gap-2">
+      <Badge tone={roll.complete === roll.total ? "ok" : "neutral"}>
+        {roll.complete} / {roll.total} Complete
+      </Badge>
+      {missing.map(([label, count]) => (
+        <Badge key={label} tone="warn">
+          {count} Missing {label}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function ManualFillPanel({
+  projectId,
+  incompleteRefs,
+}: {
+  projectId: string;
+  incompleteRefs: string[];
+}) {
+  const [ref, setRef] = useState(incompleteRefs[0] ?? "");
+  const [search, setSearch] = useState("");
+  const [partId, setPartId] = useState("");
+  const parts = usePartsQuery({ q: search, category: undefined, completeOnly: true });
+  const fill = useManualFill();
+  const { toast } = useToast();
+
+  // Keep the selected ref valid as the residual shrinks after each fill.
+  useEffect(() => {
+    if (!incompleteRefs.includes(ref)) setRef(incompleteRefs[0] ?? "");
+  }, [incompleteRefs, ref]);
+
+  // Clear the armed part whenever the target component changes (a manual pick OR the auto-advance
+  // after a fill), so Link never fires a part chosen for a DIFFERENT component.
+  useEffect(() => {
+    setPartId("");
+  }, [ref]);
+
+  const options = parts.data?.parts ?? [];
+
+  function onLink() {
+    if (!ref || !partId) return;
+    fill.mutate(
+      { id: projectId, ref, part_id: partId },
+      {
+        onSuccess: (r) =>
+          toast(
+            r.committed ? `Linked ${r.ref} to the library part.` : `${r.ref} already matches; nothing changed.`,
+            r.committed ? "ok" : "neutral",
+          ),
+        onError: (e) => toast(errMsg(e, "Could not link the component."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div
+      data-testid="manual-fill-panel"
+      className="rounded-control border border-line2 p-3"
+    >
+      <h3 className="mb-2 text-sm font-medium text-t1">Link a Component</h3>
+      <p className="mb-3 text-xs text-t3">
+        Pick a component the library could not match, then a library part to link it to. Its symbol,
+        footprint, and identity fields are set from that part in one commit.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-t3">
+          Component
+          <select
+            data-testid="manual-fill-ref"
+            className="rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+          >
+            {incompleteRefs.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-t3">
+          Search Library
+          <input
+            data-testid="manual-fill-search"
+            className="rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
+            placeholder="MPN or name"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-t3">
+          Library Part
+          <select
+            data-testid="manual-fill-part"
+            className="min-w-[12rem] rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
+            value={partId}
+            onChange={(e) => setPartId(e.target.value)}
+          >
+            <option value="">Select a part</option>
+            {options.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.display_name}
+                {p.mpn ? ` (${p.mpn})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          variant="accent"
+          small
+          onClick={onLink}
+          disabled={!ref || !partId || fill.isPending}
+          data-testid="manual-fill-link"
+        >
+          {fill.isPending ? "Linking..." : "Link"}
+        </Button>
+      </div>
     </div>
   );
 }

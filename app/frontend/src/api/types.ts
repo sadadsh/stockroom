@@ -880,6 +880,82 @@ export interface StackupResult extends StackupRead {
   changed: boolean;
 }
 
+// M7f-D Library Fill + Prepare/Complete-All + reversible Restore.
+export interface FillChange {
+  prop: string;
+  old: string;
+  new: string;
+  kind: "fill" | "overwrite";
+}
+
+export interface FillPlanItem {
+  ref: string;
+  sheet: string;
+  confidence: "symbol" | "mpn";
+  part_id: string;
+  changes: FillChange[];
+  default_selected: boolean;
+}
+
+export interface FillPlan {
+  items: FillPlanItem[];
+  summary: { components: number; matched: number; no_match: number; fields: number };
+}
+
+export interface CompletionRoll {
+  total: number;
+  complete: number;
+  incomplete_refs: string[];
+  missing_counts: Record<string, number>;
+}
+
+// GET /api/projects/{id}/prepare (a dry-run: what a Prepare would annotate + fill + leave incomplete)
+export interface PrepareRead {
+  project: string;
+  under_git: boolean;
+  has_sch: boolean;
+  annotate: number;
+  fill_fields: number;
+  files: { path: string; annotated: number; filled: number }[];
+  plan: FillPlan;
+  // The CURRENT on-disk residual: incomplete_refs are real disk designators, so the manual-fill
+  // picker only names components that exist. completion_after is the projection once Prepare runs.
+  completion: CompletionRoll;
+  completion_after: CompletionRoll;
+}
+
+// The result of a Prepare job (POST /api/projects/{id}/prepare -> job -> this on the SSE result event)
+export interface PrepareResult {
+  project: string;
+  committed: string | null;
+  annotated: number;
+  fill_fields: number;
+  files: { path: string; annotated: number; filled: number }[];
+  completion: CompletionRoll;
+}
+
+// POST /api/projects/{id}/prepare/fill
+export interface ManualFillBody {
+  ref: string;
+  part_id: string;
+}
+
+export interface ManualFillResult {
+  project: string;
+  committed: string | null;
+  ref: string;
+  part_id: string;
+}
+
+// POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)
+export interface RestoreResult {
+  project: string;
+  restored: string;
+  short: string;
+  subject: string;
+  committed: string;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

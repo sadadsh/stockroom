@@ -4,6 +4,7 @@
  * refetches; select a part and the detail loads. keepPreviousData keeps the list
  * from flickering to empty while a new search is in flight.
  */
+import { useCallback } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -13,6 +14,7 @@ import {
 import type {
   ConformBody,
   DesignRules,
+  ManualFillBody,
   NetClass,
   SetBoardSettingsBody,
   StackupBody,
@@ -579,5 +581,59 @@ export function useApplyStackup() {
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
     },
+  });
+}
+
+// A dry-run of Prepare / Complete-All for one project (M7f-D): what a Prepare would annotate + fill
+// from the library + leave incomplete. Disabled until a project is selected.
+export function useProjectPrepare(id: string | null) {
+  return useQuery({
+    queryKey: ["project-prepare", id],
+    queryFn: () => api.getPrepare(id as string),
+    enabled: !!id,
+  });
+}
+
+// Invalidate everything a Prepare / Fill / Restore changes: the prepare dry-run (fewer refs remain),
+// the project detail (git head moved), and the cached ERC/DRC + BOM (the netlist/BOM changed, so a
+// stale pass is evicted and re-read as the honest not-run/not-built shape). Also the revision list.
+function useInvalidateAfterPrepare() {
+  const qc = useQueryClient();
+  // Memoize so the returned function has a STABLE identity: it is a useEffect dependency in
+  // PrepareForm, and a fresh closure each render would re-fire the effect (a redundant invalidation
+  // round) on every render while the job sits in "done".
+  return useCallback(
+    (id: string) => {
+      qc.invalidateQueries({ queryKey: ["project-prepare", id] });
+      qc.invalidateQueries({ queryKey: ["project", id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", id] });
+      qc.invalidateQueries({ queryKey: ["project-bom", id] });
+      qc.invalidateQueries({ queryKey: ["project-revisions", id] });
+    },
+    [qc],
+  );
+}
+
+export { useInvalidateAfterPrepare };
+
+// Manually link one placed component to a chosen library part (M7f-D). Invalidates the prepare
+// dry-run + the derived caches so the residual re-reads after the fill.
+export function useManualFill() {
+  const invalidate = useInvalidateAfterPrepare();
+  return useMutation({
+    mutationFn: (vars: { id: string } & ManualFillBody) => {
+      const { id, ...body } = vars;
+      return api.manualFill(id, body);
+    },
+    onSuccess: (_data, vars) => invalidate(vars.id),
+  });
+}
+
+// Undo the project's last Prepare / Fill (M7f-D). Invalidates the same derived caches.
+export function useRestore() {
+  const invalidate = useInvalidateAfterPrepare();
+  return useMutation({
+    mutationFn: (id: string) => api.restore(id),
+    onSuccess: (_data, id) => invalidate(id),
   });
 }

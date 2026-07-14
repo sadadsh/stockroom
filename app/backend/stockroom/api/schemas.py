@@ -217,3 +217,14 @@ class StackupBody(BaseModel):
     copper_finish: str | None = None
     dielectric_constraints: bool | None = None
     layer_edits: dict[str, dict[str, Any]] | None = None
+
+
+class ManualFillBody(BaseModel):
+    """Manually link one placed component to a chosen shared-library part (M7f-D): the residual
+    filler for a component Prepare / Complete-All could not match automatically. `ref` is the
+    component's reference designator, `part_id` the library part id. Fills ALL of the part's identity
+    fields (overwrite allowed, since this is an explicit user choice) and repoints the symbol lib_id, as
+    one atomic commit. An unknown part or a missing ref is a 400."""
+
+    ref: str
+    part_id: str
