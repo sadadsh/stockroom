@@ -25,6 +25,18 @@ jobs:
       - name: Sync (provision the importable stockroom package the launcher freezes)
         run: uv sync
 
+      - name: Fetch portable git (MinGit) to bundle into the exe
+        shell: pwsh
+        run: |
+          $rel = Invoke-RestMethod -Headers @{ 'User-Agent' = 'stockroom-ci' } https://api.github.com/repos/git-for-windows/git/releases/latest
+          $asset = $rel.assets | Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' -and $_.name -notmatch 'busybox' } | Select-Object -First 1
+          if (-not $asset) { throw "MinGit 64-bit asset not found in the latest git-for-windows release" }
+          Write-Host "Downloading $($asset.name)"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mingit.zip
+          Expand-Archive -Path mingit.zip -DestinationPath packaging/mingit -Force
+          if (-not (Test-Path packaging/mingit/cmd/git.exe)) { throw "MinGit git.exe missing after extract" }
+          Write-Host "MinGit ready at packaging/mingit"
+
       - name: Build the launcher exe
         run: uv run --with pyinstaller pyinstaller packaging/stockroom.spec --noconfirm --clean
 

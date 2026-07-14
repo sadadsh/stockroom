@@ -8,14 +8,33 @@
 # launcher clones + self-updates and runs via `uv run`, never inside this exe. That is the
 # "frozen once" model (spec section 12): the exe never needs re-freezing per release.
 #
-# Target prerequisites: git + uv on PATH (a git-native app; uv provisions the app env).
+# Target prerequisites: git on PATH (a git-native app). uv is BUNDLED into the exe below, so
+# the target machine does NOT need uv installed (uv also provisions Python + the app env).
 import os
+import shutil
+
+# Bundle the uv binary beside the launcher so a Windows box without uv still runs (the WinError 2
+# fix). Resolved from the build machine's PATH (the CI installs uv via astral-sh/setup-uv); fail
+# the build loudly rather than silently ship an exe that dies at first `uv sync`.
+_uv = shutil.which("uv") or shutil.which("uv.exe")
+if not _uv:
+    raise SystemExit("packaging/stockroom.spec: uv not found at build time; cannot bundle it")
+
+_datas = [(_uv, ".")]  # uv -> sys._MEIPASS/uv(.exe); resolved at runtime by launcher._uv_bin
+
+# Portable git (MinGit), fetched into packaging/mingit by the release CI, bundled so a bare
+# Windows box needs NO system git (clone + the in-app self-update use it via launcher._git_bin,
+# and the host's git ops resolve it through launcher._child_env's PATH prepend). Optional on a
+# local/dev build: absent, git from PATH is used instead. -> sys._MEIPASS/mingit/cmd/git.exe.
+_mingit = os.path.join(SPECPATH, "mingit")  # noqa: F821 (SPECPATH is injected)
+if os.path.isdir(_mingit):
+    _datas.append((_mingit, "mingit"))
 
 a = Analysis(
     ["stockroom_launcher.py"],
     pathex=[os.path.join(SPECPATH, "..", "app", "backend")],  # noqa: F821 (SPECPATH is injected)
     binaries=[],
-    datas=[],
+    datas=_datas,
     hiddenimports=["stockroom.launcher.launch", "stockroom.launcher.exit_codes"],
     hookspath=[],
     hooksconfig={},
