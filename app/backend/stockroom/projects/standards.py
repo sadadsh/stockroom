@@ -121,43 +121,44 @@ def validate_classes(classes, floor) -> list:
     """
     prof = _resolve_floor(floor)
     findings: list = []
-    priorities: dict = {}
+
+    def _num(cls, key):
+        # Real KiCad-10 OMITS a field from a class when it equals the editor default (the
+        # on-disk Default class is just name/clearance/track_width/via_diameter/via_drill).
+        # An absent key is valid data, not a below-floor risk, so return None and skip the
+        # check rather than reading it as 0 and fabricating a violation.
+        v = cls.get(key)
+        return None if v is None else float(v)
 
     for cls in classes:
         name = cls.get("name", "?")
-        clearance = float(cls.get("clearance", 0) or 0)
-        track = float(cls.get("track_width", 0) or 0)
-        via = float(cls.get("via_diameter", 0) or 0)
-        drill = float(cls.get("via_drill", 0) or 0)
-        wire = float(cls.get("wire_width", 0) or 0)
-        bus = float(cls.get("bus_width", 0) or 0)
-        dp_width = float(cls.get("diff_pair_width", 0) or 0)
-        dp_gap = float(cls.get("diff_pair_gap", 0) or 0)
+        clearance, track = _num(cls, "clearance"), _num(cls, "track_width")
+        via, drill = _num(cls, "via_diameter"), _num(cls, "via_drill")
+        wire, bus = _num(cls, "wire_width"), _num(cls, "bus_width")
+        dp_width, dp_gap = _num(cls, "diff_pair_width"), _num(cls, "diff_pair_gap")
 
         def bad(issue: str, _name=name):
             findings.append({"netclass": _name, "issue": issue})
 
-        if clearance < prof["min_clearance"] - _EPS:
+        if clearance is not None and clearance < prof["min_clearance"] - _EPS:
             bad(f"clearance {clearance} below fab min {prof['min_clearance']}")
-        if track < prof["min_track"] - _EPS:
+        if track is not None and track < prof["min_track"] - _EPS:
             bad(f"track width {track} below fab min {prof['min_track']}")
-        if via < prof["min_via"] - _EPS:
+        if via is not None and via < prof["min_via"] - _EPS:
             bad(f"via diameter {via} below fab min {prof['min_via']}")
-        if drill < prof["min_drill"] - _EPS:
+        if drill is not None and drill < prof["min_drill"] - _EPS:
             bad(f"via drill {drill} below fab min {prof['min_drill']}")
-        if via and drill >= via:
+        if via and drill and drill >= via:
             bad(f"via drill {drill} not smaller than via diameter {via}")
         elif via and drill and (via - drill) / 2 < prof["min_annular"] - _EPS:
             bad(f"annular ring {(via - drill) / 2:.4f} below fab min {prof['min_annular']}")
-        if wire <= 0 or bus <= 0:
+        # Only a PRESENT non-positive stroke is a defect; an omitted key is a KiCad default.
+        if (wire is not None and wire <= 0) or (bus is not None and bus <= 0):
             bad("non-positive wire or bus stroke")
-        if dp_width > 0 and dp_gap <= 0:
+        if dp_width is not None and dp_width > 0 and (dp_gap is None or dp_gap <= 0):
             bad("diff-pair width set but no gap")
 
-        priorities.setdefault(cls.get("priority"), []).append(name)
-
-    for prio, names in priorities.items():
-        if prio is not None and len(names) > 1:
-            findings.append({"netclass": ", ".join(names), "issue": f"duplicate priority {prio}"})
-
+    # NOTE: no duplicate-priority check. In KiCad-10 net-class priority is a resolution-order
+    # tiebreaker (default 0) that classes legitimately share, not a uniqueness constraint;
+    # flagging a shared priority produced huge bogus findings on real projects.
     return findings

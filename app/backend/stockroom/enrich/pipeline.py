@@ -107,10 +107,14 @@ class DatasheetSource:
 
 class EnrichmentPipeline:
     def __init__(self, cache_dir, fetcher: RenderedDomFetcher | None = None,
-                 mouser=None, limiter=None, url_for=None, http_fetcher=None):
+                 mouser=None, limiter=None, url_for=None, http_fetcher=None,
+                 mouser_limiter=None):
         self.cache = TtlCache(Path(cache_dir))
         self.fetcher = fetcher or HttpRenderedDomFetcher()
         self.limiter = limiter or SlidingWindowLimiter(limit=10, window=60.0)
+        # The Mouser API has its OWN documented cap (~30/60), separate from the gentler
+        # scraper budget, so it gets a dedicated limiter (lifted from KiCost's api_mouser).
+        self.mouser_limiter = mouser_limiter or SlidingWindowLimiter(limit=30, window=60.0)
         self.mouser = mouser
         # The datasheet PDF is a direct HTTP GET (not a rendered DOM), so it uses an
         # HttpFetcher; injectable so tests never touch the network.
@@ -124,7 +128,7 @@ class EnrichmentPipeline:
             DatasheetSource(fetcher=self.http_fetcher, cache_dir=self._datasheet_dir),
         ]
         if mouser is not None and getattr(mouser, "enabled", False):
-            sources.append(_MouserSource(mouser))
+            sources.append(_MouserSource(mouser, self.mouser_limiter))
         self.registry = SourceRegistry(sources)
 
     def enrich(self, mpn: str, category: str, want=None) -> EnrichmentResult:
@@ -203,10 +207,16 @@ class EnrichmentPipeline:
 class _MouserSource:
     name = "mouser"
 
-    def __init__(self, adapter):
+    def __init__(self, adapter, limiter=None):
         self._adapter = adapter
+        self._limiter = limiter
 
     def enrich(self, mpn, category, remaining):
+        # Pace the Mouser API path (the exact ban scenario the KiCost limiter exists to
+        # prevent). Without this a bulk enrich of many uncached parts fires unthrottled and
+        # can trip Mouser's rate cap; the mouser.py docstring's "paced" claim depends on it.
+        if self._limiter is not None:
+            self._limiter.acquire()
         return self._adapter.lookup(mpn)
 
 
