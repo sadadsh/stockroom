@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import type { PartSummary } from "../api/types";
+import { NAV } from "../lib/nav";
 import { RouterProvider, useRouter } from "../lib/router";
 import { ThemeProvider } from "../lib/theme";
 import { requestPart } from "../lib/partSelection";
@@ -92,10 +93,15 @@ describe("CommandPalette", () => {
     expect(within(dialog).getByText("Components")).toBeInTheDocument();
     expect(within(dialog).getByText("Ingest")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
+    // Projects has shipped (M7a), so it is now offered.
+    expect(within(dialog).getByText("Projects")).toBeInTheDocument();
     expect(within(dialog).getByText("Doctor")).toBeInTheDocument();
     expect(within(dialog).getByText("Settings")).toBeInTheDocument();
-    // Unbuilt routes are never offered (they are not `available` in NAV).
-    expect(within(dialog).queryByText("Projects")).toBeNull();
+    // The palette derives from availableNav(), so an unbuilt route (were one present)
+    // is never offered: assert exactly the available titles appear, nothing else.
+    for (const entry of NAV.filter((e) => !e.available)) {
+      expect(within(dialog).queryByText(entry.title)).toBeNull();
+    }
     // Actions group: the one global action.
     expect(within(dialog).getByText("Actions")).toBeInTheDocument();
     expect(within(dialog).getByText("Switch to Light Theme")).toBeInTheDocument();

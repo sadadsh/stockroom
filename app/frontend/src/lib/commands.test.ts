@@ -5,16 +5,24 @@ import {
   registeredCommands,
   unregisterCommand,
 } from "./commands";
+import { NAV, availableNav } from "./nav";
 
 describe("command registry", () => {
-  it("derives a nav command only for available destinations", () => {
-    const ids = navCommands().map((c) => c.id);
-    // Built surfaces are offered...
+  it("derives a nav command for exactly the available destinations", () => {
+    const ids = navCommands().map((c) => c.id).sort();
+    // Every available destination is offered, and nothing else, so the palette can
+    // never route to an unbuilt stub. Derive the expectation from NAV rather than a
+    // hardcoded list so this stays honest as routes light up.
+    const expected = availableNav().map((entry) => `nav.${entry.route}`).sort();
+    expect(ids).toEqual(expected);
+    // Built surfaces (including Projects, now shipped) are present.
     expect(ids).toContain("nav.components");
-    expect(ids).toContain("nav.ingest");
-    expect(ids).toContain("nav.duplicates");
-    // ...but unbuilt ones are not, so the palette can never route to a stub.
-    expect(ids).not.toContain("nav.projects");
+    expect(ids).toContain("nav.projects");
+    // An unavailable route, were there one, would be excluded.
+    const unavailable = NAV.filter((entry) => !entry.available);
+    for (const entry of unavailable) {
+      expect(ids).not.toContain(`nav.${entry.route}`);
+    }
   });
 
   it("a nav command navigates to its route when run", () => {

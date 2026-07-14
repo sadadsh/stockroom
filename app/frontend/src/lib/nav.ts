@@ -19,7 +19,7 @@ export const NAV: NavEntry[] = [
   { route: "components", title: "Components", glyph: "▤", group: "primary", available: true },
   { route: "ingest", title: "Ingest", glyph: "▽", group: "primary", available: true },
   { route: "duplicates", title: "Duplicates", glyph: "⧉", group: "primary", available: true },
-  { route: "projects", title: "Projects", glyph: "▧", group: "primary", available: false },
+  { route: "projects", title: "Projects", glyph: "▧", group: "primary", available: true },
   { route: "doctor", title: "Doctor", glyph: "✚", group: "foot", available: true },
   { route: "settings", title: "Settings", glyph: "⚙", group: "foot", available: true },
 ];

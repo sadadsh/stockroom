@@ -361,4 +361,115 @@ describe("api client", () => {
     expect(url).toContain("rev=abc123");
     expect(url).toContain("bw=true");
   });
+
+  // --- Projects (M7a) ---
+
+  it("lists projects from the derived index", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        {
+          id: "proj1",
+          name: "Netdeck",
+          root: "/home/sadad/git/netdeck",
+          board_count: 1,
+          sheet_count: 3,
+          has_git: true,
+          registered_at: "2026-07-13T12:00:00-04:00",
+        },
+      ]),
+    );
+    const res = await api.listProjects();
+    expect(res).toHaveLength(1);
+    expect(res[0].root).toBe("/home/sadad/git/netdeck");
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/projects");
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe("GET");
+  });
+
+  it("registers a project by posting its absolute root path", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        id: "proj1",
+        name: "Netdeck",
+        root: "/home/sadad/git/netdeck",
+        pro_path: "/home/sadad/git/netdeck/netdeck.kicad_pro",
+        board_paths: ["/home/sadad/git/netdeck/netdeck.kicad_pcb"],
+        sheet_paths: ["/home/sadad/git/netdeck/netdeck.kicad_sch"],
+        git_root: "/home/sadad/git/netdeck",
+        audit_digest: null,
+        registered_at: "2026-07-13T12:00:00-04:00",
+      }),
+    );
+    const rec = await api.registerProject("/home/sadad/git/netdeck");
+    expect(rec.name).toBe("Netdeck");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/projects");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      root: "/home/sadad/git/netdeck",
+    });
+  });
+
+  it("surfaces a 400 (no KiCad files / already registered) as an ApiError", async () => {
+    fetchMock.mockResolvedValueOnce(errJson(400, { detail: "no KiCad files found" }));
+    await expect(api.registerProject("/tmp/empty")).rejects.toMatchObject({
+      status: 400,
+      message: "no KiCad files found",
+    });
+  });
+
+  it("gets a single project record by id", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        id: "proj1",
+        name: "Netdeck",
+        root: "/home/sadad/git/netdeck",
+        pro_path: "/home/sadad/git/netdeck/netdeck.kicad_pro",
+        board_paths: [],
+        sheet_paths: [],
+        git_root: null,
+        audit_digest: null,
+        registered_at: "2026-07-13T12:00:00-04:00",
+      }),
+    );
+    const rec = await api.getProject("proj1");
+    expect(rec.git_root).toBeNull();
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/projects/proj1");
+  });
+
+  it("deletes a project by id (204, no body)", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 204 } as unknown as Response);
+    await api.deleteProject("proj1");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/projects/proj1");
+    expect((init as RequestInit).method).toBe("DELETE");
+  });
+
+  it("reads the project audit with its markdown report", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        project: "netdeck",
+        components: 42,
+        healthy: 40,
+        counts: {
+          by_severity: { error: 1, warning: 1, info: 0 },
+          by_kind: { unannotated: 1, no_footprint: 1 },
+        },
+        findings: [
+          { ref: "U1", severity: "error", kind: "unannotated", detail: "reference designator not annotated" },
+          { ref: "R5", severity: "warning", kind: "no_footprint", detail: "no footprint assigned" },
+        ],
+        checked_footprints: 40,
+        unresolved_footprints: 0,
+        sheets: 3,
+        markdown: "# Health\n",
+      }),
+    );
+    const au = await api.projectAudit("proj1");
+    expect(au.components).toBe(42);
+    expect(au.counts.by_kind.unannotated).toBe(1);
+    expect(au.markdown).toContain("# Health");
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe(
+      "/api/projects/proj1/audit",
+    );
+  });
 });
