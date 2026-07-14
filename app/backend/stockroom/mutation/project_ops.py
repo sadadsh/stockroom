@@ -151,8 +151,10 @@ class ProjectOps:
         Transaction, no commit, no cache eviction. `checks` / `bom` are the CACHED results the
         router injects (ctx.checks_cache.get(id) / ctx.bom_cache.get(id)); a cold cache is an
         honest 'not run yet' HARD blocker, NEVER a fabricated pass (a false READY is worse than
-        a false NOT-READY). Completeness is computed LIVE (no library needed), so it agrees with
-        the Prepare section by construction. Separation of concerns: completeness owns the
+        a false NOT-READY). Completeness is computed LIVE (no library needed): its identity residual
+        matches the Prepare section, though the unannotated count is the full on-disk set (a superset
+        of what Prepare auto-numbers, since multi-unit / repeated-hierarchy refs are deferred to
+        KiCad, so its blocker names KiCad too). Separation of concerns: completeness owns the
         physical board (annotation + footprint), the BOM owns orderability (priced + stock +
         lifecycle). Returns {project, ready, signals, blockers, warnings}; `ready` is True only
         when there are ZERO hard blockers. Raises FileNotFoundError for an unknown id."""
@@ -177,9 +179,12 @@ class ProjectOps:
         else:
             if cr["unannotated"]:
                 comp_state = "fail"
+                # Prepare auto-numbers single-unit refs but DEFERS multi-unit / repeated-hierarchy
+                # ones to KiCad (fill.annotate_document), so the count is a superset of what
+                # Prepare can fix; the remedy must name KiCad too, never a Prepare-only dead-end.
                 blockers.append({"kind": "unannotated",
                                  "detail": f"{cr['unannotated']} reference(s) are not annotated",
-                                 "next_step": "Prepare the project (Prepare section)"})
+                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad"})
             if cr["missing_footprint"]:
                 comp_state = "fail"
                 blockers.append({"kind": "missing_footprint",
@@ -190,6 +195,10 @@ class ProjectOps:
                 warnings.append({"kind": "identity_incomplete",
                                  "detail": f"{incomplete} component(s) have incomplete library identity",
                                  "next_step": "Prepare the project (Prepare section)"})
+                # A warning-only completeness must read amber "warn", agreeing with the Prepare
+                # section, not green "pass" (mirrors the BOM signal's soft-issue downgrade).
+                if comp_state == "pass":
+                    comp_state = "warn"
         completeness = {"state": comp_state, "has_sch": has_sch, "total": cr["total"],
                         "complete": cr["complete"], "unannotated": cr["unannotated"],
                         "missing_footprint": cr["missing_footprint"],
@@ -215,6 +224,8 @@ class ProjectOps:
                 blockers.append({"kind": "checks_failed", "detail": detail,
                                  "next_step": "fix the errors and re-run (Checks section)"})
             elif warns > 0:
+                # Amber "warn", agreeing with the Checks section's warning badge, not green "pass".
+                checks_signal["state"] = "warn"
                 warnings.append({"kind": "checks_warnings",
                                  "detail": f"{warns} ERC/DRC warning(s)",
                                  "next_step": "review the warnings (Checks section)"})

@@ -60,6 +60,9 @@ def _sheet(symbols):
 _FRESH = _sheet([_sym("R?", uuid="r"), _sym("U?", footprint="Package_SO:SOIC-8", lib_id="SR:LM358", uuid="u")])
 _DONE = _sheet([_sym("U1", footprint="Package_SO:SOIC-8", props=_COMPLETE, lib_id="SR:LM358", uuid="u1")])
 _NOFP = _sheet([_sym("R1", footprint="", props=_COMPLETE, uuid="r1")])
+# annotated + footprinted, but missing MPN/Manufacturer/Datasheet/Description: an identity
+# warning with NO hard blocker (so the completeness signal should read "warn", not "pass").
+_ANNOT_NO_MPN = _sheet([_sym("R1", footprint="Resistor_SMD:R_0402", uuid="r1")])
 
 
 def _git_project(dir_path, sheet=_FRESH):
@@ -125,6 +128,32 @@ def test_checks_warnings_do_not_block(tmp_path):
     v = ops.buildability(rec.id, checks=_CHECKS_WARN, bom=_BOM_OK)
     assert v["ready"] is True
     assert any(w["kind"] == "checks_warnings" for w in v["warnings"])
+    # review fix: the chip must read "warn" (amber), agreeing with the Checks section below,
+    # not "pass" (green).
+    assert v["signals"]["checks"]["state"] == "warn"
+
+
+def test_identity_incomplete_downgrades_completeness_to_warn(tmp_path):
+    # A fully annotated + footprinted board that still lacks MPN/datasheet is a warning, not a
+    # hard blocker; its completeness chip must read "warn", not "pass".
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p", sheet=_ANNOT_NO_MPN)
+    rec = ops.register(proj)
+    v = ops.buildability(rec.id, checks=_CHECKS_OK, bom=_BOM_OK)
+    assert v["signals"]["completeness"]["state"] == "warn"
+    assert any(w["kind"] == "identity_incomplete" for w in v["warnings"])
+    assert v["ready"] is True
+
+
+def test_unannotated_blocker_remedy_names_kicad(tmp_path):
+    # Multi-unit / repeated-hierarchy refs are DEFERRED to KiCad by Prepare, so the remedy must
+    # not be a Prepare-only dead-end that provably cannot clear the blocker.
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p")  # _FRESH has unannotated R?/U?
+    rec = ops.register(proj)
+    v = ops.buildability(rec.id)
+    b = next(b for b in v["blockers"] if b["kind"] == "unannotated")
+    assert "KiCad" in b["next_step"]
 
 
 def test_bom_stock_risk_is_warning_not_blocker(tmp_path):
