@@ -54,6 +54,7 @@ def projects_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         ctx.project_ops.delete(project_id)
         ctx.checks_cache.pop(project_id, None)  # the cached ERC/DRC is now stale
+        ctx.bom_cache.pop(project_id, None)  # the cached BOM is now stale too
         ctx.rebuild_project_index()
         return Response(status_code=204)
 
@@ -108,4 +109,62 @@ def projects_router(require_token) -> APIRouter:
             return {"project": rec.name, "ran_at": None, "erc": None, "drc": [], "summary": None}
         return cached
 
+    @r.post("/{project_id}/bom")
+    def build_bom(request: Request, project_id: str, body: dict | None = None) -> dict:
+        # Build a grouped, priced BOM off the request path as a job with SSE progress
+        # (pricing each unique MPN through the enrich layer is network-bound). Grouping is
+        # offline, so there is NO kicad-cli gate: the BOM works without KiCad installed;
+        # pricing degrades honestly to unpriced lines when the enrich layer cannot reach a
+        # distributor (Decision 8), never a fabricated price. Cached in AppContext so a
+        # re-open renders instantly. Unknown id -> 404.
+        ctx = request.app.state.ctx
+        if ctx.project_ops.get(project_id) is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        boards = (body or {}).get("boards", 1)
+
+        def work(progress):
+            price_lookup = _bom_price_lookup(ctx)
+            result = ctx.project_ops.bom(
+                project_id, boards=boards, price_lookup=price_lookup, progress=progress
+            )
+            ctx.bom_cache[project_id] = result
+            return result
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/{project_id}/bom")
+    def get_bom(request: Request, project_id: str) -> dict:
+        # The cached last build, or an honest not-built shape so the frontend renders a
+        # stable "not built yet" state (summary None, never a fabricated cost). Unknown id -> 404.
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        cached = ctx.bom_cache.get(project_id)
+        if cached is None:
+            return {"project": rec.name, "ran_at": None, "boards": 1, "priced": False,
+                    "line_count": 0, "component_count": 0, "lines": [],
+                    "summary": None, "by_source": None, "cost_at_qty": None}
+        return cached
+
     return r
+
+
+def _bom_price_lookup(ctx):
+    """A price_lookup(mpn) served by Stockroom's own enrich layer: build the same
+    pipeline the enrich routes use, enrich each MPN (cache-first), and adapt the result
+    into the BOM's flat cost dict. Any failure or a total miss returns None, so the line
+    stays honestly unpriced and a price is never invented."""
+    from stockroom.api.routers.enrich import _make_pipeline
+    from stockroom.projects.bom import enrichment_to_bom_lookup
+
+    pipeline = _make_pipeline(ctx)
+
+    def lookup(mpn):
+        try:
+            result = pipeline.enrich(mpn, "Other")
+        except Exception:  # noqa: BLE001 - a dead lookup leaves the line unpriced, never blocks
+            return None
+        return enrichment_to_bom_lookup(result)
+
+    return lookup
