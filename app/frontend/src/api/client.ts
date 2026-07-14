@@ -22,6 +22,7 @@ import type {
   JobRef,
   PartDetail,
   PartsResponse,
+  ProcurementExportOptions,
   ProcurementResult,
   ProfilesResponse,
   ProjectDetail,
@@ -482,11 +483,23 @@ export const api = {
   },
 
   // Download a BOM export (M7d). Fetches the named binary with the bearer token and saves it
-  // via a temporary object URL, so a CSV / XLSX / cart / JLCPCB sheet lands as a file.
-  async downloadBomExport(id: string, kind: BomExportKind): Promise<void> {
+  // via a temporary object URL, so a CSV / XLSX / cart / JLCPCB sheet lands as a file. The
+  // optional procurement knobs (spares / PCB pack / tax / shipping / labour / assembly) are
+  // threaded to the Procurement Sheet + Mouser Cart exports; a null/undefined knob is omitted.
+  async downloadBomExport(
+    id: string,
+    kind: BomExportKind,
+    opts?: ProcurementExportOptions,
+  ): Promise<void> {
+    const params: Record<string, string> = { kind };
+    if (opts) {
+      for (const [k, v] of Object.entries(opts)) {
+        if (v != null) params[k] = String(v);
+      }
+    }
     const { blob, filename } = await fetchDownload(
       `/api/projects/${encodeURIComponent(id)}/bom/export`,
-      { kind },
+      params,
     );
     triggerDownload(blob, filename);
   },
