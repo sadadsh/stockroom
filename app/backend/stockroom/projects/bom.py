@@ -69,6 +69,68 @@ def _dist_pn(r) -> str:
     return lcsc or mouser or digikey
 
 
+# -- row primitives shared by procurement / export / diff (M7d) ----------------
+
+
+def _bom_line_qty(r) -> int:
+    """A BOM line's per-board quantity as a whole number: 'qty' (project BOM) or
+    'total_qty' (consolidated). Anything unparseable folds to 0."""
+    try:
+        return int(float(r.get("qty", r.get("total_qty", 0)) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _row_refs(r) -> list:
+    """The reference designators for a BOM row, from a project row (`refs`) or a
+    consolidated row (`refs_by_board`), de-duplicated and naturally sorted."""
+    if r.get("refs"):
+        return sorted(set(r["refs"]), key=_natural_ref)
+    out: list = []
+    for refs in (r.get("refs_by_board") or {}).values():
+        out.extend(refs)
+    return sorted(set(out), key=_natural_ref)
+
+
+def _row_is_passive(r) -> bool:
+    """Whether a BOM row is a small SMT passive (R / C / L / ferrite bead) - the parts
+    that suffer pick-and-place attrition on an assembly line. Keyed off the refdes prefix
+    against the same _BASIC_PREFIXES set is_basic_part uses, but MPN-independent (a
+    specific-MPN 0402 cap is still a passive). A row groups one part, so its refdes share
+    a prefix; the first ref decides."""
+    refs = _row_refs(r)
+    if not refs:
+        return False
+    m = re.match(r"[A-Za-z]+", refs[0])
+    return (m.group(0).upper() if m else "") in _BASIC_PREFIXES
+
+
+def _lead_weeks(v):
+    """Normalize a distributor lead-time value into whole weeks, or None when unknown.
+    Providers disagree on shape: Mouser gives strings ("16 Weeks"), DigiKey gives a number
+    of weeks, LCSC gives nothing. A numeric value is taken as weeks; a string is parsed for
+    a leading count plus an optional unit (weeks default, days converted up), and anything
+    without a parseable number ("In Stock", "", None) returns None - unknown, not a warning.
+    Negative -> None (garbage); 0 stays 0 (in stock, not a lead risk). Days round UP to whole
+    weeks so a lead time is never understated."""
+    import math
+    if isinstance(v, bool):  # a stray bool is not a duration
+        return None
+    if isinstance(v, (int, float)):
+        return int(v) if v >= 0 else None
+    if not isinstance(v, str):
+        return None
+    m = re.search(r"(\d+(?:\.\d+)?)", v)
+    if not m:
+        return None
+    n = float(m.group(1))
+    if n < 0:
+        return None
+    if re.search(r"\bday", v, re.IGNORECASE):
+        return math.ceil(n / 7.0)
+    return int(n)
+
+
 # -- schematic read (Stockroom sexp, replacing fp_render.parse_sexpr) ----------
 
 
@@ -611,11 +673,12 @@ _DISTRIBUTOR_SOURCES = {"mouser": "Mouser", "lcsc": "LCSC", "digikey": "DigiKey"
 
 def enrichment_to_bom_lookup(result) -> dict | None:
     """Adapt an enrich-layer EnrichmentResult into the flat {price_breaks, unit_price,
-    stock, manufacturer, datasheet, description, source} dict the BOM's price_lookup
-    expects (M7c-3), so pricing is served by Stockroom's own enrich layer rather than the
-    retired app's dropped distributor adapters. Returns None for an empty result (a total
-    miss), so the line stays honestly unpriced. lifecycle / lead time / distributor part
-    numbers are added in M7d, where sourcing-risk and exports need them."""
+    stock, manufacturer, datasheet, description, source, lifecycle, lead_time, url,
+    <dist>_pn} dict the BOM's price_lookup expects (M7c-3 + M7d), so pricing AND
+    procurement are served by Stockroom's own enrich layer rather than the retired app's
+    dropped distributor adapters. Returns None for an empty result (a total miss), so the
+    line stays honestly unpriced. Each optional field is emitted only when the result
+    carried it, so an absent lifecycle/lead/dist-P/N is simply omitted, never a blank."""
     if result is None:
         return None
     breaks = [{"qty": b.qty, "price": b.price} for b in getattr(result, "price_breaks", [])]
@@ -635,6 +698,16 @@ def enrichment_to_bom_lookup(result) -> dict | None:
         out["datasheet"] = _val(result.datasheet_url)
     if result.description is not None:
         out["description"] = _val(result.description)
+    # M7d procurement fields the sourcing-risk + export layer reads off the priced row.
+    if result.lifecycle is not None:
+        out["lifecycle"] = _val(result.lifecycle)
+    if result.lead_time is not None:
+        out["lead_time"] = _val(result.lead_time)
+    if result.product_url is not None:
+        out["url"] = _val(result.product_url)
+    for dist, pn in (getattr(result, "dist_pns", None) or {}).items():
+        if pn:
+            out[f"{dist}_pn"] = pn
     # Label the Source with the distributor that carried the priced signal: prefer the
     # source recorded on stock (a distributor stock count), else on the MPN.
     for sourced in (result.stock, result.mpn, result.manufacturer):

@@ -70,3 +70,39 @@ def test_canonical_specs_defaults():
     assert cs.package == ""
     assert cs.specs == {}
     assert cs.pinout == []
+
+
+# -- M7d: the procurement fields (lifecycle / lead time / product page / distributor P/Ns)
+
+
+def test_procurement_fields_default_empty():
+    r = EnrichmentResult(category="ICs")
+    assert r.lifecycle is None
+    assert r.lead_time is None
+    assert r.product_url is None
+    assert r.dist_pns == {}
+    assert r.filled_fields() == set()
+
+
+def test_filled_fields_reports_the_procurement_fields():
+    r = EnrichmentResult(category="ICs")
+    r.lifecycle = Sourced("Active", "mouser", "high")
+    r.lead_time = Sourced("16 Weeks", "mouser", "high")
+    r.product_url = Sourced("http://x/p", "mouser", "high")
+    r.dist_pns = {"mouser": "595-TPS62130RGTR"}
+    assert r.filled_fields() == {"lifecycle", "lead_time", "product_url", "dist_pns"}
+
+
+def test_merge_missing_fills_procurement_fields_only_when_empty():
+    a = EnrichmentResult(category="ICs")
+    a.lifecycle = Sourced("Active", "datasheet", "high")
+    a.dist_pns = {"mouser": "595-KEEP"}
+    b = EnrichmentResult(category="ICs")
+    b.lifecycle = Sourced("NRND", "scrape", "low")  # a already filled: must not overwrite
+    b.lead_time = Sourced("12 Weeks", "scrape", "medium")  # a empty: take it
+    b.dist_pns = {"mouser": "595-DROP", "lcsc": "C123"}  # per-key: keep mouser, add lcsc
+    a.merge_missing(b)
+    assert a.lifecycle.value == "Active"
+    assert a.lifecycle.source == "datasheet"
+    assert a.lead_time.value == "12 Weeks"
+    assert a.dist_pns == {"mouser": "595-KEEP", "lcsc": "C123"}

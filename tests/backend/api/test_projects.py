@@ -402,6 +402,60 @@ def test_bom_job_does_not_resurrect_cache_for_a_deleted_project(client, app_ctx,
     assert rec["id"] not in app_ctx.bom_cache  # the existence re-check prevented resurrection
 
 
+# ---- procurement (M7d) ------------------------------------------------------
+
+
+class _ProcPipeline:
+    """A stand-in enrich pipeline that prices the IC as a short-stock, NRND, long-lead
+    part so the procurement roll-ups have a real risk + lead to report."""
+
+    def enrich(self, mpn, category, want=None):
+        from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+        r = EnrichmentResult()
+        if mpn == "TPS2121RUXR":
+            r.mpn = Sourced(mpn, "mouser", "high")
+            r.stock = Sourced(0, "mouser", "high")  # no stock -> a real risk
+            r.lifecycle = Sourced("NRND", "mouser", "high")
+            r.lead_time = Sourced("18 Weeks", "mouser", "high")
+            r.price_breaks = [PriceBreak(qty=1, price=1.25)]
+        return r
+
+
+def test_get_procurement_before_a_build_is_an_honest_not_built_shape(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
+    body = client.get(f"/api/projects/{rec['id']}/procurement").json()
+    assert body["built"] is False
+    assert body["lines"] == []
+    assert body["risks"]["any"] is False
+    assert body["lead"]["any"] is False
+
+
+def test_get_procurement_after_a_build_reports_risk_and_lead(client, app_ctx, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _ProcPipeline()
+    )
+    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
+
+    body = client.get(f"/api/projects/{rec['id']}/procurement").json()
+    assert body["built"] is True
+    assert body["priced"] is True
+    by_mpn = {ln["mpn"]: ln for ln in body["lines"]}
+    assert by_mpn["TPS2121RUXR"]["stock_risk"]["kind"] == "err"  # 0 stock
+    assert by_mpn["TPS2121RUXR"]["orderable"] is False
+    assert body["risks"]["not_active"] == 1  # NRND
+    assert body["risks"]["no_stock"] == 1
+    assert "TPS2121RUXR" in body["risks"]["risky_mpns"]
+    assert body["lead"]["max_weeks"] == 18
+    assert body["lead"]["critical_mpn"] == "TPS2121RUXR"
+    assert body["summary"].startswith("BOM: ")
+
+
+def test_get_procurement_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/procurement").status_code == 404
+
+
 # ---- auth -------------------------------------------------------------------
 
 
@@ -410,3 +464,4 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.post("/api/projects/x/checks").status_code == 401
     assert anon_client.post("/api/projects/x/bom").status_code == 401
     assert anon_client.get("/api/projects/x/bom").status_code == 401
+    assert anon_client.get("/api/projects/x/procurement").status_code == 401

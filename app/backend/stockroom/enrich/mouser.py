@@ -56,6 +56,21 @@ def _parse_mouser_part(p: dict) -> EnrichmentResult:
         stock = 0
     if stock:
         r.stock = Sourced(stock, "mouser", "high")
+    # M7d procurement fields the BOM cost/sourcing layer consumes. Each is emitted only
+    # when Mouser actually returned it, so an absent value stays None (honest unknown,
+    # not a fabricated status/lead).
+    lifecycle = (p.get("LifecycleStatus") or "").strip()
+    if lifecycle:
+        r.lifecycle = Sourced(lifecycle, "mouser", "high")
+    lead = (p.get("LeadTime") or "").strip()
+    if lead:
+        r.lead_time = Sourced(lead, "mouser", "high")
+    url = (p.get("ProductDetailUrl") or "").strip()
+    if url:
+        r.product_url = Sourced(url, "mouser", "high")
+    mouser_pn = (p.get("MouserPartNumber") or "").strip()
+    if mouser_pn:
+        r.dist_pns["mouser"] = mouser_pn
     breaks: list[PriceBreak] = []
     for b in p.get("PriceBreaks") or []:
         qty, price = b.get("Quantity"), _coerce_price(b.get("Price"))

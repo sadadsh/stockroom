@@ -322,6 +322,31 @@ def test_enrichment_to_bom_lookup_blank_source_for_non_distributor():
     assert "source" not in row  # a scrape is not a distributor -> Unsourced downstream
 
 
+def test_enrichment_to_bom_lookup_carries_procurement_fields():  # M7d
+    result = EnrichmentResult()
+    result.mpn = Sourced("TPS62130RGTR", "mouser", "high")
+    result.stock = Sourced(4200, "mouser", "high")
+    result.lifecycle = Sourced("Active", "mouser", "high")
+    result.lead_time = Sourced("16 Weeks", "mouser", "high")
+    result.product_url = Sourced("http://x/exact", "mouser", "high")
+    result.dist_pns = {"mouser": "595-TPS62130RGTR", "lcsc": "C123"}
+    row = enrichment_to_bom_lookup(result)
+    assert row["lifecycle"] == "Active"
+    assert row["lead_time"] == "16 Weeks"
+    assert row["url"] == "http://x/exact"
+    assert row["mouser_pn"] == "595-TPS62130RGTR"
+    assert row["lcsc_pn"] == "C123"
+
+
+def test_enrichment_to_bom_lookup_omits_absent_procurement_fields():  # M7d: honest, no blanks
+    result = EnrichmentResult()
+    result.mpn = Sourced("X", "mouser", "high")
+    result.price_breaks = [PriceBreak(qty=1, price=1.0)]
+    row = enrichment_to_bom_lookup(result)
+    for absent in ("lifecycle", "lead_time", "url", "mouser_pn", "lcsc_pn", "digikey_pn"):
+        assert absent not in row
+
+
 # -- project orchestrator (M7c-4) ----------------------------------------------
 def test_project_bom_builds_grouped_rows_offline(tmp_path):
     _write_sch(tmp_path / "root.kicad_sch",

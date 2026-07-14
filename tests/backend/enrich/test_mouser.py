@@ -38,3 +38,14 @@ def test_lookup_prefers_the_exact_mpn_row_not_parts_zero():
 def test_lookup_returns_empty_on_no_parts():
     a = MouserAdapter(api_key="k", requester=lambda mpn: {"SearchResults": {"Parts": []}})
     assert a.lookup("NOPE").filled_fields() == set()
+
+
+def test_lookup_carries_the_procurement_fields(  # M7d: lifecycle / lead / product page / Mouser P/N
+):
+    body = json.loads((FIX / "mouser_partnumber.json").read_text())
+    a = MouserAdapter(api_key="k", requester=lambda mpn: body)
+    r = a.lookup("TPS62130RGTR")
+    assert r.lifecycle.value == "Active"
+    assert r.lead_time.value == "16 Weeks"
+    assert r.product_url.value == "http://x/exact"
+    assert r.dist_pns == {"mouser": "595-TPS62130RGTR"}

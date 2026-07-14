@@ -52,6 +52,11 @@ class CanonicalSpecs:
 
 
 # The single-valued Sourced fields on EnrichmentResult, in merge/report order.
+# lifecycle / lead_time / product_url (M7d) feed the BOM procurement + export layer:
+# a part's manufacturing status, its manufacturer lead time, and its distributor
+# product page. Populated where a source carries them (the Mouser API); a scrape that
+# does not surface them leaves them None, so procurement degrades honestly, never
+# inventing a status or a lead.
 _SOURCED_FIELDS: tuple[str, ...] = (
     "mpn",
     "manufacturer",
@@ -59,6 +64,9 @@ _SOURCED_FIELDS: tuple[str, ...] = (
     "datasheet_url",
     "stock",
     "package",
+    "lifecycle",
+    "lead_time",
+    "product_url",
 )
 
 
@@ -71,6 +79,13 @@ class EnrichmentResult:
     datasheet_url: Sourced | None = None
     stock: Sourced | None = None
     package: Sourced | None = None
+    # M7d procurement fields (see _SOURCED_FIELDS note). dist_pns maps a lowercase
+    # distributor name ("mouser"/"lcsc"/"digikey") to that distributor's own part number,
+    # so an order export can say "order from {dist} by {this P/N}".
+    lifecycle: Sourced | None = None
+    lead_time: Sourced | None = None
+    product_url: Sourced | None = None
+    dist_pns: dict[str, str] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
@@ -81,13 +96,15 @@ class EnrichmentResult:
             out.add("price_breaks")
         if self.specs:
             out.add("specs")
+        if self.dist_pns:
+            out.add("dist_pns")
         return out
 
     def merge_missing(self, other: "EnrichmentResult") -> None:
         """Fill only fields still empty on self from other; NEVER overwrite a field
         already set (spec section 6.1: enrichment never silently overwrites; the
-        first, higher-priority source wins). Specs merge key-by-key, only for keys
-        not already present."""
+        first, higher-priority source wins). Specs and distributor P/Ns merge
+        key-by-key, only for keys not already present."""
         for name in _SOURCED_FIELDS:
             if getattr(self, name) is None and getattr(other, name) is not None:
                 setattr(self, name, getattr(other, name))
@@ -95,3 +112,5 @@ class EnrichmentResult:
             self.price_breaks = list(other.price_breaks)
         for key, val in other.specs.items():
             self.specs.setdefault(key, val)
+        for key, val in other.dist_pns.items():
+            self.dist_pns.setdefault(key, val)
