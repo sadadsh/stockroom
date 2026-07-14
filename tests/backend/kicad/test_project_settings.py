@@ -120,6 +120,26 @@ def test_merge_does_not_mutate_the_base_argument():
     assert base["board"]["rules"]["a"] == 1  # caller's dict is not clobbered
 
 
+def test_merge_result_does_not_alias_an_untouched_nested_container_of_base():
+    # a nested container on a key the patch does NOT touch must be a copy, not aliased:
+    # mutating it through the returned dict must not reach back into base.
+    base = {"net_settings": {"classes": [{"name": "Default"}]}, "other": {"x": 1}}
+    merged = ps.merge(base, {"net_settings": {"meta": {"version": 5}}})
+    merged["net_settings"]["classes"].append({"name": "PWR"})  # mutate a preserved list
+    merged["other"]["x"] = 99  # mutate a preserved dict
+    assert base["net_settings"]["classes"] == [{"name": "Default"}]  # base untouched
+    assert base["other"]["x"] == 1
+
+
+def test_merge_result_does_not_alias_the_patch_container():
+    # a container coming from the patch must also be copied, so mutating the result does
+    # not reach back into the caller's patch dict.
+    patch = {"net_settings": {"classes": [{"name": "PWR"}]}}
+    merged = ps.merge({}, patch)
+    merged["net_settings"]["classes"].append({"name": "X"})
+    assert patch["net_settings"]["classes"] == [{"name": "PWR"}]
+
+
 def test_merge_type_change_dict_to_scalar_patch_wins():
     base = {"k": {"nested": 1}}
     merged = ps.merge(base, {"k": 5})

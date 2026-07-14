@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow
@@ -118,14 +118,22 @@ class SetSpecsBody(BaseModel):
 
 
 class NetClassDTO(BaseModel):
-    """One net class the Editor submits (M7e). `name` is required (a class with no name
-    is a clean 422, never a silent drop); every other KiCad-10 dimension/color field is
-    optional and passes through (extra=allow) so the reconcile can field-merge only the
-    edited keys onto the on-disk class, preserving fields the UI never models."""
+    """One net class the Editor submits (M7e). `name` is required and non-blank (a blank
+    name is a clean 422, never a silent drop by the reconcile which keys on a truthy name);
+    every other KiCad-10 dimension/color field is optional and passes through (extra=allow)
+    so the reconcile can field-merge only the edited keys onto the on-disk class, preserving
+    fields the UI never models."""
 
     model_config = ConfigDict(extra="allow")
 
     name: str
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a net class name must not be blank")
+        return v
 
 
 class SetNetClassesBody(BaseModel):

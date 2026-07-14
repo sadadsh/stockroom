@@ -712,6 +712,16 @@ def test_patch_net_classes_class_without_name_is_422(client, tmp_path):
     assert r.status_code == 422
 
 
+def test_patch_net_classes_empty_name_is_422(client, tmp_path):
+    # an empty (or whitespace) class name passes a bare `name: str` but reconcile would
+    # silently drop it and still report success. The DTO must reject it as a clean 422.
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/net-classes",
+                     json={"classes": [{"name": "  ", "track_width": 0.15}]})
+    assert r.status_code == 422
+
+
 def test_patch_net_classes_on_a_non_git_project_is_400(client, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
     r = client.patch(f"/api/projects/{rec['id']}/net-classes",
