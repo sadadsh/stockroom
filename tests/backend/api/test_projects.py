@@ -568,6 +568,30 @@ def test_bom_diff_reconstructs_rev_a_against_the_working_tree(client, tmp_path):
     assert changed["10k"]["from_qty"] == 2 and changed["10k"]["to_qty"] == 3
 
 
+def test_bom_diff_cost_delta_comes_from_the_cached_priced_build(client, tmp_path, monkeypatch):
+    # Locks the router wire that feeds the cached PRICED build as rev B (current_rows) into
+    # the diff: without it the working tree is reconstructed unpriced and the cost delta is 0.
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
+    )
+    # rev A holds only the passive (with the current footprint so it does not itself diff).
+    rev_a_body = (
+        '  (symbol (lib_id "Device:R") (property "Reference" "R1" (at 0 0 0))'
+        ' (property "Value" "10k" (at 0 0 0)) (property "Footprint" "Resistor_SMD:R_0402" (at 0 0 0)))\n'
+    )
+    proj, rev_a = _make_git_project(tmp_path / "board", rev_a_body)
+    rec = _register(client, proj)
+    # working tree adds the priced IC (TPS2121RUXR, $1.25 from the fake pipeline)
+    (proj / "board.kicad_sch").write_text("(kicad_sch\n" + _IC_AND_PASSIVE + ")\n", encoding="utf-8")
+    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
+
+    body = client.get(f"/api/projects/{rec['id']}/bom/diff", params={"a": rev_a}).json()
+    assert any(x["mpn"] == "TPS2121RUXR" for x in body["added"])
+    assert body["cost"]["priced"] is True  # the current build is priced -> delta is meaningful
+    assert body["cost"]["added_cost"] == 1.25
+    assert body["cost"]["delta"] == 1.25
+
+
 def test_bom_diff_without_a_revision_is_a_400(client, tmp_path):
     proj, _rev = _make_git_project(tmp_path / "board", _TWO_RES)
     rec = _register(client, proj)

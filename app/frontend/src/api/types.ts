@@ -549,6 +549,19 @@ export interface ProcurementResult {
 // are CSV; xlsx/procurement are Excel workbooks.
 export type BomExportKind = "csv" | "priced" | "cart" | "jlcpcb" | "xlsx" | "procurement";
 
+// The buy-side knobs for the Procurement Sheet export (and spares for the Mouser Cart). Sent
+// as query params; tax_rate / assembly_surcharge_rate are FRACTIONS (0.1 = 10%), spares_pct is
+// a whole percent (10 = 10%), matching the backend procurement_xlsx signature.
+export interface ProcurementExportOptions {
+  boards?: number;
+  spares_pct?: number;
+  pcb_multiple?: number;
+  tax_rate?: number;
+  shipping?: number;
+  labour_per_board?: number;
+  assembly_surcharge_rate?: number;
+}
+
 // --- Revision diff (M7d) ---
 
 // One commit in a project's git history (GET /api/projects/{id}/revisions).

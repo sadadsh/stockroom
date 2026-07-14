@@ -40,6 +40,7 @@ import type {
   CheckFinding,
   CheckRun,
   ChecksResult,
+  ProcurementExportOptions,
   ProcurementLine,
   ProcurementResult,
   ProjectSummary,
@@ -1061,15 +1062,54 @@ function saveText(filename: string, text: string): void {
 // stock / short lines / critical-path lead), a per-line orderability table, and the export
 // bar. Honest: before a build it prompts to build; an unpriced build lists lines with
 // unknown (never-a-risk) stock and no cost.
+// The buy-side knobs, in UI units (percentages as whole numbers), defaulting to no
+// adjustment so a one-click export is never silently inflated. tax/assembly are converted to
+// the backend's fraction form when sent; spares stays a whole percent.
+interface ExportOpts {
+  sparesPct: number;
+  pcbMultiple: number;
+  taxPct: number;
+  shipping: number;
+  labourPerBoard: number;
+  assemblyPct: number;
+}
+
+const DEFAULT_EXPORT_OPTS: ExportOpts = {
+  sparesPct: 0,
+  pcbMultiple: 1,
+  taxPct: 0,
+  shipping: 0,
+  labourPerBoard: 0,
+  assemblyPct: 0,
+};
+
 function ProcurementSection({ projectId }: { projectId: string }) {
   const query = useProjectProcurement(projectId);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<BomExportKind | null>(null);
+  const [opts, setOpts] = useState<ExportOpts>(DEFAULT_EXPORT_OPTS);
+
+  // Map the UI knobs to the export query params, per kind: the Procurement Sheet takes them
+  // all, the Mouser Cart takes only spares, and every other kind is a plain one-click export.
+  function exportOpts(kind: BomExportKind): ProcurementExportOptions | undefined {
+    if (kind === "procurement") {
+      return {
+        spares_pct: opts.sparesPct,
+        pcb_multiple: opts.pcbMultiple,
+        tax_rate: opts.taxPct / 100,
+        shipping: opts.shipping,
+        labour_per_board: opts.labourPerBoard,
+        assembly_surcharge_rate: opts.assemblyPct / 100,
+      };
+    }
+    if (kind === "cart") return { spares_pct: opts.sparesPct };
+    return undefined;
+  }
 
   async function onExport(kind: BomExportKind) {
     setDownloading(kind);
     try {
-      await api.downloadBomExport(projectId, kind);
+      await api.downloadBomExport(projectId, kind, exportOpts(kind));
     } catch (e) {
       toast(errMsg(e, "Could not export the BOM."), "err");
     } finally {
@@ -1099,10 +1139,51 @@ function ProcurementSection({ projectId }: { projectId: string }) {
       ) : (
         <div className="flex flex-col gap-4" data-testid="procurement-result">
           <ProcurementRollup data={data as ProcurementResult} />
+          <ExportOptionsForm opts={opts} onChange={setOpts} />
           <ExportBar onExport={onExport} downloading={downloading} />
           <ProcurementLinesTable lines={(data as ProcurementResult).lines} />
         </div>
       )}
+    </div>
+  );
+}
+
+function ExportOptionsForm({
+  opts,
+  onChange,
+}: {
+  opts: ExportOpts;
+  onChange: (o: ExportOpts) => void;
+}) {
+  const fields: { key: keyof ExportOpts; label: string; step?: string }[] = [
+    { key: "sparesPct", label: "Spares %" },
+    { key: "pcbMultiple", label: "PCB Pack" },
+    { key: "taxPct", label: "Tax %", step: "0.1" },
+    { key: "shipping", label: "Shipping $", step: "0.01" },
+    { key: "labourPerBoard", label: "Labour/Board $", step: "0.01" },
+    { key: "assemblyPct", label: "Assembly %", step: "0.1" },
+  ];
+  return (
+    <div data-testid="export-options">
+      <p className="mb-1.5 text-2xs text-t3">
+        Procurement Sheet options (spares also apply to the Mouser Cart).
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {fields.map(({ key, label, step }) => (
+          <label key={key} className="flex flex-col gap-1 text-2xs text-t3">
+            {label}
+            <input
+              type="number"
+              min={0}
+              step={step ?? "1"}
+              className={`${INPUT_CLS} w-24`}
+              data-testid={`opt-${key}`}
+              value={opts[key]}
+              onChange={(e) => onChange({ ...opts, [key]: Number(e.target.value) || 0 })}
+            />
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1327,6 +1408,27 @@ function BomDiffView({ result }: { result: BomDiffResult }) {
   const { added, removed, changed, cost, lead } = result;
   const noChange = added.length === 0 && removed.length === 0 && changed.length === 0;
   const filename = `${(result.project || "project").replace(/[^A-Za-z0-9._-]+/g, "_")}_bom_diff.csv`;
+
+  // Honesty guard: when a revision's schematics could not be read (the files did not exist at
+  // that commit, or were renamed since), its side reconstructs to zero components and every
+  // current part reads as Added with a fabricated cost/lead delta. Surface that instead of the
+  // misleading diff. b_sheets_found is null for the current build, so it never false-triggers.
+  const unreadable =
+    result.a_sheets_found === 0
+      ? "A"
+      : result.b_sheets_found === 0
+        ? "B"
+        : null;
+  if (unreadable) {
+    return (
+      <Card className="px-4 py-3.5" data-testid="diff-unreadable">
+        <p className="text-sm text-warn">
+          Revision {unreadable} had no readable schematics at that commit, so this comparison is
+          not meaningful. Pick a commit after the schematic was added.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4" data-testid="diff-result">

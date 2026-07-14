@@ -686,7 +686,28 @@ describe("ProjectsPage", () => {
 
     await screen.findByTestId("export-bar");
     await user.click(screen.getByRole("button", { name: "JLCPCB BOM" }));
-    expect(mockApi.downloadBomExport).toHaveBeenCalledWith("netdeck", "jlcpcb");
+    // JLCPCB is a plain one-click export: no procurement knobs.
+    expect(mockApi.downloadBomExport).toHaveBeenCalledWith("netdeck", "jlcpcb", undefined);
+  });
+
+  it("threads the procurement-sheet options into the export (percent to fraction)", async () => {
+    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("export-options");
+    await user.clear(screen.getByTestId("opt-sparesPct"));
+    await user.type(screen.getByTestId("opt-sparesPct"), "5");
+    await user.clear(screen.getByTestId("opt-taxPct"));
+    await user.type(screen.getByTestId("opt-taxPct"), "7");
+    await user.click(screen.getByRole("button", { name: "Procurement Sheet" }));
+
+    expect(mockApi.downloadBomExport).toHaveBeenCalledWith(
+      "netdeck",
+      "procurement",
+      expect.objectContaining({ spares_pct: 5, tax_rate: 0.07, pcb_multiple: 1 }),
+    );
   });
 
   it("toasts when an export fails", async () => {
@@ -739,5 +760,23 @@ describe("ProjectsPage", () => {
     await screen.findByTestId("diff-pickers");
     expect(screen.getByText(/Choose a commit to compare/i)).toBeInTheDocument();
     expect(mockApi.getBomDiff).not.toHaveBeenCalled();
+  });
+
+  it("flags an unreadable revision instead of fabricating an everything-added diff", async () => {
+    // a_sheets_found 0 = rev A predates the schematic; the diff would otherwise show every
+    // current part as Added with a cost delta. It must show an honest caveat, not that diff.
+    mockApi.getRevisions.mockResolvedValue(REVS_TWO);
+    mockApi.getBomDiff.mockResolvedValue({ ...DIFF, a_sheets_found: 0 });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("diff-pickers");
+    await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
+    expect(await screen.findByTestId("diff-unreadable")).toHaveTextContent(
+      /no readable schematics/i,
+    );
+    // the fabricated diff table + cost badge must NOT render
+    expect(screen.queryByTestId("diff-result")).not.toBeInTheDocument();
   });
 });
