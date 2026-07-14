@@ -427,6 +427,68 @@ export interface ChecksResult {
   ran_at: string | null;
 }
 
+// One grouped BOM line (POST/GET /api/projects/{id}/bom, M7c). refs are the reference
+// designators that merged into this line; basic marks a standard passive stocked by
+// value; has_real_mpn is false for a passive with no purchasable part number. The
+// priced fields (unit_price/extended/stock/source) are present only when the line was
+// costed; an unpriced line simply omits them (a price is never invented).
+export interface BomLine {
+  refs: string[];
+  qty: number;
+  value: string;
+  mpn: string;
+  manufacturer: string;
+  has_real_mpn: boolean;
+  footprint: string;
+  datasheet: string;
+  description: string;
+  basic: boolean;
+  unit_price?: number | string;
+  extended?: number;
+  stock?: number;
+  source?: string;
+  price_breaks?: { qty: number; price: number }[];
+}
+
+// The BOM cost roll-up. state is the honest verdict: "empty" (no lines), "built"
+// (grouped, pricing not attempted), "unpriced" (pricing attempted, nothing costed, e.g.
+// offline), "partial" (some lines unpriced), "costed" (every line priced). Only "costed"
+// is a fully green verdict, mirroring the checks "nothing checked is never Clean" rule.
+export interface BomCostSummary {
+  total_cost: number;
+  priced_lines: number;
+  unpriced_lines: number;
+  line_count: number;
+  currency: string;
+  state: "empty" | "built" | "unpriced" | "partial" | "costed";
+  priced: boolean;
+}
+
+// POST/GET /api/projects/{id}/bom -> a grouped, optionally priced BOM (M7c). ran_at and
+// summary are null before the first build: an honest "not built yet" state, never a
+// fabricated cost. by_source / cost_at_qty are present only for a priced build.
+export interface BomResult {
+  project: string;
+  ran_at: string | null;
+  boards: number;
+  priced: boolean;
+  line_count: number;
+  component_count: number;
+  lines: BomLine[];
+  summary: BomCostSummary | null;
+  by_source: {
+    sources: Record<string, { total_cost: number; lines: number }>;
+    currency: string;
+  } | null;
+  cost_at_qty: {
+    boards: number;
+    total_cost: number;
+    priced_lines: number;
+    unpriced_lines: number;
+    currency: string;
+  } | null;
+}
+
 // GET /api/system/info
 export interface SystemInfo {
   active_profile: string;

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { api, ApiError } from "../api/client";
 import type {
   AuditResult,
+  BomResult,
   ChecksResult,
   ProjectDetail,
   ProjectSummary,
@@ -23,6 +24,8 @@ vi.mock("../api/client", async (importActual) => {
       projectAudit: vi.fn(),
       runChecks: vi.fn(),
       getChecks: vi.fn(),
+      runBom: vi.fn(),
+      getBom: vi.fn(),
       openJobStream: vi.fn(),
     },
   };
@@ -132,6 +135,69 @@ const RAN: ChecksResult = {
   ran_at: "2026-07-13T15:00:00Z",
 };
 
+const NOT_BUILT: BomResult = {
+  project: "Netdeck",
+  ran_at: null,
+  boards: 1,
+  priced: false,
+  line_count: 0,
+  component_count: 0,
+  lines: [],
+  summary: null,
+  by_source: null,
+  cost_at_qty: null,
+};
+
+const BUILT: BomResult = {
+  project: "Netdeck",
+  ran_at: "2026-07-13T16:00:00Z",
+  boards: 1,
+  priced: true,
+  line_count: 2,
+  component_count: 3,
+  lines: [
+    {
+      refs: ["R1", "R2"],
+      qty: 2,
+      value: "10k",
+      mpn: "",
+      manufacturer: "",
+      has_real_mpn: false,
+      footprint: "Resistor_SMD:R_0402",
+      datasheet: "",
+      description: "",
+      basic: true,
+    },
+    {
+      refs: ["U1"],
+      qty: 1,
+      value: "TPS2121",
+      mpn: "TPS2121RUXR",
+      manufacturer: "TI",
+      has_real_mpn: true,
+      footprint: "",
+      datasheet: "",
+      description: "",
+      basic: false,
+      unit_price: 1.25,
+      extended: 1.25,
+      stock: 5000,
+      source: "Mouser",
+    },
+  ],
+  summary: {
+    total_cost: 1.25,
+    priced_lines: 1,
+    unpriced_lines: 1,
+    line_count: 2,
+    currency: "USD",
+    state: "partial",
+    priced: true,
+  },
+  by_source: { sources: { Mouser: { total_cost: 1.25, lines: 1 } }, currency: "USD" },
+  cost_at_qty: null,
+};
+
 // Build an SSE body from event frames, matching the fetch-based job stream the client
 // consumes (event:/data: lines, blank-line separated).
 function sseStream(frames: string[]): ReadableStream<Uint8Array> {
@@ -165,6 +231,7 @@ beforeEach(() => {
   mockApi.registerProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.deleteProject.mockResolvedValue(undefined);
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
+  mockApi.getBom.mockResolvedValue(NOT_BUILT);
 });
 
 describe("ProjectsPage", () => {
@@ -384,5 +451,86 @@ describe("ProjectsPage", () => {
     expect(await screen.findByTestId("checks-result")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Re-run Checks" })).toBeInTheDocument();
     expect(mockApi.runChecks).not.toHaveBeenCalled();
+  });
+
+  it("prompts to build and offers a Build And Cost action on an unbuilt project", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByText(/BOM has not been built yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Build And Cost" })).toBeInTheDocument();
+  });
+
+  it("builds a grouped, priced BOM and shows the verdict, lines, and cost", async () => {
+    mockApi.runBom.mockResolvedValue({ job_id: "bom-1" });
+    mockApi.openJobStream.mockResolvedValue(
+      sseStream([
+        `event: result\r\ndata: ${JSON.stringify({ result: BUILT })}`,
+        `event: done\r\ndata: {}`,
+      ]),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
+
+    await waitFor(() => expect(mockApi.runBom).toHaveBeenCalledWith("netdeck"));
+    const result = await screen.findByTestId("bom-result");
+    // partial verdict: costed total plus an honest unpriced-line count (never hidden)
+    expect(within(result).getByText("$1.25 Costed")).toBeInTheDocument();
+    expect(within(result).getByText("1 Unpriced Line")).toBeInTheDocument();
+    // the grouped lines: the merged passive (Basic) and the priced IC
+    const lines = within(result).getByTestId("bom-lines");
+    expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
+    expect(within(lines).getByText("Basic")).toBeInTheDocument();
+    expect(within(lines).getByText("R1, R2")).toBeInTheDocument();
+    expect(within(lines).getByText("$1.25")).toBeInTheDocument();
+  });
+
+  it("surfaces an honest error when the BOM build cannot start", async () => {
+    mockApi.runBom.mockRejectedValue(new ApiError(500, "the build engine failed"));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
+
+    expect(await screen.findAllByText(/the build engine failed/i)).not.toHaveLength(0);
+    expect(screen.queryByTestId("bom-result")).toBeNull();
+  });
+
+  it("shows an honest Unpriced verdict when a build could source nothing", async () => {
+    mockApi.getBom.mockResolvedValue({
+      ...BUILT,
+      lines: [BUILT.lines[1]].map((l) => ({ ...l, unit_price: undefined, extended: undefined, source: undefined })),
+      line_count: 1,
+      priced: true,
+      summary: {
+        total_cost: 0,
+        priced_lines: 0,
+        unpriced_lines: 1,
+        line_count: 1,
+        currency: "USD",
+        state: "unpriced",
+        priced: true,
+      },
+      by_source: { sources: {}, currency: "USD" },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const result = await screen.findByTestId("bom-result");
+    expect(within(result).getByText("Unpriced")).toBeInTheDocument();
+    expect(within(result).queryByText(/Costed/)).toBeNull();
+  });
+
+  it("renders a previously cached build on select without rebuilding", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    expect(await screen.findByTestId("bom-result")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rebuild BOM" })).toBeInTheDocument();
+    expect(mockApi.runBom).not.toHaveBeenCalled();
   });
 });

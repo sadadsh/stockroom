@@ -9,6 +9,7 @@ import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
   AuditResult,
+  BomResult,
   ChecksResult,
   DiffResponse,
   DoctorScan,
@@ -395,5 +396,18 @@ export const api = {
   // first run. Read on selecting a project so a prior run renders without re-running.
   getChecks(id: string): Promise<ChecksResult> {
     return apiGet<ChecksResult>(`/api/projects/${encodeURIComponent(id)}/checks`);
+  },
+
+  // Build a grouped, priced BOM (M7c) off the request path as a job (the built BOM
+  // arrives on the job's SSE result event). No kicad-cli needed; pricing is best-effort
+  // through the enrich layer, so a line that cannot be sourced stays honestly unpriced.
+  runBom(id: string): Promise<JobRef> {
+    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`);
+  },
+
+  // The cached last build, or an honest not-built shape (ran_at null) before the first
+  // build. Read on selecting a project so a prior build renders without rebuilding.
+  getBom(id: string): Promise<BomResult> {
+    return apiGet<BomResult>(`/api/projects/${encodeURIComponent(id)}/bom`);
   },
 };
