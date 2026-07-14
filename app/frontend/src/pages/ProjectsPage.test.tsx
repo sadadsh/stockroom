@@ -2264,6 +2264,16 @@ describe("Fab Prep (M7i)", () => {
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
   });
 
+  it("shows an honest error instead of the no-board prompt when the fab status fails to load", async () => {
+    mockApi.getFab.mockRejectedValue(new ApiError(500, "server exploded"));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByTestId("fab-error")).toHaveTextContent(/server exploded/i);
+    expect(screen.queryByTestId("fab-no-board")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
+  });
+
   it("exports the fab bundle with the default options through the authed download client", async () => {
     renderPage(); // beforeEach seeds FAB_READY (board present + kicad-cli available)
     const user = userEvent.setup();

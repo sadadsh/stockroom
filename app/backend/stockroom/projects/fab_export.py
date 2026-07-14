@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import os
+import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -66,28 +67,45 @@ def build_fab_bundle(
         raise ValueError(f"board file not found: {pcb.name}")
 
     with tempfile.TemporaryDirectory(prefix="stockroom-fab-") as tmp:
-        out = Path(tmp)
+        # kicad-cli writes a <board>.kicad_prl (local settings) NEXT TO the board it opens, so
+        # run against a COPY in an isolated `src` dir: the stray .kicad_prl lands beside the copy
+        # (discarded with the temp dir) and the project tree is never touched. `out` holds only
+        # the fab files we zip. Deleting the .kicad_prl afterward would be wrong (it could clobber
+        # a user's real one), so we never let it near the project in the first place.
         stem = pcb.stem
+        src = Path(tmp) / "src"
+        out = Path(tmp) / "out"
+        src.mkdir()
+        out.mkdir()
+        board = src / pcb.name
+        shutil.copyfile(pcb, board)
 
         # Gerbers (+ the .gbrjob job file kicad-cli emits alongside them). -o is a directory.
         gerbers = [cli, "pcb", "export", "gerbers", "-o", str(out)]
         if not protel_ext:
             gerbers.append("--no-protel-ext")
-        gerbers.append(str(pcb))
+        gerbers.append(str(board))
         _run(gerbers)
 
         # Drill files. -o is a directory and kicad-cli wants a trailing separator.
         drill = [cli, "pcb", "export", "drill", "-o", str(out) + os.sep, "--format", drill_format]
         if drill_map:
             drill.append("--generate-map")
-        drill.append(str(pcb))
+        drill.append(str(board))
         _run(drill)
 
         # Placement / centroid file for assembly. -o is a FILE, not a directory.
         if include_pos:
-            pos_out = out / f"{stem}-pos.{_POS_EXT[pos_format]}"
-            _run([cli, "pcb", "export", "pos", "-o", str(pos_out),
-                  "--format", pos_format, str(pcb)])
+            if pos_format == "gerber":
+                # Gerber placement is one side per file: kicad-cli rejects the default --side both
+                # for Gerber ('"both" not supported for Gerber format'), so plot front and back.
+                for side in ("front", "back"):
+                    _run([cli, "pcb", "export", "pos", "-o", str(out / f"{stem}-pos-{side}.gbr"),
+                          "--format", "gerber", "--side", side, str(board)])
+            else:
+                pos_out = out / f"{stem}-pos.{_POS_EXT[pos_format]}"
+                _run([cli, "pcb", "export", "pos", "-o", str(pos_out),
+                      "--format", pos_format, str(board)])
 
         files = sorted(p for p in out.iterdir() if p.is_file())
         if not files:
@@ -111,11 +129,12 @@ def _run(cmd: list) -> None:
     try:
         proc = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, creationflags=_NO_WINDOW, timeout=_TIMEOUT,
+            text=True, encoding="utf-8", errors="replace",
+            creationflags=_NO_WINDOW, timeout=_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
         raise KiCadCliError(f"kicad-cli timed out after {_TIMEOUT}s")
-    except OSError as e:
+    except Exception as e:  # noqa: BLE001 - any spawn/decode failure is a labeled honest error (-> 502)
         raise KiCadCliError(str(e))
     if proc.returncode != 0:
         err = (proc.stdout or "").strip() or f"kicad-cli exited {proc.returncode}"
