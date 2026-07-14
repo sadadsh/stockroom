@@ -509,6 +509,82 @@ def test_export_for_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/bom/export", params={"kind": "csv"}).status_code == 404
 
 
+# ---- revision diff (M7d) ----------------------------------------------------
+
+import subprocess
+
+
+def _make_git_project(dir_path, sheet_body):
+    """A registered-able project dir that is its OWN git repo, with one commit."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
+    (dir_path / "board.kicad_sch").write_text(
+        "(kicad_sch\n" + sheet_body + ")\n", encoding="utf-8")
+    for args in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"], ["add", "."], ["commit", "-m", "rev A"]):
+        subprocess.run(["git", "-C", str(dir_path), *args], check=True, capture_output=True)
+    head = subprocess.run(["git", "-C", str(dir_path), "rev-parse", "HEAD"],
+                          check=True, capture_output=True, text=True).stdout.strip()
+    return dir_path, head
+
+
+_TWO_RES = (
+    '  (symbol (lib_id "Device:R") (property "Reference" "R1" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0)))\n'
+    '  (symbol (lib_id "Device:R") (property "Reference" "R2" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0)))\n'
+)
+
+
+def test_revisions_lists_the_project_git_history(client, tmp_path):
+    proj, rev_a = _make_git_project(tmp_path / "board", _TWO_RES)
+    rec = _register(client, proj)
+    body = client.get(f"/api/projects/{rec['id']}/revisions").json()
+    assert body["under_git"] is True
+    assert len(body["revisions"]) == 1
+    assert body["revisions"][0]["sha"] == rev_a
+    assert body["revisions"][0]["short"] == rev_a[:7]
+
+
+def test_revisions_for_a_non_git_project_is_an_honest_empty(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
+    body = client.get(f"/api/projects/{rec['id']}/revisions").json()
+    assert body["under_git"] is False
+    assert body["revisions"] == []
+
+
+def test_bom_diff_reconstructs_rev_a_against_the_working_tree(client, tmp_path):
+    proj, rev_a = _make_git_project(tmp_path / "board", _TWO_RES)
+    rec = _register(client, proj)
+    # add a third 10k in the working tree after registration
+    (proj / "board.kicad_sch").write_text(
+        "(kicad_sch\n" + _TWO_RES
+        + '  (symbol (lib_id "Device:R") (property "Reference" "R3" (at 0 0 0))'
+          ' (property "Value" "10k" (at 0 0 0)))\n)\n', encoding="utf-8")
+    body = client.get(f"/api/projects/{rec['id']}/bom/diff", params={"a": rev_a}).json()
+    assert body["rev_a"] == rev_a
+    assert body["rev_b"] == "current"
+    changed = {c["value"]: c for c in body["changed"]}
+    assert changed["10k"]["from_qty"] == 2 and changed["10k"]["to_qty"] == 3
+
+
+def test_bom_diff_without_a_revision_is_a_400(client, tmp_path):
+    proj, _rev = _make_git_project(tmp_path / "board", _TWO_RES)
+    rec = _register(client, proj)
+    assert client.get(f"/api/projects/{rec['id']}/bom/diff").status_code == 400
+
+
+def test_bom_diff_for_a_non_git_project_is_a_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    r = client.get(f"/api/projects/{rec['id']}/bom/diff", params={"a": "HEAD"})
+    assert r.status_code == 400
+
+
+def test_revisions_and_diff_for_an_unknown_project_are_404(client):
+    assert client.get("/api/projects/nope/revisions").status_code == 404
+    assert client.get("/api/projects/nope/bom/diff", params={"a": "HEAD"}).status_code == 404
+
+
 # ---- auth -------------------------------------------------------------------
 
 
@@ -519,3 +595,5 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects/x/bom").status_code == 401
     assert anon_client.get("/api/projects/x/procurement").status_code == 401
     assert anon_client.get("/api/projects/x/bom/export").status_code == 401
+    assert anon_client.get("/api/projects/x/revisions").status_code == 401
+    assert anon_client.get("/api/projects/x/bom/diff").status_code == 401

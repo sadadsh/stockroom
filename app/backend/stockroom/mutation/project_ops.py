@@ -78,3 +78,56 @@ class ProjectOps:
             rec.root, rec.pro_path, rec.sheet_paths,
             name=rec.name, boards=boards, price_lookup=price_lookup, progress=progress,
         )
+
+    def revisions(self, project_id: str, max_count: int = 50) -> dict:
+        """The registered project's git history (the commits touching its schematic sheets
+        and project file), for the revision-diff pickers (M7d). Reads the project's OWN git
+        repo (rec.git_root); a project not under git is an honest {under_git: False,
+        revisions: []}, never a crash. Raises FileNotFoundError for an unknown id."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if not rec.git_root:
+            return {"project": rec.name, "under_git": False, "revisions": []}
+        from stockroom.vcs.repo import GitRepo
+
+        repo = GitRepo(Path(rec.git_root))
+        root, git_root = Path(rec.root).resolve(), Path(rec.git_root).resolve()
+        rels = []
+        for rel in (list(rec.sheet_paths) + ([rec.pro_path] if rec.pro_path else [])):
+            try:
+                rels.append((root / rel).resolve().relative_to(git_root))
+            except ValueError:
+                continue
+        commits = repo.log_paths(rels, max_count=max_count) if rels else []
+        return {
+            "project": rec.name,
+            "under_git": True,
+            "revisions": [
+                {"sha": c.sha, "short": c.sha[:7], "subject": c.subject,
+                 "author": c.author, "date": c.iso_date}
+                for c in commits
+            ],
+        }
+
+    def bom_diff(self, project_id: str, rev_a: str, rev_b: str = "",
+                 current_rows=None) -> dict:
+        """Diff the project's BOM between rev_a (reconstructed from git) and rev_b (a blank /
+        'current' sentinel = the current build) (M7d). `current_rows` (the cached priced BOM
+        lines, passed by the router) makes the cost/lead deltas meaningful. Raises
+        FileNotFoundError for an unknown id, and ValueError when rev_a is missing or the
+        project is not under git (both -> 400)."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        if not (rev_a or "").strip():
+            raise ValueError("a revision to diff against (a=) is required")
+        if not rec.git_root:
+            raise ValueError("this project is not under git; a revision diff needs git history")
+        from stockroom.projects.bom_diff import project_bom_diff
+
+        result = project_bom_diff(
+            rec.root, rec.sheet_paths, rec.git_root, rev_a, rev_b, current_rows=current_rows,
+        )
+        result["project"] = rec.name
+        return result
