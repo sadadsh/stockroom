@@ -56,6 +56,26 @@ jobs:
         shell: pwsh
         run: if (-not (Test-Path dist/Stockroom.exe)) { throw "Stockroom.exe was not built" }
 
+      - name: Code-sign the exe (only if a signing cert is configured)
+        shell: pwsh
+        env:
+          CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          # To kill the SmartScreen "Windows protected your PC" warning, add two repo secrets:
+          #   WINDOWS_CERT_BASE64   = base64 of a code-signing .pfx (an Authenticode / OV/EV cert)
+          #   WINDOWS_CERT_PASSWORD = its password
+          # Until then this is a clean no-op (the exe ships unsigned and SmartScreen warns once).
+          if (-not $env:CERT_BASE64) { Write-Host "No signing cert configured; shipping unsigned (SmartScreen will warn once)."; exit 0 }
+          $pfx = "$env:RUNNER_TEMP\stockroom-cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_BASE64))
+          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
+          if (-not $signtool) { throw "signtool.exe not found on the runner" }
+          & $signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 dist\Stockroom.exe
+          if ($LASTEXITCODE -ne 0) { throw "signing failed" }
+          Remove-Item $pfx -Force
+          Write-Host "Signed dist\Stockroom.exe"
+
       - name: Upload as a build artifact
         uses: actions/upload-artifact@v4
         with:
