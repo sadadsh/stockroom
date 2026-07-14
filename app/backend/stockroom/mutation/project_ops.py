@@ -740,6 +740,16 @@ class ProjectOps:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing"
             )
+        # Refuse a dirty tree: conform saves + commits whole files, so uncommitted user edits to any
+        # touched board/sheet would be swept into the conform commit and then destroyed by a Restore
+        # that reverts it. Guard before any read (mirrors prepare_apply).
+        repo = GitRepo(Path(rec.git_root))
+        root = Path(rec.root)
+        touched = self._sheet_abs(rec) + [root / b for b in rec.board_paths if (root / b).exists()]
+        if touched and not repo.is_clean(touched):
+            raise ValueError(
+                "this project has uncommitted changes; commit or discard them before conforming"
+            )
         staged = self._stage_conform(rec, pcb_targets, sch_targets)
         files_result = [{"path": s["path"], "counts": s["counts"], "changed": s["changed"]}
                         for s in staged]
@@ -749,7 +759,6 @@ class ProjectOps:
             return {"project": rec.name, "committed": None, "files": files_result, "total": 0}
 
         message = f"Conform {rec.name}: " + self._conform_summary(pcb_targets, sch_targets)
-        repo = GitRepo(Path(rec.git_root))
         with Transaction(repo) as txn:
             # Track every file to be written BEFORE any write, so a save that raises mid-write (a
             # later file failing after an earlier one already landed) rolls ALL of them back.
@@ -893,6 +902,14 @@ class ProjectOps:
         board_path = self._primary_board(rec)
         if board_path is None:
             raise ValueError("this project has no .kicad_pcb to edit")
+        # Refuse a board with uncommitted changes: this apply saves + commits the whole board, so a
+        # dirty board's in-progress user edits would be swept into the stackup commit and then
+        # destroyed by a Restore that reverts it. Guard before any read (mirrors prepare_apply).
+        repo = GitRepo(Path(rec.git_root))
+        if not repo.is_clean([board_path]):
+            raise ValueError(
+                "this project has uncommitted changes to the board; commit or discard them before editing the stackup"
+            )
         board = Board.load(board_path)
         original = board.serialize()
         preset, _new_thickness = self._stage_stackup(
@@ -903,7 +920,6 @@ class ProjectOps:
 
         label = preset["label"] if preset else "fields"
         message = f"Set {rec.name} stackup: {label}"
-        repo = GitRepo(Path(rec.git_root))
         with Transaction(repo) as txn:
             # Track BEFORE the write so a save that raises mid-write still rolls the board back to
             # its committed bytes.

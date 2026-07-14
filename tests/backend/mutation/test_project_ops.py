@@ -884,6 +884,20 @@ def test_conform_apply_nothing_to_change_is_a_no_commit_noop(tmp_path):
     assert prepo.head() == head_before  # no commit landed
 
 
+def test_conform_apply_refuses_a_dirty_tree(tmp_path):
+    # roadmap #7: uncommitted edits to a touched board/sheet must not be swept into the conform
+    # commit (a Restore would then destroy them). Guard before any read; nothing is committed.
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project_conformable(tmp_path / "ext" / "board")
+    rec = ops.register(proj)
+    sch = proj / "board.kicad_sch"
+    sch.write_text(sch.read_text(encoding="utf-8") + "\n(comment)\n", encoding="utf-8")  # uncommitted
+    head_before = prepo.head()
+    with pytest.raises(ValueError, match="uncommitted"):
+        ops.conform_apply(rec.id, {"silk": {"size": 2.0}}, {"labels": {"size": 2.0}})
+    assert prepo.head() == head_before
+
+
 def test_conform_apply_refuses_a_project_not_under_git(tmp_path):
     ops = _ops(tmp_path)
     proj = _make_project(tmp_path / "nogit" / "board", _UNANNOTATED)
