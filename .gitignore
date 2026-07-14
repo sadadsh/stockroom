@@ -27,6 +27,7 @@ Thumbs.db
 /dist/
 /build/
 /packaging/mingit/
+/packaging/webview2/
 /mingit.zip
 
 # Superpowers SDD scratch (ledger, task briefs, review packages)

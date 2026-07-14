@@ -164,6 +164,38 @@ def test_child_env_unchanged_on_a_source_run(monkeypatch):
     assert launch._child_env()["PATH"] == "/orig"
 
 
+# -- WebView2 runtime guarantee (the last bare-Windows blocker) -----------------
+
+
+def test_webview2_installed_is_true_off_windows(monkeypatch):
+    monkeypatch.setattr(launch.os, "name", "posix")
+    assert launch.webview2_installed() is True
+
+
+def test_ensure_webview2_skips_when_already_installed():
+    calls = []
+    launch.ensure_webview2(installed=lambda: True, install=lambda: calls.append(1))
+    assert calls == []
+
+
+def test_ensure_webview2_installs_when_absent():
+    calls = []
+    launch.ensure_webview2(installed=lambda: False, install=lambda: calls.append(1))
+    assert calls == [1]
+
+
+def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
+    order = []
+    supervise(
+        tmp_path,
+        ensure=lambda _wd: order.append("ensure"),
+        webview2=lambda: order.append("webview2"),
+        uv_sync=lambda _wd: order.append("sync"),
+        spawn=lambda _wd: (order.append("spawn"), 0)[1],
+    )
+    assert order == ["ensure", "webview2", "sync", "spawn"]
+
+
 def test_supervise_ensures_before_first_run(tmp_path):
     order = []
     supervise(

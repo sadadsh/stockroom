@@ -30,6 +30,13 @@ _mingit = os.path.join(SPECPATH, "mingit")  # noqa: F821 (SPECPATH is injected)
 if os.path.isdir(_mingit):
     _datas.append((_mingit, "mingit"))
 
+# The WebView2 Evergreen Bootstrapper (~2 MB, fetched into packaging/webview2 by the release
+# CI), bundled so a bare Windows box with no WebView2 runtime can install it silently before the
+# host opens its window (launcher.ensure_webview2). Optional on a local/dev build.
+_wv2 = os.path.join(SPECPATH, "webview2", "MicrosoftEdgeWebview2Setup.exe")  # noqa: F821
+if os.path.isfile(_wv2):
+    _datas.append((_wv2, "webview2"))  # -> sys._MEIPASS/webview2/MicrosoftEdgeWebview2Setup.exe
+
 a = Analysis(
     ["stockroom_launcher.py"],
     pathex=[os.path.join(SPECPATH, "..", "app", "backend")],  # noqa: F821 (SPECPATH is injected)
@@ -59,7 +66,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,  # an unsigned UPX-packed onefile bundling git.exe is a classic AV false positive
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,  # windowed: no console flash when the user double-clicks it
