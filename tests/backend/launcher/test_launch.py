@@ -52,6 +52,24 @@ def test_ensure_clone_clones_when_absent(tmp_path):
     assert calls == [("REMOTE", dest)]
 
 
+def test_ensure_clone_clears_a_partial_non_git_dir_then_clones(tmp_path):
+    # A leftover / partial dir (e.g. a stray .venv from a failed provision) has no .git; a real
+    # git clone refuses a non-empty destination, so ensure_clone must clear it first and recover.
+    dest = tmp_path / "app"
+    (dest / ".venv").mkdir(parents=True)
+    (dest / "leftover.txt").write_text("x", encoding="utf-8")
+    calls = []
+
+    def fake_clone(_remote, workdir):
+        calls.append(workdir)
+        (Path(workdir) / ".git").mkdir(parents=True)  # stand in for the real clone
+
+    ensure_clone(dest, remote="R", clone=fake_clone)
+    assert calls == [dest]
+    assert not (dest / ".venv").exists()  # the partial contents were cleared before cloning
+    assert not (dest / "leftover.txt").exists()
+
+
 # -- supervise (the self-update relaunch loop) ---------------------------------
 
 
