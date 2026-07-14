@@ -204,6 +204,24 @@ def projects_router(require_token) -> APIRouter:
             headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
         )
 
+    @r.get("/{project_id}/revisions")
+    def project_revisions(request: Request, project_id: str) -> dict:
+        # The project's git history, for the revision-diff pickers (M7d). A project not under
+        # git is an honest {under_git: False, revisions: []}; an unknown id -> 404.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.revisions(project_id)
+
+    @r.get("/{project_id}/bom/diff")
+    def bom_diff(request: Request, project_id: str, a: str = "", b: str = "") -> dict:
+        # Diff the BOM between revision `a` (reconstructed from the project's git) and `b`
+        # (blank = the current build). The current build's cached priced lines feed the
+        # cost/lead deltas so they are meaningful. A missing `a` or a non-git project is a
+        # ValueError -> 400; an unknown id -> 404.
+        ctx = request.app.state.ctx
+        cached = ctx.bom_cache.get(project_id)
+        current_rows = cached["lines"] if (cached and cached.get("ran_at")) else None
+        return ctx.project_ops.bom_diff(project_id, a, b, current_rows=current_rows)
+
     return r
 
 
