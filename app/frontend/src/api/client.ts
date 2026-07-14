@@ -21,6 +21,9 @@ import type {
   HistoryResponse,
   JobRef,
   PartDetail,
+  DesignResult,
+  DesignRules,
+  NetClass,
   PartsResponse,
   ProcurementExportOptions,
   ProcurementResult,
@@ -29,6 +32,8 @@ import type {
   ProjectSummary,
   RepairResult,
   RevisionsResult,
+  SetDesignRulesResult,
+  SetNetClassesResult,
   SettingsInfo,
   StagingCandidate,
   SyncResult,
@@ -502,5 +507,42 @@ export const api = {
       params,
     );
     triggerDownload(blob, filename);
+  },
+
+  // The project's current net classes + design rules read from its .kicad_pro, plus the
+  // fab-floor catalog and a validation against `floor` (M7e). Read-only.
+  getDesign(id: string, floor?: string): Promise<DesignResult> {
+    const params: Record<string, string> = {};
+    if (floor) params.floor = floor;
+    return apiGet<DesignResult>(`/api/projects/${encodeURIComponent(id)}/design`, params);
+  },
+
+  // Edit the project's net classes (M7e): the full edited set, names to delete, and the
+  // fab floor the returned validation checks against. Writes a minimal diff, one scoped
+  // commit on the project's own git.
+  setNetClasses(
+    id: string,
+    classes: NetClass[],
+    opts?: { deleted?: string[]; floor?: string },
+  ): Promise<SetNetClassesResult> {
+    return request<SetNetClassesResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/net-classes`,
+      { body: { classes, deleted: opts?.deleted ?? [], floor: opts?.floor ?? "none" } },
+    );
+  },
+
+  // Edit the project's board design-rule constraints (M7e). `rules` field-merges; the size
+  // lists, when given, replace their arrays wholesale.
+  setDesignRules(
+    id: string,
+    rules: DesignRules,
+    opts?: { track_widths?: unknown[]; via_dimensions?: unknown[]; diff_pair_dimensions?: unknown[] },
+  ): Promise<SetDesignRulesResult> {
+    return request<SetDesignRulesResult>(
+      "PATCH",
+      `/api/projects/${encodeURIComponent(id)}/design-rules`,
+      { body: { rules, ...opts } },
+    );
   },
 };

@@ -10,6 +10,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { DesignRules, NetClass } from "./types";
 import { api, type ListPartsArgs } from "./client";
 
 export function usePartsQuery(args: ListPartsArgs) {
@@ -407,6 +408,60 @@ export function useDeleteProject() {
       qc.removeQueries({ queryKey: ["project-bom", id] });
       qc.removeQueries({ queryKey: ["project-procurement", id] });
       qc.removeQueries({ queryKey: ["project-revisions", id] });
+      qc.removeQueries({ queryKey: ["project-design", id] });
+    },
+  });
+}
+
+// --- Editor: design rules + net classes (M7e) ---
+
+// The project's current net classes + design rules read from its .kicad_pro, validated
+// against the chosen fab floor (keyed on the floor so switching it re-reads). Disabled
+// until a project is selected.
+export function useProjectDesign(id: string | null, floor: string) {
+  return useQuery({
+    queryKey: ["project-design", id, floor],
+    queryFn: () => api.getDesign(id as string, floor),
+    enabled: !!id,
+  });
+}
+
+// A net-class / design-rule write invalidates the design read (re-reads the committed
+// classes + fresh validation) and the project detail; it also evicts the cached ERC/DRC
+// server-side (a rules change can alter DRC), so the checks query is invalidated to re-read
+// the honest not-run shape rather than a stale pass.
+export function useSetNetClasses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; classes: NetClass[]; deleted: string[]; floor: string }) =>
+      api.setNetClasses(vars.id, vars.classes, { deleted: vars.deleted, floor: vars.floor }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-design", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
+export function useSetDesignRules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      rules: DesignRules;
+      track_widths?: unknown[];
+      via_dimensions?: unknown[];
+      diff_pair_dimensions?: unknown[];
+    }) =>
+      api.setDesignRules(vars.id, vars.rules, {
+        track_widths: vars.track_widths,
+        via_dimensions: vars.via_dimensions,
+        diff_pair_dimensions: vars.diff_pair_dimensions,
+      }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-design", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
     },
   });
 }

@@ -7,6 +7,7 @@ import type {
   BomDiffResult,
   BomResult,
   ChecksResult,
+  DesignResult,
   ProcurementResult,
   ProjectDetail,
   ProjectSummary,
@@ -34,6 +35,9 @@ vi.mock("../api/client", async (importActual) => {
       getBomDiff: vi.fn(),
       downloadBomExport: vi.fn(),
       openJobStream: vi.fn(),
+      getDesign: vi.fn(),
+      setNetClasses: vi.fn(),
+      setDesignRules: vi.fn(),
     },
   };
 });
@@ -280,6 +284,37 @@ const PROC_BUILT: ProcurementResult = {
   summary: "BOM: 1 lines · 1 parts · $1.25/board · critical path 18 wk",
 };
 
+const DESIGN: DesignResult = {
+  project: "Netdeck",
+  under_git: true,
+  has_pro: true,
+  net_classes: [
+    {
+      name: "Default", clearance: 0.2, track_width: 0.2, via_diameter: 0.6, via_drill: 0.3,
+      microvia_diameter: 0.3, microvia_drill: 0.1, diff_pair_width: 0.2, diff_pair_gap: 0.25,
+      priority: 2147483647, wire_width: 6, bus_width: 12,
+    },
+    {
+      name: "HS", clearance: 0.15, track_width: 0.1, via_diameter: 0.45, via_drill: 0.2,
+      microvia_diameter: 0.3, microvia_drill: 0.1, diff_pair_width: 0.2, diff_pair_gap: 0.25,
+      priority: 3, wire_width: 6, bus_width: 12,
+    },
+  ],
+  netclass_patterns: [{ netclass: "HS", pattern: "*USB*" }],
+  design_rules: {
+    min_clearance: 0.2, min_track_width: 0.2, min_via_diameter: 0.5,
+    use_height_for_length_calcs: true,
+  },
+  track_widths: [],
+  via_dimensions: [],
+  diff_pair_dimensions: [],
+  fab_floors: {
+    none: { label: "No fab floor", min_clearance: 0, min_track: 0, min_via: 0, min_drill: 0, min_annular: 0 },
+    oshpark_2: { label: "OSH Park 2-layer", min_clearance: 0.1524, min_track: 0.1524, min_via: 0.508, min_drill: 0.254, min_annular: 0.127 },
+  },
+  validation: [{ netclass: "HS", issue: "track width 0.1 below fab min 0.1524" }],
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -326,6 +361,14 @@ beforeEach(() => {
   mockApi.getRevisions.mockResolvedValue(REVS_NONE);
   mockApi.getBomDiff.mockResolvedValue(DIFF);
   mockApi.downloadBomExport.mockResolvedValue(undefined);
+  mockApi.getDesign.mockResolvedValue(DESIGN);
+  mockApi.setNetClasses.mockResolvedValue({
+    project: "Netdeck", committed: "cccccccc3333", net_classes: DESIGN.net_classes,
+    validation: DESIGN.validation,
+  });
+  mockApi.setDesignRules.mockResolvedValue({
+    project: "Netdeck", committed: "cccccccc3333", design_rules: DESIGN.design_rules,
+  });
 });
 
 describe("ProjectsPage", () => {
@@ -778,5 +821,121 @@ describe("ProjectsPage", () => {
     );
     // the fabricated diff table + cost badge must NOT render
     expect(screen.queryByTestId("diff-result")).not.toBeInTheDocument();
+  });
+
+  // -- Editor: design rules + net classes (M7e) --
+
+  it("renders the project net classes and design rules", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const editor = await screen.findByTestId("editor-section");
+    expect(within(editor).getByTestId("nc-row-Default")).toBeInTheDocument();
+    expect(within(editor).getByTestId("nc-row-HS")).toBeInTheDocument();
+    // a design-rule field renders with its current value
+    expect((within(editor).getByTestId("dr-min_track_width") as HTMLInputElement).value).toBe("0.2");
+  });
+
+  it("saves an edited net-class track width to the right endpoint", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const input = screen.getByTestId("nc-Default-track_width");
+    await user.clear(input);
+    await user.type(input, "0.15");
+    await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
+    expect(mockApi.setNetClasses).toHaveBeenCalledTimes(1);
+    const [id, classes] = mockApi.setNetClasses.mock.calls[0];
+    expect(id).toBe("netdeck");
+    expect(classes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Default", track_width: 0.15 })]),
+    );
+  });
+
+  it("adds a net class and includes it on save", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    await user.click(screen.getByRole("button", { name: "Add Net Class" }));
+    await user.type(screen.getByTestId("nc-new-name"), "PWR");
+    await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
+    const [, classes] = mockApi.setNetClasses.mock.calls[0];
+    expect(classes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "PWR" })]),
+    );
+  });
+
+  it("deletes a net class on save", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
+    const call = mockApi.setNetClasses.mock.calls[0];
+    // deleted names are passed as the 3rd positional options arg
+    expect(call[2]).toEqual(expect.objectContaining({ deleted: ["HS"] }));
+    // the deleted class is not in the submitted set
+    expect(call[1].some((c: { name: string }) => c.name === "HS")).toBe(false);
+  });
+
+  it("saves edited design rules to the right endpoint", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const input = screen.getByTestId("dr-min_track_width");
+    await user.clear(input);
+    await user.type(input, "0.13");
+    await user.click(screen.getByRole("button", { name: "Save Design Rules" }));
+    expect(mockApi.setDesignRules).toHaveBeenCalledTimes(1);
+    const [id, rules] = mockApi.setDesignRules.mock.calls[0];
+    expect(id).toBe("netdeck");
+    expect(rules).toEqual(expect.objectContaining({ min_track_width: 0.13 }));
+  });
+
+  it("surfaces fab-floor validation as amber on the offending class", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const row = screen.getByTestId("nc-row-HS");
+    expect(row).toHaveTextContent(/below fab min/i);
+  });
+
+  it("refetches the design against the chosen fab floor", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    await user.selectOptions(screen.getByTestId("fab-floor-select"), "oshpark_2");
+    await waitFor(() =>
+      expect(mockApi.getDesign).toHaveBeenCalledWith("netdeck", "oshpark_2"),
+    );
+  });
+
+  it("marks the net-class section dirty on edit and disables Save until then", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("editor-section");
+    const save = screen.getByRole("button", { name: "Save Net Classes" });
+    expect(save).toBeDisabled(); // clean on load
+    const input = screen.getByTestId("nc-Default-track_width");
+    await user.clear(input);
+    await user.type(input, "0.15");
+    expect(save).toBeEnabled(); // dirty after an edit
+  });
+
+  it("shows an honest not-under-git state without editing controls", async () => {
+    mockApi.getDesign.mockResolvedValue({ ...DESIGN, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const editor = await screen.findByTestId("editor-section");
+    expect(editor).toHaveTextContent(/not under git/i);
+    expect(screen.queryByRole("button", { name: "Save Net Classes" })).not.toBeInTheDocument();
   });
 });
