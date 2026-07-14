@@ -3,9 +3,13 @@ host) are injected, so the relaunch-on-self-update loop is fully testable on Lin
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
+import pytest
+
 from stockroom.host.run import EXIT_RESTART
+from stockroom.launcher import launch
 from stockroom.launcher.launch import app_workdir, ensure_clone, supervise
 
 
@@ -75,6 +79,89 @@ def test_supervise_returns_the_host_exit_code(tmp_path):
         tmp_path, spawn=lambda _wd: 7, uv_sync=lambda _wd: None, ensure=lambda _wd: None
     )
     assert code == 7
+
+
+# -- uv resolution (the bundled-uv WinError 2 fix) + git preflight --------------
+
+
+def test_uv_bin_uses_path_when_not_frozen(monkeypatch):
+    monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
+    assert launch._uv_bin() == "uv"
+
+
+def test_uv_bin_prefers_the_bundled_uv_when_frozen(monkeypatch, tmp_path):
+    name = "uv.exe" if os.name == "nt" else "uv"
+    (tmp_path / name).write_text("", encoding="utf-8")
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
+    assert launch._uv_bin() == str(tmp_path / name)
+
+
+def test_uv_bin_falls_back_to_path_when_bundle_absent(monkeypatch, tmp_path):
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)  # empty dir
+    assert launch._uv_bin() == "uv"
+
+
+def test_git_bin_uses_path_when_not_frozen(monkeypatch):
+    monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
+    assert launch._git_bin() == "git"
+
+
+def test_git_bin_prefers_bundled_mingit_when_frozen(monkeypatch, tmp_path):
+    name = "git.exe" if os.name == "nt" else "git"
+    (tmp_path / "mingit" / "cmd").mkdir(parents=True)
+    (tmp_path / "mingit" / "cmd" / name).write_text("", encoding="utf-8")
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
+    assert launch._git_bin() == str(tmp_path / "mingit" / "cmd" / name)
+
+
+def test_git_bin_falls_back_to_path_when_mingit_absent(monkeypatch, tmp_path):
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
+    assert launch._git_bin() == "git"
+
+
+def test_require_git_raises_a_readable_error_when_git_absent(monkeypatch):
+    monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
+    monkeypatch.setattr(launch.shutil, "which", lambda _name: None)
+    with pytest.raises(RuntimeError, match="git"):
+        launch._require_git()
+
+
+def test_require_git_passes_when_git_present(monkeypatch):
+    monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
+    monkeypatch.setattr(launch.shutil, "which", lambda _name: "/usr/bin/git")
+    launch._require_git()  # no raise
+
+
+def test_require_git_ok_with_bundled_git_even_without_path_git(monkeypatch, tmp_path):
+    # a frozen exe carries its own git, so it must NOT require a system git on PATH
+    name = "git.exe" if os.name == "nt" else "git"
+    (tmp_path / "mingit" / "cmd").mkdir(parents=True)
+    (tmp_path / "mingit" / "cmd" / name).write_text("", encoding="utf-8")
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
+    monkeypatch.setattr(launch.shutil, "which", lambda _n: None)
+    launch._require_git()  # no raise (bundled git present)
+
+
+def test_child_env_prepends_bundled_git_dirs_when_frozen(monkeypatch, tmp_path):
+    (tmp_path / "mingit" / "cmd").mkdir(parents=True)
+    (tmp_path / "mingit" / "bin").mkdir(parents=True)
+    monkeypatch.setattr(launch.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(launch.sys, "_MEIPASS", str(tmp_path), raising=False)
+    monkeypatch.setenv("PATH", "/orig")
+    env = launch._child_env()
+    assert str(tmp_path / "mingit" / "cmd") in env["PATH"]
+    assert env["PATH"].endswith("/orig")  # the machine PATH is preserved after the bundle dirs
+
+
+def test_child_env_unchanged_on_a_source_run(monkeypatch):
+    monkeypatch.setattr(launch.sys, "frozen", False, raising=False)
+    monkeypatch.setenv("PATH", "/orig")
+    assert launch._child_env()["PATH"] == "/orig"
 
 
 def test_supervise_ensures_before_first_run(tmp_path):

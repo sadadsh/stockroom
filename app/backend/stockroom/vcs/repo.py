@@ -14,6 +14,10 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+# CREATE_NO_WINDOW on Windows so a git subprocess never flashes a console window (the frozen
+# exe is windowed); a harmless 0 on POSIX. Mirrors kicad/checks.py's _NO_WINDOW.
+_NO_WINDOW = 0x08000000 if hasattr(subprocess, "STARTUPINFO") else 0
+
 
 class GitError(Exception):
     pass
@@ -78,6 +82,7 @@ class GitRepo:
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=_NO_WINDOW,
         )
         if check and proc.returncode != 0:
             raise GitError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
@@ -95,7 +100,8 @@ class GitRepo:
         args = ["init", "-b", "main"]
         if bare:
             args.append("--bare")
-        subprocess.run([self.git, "-C", str(self.root), *args], capture_output=True, text=True, check=True)
+        subprocess.run([self.git, "-C", str(self.root), *args], capture_output=True, text=True,
+                       check=True, creationflags=_NO_WINDOW)
         if not bare:
             self._set_test_identity_if_missing()
 
@@ -103,7 +109,7 @@ class GitRepo:
         self.root.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.run(
             [self.git, "clone", str(origin), str(self.root)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, creationflags=_NO_WINDOW,
         )
         if proc.returncode != 0:
             raise GitError(f"git clone failed: {proc.stderr.strip()}")
@@ -147,7 +153,7 @@ class GitRepo:
         # -A so a scoped commit also stages DELETIONS of tracked files that were removed
         # from the working tree (profile/part deletion), not just adds/mods. Only add
         # paths git can still see (present on disk, or still tracked in the index): a path
-        # that is neither — e.g. the source of a rename already staged by `git mv` — would
+        # that is neither (e.g. the source of a rename already staged by `git mv`) would
         # abort `git add` with "did not match any files". Its change is already staged, so
         # --only below still carries it into the commit.
         addable = [p for p in paths if Path(p).exists() or self._is_tracked(p)]

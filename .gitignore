@@ -23,6 +23,12 @@ Thumbs.db
 /tools/uv*
 /tools/mingit/
 
+# PyInstaller / launcher build outputs (packaging/build_exe.ps1 + the release CI produce these)
+/dist/
+/build/
+/packaging/mingit/
+/mingit.zip
+
 # Superpowers SDD scratch (ledger, task briefs, review packages)
 .superpowers/
 

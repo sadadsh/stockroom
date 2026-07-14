@@ -17,7 +17,9 @@ No em dashes anywhere (standing owner rule).
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -25,6 +27,66 @@ from stockroom.launcher.exit_codes import EXIT_RESTART
 
 # The public app repo the launcher clones + the in-app updater pulls (github.com/sadadsh/stockroom).
 APP_REPO_REMOTE = "https://github.com/sadadsh/stockroom.git"
+
+
+# CREATE_NO_WINDOW on Windows so a shelled-out git / uv never flashes a console window (the exe
+# is windowed); a harmless 0 on POSIX. Mirrors kicad/checks.py + vcs/repo.py.
+_NO_WINDOW = 0x08000000 if hasattr(subprocess, "STARTUPINFO") else 0
+
+
+def _meipass() -> Path | None:
+    """The PyInstaller unpack dir when running as the frozen exe, else None (a source run)."""
+    if getattr(sys, "frozen", False):
+        mp = getattr(sys, "_MEIPASS", None)
+        if mp:
+            return Path(mp)
+    return None
+
+
+def _bundled(*parts: str) -> str | None:
+    """An absolute path to a file bundled beside the frozen exe, or None if absent / a source run."""
+    mp = _meipass()
+    if mp is not None:
+        p = mp.joinpath(*parts)
+        if p.exists():
+            return str(p)
+    return None
+
+
+def _uv_bin() -> str:
+    """The uv executable. A FROZEN exe bundles its own uv, so a target machine needs no system uv
+    (the WinError 2 fix); a source run uses 'uv' from PATH."""
+    return _bundled("uv.exe" if os.name == "nt" else "uv") or "uv"
+
+
+def _git_bin() -> str:
+    """The git executable. A FROZEN exe bundles portable git (MinGit) so a bare Windows box with
+    no git still clones + self-updates; a source run uses 'git' from PATH."""
+    return _bundled("mingit", "cmd", "git.exe" if os.name == "nt" else "git") or "git"
+
+
+def _child_env() -> dict:
+    """The environment for the spawned host. Prepends the bundled git (and uv) dirs to PATH so the
+    HOST's OWN git operations (library sync, project commits, the in-app self-update) resolve the
+    bundled git too, not just the launcher's clone. On a source run this is os.environ unchanged."""
+    env = os.environ.copy()
+    mp = _meipass()
+    if mp is not None:
+        extra = [str(mp / "mingit" / "cmd"), str(mp / "mingit" / "bin"), str(mp)]
+        extra = [d for d in extra if os.path.isdir(d)]
+        if extra:
+            env["PATH"] = os.pathsep.join(extra) + os.pathsep + env.get("PATH", "")
+    return env
+
+
+def _require_git() -> None:
+    """git is the one hard external dependency of this git-native app. A frozen exe bundles it, so
+    this only fires on a source run with no git: an honest, readable failure, not a WinError 2."""
+    if _git_bin() == "git" and shutil.which("git") is None:
+        raise RuntimeError(
+            "git was not found on this machine. Stockroom needs git (https://git-scm.com) to "
+            "fetch and update its app files. Install git, make sure it is on PATH, then relaunch."
+        )
 
 
 def _os_name() -> str:
@@ -90,22 +152,28 @@ def supervise(
 
 
 def _git_clone(remote: str, workdir: Path) -> None:  # pragma: no cover - real shell-out
+    _require_git()
     workdir = Path(workdir)
     workdir.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
-        ["git", "clone", remote, str(workdir)], capture_output=True, text=True
+        [_git_bin(), "clone", remote, str(workdir)],
+        capture_output=True, text=True, creationflags=_NO_WINDOW,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"could not clone the Stockroom app repo: {proc.stderr.strip()}")
 
 
 def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
-    subprocess.run(["uv", "sync", "--frozen"], cwd=str(workdir), check=True)
+    subprocess.run(
+        [_uv_bin(), "sync", "--frozen"], cwd=str(workdir), check=True,
+        env=_child_env(), creationflags=_NO_WINDOW,
+    )
 
 
 def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
     proc = subprocess.run(
-        ["uv", "run", "python", "-m", "stockroom.host.run"], cwd=str(workdir)
+        [_uv_bin(), "run", "python", "-m", "stockroom.host.run"],
+        cwd=str(workdir), env=_child_env(), creationflags=_NO_WINDOW,
     )
     return proc.returncode
 
