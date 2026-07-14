@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.host.run import EXIT_RESTART
-from stockroom.launcher import launch
+from stockroom.launcher import launch, splash
 from stockroom.launcher.launch import app_workdir, ensure_clone, supervise
 
 
@@ -194,6 +194,58 @@ def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
     )
     assert order == ["ensure", "webview2", "sync", "spawn"]
+
+
+# -- first-run splash: progress plumbing + safe fallback ------------------------
+
+
+def test_supervise_emits_progress_phases_in_order(tmp_path):
+    phases = []
+    supervise(
+        tmp_path, ensure=lambda _wd: None, webview2=lambda: None,
+        uv_sync=lambda _wd: None, spawn=lambda _wd: 0, progress=phases.append,
+    )
+    assert phases == ["clone", "webview2", "sync", "starting"]
+
+
+def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
+    phases = []
+    calls = {"n": 0}
+
+    def spawn(_wd):
+        calls["n"] += 1
+        return EXIT_RESTART if calls["n"] < 2 else 0  # one self-update restart, then quit
+
+    supervise(
+        tmp_path, ensure=lambda _wd: None, webview2=lambda: None,
+        uv_sync=lambda _wd: None, spawn=spawn, progress=phases.append,
+    )
+    assert phases.count("starting") == 1  # only before the FIRST spawn
+    assert phases == ["clone", "webview2", "sync", "starting", "sync"]
+
+
+def test_splash_run_falls_back_to_plain_run_when_no_display(monkeypatch):
+    # If the GUI path fails for any reason, the app must STILL launch (work runs, code returned).
+    def boom(_work):
+        raise RuntimeError("no display")
+
+    monkeypatch.setattr(splash, "_run_with_splash", boom)
+    seen = []
+
+    def work(progress):
+        progress("clone")  # the no-op progress in the fallback path
+        seen.append("ran")
+        return 7
+
+    assert splash.run(work) == 7
+    assert seen == ["ran"]
+
+
+def test_splash_run_uses_the_splash_result_when_available(monkeypatch):
+    monkeypatch.setattr(splash, "_run_with_splash", lambda _work: 3)
+    ran = []
+    assert splash.run(lambda _progress: ran.append(1) or 999) == 3
+    assert ran == []  # work is NOT double-run when the splash path handled it
 
 
 def test_supervise_ensures_before_first_run(tmp_path):
