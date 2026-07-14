@@ -39,7 +39,9 @@ import type {
   ManualFillBody,
   ManualFillResult,
   RestoreResult,
+  OnboardingStatus,
   ProfilesResponse,
+  SetLibraryBody,
   ProjectDetail,
   ProjectSummary,
   BoardSettings,
@@ -397,6 +399,21 @@ export const api = {
 
   doSync(): Promise<SyncResult> {
     return request<SyncResult>("POST", "/api/sync");
+  },
+
+  // First-run library onboarding (M9b/M9c): point the app at a library (open an existing
+  // one, clone a git URL, or create a fresh one) and repoint the running engine at it live.
+  // A set/complete changes which library EVERY other query reads, so callers invalidate all.
+  getOnboarding(): Promise<OnboardingStatus> {
+    return apiGet<OnboardingStatus>("/api/onboarding");
+  },
+
+  setLibrary(body: SetLibraryBody): Promise<OnboardingStatus> {
+    return request<OnboardingStatus>("POST", "/api/onboarding/library", { body });
+  },
+
+  completeOnboarding(): Promise<OnboardingStatus> {
+    return request<OnboardingStatus>("POST", "/api/onboarding/complete");
   },
 
   // App self-update (spec section 12), distinct from library sync.
