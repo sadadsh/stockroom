@@ -87,6 +87,20 @@ def test_field_present_on_one_node_only_is_not_a_conflict():
     assert row["editable"] is True and row["fields"]["MPN"] == "M1" and row["conflicts"] == []
 
 
+def test_field_blank_on_one_node_and_filled_on_another_is_not_a_conflict():
+    # review #1: one unit of a multi-unit component carries MPN filled, the other carries MPN
+    # present-but-BLANK (or KiCad's ~). A blank and an absent field are the same, so this is one
+    # legitimate editable component, not a duplicate-designator anomaly; its real value shows.
+    for blank in ("", "~", "-"):
+        comps = [_c("U1", lib_id="A:x", value="v", MPN="M1"),
+                 _c("U1", lib_id="A:x", value="v", MPN=blank)]
+        grid = fields.build_field_grid(comps)
+        row = grid["rows"][0]
+        assert row["editable"] is True, f"blank={blank!r}"
+        assert row["fields"]["MPN"] == "M1" and row["conflicts"] == []
+        assert grid["summary"]["duplicate"] == 0
+
+
 def test_grid_summary_counts():
     grid = fields.build_field_grid([_c("R1"), _c("C?", lib_id="Device:C"), _c("R2")])
     assert grid["summary"]["components"] == 3
@@ -143,6 +157,19 @@ def test_unannotated_ref_edit_is_refused():
 def test_adding_a_new_field_column_is_allowed():
     changes = fields.field_changes_by_ref(_rows(), [{"ref": "R1", "field": "Tolerance", "value": "1%"}])
     assert changes == {"R1": {"Tolerance": "1%"}}
+
+
+def test_case_colliding_field_snaps_to_the_existing_column():
+    # review #2: editing "mpn" when an "MPN" column exists must UPDATE MPN, never insert a second
+    # duplicate "mpn" property. The change is keyed on the existing column's exact case.
+    changes = fields.field_changes_by_ref(_rows(), [{"ref": "R1", "field": "mpn", "value": "RC0402"}])
+    assert changes == {"R1": {"MPN": "RC0402"}}
+
+
+def test_case_variant_of_reference_is_still_refused():
+    # canonicalization must not let "reference" slip past the read-only guard
+    with pytest.raises(ValueError):
+        fields.field_changes_by_ref(_rows(), [{"ref": "R1", "field": "reference", "value": "R9"}])
 
 
 def test_none_value_becomes_empty_string():

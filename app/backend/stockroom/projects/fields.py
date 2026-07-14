@@ -38,6 +38,16 @@ _PRIORITY = ("Reference", "Value", "Footprint", "Datasheet", "Description", "MPN
 _PRIORITY_SET = frozenset(_PRIORITY)
 READONLY_FIELDS = frozenset({"Reference"})
 
+# A value that reads as "no real value" (empty or a KiCad placeholder). Two nodes of one
+# component that carry a field where one is a real value and the other is blank/placeholder are
+# NOT in conflict: a blank and an absent field are the same thing. Mirrors identity._PLACEHOLDERS
+# + fill._BLANKS so the grid, the BOM, and Complete-All agree on what counts as filled.
+_BLANK_VALUES = {"", "~", "*", "-", "n/a", "na", "none", "value"}
+
+
+def _is_blank(value) -> bool:
+    return str(value or "").strip().lower() in _BLANK_VALUES
+
 _NUM = re.compile(r"(\d+)")
 
 
@@ -79,16 +89,17 @@ def build_field_grid(components) -> dict:
         merged: dict[str, str] = {}
         conflicts: list[str] = []
         for name in names:
-            # Compare only the nodes that actually carry the field: a field on one unit-node of a
-            # multi-unit part (all present values agreeing) is not a conflict; genuinely differing
-            # values across a shared ref are (a duplicate-designator anomaly).
+            # Compare only the REAL (non-blank / non-placeholder) values across the ref's nodes: a
+            # field carried by only some unit-nodes, or blank on some and filled on others, is not a
+            # conflict (a blank and an absent field are the same). Genuinely DIFFERING real values
+            # across a shared ref are (a duplicate-designator anomaly), which locks the row.
             vals = {
-                str((n.get("props") or {}).get(name) or "")
+                str((n.get("props") or {}).get(name)).strip()
                 for n in nodes
-                if name in (n.get("props") or {})
+                if name in (n.get("props") or {}) and not _is_blank((n.get("props") or {}).get(name))
             }
-            if len(vals) == 1:
-                merged[name] = next(iter(vals))
+            if len(vals) <= 1:
+                merged[name] = next(iter(vals)) if vals else ""
             else:
                 merged[name] = ""
                 conflicts.append(name)
@@ -129,6 +140,15 @@ def field_changes_by_ref(rows, edits) -> dict:
     field name, the read-only Reference field, or an unknown / non-editable reference. `value`
     None becomes an empty string (clearing a field). Adding a not-yet-a-column field is allowed."""
     by_ref = {r["ref"]: r for r in rows}
+    # Map case-folded field name -> its canonical existing spelling, so an edit that case-collides
+    # with an existing column ("mpn" vs "MPN") UPDATES that column instead of inserting a SECOND,
+    # duplicate property (KiCad keeps both; identity._normalize_keys then case-folds them into one
+    # order-dependent slot, masking the value). Reference's variants also canonicalize, so the
+    # read-only guard below catches "reference" too.
+    canon: dict[str, str] = {}
+    for r in rows:
+        for name in (r.get("fields") or {}):
+            canon.setdefault(name.casefold(), name)
     changes: dict[str, dict[str, str]] = {}
     for edit in edits or []:
         ref = str(edit.get("ref") or "").strip()
@@ -137,6 +157,7 @@ def field_changes_by_ref(rows, edits) -> dict:
         value = "" if value is None else str(value)
         if not field:
             raise ValueError("a field name must not be blank")
+        field = canon.get(field.casefold(), field)  # snap to an existing column's exact case
         if field in READONLY_FIELDS:
             raise ValueError(f"the {field} field is set by annotation, not the field editor")
         row = by_ref.get(ref)

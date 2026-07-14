@@ -36,18 +36,17 @@ def _library(root, profile="Main"):
 # -- in-repo library (lives inside the app repo) -------------------------------
 
 
-def test_ensure_git_does_not_nest_inside_an_existing_repo(tmp_path):
-    # A library committed inside the app repo must NOT get its own nested .git (a nested repo is
-    # ignored by the parent, so a clone would not carry the library). _ensure_git uses the
-    # enclosing repo instead.
-    outer = tmp_path / "app"
+def test_ensure_git_isolates_a_library_nested_in_an_unrelated_repo(tmp_path):
+    # An ONBOARDED library (open/create) that happens to live inside an unrelated git checkout
+    # must get its OWN repo, so its part commits + sync never leak into that unrelated repo
+    # (review #3/#6: is_git_repo() would have wrongly bound it to the enclosing repo).
+    outer = tmp_path / "projects"
     outer.mkdir()
     GitRepo(outer).init()
-    lib = outer / "libraries"
+    lib = outer / "kicad-lib"
     lib.mkdir()
-    repo = onboarding._ensure_git(lib)
-    assert not (lib / ".git").exists()  # no nested repo created
-    assert repo.is_git_repo()  # but it IS under git (the enclosing app repo)
+    onboarding._ensure_git(lib)
+    assert (lib / ".git").exists()  # its OWN repo, isolated from the unrelated parent
 
 
 def test_bootstrap_prefers_in_repo_over_a_placeholder_config(tmp_path, monkeypatch):

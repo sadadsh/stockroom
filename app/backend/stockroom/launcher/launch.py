@@ -214,9 +214,38 @@ def ensure_clone(
     workdir = Path(workdir)
     if (workdir / ".git").exists():
         return
+    recovered: Path | None = None
     if workdir.exists():
+        # A partial / corrupt checkout with NO .git. The library now lives IN-tree at
+        # workdir/libraries and its commits may not be pushed off-machine yet, so preserve the
+        # part FILES across the re-clone (the git history is unrecoverable once .git is gone, but
+        # the JSON on disk is not): move libraries/ aside, then overlay it back onto the fresh
+        # clone so a corrupted checkout never silently discards the user's added parts.
+        lib = workdir / "libraries"
+        if lib.is_dir():
+            recovered = workdir.parent / ".stockroom-recovered-library"
+            if recovered.exists():
+                shutil.rmtree(recovered, ignore_errors=True)
+            shutil.move(str(lib), str(recovered))
         shutil.rmtree(workdir, ignore_errors=True)
     (clone or _git_clone)(remote, workdir)
+    if recovered is not None and recovered.exists():
+        _restore_recovered_library(recovered, workdir / "libraries")
+        shutil.rmtree(recovered, ignore_errors=True)
+
+
+def _restore_recovered_library(recovered: Path, fresh: Path) -> None:
+    """Overlay the part / asset FILES from a recovered in-tree library onto the freshly cloned one,
+    so a checkout that lost its .git does not lose the user's added parts. Only real content is
+    copied (a .gitkeep placeholder never overwrites anything); existing shipped files are kept
+    unless the recovered copy is newer content for the same path."""
+    for src in recovered.rglob("*"):
+        if not src.is_file() or src.name == ".gitkeep":
+            continue
+        rel = src.relative_to(recovered)
+        dst = fresh / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(src), str(dst))
 
 
 def update_to_latest(workdir: Path, *, pull: Callable[[Path], None] | None = None) -> None:
@@ -290,12 +319,25 @@ def _git_clone(remote: str, workdir: Path) -> None:  # pragma: no cover - real s
 
 
 def _git_pull(workdir: Path) -> None:  # pragma: no cover - real shell-out
-    # ff-only so a diverged checkout is never silently reset; a failure (offline, non-ff) is
-    # swallowed on purpose so the launch always proceeds on the last-good checkout.
-    subprocess.run(
-        [_git_bin(), "-C", str(workdir), "pull", "--ff-only", "--quiet"],
-        capture_output=True, text=True, creationflags=_NO_WINDOW,
-    )
+    _reconcile_pull(workdir, _git_bin())
+
+
+def _reconcile_pull(workdir: Path, git: str) -> None:
+    """Bring the managed checkout to the latest pushed code, RECONCILING local library commits.
+    The library lives in-tree (libraries/), so a local part commit + a remote app-code commit is a
+    normal divergence whose changes touch DISJOINT paths: try a fast-forward first, then a REBASE
+    that replays the local library commits on top of the new app code, so updates keep flowing AND
+    the user's parts are preserved. A plain ff-only would get permanently stuck the moment the first
+    part is added. Every failure (offline, or the rare real conflict) is swallowed after aborting a
+    half-applied rebase, so the launch always proceeds on the last-good checkout (honest degradation)."""
+    common = dict(capture_output=True, text=True, creationflags=_NO_WINDOW)
+    ff = subprocess.run([git, "-C", str(workdir), "pull", "--ff-only", "--quiet"], **common)
+    if ff.returncode == 0:
+        return
+    reb = subprocess.run([git, "-C", str(workdir), "pull", "--rebase", "--quiet"], **common)
+    if reb.returncode != 0:
+        # a true conflict, no upstream, or offline: abort any half-applied rebase and run last-good
+        subprocess.run([git, "-C", str(workdir), "rebase", "--abort"], **common)
 
 
 def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
