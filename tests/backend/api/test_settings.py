@@ -71,3 +71,36 @@ def test_settings_is_token_guarded(anon_client):
     assert anon_client.patch(
         "/api/settings", json={"mouser_api_key": "x"}
     ).status_code in (401, 403)
+
+
+# -- GitHub personal access token (auto-push auth) -----------------------------
+
+
+def test_get_settings_reports_no_github_token_when_unset(client):
+    assert client.get("/api/settings").json()["github_token_set"] is False
+
+
+def test_patch_github_token_sets_it_live_and_never_leaks_it(client, app_ctx):
+    r = client.patch("/api/settings", json={"github_token": "ghp_SECRET1234"})
+    body = r.json()
+    assert body["github_token_set"] is True and body["github_token_hint"] == "1234"
+    assert "ghp_SECRET" not in json.dumps(body)  # only presence + last-4, never the raw token
+    assert app_ctx.config.github_token == "ghp_SECRET1234"
+    # applied LIVE to the library repo so push/pull authenticate immediately (a github extraheader)
+    got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
+    assert got.returncode == 0 and "basic" in got.stdout.lower()
+    assert "ghp_SECRET" not in got.stdout  # base64-encoded, not the raw token
+
+
+def test_patch_persists_the_github_token(client):
+    client.patch("/api/settings", json={"github_token": "ghp_PERSIST42"})
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["github_token"] == "ghp_PERSIST42"
+
+
+def test_patch_empty_github_token_clears_the_credential(client, app_ctx):
+    client.patch("/api/settings", json={"github_token": "ghp_TEMP"})
+    client.patch("/api/settings", json={"github_token": ""})
+    assert app_ctx.config.github_token == ""
+    got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
+    assert got.returncode != 0  # the credential header was removed

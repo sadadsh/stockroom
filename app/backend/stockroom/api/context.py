@@ -67,6 +67,24 @@ class AppContext:
         self.index.close()
         self.index = LibraryIndex.build(self.profile.library.parts_dir)
 
+    def auto_push(self) -> None:
+        """After a library write, push it to the remote when a GitHub token is configured and sync
+        is enabled, first rebasing to pick up any collaborator changes. Non-fatal: an offline /
+        no-remote / auth / conflict failure never breaks the write (the change is already committed
+        locally, and the next launch's pull + a Sync push it). So a part add lands in git
+        immediately and reaches every collaborator on their next launch."""
+        if not getattr(self.config, "sync_enabled", True):
+            return
+        if not (getattr(self.config, "github_token", "") or "").strip():
+            return  # no credential yet; the commit stands locally, Sync pushes once a token is set
+        try:
+            if not self.repo.has_remote():
+                return
+            self.repo.pull_rebase()  # reconcile local commits with collaborators' changes first
+            self.repo.push()
+        except Exception:  # noqa: BLE001 - auto-push is best-effort; never break the write
+            pass
+
     def rebuild_project_index(self) -> None:
         # Projects live repo-level (profile-independent), so this rebuilds from the same
         # <libraries_root>/.projects dir the store writes to; called after register/delete.
@@ -147,7 +165,7 @@ def build_context(
         app_repo = GitRepo(app_repo_root)
     except GitError:
         app_repo = None
-    return AppContext(
+    ctx = AppContext(
         libraries_root=libraries_root,
         repo=repo,
         config=config,
@@ -165,3 +183,13 @@ def build_context(
         project_ops=project_ops,
         app_repo=app_repo,
     )
+    # Apply the configured GitHub credential to the library repo so push/pull authenticate
+    # non-interactively (a recovery re-clone resets .git/config, so re-applying on every boot
+    # keeps it live). Non-fatal: a non-git library or a git error never blocks the boot.
+    try:
+        from stockroom.vcs import github_auth
+
+        github_auth.configure(repo, getattr(config, "github_token", ""))
+    except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
+        pass
+    return ctx

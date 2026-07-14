@@ -91,6 +91,7 @@ def library_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.edit_field(part_id, body.field, body.value)
         ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
 
     @r.post("/parts/{part_id}/specs")
@@ -104,6 +105,7 @@ def library_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.set_specs(part_id, body.specs, overwrite=body.overwrite)
         ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
 
     @r.get("/parts/{part_id}/history")
@@ -160,6 +162,7 @@ def library_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.move_category(part_id, body.category)
         ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
 
     @r.delete("/parts/{part_id}", status_code=204)
@@ -169,6 +172,7 @@ def library_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         ctx.ops.delete_part(part_id)
         ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return Response(status_code=204)
 
     return r

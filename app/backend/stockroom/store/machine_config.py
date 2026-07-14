@@ -41,6 +41,11 @@ class MachineConfig:
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
     libraries_root: str = ""
     mouser_api_key: str = ""
+    # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
+    # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
+    # collaborator's changes pull. Per-machine, stored in config.json (in the OS config dir, never
+    # the repo), so it is a local secret and never committed. Blank = no auto-push, sign in later.
+    github_token: str = ""
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.
