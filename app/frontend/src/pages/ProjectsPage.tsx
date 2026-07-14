@@ -2013,13 +2013,29 @@ function NetclassPatternEditor({ projectId, data }: { projectId: string; data: D
   function onSave() {
     // A blank-pattern row is incomplete: drop it rather than write an empty glob. The netclass
     // is always a select value, so it is never blank when a pattern is present.
-    const rows = drafts
-      .filter((d) => d.pattern.trim() !== "")
-      .map((d) => ({ netclass: d.netclass, pattern: d.pattern.trim() }));
+    const active = drafts.filter((d) => d.pattern.trim() !== "");
+    // A row whose net class the project no longer defines (e.g. the class was deleted in the Net
+    // Classes editor, which does not clean up its patterns) would be rejected wholesale by the
+    // backend, blocking every unrelated edit with an opaque error. Catch it here and name the
+    // exact pattern to fix, so the user reassigns or deletes it deliberately (never silently).
+    const orphan = active.find((d) => !classNames.includes(d.netclass));
+    if (orphan) {
+      toast(
+        `Pattern "${orphan.pattern.trim()}" is assigned to net class "${orphan.netclass}", which no longer exists. Reassign or delete it before saving.`,
+        "err",
+      );
+      return;
+    }
+    const rows = active.map((d) => ({ netclass: d.netclass, pattern: d.pattern.trim() }));
     save.mutate(
       { id: projectId, patterns: rows },
       {
-        onSuccess: () => toast("Netclass patterns saved."),
+        // Re-seed from the committed result so an effective no-op (e.g. a dropped blank row)
+        // does not strand the section permanently Unsaved: the local drafts match disk again.
+        onSuccess: (result) => {
+          setDrafts(seedPatterns(result.netclass_patterns));
+          toast("Netclass patterns saved.");
+        },
         onError: (e) => toast(errMsg(e, "Could not save the netclass patterns."), "err"),
       },
     );
@@ -2058,48 +2074,62 @@ function NetclassPatternEditor({ projectId, data }: { projectId: string; data: D
             <div className="w-40 shrink-0">Net Class</div>
             <div className="w-16 shrink-0" />
           </div>
-          {drafts.map((d, i) => (
-            <div
-              key={d.rowId}
-              className="flex items-center gap-2 border-b border-line py-1.5"
-              data-testid={`ncp-row-${i}`}
-            >
-              <input
-                type="text"
-                className={`${INPUT_CLS} flex-1 !py-1 text-xs`}
-                data-testid={`ncp-${i}-pattern`}
-                placeholder="*NET*"
-                value={d.pattern}
-                onChange={(e) => editPattern(d.rowId, e.target.value)}
-              />
-              <select
-                className={`${INPUT_CLS} w-40 shrink-0 !py-1 text-xs`}
-                data-testid={`ncp-${i}-netclass`}
-                value={d.netclass}
-                onChange={(e) => editNetclass(d.rowId, e.target.value)}
+          {drafts.map((d, i) => {
+            // A row is orphaned when its non-blank pattern points at a net class the project no
+            // longer defines. It is kept (never silently dropped) but flagged so the user sees
+            // exactly which pattern to reassign or delete before a save can go through.
+            const orphan =
+              d.pattern.trim() !== "" && d.netclass !== "" && !classNames.includes(d.netclass);
+            return (
+              <div
+                key={d.rowId}
+                className="border-b border-line py-1.5"
+                data-testid={`ncp-row-${i}`}
               >
-                {/* If a stored pattern names a class the project no longer defines, keep it as a
-                    selectable option so the row is honest and a save does not silently remap it. */}
-                {!classNames.includes(d.netclass) && d.netclass !== "" ? (
-                  <option value={d.netclass}>{d.netclass}</option>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    className={`${INPUT_CLS} flex-1 !py-1 text-xs`}
+                    data-testid={`ncp-${i}-pattern`}
+                    placeholder="*NET*"
+                    value={d.pattern}
+                    onChange={(e) => editPattern(d.rowId, e.target.value)}
+                  />
+                  <select
+                    className={`${INPUT_CLS} w-40 shrink-0 !py-1 text-xs ${orphan ? "border-warn" : ""}`}
+                    data-testid={`ncp-${i}-netclass`}
+                    value={d.netclass}
+                    onChange={(e) => editNetclass(d.rowId, e.target.value)}
+                  >
+                    {/* If a stored pattern names a class the project no longer defines, keep it as
+                        a selectable option so the row is honest and a save never silently remaps it. */}
+                    {!classNames.includes(d.netclass) && d.netclass !== "" ? (
+                      <option value={d.netclass}>{d.netclass}</option>
+                    ) : null}
+                    {classNames.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex w-16 shrink-0 justify-end">
+                    <button
+                      type="button"
+                      className="text-2xs text-err hover:opacity-80"
+                      onClick={() => removeRow(d.rowId)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                {orphan ? (
+                  <p className="mt-1 pl-1 text-2xs text-warn">
+                    Net class "{d.netclass}" no longer exists. Reassign or delete this pattern.
+                  </p>
                 ) : null}
-                {classNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <div className="flex w-16 shrink-0 justify-end">
-                <button
-                  type="button"
-                  className="text-2xs text-err hover:opacity-80"
-                  onClick={() => removeRow(d.rowId)}
-                >
-                  Delete
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

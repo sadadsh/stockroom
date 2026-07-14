@@ -1334,6 +1334,57 @@ describe("ProjectsPage", () => {
     expect(save).toBeEnabled(); // dirty after an edit
   });
 
+  it("flags a pattern row whose net class no longer exists", async () => {
+    mockApi.getDesign.mockResolvedValue({
+      ...DESIGN,
+      netclass_patterns: [{ netclass: "GONE", pattern: "*X*" }],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    expect(screen.getByTestId("ncp-row-0")).toHaveTextContent(/no longer/i);
+  });
+
+  it("blocks the save and warns when a pattern references a deleted net class", async () => {
+    // Deleting a class in the Net Classes editor leaves its patterns dangling. The backend
+    // rejects the whole wholesale save (400), so the editor must catch the orphan first and
+    // tell the user exactly which pattern to fix, never send it and surface an opaque error.
+    mockApi.getDesign.mockResolvedValue({
+      ...DESIGN,
+      netclass_patterns: [{ netclass: "GONE", pattern: "*X*" }],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    // make an unrelated valid edit so there is a change to attempt to save
+    await user.click(screen.getByRole("button", { name: "Add Pattern" }));
+    await user.type(screen.getByTestId("ncp-1-pattern"), "*GND");
+    await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
+    expect(mockApi.setNetclassPatterns).not.toHaveBeenCalled();
+    // the toast names the exact pattern to fix (its text is distinct from the per-row flag)
+    expect(await screen.findByText(/Reassign or delete it before saving/i)).toBeInTheDocument();
+  });
+
+  it("clears the Unsaved state after saving a change that drops to a no-op", async () => {
+    // Adding a blank row marks the section dirty, but the blank row is dropped on save so the
+    // committed list is unchanged. Re-seeding from the save result must clear the stray row and
+    // the Unsaved badge, never leave the editor permanently dirty on an effective no-op.
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await screen.findByTestId("netclass-pattern-editor");
+    await user.click(screen.getByRole("button", { name: "Add Pattern" }));
+    const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    await waitFor(() => expect(mockApi.setNetclassPatterns).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save Netclass Patterns" })).toBeDisabled(),
+    );
+  });
+
   // --- M7f-A Board Setup editor ---
 
   it("shows the board setup with its current values", async () => {

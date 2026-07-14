@@ -110,7 +110,7 @@ async function request<T>(
     let missing: string[] | undefined;
     try {
       const body = await res.json();
-      msg = body.error || body.detail || body.message || msg;
+      msg = body.detail || body.error || body.message || msg;
       // The complete-to-add gate returns 422 with a `missing` label list; carry it
       // on the error so the ingest commit flow can highlight the unfilled fields.
       if (Array.isArray(body.missing)) missing = body.missing as string[];
@@ -145,7 +145,7 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
     let msg = `request failed (${res.status})`;
     try {
       const body = await res.json();
-      msg = body.error || body.detail || body.message || msg;
+      msg = body.detail || body.error || body.message || msg;
     } catch {
       /* non-JSON error body, keep the status message */
     }
@@ -176,7 +176,7 @@ async function fetchDownload(
     let msg = `request failed (${res.status})`;
     try {
       const body = await res.json();
-      msg = body.error || body.detail || body.message || msg;
+      msg = body.detail || body.error || body.message || msg;
     } catch {
       /* non-JSON error body, keep the status message */
     }

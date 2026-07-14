@@ -82,6 +82,17 @@ describe("api client", () => {
     await expect(api.partDetail("x")).rejects.toMatchObject({ message: "incomplete" });
   });
 
+  it("prefers the descriptive detail over the exception class name when both are present", async () => {
+    // The real backend envelope is {error: <ExceptionClassName>, detail: <message>}. The toast
+    // must surface the human-readable detail, not the opaque class name ("ValueError").
+    fetchMock.mockResolvedValueOnce(
+      errJson(400, { error: "ValueError", detail: "unknown net class 'HS'" }),
+    );
+    await expect(api.partDetail("x")).rejects.toMatchObject({
+      message: "unknown net class 'HS'",
+    });
+  });
+
   it("reports a network failure as ApiError status 0", async () => {
     fetchMock.mockRejectedValueOnce(new Error("connection refused"));
 

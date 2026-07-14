@@ -323,6 +323,42 @@ def test_set_netclass_patterns_leaves_classes_and_board_byte_identical(tmp_path)
     assert prepo.is_clean()
 
 
+def test_set_netclass_patterns_preserves_net_settings_siblings(tmp_path):
+    # A real KiCad-10 net_settings also carries net_colors + netclass_assignments beside
+    # classes/meta/netclass_patterns (verified against the NETDECK Master.kicad_pro). A
+    # patterns-only edit must leave every sibling intact (the partial-merge deep-copies
+    # untouched keys), never drop one. Also exercises a non-Default netclass reference.
+    import json
+
+    pro_dict = {
+        "board": {"design_settings": {"rules": {"min_clearance": 0.2}}},
+        "meta": {"filename": "board.kicad_pro", "version": 3},
+        "net_settings": {
+            "classes": [
+                {"clearance": 0.2, "name": "Default", "track_width": 0.2},
+                {"clearance": 0.15, "name": "GND", "track_width": 0.25},
+            ],
+            "meta": {"version": 5},
+            "net_colors": {"GND": "rgb(0, 0, 0)"},
+            "netclass_assignments": {"/CHASSIS": "GND"},
+            "netclass_patterns": [],
+        },
+    }
+    pro_text = json.dumps(pro_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "board", pro_text=pro_text)
+    rec = ops.register(proj)
+
+    ops.set_netclass_patterns(rec.id, [{"pattern": "*GND", "netclass": "GND"}])
+
+    ns = json.loads((proj / "board.kicad_pro").read_text(encoding="utf-8"))["net_settings"]
+    assert ns["netclass_patterns"] == [{"netclass": "GND", "pattern": "*GND"}]  # edited
+    assert ns["net_colors"] == {"GND": "rgb(0, 0, 0)"}  # sibling preserved
+    assert ns["netclass_assignments"] == {"/CHASSIS": "GND"}  # sibling preserved
+    assert [c["name"] for c in ns["classes"]] == ["Default", "GND"]  # classes preserved
+    assert prepo.is_clean()
+
+
 def test_set_netclass_patterns_refuses_a_project_not_under_git(tmp_path):
     ops = _ops(tmp_path)
     proj = _make_project(tmp_path / "nogit" / "board", _UNANNOTATED)
