@@ -278,6 +278,13 @@ function SyncSection() {
           toast("Sync failed: the remote is unreachable.", "err");
           return;
         }
+        if (r.state === "denied") {
+          toast(
+            "Sync failed: cannot sign in to the library remote (a private repo, or missing git credentials). Check the repo access or its URL.",
+            "err",
+          );
+          return;
+        }
         if (r.state === "no_remote") {
           toast("No remote is configured for this library.", "neutral");
           return;
