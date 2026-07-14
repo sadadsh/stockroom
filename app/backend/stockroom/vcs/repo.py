@@ -150,6 +150,12 @@ class GitRepo:
     def commit(self, message: str, paths: list[Path]) -> str:
         if not message.strip():
             raise GitError("commit message must not be empty")
+        # Guarantee a commit identity for EVERY commit, not only after init()/clone_from(): the
+        # library committed inside the app repo is cloned by the launcher's raw `git clone` (never
+        # GitRepo.clone_from), so on a fresh machine with no global git identity its first part
+        # commit would otherwise fail with "Please tell me who you are". A real global identity
+        # still wins; this only fills a MISSING one.
+        self._set_test_identity_if_missing()
         # -A so a scoped commit also stages DELETIONS of tracked files that were removed
         # from the working tree (profile/part deletion), not just adds/mods. Only add
         # paths git can still see (present on disk, or still tracked in the index): a path
