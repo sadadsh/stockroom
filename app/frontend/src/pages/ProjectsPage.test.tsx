@@ -2,7 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api, ApiError } from "../api/client";
-import type { AuditResult, ProjectDetail, ProjectSummary } from "../api/types";
+import type {
+  AuditResult,
+  ChecksResult,
+  ProjectDetail,
+  ProjectSummary,
+} from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
 
@@ -16,6 +21,9 @@ vi.mock("../api/client", async (importActual) => {
       getProject: vi.fn(),
       deleteProject: vi.fn(),
       projectAudit: vi.fn(),
+      runChecks: vi.fn(),
+      getChecks: vi.fn(),
+      openJobStream: vi.fn(),
     },
   };
 });
@@ -82,6 +90,61 @@ const AUDIT: AuditResult = {
   markdown: "# Netdeck Health\n\nAll good.\n",
 };
 
+const NOT_RUN: ChecksResult = {
+  project: "Netdeck",
+  erc: null,
+  drc: [],
+  summary: null,
+  ran_at: null,
+};
+
+const RAN: ChecksResult = {
+  project: "Netdeck",
+  erc: {
+    ok: true,
+    findings: [
+      { severity: "warning", rule: "pin_not_connected", message: "Pin floating", where: "U1" },
+    ],
+    summary: {
+      total: 1, errors: 0, warnings: 1,
+      by_severity: { error: 0, warning: 1, exclusion: 0, info: 0 },
+      by_rule: { pin_not_connected: 1 },
+    },
+    error: "",
+    sheet: "netdeck.kicad_sch",
+  },
+  drc: [
+    {
+      ok: true,
+      findings: [
+        { severity: "error", rule: "clearance", message: "Tracks too close", where: "(10, 20)" },
+      ],
+      summary: {
+        total: 1, errors: 1, warnings: 0,
+        by_severity: { error: 1, warning: 0, exclusion: 0, info: 0 },
+        by_rule: { clearance: 1 },
+      },
+      error: "",
+      board: "netdeck.kicad_pcb",
+    },
+  ],
+  summary: { ok: true, errors: 1, warnings: 1, total: 2, checked: 2 },
+  ran_at: "2026-07-13T15:00:00Z",
+};
+
+// Build an SSE body from event frames, matching the fetch-based job stream the client
+// consumes (event:/data: lines, blank-line separated).
+function sseStream(frames: string[]): ReadableStream<Uint8Array> {
+  const body = frames.map((f) => f + "\r\n\r\n").join("");
+  const bytes = new TextEncoder().encode(body);
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -101,6 +164,7 @@ beforeEach(() => {
   mockApi.projectAudit.mockResolvedValue(AUDIT);
   mockApi.registerProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.deleteProject.mockResolvedValue(undefined);
+  mockApi.getChecks.mockResolvedValue(NOT_RUN);
 });
 
 describe("ProjectsPage", () => {
@@ -243,5 +307,64 @@ describe("ProjectsPage", () => {
     expect(
       await screen.findByText(/Cannot reach the Stockroom server/i),
     ).toBeInTheDocument();
+  });
+
+  // ---- Rules Check (ERC + DRC, M7b) ----------------------------------------
+
+  it("prompts to run checks and offers a Run Checks action on an unchecked project", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    expect(await screen.findByText(/Checks have not run yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run Checks" })).toBeInTheDocument();
+  });
+
+  it("runs ERC and DRC and shows the combined verdict plus the findings", async () => {
+    mockApi.runChecks.mockResolvedValue({ job_id: "checks-1" });
+    mockApi.openJobStream.mockResolvedValue(
+      sseStream([
+        `event: result\r\ndata: ${JSON.stringify({ result: RAN })}`,
+        `event: done\r\ndata: {}`,
+      ]),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("button", { name: "Run Checks" }));
+
+    await waitFor(() => expect(mockApi.runChecks).toHaveBeenCalledWith("netdeck"));
+    // combined verdict: one error + one warning
+    const result = await screen.findByTestId("checks-result");
+    expect(within(result).getByText("1 Error")).toBeInTheDocument();
+    expect(within(result).getByText("1 Warning")).toBeInTheDocument();
+    // ERC + DRC findings surfaced with their rules and messages
+    expect(within(result).getByText("pin_not_connected")).toBeInTheDocument();
+    expect(within(result).getByText("Pin floating")).toBeInTheDocument();
+    expect(within(result).getByText("clearance")).toBeInTheDocument();
+    expect(within(result).getByText("Tracks too close")).toBeInTheDocument();
+  });
+
+  it("surfaces an honest cli-absent error when checks cannot start", async () => {
+    mockApi.runChecks.mockRejectedValue(new ApiError(502, "kicad-cli not found; install KiCad 10"));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("button", { name: "Run Checks" }));
+
+    // inline error (never a fabricated pass) + the run prompt did not become a result
+    expect(await screen.findAllByText(/kicad-cli not found/i)).not.toHaveLength(0);
+    expect(screen.queryByTestId("checks-result")).toBeNull();
+  });
+
+  it("renders a previously cached run on select without re-running", async () => {
+    mockApi.getChecks.mockResolvedValue(RAN);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    // the cached run renders and the action reads Re-run, without any runChecks call
+    expect(await screen.findByTestId("checks-result")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Re-run Checks" })).toBeInTheDocument();
+    expect(mockApi.runChecks).not.toHaveBeenCalled();
   });
 });

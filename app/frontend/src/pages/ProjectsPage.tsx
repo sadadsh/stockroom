@@ -17,14 +17,24 @@
  * a retry surface, never a crash.
  */
 import { useEffect, useState } from "react";
-import { ApiError } from "../api/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { ApiError, api } from "../api/client";
 import {
   useProjectsQuery,
   useProjectAudit,
+  useProjectChecks,
   useRegisterProject,
   useDeleteProject,
 } from "../api/queries";
-import type { AuditFinding, AuditResult, ProjectSummary } from "../api/types";
+import type {
+  AuditFinding,
+  AuditResult,
+  CheckFinding,
+  CheckRun,
+  ChecksResult,
+  ProjectSummary,
+} from "../api/types";
+import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -372,6 +382,8 @@ function ProjectDetailView({
           onKindFilter={setKindFilter}
         />
       ) : null}
+
+      <ChecksSection key={project.id} projectId={project.id} />
     </div>
   );
 }
@@ -539,4 +551,256 @@ function downloadMarkdown(audit: AuditResult) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// -- Rules Check (ERC + DRC, M7b) --------------------------------------------
+
+// Severity -> tone for the ERC/DRC findings tables. exclusion is a deliberate KiCad
+// waiver (neutral); info is muted.
+const CHECK_SEVERITY_TONE: Record<CheckFinding["severity"], "err" | "warn" | "neutral"> = {
+  error: "err",
+  warning: "warn",
+  exclusion: "neutral",
+  info: "neutral",
+};
+
+// The Rules Check section: run structured ERC + DRC via kicad-cli as a job, then show
+// the cached result. Keyed by project id in the parent so its job state never leaks
+// across a project switch. Honest states throughout: a missing kicad-cli is an inline
+// error (never a fabricated pass), and an unrun project shows a "not run yet" prompt.
+function ChecksSection({ projectId }: { projectId: string }) {
+  const checksQuery = useProjectChecks(projectId);
+  const job = useJob<ChecksResult>();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  // When a run finishes, refresh the cached-run query so a later revisit reads the
+  // same server-cached result this job just produced.
+  useEffect(() => {
+    if (job.status === "done") {
+      qc.invalidateQueries({ queryKey: ["project-checks", projectId] });
+    }
+  }, [job.status, projectId, qc]);
+
+  async function onRun() {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const { job_id } = await api.runChecks(projectId);
+      job.run(job_id);
+    } catch (e) {
+      // A missing kicad-cli is an honest 502; surface it inline (and as a toast).
+      const msg = errMsg(e, "Could not start the checks.");
+      setStartError(msg);
+      toast(msg, "err");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  const busy = starting || job.status === "running";
+  // Prefer the just-produced run; else the cached last run.
+  const data: ChecksResult | null =
+    job.status === "done" && job.result ? job.result : (checksQuery.data ?? null);
+  const hasRun = data != null && data.ran_at != null;
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="checks-section">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-0.5">Rules Check</Eyebrow>
+          <p className="text-xs text-t3">
+            Run KiCad ERC on the schematic and DRC on the board through kicad-cli.
+          </p>
+        </div>
+        <Button variant="accent" small onClick={onRun} disabled={busy}>
+          {busy ? "Running..." : hasRun ? "Re-run Checks" : "Run Checks"}
+        </Button>
+      </div>
+
+      {busy && job.progress?.message ? (
+        <p className="mb-2 text-xs text-t3">{job.progress.message}...</p>
+      ) : null}
+      {startError ? <p className="mb-2 text-sm text-err">{startError}</p> : null}
+      {job.status === "error" ? (
+        <p className="mb-2 text-sm text-err">{job.error ?? "The checks failed."}</p>
+      ) : null}
+
+      {checksQuery.isLoading && !hasRun && !busy ? (
+        <p className="text-sm text-t3">Loading the last run...</p>
+      ) : hasRun && data ? (
+        <ChecksResultView result={data} />
+      ) : !busy && !startError && job.status !== "error" ? (
+        <p className="text-sm text-t3">
+          Checks have not run yet. Run them to see ERC and DRC results.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ChecksResultView({ result }: { result: ChecksResult }) {
+  const s = result.summary;
+  return (
+    <div className="flex flex-col gap-4" data-testid="checks-result">
+      <div className="flex flex-wrap items-center gap-2.5">
+        {s ? <ChecksVerdictBadge summary={s} /> : null}
+        {s && !s.ok ? (
+          <span className="text-xs text-warn">
+            A check could not complete; its results are not included.
+          </span>
+        ) : null}
+      </div>
+
+      <CheckRunView label="ERC" run={result.erc} emptyLabel="No schematic to check." />
+
+      {result.drc.length === 0 ? (
+        <p className="text-xs text-t3">No board to run DRC on.</p>
+      ) : (
+        result.drc.map((run, i) => (
+          <CheckRunView
+            key={run.board ?? i}
+            label={run.board ? `DRC (${run.board})` : "DRC"}
+            run={run}
+            emptyLabel=""
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+function ChecksVerdictBadge({
+  summary,
+}: {
+  summary: NonNullable<ChecksResult["summary"]>;
+}) {
+  const badges = [];
+  if (summary.errors > 0) {
+    badges.push(
+      <Badge key="e" tone="err">
+        {countLabel(summary.errors, "Error")}
+      </Badge>,
+    );
+  }
+  if (summary.warnings > 0) {
+    badges.push(
+      <Badge key="w" tone="warn">
+        {countLabel(summary.warnings, "Warning")}
+      </Badge>,
+    );
+  }
+  if (badges.length === 0) {
+    badges.push(
+      summary.ok ? (
+        <Badge key="c" tone="ok">
+          Clean
+        </Badge>
+      ) : (
+        <Badge key="x" tone="neutral">
+          No Results
+        </Badge>
+      ),
+    );
+  }
+  return <>{badges}</>;
+}
+
+function CheckRunView({
+  label,
+  run,
+  emptyLabel,
+}: {
+  label: string;
+  run: CheckRun | null;
+  emptyLabel: string;
+}) {
+  if (run == null) {
+    return emptyLabel ? <p className="text-xs text-t3">{emptyLabel}</p> : null;
+  }
+  if (!run.ok) {
+    return (
+      <div>
+        <div className="mb-1 text-sm font-medium text-t2">{label}</div>
+        <p className="text-sm text-err">{run.error || "This check could not complete."}</p>
+      </div>
+    );
+  }
+  if (run.findings.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-t2">{label}</span>
+        <Badge tone="ok">Clean</Badge>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="text-sm font-medium text-t2">{label}</span>
+        <span className="text-2xs text-t3">
+          {countLabel(run.summary.errors, "error")},{" "}
+          {countLabel(run.summary.warnings, "warning")}
+        </span>
+      </div>
+      <CheckFindingsTable findings={run.findings} testid={`check-findings-${label}`} />
+    </div>
+  );
+}
+
+function CheckFindingsTable({
+  findings,
+  testid,
+}: {
+  findings: CheckFinding[];
+  testid: string;
+}) {
+  return (
+    <Card className="overflow-hidden" data-testid={testid}>
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-2xs text-t3">
+            <th className="px-4 py-2 font-medium">Severity</th>
+            <th className="px-4 py-2 font-medium">Rule</th>
+            <th className="px-4 py-2 font-medium">Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {findings.map((finding, i) => (
+            <tr
+              key={`${finding.rule}-${i}`}
+              className="border-b border-line last:border-b-0"
+            >
+              <td className="px-4 py-2 align-top">
+                <Badge tone={CHECK_SEVERITY_TONE[finding.severity]}>
+                  {checkSeverityLabel(finding.severity)}
+                </Badge>
+              </td>
+              <td className="px-4 py-2 align-top font-mono text-xs text-t2">
+                {finding.rule}
+              </td>
+              <td className="px-4 py-2 align-top text-t1">
+                {finding.message}
+                {finding.where ? (
+                  <span className="mt-0.5 block text-2xs text-t3">{finding.where}</span>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+function checkSeverityLabel(severity: CheckFinding["severity"]): string {
+  return severity[0].toUpperCase() + severity.slice(1);
+}
+
+// "1 Error", "3 Errors"; noun casing is the caller's (Title Case in a badge, lower in
+// a caption).
+function countLabel(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
