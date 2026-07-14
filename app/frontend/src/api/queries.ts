@@ -479,6 +479,22 @@ export function useSetDesignRules() {
   });
 }
 
+// A netclass-pattern write invalidates the design read (re-reads the committed patterns) and
+// the project detail; it also evicts the cached ERC/DRC server-side (a pattern change alters
+// DRC net grouping), so the checks query is invalidated to re-read the honest not-run shape.
+export function useSetNetclassPatterns() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; patterns: { netclass: string; pattern: string }[] }) =>
+      api.setNetclassPatterns(vars.id, vars.patterns),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["project-design", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project-checks", vars.id] });
+    },
+  });
+}
+
 // --- Editor: board setup + thickness (M7f-A) ---
 
 // The project's current board setup + overall thickness read from its primary .kicad_pcb,

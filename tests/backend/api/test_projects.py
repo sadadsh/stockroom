@@ -745,6 +745,64 @@ def test_patch_design_rules_evicts_the_stale_checks_cache(client, tmp_path, app_
     assert rec["id"] not in app_ctx.checks_cache
 
 
+# ---- roadmap #4 Editor: netclass patterns -----------------------------------
+
+
+def test_patch_netclass_patterns_edits_the_kicad_pro_and_commits(client, tmp_path):
+    proj, head = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
+                     json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["committed"] and body["committed"] != head
+    assert body["netclass_patterns"] == [{"netclass": "Default", "pattern": "*GND"}]
+    on_disk = (proj / "board.kicad_pro").read_text(encoding="utf-8")
+    assert '"pattern": "*GND"' in on_disk
+    # the net classes are untouched by a patterns edit
+    assert '"name": "Default"' in on_disk
+
+
+def test_patch_netclass_patterns_unknown_netclass_is_400(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
+                     json={"patterns": [{"pattern": "*X", "netclass": "Nope"}]})
+    assert r.status_code == 400
+
+
+def test_patch_netclass_patterns_blank_pattern_is_422(client, tmp_path):
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
+                     json={"patterns": [{"pattern": "   ", "netclass": "Default"}]})
+    assert r.status_code == 422
+
+
+def test_patch_netclass_patterns_on_a_non_git_project_is_400(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))  # not a git repo
+    r = client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
+                     json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    assert r.status_code == 400
+
+
+def test_patch_netclass_patterns_unknown_project_is_404(client):
+    r = client.patch("/api/projects/nope/netclass-patterns",
+                     json={"patterns": []})
+    assert r.status_code == 404
+
+
+def test_patch_netclass_patterns_evicts_the_stale_checks_cache(client, tmp_path, app_ctx):
+    # a netclass-pattern change alters DRC net grouping, so the cached ERC/DRC must not
+    # linger as a fabricated pass. The write evicts it, forcing an honest re-run.
+    proj, _ = _make_git_pro_project(tmp_path / "board")
+    rec = _register(client, proj)
+    app_ctx.checks_cache[rec["id"]] = {"stale": True}
+    client.patch(f"/api/projects/{rec['id']}/netclass-patterns",
+                 json={"patterns": [{"pattern": "*GND", "netclass": "Default"}]})
+    assert rec["id"] not in app_ctx.checks_cache
+
+
 # ---- M7f-A Editor: board setup + thickness ----------------------------------
 
 _PCB_FULL = (
@@ -1006,6 +1064,7 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.get("/api/projects/x/design").status_code == 401
     assert anon_client.patch("/api/projects/x/net-classes", json={"classes": []}).status_code == 401
     assert anon_client.patch("/api/projects/x/design-rules", json={"rules": {}}).status_code == 401
+    assert anon_client.patch("/api/projects/x/netclass-patterns", json={"patterns": []}).status_code == 401
     assert anon_client.get("/api/projects/x/settings").status_code == 401
     assert anon_client.patch("/api/projects/x/settings", json={"thickness": 1.2}).status_code == 401
 

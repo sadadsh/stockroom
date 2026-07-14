@@ -29,6 +29,7 @@ import {
   useProjectDesign,
   useSetNetClasses,
   useSetDesignRules,
+  useSetNetclassPatterns,
   useProjectSettings,
   useSetProjectSettings,
   useProjectConform,
@@ -1616,8 +1617,8 @@ function EditorSection({ projectId }: { projectId: string }) {
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Editor</Eyebrow>
         <p className="text-xs text-t3">
-          Edit the board net classes and design rules. Each save writes a minimal change to
-          the project file and commits it to the project's own git history.
+          Edit the board net classes, netclass patterns, and design rules. Each save writes a
+          minimal change to the project file and commits it to the project's own git history.
         </p>
       </div>
 
@@ -1640,6 +1641,7 @@ function EditorSection({ projectId }: { projectId: string }) {
       ) : (
         <div className="flex flex-col gap-7">
           <NetClassEditor projectId={projectId} data={data} floor={floor} onFloor={setFloor} />
+          <NetclassPatternEditor projectId={projectId} data={data} />
           <DesignRulesEditor projectId={projectId} data={data} />
         </div>
       )}
@@ -1946,6 +1948,160 @@ function DesignRulesEditor({ projectId, data }: { projectId: string; data: Desig
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// -- Editor: netclass patterns (roadmap #4) -----------------------------------
+
+// One editable pattern row: a net-name glob bound to a net class. rowId is a stable key
+// across edits/deletes; the on-wire shape is exactly {netclass, pattern} (the two keys KiCad
+// writes). A blank-pattern row is incomplete and dropped on save, mirroring the net-class
+// editor's drop of an unnamed class.
+interface PatternDraft {
+  rowId: string;
+  pattern: string;
+  netclass: string;
+}
+
+function seedPatterns(pats: { netclass: string; pattern: string }[]): PatternDraft[] {
+  return pats.map((p, i) => ({ rowId: `seed-${i}`, pattern: p.pattern, netclass: p.netclass }));
+}
+
+// The netclass-pattern editor: assign net-name globs (e.g. *GND) to a net class. The editor
+// re-sends the FULL list, so a save replaces net_settings.netclass_patterns wholesale as a
+// minimal-diff scoped commit on the project's own git (roadmap #4). The net class is a select
+// of the project's classes, so a pattern can never reference a class the project does not define.
+function NetclassPatternEditor({ projectId, data }: { projectId: string; data: DesignResult }) {
+  const [drafts, setDrafts] = useState<PatternDraft[]>(() => seedPatterns(data.netclass_patterns));
+  const [newCount, setNewCount] = useState(0);
+  const save = useSetNetclassPatterns();
+  const { toast } = useToast();
+  const classNames = data.net_classes.map((c) => c.name);
+
+  // Re-seed on the patterns CONTENT (not the reference) so a floor-only refetch (identical
+  // content, fresh reference) does not clobber unsaved edits, matching the net-class editor.
+  const sig = JSON.stringify(data.netclass_patterns);
+  useEffect(() => {
+    setDrafts(seedPatterns(data.netclass_patterns));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sig is the content of data.netclass_patterns
+  }, [sig]);
+
+  const seeded = seedPatterns(data.netclass_patterns);
+  const dirty =
+    JSON.stringify(drafts.map((d) => [d.pattern, d.netclass])) !==
+    JSON.stringify(seeded.map((d) => [d.pattern, d.netclass]));
+
+  function editPattern(rowId: string, pattern: string) {
+    setDrafts((ds) => ds.map((d) => (d.rowId === rowId ? { ...d, pattern } : d)));
+  }
+
+  function editNetclass(rowId: string, netclass: string) {
+    setDrafts((ds) => ds.map((d) => (d.rowId === rowId ? { ...d, netclass } : d)));
+  }
+
+  function addRow() {
+    const rowId = `new-${newCount}`;
+    setNewCount((n) => n + 1);
+    setDrafts((ds) => [...ds, { rowId, pattern: "", netclass: classNames[0] ?? "" }]);
+  }
+
+  function removeRow(rowId: string) {
+    setDrafts((ds) => ds.filter((d) => d.rowId !== rowId));
+  }
+
+  function onSave() {
+    // A blank-pattern row is incomplete: drop it rather than write an empty glob. The netclass
+    // is always a select value, so it is never blank when a pattern is present.
+    const rows = drafts
+      .filter((d) => d.pattern.trim() !== "")
+      .map((d) => ({ netclass: d.netclass, pattern: d.pattern.trim() }));
+    save.mutate(
+      { id: projectId, patterns: rows },
+      {
+        onSuccess: () => toast("Netclass patterns saved."),
+        onError: (e) => toast(errMsg(e, "Could not save the netclass patterns."), "err"),
+      },
+    );
+  }
+
+  return (
+    <div data-testid="netclass-pattern-editor">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-t1">Netclass Patterns</h3>
+          {dirty ? <Badge tone="warn">Unsaved</Badge> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button small onClick={addRow} disabled={classNames.length === 0}>
+            Add Pattern
+          </Button>
+          <Button variant="accent" small onClick={onSave} disabled={!dirty || save.isPending}>
+            {save.isPending ? "Saving..." : "Save Netclass Patterns"}
+          </Button>
+        </div>
+      </div>
+
+      <p className="mb-2 text-2xs text-t3">
+        A net-name glob (e.g. *GND, *USB*) assigns every matching net to a net class. KiCad
+        applies the patterns in order.
+      </p>
+
+      {drafts.length === 0 ? (
+        <p className="text-xs text-t3" data-testid="ncp-empty">
+          No netclass patterns. Add one to assign nets to a class by name.
+        </p>
+      ) : (
+        <div className="flex flex-col">
+          <div className="flex gap-2 border-b border-line pb-1.5 text-2xs text-t3">
+            <div className="flex-1">Pattern</div>
+            <div className="w-40 shrink-0">Net Class</div>
+            <div className="w-16 shrink-0" />
+          </div>
+          {drafts.map((d, i) => (
+            <div
+              key={d.rowId}
+              className="flex items-center gap-2 border-b border-line py-1.5"
+              data-testid={`ncp-row-${i}`}
+            >
+              <input
+                type="text"
+                className={`${INPUT_CLS} flex-1 !py-1 text-xs`}
+                data-testid={`ncp-${i}-pattern`}
+                placeholder="*NET*"
+                value={d.pattern}
+                onChange={(e) => editPattern(d.rowId, e.target.value)}
+              />
+              <select
+                className={`${INPUT_CLS} w-40 shrink-0 !py-1 text-xs`}
+                data-testid={`ncp-${i}-netclass`}
+                value={d.netclass}
+                onChange={(e) => editNetclass(d.rowId, e.target.value)}
+              >
+                {/* If a stored pattern names a class the project no longer defines, keep it as a
+                    selectable option so the row is honest and a save does not silently remap it. */}
+                {!classNames.includes(d.netclass) && d.netclass !== "" ? (
+                  <option value={d.netclass}>{d.netclass}</option>
+                ) : null}
+                {classNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <div className="flex w-16 shrink-0 justify-end">
+                <button
+                  type="button"
+                  className="text-2xs text-err hover:opacity-80"
+                  onClick={() => removeRow(d.rowId)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

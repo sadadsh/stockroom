@@ -252,6 +252,66 @@ class ProjectOps:
         )
         return {"project": rec.name, "committed": sha, "design_rules": dict(rules)}
 
+    @staticmethod
+    def _validate_netclass_patterns(patterns, valid_netclasses, *, check_membership) -> list:
+        """Validate + normalize the submitted netclass-pattern rows to exactly
+        {netclass, pattern} (the two keys KiCad 10 writes, verified against the real NETDECK
+        .kicad_pro). Each row needs a non-empty pattern and a non-empty netclass; when
+        check_membership, the netclass must exist among the project's classes (an unknown one
+        is a ValueError -> 400). List order is preserved (KiCad applies patterns in order)."""
+        if not isinstance(patterns, list):
+            raise ValueError("netclass_patterns must be a list")
+        rows = []
+        for i, row in enumerate(patterns):
+            if not isinstance(row, dict):
+                raise ValueError(f"netclass pattern {i} must be an object")
+            pattern = row.get("pattern")
+            netclass = row.get("netclass")
+            if not isinstance(pattern, str) or not pattern.strip():
+                raise ValueError(f"netclass pattern {i} needs a non-empty pattern")
+            if not isinstance(netclass, str) or not netclass.strip():
+                raise ValueError(f"netclass pattern {i} needs a net class")
+            if check_membership and netclass not in valid_netclasses:
+                raise ValueError(
+                    f"netclass pattern {i} references unknown net class {netclass!r}"
+                )
+            rows.append({"netclass": netclass, "pattern": pattern})
+        return rows
+
+    def set_netclass_patterns(self, project_id: str, patterns) -> dict:
+        """Replace net_settings.netclass_patterns in the project's .kicad_pro (net-name glob
+        -> net class rows) as a minimal diff, one scoped commit on the project's own git
+        (roadmap #4). The list is REPLACED wholesale (the editor sends the full list; a plain
+        merge replaces a list value, so an empty list clears every pattern and no replace_keys
+        is needed). Each row is validated BEFORE any git touch: a non-empty pattern and a
+        netclass that exists among the project's classes (an unknown one is a ValueError ->
+        400). Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro, not under git,
+        or a bad row)."""
+        rec = self._require(project_id)
+        pro = self._pro_path(rec)
+        # Read the project's own classes to validate the netclass references. When the file is
+        # gone from disk we cannot know the valid set, so membership is deferred and _write_pro
+        # raises the honest 'missing on disk' (re-register) rather than a misleading 'unknown
+        # net class'. A truly present-but-classless file yields an empty valid set (correct: no
+        # class to reference).
+        valid: set = set()
+        exists = pro.exists()
+        if exists:
+            data = project_settings.parse(pro.read_text(encoding="utf-8"))
+            net = data.get("net_settings") or {}
+            valid = {
+                c.get("name")
+                for c in (net.get("classes") or [])
+                if isinstance(c, dict) and isinstance(c.get("name"), str)
+            }
+        rows = self._validate_netclass_patterns(patterns, valid, check_membership=exists)
+        sha = self._write_pro(
+            rec,
+            {"net_settings": {"netclass_patterns": rows}},
+            f"Edit {rec.name}: netclass patterns",
+        )
+        return {"project": rec.name, "committed": sha, "netclass_patterns": rows}
+
     # --- M7f Editor writes (board setup + thickness) -------------------------
 
     def _primary_board(self, rec: ProjectRecord) -> Path | None:

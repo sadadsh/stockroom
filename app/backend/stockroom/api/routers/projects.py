@@ -24,6 +24,7 @@ from stockroom.api.schemas import (
     ProjectSummary,
     RegisterProjectBody,
     SetDesignRulesBody,
+    SetNetclassPatternsBody,
     SetNetClassesBody,
     SetSettingsBody,
     StackupBody,
@@ -266,6 +267,22 @@ def projects_router(require_token) -> APIRouter:
         result = ctx.project_ops.set_design_rules(
             project_id, body.rules, track_widths=body.track_widths,
             via_dimensions=body.via_dimensions, diff_pair_dimensions=body.diff_pair_dimensions,
+        )
+        ctx.checks_cache.pop(project_id, None)
+        return result
+
+    @r.patch("/{project_id}/netclass-patterns")
+    def patch_netclass_patterns(request: Request, project_id: str,
+                                body: SetNetclassPatternsBody) -> dict:
+        # Replace the project's netclass-pattern assignments (net-name glob -> net class),
+        # one scoped commit on the project's OWN git (roadmap #4). A blank pattern/net class is
+        # a clean 422; an unknown id -> 404; a project not under git (or without a .kicad_pro),
+        # or a row referencing a net class the project does not define -> 400; a GitError -> 503.
+        # A pattern change alters DRC net grouping, so the stale cached ERC/DRC is evicted and
+        # the next check re-runs honestly.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.set_netclass_patterns(
+            project_id, [p.model_dump() for p in body.patterns]
         )
         ctx.checks_cache.pop(project_id, None)
         return result

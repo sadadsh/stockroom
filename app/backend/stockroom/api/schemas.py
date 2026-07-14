@@ -157,6 +157,31 @@ class SetDesignRulesBody(BaseModel):
     diff_pair_dimensions: list[Any] | None = None
 
 
+class NetclassPatternDTO(BaseModel):
+    """One netclass-pattern assignment the Editor submits (roadmap #4): a net-name glob
+    `pattern` bound to a `netclass`. Both are required and non-blank (a blank one is a clean
+    422); the engine additionally checks the netclass exists among the project's classes. Only
+    these two keys are modeled because they are the only ones KiCad 10 writes for a pattern row
+    (verified against the real NETDECK .kicad_pro)."""
+
+    pattern: str
+    netclass: str
+
+    @field_validator("pattern", "netclass")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("a netclass pattern's pattern and net class must not be blank")
+        return v
+
+
+class SetNetclassPatternsBody(BaseModel):
+    """Replace a project's netclass-pattern assignments (roadmap #4). `patterns` is the FULL
+    edited list (the editor re-sends every row); an empty list clears every pattern."""
+
+    patterns: list[NetclassPatternDTO]
+
+
 class SetSettingsBody(BaseModel):
     """Edit a project's board setup + overall thickness (its .kicad_pcb) and/or its .kicad_pro
     settings: ERC/DRC rule severities, the ERC pin-conflict matrix, project text variables
