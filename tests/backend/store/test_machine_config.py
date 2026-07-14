@@ -53,3 +53,13 @@ def test_load_ignores_unknown_keys(tmp_path):
     path.write_text(json.dumps({"active_profile": "X", "future_field": 9}))
     cfg = MachineConfig.load(path)
     assert cfg.active_profile == "X"
+
+
+def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
+    # M9a: the per-machine library location. Blank on a fresh install (first-run onboarding);
+    # persisted once the user picks/creates/clones a library.
+    assert MachineConfig().libraries_root == ""
+    path = tmp_path / "config.json"
+    cfg = MachineConfig(libraries_root=str(tmp_path / "lib"))
+    cfg.save(path)
+    assert MachineConfig.load(path).libraries_root == str(tmp_path / "lib")

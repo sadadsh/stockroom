@@ -37,8 +37,14 @@ def _uv_sync() -> None:  # pragma: no cover - shells out to the bundled uv
 def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = None) -> AppContext:
     config = MachineConfig.load()
     if libraries_root is None:
-        # the in-repo library lives beside this package; resolved by the launcher
-        libraries_root = _LIBRARIES_ROOT
+        # Guarantee a usable library exists so the server ALWAYS boots (M9a/M9b): the
+        # persisted choice or the in-repo dev library if either is usable, else a freshly
+        # created default. This turns a frozen first run (which ships no library) into a
+        # bootable app that serves the onboarding UI, where the user opens / clones / creates
+        # the real library and the engine repoints live, instead of a startup crash.
+        from stockroom.store.onboarding import bootstrap_library
+
+        libraries_root = bootstrap_library(config)
     ctx = _build_context(libraries_root, kicad_dir=kicad_dir, config=config, token=mint_token())
     # Attach the app-repo GitRepo + a real uv_sync runner for the self-updater. The
     # app repo (this file's repo) is distinct from the library repo the context
