@@ -44,6 +44,13 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
       mode === "create" ||
       (mode === "clone" && url.trim() !== ""));
 
+  function continueWithDefault() {
+    complete.mutate(undefined, {
+      onError: (e) =>
+        toast(e instanceof ApiError ? e.message : "Could not continue", "err"),
+    });
+  }
+
   function submit() {
     if (!canSubmit) return;
     const body: SetLibraryBody =
@@ -147,7 +154,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         <div className="mt-5 flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => complete.mutate()}
+            onClick={continueWithDefault}
             disabled={busy}
             className="text-sm text-t3 underline-offset-2 hover:text-t1 hover:underline disabled:opacity-50"
           >

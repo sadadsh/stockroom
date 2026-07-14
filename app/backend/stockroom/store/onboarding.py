@@ -28,10 +28,20 @@ _DEFAULT_PROFILE = "Main"
 
 
 def default_library_dir() -> Path:
-    """Where a fresh library is created / cloned when the user gives no explicit path: a
-    `library` dir beside the per-machine config (writable + portable on every OS, and it
-    travels with STOCKROOM_CONFIG_DIR so tests and portable installs stay self-contained)."""
+    """The USER-FACING default location for a fresh / cloned library when the user gives no
+    explicit path: a `library` dir beside the per-machine config (writable + portable on every
+    OS, and it travels with STOCKROOM_CONFIG_DIR so tests and portable installs stay
+    self-contained). Kept DISTINCT from the boot placeholder below, so a first-run clone or
+    create into the default is never blocked by the auto-created placeholder library."""
     return config_dir() / "library"
+
+
+def _bootstrap_dir() -> Path:
+    """A dedicated INTERNAL location for the auto-created boot placeholder library (so the
+    server can start and serve the onboarding UI). Distinct from default_library_dir() on
+    purpose: if bootstrap occupied the user default, a first-run clone/create into that
+    default would always collide with it and fail."""
+    return config_dir() / ".bootstrap-library"
 
 
 def _ensure_git(root: Path) -> GitRepo:
@@ -72,18 +82,38 @@ def _finalize(root: Path, config: MachineConfig, *, onboarded: bool) -> Path:
 def bootstrap_library(config: MachineConfig) -> Path:
     """Guarantee a usable library exists so the server can boot, WITHOUT completing
     onboarding (the welcome screen still shows on genuine first run). Returns the already
-    usable configured / in-repo library if there is one, else creates a fresh default (at
-    the configured-but-empty path if one was set, else default_library_dir())."""
+    usable configured / in-repo library if there is one, else creates a placeholder library
+    (at the configured path if one was set, else the internal boot dir) so the app can serve
+    the onboarding UI."""
     resolved = resolve_libraries_root(config)
     if library_is_initialized(resolved):
-        # Persist the resolved path so a later switch/read is unambiguous, but do NOT onboard.
+        # An already-usable library: repair a drifted active_profile (a cloned / pulled
+        # library, or a config copied from another machine, may not carry this machine's
+        # active-profile name) so the immediately-following build_context never 404s the
+        # profile. Persist the resolved path when it was implicit. Never onboard here.
+        store = ProfileStore(Path(resolved), GitRepo(Path(resolved)))
+        names = store.list()
+        changed = False
+        if names and config.active_profile not in names:
+            config.active_profile = names[0]
+            changed = True
         if not (config.libraries_root or "").strip():
             config.libraries_root = str(resolved)
+            changed = True
+        if changed:
             config.save()
         return Path(resolved)
-    target = Path((config.libraries_root or "").strip() or default_library_dir())
+    # Not usable yet. If a PREVIOUSLY configured library is what went missing, re-show
+    # onboarding rather than silently handing back a fresh empty library as if the user's
+    # parts were never there; a genuine first run (no path set) uses the internal placeholder.
+    was_configured = bool((config.libraries_root or "").strip())
+    target = Path((config.libraries_root or "").strip() or _bootstrap_dir())
     target.mkdir(parents=True, exist_ok=True)
-    return _finalize(target, config, onboarded=False)
+    lib = _finalize(target, config, onboarded=False)
+    if was_configured and config.onboarded:
+        config.onboarded = False
+        config.save()
+    return lib
 
 
 def set_library(
@@ -108,6 +138,16 @@ def set_library(
             raise ValueError(f"no such directory: {root}")
     elif mode == "create":
         root = Path(path) if path else default_library_dir()
+        # Create means a FRESH library: refuse a path that is a file, or a non-empty directory
+        # (which is likely a user's existing library or repo we must not commit into). This is
+        # symmetric with clone's emptiness guard, and turns an opaque mkdir crash into a 400.
+        if root.exists():
+            if not root.is_dir():
+                raise ValueError(f"not a directory: {root}")
+            if any(root.iterdir()):
+                raise ValueError(
+                    f"directory is not empty: {root} (use Open to adopt an existing library)"
+                )
         root.mkdir(parents=True, exist_ok=True)
     elif mode == "clone":
         if not (url or "").strip():

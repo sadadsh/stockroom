@@ -139,3 +139,69 @@ def test_complete_onboarding_sets_and_persists_flag():
     onboarding.complete_onboarding(cfg)
     assert cfg.onboarded is True
     assert MachineConfig.load().onboarded is True
+
+
+# -- adversarial-review fix round (M9 review, confirmed findings) --------------
+
+
+def test_bootstrap_uses_a_distinct_dir_from_the_onboarding_default(tmp_path, monkeypatch):
+    # The boot placeholder must NOT occupy default_library_dir(), else a first-run
+    # clone/create into the default always collides with it (confirmed HIGH).
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", tmp_path / "absent")
+    cfg = MachineConfig()
+    root = onboarding.bootstrap_library(cfg)
+    assert root != onboarding.default_library_dir()
+    assert not library_is_initialized(onboarding.default_library_dir())  # left free
+
+
+def test_clone_default_dest_succeeds_after_bootstrap(tmp_path, monkeypatch):
+    # The confirmed HIGH: a default-dest clone on a frozen first run must SUCCEED, not 400.
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", tmp_path / "absent")
+    src = _library(tmp_path / "remote", "Main")
+    cfg = MachineConfig()
+    onboarding.bootstrap_library(cfg)  # occupies the placeholder, not the default
+    root = onboarding.set_library(cfg, "clone", url=str(src))  # blank dest -> default
+    assert root == onboarding.default_library_dir()
+    assert library_is_initialized(root) and cfg.onboarded is True
+
+
+def test_bootstrap_repairs_active_profile_on_existing_library(tmp_path):
+    # Confirmed MED: an already-usable library whose profiles do not include this machine's
+    # active_profile must have it repaired, or the following build_context crashes at boot.
+    lib = _library(tmp_path / "L", "Bench")  # only a Bench profile
+    cfg = MachineConfig(active_profile="Main", libraries_root=str(lib))
+    root = onboarding.bootstrap_library(cfg)  # must NOT crash
+    assert root == lib
+    assert cfg.active_profile == "Bench"  # repointed to a profile that exists
+
+
+def test_create_refuses_a_nonempty_existing_directory(tmp_path):
+    # Confirmed MED: create must not write a commit into a user's populated dir/repo.
+    d = tmp_path / "occupied"
+    d.mkdir()
+    (d / "x.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(ValueError):
+        onboarding.set_library(MachineConfig(), "create", path=d)
+
+
+def test_create_refuses_an_existing_file_path(tmp_path):
+    # Confirmed LOW: a clean 400, not an opaque mkdir 500.
+    f = tmp_path / "afile"
+    f.write_text("x", encoding="utf-8")
+    with pytest.raises(ValueError):
+        onboarding.set_library(MachineConfig(), "create", path=f)
+
+
+def test_create_into_a_new_dir_still_works(tmp_path):
+    root = onboarding.set_library(MachineConfig(), "create", path=tmp_path / "brand-new")
+    assert library_is_initialized(root)
+
+
+def test_bootstrap_reonboards_when_a_configured_library_went_missing(tmp_path, monkeypatch):
+    # Honesty (plausible finding): if the user's configured library is gone, do NOT hand
+    # back a fresh empty one as if nothing happened; re-show onboarding.
+    monkeypatch.setattr("stockroom.store.library_location.IN_REPO_DEFAULT", tmp_path / "absent")
+    missing = tmp_path / "gone"
+    cfg = MachineConfig(libraries_root=str(missing), onboarded=True)
+    onboarding.bootstrap_library(cfg)
+    assert cfg.onboarded is False
