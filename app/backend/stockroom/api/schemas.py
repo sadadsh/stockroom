@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow
@@ -115,3 +115,35 @@ class SetSpecsBody(BaseModel):
 
     specs: dict[str, Any] = {}
     overwrite: bool = False
+
+
+class NetClassDTO(BaseModel):
+    """One net class the Editor submits (M7e). `name` is required (a class with no name
+    is a clean 422, never a silent drop); every other KiCad-10 dimension/color field is
+    optional and passes through (extra=allow) so the reconcile can field-merge only the
+    edited keys onto the on-disk class, preserving fields the UI never models."""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+
+
+class SetNetClassesBody(BaseModel):
+    """Edit a project's net classes (M7e). `classes` is the full edited set; `deleted`
+    names classes to remove; `floor` selects the fab-house dimension floor the returned
+    validation checks against (default no floor)."""
+
+    classes: list[NetClassDTO]
+    deleted: list[str] = []
+    floor: str = "none"
+
+
+class SetDesignRulesBody(BaseModel):
+    """Edit a project's board design-rule constraints (M7e). `rules` field-merges into
+    board.design_settings.rules (an omitted rule is preserved); the size lists, when
+    provided, replace their board.design_settings arrays wholesale."""
+
+    rules: dict[str, Any]
+    track_widths: list[Any] | None = None
+    via_dimensions: list[Any] | None = None
+    diff_pair_dimensions: list[Any] | None = None
