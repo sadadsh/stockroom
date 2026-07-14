@@ -238,6 +238,25 @@ export interface ActivateResponse {
   part_count: number;
 }
 
+// GET /api/onboarding (M9b/M9c): where the library lives + whether the one-time
+// first-run welcome should show. A frozen exe ships no library, so this is the gate.
+export interface OnboardingStatus {
+  onboarded: boolean;
+  first_run: boolean;
+  libraries_root: string;
+  profiles: string[];
+  under_git: boolean;
+  default_dir: string;
+}
+
+// POST /api/onboarding/library
+export interface SetLibraryBody {
+  mode: "open" | "create" | "clone";
+  path?: string;
+  url?: string;
+  dest?: string;
+}
+
 // GET /api/sync/status
 export interface SyncStatus {
   has_remote: boolean;

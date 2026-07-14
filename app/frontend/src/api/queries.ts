@@ -17,9 +17,36 @@ import type {
   ManualFillBody,
   NetClass,
   SetBoardSettingsBody,
+  SetLibraryBody,
   StackupBody,
 } from "./types";
 import { api, type ListPartsArgs } from "./client";
+
+// First-run library onboarding (M9c). Set/complete repoint the running engine at a
+// different library, so EVERY server query is invalidated (parts, projects, facets, ...).
+export function useOnboarding() {
+  return useQuery({
+    queryKey: ["onboarding"],
+    queryFn: () => api.getOnboarding(),
+    retry: false,
+  });
+}
+
+export function useSetLibrary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SetLibraryBody) => api.setLibrary(body),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.completeOnboarding(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding"] }),
+  });
+}
 
 export function usePartsQuery(args: ListPartsArgs) {
   return useQuery({
