@@ -382,6 +382,53 @@ def test_project_bom_costs_at_multiple_boards(tmp_path):
 
 
 # -- consolidated across boards ------------------------------------------------
+# -- review-fix regressions ----------------------------------------------------
+def test_do_not_fit_matches_multiword_config_spellings():
+    # A multi-word DNF phrase in Config must match as a whole (a naive [ ,]+ split would
+    # shred "do not fit" into words that are not in the DNF set) - KiBoM isFitted parity.
+    for phrase in ("do not fit", "do not place", "do not load", "not fitted",
+                   "not loaded", "not placed", "no stuff"):
+        assert kibom.is_do_not_fit({"Config": phrase}) is True, phrase
+    assert kibom.is_do_not_fit({"Config": "variantA, do not fit"}) is True
+    assert kibom.is_do_not_fit({"Config": "DNF"}) is True
+    assert kibom.is_do_not_fit({"Config": "populate"}) is False
+    assert kibom.is_do_not_fit({"Value": "10k"}) is False
+
+
+def test_bom_excludes_a_multiword_config_dnf_part(tmp_path):
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k"),
+                   _sym("R2", "10k", fp="Resistor_SMD:R_0402",
+                        extra='(property "Config" "do not fit" (at 0 0 0))'))
+    refs = {r["refs"][0] for r in bom_from_kicad_schematic(str(f))["rows"]}
+    assert refs == {"R1"}
+
+
+def test_row_cost_at_qty_coerces_string_ladder_prices():
+    # A string ladder price must cost like a float one, not raise round(str * qty).
+    float_ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    str_ladder = [{"qty": 1, "price": "$0.10"}, {"qty": 100, "price": "$0.05"}]
+    rf = {"qty": 2, "price_breaks": float_ladder}
+    rs = {"qty": 2, "price_breaks": str_ladder}
+    assert _row_cost_at_qty(rs, 50) == _row_cost_at_qty(rf, 50) == (100, 0.05, 5.0)
+    assert bom_cost_at_qty([rs], 50)["total_cost"] == 5.0
+    assert bom_cost_by_source([{**rs, "source": "Mouser"}], 50)["sources"]["Mouser"]["total_cost"] == 5.0
+
+
+def test_project_bom_summary_agrees_with_by_source_and_cost_at_qty_for_multi_board(tmp_path):
+    # For boards>1 the headline summary must be projected at the run quantity so it equals
+    # the per-source split and cost_at_qty (never a per-board figure beside a run figure).
+    _write_sch(tmp_path / "root.kicad_sch",
+               _sym("U1", "STM32", lib="Device:U", mpn="STM32F407VGT6", mfr="ST"))
+    ladder = {"price_breaks": [{"qty": 1, "price": 8.0}, {"qty": 100, "price": 5.0}], "source": "Mouser"}
+    res = project_bom(tmp_path, "root.kicad_pro", ["root.kicad_sch"], name="Demo",
+                      boards=100, price_lookup=lambda m: ladder if m == "STM32F407VGT6" else None)
+    total = res["summary"]["total_cost"]
+    assert total == 500.0
+    assert total == res["cost_at_qty"]["total_cost"]
+    assert total == sum(s["total_cost"] for s in res["by_source"]["sources"].values())
+
+
 def test_consolidated_bom_sums_across_boards(tmp_path):
     parent = _write_sch(tmp_path / "p.kicad_sch",
                         _sym("U1", "STM32", lib="Device:U", mpn="STM32F407VGT6", mfr="ST"))

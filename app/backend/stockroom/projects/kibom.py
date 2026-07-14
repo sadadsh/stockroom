@@ -188,9 +188,14 @@ def is_do_not_fit(props: dict) -> bool:
     norm = {(k or "").strip().lower(): (v or "").strip() for k, v in (props or {}).items()}
     if norm.get("value", "").lower() in _DNF:
         return True
-    config = norm.get("config", "")
+    config = norm.get("config", "").lower()
     if config:
-        for opt in re.split(r"[ ,]+", config):
-            if opt.strip().lower() in _DNF:
-                return True
+        # Two passes, mirroring KiBoM's isFitted: split on spaces for single-word
+        # spellings, then on commas for WHOLE segments, so a multi-word phrase like
+        # "do not fit" survives as one segment and still matches (a naive [ ,]+ split
+        # would shred it into "do"/"not"/"fit", none of which is in _DNF).
+        if any(opt in _DNF for opt in config.split(" ")):
+            return True
+        if any(opt.strip() in _DNF for opt in config.split(",")):
+            return True
     return False
