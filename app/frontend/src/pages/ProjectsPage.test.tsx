@@ -4,10 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { api, ApiError } from "../api/client";
 import type {
   AuditResult,
+  BomDiffResult,
   BomResult,
   ChecksResult,
+  ProcurementResult,
   ProjectDetail,
   ProjectSummary,
+  RevisionsResult,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -26,6 +29,10 @@ vi.mock("../api/client", async (importActual) => {
       getChecks: vi.fn(),
       runBom: vi.fn(),
       getBom: vi.fn(),
+      getProcurement: vi.fn(),
+      getRevisions: vi.fn(),
+      getBomDiff: vi.fn(),
+      downloadBomExport: vi.fn(),
       openJobStream: vi.fn(),
     },
   };
@@ -224,6 +231,89 @@ function renderPage() {
   );
 }
 
+const PROC_NOT_BUILT: ProcurementResult = {
+  project: "Netdeck",
+  built: false,
+  priced: false,
+  boards: 1,
+  lines: [],
+  risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
+  lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
+  summary: "",
+};
+
+const PROC_BUILT: ProcurementResult = {
+  project: "Netdeck",
+  built: true,
+  priced: true,
+  boards: 1,
+  lines: [
+    {
+      refs: ["U1"],
+      qty: 1,
+      value: "TPS2121",
+      mpn: "TPS2121RUXR",
+      manufacturer: "TI",
+      has_real_mpn: true,
+      footprint: "",
+      datasheet: "",
+      description: "",
+      basic: false,
+      unit_price: 1.25,
+      extended: 1.25,
+      stock: 0,
+      lifecycle: "NRND",
+      lead_time: "18 Weeks",
+      source: "Mouser",
+      stock_risk: { kind: "err", required: 1, available: 0, short: true },
+      orderable: false,
+    },
+  ],
+  risks: {
+    not_active: 1,
+    no_stock: 1,
+    insufficient_stock: 0,
+    risky_mpns: ["TPS2121RUXR"],
+    any: true,
+  },
+  lead: { max_weeks: 18, critical_mpn: "TPS2121RUXR", with_lead: 1, any: true },
+  summary: "BOM: 1 lines · 1 parts · $1.25/board · critical path 18 wk",
+};
+
+const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
+
+const REVS_TWO: RevisionsResult = {
+  project: "Netdeck",
+  under_git: true,
+  revisions: [
+    { sha: "aaaaaaaa1111", short: "aaaaaaa", subject: "add power mux", author: "s", date: "d" },
+    { sha: "bbbbbbbb2222", short: "bbbbbbb", subject: "initial", author: "s", date: "d" },
+  ],
+};
+
+const DIFF: BomDiffResult = {
+  project: "Netdeck",
+  rev_a: "aaaaaaaa1111",
+  rev_b: "current",
+  added: [{ mpn: "STM32", value: "MCU", footprint: "", qty: 1 }],
+  removed: [],
+  changed: [{ mpn: "", value: "10k", footprint: "R_0402", from_qty: 2, to_qty: 3, delta: 1 }],
+  unchanged: 1,
+  cost: { delta: 3.5, added_cost: 3.5, changed_cost: 0, removed_unpriced: 0, priced: true, currency: "USD" },
+  lead: {
+    added_max_weeks: 20,
+    added_critical_mpn: "STM32",
+    build_max_weeks: 20,
+    build_critical_mpn: "STM32",
+    on_critical_path: true,
+    removed_unassessed: 0,
+    any: true,
+  },
+  csv: "Change,MPN,Value,From Qty,To Qty,Delta\nAdded,STM32,MCU,0,1,1\n",
+  a_sheets_found: 1,
+  b_sheets_found: null,
+};
+
 beforeEach(() => {
   mockApi.listProjects.mockResolvedValue([NETDECK, BENCH]);
   mockApi.getProject.mockResolvedValue(NETDECK_DETAIL);
@@ -232,6 +322,10 @@ beforeEach(() => {
   mockApi.deleteProject.mockResolvedValue(undefined);
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
+  mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
+  mockApi.getRevisions.mockResolvedValue(REVS_NONE);
+  mockApi.getBomDiff.mockResolvedValue(DIFF);
+  mockApi.downloadBomExport.mockResolvedValue(undefined);
 });
 
 describe("ProjectsPage", () => {
@@ -554,5 +648,96 @@ describe("ProjectsPage", () => {
     expect(await screen.findByTestId("bom-result")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rebuild BOM" })).toBeInTheDocument();
     expect(mockApi.runBom).not.toHaveBeenCalled();
+  });
+
+  // -- Procurement (M7d) --
+
+  it("prompts to build the BOM before showing procurement", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("procurement-section");
+    expect(section).toHaveTextContent(/Build the BOM to see sourcing risk/i);
+    expect(screen.queryByTestId("procurement-lines")).not.toBeInTheDocument();
+  });
+
+  it("shows sourcing risk, lead and per-line orderability from a built BOM", async () => {
+    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    const rollup = await screen.findByTestId("procurement-rollup");
+    expect(rollup).toHaveTextContent(/Not Active/i);
+    expect(rollup).toHaveTextContent(/No Stock Line/i);
+    expect(rollup).toHaveTextContent(/Critical path 18 wk/i);
+    const lines = screen.getByTestId("procurement-lines");
+    expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
+    expect(within(lines).getByText("NRND")).toBeInTheDocument();
+    // 0 stock + a 1-part run -> not orderable
+    expect(within(lines).getByText("No")).toBeInTheDocument();
+  });
+
+  it("exports the BOM through the authed download client", async () => {
+    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("export-bar");
+    await user.click(screen.getByRole("button", { name: "JLCPCB BOM" }));
+    expect(mockApi.downloadBomExport).toHaveBeenCalledWith("netdeck", "jlcpcb");
+  });
+
+  it("toasts when an export fails", async () => {
+    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    mockApi.downloadBomExport.mockRejectedValue(new ApiError(400, "build the BOM before exporting it"));
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("export-bar");
+    await user.click(screen.getByRole("button", { name: "BOM CSV" }));
+    expect(await screen.findByText(/build the BOM before exporting it/i)).toBeInTheDocument();
+  });
+
+  // -- Revision diff (M7d) --
+
+  it("shows an honest not-under-git state when the project has no git history", async () => {
+    // The default getRevisions returns under_git false: the diff section must say so, not crash.
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    const section = await screen.findByTestId("diff-section");
+    expect(section).toHaveTextContent(/not under git/i);
+  });
+
+  it("diffs a chosen revision against the current build", async () => {
+    mockApi.getRevisions.mockResolvedValue(REVS_TWO);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("diff-pickers");
+    await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
+    expect(mockApi.getBomDiff).toHaveBeenCalledWith("netdeck", "aaaaaaaa1111", "");
+
+    const result = await screen.findByTestId("diff-result");
+    expect(result).toHaveTextContent(/1 Added/);
+    expect(result).toHaveTextContent(/1 Changed/);
+    expect(result).toHaveTextContent(/\$3\.50\/board/);
+    const lines = screen.getByTestId("diff-lines");
+    expect(within(lines).getByText("STM32")).toBeInTheDocument();
+  });
+
+  it("does not diff until a revision is chosen", async () => {
+    mockApi.getRevisions.mockResolvedValue(REVS_TWO);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+
+    await screen.findByTestId("diff-pickers");
+    expect(screen.getByText(/Choose a commit to compare/i)).toBeInTheDocument();
+    expect(mockApi.getBomDiff).not.toHaveBeenCalled();
   });
 });

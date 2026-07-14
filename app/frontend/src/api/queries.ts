@@ -351,6 +351,38 @@ export function useProjectBom(id: string | null) {
   });
 }
 
+// The procurement view (M7d) over the cached BOM: per-line orderability + sourcing/stock
+// risk + lead time. Disabled until a project is selected; an honest not-built shape before a
+// build. Invalidated when the BOM (re)builds so it re-reads the fresh sourcing data.
+export function useProjectProcurement(id: string | null) {
+  return useQuery({
+    queryKey: ["project-procurement", id],
+    queryFn: () => api.getProcurement(id as string),
+    enabled: !!id,
+  });
+}
+
+// The project's git history (M7d) for the revision-diff pickers. Disabled until a project is
+// selected; under_git false / empty for a project not under git.
+export function useProjectRevisions(id: string | null) {
+  return useQuery({
+    queryKey: ["project-revisions", id],
+    queryFn: () => api.getRevisions(id as string),
+    enabled: !!id,
+  });
+}
+
+// The BOM diff between revision `a` and `b` (blank = the current build) (M7d). Disabled until
+// a revision A is chosen; keyed on both revs so switching either re-fetches. A BOM (re)build
+// invalidates ["project-diff", id] so the cost/lead deltas re-read the fresh prices.
+export function useBomDiff(id: string, a: string | null, b: string) {
+  return useQuery({
+    queryKey: ["project-diff", id, a, b],
+    queryFn: () => api.getBomDiff(id, a as string, b),
+    enabled: !!a,
+  });
+}
+
 // Registering a project rebuilds the project index server-side, so the list must
 // re-read to show the new project. Nothing else in the app reads project state.
 export function useRegisterProject() {
@@ -373,6 +405,8 @@ export function useDeleteProject() {
       qc.removeQueries({ queryKey: ["project-audit", id] });
       qc.removeQueries({ queryKey: ["project-checks", id] });
       qc.removeQueries({ queryKey: ["project-bom", id] });
+      qc.removeQueries({ queryKey: ["project-procurement", id] });
+      qc.removeQueries({ queryKey: ["project-revisions", id] });
     },
   });
 }
