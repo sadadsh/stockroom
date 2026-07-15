@@ -43,10 +43,11 @@ _EIA_TO_METRIC: dict[str, str] = {
     "1008": "2520Metric",
     "1206": "3216Metric",
     "1210": "3225Metric",
-    "1218": "4832Metric",
+    "1218": "3246Metric",
     "1806": "4516Metric",
     "1812": "4532Metric",
     "2010": "5025Metric",
+    "2220": "5750Metric",
     "2512": "6332Metric",
     "2725": "6864Metric",
 }
@@ -134,30 +135,6 @@ def decode_capacitance(code: str) -> float | None:
     return None
 
 
-def _decode_inductance(code: str) -> float | None:
-    """Decode an inductance code to henries. Murata/EIA nano/micro notation:
-    "N10"/"10N" = 10 nH, "R10" = 0.10 uH, "100" = 10 uH (2 sig + decade, uH).
-    Best-effort: an unrecognized code returns None (the part is still an inductor)."""
-    code = (code or "").strip().upper()
-    if not code:
-        return None
-    if "N" in code:  # nanohenry decimal (N as the decimal point)
-        left, _, right = code.partition("N")
-        try:
-            return float(f"{left or '0'}.{right or '0'}") * 1e-9
-        except ValueError:
-            return None
-    if "R" in code:  # microhenry decimal
-        left, _, right = code.partition("R")
-        try:
-            return float(f"{left or '0'}.{right or '0'}") * 1e-6
-        except ValueError:
-            return None
-    if code.isdigit() and len(code) == 3:  # 2 sig + decade, microhenries
-        return int(code[:2]) * (10 ** int(code[2])) * 1e-6
-    return None
-
-
 def _fmt_num(x: float) -> str:
     s = f"{x:.3f}".rstrip("0").rstrip(".")
     return s or "0"
@@ -177,14 +154,6 @@ def _fmt_farads(x: float) -> str:
     if x >= 1e-9:
         return f"{_fmt_num(x / 1e-9)} nF"
     return f"{_fmt_num(x / 1e-12)} pF"
-
-
-def _fmt_henries(x: float) -> str:
-    if x >= 1e-3:
-        return f"{_fmt_num(x / 1e-3)} mH"
-    if x >= 1e-6:
-        return f"{_fmt_num(x / 1e-6)} µH"
-    return f"{_fmt_num(x / 1e-9)} nH"
 
 
 # --------------------------------------------------------------------------- #
@@ -272,7 +241,7 @@ _CRCW_VISHAY = _Family(
 # grounded in real parts are mapped; unknown codes leave the package blank.
 _ERJ_PANASONIC = _Family(
     "ERJ", "Panasonic", "resistor",
-    re.compile(r"^ERJ-?(?P<size>P?A?\d+)[A-Z]*?(?P<tol>[BCDFGJ])"
+    re.compile(r"^ERJ-?(?P<size>P?[AB]?\d+)[A-Z]*?(?P<tol>[BCDFGJ])"
                r"(?P<value>\d+[RKM]\d*|[RKM]\d+|\d{3,4})[A-Z]?$"),
     size_map={
         "P02": "0402", "P03": "0603", "P06": "0805", "P08": "1206",
@@ -291,13 +260,16 @@ _CL_SAMSUNG = _Family(
 )
 
 # Inductors -------------------------------------------------------------------
-# Murata LQ-series: LQ[WGMHP]<case><type><value><tol>...  Case is coded. Value is a
-# best-effort inductance decode; the part is an inductor regardless.
+# Murata LQ-series (LQW/LQG/LQM/LQH/LQP). Only the KIND is decoded offline: the
+# inductance encoding differs across these families (the RF nano-henry "N"-decimal
+# vs the wire-wound micro-henry decade code, with a type-code letter in between that
+# collides with the value), and the Murata case code is per-series and not a clean
+# EIA case. Both would be confidently-wrong from a single regex, so value and package
+# are left for jlcsearch to fill (blank beats wrong). Kind detection is reliable.
 _LQ_MURATA = _Family(
     "LQ", "Murata", "inductor",
-    re.compile(r"^LQ[WGMHP](?P<size>\d{2})[A-Z0-9]{1,3}?(?P<value>\d+[NR]\d*|[NR]\d+)"
-               r"(?P<tol>[BCDFGJKM])[A-Z0-9]*$"),
-    size_map={"15": "0402", "18": "0603", "21": "0805", "2B": "1008", "31": "1206"},
+    re.compile(r"^LQ[WGMHP][0-9A-Z]{2}[A-Z0-9]+$"),
+    size_map=None,
 )
 
 FAMILIES: tuple[_Family, ...] = (
@@ -345,18 +317,14 @@ def parse_passive_mpn(mpn: str) -> PassiveSpec | None:
                 spec.value = _fmt_ohms(ohms)
             if spec.package and fam.std_power:
                 spec.power = _STD_POWER.get(spec.package, "")
-            elif fam.name == "ERJ" and spec.package == "0603" and size_raw.startswith("P"):
-                spec.power = "0.2 W"  # ERJ-P anti-surge 0603 (grounded in the owner's part)
+            elif fam.name == "ERJ" and size_raw == "P03":
+                spec.power = "0.2 W"  # ERJ-P03 anti-surge 0603 (grounded in the owner's part)
         elif fam.kind == "capacitor":
             farads = decode_capacitance(value_code)
             if farads is not None:
                 spec.value_farads = farads
                 spec.value = _fmt_farads(farads)
-        elif fam.kind == "inductor":
-            henries = _decode_inductance(value_code)
-            if henries is not None:
-                spec.value_henries = henries
-                spec.value = _fmt_henries(henries)
+        # Inductors: kind only (see _LQ_MURATA). No offline value/package decode.
         return spec
     return None
 
