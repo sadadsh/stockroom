@@ -69,6 +69,63 @@ export function Button({
   );
 }
 
+// An action button carrying an icon. `compact` renders it icon-only and reveals the label on
+// hover / keyboard focus (a space-saving toolbar affordance); the label is always in the DOM
+// via aria-label + title so it stays accessible when collapsed and the expand respects
+// reduced-motion. Non-compact is the ordinary icon+label Button.
+export function IconButton({
+  icon,
+  label,
+  compact = false,
+  variant = "default",
+  small = false,
+  className,
+  ...rest
+}: {
+  icon: ReactNode;
+  label: string;
+  compact?: boolean;
+  variant?: ButtonVariant;
+  small?: boolean;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  if (!compact) {
+    return (
+      <Button variant={variant} small={small} icon={icon} className={className} {...rest}>
+        {label}
+      </Button>
+    );
+  }
+  const size = small ? "h-[27px] px-2" : "h-[31px] px-2.5";
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={cx(
+        "group inline-flex items-center gap-1.5 rounded-control border border-line bg-raise " +
+          "font-medium text-t2 transition-colors hover:bg-raise2 hover:text-t1 " +
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
+          "focus-visible:outline-acc disabled:cursor-not-allowed disabled:opacity-50",
+        size,
+        className,
+      )}
+      {...rest}
+    >
+      {icon}
+      <span
+        className={
+          "max-w-0 overflow-hidden whitespace-nowrap text-xs opacity-0 transition-all duration-150 " +
+          "group-hover:ml-0.5 group-hover:max-w-[10rem] group-hover:opacity-100 " +
+          "group-focus-visible:ml-0.5 group-focus-visible:max-w-[10rem] group-focus-visible:opacity-100 " +
+          "motion-reduce:transition-none"
+        }
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 // A small uppercase section eyebrow: the mockup's .sec / .srcsub label.
 export function Eyebrow({
   className,
