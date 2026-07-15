@@ -18,6 +18,16 @@ from html import unescape
 
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 
+# Mouser embeds the real datasheet URL in its analytics dataLayer as
+# `event_datasheet_url`, both raw ("event_datasheet_url":"https://...pdf") and
+# HTML-escaped (&quot;event_datasheet_url&quot;:&quot;https://...pdf&quot;). This is the
+# reliable one: the page also carries PCN / catalog PDFs as plain anchors, which are NOT
+# the part datasheet, so a blind "first .pdf link" would grab the wrong file.
+_MOUSER_DATASHEET = re.compile(
+    r"event_datasheet_url(?:&quot;|[\"'])?\s*:\s*(?:&quot;|[\"'])(https?://[^\"'&\s\\]+)",
+    re.IGNORECASE,
+)
+
 # Bare-cell fallback for older/simpler pages: <td>label</td><td>value</td> with no
 # nested markup. Kept as a fallback, applied only when the attr-col pass finds nothing.
 _ROW = re.compile(
@@ -53,6 +63,14 @@ class MouserWebSite:
 
     def extract(self, html: str, url: str) -> EnrichmentResult:
         r = EnrichmentResult()
+        # The datasheet Mouser marks in its dataLayer (the manufacturer PDF), not a PCN
+        # or catalog PDF. Only accept a value that looks like a real datasheet.
+        m = _MOUSER_DATASHEET.search(html)
+        if m:
+            ds = unescape(m.group(1))
+            v = ds.lower()
+            if v.startswith("http") and (v.endswith(".pdf") or "datasheet" in v or ".pdf?" in v):
+                r.datasheet_url = Sourced(ds, "mouser_web", "medium")
         found = False
         for raw_label, raw_value in _ATTR_PAIR.findall(html):
             label = _clean(raw_label).rstrip(":").strip()

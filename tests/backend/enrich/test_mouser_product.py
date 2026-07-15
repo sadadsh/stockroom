@@ -50,3 +50,36 @@ def test_package_resolves_from_the_package_case_row() -> None:
     r = _result()
     assert r.package.value == "0603 (1608 Metric)"
     assert "Package / Case" not in r.specs
+
+
+def test_datasheet_from_the_datalayer_raw() -> None:
+    # Mouser's real page carries the datasheet ONLY in its analytics dataLayer
+    # (event_datasheet_url), not JSON-LD; the extractor must lift it.
+    from stockroom.enrich.sites.mouser_web import MouserWebSite
+
+    html = (
+        '<a href="https://www.mouser.com/catalog/additional/Foo_Catalog.pdf">Catalog</a>'
+        '<script>var d={"event_manufacturerpn":"erj-p03f1101v",'
+        '"event_datasheet_url":"https://industrial.panasonic.com/cdbs/x/AOA0000C331.pdf"};</script>'
+    )
+    r = MouserWebSite().extract(html, "https://www.mouser.com/ProductDetail/x")
+    assert r.datasheet_url is not None
+    assert r.datasheet_url.value == "https://industrial.panasonic.com/cdbs/x/AOA0000C331.pdf"
+
+
+def test_datasheet_from_the_datalayer_html_escaped() -> None:
+    from stockroom.enrich.sites.mouser_web import MouserWebSite
+
+    html = "&quot;event_datasheet_url&quot;:&quot;https://example.com/ds/abc.pdf&quot;"
+    r = MouserWebSite().extract(html, "https://www.mouser.com/x")
+    assert r.datasheet_url is not None
+    assert r.datasheet_url.value == "https://example.com/ds/abc.pdf"
+
+
+def test_pcn_or_catalog_pdf_is_not_taken_as_the_datasheet() -> None:
+    # No event_datasheet_url present: a PCN/catalog PDF anchor must NOT be chosen.
+    from stockroom.enrich.sites.mouser_web import MouserWebSite
+
+    html = '<a href="https://www.mouser.com/PCN/Panasonic_Change.pdf">PCN</a>'
+    r = MouserWebSite().extract(html, "https://www.mouser.com/x")
+    assert r.datasheet_url is None
