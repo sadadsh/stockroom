@@ -1,0 +1,15 @@
+{
+  "audit_digest": null,
+  "board_paths": [
+    "netdeck.kicad_pcb"
+  ],
+  "git_root": "C:/Users/Sadad Haidari/AppData/Local/Temp/tmp07e84pmh/netdeck",
+  "id": "netdeck",
+  "name": "netdeck",
+  "pro_path": "netdeck.kicad_pro",
+  "registered_at": "2026-07-15T12:22:02Z",
+  "root": "C:/Users/SADADH~1/AppData/Local/Temp/tmp07e84pmh/netdeck",
+  "sheet_paths": [
+    "netdeck.kicad_sch"
+  ]
+}
