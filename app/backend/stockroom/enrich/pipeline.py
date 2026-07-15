@@ -33,6 +33,22 @@ _CANDIDATE_FIELDS = {
 }
 
 
+def _copy_specs(candidate, result, overwrite: set[str]) -> None:
+    """Carry every enriched spec (and the resolved package) onto the candidate's spec
+    bag, so the FULL field set a distributor page yielded reaches the committed record,
+    not just the three identity fields (the owner's capture-everything requirement).
+    Per-field: an existing spec is kept unless 'specs' is opted into overwrite.
+    product_url is a purchase-link mechanism, not a spec row."""
+    take = "specs" in overwrite
+    if result.package is not None and (take or "Package" not in candidate.specs):
+        candidate.specs["Package"] = str(result.package.value)
+    for label, sourced in result.specs.items():
+        if label == "product_url":
+            continue
+        if take or label not in candidate.specs:
+            candidate.specs[label] = str(sourced.value)
+
+
 def _default_url_for(mpn: str, category: str) -> str:
     """A best-effort product URL for a bare MPN, used only by the generic ScrapeSource
     fallback. LCSC catalogue resolution now lives in LcscSource (jlcsearch -> the real
@@ -295,6 +311,7 @@ class EnrichmentPipeline:
                 continue
             if not getattr(candidate, attr, "") or attr in overwrite:
                 setattr(candidate, attr, str(sourced.value))
+        _copy_specs(candidate, result, overwrite)
 
         # Attach the scraped price/stock to the purchase entry the user pasted, keeping
         # its vendor and url intact (a pasted Mouser link stays a Mouser link).
@@ -340,6 +357,7 @@ class EnrichmentPipeline:
             current = getattr(candidate, attr, "")
             if not current or attr in overwrite:
                 setattr(candidate, attr, str(sourced.value))
+        _copy_specs(candidate, result, overwrite)
 
         # a purchase link from the product URL + price breaks (fills the passport's
         # sourcing field; still per-field: only if the candidate has no purchase yet)

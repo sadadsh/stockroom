@@ -121,6 +121,48 @@ def test_cache_round_trips_the_procurement_fields():  # M7d: lifecycle/lead/prod
     assert back.dist_pns == {"mouser": "595-TPS62130RGTR"}
 
 
+_MOUSER_LIKE_HTML = (
+    '<html><head><script type="application/ld+json">'
+    '{"@context":"https://schema.org","@type":"Product","sku":"667-ERJ-P03F1101V",'
+    '"mpn":"ERJ-P03F1101V","brand":{"name":"Panasonic"},"description":"1.1k 0.2W res",'
+    '"datasheet":"https://industrial.panasonic.com/ds.pdf",'
+    '"offers":{"@type":"Offer","price":"0.10","priceCurrency":"USD",'
+    '"availability":"http://schema.org/InStock","inventoryLevel":5000}}'
+    "</script></head><body><table>"
+    "<tr><td>Resistance</td><td>1.1 kOhm</td></tr>"
+    "<tr><td>Tolerance</td><td>1%</td></tr>"
+    "<tr><td>Power</td><td>0.2 W</td></tr>"
+    "</table></body></html>"
+)
+
+
+def test_pasted_product_url_carries_every_spec_to_the_candidate_and_staged_part(tmp_path):
+    # The owner's flow: paste a distributor link -> autofill EVERYTHING. The rich specs
+    # a page yields must land on the candidate AND survive into the staged part (they
+    # were previously extracted then discarded because the candidate had no spec bag).
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=_StubFetcher(_MOUSER_LIKE_HTML),
+        limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+        jlcsearch=_NullJlc(),
+    )
+    from stockroom.model.part import Purchase
+
+    c = _candidate(mpn="", manufacturer="", description="")
+    c.purchase = [Purchase(vendor="Mouser",
+                           url="https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V")]
+    pipe.enrich_from_product_url(c, c.purchase[0].url)
+
+    assert c.mpn == "ERJ-P03F1101V" and c.manufacturer == "Panasonic"
+    assert c.specs["Resistance"] == "1.1 kOhm"
+    assert c.specs["Tolerance"] == "1%"
+    assert c.specs["Power"] == "0.2 W"
+    # and the specs survive the hand-off to the committable staged part
+    c.symbol_lib_path = FIX / "nope.kicad_sym"  # to_staged_part only needs the paths set
+    c.footprint_variants = [FIX / "fp.kicad_mod"]
+    staged = c.to_staged_part()
+    assert staged.specs["Resistance"] == "1.1 kOhm"
+
+
 def test_datasheet_field_is_preferred_over_a_scrape_field():
     # datasheet gives the MPN at high confidence; a scrape gives a WRONG MPN.
     ds = EnrichmentResult(category="ICs")

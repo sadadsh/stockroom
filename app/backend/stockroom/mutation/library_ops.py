@@ -71,6 +71,7 @@ class StagedPart:
     provenance: Provenance | None = None
     datasheet_meta: Datasheet | None = None
     purchase: list[Purchase] = field(default_factory=list)
+    specs: dict = field(default_factory=dict)
 
 
 class IncompleteError(ValueError):
@@ -255,6 +256,7 @@ class LibraryOps:
                 model=model_ref,
                 provenance=staged.provenance,
                 purchase=list(staged.purchase),
+                specs=dict(staged.specs),
             )
             sym_lib = SymbolLib.load(sym_lib_path)
             sym = sym_lib.get_symbol(staged.entry_name)
