@@ -291,6 +291,20 @@ def _clean_mpn(mpn: str) -> str:
     return _DISTRIBUTOR_PREFIX.sub("", (mpn or "").strip().upper())
 
 
+def clean_mpn(mpn: str) -> str:
+    """Strip a leading distributor prefix (e.g. Mouser "667-") from an MPN and
+    upper-case it. Public wrapper so the file-less add path can normalize an
+    *undecodable* MPN the same way a decoded one is normalized."""
+    return _clean_mpn(mpn)
+
+
+def passive_package_options() -> list[str]:
+    """The EIA chip cases that resolve to a KiCad stock footprint, in ascending
+    case order. Feeds the manual package picker used when an MPN cannot be decoded
+    so the user only ever chooses a package that actually resolves."""
+    return sorted(_EIA_TO_METRIC)
+
+
 def parse_passive_mpn(mpn: str) -> PassiveSpec | None:
     """Decode a known passive MPN into a PassiveSpec, or None if the MPN is not a
     recognized passive family. Strips a leading distributor prefix (Mouser "667-")

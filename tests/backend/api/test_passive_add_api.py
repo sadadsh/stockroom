@@ -45,6 +45,41 @@ def test_passive_add_without_datasheet_is_422_incomplete(client):
     assert client.get("/api/library/parts").json()["count"] == 2  # zero trace
 
 
-def test_non_passive_input_is_422(client):
-    resp = client.post("/api/library/passive/preview", json={"input": "STM32F103C8T6"})
+def test_undecodable_input_asks_for_manual_input(client):
+    # An MPN no decoder knows is NOT an error: the preview returns 200 with a
+    # needs_input status and the package options so the UI reveals manual pickers.
+    resp = client.post("/api/library/passive/preview", json={"input": "560112116151"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "needs_input"
+    assert body["mpn"] == "560112116151"
+    assert "0603" in body["packages"]
+    # nothing was committed
+    assert client.get("/api/library/parts").json()["count"] == 2
+
+
+def test_manual_kind_and_package_preview_then_add(client):
+    # After the pickers are filled the preview builds a real record, and the add
+    # commits it with the stock footprint resolved from the picked package.
+    preview = client.post("/api/library/passive/preview", json={
+        "input": "560112116151", "kind": "inductor", "package": "1210",
+        "value": "4.7 uH", "manufacturer": "Wurth Elektronik",
+    })
+    assert preview.status_code == 200, preview.text
+    pbody = preview.json()
+    assert pbody["status"] == "ok"
+    assert pbody["record"]["footprint"] == {"lib": "Inductor_SMD", "name": "L_1210_3225Metric"}
+
+    resp = client.post("/api/library/passive", json={
+        "input": "560112116151", "kind": "inductor", "package": "1210",
+        "value": "4.7 uH", "manufacturer": "Wurth Elektronik",
+        "datasheet_url": "https://www.we-online.com/x.pdf",
+    })
+    assert resp.status_code == 200, resp.text
+    assert client.get("/api/library/parts").json()["count"] == 3
+
+
+def test_add_undecodable_without_a_manual_pick_is_422(client):
+    resp = client.post("/api/library/passive", json={"input": "560112116151"})
     assert resp.status_code == 422
+    assert client.get("/api/library/parts").json()["count"] == 2  # zero trace
