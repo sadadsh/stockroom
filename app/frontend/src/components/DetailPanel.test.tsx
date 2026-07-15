@@ -182,3 +182,49 @@ describe("DetailPanel pinout (M6i)", () => {
     expect(screen.queryByText(/no pins match/i)).not.toBeInTheDocument();
   });
 });
+
+describe("DetailPanel sourcing vendor label", () => {
+  it("shows a human distributor name derived from the URL, not a lowercase 'manual'", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          purchase: [
+            {
+              vendor: "manual",
+              url: "https://www.mouser.com/ProductDetail/Vishay/MCT06030D1101BP500",
+              price_breaks: [],
+              stock: null,
+              currency: "",
+              fetched_at: "",
+            },
+          ],
+        })}
+        {...BASE}
+      />,
+    );
+    expect(screen.getByText("Mouser")).toBeInTheDocument();
+    expect(screen.queryByText("manual")).toBeNull();
+  });
+
+  it("Title Cases an unknown stored vendor", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          purchase: [
+            {
+              vendor: "acme parts",
+              url: "https://acme.example.com/p/1",
+              price_breaks: [],
+              stock: null,
+              currency: "",
+              fetched_at: "",
+            },
+          ],
+        })}
+        {...BASE}
+      />,
+    );
+    // known-vendor map misses, so it Title Cases the stored name's first letter
+    expect(screen.getByText("Acme parts")).toBeInTheDocument();
+  });
+});
