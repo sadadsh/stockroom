@@ -66,6 +66,31 @@ def test_update_diverged_is_surfaced_not_guessed(tmp_path):
     assert result.restart_requested is False
 
 
+def test_update_reconciles_a_disjoint_local_commit_by_rebase(tmp_path):
+    # The in-repo library case (the whole reason self-update was stuck): a LOCAL part commit
+    # (libraries/, added on this machine) plus a REMOTE app-code commit (app/) touch DISJOINT
+    # paths. A plain ff-only pull refuses this divergence forever, so once a part is added the app
+    # can never self-update and the user is forced to re-download a release. The updater must
+    # REBASE the local part commit onto the app update and still succeed, keeping the part.
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    (clone / "part.json").write_text("{}\n", encoding="utf-8")  # local: add a part (disjoint)
+    c.commit("add a part", [clone / "part.json"])
+    (origin / "app.py").write_text("v2\n", encoding="utf-8")  # remote: advance app code
+    o.commit("v2 app code", [origin / "app.py"])
+
+    ran = {"uv": False, "restart": False}
+    updater = AppUpdater(
+        c,
+        uv_runner=lambda: ran.__setitem__("uv", True),
+        restart=lambda: ran.__setitem__("restart", True),
+    )
+    result = updater.update()
+    assert result.state == UpdateState.UPDATED and result.restart_requested is True
+    assert (clone / "app.py").read_text() == "v2\n"  # got the app update
+    assert (clone / "part.json").exists()  # kept the local part
+    assert ran["uv"] and ran["restart"]
+
+
 def test_check_reports_when_an_update_is_available(tmp_path):
     o, origin, c, clone = _origin_and_clone(tmp_path)
     (origin / "app.py").write_text("v2\n", encoding="utf-8")
