@@ -749,6 +749,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
 
     // headline: healthy / total
     expect(await screen.findByText(/40 of 42/)).toBeInTheDocument();
@@ -798,6 +799,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     const head = await screen.findByTestId("findings-head");
     // no `uppercase` / `tracking-*` classes: Title Case labels, no letterspacing.
     expect(head.className).not.toMatch(/uppercase|tracking/);
@@ -809,6 +811,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await screen.findByText("U1");
 
     // click the unannotated breakdown chip -> only U1 (unannotated) remains, R5 gone
@@ -834,6 +837,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Download Report" }));
 
     expect(createUrl).toHaveBeenCalledTimes(1);
@@ -879,6 +883,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByText(/Checks have not run yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run Checks" })).toBeInTheDocument();
   });
@@ -894,6 +899,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Run Checks" }));
 
     await waitFor(() => expect(mockApi.runChecks).toHaveBeenCalledWith("netdeck"));
@@ -913,6 +919,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Run Checks" }));
 
     // inline error (never a fabricated pass) + the run prompt did not become a result
@@ -933,6 +940,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     const result = await screen.findByTestId("checks-result");
     expect(within(result).getByText("Nothing Checked")).toBeInTheDocument();
     expect(within(result).queryByText("Clean")).toBeNull();
@@ -943,6 +951,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
 
     // the cached run renders and the action reads Re-run, without any runChecks call
     expect(await screen.findByTestId("checks-result")).toBeInTheDocument();
@@ -954,6 +963,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByText(/BOM has not been built yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Build And Cost" })).toBeInTheDocument();
   });
@@ -969,6 +979,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
 
     await waitFor(() => expect(mockApi.runBom).toHaveBeenCalledWith("netdeck"));
@@ -989,6 +1000,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
 
     expect(await screen.findAllByText(/the build engine failed/i)).not.toHaveLength(0);
@@ -1015,6 +1027,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const result = await screen.findByTestId("bom-result");
     expect(within(result).getByText("Unpriced")).toBeInTheDocument();
     expect(within(result).queryByText(/Costed/)).toBeNull();
@@ -1037,6 +1050,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const lines = within(await screen.findByTestId("bom-result")).getByTestId("bom-lines");
     expect(within(lines).getByText("No MPN")).toBeInTheDocument();
     expect(within(lines).getByText("Basic")).toBeInTheDocument(); // the true passive keeps it
@@ -1047,6 +1061,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     expect(await screen.findByTestId("bom-result")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rebuild BOM" })).toBeInTheDocument();
@@ -1059,6 +1074,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const section = await screen.findByTestId("procurement-section");
     expect(section).toHaveTextContent(/Build the BOM to see sourcing risk/i);
     expect(screen.queryByTestId("procurement-lines")).not.toBeInTheDocument();
@@ -1069,6 +1085,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     const rollup = await screen.findByTestId("procurement-rollup");
     expect(rollup).toHaveTextContent(/Not Active/i);
@@ -1086,6 +1103,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
     await user.click(screen.getByRole("button", { name: "JLCPCB BOM" }));
@@ -1098,6 +1116,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-options");
     await user.clear(screen.getByTestId("opt-sparesPct"));
@@ -1119,6 +1138,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
     await user.click(screen.getByRole("button", { name: "BOM CSV" }));
@@ -1132,6 +1152,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const section = await screen.findByTestId("diff-section");
     expect(section).toHaveTextContent(/not under git/i);
   });
@@ -1141,6 +1162,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
@@ -1159,6 +1181,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     expect(screen.getByText(/Choose a commit to compare/i)).toBeInTheDocument();
@@ -1173,6 +1196,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
@@ -1189,6 +1213,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("editor-section");
     expect(within(editor).getByTestId("nc-row-Default")).toBeInTheDocument();
     expect(within(editor).getByTestId("nc-row-HS")).toBeInTheDocument();
@@ -1200,6 +1225,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1219,6 +1245,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     expect(within(section).getByTestId("fields-table")).toBeInTheDocument();
     expect(within(section).getByTestId("fields-row-R1")).toBeInTheDocument();
@@ -1231,6 +1258,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("fields-section");
     // the unannotated R? row exposes no editable cell for its Value
     expect(screen.getByTestId("fields-row-R?")).toBeInTheDocument();
@@ -1242,6 +1270,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     await user.type(within(section).getByTestId("fields-cell-R1-MPN"), "RC0402FR-0710KL");
     await user.click(within(section).getByRole("button", { name: "Save Field Edits" }));
@@ -1255,6 +1284,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     await user.type(within(section).getByTestId("fields-new-field"), "Tolerance");
     await user.click(within(section).getByRole("button", { name: "Add Field" }));
@@ -1268,6 +1298,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(screen.getByRole("button", { name: "Add Net Class" }));
     await user.type(screen.getByTestId("nc-new-name"), "PWR");
@@ -1282,6 +1313,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
@@ -1296,6 +1328,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("dr-min_track_width");
     await user.clear(input);
@@ -1311,6 +1344,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const row = screen.getByTestId("nc-row-HS");
     expect(row).toHaveTextContent(/below fab min/i);
@@ -1320,6 +1354,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.selectOptions(screen.getByTestId("fab-floor-select"), "oshpark_2");
     await waitFor(() =>
@@ -1331,6 +1366,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const save = screen.getByRole("button", { name: "Save Net Classes" });
     expect(save).toBeDisabled(); // clean on load
@@ -1345,6 +1381,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("editor-section");
     expect(editor).toHaveTextContent(/not under git/i);
     expect(screen.queryByRole("button", { name: "Save Net Classes" })).not.toBeInTheDocument();
@@ -1359,6 +1396,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1375,6 +1413,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Add Net Class" }));
@@ -1389,6 +1428,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1402,6 +1442,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("dr-min_track_width");
     await user.clear(input);
@@ -1416,6 +1457,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("netclass-pattern-editor");
     expect((within(editor).getByTestId("ncp-0-pattern") as HTMLInputElement).value).toBe("*USB*");
     expect((within(editor).getByTestId("ncp-0-netclass") as HTMLSelectElement).value).toBe("HS");
@@ -1425,6 +1467,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     const input = screen.getByTestId("ncp-0-pattern");
     await user.clear(input);
@@ -1440,6 +1483,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.selectOptions(screen.getByTestId("ncp-0-netclass"), "Default");
     await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
@@ -1451,6 +1495,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     await user.type(screen.getByTestId("ncp-1-pattern"), "*GND");
@@ -1465,6 +1510,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(within(screen.getByTestId("ncp-row-0")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
@@ -1476,6 +1522,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     // the new row's pattern is left blank; only the existing complete row is sent
@@ -1488,6 +1535,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
     expect(save).toBeDisabled(); // clean on load
@@ -1505,6 +1553,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     expect(screen.getByTestId("ncp-row-0")).toHaveTextContent(/no longer/i);
   });
@@ -1520,6 +1569,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     // make an unrelated valid edit so there is a change to attempt to save
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
@@ -1537,6 +1587,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
@@ -1554,6 +1605,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     expect(screen.getByTestId("bs-pad_to_mask_clearance")).toHaveValue("0.0508");
     expect(screen.getByTestId("bs-thickness")).toHaveValue("1.6");
@@ -1566,6 +1618,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-pad_to_mask_clearance");
     await user.clear(input);
@@ -1584,6 +1637,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1600,6 +1654,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     await user.click(screen.getByTestId("bs-tenting_front")); // ON -> OFF
     await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
@@ -1614,6 +1669,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const save = screen.getByRole("button", { name: "Save Board Setup" });
     expect(save).toBeDisabled();
@@ -1627,6 +1683,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-pad_to_mask_clearance");
     await user.clear(input);
@@ -1643,6 +1700,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("board-setup-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
   });
@@ -1652,6 +1710,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("board-setup-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
   });
@@ -1661,6 +1720,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1674,6 +1734,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     await user.clear(screen.getByTestId("bs-pad_to_mask_clearance"));
     expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled();
@@ -1691,6 +1752,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1708,6 +1770,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     expect(screen.getByTestId("sev-erc-pin_not_connected")).toHaveValue("error");
     expect(screen.getByTestId("sev-erc-wire_dangling")).toHaveValue("warning");
@@ -1718,6 +1781,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     await user.selectOptions(screen.getByTestId("sev-erc-pin_not_connected"), "warning");
     await user.selectOptions(screen.getByTestId("sev-drc-clearance"), "ignore");
@@ -1733,6 +1797,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     expect(screen.getByRole("button", { name: "Save Severities" })).toBeDisabled();
     await user.selectOptions(screen.getByTestId("sev-erc-wire_dangling"), "ignore");
@@ -1743,6 +1808,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("pinmap-grid");
     // output vs output (index 1,1) is an error in the fixture
     expect(screen.getByTestId("pm-1-1")).toHaveAttribute("data-sev", "2");
@@ -1753,6 +1819,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("pinmap-grid");
     await user.click(screen.getByTestId("pm-0-1")); // 0 -> 1 (warning), mirrors to [1][0]
     expect(screen.getByTestId("pm-0-1")).toHaveAttribute("data-sev", "1");
@@ -1770,6 +1837,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("pinmap-absent")).toBeInTheDocument();
     expect(screen.queryByTestId("pinmap-grid")).not.toBeInTheDocument();
   });
@@ -1778,6 +1846,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     expect(screen.getByTestId("tv-name-0")).toHaveValue("REV");
     expect(screen.getByTestId("tv-value-0")).toHaveValue("A");
@@ -1787,6 +1856,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByTestId("tv-del-1")); // remove OLD
     await user.click(screen.getByRole("button", { name: "Save Text Variables" }));
@@ -1800,6 +1870,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByRole("button", { name: "Add Variable" }));
     await user.type(screen.getByTestId("tv-name-2"), "BATCH");
@@ -1821,6 +1892,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByTestId("tv-del-0")); // remove A -> rows [B]
     await user.click(screen.getByRole("button", { name: "Add Variable" })); // -> [B, blank]
@@ -1834,6 +1906,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByRole("button", { name: "Add Variable" }));
     await user.type(screen.getByTestId("tv-name-2"), "REV"); // duplicate
@@ -1851,6 +1924,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("prosettings-no-pro")).toBeInTheDocument();
     expect(screen.queryByTestId("severities-form")).not.toBeInTheDocument();
   });
@@ -1861,6 +1935,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.getByTestId("conform-enable-silk")).toBeInTheDocument();
     expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
@@ -1872,6 +1947,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.getByRole("button", { name: "Preview Changes" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Conform Objects" })).toBeDisabled();
@@ -1884,6 +1960,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.click(screen.getByTestId("conform-enable-labels"));
@@ -1900,6 +1977,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.clear(screen.getByTestId("conform-thickness-silk")); // drop thickness
@@ -1914,6 +1992,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.click(screen.getByRole("button", { name: "Preview Changes" }));
@@ -1929,6 +2008,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.clear(screen.getByTestId("conform-size-silk"));
@@ -1944,6 +2024,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("conform-no-target")).toBeInTheDocument();
     expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
   });
@@ -1953,6 +2034,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("conform-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
   });
@@ -1962,6 +2044,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.queryByTestId("conform-enable-silk")).not.toBeInTheDocument();
     expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
@@ -1973,6 +2056,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     expect(screen.getByTestId("stackup-current")).toHaveTextContent("F.Cu");
     expect(screen.getByTestId("stackup-row-dielectric 1")).toHaveTextContent("FR4");
@@ -1984,6 +2068,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-preset-block"));
     // Apply is disabled until a preset is chosen
@@ -2000,6 +2085,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-preset-block"));
     // the board has 4 copper layers; the 2-layer preset is incompatible
@@ -2014,6 +2100,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     // buttons are disabled until something differs from disk
@@ -2030,6 +2117,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2045,6 +2133,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2060,6 +2149,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2073,6 +2163,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     expect(screen.getByTestId("stackup-none")).toBeInTheDocument();
     expect(screen.getByTestId("stackup-preset-block")).toBeInTheDocument();
@@ -2087,6 +2178,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("stackup-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
   });
@@ -2096,6 +2188,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("stackup-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
   });
@@ -2104,6 +2197,7 @@ describe("ProjectsPage", () => {
 describe("Prepare / Complete-All (M7f-D)", () => {
   async function openPrepare(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     return await screen.findByTestId("prepare-form");
   }
 
@@ -2229,6 +2323,7 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByTestId("prepare-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("prepare-form")).not.toBeInTheDocument();
   });
@@ -2238,6 +2333,7 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByTestId("prepare-no-sch")).toBeInTheDocument();
   });
 });
@@ -2250,6 +2346,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const section = await screen.findByTestId("fab-section");
     expect(await within(section).findByTestId("fab-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
@@ -2262,6 +2359,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByTestId("fab-no-cli")).toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
   });
@@ -2271,6 +2369,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByTestId("fab-error")).toHaveTextContent(/server exploded/i);
     expect(screen.queryByTestId("fab-no-board")).not.toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
@@ -2280,6 +2379,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage(); // beforeEach seeds FAB_READY (board present + kicad-cli available)
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByTestId("fab-export"));
     expect(mockApi.downloadFabExport).toHaveBeenCalledWith("netdeck", {
       drillFormat: "excellon",
@@ -2295,6 +2395,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await screen.findByTestId("fab-options");
     await user.click(screen.getByTestId("fab-include-pos")); // placement off (default on)
     await user.click(screen.getByTestId("fab-protel-ext")); // protel ext off (default on)
@@ -2308,5 +2409,72 @@ describe("Fab Prep (M7i)", () => {
       protelExt: false,
       board: undefined,
     });
+  });
+});
+
+describe("Project tabs (IA)", () => {
+  async function select(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+  }
+
+  it("renders the five per-project tabs with Overview active by default", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    for (const name of [
+      "Overview",
+      "Health",
+      "BOM & Procurement",
+      "PCB Setup",
+      "Net Classes",
+    ]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // A freshly selected project lands on Overview's readiness verdict.
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
+  });
+
+  it("shows only the active tab's sections (conditional render, not merely hidden)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
+
+    // BOM & Procurement: its sections mount and Overview's leave the DOM entirely.
+    await user.click(screen.getByRole("tab", { name: "BOM & Procurement" }));
+    expect(await screen.findByTestId("bom-section")).toBeInTheDocument();
+    expect(screen.queryByTestId("buildability-section")).toBeNull();
+    expect(
+      screen.getByRole("tab", { name: "BOM & Procurement" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    // PCB Setup: the BOM sections unmount in turn (never two tabs' bodies at once).
+    await user.click(screen.getByRole("tab", { name: "PCB Setup" }));
+    expect(await screen.findByTestId("board-setup-section")).toBeInTheDocument();
+    expect(screen.queryByTestId("bom-section")).toBeNull();
+  });
+
+  it("resets to the Overview tab when a different project is selected", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    await user.click(screen.getByRole("tab", { name: "Net Classes" }));
+    expect(await screen.findByTestId("editor-section")).toBeInTheDocument();
+
+    // Switching to another project drops back to Overview, never stranding the
+    // previous project's open tab.
+    await user.click(await screen.findByTestId("project-row-bench"));
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(screen.queryByTestId("editor-section")).toBeNull();
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
   });
 });

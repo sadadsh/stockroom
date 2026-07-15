@@ -94,7 +94,7 @@ import type {
 } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
+import { Badge, Button, Card, Dot, Eyebrow, TabStrip, type TabItem } from "../components/primitives";
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
@@ -385,6 +385,28 @@ function RegisterBar({
   );
 }
 
+// The selected project was ONE long scroll of 14 stacked sections (owner: "the ia
+// is still really bad"). It is now five per-project tabs, mirroring the Library
+// fold and the north-star Projects shape: Overview (the readiness verdict + board
+// viewer), Health (audit findings + ERC/DRC + Prepare), BOM & Procurement (build,
+// cost, orderability, revision diff, fab exports), PCB Setup (board/stackup/conform/
+// checks-config/meta editors), and Net Classes (net classes + design rules + patterns).
+type ProjectTab = "overview" | "health" | "bom" | "setup" | "netclasses";
+
+const PROJECT_TABS: readonly TabItem<ProjectTab>[] = [
+  { id: "overview", label: "Overview" },
+  { id: "health", label: "Health" },
+  { id: "bom", label: "BOM & Procurement" },
+  { id: "setup", label: "PCB Setup" },
+  { id: "netclasses", label: "Net Classes" },
+];
+
+// Sections carry a leading `mt-7 border-t pt-6` divider to separate them when
+// stacked. Whichever section renders FIRST in a tab has that divider stripped, so
+// the tab strip is not followed by a stray rule and a large gap.
+const TAB_BODY_CLS =
+  "[&>*:first-child]:mt-0 [&>*:first-child]:border-t-0 [&>*:first-child]:pt-0";
+
 function ProjectDetailView({
   project,
   onRemove,
@@ -394,19 +416,18 @@ function ProjectDetailView({
   onRemove: () => void;
   removeBusy: boolean;
 }) {
-  const auditQuery = useProjectAudit(project.id);
-  // The active kind filter for the findings table. null = show every finding.
-  const [kindFilter, setKindFilter] = useState<string | null>(null);
+  const [tab, setTab] = useState<ProjectTab>("overview");
 
-  // Reset the filter whenever the selected project changes, so a chip active on one
-  // project never carries over to another.
+  // Land on Overview whenever the selected project changes, so a tab open on one
+  // project never carries over to another. Each tab body is also keyed by the
+  // project id, so its sections and any in-progress drafts reset with the project.
   useEffect(() => {
-    setKindFilter(null);
+    setTab("overview");
   }, [project.id]);
 
   return (
-    <div className="max-w-[820px] pb-12">
-      <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="max-w-[860px] pb-12">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="truncate text-xl font-semibold text-t1">{project.name}</div>
           <div className="truncate font-mono text-xs text-t3" title={project.root}>
@@ -424,9 +445,49 @@ function ProjectDetailView({
         </Button>
       </div>
 
-      <BuildabilitySection key={`build-${project.id}`} projectId={project.id} />
-      <ProjectViewerSection key={`viewer-${project.id}`} projectId={project.id} />
+      <TabStrip
+        tabs={PROJECT_TABS}
+        active={tab}
+        onSelect={setTab}
+        className="mb-6"
+        aria-label="Project sections"
+      />
 
+      {tab === "overview" ? (
+        <OverviewTab key={project.id} projectId={project.id} />
+      ) : tab === "health" ? (
+        <HealthTab key={project.id} projectId={project.id} />
+      ) : tab === "bom" ? (
+        <BomTab key={project.id} projectId={project.id} />
+      ) : tab === "setup" ? (
+        <SetupTab key={project.id} projectId={project.id} />
+      ) : (
+        <NetClassesTab key={project.id} projectId={project.id} />
+      )}
+    </div>
+  );
+}
+
+// Overview: the readiness verdict card and the board viewer.
+function OverviewTab({ projectId }: { projectId: string }) {
+  return (
+    <div className={TAB_BODY_CLS}>
+      <BuildabilitySection projectId={projectId} />
+      <ProjectViewerSection projectId={projectId} />
+    </div>
+  );
+}
+
+// Health: the audit findings table (with its kind filter), the ERC/DRC checks, and
+// Prepare This Project (Fix-All + Restore). The audit query is scoped here so it
+// loads only when Health is open, not on every project select.
+function HealthTab({ projectId }: { projectId: string }) {
+  const auditQuery = useProjectAudit(projectId);
+  // The active kind filter for the findings table. null = show every finding.
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
+
+  return (
+    <div className={TAB_BODY_CLS}>
       {auditQuery.isLoading ? (
         <Card className="px-4 py-3.5">
           <p className="py-1 text-sm text-t3">Auditing the project...</p>
@@ -445,18 +506,45 @@ function ProjectDetailView({
         />
       ) : null}
 
-      <ChecksSection key={project.id} projectId={project.id} />
-      <BomSection key={`bom-${project.id}`} projectId={project.id} />
-      <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
-      <FabSection key={`fab-${project.id}`} projectId={project.id} />
-      <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
-      <EditorSection key={`editor-${project.id}`} projectId={project.id} />
-      <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
-      <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
-      <StackupSection key={`stackup-${project.id}`} projectId={project.id} />
-      <ConformSection key={`conform-${project.id}`} projectId={project.id} />
-      <PrepareSection key={`prepare-${project.id}`} projectId={project.id} />
-      <FieldsSection key={`fields-${project.id}`} projectId={project.id} />
+      <ChecksSection projectId={projectId} />
+      <PrepareSection projectId={projectId} />
+    </div>
+  );
+}
+
+// BOM & Procurement: build and cost, per-line orderability, revision diff, and the
+// fab (gerber/drill/placement) exports.
+function BomTab({ projectId }: { projectId: string }) {
+  return (
+    <div className={TAB_BODY_CLS}>
+      <BomSection projectId={projectId} />
+      <ProcurementSection projectId={projectId} />
+      <RevisionDiffSection projectId={projectId} />
+      <FabSection projectId={projectId} />
+    </div>
+  );
+}
+
+// PCB Setup: the master-detail editors for the physical board and project settings
+// (board setup + thickness, ERC/DRC severities + pin map + text variables, stackup,
+// object conform, and the project title-block fields).
+function SetupTab({ projectId }: { projectId: string }) {
+  return (
+    <div className={TAB_BODY_CLS}>
+      <BoardSetupSection projectId={projectId} />
+      <ProSettingsSection projectId={projectId} />
+      <StackupSection projectId={projectId} />
+      <ConformSection projectId={projectId} />
+      <FieldsSection projectId={projectId} />
+    </div>
+  );
+}
+
+// Net Classes: net classes, board design rules, and netclass patterns.
+function NetClassesTab({ projectId }: { projectId: string }) {
+  return (
+    <div className={TAB_BODY_CLS}>
+      <EditorSection projectId={projectId} />
     </div>
   );
 }

@@ -192,3 +192,51 @@ export function Dot({ tone }: { tone: BadgeTone }) {
     />
   );
 }
+
+export interface TabItem<T extends string> {
+  id: T;
+  label: string;
+}
+
+// The one guided tab control for the whole app: a segmented pill row, not a set
+// of loose buttons. The Library flagship and the per-project Projects surface both
+// render through this, so a tab reads and behaves identically everywhere. Each
+// option is a real `role="tab"` with `aria-selected`, so the keyboard and screen
+// reader see a tablist; the active pill is the raised `bg-raise2` fill.
+export function TabStrip<T extends string>({
+  tabs,
+  active,
+  onSelect,
+  className,
+  "aria-label": ariaLabel,
+}: {
+  tabs: readonly TabItem<T>[];
+  active: T;
+  onSelect: (id: T) => void;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
+    >
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={active === t.id}
+          onClick={() => onSelect(t.id)}
+          className={cx(
+            "rounded-control px-3 py-1 text-sm transition-colors",
+            active === t.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2",
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
