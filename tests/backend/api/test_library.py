@@ -122,3 +122,36 @@ def test_set_specs_rejects_a_malformed_specs_body(client):
     # 422 by the typed body, never an opaque 500 from specs.items() blowing up.
     r = client.post("/api/library/parts/tps62130/specs", json={"specs": ["pinout"]})
     assert r.status_code == 422
+
+
+# -- BOM match: paste a BOM, see what the library already has --------------------
+
+
+def test_bom_match_reports_in_library_and_missing(client):
+    # the fixture library has TPS62130 (complete) and MYSTERY (incomplete, no MPN)
+    r = client.post("/api/library/bom-match", json={"text": "tps-62130\nWIDGET99"})
+    assert r.status_code == 200
+    body = r.json()
+    items = {i["mpn"]: i for i in body["items"]}
+    hit = items["tps-62130"]
+    assert hit["part_id"] == "tps62130"
+    assert hit["display_name"] == "TPS62130"
+    assert hit["is_complete"] is True
+    miss = items["WIDGET99"]
+    assert miss["part_id"] is None
+    assert body["in_library"] == 1
+    assert body["total"] == 2
+
+
+def test_bom_match_accepts_a_bom_csv(client):
+    csv = "Reference,MPN,Qty\nU1,TPS62130,1\nR1,WIDGET99,10\n"
+    r = client.post("/api/library/bom-match", json={"csv": csv})
+    assert r.status_code == 200
+    mpns = [i["mpn"] for i in r.json()["items"]]
+    assert "TPS62130" in mpns and "WIDGET99" in mpns
+
+
+def test_bom_match_empty_input_is_an_empty_report(client):
+    r = client.post("/api/library/bom-match", json={"text": "   "})
+    assert r.status_code == 200
+    assert r.json()["items"] == [] and r.json()["total"] == 0

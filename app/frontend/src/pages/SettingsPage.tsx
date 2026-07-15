@@ -281,7 +281,7 @@ function SyncSection() {
         }
         if (r.state === "denied") {
           toast(
-            "Sync failed: cannot sign in to the library remote (a private repo, or missing git credentials). Check the repo access or its URL.",
+            "Sync failed: the remote refused this token (403). If you are a collaborator, accept the repo invitation and use a CLASSIC personal access token with the repo scope; a fine-grained token cannot access a repo owned by another user.",
             "err",
           );
           return;
@@ -585,7 +585,7 @@ function GitHubSection() {
   return (
     <Section
       title="GitHub"
-      hint="Connect a GitHub personal access token so adding or editing a part pushes it to the library repo automatically, and collaborators' changes pull in on launch. Create a fine-grained token with Contents: write on the library repo. Each collaborator connects their own token (and needs write access, granted by the repo owner). Stored per machine, never shown again."
+      hint="Connect a GitHub personal access token so adding or editing a part pushes it to the library repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
     >
       <StatusRow
         label="Connection"
@@ -660,7 +660,15 @@ function UpdateSection() {
       ) : (
         <StatusRow
           label="Status"
-          value={available ? "Update available" : "Up to date"}
+          value={
+            check.data?.state === "offline" ? (
+              <span className="text-warn">Could not reach the update server</span>
+            ) : available ? (
+              "Update available"
+            ) : (
+              "Up to date"
+            )
+          }
         />
       )}
       <div className="mt-3.5 flex items-center gap-3">

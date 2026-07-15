@@ -25,6 +25,7 @@ function renderRoute(route: Route) {
   switch (route) {
     case "components":
     case "ingest":
+    case "bom":
     case "duplicates":
     case "doctor":
       // The library surfaces are tabs of the Library flagship; the route names

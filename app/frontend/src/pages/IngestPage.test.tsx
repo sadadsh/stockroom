@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { BulkReport, PartDetail, StagingCandidate } from "../api/types";
+import type { PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { IngestPage } from "./IngestPage";
 
@@ -187,65 +187,6 @@ describe("IngestPage", () => {
   });
 });
 
-function bulkResultStream(report: BulkReport): ReadableStream<Uint8Array> {
-  return streamOf([
-    'event: progress\ndata: {"pct":50,"message":"enriching 2 parts"}\n\n',
-    `event: result\ndata: ${JSON.stringify({ result: report })}\n\n`,
-    "event: done\ndata: {}\n\n",
-  ]);
-}
-
-describe("Bulk Lookup (spec 8.1)", () => {
-  it("looks up pasted MPNs and shows a per-part completeness report", async () => {
-    mockApi.enrichBulk.mockResolvedValue({ job_id: "b1" });
-    mockApi.openJobStream.mockResolvedValue(
-      bulkResultStream({
-        items: [
-          { mpn: "TPS62130RGTR", complete: true, missing: [], error: "" },
-          { mpn: "WIDGET99", complete: false, missing: ["manufacturer", "symbol"], error: "" },
-        ],
-      }),
-    );
-    wrap(<IngestPage />);
-    const user = userEvent.setup();
-    await user.type(screen.getByTestId("bulk-input"), "TPS62130RGTR\nWIDGET99");
-    await user.click(screen.getByTestId("bulk-run"));
-
-    const report = await screen.findByTestId("bulk-report");
-    expect(report).toHaveTextContent("1/2");
-    expect(report).toHaveTextContent("complete");
-    expect(screen.getByTestId("bulk-item-TPS62130RGTR")).toHaveTextContent("Complete");
-    expect(screen.getByTestId("bulk-item-WIDGET99")).toHaveTextContent(
-      /Missing manufacturer, symbol/,
-    );
-    expect(mockApi.enrichBulk).toHaveBeenCalledWith({
-      text: "TPS62130RGTR\nWIDGET99",
-      category: "Other",
-    });
-  });
-
-  it("disables the lookup for an empty input", () => {
-    wrap(<IngestPage />);
-    expect(screen.getByTestId("bulk-run")).toBeDisabled();
-    expect(mockApi.enrichBulk).not.toHaveBeenCalled();
-  });
-
-  it("routes a pasted BOM CSV to the csv parser, not the MPN-list parser", async () => {
-    mockApi.enrichBulk.mockResolvedValue({ job_id: "b2" });
-    mockApi.openJobStream.mockResolvedValue(bulkResultStream({ items: [] }));
-    wrap(<IngestPage />);
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId("bulk-input"));
-    await user.paste("Reference,MPN,Qty\nR1,TPS62130RGTR,2");
-    await user.click(screen.getByTestId("bulk-run"));
-    await waitFor(() =>
-      expect(mockApi.enrichBulk).toHaveBeenCalledWith({
-        csv: "Reference,MPN,Qty\nR1,TPS62130RGTR,2",
-        category: "Other",
-      }),
-    );
-  });
-});
 
 describe("IngestPage — candidate autofill", () => {
   it("autofills a candidate from its pasted datasheet link", async () => {
