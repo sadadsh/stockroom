@@ -26,7 +26,6 @@ import {
   useProjectAudit,
   useProjectBom,
   useProjectChecks,
-  useProjectProcurement,
   useProjectFab,
   useProjectRevisions,
   useProjectDesign,
@@ -89,8 +88,8 @@ import type {
   FieldEdit,
   NetClass,
   ProcurementExportOptions,
-  ProcurementLine,
-  ProcurementResult,
+  SourcingRisks,
+  LeadTime,
   ProjectSummary,
   BoardSettings,
 } from "../api/types";
@@ -108,6 +107,7 @@ import {
 } from "../components/primitives";
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ExternalIcon } from "../components/icons";
 
 const INPUT_CLS =
   "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 " +
@@ -529,7 +529,7 @@ function BomTab({ projectId }: { projectId: string }) {
   return (
     <>
       <BomSection projectId={projectId} />
-      <ProcurementSection projectId={projectId} />
+      <BomExportsSection projectId={projectId} />
       <RevisionDiffSection projectId={projectId} />
       <FabSection projectId={projectId} />
     </>
@@ -1173,8 +1173,7 @@ function BomSection({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (job.status === "done") {
       qc.invalidateQueries({ queryKey: ["project-bom", projectId] });
-      // A fresh build changes the sourcing data and the diff's cost side, so both re-read.
-      qc.invalidateQueries({ queryKey: ["project-procurement", projectId] });
+      // A fresh build changes the diff's cost side (sourcing is now folded into the BOM result).
       qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
     }
   }, [job.status, projectId, qc]);
@@ -1211,8 +1210,7 @@ function BomSection({ projectId }: { projectId: string }) {
         {
           onSuccess: (result) => {
             qc.setQueryData(["project-bom", projectId], result);
-            // A reprice changes the sourcing/diff cost side exactly like a rebuild does.
-            qc.invalidateQueries({ queryKey: ["project-procurement", projectId] });
+            // A reprice changes the diff's cost side exactly like a rebuild does.
             qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
           },
         },
@@ -1490,13 +1488,59 @@ function BomResultView({ result }: { result: BomResult }) {
         ))}
       </div>
 
+      {result.risks ? (
+        <BomRiskHeadline risks={result.risks} lead={result.lead} priced={result.priced} />
+      ) : null}
+
       {result.build && result.priced ? <BuildRollupLine build={result.build} /> : null}
 
       {result.lines.length === 0 ? (
         <p className="text-xs text-t3">No parts to build a BOM from.</p>
       ) : (
-        <BomLinesTable lines={result.lines} priced={result.priced} />
+        <BomLinesTable lines={result.lines} />
       )}
+    </div>
+  );
+}
+
+// The sourcing-risk headline, folded onto the one BOM page (was the separate Procurement
+// section): the failures worth catching before ordering (NRND, no stock, short lines) plus
+// the critical-path lead time. Honest: a clean priced build reads "No Sourcing Risks"; an
+// unpriced build notes that stock is unknown, not a risk.
+function BomRiskHeadline({
+  risks,
+  lead,
+  priced,
+}: {
+  risks: SourcingRisks;
+  lead?: LeadTime;
+  priced: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2.5" data-testid="bom-risk-rollup">
+      {!risks.any ? (
+        <Badge tone="ok">No Sourcing Risks</Badge>
+      ) : (
+        <>
+          {risks.not_active > 0 ? (
+            <Badge tone="warn">{countLabel(risks.not_active, "Not Active")}</Badge>
+          ) : null}
+          {risks.no_stock > 0 ? (
+            <Badge tone="err">{countLabel(risks.no_stock, "No Stock Line")}</Badge>
+          ) : null}
+          {risks.insufficient_stock > 0 ? (
+            <Badge tone="warn">{countLabel(risks.insufficient_stock, "Short Line")}</Badge>
+          ) : null}
+        </>
+      )}
+      {lead?.any && lead.max_weeks != null ? (
+        <span className="text-xs text-t3">
+          Critical path {lead.max_weeks} wk{lead.critical_mpn ? ` (${lead.critical_mpn})` : ""}
+        </span>
+      ) : null}
+      {!priced ? (
+        <span className="text-2xs text-t3">Unpriced build: stock is unknown, not a risk.</span>
+      ) : null}
     </div>
   );
 }
@@ -1548,99 +1592,173 @@ function BomVerdictBadge({ summary }: { summary: NonNullable<BomResult["summary"
   }
 }
 
-// The BOM line table: identity (Reference / Value / Description / Mfr # / Vendor) plus,
-// once the build is priced, the per-line build economics (Min Qty / Final Qty / Unit Cost /
-// Cost @ Qty / Tax/Tariff / Total Cost) at the current Build Quantity + Tax/Tariff. A wide
-// table: it scrolls horizontally inside its own container so the page body never does.
-function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean }) {
+// The distributor's own part number for a priced line, matched to its Source (LCSC -> lcsc_pn,
+// Mouser -> mouser_pn, DigiKey -> digikey_pn), else whichever is present. Mirrors the backend
+// _dist_pn so the on-screen Distributor P/N agrees with the export.
+function distPn(line: BomLine): string {
+  const src = (line.source || "").trim().toLowerCase();
+  const lcsc = (line.lcsc_pn || "").trim();
+  const mouser = (line.mouser_pn || "").trim();
+  const digikey = (line.digikey_pn || "").trim();
+  if (src === "lcsc") return lcsc || mouser || digikey;
+  if (src === "mouser") return mouser || lcsc || digikey;
+  if (src === "digikey") return digikey || mouser || lcsc;
+  return lcsc || mouser || digikey;
+}
+
+// A KiCad footprint name without its library prefix (Resistor_SMD:R_0603 -> R_0603), for a
+// compact Footprint column; the full name stays in the cell title.
+function shortFootprint(fp: string): string {
+  return (fp || "").split(":").pop() || "";
+}
+
+// A compact icon link that opens a datasheet or product page in a new tab; "-" when the line
+// carries no URL (never a dead link).
+function IconLink({ href, label }: { href?: string; label: string }) {
+  if (!href) return <span className="text-t3">-</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={label}
+      title={label}
+      className="inline-flex text-t2 hover:text-t1"
+    >
+      <ExternalIcon />
+    </a>
+  );
+}
+
+// The Stock cell, folded from the retired Procurement table: the known count, tinted by the
+// per-line stock risk (red at 0, amber when short of the run) with the required quantity when
+// short; "Unknown" when the line was never priced (unknown is never a risk).
+function BomStockCell({ line }: { line: BomLine }) {
+  const risk = line.stock_risk;
+  if (!risk || risk.available == null) {
+    return <span className="text-2xs text-t3">Unknown</span>;
+  }
+  const tone = risk.kind === "err" ? "text-err" : risk.kind === "warn" ? "text-warn" : "text-t2";
+  return (
+    <span className={`text-xs ${tone}`}>
+      {risk.available.toLocaleString()}
+      {risk.short ? (
+        <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
+      ) : null}
+    </span>
+  );
+}
+
+// The RoHS cell: a compact compliance verdict. "Yes" reads as an ok badge, "No" as an error
+// badge, an unreadable value as muted text; "-" when unknown (never a guessed compliance).
+function RohsCell({ value }: { value?: string }) {
+  const v = (value || "").trim();
+  if (!v) return <span className="text-t3">-</span>;
+  if (v.toLowerCase() === "yes") return <Badge tone="ok">Yes</Badge>;
+  if (v.toLowerCase() === "no") return <Badge tone="err">No</Badge>;
+  return <span className="text-2xs text-t2">{v}</span>;
+}
+
+// The one wide BOM table (the "perfect BOM"): every field its own column, spreadsheet-style,
+// scrolling horizontally inside its own container so the page body never does. Identity +
+// package + sourcing (Vendor / Distributor P/N / Stock / Lifecycle / Lead) + the datasheet and
+// product links + RoHS, then the per-line build economics (Min Qty / Final Qty / Unit Cost /
+// Cost @ Qty / Tax/Tariff / Total Cost) at the current Build Quantity + Tax/Tariff. Every cell
+// reads "-" when its value is absent, so an unpriced line still lines up the columns.
+const BOM_COLUMNS = [
+  "Reference", "Qty", "Value", "Description", "MPN", "Manufacturer", "Footprint", "Package",
+  "Vendor", "Distributor P/N", "Stock", "Lifecycle", "Lead", "Datasheet", "Product Link", "RoHS",
+  "Min Qty", "Final Qty", "Unit Cost", "Cost @ Qty", "Tax/Tariff", "Total Cost",
+];
+
+function BomLinesTable({ lines }: { lines: BomLine[] }) {
   return (
     <Card className="overflow-hidden" data-testid="bom-lines">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1680px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-2xs text-t3">
-              <th className="px-4 py-2 font-medium">Reference</th>
-              <th className="px-4 py-2 font-medium">Value</th>
-              <th className="px-4 py-2 font-medium">Description</th>
-              <th className="px-4 py-2 font-medium">Mfr #</th>
-              <th className="px-4 py-2 font-medium">Vendor</th>
-              {priced ? <th className="px-4 py-2 font-medium">Min Qty</th> : null}
-              {priced ? <th className="px-4 py-2 font-medium">Final Qty</th> : null}
-              {priced ? <th className="px-4 py-2 font-medium">Unit Cost</th> : null}
-              {priced ? <th className="px-4 py-2 font-medium">Cost @ Qty</th> : null}
-              {priced ? <th className="px-4 py-2 font-medium">Tax/Tariff</th> : null}
-              {priced ? <th className="px-4 py-2 font-medium">Total Cost</th> : null}
+              {BOM_COLUMNS.map((c) => (
+                <th key={c} className="whitespace-nowrap px-3 py-2 font-medium">
+                  {c}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {lines.map((line, i) => {
-              const refsText = line.refs.join(", ");
-              return (
-                <tr
-                  key={`${line.mpn || line.value}-${i}`}
-                  className="border-b border-line last:border-b-0"
-                >
-                  <td
-                    className="max-w-[9rem] truncate px-4 py-2 align-top text-t2"
-                    title={refsText}
-                  >
-                    {refsText || "-"}
-                  </td>
-                  <td className="px-4 py-2 align-top text-t1">{line.value || "-"}</td>
-                  <td
-                    className="max-w-[14rem] truncate px-4 py-2 align-top text-2xs text-t3"
-                    title={line.description}
-                  >
-                    {line.description || "-"}
-                  </td>
-                  <td className="px-4 py-2 align-top">
-                    {line.mpn ? (
-                      <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                    ) : line.basic ? (
-                      <Badge tone="neutral">Basic</Badge>
-                    ) : (
-                      <Badge tone="neutral">No MPN</Badge>
-                    )}
-                    {line.manufacturer ? (
-                      <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-2 align-top text-t2">
-                    {vendorLabel(line.source ?? "", line.url)}
-                  </td>
-                  {priced ? (
-                    <td className="px-4 py-2 align-top text-t2">{line.moq ?? "-"}</td>
-                  ) : null}
-                  {priced ? (
-                    <td className="px-4 py-2 align-top text-t2">{line.final_qty ?? "-"}</td>
-                  ) : null}
-                  {priced ? (
-                    <td className="px-4 py-2 align-top text-t2">
-                      {moneyOrDash(line.final_unit_price)}
-                    </td>
-                  ) : null}
-                  {priced ? (
-                    <td className="px-4 py-2 align-top text-t2">
-                      {moneyOrDash(line.final_extended)}
-                    </td>
-                  ) : null}
-                  {priced ? (
-                    <td className="px-4 py-2 align-top text-t2">
-                      {moneyOrDash(line.tax_tariff)}
-                    </td>
-                  ) : null}
-                  {priced ? (
-                    <td className="px-4 py-2 align-top font-medium text-t1">
-                      {moneyOrDash(line.line_total)}
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
+            {lines.map((line, i) => (
+              <BomLineRow key={`${line.mpn || line.value}-${i}`} line={line} />
+            ))}
           </tbody>
         </table>
       </div>
     </Card>
+  );
+}
+
+function BomLineRow({ line }: { line: BomLine }) {
+  const refsText = line.refs.join(", ");
+  const fp = shortFootprint(line.footprint);
+  const dist = distPn(line);
+  const lifecycle = (line.lifecycle || "").trim();
+  return (
+    <tr className="border-b border-line last:border-b-0">
+      <td className="max-w-[9rem] truncate px-3 py-2 align-top text-t2" title={refsText}>
+        {refsText || "-"}
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.qty}</td>
+      <td className="px-3 py-2 align-top text-t1">{line.value || "-"}</td>
+      <td
+        className="max-w-[14rem] truncate px-3 py-2 align-top text-2xs text-t3"
+        title={line.description}
+      >
+        {line.description || "-"}
+      </td>
+      <td className="px-3 py-2 align-top">
+        {line.mpn ? (
+          <span className="font-mono text-xs text-t2">{line.mpn}</span>
+        ) : line.basic ? (
+          <Badge tone="neutral">Basic</Badge>
+        ) : (
+          <Badge tone="neutral">No MPN</Badge>
+        )}
+      </td>
+      <td className="px-3 py-2 align-top text-2xs text-t3">{line.manufacturer || "-"}</td>
+      <td className="max-w-[11rem] truncate px-3 py-2 align-top text-2xs text-t3" title={line.footprint}>
+        {fp || "-"}
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.package || "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{vendorLabel(line.source ?? "", line.url)}</td>
+      <td className="px-3 py-2 align-top font-mono text-2xs text-t3">{dist || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        <BomStockCell line={line} />
+      </td>
+      <td className="px-3 py-2 align-top text-2xs">
+        {lifecycle ? (
+          <span className={lifecycle.toLowerCase() === "active" ? "text-t3" : "text-warn"}>
+            {lifecycle}
+          </span>
+        ) : (
+          <span className="text-t3">-</span>
+        )}
+      </td>
+      <td className="px-3 py-2 align-top text-2xs text-t3">{line.lead_time || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        <IconLink href={line.datasheet} label="Datasheet" />
+      </td>
+      <td className="px-3 py-2 align-top">
+        <IconLink href={line.url} label="Product Page" />
+      </td>
+      <td className="px-3 py-2 align-top">
+        <RohsCell value={line.rohs} />
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.moq ?? "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{line.final_qty ?? "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.final_unit_price)}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.final_extended)}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.tax_tariff)}</td>
+      <td className="px-3 py-2 align-top font-medium text-t1">{moneyOrDash(line.line_total)}</td>
+    </tr>
   );
 }
 
@@ -1670,10 +1788,6 @@ function saveText(filename: string, text: string): void {
   URL.revokeObjectURL(url);
 }
 
-// The Procurement section reads the cached BOM's sourcing view: a risk headline (NRND / no
-// stock / short lines / critical-path lead), a per-line orderability table, and the export
-// bar. Honest: before a build it prompts to build; an unpriced build lists lines with
-// unknown (never-a-risk) stock and no cost.
 // The buy-side knobs, in UI units (percentages as whole numbers), defaulting to no
 // adjustment so a one-click export is never silently inflated. tax/assembly are converted to
 // the backend's fraction form when sent; spares stays a whole percent.
@@ -1695,8 +1809,12 @@ const DEFAULT_EXPORT_OPTS: ExportOpts = {
   assemblyPct: 0,
 };
 
-function ProcurementSection({ projectId }: { projectId: string }) {
-  const query = useProjectProcurement(projectId);
+// The Exports section on the one BOM page (the sourcing risk + per-line orderability are now
+// folded into the BOM table above): the purchasing-sheet knobs and the export bar. Gated on the
+// cached BOM's built state (read from the same project-bom query the table uses, so the two
+// never disagree): before a build it prompts to build, never a dead export.
+function BomExportsSection({ projectId }: { projectId: string }) {
+  const bomQuery = useProjectBom(projectId);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<BomExportKind | null>(null);
   const [opts, setOpts] = useState<ExportOpts>(DEFAULT_EXPORT_OPTS);
@@ -1729,31 +1847,25 @@ function ProcurementSection({ projectId }: { projectId: string }) {
     }
   }
 
-  const data = query.data ?? null;
-  const built = data != null && data.built;
+  const built = bomQuery.data != null && bomQuery.data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="procurement-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="exports-section">
       <div className="mb-3">
-        <Eyebrow className="mb-0.5">Procurement</Eyebrow>
+        <Eyebrow className="mb-0.5">Exports</Eyebrow>
         <p className="text-xs text-t3">
-          Sourcing risk, lead time and per-line orderability from the priced BOM, plus the
-          purchasing exports.
+          Purchasing sheets and vendor uploads from the priced BOM.
         </p>
       </div>
 
-      {query.isLoading ? (
-        <p className="text-sm text-t3">Loading procurement...</p>
+      {bomQuery.isLoading ? (
+        <p className="text-sm text-t3">Loading the last build...</p>
       ) : !built ? (
-        <p className="text-sm text-t3">
-          Build the BOM to see sourcing risk, lead time and export the purchasing sheets.
-        </p>
+        <p className="text-sm text-t3">Build the BOM to export the purchasing sheets.</p>
       ) : (
-        <div className="flex flex-col gap-4" data-testid="procurement-result">
-          <ProcurementRollup data={data as ProcurementResult} />
+        <div className="flex flex-col gap-4" data-testid="exports-result">
           <ExportOptionsForm opts={opts} onChange={setOpts} />
           <ExportBar onExport={onExport} downloading={downloading} />
-          <ProcurementLinesTable lines={(data as ProcurementResult).lines} />
         </div>
       )}
     </div>
@@ -1800,37 +1912,20 @@ function ExportOptionsForm({
   );
 }
 
-function ProcurementRollup({ data }: { data: ProcurementResult }) {
-  const { risks, lead } = data;
-  return (
-    <div className="flex flex-wrap items-center gap-2.5" data-testid="procurement-rollup">
-      {!risks.any ? (
-        <Badge tone="ok">No Sourcing Risks</Badge>
-      ) : (
-        <>
-          {risks.not_active > 0 ? (
-            <Badge tone="warn">{countLabel(risks.not_active, "Not Active")}</Badge>
-          ) : null}
-          {risks.no_stock > 0 ? (
-            <Badge tone="err">{countLabel(risks.no_stock, "No Stock Line")}</Badge>
-          ) : null}
-          {risks.insufficient_stock > 0 ? (
-            <Badge tone="warn">{countLabel(risks.insufficient_stock, "Short Line")}</Badge>
-          ) : null}
-        </>
-      )}
-      {lead.any && lead.max_weeks != null ? (
-        <span className="text-xs text-t3">
-          Critical path {lead.max_weeks} wk{lead.critical_mpn ? ` (${lead.critical_mpn})` : ""}
-        </span>
-      ) : null}
-      {!data.priced ? (
-        <span className="text-2xs text-t3">Unpriced build: stock is unknown, not a risk.</span>
-      ) : null}
-    </div>
-  );
-}
+// What each export format is, so the picked format explains itself instead of the buyer
+// guessing from a terse button label.
+const EXPORT_HELP: Record<BomExportKind, string> = {
+  csv: "The full grouped BOM as a CSV.",
+  xlsx: "The full grouped BOM as an Excel workbook.",
+  priced: "The priced purchasing sheet: unit and extended cost per line.",
+  procurement: "The procurement sheet with spares, tax, shipping and assembly applied.",
+  cart: "A Mouser cart upload: part numbers and quantities.",
+  jlcpcb: "A JLCPCB assembly BOM.",
+};
 
+// One export control, not a row of six buttons (the formats are one choice, not six actions):
+// pick a format, read what it is, then Export. Keeps a single primary action and lets the format
+// list grow without crowding the page.
 function ExportBar({
   onExport,
   downloading,
@@ -1838,96 +1933,31 @@ function ExportBar({
   onExport: (kind: BomExportKind) => void;
   downloading: BomExportKind | null;
 }) {
+  const [kind, setKind] = useState<BomExportKind>("csv");
+  const busy = downloading != null;
   return (
-    <div className="flex flex-wrap gap-2" data-testid="export-bar">
-      {EXPORT_KINDS.map(({ kind, label }) => (
-        <Button
-          key={kind}
-          small
-          onClick={() => onExport(kind)}
-          disabled={downloading != null}
+    <div className="flex flex-wrap items-end gap-3" data-testid="export-bar">
+      <label className="flex flex-col gap-1 text-2xs text-t3">
+        Export Format
+        <select
+          className={`${INPUT_CLS} w-52`}
+          data-testid="export-format"
+          value={kind}
+          disabled={busy}
+          onChange={(e) => setKind(e.target.value as BomExportKind)}
         >
-          {downloading === kind ? "Saving..." : label}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-function ProcurementLinesTable({ lines }: { lines: ProcurementLine[] }) {
-  return (
-    <Card className="overflow-hidden" data-testid="procurement-lines">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-line text-2xs text-t3">
-            <th className="px-4 py-2 font-medium">Part</th>
-            <th className="px-4 py-2 font-medium">Qty</th>
-            <th className="px-4 py-2 font-medium">Stock</th>
-            <th className="px-4 py-2 font-medium">Lifecycle</th>
-            <th className="px-4 py-2 font-medium">Lead</th>
-            <th className="px-4 py-2 font-medium">Orderable</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, i) => (
-            <tr
-              key={`${line.mpn || line.value}-${i}`}
-              className="border-b border-line last:border-b-0"
-            >
-              <td className="px-4 py-2 align-top">
-                {line.mpn ? (
-                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                ) : (
-                  <span className="text-t2">{line.value || "-"}</span>
-                )}
-                <span className="mt-0.5 block text-2xs text-t3">{line.refs.join(", ")}</span>
-              </td>
-              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
-              <td className="px-4 py-2 align-top">
-                <StockCell line={line} />
-              </td>
-              <td className="px-4 py-2 align-top text-2xs">
-                {line.lifecycle ? (
-                  <span
-                    className={
-                      line.lifecycle.toLowerCase() === "active" ? "text-t3" : "text-warn"
-                    }
-                  >
-                    {line.lifecycle}
-                  </span>
-                ) : (
-                  <span className="text-t3">-</span>
-                )}
-              </td>
-              <td className="px-4 py-2 align-top text-2xs text-t3">{line.lead_time || "-"}</td>
-              <td className="px-4 py-2 align-top">
-                {line.orderable ? (
-                  <Badge tone="ok">Yes</Badge>
-                ) : (
-                  <Badge tone="neutral">No</Badge>
-                )}
-              </td>
-            </tr>
+          {EXPORT_KINDS.map(({ kind: k, label }) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
           ))}
-        </tbody>
-      </table>
-    </Card>
-  );
-}
-
-function StockCell({ line }: { line: ProcurementLine }) {
-  const risk = line.stock_risk;
-  if (risk.available == null) {
-    return <span className="text-2xs text-t3">Unknown</span>;
-  }
-  const tone = risk.kind === "err" ? "text-err" : risk.kind === "warn" ? "text-warn" : "text-t2";
-  return (
-    <span className={`text-xs ${tone}`}>
-      {risk.available.toLocaleString()}
-      {risk.short ? (
-        <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
-      ) : null}
-    </span>
+        </select>
+      </label>
+      <Button variant="accent" small onClick={() => onExport(kind)} disabled={busy}>
+        {busy ? "Saving..." : "Export"}
+      </Button>
+      <p className="mb-1.5 max-w-xs text-2xs text-t3">{EXPORT_HELP[kind]}</p>
+    </div>
   );
 }
 
