@@ -1,23 +1,22 @@
 /**
- * The Ingest page: add parts to the library. A part enters by dropping a vendor
- * ZIP anywhere in the window (the global drop overlay hands the native paths here)
- * or by pasting LCSC part ids. Either way the backend inspects the input into
- * staging candidates over an SSE job; the user reviews and edits each candidate,
- * then commits it. The complete-to-add gate is honest: a 422 lists exactly which
- * required fields are still missing, shown on the candidate, and nothing is added
- * until it passes.
+ * Add A Part: the one place to add a part to the library. Paste a product link (Mouser,
+ * LCSC, DigiKey...) or a part number and Stockroom pulls every field and decides what the
+ * part needs. A passive (R/C/L) is complete with no files: it uses KiCad's stock symbol,
+ * footprint and 3D model, which are shown before it is added. A non-passive needs its
+ * symbol, footprint and 3D model dropped as a vendor ZIP; the pulled identity/specs merge
+ * onto it so nothing is re-typed. A vendor ZIP dropped with no link still works on its own.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
-import { useIngestCommit } from "../api/queries";
-import type { IngestEnrichResult, StagingCandidate } from "../api/types";
+import type { EnrichmentResult, SourcedField, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
-import { useToast, type ToastTone } from "../lib/toast";
+import { useToast } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
-import { AutofillFromLinkCard } from "../components/AutofillFromLinkCard";
-import { PassiveAddCard } from "../components/PassiveAddCard";
-import { EnrichIcon, UploadIcon } from "../components/icons";
+import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
+import { Badge, Button, Card, Eyebrow } from "../components/primitives";
+import { CandidateCard } from "../components/CandidateCard";
+import { PassiveAddSection } from "../components/PassiveAddSection";
+import { UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -25,15 +24,52 @@ import { EnrichIcon, UploadIcon } from "../components/icons";
 interface Staged {
   id: number;
   candidate: StagingCandidate;
+  datasheetUrl: string;
 }
 
+function sv(s: SourcedField | null | undefined): string {
+  return s == null ? "" : String(s.value ?? "");
+}
+
+const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
+
 export function IngestPage() {
-  const [lcsc, setLcsc] = useState("");
+  const [input, setInput] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [result, setResult] = useState<EnrichmentResult | null>(null);
+  // The exact input that produced `result`, so the passive section and the ZIP merge
+  // use the right link even after the input box is edited.
+  const [lookedUpInput, setLookedUpInput] = useState("");
   // null = nothing inspected yet; [] = inspected, found nothing.
   const [staged, setStaged] = useState<Staged[] | null>(null);
   const nextId = useRef(0);
   const job = useJob<StagingCandidate[]>();
   const { toast } = useToast();
+
+  const lookUp = useCallback(async () => {
+    const v = input.trim();
+    if (!v || looking) return;
+    setLooking(true);
+    setResult(null);
+    setStaged(null);
+    try {
+      const r = isUrl(v) ? await api.enrichFromUrl(v) : await api.enrichPart(v);
+      setResult(r);
+      setLookedUpInput(v);
+      const gotAnything =
+        r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
+      if (!gotAnything) {
+        toast(
+          "Nothing came back. The page may have blocked the fetch, or the link is not a product page.",
+          "neutral",
+        );
+      }
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Look up failed.", "err");
+    } finally {
+      setLooking(false);
+    }
+  }, [input, looking, toast]);
 
   const inspect = useCallback(
     async (paths: string[], lcscIds: string[]) => {
@@ -74,12 +110,24 @@ export function IngestPage() {
     }
   }, [inspect, toast]);
 
-  // Load the job's result into editable local state once it settles, tagging each
-  // with a stable id so a commit/remove never remounts its siblings.
+  // Load the job's result once it settles. When a link was looked up (a non-passive), the
+  // pulled identity/specs merge onto each candidate so only the ZIP's assets are new; the
+  // pulled datasheet link is carried so the candidate can fetch+store it in one click.
   useEffect(() => {
     if (job.status === "done" && job.result) {
-      setStaged(job.result.map((candidate) => ({ id: nextId.current++, candidate })));
+      const r = result;
+      const url = r && isUrl(lookedUpInput) ? lookedUpInput : "";
+      setStaged(
+        job.result.map((candidate) => ({
+          id: nextId.current++,
+          candidate: r ? mergeResultIntoCandidate(candidate, r, url) : candidate,
+          datasheetUrl: r ? sv(r.datasheet_url) : "",
+        })),
+      );
     }
+    // result/lookedUpInput are read at settle time; re-running on their change would
+    // re-key already-loaded cards and discard edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.status, job.result]);
 
   // A drop anywhere in the window queues native paths here; inspect them.
@@ -89,93 +137,162 @@ export function IngestPage() {
     });
   }, [inspect]);
 
-  function handleInspectClick() {
-    const ids = lcsc.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
-    if (ids.length > 0) inspect([], ids);
-  }
-
   function removeStaged(id: number) {
     setStaged((s) => (s ? s.filter((x) => x.id !== id) : s));
   }
 
+  function reset() {
+    setInput("");
+    setResult(null);
+    setLookedUpInput("");
+    setStaged(null);
+  }
+
   const busy = job.status === "running";
+  const plan = result?.add_plan ?? null;
+  const nonPassive = result !== null && plan === null;
 
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
-        <div className="max-w-[760px] pb-10">
-          <div className="mb-4">
-            <AutofillFromLinkCard toast={toast} />
-          </div>
-          <div className="mb-4">
-            <PassiveAddCard toast={toast} />
-          </div>
-          <Card className="px-4 py-3.5">
-            <label
-              htmlFor="lcsc-ids"
-              className="mb-2 block text-xs text-t3"
+    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+      <div className="max-w-[760px] pb-10">
+        <Card className="px-4 py-3.5">
+          <Eyebrow>Add A Part</Eyebrow>
+          <p className="mb-3 mt-1 text-xs text-t3">
+            Paste a product link (Mouser, LCSC, DigiKey...) or a part number. Stockroom pulls
+            every field and figures out what it needs. A passive is complete with no files; a
+            non-passive needs its symbol, footprint and 3D model.
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              aria-label="Product link or part number"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") lookUp();
+              }}
+              placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
+              disabled={looking}
+              className="min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc disabled:opacity-50"
+            />
+            <Button
+              variant="accent"
+              onClick={lookUp}
+              disabled={looking || !input.trim()}
+              className="flex-none"
             >
-              LCSC Part IDs
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                id="lcsc-ids"
-                value={lcsc}
-                onChange={(e) => setLcsc(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleInspectClick();
-                }}
-                placeholder="C25804, C7442 ..."
-                disabled={busy}
-                className="min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc disabled:opacity-50"
-              />
-              <Button
-                variant="accent"
-                onClick={handleInspectClick}
-                disabled={busy}
-                className="flex-none"
-              >
-                {busy ? "Inspecting..." : "Inspect"}
-              </Button>
-            </div>
+              {looking ? "Looking Up..." : "Look Up"}
+            </Button>
+          </div>
+          {!result ? (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
                 Browse For ZIP
               </Button>
               <span className="text-xs text-t3">
-                Pick one or more vendor ZIP files to inspect and add.
+                Or add a part from a vendor ZIP directly (SnapEDA, Ultra Librarian).
               </span>
             </div>
+          ) : null}
+        </Card>
+
+        {result && plan ? (
+          <Card className="mt-4 px-4 py-4">
+            <PassiveAddSection
+              key={lookedUpInput}
+              result={result}
+              plan={plan}
+              input={lookedUpInput}
+              onAdded={(name) => {
+                toast(`Added ${name}`, "ok");
+                reset();
+              }}
+              toast={toast}
+            />
           </Card>
+        ) : null}
 
-          {busy ? <Progress progress={job.progress} /> : null}
-          {job.status === "error" ? (
-            <div className="mt-4 text-sm text-err">
-              Inspect failed. {job.error}
+        {nonPassive ? (
+          <Card className="mt-4 px-4 py-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-sm text-t2">
+                <Badge tone="warn">Needs Files</Badge>
+                <span>This part needs a symbol, footprint and 3D model.</span>
+              </div>
+              <PulledSummary result={result} />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+                  Browse For ZIP
+                </Button>
+                <span className="text-xs text-t3">
+                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) anywhere, or browse. The
+                  pulled details are kept, so you only add the files.
+                </span>
+              </div>
             </div>
-          ) : null}
+          </Card>
+        ) : null}
 
-          {staged && staged.length > 0 ? (
-            <div className="mt-6 flex flex-col gap-4">
-              <Eyebrow>Review And Add</Eyebrow>
-              {staged.map(({ id, candidate }) => (
-                <CandidateCard
-                  key={id}
-                  candidate={candidate}
-                  onCommitted={() => removeStaged(id)}
-                  toast={toast}
-                />
-              ))}
-            </div>
-          ) : staged && staged.length === 0 ? (
-            <div className="mt-8 text-center text-sm text-t3">
-              No parts found in what you dropped or entered.
-            </div>
-          ) : null}
+        {busy ? <Progress progress={job.progress} /> : null}
+        {job.status === "error" ? (
+          <div className="mt-4 text-sm text-err">Inspect failed. {job.error}</div>
+        ) : null}
 
-        </div>
+        {staged && staged.length > 0 ? (
+          <div className="mt-6 flex flex-col gap-4">
+            <Eyebrow>Review And Add</Eyebrow>
+            {staged.map(({ id, candidate, datasheetUrl }) => (
+              <CandidateCard
+                key={id}
+                candidate={candidate}
+                initialDatasheetUrl={datasheetUrl}
+                onCommitted={() => removeStaged(id)}
+                toast={toast}
+              />
+            ))}
+          </div>
+        ) : staged && staged.length === 0 ? (
+          <div className="mt-8 text-center text-sm text-t3">
+            No parts found in what you dropped.
+          </div>
+        ) : null}
       </div>
-    </>
+    </div>
+  );
+}
+
+function PulledSummary({ result }: { result: EnrichmentResult }) {
+  const rows = (
+    [
+      ["MPN", sv(result.mpn)],
+      ["Manufacturer", sv(result.manufacturer)],
+      ["Description", sv(result.description)],
+      ["Package", sv(result.package)],
+    ] as [string, string][]
+  ).filter(([, v]) => v);
+  const specCount = Object.keys(result.specs).filter((k) => k !== "product_url").length;
+  if (rows.length === 0 && specCount === 0) {
+    return (
+      <span className="text-sm text-warn">
+        Nothing was pulled. The page may have blocked the fetch, or the link is not a product page.
+      </span>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-card border border-line2 bg-raise2 p-4">
+      {rows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
+          {rows.map(([k, v]) => (
+            <div key={k} className="contents">
+              <span className="text-t3">{k}</span>
+              <span className="truncate text-t1">{v}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {specCount > 0 ? (
+        <span className="text-xs text-t3">{specCount} specs pulled and kept.</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -194,262 +311,4 @@ function Progress({ progress }: { progress: JobProgress | null }) {
       </div>
     </div>
   );
-}
-
-function CandidateCard({
-  candidate,
-  onCommitted,
-  toast,
-}: {
-  candidate: StagingCandidate;
-  onCommitted: () => void;
-  toast: (message: string, tone?: ToastTone) => void;
-}) {
-  const [c, setC] = useState<StagingCandidate>(candidate);
-  const [missing, setMissing] = useState<string[]>([]);
-  const commit = useIngestCommit();
-  // Autofill: paste a datasheet link (or attach the PDF) and a purchase link, and
-  // the backend fills the remaining identity from the datasheet + enrichment.
-  const enrich = useJob<IngestEnrichResult>();
-  const [dsUrl, setDsUrl] = useState("");
-  const [dsFile, setDsFile] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string[]>([]);
-  const filling = enrich.status === "running";
-
-  function set<K extends keyof StagingCandidate>(key: K, value: StagingCandidate[K]) {
-    setC((prev) => ({ ...prev, [key]: value }));
-  }
-
-  async function handleAutofill() {
-    if (filling) return;
-    setNotes([]);
-    try {
-      const { job_id } = await api.ingestEnrich({
-        candidate: c,
-        datasheet_url: dsUrl.trim() || undefined,
-        // Send the purchase link explicitly so the backend derives its real vendor
-        // (Mouser/DigiKey/LCSC from the host) and scrapes that product page to fill
-        // the rest of the identity, not just what a datasheet holds.
-        purchase_url: (c.purchase?.[0]?.url ?? "").trim() || undefined,
-        datasheet_file: dsFile ?? undefined,
-      });
-      await enrich.run(job_id);
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Autofill failed", "err");
-    }
-  }
-
-  async function attachPdf() {
-    const hostApi = (
-      window as unknown as {
-        pywebview?: { api?: { pick_datasheet_file?: () => Promise<string[]> } };
-      }
-    ).pywebview?.api;
-    if (!hostApi?.pick_datasheet_file) {
-      toast(
-        "Open Stockroom as the app to attach a PDF from disk, or paste its link instead.",
-        "neutral",
-      );
-      return;
-    }
-    try {
-      const paths = await hostApi.pick_datasheet_file();
-      if (paths && paths.length > 0) setDsFile(paths[0]);
-    } catch {
-      // the picker was cancelled or is unavailable; nothing to do
-    }
-  }
-
-  useEffect(() => {
-    if (enrich.status === "done" && enrich.result) {
-      setC(enrich.result.candidate);
-      setNotes(enrich.result.notes);
-      const n = enrich.result.filled.length;
-      toast(
-        n > 0 ? `Filled ${n} field${n === 1 ? "" : "s"}.` : "Nothing new was found.",
-        n > 0 ? "ok" : "neutral",
-      );
-    }
-  }, [enrich.status, enrich.result, toast]);
-
-  function handleCommit() {
-    setMissing([]);
-    commit.mutate(c, {
-      onSuccess: () => {
-        toast(`Added ${c.display_name || "part"}`, "ok");
-        onCommitted();
-      },
-      onError: (err) => {
-        if (err instanceof ApiError && err.missing && err.missing.length > 0) {
-          setMissing(err.missing);
-          toast("Still Incomplete", "err");
-        } else {
-          toast(err instanceof ApiError ? err.message : "Could not add", "err");
-        }
-      },
-    });
-  }
-
-  // Guard the array itself: a candidate may arrive without a purchase field.
-  const purchaseUrl = c.purchase?.[0]?.url ?? "";
-  const chosenFootprint = c.footprint_variants[c.chosen_footprint_index] ?? "";
-
-  return (
-    <Card data-candidate className="px-4 py-4">
-      <div className="grid gap-2.5">
-        <Field label="Name" value={c.display_name} onChange={(v) => set("display_name", v)} />
-        <Field label="Part Number" value={c.mpn} onChange={(v) => set("mpn", v)} mono />
-        <Field
-          label="Manufacturer"
-          value={c.manufacturer}
-          onChange={(v) => set("manufacturer", v)}
-        />
-        <Field label="Category" value={c.category} onChange={(v) => set("category", v)} />
-        <Field
-          label="Description"
-          value={c.description}
-          onChange={(v) => set("description", v)}
-        />
-        <Field
-          label="Purchase URL"
-          value={purchaseUrl}
-          mono
-          onChange={(v) =>
-            set("purchase", v.trim() ? [{ vendor: "manual", url: v.trim() }] : [])
-          }
-        />
-        <Field label="Datasheet URL" value={dsUrl} mono onChange={setDsUrl} />
-        {c.footprint_variants.length > 1 ? (
-          <div className="flex items-center gap-3">
-            <span className="w-[116px] flex-none text-xs text-t3">Footprint</span>
-            <select
-              aria-label="Footprint"
-              value={c.chosen_footprint_index}
-              onChange={(e) => set("chosen_footprint_index", Number(e.target.value))}
-              className="rounded-control border border-line2 bg-field px-2 py-1 text-base text-t1 outline-none focus:border-acc"
-            >
-              {c.footprint_variants.map((fp, i) => (
-                <option key={fp} value={i}>
-                  {baseName(fp)}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-      </div>
-
-      {/* asset presence */}
-      <div className="mt-3.5 flex flex-wrap gap-2">
-        <Asset label="Symbol" present={!!c.symbol_name} />
-        <Asset label="Footprint" present={!!chosenFootprint} />
-        <Asset label="3D Model" present={!!c.model_path} />
-        <Asset label="Datasheet" present={!!c.datasheet_path} />
-      </div>
-
-      {c.gaps.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {c.gaps.map((g) => (
-            <Badge key={g} tone="warn">
-              {g}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-
-      {notes.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-1">
-          {notes.map((n) => (
-            <div key={n} className="text-xs text-warn">
-              {n}
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {enrich.status === "error" ? (
-        <div className="mt-3 text-xs text-err">Autofill failed. {enrich.error}</div>
-      ) : null}
-
-      {missing.length > 0 ? (
-        <div className="mt-3">
-          <div className="mb-1.5 text-xs text-err">
-            Still needs before it can be added
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {missing.map((m) => (
-              <Badge key={m} tone="err">
-                {m}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Button
-            onClick={handleAutofill}
-            disabled={filling || commit.isPending}
-            icon={<EnrichIcon />}
-          >
-            {filling ? "Filling..." : "Autofill"}
-          </Button>
-          <Button small onClick={attachPdf} disabled={filling}>
-            Attach PDF
-          </Button>
-          {dsFile ? (
-            <span className="max-w-[200px] truncate text-xs text-t3">{baseName(dsFile)}</span>
-          ) : null}
-        </div>
-        <Button
-          variant="accent"
-          onClick={handleCommit}
-          disabled={commit.isPending || filling}
-        >
-          {commit.isPending ? "Adding..." : "Add To Library"}
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  mono,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="w-[116px] flex-none text-xs text-t3">{label}</span>
-      <input
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={
-          "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-1.5 text-base text-t1 outline-none focus:border-acc " +
-          (mono ? "tnum" : "")
-        }
-      />
-    </div>
-  );
-}
-
-function Asset({ label, present }: { label: string; present: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-control bg-raise px-2.5 py-1 text-2xs text-t2">
-      <Dot tone={present ? "ok" : "warn"} />
-      {label}
-    </span>
-  );
-}
-
-function baseName(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] || path;
 }

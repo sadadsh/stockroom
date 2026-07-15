@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { PartDetail, StagingCandidate } from "../api/types";
+import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
+import { ThemeProvider } from "../lib/theme";
 import { IngestPage } from "./IngestPage";
 
 vi.mock("../api/client", async (im) => {
@@ -13,15 +14,79 @@ vi.mock("../api/client", async (im) => {
     ...actual,
     api: {
       ...actual.api,
+      enrichFromUrl: vi.fn(),
+      enrichPart: vi.fn(),
+      passivePreview: vi.fn(),
+      passiveAdd: vi.fn(),
+      facets: vi.fn(),
+      stockPreviewSvg: vi.fn(),
+      stockModelGlb: vi.fn(),
       ingestInspect: vi.fn(),
       openJobStream: vi.fn(),
       ingestCommit: vi.fn(),
       ingestEnrich: vi.fn(),
-      enrichBulk: vi.fn(),
     },
   };
 });
 const mockApi = vi.mocked(api);
+
+function sf(value: unknown) {
+  return { value, source: "mouser", confidence: "high" };
+}
+
+const EMPTY_RESULT: EnrichmentResult = {
+  category: "",
+  mpn: null,
+  manufacturer: null,
+  description: null,
+  datasheet_url: null,
+  stock: null,
+  package: null,
+  price_breaks: [],
+  specs: {},
+  add_plan: null,
+  schema_version: 1,
+};
+
+const PASSIVE_RECORD = {
+  id: "",
+  display_name: "118 Ohm 1% 0603 Resistor",
+  category: "Resistors",
+  description: "Resistor, 118 Ohm, 1%, 0603",
+  mpn: "560112116151",
+  manufacturer: "",
+  passive: true,
+  symbol: { lib: "Device", name: "R" },
+  footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric" },
+  model: null,
+  datasheet: { source_url: "" },
+  purchase: [{ vendor: "Mouser", url: "https://www.mouser.com/x", part_number: "" }],
+  specs: {
+    Resistance: "118 Ohms",
+    Tolerance: "1%",
+    Package: "0603",
+    "3D Model": "Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+  },
+} as unknown as PartDetail;
+
+const ZIP_CANDIDATE: StagingCandidate = {
+  vendor: "snapeda",
+  symbol_lib_path: "/tmp/x.kicad_sym",
+  symbol_name: "STM32F103",
+  footprint_variants: ["/tmp/LQFP48.kicad_mod"],
+  chosen_footprint_index: 0,
+  model_path: "/tmp/LQFP48.step",
+  datasheet_path: null,
+  display_name: "",
+  entry_name: "STM32",
+  category: "",
+  mpn: "",
+  manufacturer: "",
+  description: "",
+  tags: [],
+  purchase: [],
+  gaps: [],
+};
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -33,30 +98,8 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-const CANDIDATE: StagingCandidate = {
-  vendor: "lcsc",
-  symbol_lib_path: "/tmp/SR-ICs.kicad_sym",
-  symbol_name: "NE555P",
-  footprint_variants: ["/tmp/DIP-8.kicad_mod", "/tmp/SOIC-8.kicad_mod"],
-  chosen_footprint_index: 0,
-  model_path: null,
-  datasheet_path: "/tmp/ne555.pdf",
-  display_name: "NE555P",
-  entry_name: "NE555P",
-  category: "ICs",
-  mpn: "NE555P",
-  manufacturer: "Texas Instruments",
-  description: "Single timer",
-  tags: ["timer"],
-  purchase: [],
-  gaps: ["no 3D model in this package"],
-};
-
-const PART_DETAIL = { id: "ne555", display_name: "NE555P" } as PartDetail;
-
 function resultStream(candidates: StagingCandidate[]): ReadableStream<Uint8Array> {
   return streamOf([
-    'event: progress\ndata: {"pct":50,"message":"fetching"}\n\n',
     `event: result\ndata: ${JSON.stringify({ result: candidates })}\n\n`,
     "event: done\ndata: {}\n\n",
   ]);
@@ -66,221 +109,135 @@ function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ToastProvider>{ui}</ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }
 
-async function inspectOnce(candidates: StagingCandidate[]) {
-  mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
-  mockApi.openJobStream.mockResolvedValue(resultStream(candidates));
-  wrap(<IngestPage />);
-  const user = userEvent.setup();
-  await user.type(screen.getByLabelText("LCSC Part IDs"), "C123");
-  await user.click(screen.getByRole("button", { name: "Inspect" }));
-  return user;
-}
+beforeEach(() => {
+  mockApi.facets.mockResolvedValue({ by_category: {}, by_manufacturer: {} } as never);
+  mockApi.stockPreviewSvg.mockRejectedValue(new ApiError(404, "no kicad"));
+  mockApi.stockModelGlb.mockRejectedValue(new ApiError(404, "no kicad"));
+});
 
-describe("IngestPage", () => {
-  it("inspects an LCSC id and renders the returned staging candidate", async () => {
-    const user = await inspectOnce([CANDIDATE]);
-    expect(mockApi.ingestInspect).toHaveBeenCalledWith([], ["C123"]);
-    // The candidate's proposed name lands in an editable field.
-    expect(await screen.findByLabelText("Name")).toHaveValue("NE555P");
-    // Its gap is surfaced honestly.
-    expect(screen.getByText(/no 3D model/i)).toBeInTheDocument();
-    void user;
-  });
-
-  it("browses for a vendor ZIP via the host picker and inspects the chosen paths", async () => {
-    mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
-    mockApi.openJobStream.mockResolvedValue(resultStream([]));
-    const pick = vi.fn().mockResolvedValue(["C:/dl/MyPart.zip"]);
-    (window as unknown as { pywebview?: unknown }).pywebview = { api: { pick_ingest_files: pick } };
+describe("IngestPage — unified Add A Part", () => {
+  it("looks up a passive link and adds it with no files", async () => {
+    mockApi.enrichFromUrl.mockResolvedValue({
+      ...EMPTY_RESULT,
+      mpn: sf("560112116151"),
+      specs: { Resistance: sf("118 Ohms") },
+      add_plan: { kind: "resistor", package: "0603", value: "118 Ohms", tolerance: "1%" },
+    });
+    mockApi.passivePreview.mockResolvedValue({
+      status: "ok",
+      record: PASSIVE_RECORD,
+      gaps: [],
+      stock_present: true,
+    });
+    mockApi.passiveAdd.mockResolvedValue(PASSIVE_RECORD);
     wrap(<IngestPage />);
     const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/x",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+
+    expect(mockApi.enrichFromUrl).toHaveBeenCalledWith("https://www.mouser.com/x");
+    // determined a passive
+    expect(await screen.findByText("Passive")).toBeInTheDocument();
+    // the file-less add resolves the stock footprint + shows the add button
+    const addBtn = await screen.findByRole("button", { name: "Add To Library" });
+    await user.click(addBtn);
+
+    expect(mockApi.passiveAdd).toHaveBeenCalledTimes(1);
+    expect(mockApi.passiveAdd.mock.calls[0][0]).toMatchObject({
+      input: "https://www.mouser.com/x",
+      kind: "resistor",
+      package: "0603",
+    });
+    expect(await screen.findByText(/Added 118 Ohm/i)).toBeInTheDocument();
+  });
+
+  it("routes a bare part number through the MPN lookup, not the URL fetch", async () => {
+    mockApi.enrichPart.mockResolvedValue({ ...EMPTY_RESULT, add_plan: null });
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Product link or part number"), "ERJ-P03F1101V");
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    expect(mockApi.enrichPart).toHaveBeenCalledWith("ERJ-P03F1101V");
+    expect(mockApi.enrichFromUrl).not.toHaveBeenCalled();
+  });
+
+  it("a non-passive link asks for files and merges the pulled data onto the dropped ZIP", async () => {
+    mockApi.enrichFromUrl.mockResolvedValue({
+      ...EMPTY_RESULT,
+      category: "ICs",
+      mpn: sf("STM32F103C8T6"),
+      description: sf("ARM Cortex-M3 MCU"),
+      add_plan: null,
+    });
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
+    mockApi.openJobStream.mockResolvedValue(resultStream([ZIP_CANDIDATE]));
+    const pick = vi.fn().mockResolvedValue(["C:/dl/STM32.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/stm32",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+
+    expect(await screen.findByText("Needs Files")).toBeInTheDocument();
+    expect(screen.getByText("STM32F103C8T6")).toBeInTheDocument(); // pulled identity shown
+
     await user.click(screen.getByRole("button", { name: "Browse For ZIP" }));
     await waitFor(() => expect(pick).toHaveBeenCalled());
-    expect(mockApi.ingestInspect).toHaveBeenCalledWith(["C:/dl/MyPart.zip"], []);
+
+    // the staged candidate carries the ZIP's assets AND the pulled identity (link wins)
+    await screen.findByText("Review And Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6");
     delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
 
-  it("commits a candidate and reports success", async () => {
-    const user = await inspectOnce([CANDIDATE]);
-    await screen.findByLabelText("Name");
-    mockApi.ingestCommit.mockResolvedValue(PART_DETAIL);
-
-    await user.click(screen.getByRole("button", { name: "Add To Library" }));
-
-    expect(mockApi.ingestCommit).toHaveBeenCalledTimes(1);
-    expect(mockApi.ingestCommit).toHaveBeenCalledWith(CANDIDATE);
-    expect(await screen.findByText(/Added NE555P/i)).toBeInTheDocument();
-  });
-
-  it("surfaces the complete-to-add gate missing fields on a 422", async () => {
-    const user = await inspectOnce([CANDIDATE]);
-    await screen.findByLabelText("Name");
-    mockApi.ingestCommit.mockRejectedValue(
-      new ApiError(422, "IncompleteError", ["3D model", "purchase link"]),
-    );
-
-    await user.click(screen.getByRole("button", { name: "Add To Library" }));
-
-    const card = (await screen.findByText("3D model")).closest("[data-candidate]")!;
-    expect(within(card as HTMLElement).getByText("3D model")).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText("purchase link")).toBeInTheDocument();
-  });
-
-  it("commits the edited candidate values, not the originals", async () => {
-    const user = await inspectOnce([CANDIDATE]);
-    await screen.findByLabelText("Name");
-    mockApi.ingestCommit.mockResolvedValue(PART_DETAIL);
-
-    const manu = screen.getByLabelText("Manufacturer");
-    await user.clear(manu);
-    await user.type(manu, "Acme Corp");
-    await user.click(screen.getByRole("button", { name: "Add To Library" }));
-
-    expect(mockApi.ingestCommit).toHaveBeenCalledWith(
-      expect.objectContaining({ manufacturer: "Acme Corp" }),
-    );
-  });
-
-  it("keeps edits on sibling candidates when one is committed", async () => {
-    const A = { ...CANDIDATE, display_name: "PART_A", entry_name: "A", mpn: "A" };
-    const B = { ...CANDIDATE, display_name: "PART_B", entry_name: "B", mpn: "B" };
+  it("adds a part from a vendor ZIP dropped with no link", async () => {
+    const cand = { ...ZIP_CANDIDATE, mpn: "NE555P", display_name: "NE555P", datasheet_path: "/tmp/x.pdf" };
     mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
-    mockApi.openJobStream.mockResolvedValue(resultStream([A, B]));
-    mockApi.ingestCommit.mockResolvedValue(PART_DETAIL);
+    mockApi.openJobStream.mockResolvedValue(resultStream([cand]));
+    mockApi.ingestCommit.mockResolvedValue({ id: "ne555", display_name: "NE555P" } as PartDetail);
+    const pick = vi.fn().mockResolvedValue(["C:/dl/NE555.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
     wrap(<IngestPage />);
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText("LCSC Part IDs"), "C1 C2");
-    await user.click(screen.getByRole("button", { name: "Inspect" }));
-    await screen.findByText("Review And Add");
 
-    // Edit the second card's Manufacturer, then commit the first card.
-    const manus = screen.getAllByLabelText("Manufacturer");
-    expect(manus).toHaveLength(2);
-    await user.clear(manus[1]);
-    await user.type(manus[1], "EDITED_B");
-    await user.click(screen.getAllByRole("button", { name: "Add To Library" })[0]);
-    await screen.findByText(/Added PART_A/i);
-
-    // The surviving card must still hold the edit, not be reset by a remount.
-    const remaining = screen.getAllByLabelText("Manufacturer");
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]).toHaveValue("EDITED_B");
-  });
-
-  it("renders a candidate that arrives without a purchase field instead of crashing", async () => {
-    const noPurchase: Partial<StagingCandidate> = { ...CANDIDATE };
-    delete noPurchase.purchase;
-    const user = await inspectOnce([noPurchase as StagingCandidate]);
-    expect(await screen.findByLabelText("Name")).toHaveValue("NE555P");
-    void user;
-  });
-
-  it("shows an honest empty state when inspection finds nothing", async () => {
-    const user = await inspectOnce([]);
-    expect(await screen.findByText(/No parts found/i)).toBeInTheDocument();
-    void user;
-  });
-});
-
-
-describe("IngestPage — candidate autofill", () => {
-  it("autofills a candidate from its pasted datasheet link", async () => {
-    const user = await inspectOnce([{ ...CANDIDATE, mpn: "", manufacturer: "" }]);
+    await user.click(screen.getByRole("button", { name: "Browse For ZIP" }));
+    await waitFor(() => expect(mockApi.ingestInspect).toHaveBeenCalledWith(["C:/dl/NE555.zip"], []));
     await screen.findByLabelText("Name");
 
-    const filled = { ...CANDIDATE, mpn: "NE555P", manufacturer: "Texas Instruments" };
-    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j2" });
-    mockApi.openJobStream.mockResolvedValue(
-      streamOf([
-        'event: progress\ndata: {"pct":45,"message":"reading the datasheet"}\n\n',
-        `event: result\ndata: ${JSON.stringify({
-          result: { candidate: filled, filled: ["mpn", "manufacturer"], notes: [], missing: [] },
-        })}\n\n`,
-        "event: done\ndata: {}\n\n",
-      ]),
-    );
+    await user.click(screen.getByRole("button", { name: "Add To Library" }));
+    expect(mockApi.ingestCommit).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Added NE555P/i)).toBeInTheDocument();
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
 
+  it("is honest when a link yields nothing addable", async () => {
+    mockApi.enrichFromUrl.mockResolvedValue({ ...EMPTY_RESULT, add_plan: null });
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
     await user.type(
-      screen.getByLabelText("Datasheet URL"),
-      "https://ti.com/ne555.pdf",
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/blocked",
     );
-    await user.click(screen.getByRole("button", { name: "Autofill" }));
-
-    expect(mockApi.ingestEnrich).toHaveBeenCalledTimes(1);
-    const body = mockApi.ingestEnrich.mock.calls[0][0];
-    expect(body.datasheet_url).toBe("https://ti.com/ne555.pdf");
-    expect(body.candidate.display_name).toBe("NE555P");
-    // the filled result lands back in the editable fields
-    await waitFor(() =>
-      expect(screen.getByLabelText("Part Number")).toHaveValue("NE555P"),
-    );
-    expect(screen.getByLabelText("Manufacturer")).toHaveValue("Texas Instruments");
-  });
-
-  it("autofills from the pasted purchase link (sends purchase_url)", async () => {
-    const user = await inspectOnce([{ ...CANDIDATE, mpn: "", manufacturer: "", purchase: [] }]);
-    await screen.findByLabelText("Name");
-
-    const filled = {
-      ...CANDIDATE,
-      mpn: "MCT06030D1101BP500",
-      manufacturer: "Vishay",
-      purchase: [{ vendor: "Mouser", url: "https://www.mouser.com/ProductDetail/xyz" }],
-    };
-    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j3" });
-    mockApi.openJobStream.mockResolvedValue(
-      streamOf([
-        `event: result\ndata: ${JSON.stringify({
-          result: { candidate: filled, filled: ["mpn", "manufacturer"], notes: [], missing: [] },
-        })}\n\n`,
-        "event: done\ndata: {}\n\n",
-      ]),
-    );
-
-    await user.type(
-      screen.getByLabelText("Purchase URL"),
-      "https://www.mouser.com/ProductDetail/xyz",
-    );
-    await user.click(screen.getByRole("button", { name: "Autofill" }));
-
-    expect(mockApi.ingestEnrich).toHaveBeenCalledTimes(1);
-    const body = mockApi.ingestEnrich.mock.calls[0][0];
-    // the pasted purchase link is threaded to the backend so it can scrape that page
-    expect(body.purchase_url).toBe("https://www.mouser.com/ProductDetail/xyz");
-    expect(body.candidate.purchase?.[0]?.url).toBe(
-      "https://www.mouser.com/ProductDetail/xyz",
-    );
-    await waitFor(() =>
-      expect(screen.getByLabelText("Part Number")).toHaveValue("MCT06030D1101BP500"),
-    );
-  });
-
-  it("surfaces the autofill notes honestly", async () => {
-    const user = await inspectOnce([CANDIDATE]);
-    await screen.findByLabelText("Name");
-    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j2" });
-    mockApi.openJobStream.mockResolvedValue(
-      streamOf([
-        `event: result\ndata: ${JSON.stringify({
-          result: {
-            candidate: CANDIDATE,
-            filled: [],
-            notes: ["the datasheet link did not yield a PDF"],
-            missing: ["purchase link"],
-          },
-        })}\n\n`,
-        "event: done\ndata: {}\n\n",
-      ]),
-    );
-
-    await user.click(screen.getByRole("button", { name: "Autofill" }));
-    expect(
-      await screen.findByText(/did not yield a PDF/i),
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    expect(await screen.findByText(/Nothing was pulled/i)).toBeInTheDocument();
   });
 });

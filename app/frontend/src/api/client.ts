@@ -295,6 +295,25 @@ export const api = {
     return blob.arrayBuffer();
   },
 
+  // Preview a KiCad STOCK footprint / 3D model by its lib_id (e.g.
+  // "Resistor_SMD:R_0603_1608Metric"), with no committed part, so the Add-A-Part flow
+  // can show a passive's built-in footprint + model before it is added. A lib_id that
+  // is not installed is a 404, absent 3D tooling a 502, surfaced honestly by the viewer.
+  stockPreviewSvg(fp: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/previews/stock/footprint.svg?fp=${encodeURIComponent(fp)}&bw=true`,
+      "image/svg+xml",
+    );
+  },
+
+  async stockModelGlb(fp: string): Promise<ArrayBuffer> {
+    const blob = await fetchPreviewBlob(
+      `/api/previews/stock/model.glb?fp=${encodeURIComponent(fp)}`,
+      "model/gltf-binary",
+    );
+    return blob.arrayBuffer();
+  },
+
   // Edit one field (mirrored to the KiCad symbol where the field maps to a symbol
   // property; `tags` takes an array). Category is NOT edited here, it moves.
   editField(id: string, field: string, value: unknown): Promise<PartDetail> {

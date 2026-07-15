@@ -1,67 +1,20 @@
 /**
- * The 3D model preview (M6d). Fetches the GLB (converted from the part's STEP/WRL by the
- * backend) and mounts it with three.js. Every non-happy path is honest: while the model
- * loads it says so; a 502 (no conversion tooling installed on this machine) or a WebGL
- * failure degrades to a plain message instead of a blank canvas or a crash. The heavy
- * three.js code is import()ed lazily so it only loads when a 3D preview is actually opened.
+ * The 3D model preview for a committed part (M6d). Fetches the GLB (converted from the
+ * part's STEP/WRL by the backend) and hands it to the shared Glb3DView canvas. All the
+ * mounting + honest-degradation logic lives in Glb3DView so a stock-lib_id preview (the
+ * Add-A-Part flow) renders through the exact same viewer.
  */
-import { useEffect, useRef, useState } from "react";
-import { ApiError } from "../api/client";
 import { usePreviewGlb } from "../api/queries";
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-t3">
-      {children}
-    </div>
-  );
-}
+import { Glb3DView } from "./Glb3DView";
 
 export function ModelViewer({ partId }: { partId: string }) {
   const query = usePreviewGlb(partId, true);
-  const mountRef = useRef<HTMLDivElement>(null);
-  const [renderError, setRenderError] = useState(false);
-
-  useEffect(() => {
-    const container = mountRef.current;
-    if (!query.data || !container) return;
-    let disposed = false;
-    let dispose = () => {};
-    void (async () => {
-      try {
-        const { mountModelScene } = await import("../lib/threeScene");
-        if (disposed || !mountRef.current) return;
-        dispose = mountModelScene(mountRef.current, query.data as ArrayBuffer, () => {
-          // GLTFLoader rejected the GLB asynchronously: show an honest message rather
-          // than a blank canvas.
-          if (!disposed) setRenderError(true);
-        });
-      } catch {
-        // no WebGL context (or three failed to load): degrade honestly.
-        if (!disposed) setRenderError(true);
-      }
-    })();
-    return () => {
-      disposed = true;
-      dispose();
-    };
-  }, [query.data]);
-
-  if (query.isLoading) {
-    return <Centered>Loading 3D model...</Centered>;
-  }
-  if (query.isError) {
-    const err = query.error instanceof ApiError ? query.error : null;
-    // A 502 carries an honest, specific reason from the backend (tooling not installed,
-    // or a WRL model that is not convertible yet) — show it rather than a single guess.
-    const message =
-      err?.status === 502 && err.message
-        ? err.message
-        : "Could not load the 3D model.";
-    return <Centered>{message}</Centered>;
-  }
-  if (renderError) {
-    return <Centered>This device could not render the 3D preview.</Centered>;
-  }
-  return <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />;
+  return (
+    <Glb3DView
+      data={query.data as ArrayBuffer | undefined}
+      isLoading={query.isLoading}
+      isError={query.isError}
+      error={query.error}
+    />
+  );
 }
