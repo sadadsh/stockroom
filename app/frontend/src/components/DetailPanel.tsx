@@ -29,6 +29,37 @@ import {
 // The passport has ten required fields (stockroom.model.part.REQUIRED_FIELDS).
 const PASSPORT_TOTAL = 10;
 
+const _KNOWN_VENDORS: Record<string, string> = {
+  lcsc: "LCSC",
+  mouser: "Mouser",
+  digikey: "DigiKey",
+  arrow: "Arrow",
+  newark: "Newark",
+  farnell: "Farnell",
+};
+
+// A human vendor label for the Sourcing card: map a known distributor host to its
+// proper name, otherwise Title Case the stored vendor. A generic stored vendor
+// ("manual", "scrape") is replaced by the distributor derived from the URL, so a
+// pasted Mouser link never shows a lowercase "manual".
+function vendorLabel(vendor: string, url: string): string {
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname.toLowerCase() : "";
+  } catch {
+    host = "";
+  }
+  for (const [token, name] of Object.entries(_KNOWN_VENDORS)) {
+    if (host.includes(token)) return name;
+  }
+  const v = (vendor || "").trim();
+  if (!v || v.toLowerCase() === "manual" || v.toLowerCase() === "scrape") {
+    if (host) return host.replace(/^www\./, "");
+    return "Vendor";
+  }
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
 interface Props {
   detail: PartDetail | undefined;
   isLoading: boolean;
@@ -579,7 +610,7 @@ function VendorCard({ purchase }: { purchase: PurchaseRef }) {
     <Card className="px-4 py-3.5">
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-t1">
-          {purchase.vendor || "Vendor"}
+          {vendorLabel(purchase.vendor, purchase.url)}
         </span>
         {purchase.fetched_at ? (
           <span className="text-2xs text-t3">
