@@ -118,3 +118,63 @@ def test_real_window_opens_and_serves_a_non_blank_page():
     # FastAPI-served page, the token is injected, drag/drop posts a full path, and
     # closing stops uvicorn. Skipped everywhere else.
     ...
+
+
+# -- bind_native_drop registers real DOM handlers (revert-safe coverage of the fix) --
+
+
+class _Slot(list):
+    def __iadd__(self, handler):
+        self.append(handler)
+        return self
+
+
+def _fake_window_with_document():
+    class Events:
+        def __init__(self):
+            self.dragover = _Slot()
+            self.drop = _Slot()
+
+    class Document:
+        def __init__(self):
+            self.events = Events()
+
+    class Dom:
+        def __init__(self):
+            self.document = Document()
+
+    class Window:
+        def __init__(self):
+            self.dom = Dom()
+
+    return Window()
+
+
+def test_bind_native_drop_registers_dragover_and_drop_handlers():
+    from stockroom.host.window import bind_native_drop
+
+    win = _fake_window_with_document()
+    captured = {}
+
+    def fake_dom_event_handler(fn, prevent_default=False, stop_propagation=False, debounce=0):
+        captured.setdefault("prevent_default", []).append(prevent_default)
+        return ("H", fn)
+
+    ok = bind_native_drop(win, lambda e: None, dom_event_handler=fake_dom_event_handler)
+    assert ok is True
+    # both a dragover (to preventDefault so drop fires) and a drop handler landed
+    assert len(win.dom.document.events.dragover) == 1
+    assert len(win.dom.document.events.drop) == 1
+    assert captured["prevent_default"] == [True, True]
+
+
+def test_bind_native_drop_is_false_when_dom_api_absent():
+    from stockroom.host.window import bind_native_drop
+
+    class NoDom:
+        @property
+        def dom(self):
+            raise RuntimeError("this backend has no DOM API")
+
+    assert bind_native_drop(NoDom(), lambda e: None,
+                            dom_event_handler=lambda *a, **k: None) is False

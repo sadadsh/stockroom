@@ -256,3 +256,58 @@ def test_apply_skips_and_reports_an_unparseable_stray_file(tmp_path, fixtures_di
     # the malformed file is surfaced honestly and never committed
     assert any(f.kind == "unparseable_file" for f in ops.scan_repairs().manual)
     assert any("broken.kicad_mod" in line for line in repo.status_porcelain())
+
+
+# ------------------------------------------------- visible metadata properties
+
+
+def _unhide_property(path, prop: str) -> None:
+    """Simulate a pre-fix symbol whose mirrored metadata property is visible."""
+    text = path.read_text()
+    start = text.index(f'(property "{prop}"')
+    seg = text[start:start + 400]
+    assert " (effects (hide yes))" in seg
+    seg = seg.replace(" (effects (hide yes))", "", 1)
+    path.write_text(text[:start] + seg + text[start + 400:], newline="")
+
+
+def test_scan_flags_a_visible_metadata_property(tmp_path, fixtures_dir):
+    repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
+    sp = profile.library.symbol_lib_path("ICs")
+    _unhide_property(sp, "MPN")
+    repo.commit("simulate a legacy visible property", [sp])
+
+    plan = ops.scan_repairs()
+    found = [a for a in plan.fixable if a.kind == "visible_metadata"]
+    assert len(found) == 1
+    assert found[0].part_id == record.id
+    assert "MPN" in found[0].detail
+    assert (found[0].before, found[0].after) == ("visible", "hidden")
+
+
+def test_repair_hides_a_visible_metadata_property(tmp_path, fixtures_dir):
+    repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
+    sp = profile.library.symbol_lib_path("ICs")
+    _unhide_property(sp, "MPN")
+    repo.commit("simulate a legacy visible property", [sp])
+
+    result = ops.apply_repairs()
+    assert result.hidden_metadata == 1
+    assert result.commit
+    text = sp.read_text()
+    start = text.index('(property "MPN"')
+    assert "(hide yes)" in text[start:start + 400]
+    # the value survived the hide
+    lib = SymbolLib.load(sp)
+    assert lib.get_symbol(record.symbol.name).get_property("MPN") == record.mpn
+    assert ops.scan_repairs().is_healthy
+    assert repo.is_clean()
+
+
+def test_add_part_writes_metadata_properties_hidden(tmp_path, fixtures_dir):
+    _, profile, _, record = _healthy(tmp_path, fixtures_dir)
+    sp = profile.library.symbol_lib_path("ICs")
+    lib = SymbolLib.load(sp)
+    sym = lib.get_symbol(record.symbol.name)
+    assert sym.property_hidden("MPN") is True
+    assert sym.property_hidden("Manufacturer") is True

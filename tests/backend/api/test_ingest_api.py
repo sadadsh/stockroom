@@ -238,7 +238,7 @@ def test_enrich_candidate_applies_explicit_links_and_autofills(client, app_ctx, 
     # part and the rest fills itself; the endpoint applies the explicit links, then
     # runs the enrichment pipeline over the candidate
     class _FakePipeline:
-        def fetch_and_store_datasheet(self, candidate, url):
+        def fetch_and_store_datasheet(self, candidate, url, force=False):
             stored = tmp_path / "stored.pdf"
             stored.write_bytes(b"%PDF-1.4\n%%EOF\n")
             candidate.datasheet_path = stored

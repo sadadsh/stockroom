@@ -160,3 +160,20 @@ def test_patch_clearing_kicad_config_override_returns_to_autodetect(
     client.patch("/api/settings", json={"kicad_config_override": ""})
     assert app_ctx.config.kicad_config_override == ""
     assert app_ctx.kicad_dir != target
+
+
+def test_patch_kicad_cli_override_never_moves_a_pinned_config_dir(client, app_ctx, tmp_path):
+    # THE review-confirmed footgun: the fixture context pins kicad_dir to a tmp
+    # dir, and saving a CLI override must NOT silently repoint it at the REAL
+    # machine's KiCad config (which a rewire would then WRITE into).
+    pinned = app_ctx.kicad_dir
+    client.patch("/api/settings", json={"kicad_cli_override": "/nonexistent/kicad-cli"})
+    assert app_ctx.kicad_dir == pinned
+
+
+def test_patch_strips_windows_copy_as_path_quotes(client, app_ctx, tmp_path):
+    target = tmp_path / "kicad-quoted"
+    target.mkdir()
+    client.patch("/api/settings", json={"kicad_config_override": f'"{target}"'})
+    assert app_ctx.config.kicad_config_override == str(target)
+    assert app_ctx.kicad_dir == target

@@ -203,10 +203,14 @@ class EnrichmentPipeline:
                 setattr(candidate, attr, str(sourced.value))
         return candidate
 
-    def fetch_and_store_datasheet(self, candidate: StagingCandidate, url: str) -> Path | None:
+    def fetch_and_store_datasheet(
+        self, candidate: StagingCandidate, url: str, force: bool = False
+    ) -> Path | None:
         """Follow a datasheet URL, validate a real PDF, store it under the pipeline's
         datasheet dir, and set candidate.datasheet_path. Returns the path, or None if
-        the link was dead or not a PDF (never raises: enrichment never blocks)."""
+        the link was dead or not a PDF (never raises: enrichment never blocks).
+        force=True refetches even when a cached PDF exists: an EXPLICITLY pasted URL
+        must win over a stale earlier download."""
         from stockroom.enrich.schema import normalize_mpn
 
         from stockroom.enrich.datasheet import looks_like_pdf
@@ -216,7 +220,7 @@ class EnrichmentPipeline:
         dst = self._datasheet_dir / f"{key}.pdf"
         # The registry's DatasheetSource may already have fetched this exact PDF (same
         # deterministic path) to extract specs; reuse it instead of a second download.
-        if dst.exists() and looks_like_pdf(dst.read_bytes()[:5]):
+        if not force and dst.exists() and looks_like_pdf(dst.read_bytes()[:5]):
             candidate.datasheet_path = dst
             return dst
         try:

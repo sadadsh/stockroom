@@ -57,6 +57,7 @@ def doctor_router(require_token) -> APIRouter:
             "healed_drift": result.healed_drift,
             "fixed_paths": result.fixed_paths,
             "committed_files": result.committed_files,
+            "hidden_metadata": result.hidden_metadata,
             "commit": result.commit,
             "manual": [
                 {"kind": f.kind, "part_id": f.part_id, "detail": f.detail,

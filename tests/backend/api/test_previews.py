@@ -336,3 +336,33 @@ def test_model_glb_real_step_end_to_end(app_ctx):
         r = c.get("/api/previews/model/tps62130.glb")
     assert r.status_code == 200
     assert r.content[:4] == GLB_MAGIC
+
+
+def test_footprint_preview_hides_the_reference_and_value_text(app_ctx):
+    # the owner's complaint: the footprint preview splashed REF** and the value over
+    # the pad art. Give the fixture footprint visible Reference/Value properties and
+    # prove the copy handed to the renderer has them hidden (the real file is untouched).
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        '\t(property "Reference" "REF**" (at 0 -1 0) (layer "F.SilkS") (effects (font (size 1 1))))\n'
+        '\t(property "Value" "TPS62130" (at 0 1 0) (layer "F.Fab") (effects (font (size 1 1))))\n'
+        '\t(pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))\n'
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get("/api/previews/footprint/tps62130.svg").status_code == 200
+    rendered = cli.fp_texts[0]
+    # the copy the renderer saw has both metadata texts hidden...
+    rstart = rendered.index('(property "Reference"')
+    assert "(hide yes)" in rendered[rstart:rstart + 200]
+    vstart = rendered.index('(property "Value"')
+    assert "(hide yes)" in rendered[vstart:vstart + 200]
+    # ...while the real footprint file on disk keeps its visible refdes for a board
+    on_disk = fp_file.read_text(encoding="utf-8")
+    dstart = on_disk.index('(property "Reference"')
+    assert "(hide yes)" not in on_disk[dstart:dstart + 200]

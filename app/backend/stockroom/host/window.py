@@ -83,6 +83,31 @@ def drop_forward_js(paths: list[str]) -> str:
     )
 
 
+def bind_native_drop(window, on_drop, dom_event_handler=None) -> bool:
+    """Register the native drop + dragover handlers through pywebview's DOM API on
+    the window's CURRENT document. Returns True when it bound, False on any failure
+    (drag-drop is an enhancement over the file picker, never a hard dependency).
+
+    Rebinding is the CALLER's job: an SPA reload (e.g. after a self-update) replaces
+    window.dom.document, so the handlers registered on the old document are gone and
+    this must run again against the new one. A stale bind-once flag was the bug that
+    silently killed drag-drop after the first reload."""
+    try:
+        if dom_event_handler is None:
+            from webview.dom import DOMEventHandler as dom_event_handler
+        doc = window.dom.document
+        # dragover must preventDefault so the drop event fires at all
+        doc.events.dragover += dom_event_handler(
+            lambda e: None, prevent_default=True, stop_propagation=False, debounce=500
+        )
+        doc.events.drop += dom_event_handler(
+            on_drop, prevent_default=True, stop_propagation=False
+        )
+        return True
+    except Exception:  # noqa: BLE001 - drag-drop is an enhancement; never break the app
+        return False
+
+
 def inject_script(base_url: str, token: str) -> str:
     """The renderer bootstrap: set the two globals the SPA actually reads: the
     frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__,
@@ -177,29 +202,22 @@ def run_window(base_url: str, token: str) -> None:
         if paths:
             window.evaluate_js(drop_forward_js(paths))
 
-    drop_bound = {"value": False}
+    # Track WHICH document the drop handlers are bound to (by identity), so a reload
+    # rebinds against the fresh document instead of a stale bind-once flag leaving
+    # drag-drop dead. WebView2 exposes dropped-file paths ONLY to handlers registered
+    # through pywebview's DOM API; window.addEventListener('drop') in the SPA gets File
+    # objects with NO path, which is why the host binds them here.
+    bound_doc = {"id": None}
 
     def _bind_native_drop() -> None:
-        # WebView2 exposes dropped-file paths ONLY to handlers registered through
-        # pywebview's DOM API; the frontend's window.addEventListener('drop') gets File
-        # objects with NO path. So the host registers the real handler here and hands
-        # the paths to the SPA via the guarded __STOCKROOM_NATIVE_DROP__ hook. Bound
-        # once (loaded fires on every SPA reload). Degrades honestly: on a pywebview
-        # without DOM events the native file picker still covers adding parts.
-        if drop_bound["value"]:
-            return
         try:
-            from webview.dom import DOMEventHandler
-
-            window.dom.document.events.dragover += DOMEventHandler(
-                lambda e: None, prevent_default=True, stop_propagation=False, debounce=500
-            )
-            window.dom.document.events.drop += DOMEventHandler(
-                _on_native_drop, prevent_default=True, stop_propagation=False
-            )
-            drop_bound["value"] = True
-        except Exception:  # noqa: BLE001 - drag-drop is an enhancement over the picker
-            pass
+            doc = window.dom.document
+        except Exception:  # noqa: BLE001 - no DOM API on this backend; picker still works
+            return
+        if id(doc) == bound_doc["id"]:
+            return  # already bound to THIS document (a route change, not a reload)
+        if bind_native_drop(window, _on_native_drop):
+            bound_doc["id"] = id(doc)
 
     def _on_loaded():
         # Re-inject on every SPA load (after a self-update reload or route change the

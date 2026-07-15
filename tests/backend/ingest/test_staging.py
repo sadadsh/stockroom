@@ -215,3 +215,28 @@ def test_merge_folds_a_datasheet_fragment_too():
 def test_merge_is_a_no_op_without_fragments():
     a, b = _full(name="PARTA"), _full(name="PARTB")
     assert merge_candidates([a, b]) == [a, b]
+
+
+def test_merge_partial_absorb_never_leaves_the_asset_on_two_cards():
+    # review #16/#31: a fragment carrying BOTH a model (target lacks) and a
+    # datasheet (target already has) must donate the model and NOT keep it, while
+    # the still-unclaimed datasheet keeps the fragment alive
+    full = _full(datasheet=Path("/zip/own.pdf"))  # has datasheet, lacks model
+    frag = _fragment(model=Path("/drop/m.step"), datasheet=Path("/drop/d.pdf"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 2
+    target, leftover = merged[0], merged[1]
+    assert target.model_path == Path("/drop/m.step")  # model moved onto the target
+    assert leftover.model_path is None                # and REMOVED from the fragment
+    assert leftover.datasheet_path == Path("/drop/d.pdf")  # its datasheet still needs a home
+
+
+def test_merge_two_anonymous_models_with_one_full_is_ambiguous():
+    # review #17: sole-full does NOT absorb when two bare models were dropped -
+    # they cannot both belong to the one part, so neither is guessed
+    full = _full()
+    a = _fragment(model=Path("/drop/a.step"))
+    b = _fragment(model=Path("/drop/b.step"))
+    merged = merge_candidates([full, a, b])
+    assert len(merged) == 3
+    assert merged[0].model_path is None  # nothing attached

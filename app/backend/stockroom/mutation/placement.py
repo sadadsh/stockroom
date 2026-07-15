@@ -102,5 +102,7 @@ def kicad_visible_properties(record: PartRecord) -> dict[str, str]:
 
 
 def mirror_fields_to_symbol(symbol: Symbol, record: PartRecord) -> None:
+    # hidden: these are metadata for KiCad's field views, never schematic text;
+    # visible they would splat URLs over a schematic and drown the symbol preview
     for name, value in kicad_visible_properties(record).items():
-        symbol.set_property(name, value)
+        symbol.set_property(name, value, hide=True)
