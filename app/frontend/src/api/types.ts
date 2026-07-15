@@ -641,6 +641,12 @@ export interface BomLine {
   stock?: number;
   source?: string;
   price_breaks?: { qty: number; price: number }[];
+  // Wide-BOM columns (the "perfect BOM" table): package + RoHS + category, derived offline
+  // from the footprint and filled from the enrich layer / library. Optional so an older cached
+  // shape (before these fields existed) still typechecks; the table renders "-" when absent.
+  package?: string;
+  rohs?: string;
+  category?: string;
   // M7d procurement fields, present only when the enrich layer carried them.
   lifecycle?: string;
   lead_time?: string;
@@ -648,6 +654,10 @@ export interface BomLine {
   mouser_pn?: string;
   lcsc_pn?: string;
   digikey_pn?: string;
+  // Folded procurement verdict (the one BOM table reads it directly): per-line stock coverage
+  // for the current run + whether the line is orderable. Present after a build/reprice.
+  stock_risk?: StockRisk;
+  orderable?: boolean;
   // Per-line build economics (M7... reprice): the order quantity and cost at a chosen
   // build size + tax/tariff rate. Present after a build/reprice; optional so an older
   // cached shape (before this field existed) still typechecks. final_qty is always a
@@ -715,6 +725,10 @@ export interface BomResult {
   // roll-up. Optional so an older cached shape (before this field existed) still typechecks.
   tax_rate?: number;
   build?: BuildRollup | null;
+  // The folded procurement roll-ups (the one BOM page's risk headline): sourcing risk + the
+  // critical-path lead time. Present after a build/reprice; optional for an older cached shape.
+  risks?: SourcingRisks;
+  lead?: LeadTime;
 }
 
 // --- Procurement (M7d) ---

@@ -205,6 +205,12 @@ const BUILT: BomResult = {
       datasheet: "",
       description: "Bulk Resistor",
       basic: true,
+      // Wide-BOM columns: the package derives from the footprint offline; rohs unknown; a
+      // never-priced line has unknown stock (never a risk) and is not orderable.
+      package: "0402",
+      rohs: "",
+      stock_risk: { kind: null, required: 2, available: null, short: false },
+      orderable: false,
       // Unpriced: the build economics still compute a final order qty (2 per board x 1
       // board), but every cost field stays honestly null (never a fabricated price).
       moq: null,
@@ -221,14 +227,22 @@ const BUILT: BomResult = {
       mpn: "TPS2121RUXR",
       manufacturer: "TI",
       has_real_mpn: true,
-      footprint: "",
-      datasheet: "",
+      footprint: "Package_SON:VSON-8",
+      datasheet: "https://ti.com/tps2121.pdf",
       description: "USB-C Power Mux",
       basic: false,
       unit_price: 1.25,
       extended: 1.25,
       stock: 5000,
       source: "Mouser",
+      // Wide-BOM columns: an authoritative package + RoHS + distributor P/N + product URL, and
+      // the folded stock risk (5000 covers the run, so no risk and orderable).
+      package: "VSON-8",
+      rohs: "Yes",
+      mouser_pn: "595-TPS2121RUXR",
+      url: "https://mouser.com/tps2121",
+      stock_risk: { kind: null, required: 10, available: 5000, short: false },
+      orderable: true,
       // Priced, with a MOQ of 10 exceeding the 1-per-board x 10-boards need (10 exactly),
       // so the order rounds to the MOQ and costs at that ladder break.
       moq: 10,
@@ -260,6 +274,55 @@ const BUILT: BomResult = {
     unpriced_lines: 1,
     currency: "USD",
   },
+  // The folded procurement roll-ups: a clean build (the priced line's stock covers the run).
+  risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
+  lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
+};
+
+// A built BOM whose priced line is NRND with zero stock and a long lead: exercises the folded
+// risk headline (Not Active / No Stock Line / critical path) and the wide table's stock tint +
+// lifecycle. One priced, risky line so the roll-ups are unambiguous.
+const BUILT_RISKY: BomResult = {
+  ...BUILT,
+  line_count: 1,
+  lines: [
+    {
+      refs: ["U1"],
+      qty: 1,
+      value: "TPS2121",
+      mpn: "TPS2121RUXR",
+      manufacturer: "TI",
+      has_real_mpn: true,
+      footprint: "Package_SON:VSON-8",
+      datasheet: "",
+      description: "USB-C Power Mux",
+      basic: false,
+      package: "VSON-8",
+      rohs: "Yes",
+      unit_price: 1.25,
+      extended: 1.25,
+      stock: 0,
+      lifecycle: "NRND",
+      lead_time: "18 Weeks",
+      source: "Mouser",
+      stock_risk: { kind: "err", required: 1, available: 0, short: true },
+      orderable: false,
+      moq: 1,
+      final_qty: 1,
+      final_unit_price: 1.25,
+      final_extended: 1.25,
+      tax_tariff: 0.12,
+      line_total: 1.37,
+    },
+  ],
+  risks: {
+    not_active: 1,
+    no_stock: 1,
+    insufficient_stock: 0,
+    risky_mpns: ["TPS2121RUXR"],
+    any: true,
+  },
+  lead: { max_weeks: 18, critical_mpn: "TPS2121RUXR", with_lead: 1, any: true },
 };
 
 // The result of reprising BUILT at a bigger build (20 boards, same tax rate): the priced
@@ -334,44 +397,6 @@ const FAB_READY: FabStatus = {
   has_board: true,
   cli_available: true,
   boards: ["netdeck.kicad_pcb"],
-};
-
-const PROC_BUILT: ProcurementResult = {
-  project: "Netdeck",
-  built: true,
-  priced: true,
-  boards: 1,
-  lines: [
-    {
-      refs: ["U1"],
-      qty: 1,
-      value: "TPS2121",
-      mpn: "TPS2121RUXR",
-      manufacturer: "TI",
-      has_real_mpn: true,
-      footprint: "",
-      datasheet: "",
-      description: "",
-      basic: false,
-      unit_price: 1.25,
-      extended: 1.25,
-      stock: 0,
-      lifecycle: "NRND",
-      lead_time: "18 Weeks",
-      source: "Mouser",
-      stock_risk: { kind: "err", required: 1, available: 0, short: true },
-      orderable: false,
-    },
-  ],
-  risks: {
-    not_active: 1,
-    no_stock: 1,
-    insufficient_stock: 0,
-    risky_mpns: ["TPS2121RUXR"],
-    any: true,
-  },
-  lead: { max_weeks: 18, critical_mpn: "TPS2121RUXR", with_lead: 1, any: true },
-  summary: "BOM: 1 lines · 1 parts · $1.25/board · critical path 18 wk",
 };
 
 const DESIGN: DesignResult = {
@@ -1065,19 +1090,26 @@ describe("ProjectsPage", () => {
     expect(within(lines).getByText("R1, R2")).toBeInTheDocument();
     expect(within(lines).getByText("USB-C Power Mux")).toBeInTheDocument();
     expect(within(lines).getByText("Mouser")).toBeInTheDocument();
-    // the new build-economics columns: MOQ 10 forces Final Qty up to 10, priced at $1.25
-    // unit, $12.50 at that quantity, $1.19 tax/tariff, $13.69 total
+    // the wide-table columns on the priced IC: manufacturer, package, distributor P/N, covered
+    // stock, plus the build economics (MOQ 10 forces Final Qty to 10, priced at $1.25 unit,
+    // $12.50 at qty, $1.19 tax/tariff, $13.69 total)
     const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(within(priceRow).getByText("TI")).toBeInTheDocument(); // Manufacturer
+    expect(within(priceRow).getAllByText("VSON-8")).toHaveLength(2); // Footprint (short) + Package
+    expect(within(priceRow).getByText("595-TPS2121RUXR")).toBeInTheDocument(); // Distributor P/N
+    expect(within(priceRow).getByText("5,000")).toBeInTheDocument(); // covered stock
     expect(within(priceRow).getAllByText("10")).toHaveLength(2); // Min Qty and Final Qty
     expect(within(priceRow).getByText("$1.25")).toBeInTheDocument(); // Unit Cost
     expect(within(priceRow).getByText("$12.50")).toBeInTheDocument(); // Cost @ Qty
     expect(within(priceRow).getByText("$1.19")).toBeInTheDocument(); // Tax/Tariff
     expect(within(priceRow).getByText("$13.69")).toBeInTheDocument(); // Total Cost
-    // the unpriced passive still gets a real Final Qty, but every cost cell reads "-"
+    // the unpriced passive: a real Qty + Final Qty (both 2), a footprint-derived package, and
+    // unknown stock (never priced); its cost cells read "-" (never a fabricated $0.00)
     const passiveRow = within(lines).getByText("R1, R2").closest("tr") as HTMLElement;
-    expect(within(passiveRow).getByText("2")).toBeInTheDocument(); // Final Qty
-    // Vendor, Min Qty, Unit Cost, Cost @ Qty, Tax/Tariff, Total Cost: none priced/sourced
-    expect(within(passiveRow).getAllByText("-")).toHaveLength(6);
+    expect(within(passiveRow).getAllByText("2")).toHaveLength(2); // Qty and Final Qty
+    expect(within(passiveRow).getByText("0402")).toBeInTheDocument(); // Package from footprint
+    expect(within(passiveRow).getByText("R_0402")).toBeInTheDocument(); // short Footprint
+    expect(within(passiveRow).getByText("Unknown")).toBeInTheDocument(); // never-priced stock
   });
 
   it("surfaces an honest error when the BOM build cannot start", async () => {
@@ -1202,9 +1234,6 @@ describe("ProjectsPage", () => {
     const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
     expect(within(priceRow).getByText("$22.00")).toBeInTheDocument(); // Cost @ Qty, repriced
     expect(within(priceRow).getByText("$24.09")).toBeInTheDocument(); // Total Cost, repriced
-
-    // a re-price changes the sourcing/diff cost side exactly like a rebuild does
-    expect(mockApi.getProcurement.mock.calls.length + mockApi.getBomDiff.mock.calls.length).toBeGreaterThan(0);
   });
 
   it("reprices when Tax/Tariff changes, and the value sticks in localStorage across a restart", async () => {
@@ -1236,51 +1265,65 @@ describe("ProjectsPage", () => {
     expect(await screen.findByTestId("tax-rate-input")).toHaveValue(12.5);
   });
 
-  // -- Procurement (M7d) --
+  // -- Folded procurement (sourcing risk + orderability now live in the one BOM table) --
 
-  it("prompts to build the BOM before showing procurement", async () => {
-    renderPage();
-    const user = userEvent.setup();
-    await user.click(await screen.findByTestId("project-row-netdeck"));
-    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
-    const section = await screen.findByTestId("procurement-section");
-    expect(section).toHaveTextContent(/Build the BOM to see sourcing risk/i);
-    expect(screen.queryByTestId("procurement-lines")).not.toBeInTheDocument();
-  });
-
-  it("shows sourcing risk, lead and per-line orderability from a built BOM", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+  it("folds the sourcing-risk headline and per-line stock into the one BOM table", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT_RISKY);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
     await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
-    const rollup = await screen.findByTestId("procurement-rollup");
+    const result = await screen.findByTestId("bom-result");
+    const rollup = within(result).getByTestId("bom-risk-rollup");
     expect(rollup).toHaveTextContent(/Not Active/i);
     expect(rollup).toHaveTextContent(/No Stock Line/i);
     expect(rollup).toHaveTextContent(/Critical path 18 wk/i);
-    const lines = screen.getByTestId("procurement-lines");
-    expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
+    // the same table carries the per-line lifecycle + the folded stock shortfall
+    const lines = within(result).getByTestId("bom-lines");
     expect(within(lines).getByText("NRND")).toBeInTheDocument();
-    // 0 stock + a 1-part run -> not orderable
-    expect(within(lines).getByText("No")).toBeInTheDocument();
+    const row = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("need 1"); // 0 stock, short of the run
   });
 
-  it("exports the BOM through the authed download client", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+  it("reads No Sourcing Risks on a clean built BOM", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    const rollup = within(await screen.findByTestId("bom-result")).getByTestId("bom-risk-rollup");
+    expect(rollup).toHaveTextContent(/No Sourcing Risks/i);
+  });
+
+  // -- Exports (one control, folded onto the BOM page) --
+
+  it("prompts to build the BOM before the exports are available", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    const section = await screen.findByTestId("exports-section");
+    expect(section).toHaveTextContent(/Build the BOM to export/i);
+    expect(screen.queryByTestId("export-bar")).not.toBeInTheDocument();
+  });
+
+  it("exports the selected BOM format through the authed download client", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
     await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
-    await user.click(screen.getByRole("button", { name: "JLCPCB BOM" }));
+    await user.selectOptions(screen.getByTestId("export-format"), "jlcpcb");
+    await user.click(screen.getByRole("button", { name: "Export" }));
     // JLCPCB is a plain one-click export: no procurement knobs.
     expect(mockApi.downloadBomExport).toHaveBeenCalledWith("netdeck", "jlcpcb", undefined);
   });
 
   it("threads the procurement-sheet options into the export (percent to fraction)", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
@@ -1291,7 +1334,8 @@ describe("ProjectsPage", () => {
     await user.type(screen.getByTestId("opt-sparesPct"), "5");
     await user.clear(screen.getByTestId("opt-taxPct"));
     await user.type(screen.getByTestId("opt-taxPct"), "7");
-    await user.click(screen.getByRole("button", { name: "Procurement Sheet" }));
+    await user.selectOptions(screen.getByTestId("export-format"), "procurement");
+    await user.click(screen.getByRole("button", { name: "Export" }));
 
     expect(mockApi.downloadBomExport).toHaveBeenCalledWith(
       "netdeck",
@@ -1301,7 +1345,7 @@ describe("ProjectsPage", () => {
   });
 
   it("toasts when an export fails", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    mockApi.getBom.mockResolvedValue(BUILT);
     mockApi.downloadBomExport.mockRejectedValue(new ApiError(400, "build the BOM before exporting it"));
     renderPage();
     const user = userEvent.setup();
@@ -1309,7 +1353,7 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
-    await user.click(screen.getByRole("button", { name: "BOM CSV" }));
+    await user.click(screen.getByRole("button", { name: "Export" }));
     expect(await screen.findByText(/build the BOM before exporting it/i)).toBeInTheDocument();
   });
 
