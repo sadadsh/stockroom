@@ -66,6 +66,11 @@ class AppContext:
     # or library switch, or a KiCad settings change), so Doctor/Settings can surface
     # honestly what happened without re-running it. None until the first attempt.
     last_wiring: object | None = None
+    # The explicitly injected kicad_dir (tests, embeddings), when one was given: a
+    # settings change must never silently repoint it at the real machine config
+    # (the review-confirmed footgun that let the test suite write into ~/.config).
+    # Clearing an override returns HERE, not to autodetection.
+    kicad_dir_pinned: Path | None = None
 
     def rebuild_index(self) -> None:
         self.index.close()
@@ -102,16 +107,26 @@ class AppContext:
         change - the fix for SR_LIB going stale when the profile/library switched."""
         from stockroom.kicad.wiring import auto_wire
 
-        self.last_wiring = auto_wire(self.kicad_dir, self.profile, cli=self.cli)
+        explicit = self.kicad_dir_pinned is not None or bool(self.config.kicad_config_override)
+        self.last_wiring = auto_wire(
+            self.kicad_dir, self.profile, cli=self.cli, explicit=explicit
+        )
 
     def apply_kicad_settings(self) -> None:
         """Rebuild every engine piece derived from the KiCad overrides LIVE (no
         restart): the cli, the ops that captured it, the effective config dir - then
-        rewire so the new KiCad sees the active library immediately."""
+        rewire so the new KiCad sees the active library immediately. A pinned
+        (explicitly injected) kicad_dir is only ever moved by an explicit override,
+        never silently repointed at the real machine config."""
         self.cli = KiCadCli(self.config.kicad_cli_override or None)
         self.ops = LibraryOps(self.profile, self.repo, self.cli)
         self.project_ops = ProjectOps(self.project_store, self.cli)
-        self.kicad_dir = kicad_config_dir(override=self.config.kicad_config_override)
+        if self.config.kicad_config_override:
+            self.kicad_dir = kicad_config_dir(override=self.config.kicad_config_override)
+        elif self.kicad_dir_pinned is not None:
+            self.kicad_dir = self.kicad_dir_pinned
+        else:
+            self.kicad_dir = kicad_config_dir()
         self.rewire_kicad()
 
     def switch_profile(self, name: str) -> None:
@@ -207,6 +222,7 @@ def build_context(
         project_index=project_index,
         project_ops=project_ops,
         app_repo=app_repo,
+        kicad_dir_pinned=Path(kicad_dir) if kicad_dir is not None else None,
     )
     # Apply the configured GitHub credential to the library repo so push/pull authenticate
     # non-interactively (a recovery re-clone resets .git/config, so re-applying on every boot

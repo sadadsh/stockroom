@@ -16,8 +16,13 @@ def _isolate_machine_config(tmp_path, monkeypatch):
     """Keep every config.save() (a profile switch, a settings write) inside the
     test's own tmp dir so the API suite never writes to the developer's real
     ~/.config/stockroom (or %APPDATA%/Stockroom). config_dir() reads this env on
-    every call, so it governs load() and save() alike."""
+    every call, so it governs load() and save() alike. XDG_CONFIG_HOME and APPDATA
+    are pinned too, so no code path (kicad_config_dir + the auto-wire that WRITES
+    there) can ever reach the developer's real ~/.config/kicad: the review caught
+    the suite doing exactly that through apply_kicad_settings."""
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
 
 
 @pytest.fixture

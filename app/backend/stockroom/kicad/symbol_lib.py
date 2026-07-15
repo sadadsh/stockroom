@@ -25,14 +25,45 @@ class Symbol:
         prop = self._property_node(name)
         return prop.children[2].value if prop else None
 
-    def set_property(self, name: str, value: str) -> None:
+    def set_property(self, name: str, value: str, hide: bool = False) -> None:
+        """Set a property value. hide=True marks it hidden (and heals an existing
+        visible one): metadata fields (MPN, Purchase, ...) must never render on a
+        schematic or drown the symbol preview in text."""
         prop = self._property_node(name)
         if prop is not None:
             prop.children[2].set_value(value, quote=True)
+            if hide:
+                self._ensure_hidden(prop)
         else:
+            effects = " (effects (hide yes))" if hide else ""
             self._node.insert_child_text(
-                f"(property {quote_kicad(name)} {quote_kicad(value)} (at 0 0 0))"
+                f"(property {quote_kicad(name)} {quote_kicad(value)} (at 0 0 0){effects})"
             )
+
+    def property_hidden(self, name: str) -> bool | None:
+        """True/False for an existing property's hidden state, None when absent."""
+        prop = self._property_node(name)
+        if prop is None:
+            return None
+        effects = prop.find("effects")
+        if effects is None:
+            return False
+        hide_node = effects.find("hide")
+        if hide_node is None:
+            return False
+        return len(hide_node.children) >= 2 and hide_node.children[1].value == "yes"
+
+    @staticmethod
+    def _ensure_hidden(prop: SexpNode) -> None:
+        effects = prop.find("effects")
+        if effects is None:
+            prop.insert_child_text("(effects (hide yes))")
+            return
+        hide_node = effects.find("hide")
+        if hide_node is None:
+            effects.insert_child_text("(hide yes)")
+        elif len(hide_node.children) >= 2 and hide_node.children[1].value != "yes":
+            hide_node.children[1].set_value("yes", quote=False)
 
 
 class SymbolLib:

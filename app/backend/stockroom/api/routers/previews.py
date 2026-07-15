@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
+from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.model_convert import (
     GLB_MAGIC,
     ModelConversionError,
@@ -146,8 +147,28 @@ def previews_router(require_token) -> APIRouter:
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
+            out_dir = Path(td) / "out"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            # Render a copy with the Reference (REF**) and Value text hidden so the
+            # preview shows clean pad/silk art, not the designator splashed over it.
+            # The real footprint file is never touched (a board needs its refdes). A
+            # footprint that will not parse falls back to the raw export (honest
+            # degradation: a preview with a refdes beats no preview).
+            render_pretty, render_name = pretty, rec.footprint.name
+            try:
+                fp = Footprint.load(fp_file)
+                fp.hide_field("Reference")
+                fp.hide_field("Value")
+                clean_pretty = Path(td) / f"{rec.category}.pretty"
+                clean_pretty.mkdir(parents=True, exist_ok=True)
+                (clean_pretty / f"{rec.footprint.name}.kicad_mod").write_text(
+                    fp.serialize(), encoding="utf-8", newline=""
+                )
+                render_pretty = clean_pretty
+            except Exception:  # noqa: BLE001 - unparseable footprint: raw preview, not a 500
+                pass
             svg = ctx.cli.fp_export_svg(
-                pretty, rec.footprint.name, Path(td), black_and_white=bw
+                render_pretty, render_name, out_dir, black_and_white=bw
             )
             text = Path(svg).read_text(encoding="utf-8")
         cached.write_text(text, encoding="utf-8")

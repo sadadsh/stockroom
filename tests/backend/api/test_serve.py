@@ -35,7 +35,7 @@ def test_build_context_auto_wires_kicad(library_root, tmp_path, monkeypatch):
         calls["profile"] = profile.name
         return "WIRING-REPORT"
 
-    monkeypatch.setattr(serve, "auto_wire", fake_auto_wire)
+    monkeypatch.setattr("stockroom.kicad.wiring.auto_wire", fake_auto_wire)
     ctx = serve.build_context(library_root, kicad_dir=tmp_path / "kicad")
     assert calls["kicad_dir"] == tmp_path / "kicad"
     assert calls["profile"] == "Main"

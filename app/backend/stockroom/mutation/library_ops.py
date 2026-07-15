@@ -156,6 +156,7 @@ class RepairResult:
     healed_drift: int = 0
     fixed_paths: int = 0
     committed_files: int = 0
+    hidden_metadata: int = 0
     commit: str = ""
     manual: list[RepairFinding] = field(default_factory=list)
 
@@ -507,6 +508,33 @@ class LibraryOps:
             )
         return None, None
 
+    def _iter_visible_metadata(self, records, libs: dict | None = None):
+        """(record, property) pairs whose mirrored metadata property renders as
+        VISIBLE schematic text (pre-fix parts): they splat URLs over a schematic
+        and drown the symbol preview. `libs` lets apply_repairs reuse its
+        in-memory SymbolLib instances so earlier heals are not lost."""
+        cache: dict = dict(libs) if libs else {}
+        for record in records.values():
+            if record.symbol is None:
+                continue
+            sym_lib_path = self.lib.symbol_lib_path(record.category)
+            if not sym_lib_path.exists():
+                continue
+            sym_lib = cache.get(sym_lib_path)
+            if sym_lib is None:
+                try:
+                    sym_lib = SymbolLib.load(sym_lib_path)
+                except Exception:  # noqa: BLE001 - unparseable files are manual findings
+                    continue
+                cache[sym_lib_path] = sym_lib
+            try:
+                sym = sym_lib.get_symbol(record.symbol.name)
+            except Exception:  # noqa: BLE001 - a missing symbol is its own finding
+                continue
+            for prop in kicad_visible_properties(record):
+                if sym.property_hidden(prop) is False:
+                    yield record, prop
+
     def scan_repairs(self) -> RepairPlan:
         """A read-only health pass (spec section 3: show the diff BEFORE healing).
         Reports every self-healable defect (drift + non-portable model links) as a
@@ -533,6 +561,17 @@ class LibraryOps:
                     part_id=part_id,
                     detail="the part's symbol is missing from its category library",
                     how_to_fix="re-add or re-ingest the part to recreate its symbol",
+                )
+            )
+
+        for record, prop in self._iter_visible_metadata(records):
+            plan.fixable.append(
+                RepairAction(
+                    kind="visible_metadata",
+                    part_id=record.id,
+                    detail=f'"{prop}" is visible text on the schematic symbol',
+                    before="visible",
+                    after="hidden",
                 )
             )
 
@@ -610,6 +649,17 @@ class LibraryOps:
                     touched_libs[sym_lib_path] = sym_lib
                 sym_lib.get_symbol(record.symbol.name).set_property(it.property, it.json_value)
                 result.healed_drift += 1
+            # 1b. hide mirrored metadata properties still rendering as schematic text
+            for record, prop in self._iter_visible_metadata(records, touched_libs):
+                sym_lib_path = self.lib.symbol_lib_path(record.category)
+                sym_lib = touched_libs.get(sym_lib_path)
+                if sym_lib is None:
+                    sym_lib = SymbolLib.load(sym_lib_path)
+                    touched_libs[sym_lib_path] = sym_lib
+                sym = sym_lib.get_symbol(record.symbol.name)
+                sym.set_property(prop, sym.get_property(prop) or "", hide=True)
+                result.hidden_metadata += 1
+
             for sym_lib_path, sym_lib in touched_libs.items():
                 sym_lib.save(sym_lib_path)
                 txn.track(sym_lib_path)

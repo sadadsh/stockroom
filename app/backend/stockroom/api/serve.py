@@ -11,7 +11,6 @@ from pathlib import Path
 
 from stockroom.api.context import AppContext, build_context as _build_context
 from stockroom.api.security import mint_token
-from stockroom.kicad.wiring import auto_wire
 from stockroom.store.machine_config import MachineConfig
 
 # The app repo (the CODE/UI/DATA repo that contains THIS package) is four parents
@@ -63,9 +62,10 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
     ctx.uv_sync = _uv_sync
     # Wire KiCad at the active library on every real boot (both entries - the
     # windowed host and standalone serve - build their context here), so the
-    # library is visible in KiCad without the manual Doctor click. auto_wire never
-    # raises: it skips when KiCad is absent and captures failures into the report.
-    ctx.last_wiring = auto_wire(ctx.kicad_dir, ctx.profile, cli=ctx.cli)
+    # library is visible in KiCad without the manual Doctor click. rewire_kicad
+    # never raises: it skips when KiCad is absent and captures failures into
+    # ctx.last_wiring, which Settings surfaces honestly.
+    ctx.rewire_kicad()
     return ctx
 
 

@@ -41,3 +41,59 @@ def test_set_name(tmp_fixture):
     fp.set_name("R_0402")
     assert fp.name == "R_0402"
     assert_only_changed(original, fp.serialize(), allowed_changes=1)
+
+
+_FP_WITH_TEXT = (
+    '(footprint "R_0603"\n'
+    '\t(layer "F.Cu")\n'
+    '\t(property "Reference" "REF**"\n'
+    '\t\t(at 0 -1 0)\n'
+    '\t\t(layer "F.SilkS")\n'
+    '\t\t(effects (font (size 1 1)))\n'
+    '\t)\n'
+    '\t(property "Value" "R_0603"\n'
+    '\t\t(at 0 1 0)\n'
+    '\t\t(layer "F.Fab")\n'
+    '\t\t(effects (font (size 1 1)))\n'
+    '\t)\n'
+    '\t(pad "1" smd roundrect (at -0.8 0) (size 0.9 0.95) (layers "F.Cu"))\n'
+    ')\n'
+)
+
+
+def test_hide_field_marks_a_visible_property_hidden(tmp_path):
+    p = tmp_path / "R.kicad_mod"
+    p.write_text(_FP_WITH_TEXT, encoding="utf-8", newline="")
+    fp = Footprint.load(p)
+    assert fp.hide_field("Reference") is True
+    assert fp.hide_field("Value") is True
+    fp.save(p)
+    text = p.read_text()
+    # both properties now carry (hide yes); the pad art is untouched
+    rstart = text.index('(property "Reference"')
+    assert "(hide yes)" in text[rstart:rstart + 200]
+    vstart = text.index('(property "Value"')
+    assert "(hide yes)" in text[vstart:vstart + 200]
+    assert '(pad "1"' in text
+
+
+def test_hide_field_is_idempotent_and_reports_no_change(tmp_path):
+    p = tmp_path / "R.kicad_mod"
+    p.write_text(_FP_WITH_TEXT, encoding="utf-8", newline="")
+    fp = Footprint.load(p)
+    fp.hide_field("Reference")
+    assert fp.hide_field("Reference") is False  # already hidden
+    assert fp.hide_field("Nonexistent") is False
+
+
+def test_hide_field_never_touches_the_pads(tmp_path):
+    p = tmp_path / "R.kicad_mod"
+    p.write_text(_FP_WITH_TEXT, encoding="utf-8", newline="")
+    fp = Footprint.load(p)
+    fp.hide_field("Reference")
+    out = fp.serialize()
+    # the pad line (and everything else) is byte-preserved; only a (hide yes) node
+    # was inserted into the Reference property, which semdiff sees as an ADD
+    assert '\t(pad "1" smd roundrect (at -0.8 0) (size 0.9 0.95) (layers "F.Cu"))\n' in out
+    diffs = semantic_diff(_FP_WITH_TEXT, out)
+    assert all(not d.startswith(("LOST", "CHANGED", "TYPE")) for d in diffs), diffs

@@ -112,30 +112,39 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
         description=d.get("description", ""),
         tags=list(d.get("tags", [])),
         purchase=[Purchase(**p) for p in d.get("purchase", [])],
+        gaps=list(d.get("gaps", [])),
     )
 
 
 def _attach_local_datasheet(ctx, candidate: StagingCandidate, path: Path, notes: list[str]) -> None:
     """Copy a user-picked PDF under the app's datasheet store and attach it to the
     candidate. Refusals are stated in notes, never silent: a non-PDF or unreadable
-    file leaves the candidate untouched."""
+    file leaves the candidate untouched. The stored name carries a content hash so
+    two staged parts with the same normalized identity never clobber each other."""
+    import hashlib
+
     from stockroom.enrich.datasheet import looks_like_pdf
     from stockroom.enrich.schema import normalize_mpn
 
     try:
-        head = path.read_bytes()[:5]
+        with open(path, "rb") as fh:
+            head = fh.read(5)
     except OSError:
-        notes.append(f"could not read the datasheet file: {path.name}")
+        notes.append(f"Could not read the datasheet file: {path.name}")
         return
     if not looks_like_pdf(head):
         notes.append(f"{path.name} is not a PDF, so it was not attached")
         return
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            digest.update(chunk)
     dest_dir = Path(ctx.enrich_cache_dir) / "datasheets"
     dest_dir.mkdir(parents=True, exist_ok=True)
     key = normalize_mpn(
         candidate.mpn or candidate.entry_name or candidate.display_name or path.stem
     )
-    dst = dest_dir / f"{key}.pdf"
+    dst = dest_dir / f"{key}-{digest.hexdigest()[:8]}.pdf"
     shutil.copyfile(path, dst)
     candidate.datasheet_path = dst
 
@@ -193,13 +202,17 @@ def ingest_router(require_token) -> APIRouter:
                 _attach_local_datasheet(ctx, candidate, Path(datasheet_file), notes)
             if datasheet_url:
                 progress({"pct": 20, "message": "fetching the datasheet"})
-                stored = pipeline.fetch_and_store_datasheet(candidate, datasheet_url)
+                stored = pipeline.fetch_and_store_datasheet(
+                    candidate, datasheet_url, force=True
+                )
                 if stored is None:
-                    notes.append("the datasheet link did not yield a PDF")
-                if candidate.provenance is None:
-                    candidate.provenance = Provenance(source="manual")
-                if not candidate.provenance.source_url:
-                    candidate.provenance.source_url = datasheet_url
+                    notes.append("The datasheet link did not yield a PDF")
+                else:
+                    # record the source only for a fetch that actually succeeded
+                    if candidate.provenance is None:
+                        candidate.provenance = Provenance(source="manual")
+                    if not candidate.provenance.source_url:
+                        candidate.provenance.source_url = datasheet_url
             if candidate.datasheet_path is not None:
                 progress({"pct": 45, "message": "reading the datasheet"})
                 pipeline.datasheet_fill(candidate)

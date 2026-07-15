@@ -39,6 +39,10 @@ def _settings_dto(ctx) -> dict:
             read_env_var(ctx.kicad_dir / "kicad_common.json", "SR_LIB")
             == str(ctx.profile.root.resolve())
         ),
+        # the last automatic wiring's honest outcome, so a green SR_LIB pointer can
+        # never mask a failed category-lib step or a skipped machine
+        "kicad_wiring_error": getattr(ctx.last_wiring, "error", "") or "",
+        "kicad_wiring_skipped": getattr(ctx.last_wiring, "skipped", "") or "",
     }
 
 
@@ -70,10 +74,12 @@ def settings_router(require_token) -> APIRouter:
             except Exception:  # noqa: BLE001 - applying the credential is best-effort
                 pass
         if "kicad_cli_override" in body or "kicad_config_override" in body:
+            # strip whitespace AND the quotes Windows "Copy as path" wraps around
+            # a path, which would otherwise break wiring and CLI discovery
             if "kicad_cli_override" in body:
-                ctx.config.kicad_cli_override = str(body["kicad_cli_override"] or "").strip()
+                ctx.config.kicad_cli_override = str(body["kicad_cli_override"] or "").strip().strip('"')
             if "kicad_config_override" in body:
-                ctx.config.kicad_config_override = str(body["kicad_config_override"] or "").strip()
+                ctx.config.kicad_config_override = str(body["kicad_config_override"] or "").strip().strip('"')
             ctx.config.save()
             # Rebuild the cli/ops/config-dir LIVE and rewire KiCad at the active
             # library, so the change takes effect without a restart.
