@@ -10,7 +10,11 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.errors import ApiError
 from stockroom.api.schemas import EditFieldBody, FacetsDTO, MoveBody, PartSummary, SetSpecsBody
-from stockroom.ingest.passive_add import PassiveAddError, build_passive_record
+from stockroom.ingest.passive_add import (
+    PassiveAddError,
+    PassiveNeedsInputError,
+    build_passive_record,
+)
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
@@ -108,26 +112,48 @@ def library_router(require_token) -> APIRouter:
         return {"items": items, "in_library": in_library, "total": len(items)}
 
     def _build_passive(body: dict):
-        try:
-            return build_passive_record(
-                body.get("input", ""),
-                category=(body.get("category") or None),
-                manufacturer=(body.get("manufacturer") or None),
-                datasheet_url=(body.get("datasheet_url") or None),
-                purchase_part_number=(body.get("purchase_part_number") or None),
-            )
-        except PassiveAddError as exc:
-            # A bad/undecodable input is the caller's problem (422), not a bad gateway.
-            raise ApiError(422, str(exc)) from exc
+        """Build a passive from the request body. Manual kind/package/value/tolerance
+        (the pick-your-package fallback for an MPN no decoder knows) are passed
+        through; a genuinely bad input raises PassiveAddError (-> 422) and an
+        undecodable MPN with no manual pick raises PassiveNeedsInputError, which the
+        preview surfaces as a needs_input status and the add rejects as 422."""
+        return build_passive_record(
+            body.get("input", ""),
+            kind=(body.get("kind") or None),
+            package=(body.get("package") or None),
+            value=(body.get("value") or None),
+            tolerance=(body.get("tolerance") or None),
+            category=(body.get("category") or None),
+            manufacturer=(body.get("manufacturer") or None),
+            datasheet_url=(body.get("datasheet_url") or None),
+            purchase_part_number=(body.get("purchase_part_number") or None),
+        )
 
     @r.post("/passive/preview")
     def passive_preview(request: Request, body: dict) -> dict:
         """Preview a file-less passive add from an MPN or a Mouser URL WITHOUT
-        committing: the decoded identity/specs, the resolved KiCad stock symbol/
-        footprint/3D references, the Mouser buy link, and the passport gaps still to
-        fill. Offline and synchronous."""
-        build = _build_passive(body)
+        committing. When the MPN decodes (or the manual pickers are filled) the body
+        is {status: "ok", record, gaps, stock_present}. When the MPN cannot be decoded
+        and no kind/package was picked, the body is {status: "needs_input", ...} with
+        the cleaned MPN, any manufacturer read from the URL, a best-effort kind guess,
+        and the package options - the signal for the UI to reveal the pickers, not an
+        error. Offline and synchronous."""
+        try:
+            build = _build_passive(body)
+        except PassiveNeedsInputError as exc:
+            return {
+                "status": "needs_input",
+                "mpn": exc.mpn,
+                "manufacturer": exc.manufacturer,
+                "suggested_kind": exc.suggested_kind,
+                "packages": exc.packages,
+                "message": str(exc),
+            }
+        except PassiveAddError as exc:
+            # A genuinely bad input (empty, non-Mouser URL) is the caller's problem.
+            raise ApiError(422, str(exc)) from exc
         return {
+            "status": "ok",
             "record": build.record.to_dict(),
             "gaps": build.gaps,
             "stock_present": build.stock_present,
@@ -137,10 +163,14 @@ def library_router(require_token) -> APIRouter:
     def passive_add(request: Request, body: dict) -> dict:
         """Add a passive with NO dropped files: build the record (KiCad stock symbol/
         footprint/3D references) and commit it through the complete-to-add gate, then
-        rebuild the index and auto-push. 422 if the input is not an auto-addable
-        passive, or the passport is incomplete (missing datasheet/purchase)."""
+        rebuild the index and auto-push. 422 if the input is not addable (undecodable
+        with no manual pick, bad input) or the passport is incomplete (missing
+        datasheet/manufacturer/purchase)."""
         ctx = request.app.state.ctx
-        build = _build_passive(body)
+        try:
+            build = _build_passive(body)
+        except (PassiveNeedsInputError, PassiveAddError) as exc:
+            raise ApiError(422, str(exc)) from exc
         record = ctx.ops.add_passive_part(build.record)  # IncompleteError -> 422
         ctx.rebuild_index()
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)

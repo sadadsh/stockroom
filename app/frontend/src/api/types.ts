@@ -116,19 +116,38 @@ export interface PartDetail {
   specs: Record<string, unknown>;
 }
 
-// POST /api/library/passive/preview -> a decoded, not-yet-committed passive record,
-// the passport fields still to fill, and whether the resolved stock footprint is
-// installed on this machine.
-export interface PassivePreview {
+// POST /api/library/passive/preview -> either a decoded, not-yet-committed passive
+// record (status "ok"), or a needs_input signal (status "needs_input") when the MPN
+// could not be decoded and the user must pick a kind + package to add it file-less.
+export interface PassivePreviewOk {
+  status: "ok";
   record: PartDetail;
   gaps: string[];
   stock_present: boolean;
 }
 
-// The body for a file-less passive preview/add: an MPN or a Mouser product URL,
-// plus optional category/manufacturer overrides and a datasheet URL.
+// The MPN did not decode: reveal the manual pickers, pre-filled with what is known.
+// `packages` are the only EIA cases that resolve to a KiCad stock footprint.
+export interface PassiveNeedsInput {
+  status: "needs_input";
+  mpn: string;
+  manufacturer: string;
+  suggested_kind: string | null;
+  packages: string[];
+  message: string;
+}
+
+export type PassivePreview = PassivePreviewOk | PassiveNeedsInput;
+
+// The body for a file-less passive preview/add: an MPN or a Mouser product URL, plus
+// optional category/manufacturer overrides, a datasheet URL, and the manual
+// kind/package/value/tolerance the user picks when the MPN cannot be decoded.
 export interface PassiveAddBody {
   input: string;
+  kind?: string;
+  package?: string;
+  value?: string;
+  tolerance?: string;
   category?: string;
   manufacturer?: string;
   datasheet_url?: string;
