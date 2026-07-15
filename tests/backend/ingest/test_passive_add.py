@@ -67,6 +67,25 @@ def test_category_override_is_honored():
     assert build.record.category == "Precision Resistors"
 
 
+def test_display_name_describes_the_passive_not_just_the_mpn():
+    build = build_passive_record(_OWNER_URL)
+    # the list should read "1.1 kOhm 1% 0603 Resistor", not the bare MPN
+    assert build.record.display_name == "1.1 kOhm 1% 0603 Resistor"
+    assert build.record.mpn == "ERJ-P03F1101V"  # MPN stays for search + id
+
+
+def test_distributor_part_number_is_carried_on_the_purchase():
+    build = build_passive_record(_OWNER_URL, purchase_part_number="667-ERJ-P03F1101V")
+    assert build.record.purchase[0].part_number == "667-ERJ-P03F1101V"
+
+
+def test_non_mouser_product_url_is_rejected_by_host_check():
+    with pytest.raises(PassiveAddError):
+        build_passive_record(
+            "https://evil.example/ProductDetail/Yageo/RC0603FR-0710KL"
+        )
+
+
 def test_non_passive_mpn_is_rejected():
     with pytest.raises(PassiveAddError):
         build_passive_record("STM32F103C8T6")
@@ -100,6 +119,36 @@ def test_add_passive_part_commits_only_the_json_record(tmp_path):
     assert json_path.is_file()
     assert repo.head() != before  # a real scoped commit landed
     assert repo.is_clean()  # atomic: no stray untracked files
+
+
+def test_add_then_delete_a_passive_leaves_no_trace(tmp_path):
+    # A passive owns no symbol/footprint files, so delete must not try to remove a
+    # non-existent stock symbol from the category lib (it used to 404/500).
+    repo, profile, ops = _ops(tmp_path)
+    build = build_passive_record(_OWNER_URL, datasheet_url="https://x/y.pdf")
+    rec = ops.add_passive_part(build.record)
+    ops.delete_part(rec.id)  # must not raise
+    assert not (profile.library.parts_dir / f"{rec.id}.json").exists()
+    assert repo.is_clean()
+
+
+def test_move_a_passive_changes_only_its_category(tmp_path):
+    repo, profile, ops = _ops(tmp_path)
+    build = build_passive_record(_OWNER_URL, datasheet_url="https://x/y.pdf")
+    rec = ops.add_passive_part(build.record)
+    moved = ops.move_category(rec.id, "Precision Resistors")
+    assert moved.category == "Precision Resistors"
+    assert moved.symbol.name == "R"  # stock lib_id is unchanged by the move
+    assert moved.footprint.name == "R_0603_1608Metric"
+    assert repo.is_clean()
+
+
+def test_a_passive_never_reports_symbol_drift(tmp_path):
+    repo, profile, ops = _ops(tmp_path)
+    build = build_passive_record(_OWNER_URL, datasheet_url="https://x/y.pdf")
+    rec = ops.add_passive_part(build.record)
+    report = ops.detect_drift()
+    assert rec.id not in report.missing_symbol
 
 
 def test_incomplete_passive_is_rejected_with_zero_trace(tmp_path):

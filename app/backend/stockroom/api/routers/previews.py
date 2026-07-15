@@ -16,6 +16,11 @@ from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
 from stockroom.kicad.footprint import Footprint
+from stockroom.kicad.stock import (
+    stock_footprint_file,
+    stock_model_file,
+    stock_symbol_lib_file,
+)
 from stockroom.kicad.model_convert import (
     GLB_MAGIC,
     ModelConversionError,
@@ -106,9 +111,18 @@ def previews_router(require_token) -> APIRouter:
         rec = ctx.ops.load_record(part_id)
         if rec.symbol is None or not rec.symbol.name:
             raise FileNotFoundError(f"part {part_id} has no symbol")
-        lib = ctx.profile.library.symbol_lib_path(rec.category)
-        if not lib.exists():
-            raise FileNotFoundError(f"symbol library missing for {rec.category}")
+        # A passive references a KiCad STOCK symbol lib (Device:R) with no owned file,
+        # so render it from the installed KiCad libraries, not the category lib.
+        if rec.passive:
+            lib = stock_symbol_lib_file(rec.symbol.lib)
+            if lib is None:
+                raise FileNotFoundError(
+                    f"KiCad stock symbol library {rec.symbol.lib} is not installed"
+                )
+        else:
+            lib = ctx.profile.library.symbol_lib_path(rec.category)
+            if not lib.exists():
+                raise FileNotFoundError(f"symbol library missing for {rec.category}")
         variant = "_bw" if bw else ""
         key = f"sym_{part_id}_{_hash_file(lib)}{variant}.svg"
         cached = _cache_dir(ctx) / key
@@ -132,12 +146,22 @@ def previews_router(require_token) -> APIRouter:
         rec = ctx.ops.load_record(part_id)
         if rec.footprint is None or not rec.footprint.name:
             raise FileNotFoundError(f"part {part_id} has no footprint")
-        pretty = ctx.profile.library.footprint_lib_path(rec.category)
-        if not pretty.exists():
-            raise FileNotFoundError(f"footprint library missing for {rec.category}")
-        fp_file = pretty / f"{rec.footprint.name}.kicad_mod"
-        if not fp_file.exists():
-            raise FileNotFoundError(f"footprint file missing: {rec.footprint.name}")
+        # A passive references a KiCad STOCK footprint with no owned file.
+        if rec.passive:
+            fp_file = stock_footprint_file(rec.footprint.lib, rec.footprint.name)
+            if fp_file is None:
+                raise FileNotFoundError(
+                    f"KiCad stock footprint {rec.footprint.lib}:{rec.footprint.name} "
+                    "is not installed"
+                )
+            pretty = fp_file.parent
+        else:
+            pretty = ctx.profile.library.footprint_lib_path(rec.category)
+            if not pretty.exists():
+                raise FileNotFoundError(f"footprint library missing for {rec.category}")
+            fp_file = pretty / f"{rec.footprint.name}.kicad_mod"
+            if not fp_file.exists():
+                raise FileNotFoundError(f"footprint file missing: {rec.footprint.name}")
         variant = "_bw" if bw else ""
         # Content-address the key (like the symbol + model endpoints) so an edited
         # footprint re-renders and two profiles sharing a part_id + footprint name in
@@ -180,13 +204,25 @@ def previews_router(require_token) -> APIRouter:
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.load_record(part_id)
-        if rec.model is None or not rec.model.file:
-            raise FileNotFoundError(f"part {part_id} has no 3D model")
-        # model.file is stored relative to the profile library root (same convention
-        # the mutation engine and the doctor use).
-        src = ctx.profile.library.root / rec.model.file
-        if not src.exists():
-            raise FileNotFoundError(f"3D model file is missing: {rec.model.file}")
+        # A passive inherits the stock footprint's own 3D model (no owned model.file):
+        # resolve it from the installed KiCad libraries keyed on the footprint lib_id.
+        if rec.passive:
+            if rec.footprint is None or not rec.footprint.name:
+                raise FileNotFoundError(f"part {part_id} has no footprint for a 3D model")
+            src = stock_model_file(rec.footprint.lib, rec.footprint.name)
+            if src is None:
+                raise FileNotFoundError(
+                    f"KiCad stock 3D model for {rec.footprint.lib}:{rec.footprint.name} "
+                    "is not installed"
+                )
+        else:
+            if rec.model is None or not rec.model.file:
+                raise FileNotFoundError(f"part {part_id} has no 3D model")
+            # model.file is stored relative to the profile library root (same convention
+            # the mutation engine and the doctor use).
+            src = ctx.profile.library.root / rec.model.file
+            if not src.exists():
+                raise FileNotFoundError(f"3D model file is missing: {rec.model.file}")
         key = f"model_{part_id}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():

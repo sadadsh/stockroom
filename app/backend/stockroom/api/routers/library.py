@@ -114,6 +114,7 @@ def library_router(require_token) -> APIRouter:
                 category=(body.get("category") or None),
                 manufacturer=(body.get("manufacturer") or None),
                 datasheet_url=(body.get("datasheet_url") or None),
+                purchase_part_number=(body.get("purchase_part_number") or None),
             )
         except PassiveAddError as exc:
             # A bad/undecodable input is the caller's problem (422), not a bad gateway.

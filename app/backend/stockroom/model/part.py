@@ -63,6 +63,9 @@ class Datasheet:
 class Purchase:
     vendor: str = ""
     url: str = ""
+    # The distributor's own order number for this part (e.g. the Mouser part number
+    # "667-ERJ-P03F1101V"), distinct from the manufacturer MPN. Blank when unknown.
+    part_number: str = ""
     price_breaks: list = field(default_factory=list)
     stock: int | None = None
     currency: str = ""
