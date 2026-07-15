@@ -1,0 +1,44 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "667_erj_p03f1101v.pdf",
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/AOA0000C331.pdf"
+  },
+  "description": "Thick Film Resistors - SMD 0603 1.1Kohms 0.2W 1% AEC-Q200",
+  "display_name": "ERJ-P03F1101V",
+  "enrichment": {},
+  "footprint": {
+    "lib": "SR-Resistors",
+    "name": "ERJ-P03F1101V"
+  },
+  "hashes": null,
+  "id": "667_erj_p03f1101v",
+  "manufacturer": " Panasonic",
+  "model": {
+    "file": "models/ERJ-P03F1101V.step"
+  },
+  "mpn": "667-ERJ-P03F1101V",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "cf91a3cbb493d22569299faed7c3d855a66a40b99814b372a0fb98c82ba273d1",
+    "source": "snapeda",
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/AOA0000C331.pdf"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V?qs=sGAEpiMZZMtG0KNrPCHnjYpPrk%252BOMd4bdFNd%2Ftqgjvc%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {},
+  "symbol": {
+    "lib": "SR-Resistors",
+    "name": "ERJ-P03F1101V"
+  },
+  "tags": []
+}
