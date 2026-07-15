@@ -1,0 +1,44 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "710_560112116151.pdf",
+    "source_url": "https://www.we-online.com/components/products/datasheet/560112116151.pdf"
+  },
+  "description": "Thick Film Resistors - SMD WRIS-RSKS 1.13 kOhms 1 % 0.1 W 0603 AEC-Q200",
+  "display_name": "WRIS-RSKS_0603",
+  "enrichment": {},
+  "footprint": {
+    "lib": "SR-Resistors",
+    "name": "WRIS-RSKS_0603"
+  },
+  "hashes": null,
+  "id": "710_560112116151",
+  "manufacturer": "Wurth Elektronik",
+  "model": {
+    "file": "models/WRIS-RSKS_0603.step"
+  },
+  "mpn": "710-560112116151",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "211d8eecb2929f5586e74b4e1ed9ba4b664a315d4662c4b00aa836f6b60a4fda",
+    "source": "snapeda",
+    "source_url": "https://www.we-online.com/components/products/datasheet/560112116151.pdf"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116151?qs=sGAEpiMZZMtG0KNrPCHnjRpfexHZHoPIOe63Hq9ISdAfX3qbuXrk3g%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {},
+  "symbol": {
+    "lib": "SR-Resistors",
+    "name": "WRIS-RSKS_0603"
+  },
+  "tags": []
+}
