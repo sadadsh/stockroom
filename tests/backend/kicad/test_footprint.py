@@ -97,3 +97,40 @@ def test_hide_field_never_touches_the_pads(tmp_path):
     assert '\t(pad "1" smd roundrect (at -0.8 0) (size 0.9 0.95) (layers "F.Cu"))\n' in out
     diffs = semantic_diff(_FP_WITH_TEXT, out)
     assert all(not d.startswith(("LOST", "CHANGED", "TYPE")) for d in diffs), diffs
+
+
+_FP_WITH_FAB_REF = (
+    '(footprint "R_0603"\n'
+    '\t(layer "F.Cu")\n'
+    '\t(property "Reference" "REF**"\n'
+    '\t\t(at 0 -1 0)\n'
+    '\t\t(layer "F.SilkS")\n'
+    '\t)\n'
+    '\t(fp_text user "${REFERENCE}"\n'
+    '\t\t(at 0 0 0)\n'
+    '\t\t(layer "F.Fab")\n'
+    '\t\t(effects (font (size 0.5 0.5)))\n'
+    '\t)\n'
+    '\t(pad "1" smd roundrect (at -0.8 0) (size 0.9 0.95) (layers "F.Cu"))\n'
+    ')\n'
+)
+
+
+def test_hide_reference_texts_hides_the_fab_designator(tmp_path):
+    p = tmp_path / "R.kicad_mod"
+    p.write_text(_FP_WITH_FAB_REF, encoding="utf-8", newline="")
+    fp = Footprint.load(p)
+    assert fp.hide_reference_texts() is True
+    fp.save(p)
+    text = p.read_text()
+    tstart = text.index("fp_text")
+    assert "(hide yes)" in text[tstart:tstart + 200]
+    assert '(pad "1"' in text  # pad art untouched
+
+
+def test_hide_reference_texts_is_idempotent(tmp_path):
+    p = tmp_path / "R.kicad_mod"
+    p.write_text(_FP_WITH_FAB_REF, encoding="utf-8", newline="")
+    fp = Footprint.load(p)
+    assert fp.hide_reference_texts() is True
+    assert fp.hide_reference_texts() is False  # already hidden

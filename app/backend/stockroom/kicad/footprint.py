@@ -62,6 +62,29 @@ class Footprint:
                 return True
         return False
 
+    def hide_reference_texts(self) -> bool:
+        """Hide any `(fp_text ... "${REFERENCE}" | "REF**" ...)` node - the fab-layer
+        designator KiCad duplicates ON TOP OF the Reference property. hide_field only
+        touches `property` nodes, so without this the preview still splashes REF** over
+        the pad art (the exact "not as clean as the old app" complaint). Returns True if
+        it changed anything; idempotent."""
+        changed = False
+        for node in self._doc.root.find_all("fp_text"):
+            if not any(
+                getattr(k, "value", None) in ("${REFERENCE}", "REF**")
+                for k in node.children
+            ):
+                continue
+            hide = node.find("hide")
+            if hide is not None:
+                if len(hide.children) >= 2 and hide.children[1].value != "yes":
+                    hide.children[1].set_value("yes", quote=False)
+                    changed = True
+            else:
+                node.insert_child_text("(hide yes)")
+                changed = True
+        return changed
+
     def serialize(self) -> str:
         return self._doc.serialize()
 

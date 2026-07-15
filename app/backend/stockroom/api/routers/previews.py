@@ -120,6 +120,7 @@ def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> s
         fp = Footprint.load(fp_file)
         fp.hide_field("Reference")
         fp.hide_field("Value")
+        fp.hide_reference_texts()  # the fab-layer ${REFERENCE} text hide_field misses
         clean_pretty = td / "clean.pretty"
         clean_pretty.mkdir(parents=True, exist_ok=True)
         (clean_pretty / f"{name}.kicad_mod").write_text(
