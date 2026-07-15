@@ -175,3 +175,158 @@ def test_a_failing_job_surfaces_its_error_over_sse_then_terminates(client, monke
     assert "error" in body
     assert "staging blew up" in body
     assert "done" in body
+
+
+def test_candidate_dto_round_trips_provenance():
+    # provenance carries the datasheet source_url that to_staged_part records on
+    # the committed part; dropping it between inspect and commit loses the source
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+    from stockroom.model.part import Provenance
+
+    c = StagingCandidate(
+        vendor="snapeda", symbol_lib_path=None, symbol_name="X",
+        footprint_variants=[], mpn="LM358", display_name="LM358",
+        entry_name="LM358", category="ICs",
+        provenance=Provenance(source="snapeda", source_url="https://x/ds.pdf",
+                              original_zip_sha256="abc123"),
+    )
+    dto = candidate_to_dto(c)
+    back = dto_to_candidate(dto)
+    assert back.provenance is not None
+    assert back.provenance.source == "snapeda"
+    assert back.provenance.source_url == "https://x/ds.pdf"
+    assert back.provenance.original_zip_sha256 == "abc123"
+    # a candidate without provenance still round-trips as None
+    bare = StagingCandidate(vendor="lcsc", symbol_lib_path=None, symbol_name="X",
+                            footprint_variants=[], mpn="A", display_name="A",
+                            entry_name="A", category="ICs")
+    assert dto_to_candidate(candidate_to_dto(bare)).provenance is None
+
+
+def test_vendor_from_url_names_the_known_distributors():
+    from stockroom.api.routers.ingest import vendor_from_url
+
+    assert vendor_from_url("https://www.lcsc.com/product-detail/x.html") == "LCSC"
+    assert vendor_from_url("https://www.mouser.com/ProductDetail/x") == "Mouser"
+    assert vendor_from_url("https://www.digikey.com/en/products/detail/x") == "DigiKey"
+    assert vendor_from_url("https://shop.example.com/p/1") == "shop.example.com"
+    assert vendor_from_url("not a url") == "manual"
+
+
+def _drain_job(client, job_id):
+    # SSE frames are `event: <kind>` + `data: <json>`; the terminal kinds are
+    # "result" (payload under "result") and "error" (detail + error class).
+    import json as _json
+
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            line = line.strip()
+            if line.startswith("event:"):
+                kind = line[len("event:"):].strip()
+            elif line.startswith("data:") and kind in ("result", "error"):
+                data = _json.loads(line[len("data:"):].strip())
+                if kind == "result":
+                    return {"status": "done", "result": data["result"]}
+                return {"status": "error", "result": data}
+    return None
+
+
+def test_enrich_candidate_applies_explicit_links_and_autofills(client, app_ctx, tmp_path, monkeypatch):
+    # the owner's add flow: paste a datasheet link + a purchase link on the staged
+    # part and the rest fills itself; the endpoint applies the explicit links, then
+    # runs the enrichment pipeline over the candidate
+    class _FakePipeline:
+        def fetch_and_store_datasheet(self, candidate, url):
+            stored = tmp_path / "stored.pdf"
+            stored.write_bytes(b"%PDF-1.4\n%%EOF\n")
+            candidate.datasheet_path = stored
+            return stored
+
+        def enrich_candidate(self, candidate, overwrite=None):
+            candidate.manufacturer = candidate.manufacturer or "Texas Instruments"
+            candidate.description = candidate.description or "Buck converter"
+            return candidate
+
+        def datasheet_fill(self, candidate):
+            candidate.mpn = candidate.mpn or "TPS62130RGTR"
+            return candidate
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.ingest._make_enrich_pipeline", lambda ctx: _FakePipeline()
+    )
+    body = {
+        "candidate": {"vendor": "snapeda", "symbol_name": "X", "display_name": "TPS62130",
+                      "entry_name": "TPS62130", "category": "ICs"},
+        "datasheet_url": "https://ti.com/ds.pdf",
+        "purchase_url": "https://www.lcsc.com/product-detail/p.html",
+    }
+    r = client.post("/api/ingest/enrich", json=body)
+    assert r.status_code == 200
+    event = _drain_job(client, r.json()["job_id"])
+    assert event["status"] == "done"
+    out = event["result"]
+    cand = out["candidate"]
+    assert cand["datasheet_path"]  # the pasted link was fetched and stored
+    assert cand["purchase"][0]["url"] == "https://www.lcsc.com/product-detail/p.html"
+    assert cand["purchase"][0]["vendor"] == "LCSC"
+    assert cand["mpn"] == "TPS62130RGTR"  # identity extracted from the datasheet
+    assert cand["manufacturer"] == "Texas Instruments"  # then enrichment filled on
+    # the pasted datasheet source is recorded for the committed record
+    assert cand["provenance"]["source_url"] == "https://ti.com/ds.pdf"
+    assert "manufacturer" in out["filled"] and "mpn" in out["filled"]
+
+
+def test_enrich_candidate_attaches_a_local_datasheet_file(client, app_ctx, tmp_path, monkeypatch):
+    class _FakePipeline:
+        def enrich_candidate(self, candidate, overwrite=None):
+            return candidate
+
+        def datasheet_fill(self, candidate):
+            return candidate
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.ingest._make_enrich_pipeline", lambda ctx: _FakePipeline()
+    )
+    pdf = tmp_path / "TPS62130.pdf"
+    pdf.write_bytes(b"%PDF-1.4\nreal enough\n%%EOF\n")
+    body = {
+        "candidate": {"vendor": "snapeda", "symbol_name": "X", "display_name": "TPS62130",
+                      "entry_name": "TPS62130", "category": "ICs", "mpn": "TPS62130RGTR"},
+        "datasheet_file": str(pdf),
+    }
+    r = client.post("/api/ingest/enrich", json=body)
+    event = _drain_job(client, r.json()["job_id"])
+    assert event["status"] == "done"
+    stored = event["result"]["candidate"]["datasheet_path"]
+    assert stored and stored != str(pdf)  # copied under the app's datasheet store
+    from pathlib import Path as _P
+
+    assert _P(stored).read_bytes().startswith(b"%PDF")
+
+
+def test_enrich_candidate_rejects_a_non_pdf_file_honestly(client, app_ctx, tmp_path, monkeypatch):
+    class _FakePipeline:
+        def enrich_candidate(self, candidate, overwrite=None):
+            return candidate
+
+        def datasheet_fill(self, candidate):
+            return candidate
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.ingest._make_enrich_pipeline", lambda ctx: _FakePipeline()
+    )
+    junk = tmp_path / "page.html"
+    junk.write_text("<html>not a datasheet</html>", encoding="utf-8")
+    body = {
+        "candidate": {"vendor": "snapeda", "symbol_name": "X", "display_name": "P",
+                      "entry_name": "P", "category": "ICs"},
+        "datasheet_file": str(junk),
+    }
+    r = client.post("/api/ingest/enrich", json=body)
+    event = _drain_job(client, r.json()["job_id"])
+    assert event["status"] == "done"
+    out = event["result"]
+    assert out["candidate"]["datasheet_path"] is None  # never silently attached
+    assert any("PDF" in n for n in out["notes"])  # and the refusal is stated

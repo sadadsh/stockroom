@@ -146,3 +146,74 @@ def build_candidates(
             )
         )
     return candidates
+
+
+def _identity_key(text: str) -> str:
+    """Case/punctuation-insensitive identity token for matching a fragment to the
+    candidate it completes (MPN-B == mpn-b == MPN_B)."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _fragment_keys(c: StagingCandidate) -> set[str]:
+    return {k for k in (_identity_key(c.mpn), _identity_key(c.display_name),
+                        _identity_key(c.entry_name)) if k}
+
+
+def _full_keys(c: StagingCandidate) -> set[str]:
+    return {k for k in (_identity_key(c.mpn), _identity_key(c.display_name),
+                        _identity_key(c.entry_name), _identity_key(c.symbol_name)) if k}
+
+
+def _refresh_asset_gaps(c: StagingCandidate) -> None:
+    c.gaps = [
+        g for g in c.gaps
+        if not (("3D model" in g and c.model_path is not None)
+                or ("datasheet" in g and c.datasheet_path is not None))
+    ]
+
+
+def _absorb(target: StagingCandidate, frag: StagingCandidate) -> bool:
+    """Move the fragment's assets onto the target where the target lacks them.
+    True only when the whole fragment was consumed; a leftover asset (the target
+    already had its own) keeps the fragment alive so nothing is silently dropped."""
+    took_any = False
+    leftover = False
+    if frag.model_path is not None:
+        if target.model_path is None:
+            target.model_path = frag.model_path
+            took_any = True
+        else:
+            leftover = True
+    if frag.datasheet_path is not None:
+        if target.datasheet_path is None:
+            target.datasheet_path = frag.datasheet_path
+            took_any = True
+        else:
+            leftover = True
+    if took_any:
+        _refresh_asset_gaps(target)
+    return took_any and not leftover
+
+
+def merge_candidates(candidates: list[StagingCandidate]) -> list[StagingCandidate]:
+    """Fold symbol-less fragments (a bare 3D model or datasheet, the second half
+    of a split vendor download) into the symbol-bearing candidate they complete.
+    Conservative: a fragment with an identity merges into the full candidate whose
+    identity matches; an anonymous fragment merges only when exactly ONE full
+    candidate exists (the common two-file case). Anything ambiguous stays a
+    separate attach-to-existing card, never a guess."""
+    fulls = [c for c in candidates if c.symbol_lib_path is not None]
+    out: list[StagingCandidate] = []
+    for c in candidates:
+        if c.symbol_lib_path is not None:
+            out.append(c)
+            continue
+        keys = _fragment_keys(c)
+        if keys:
+            matches = [f for f in fulls if keys & _full_keys(f)]
+        else:
+            matches = list(fulls)
+        if len(matches) == 1 and _absorb(matches[0], c):
+            continue  # fully consumed by the candidate it completes
+        out.append(c)
+    return out

@@ -16,6 +16,7 @@ vi.mock("../api/client", async (im) => {
       ingestInspect: vi.fn(),
       openJobStream: vi.fn(),
       ingestCommit: vi.fn(),
+      ingestEnrich: vi.fn(),
       enrichBulk: vi.fn(),
     },
   };
@@ -243,5 +244,64 @@ describe("Bulk Lookup (spec 8.1)", () => {
         category: "Other",
       }),
     );
+  });
+});
+
+describe("IngestPage — candidate autofill", () => {
+  it("autofills a candidate from its pasted datasheet link", async () => {
+    const user = await inspectOnce([{ ...CANDIDATE, mpn: "", manufacturer: "" }]);
+    await screen.findByLabelText("Name");
+
+    const filled = { ...CANDIDATE, mpn: "NE555P", manufacturer: "Texas Instruments" };
+    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j2" });
+    mockApi.openJobStream.mockResolvedValue(
+      streamOf([
+        'event: progress\ndata: {"pct":45,"message":"reading the datasheet"}\n\n',
+        `event: result\ndata: ${JSON.stringify({
+          result: { candidate: filled, filled: ["mpn", "manufacturer"], notes: [], missing: [] },
+        })}\n\n`,
+        "event: done\ndata: {}\n\n",
+      ]),
+    );
+
+    await user.type(
+      screen.getByLabelText("Datasheet URL"),
+      "https://ti.com/ne555.pdf",
+    );
+    await user.click(screen.getByRole("button", { name: "Autofill" }));
+
+    expect(mockApi.ingestEnrich).toHaveBeenCalledTimes(1);
+    const body = mockApi.ingestEnrich.mock.calls[0][0];
+    expect(body.datasheet_url).toBe("https://ti.com/ne555.pdf");
+    expect(body.candidate.display_name).toBe("NE555P");
+    // the filled result lands back in the editable fields
+    await waitFor(() =>
+      expect(screen.getByLabelText("Part Number")).toHaveValue("NE555P"),
+    );
+    expect(screen.getByLabelText("Manufacturer")).toHaveValue("Texas Instruments");
+  });
+
+  it("surfaces the autofill notes honestly", async () => {
+    const user = await inspectOnce([CANDIDATE]);
+    await screen.findByLabelText("Name");
+    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j2" });
+    mockApi.openJobStream.mockResolvedValue(
+      streamOf([
+        `event: result\ndata: ${JSON.stringify({
+          result: {
+            candidate: CANDIDATE,
+            filled: [],
+            notes: ["the datasheet link did not yield a PDF"],
+            missing: ["purchase link"],
+          },
+        })}\n\n`,
+        "event: done\ndata: {}\n\n",
+      ]),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Autofill" }));
+    expect(
+      await screen.findByText(/did not yield a PDF/i),
+    ).toBeInTheDocument();
   });
 });

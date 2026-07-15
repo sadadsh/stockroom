@@ -10,12 +10,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useIngestCommit } from "../api/queries";
-import type { BulkReport, StagingCandidate } from "../api/types";
+import type { BulkReport, IngestEnrichResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast, type ToastTone } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
-import { UploadIcon } from "../components/icons";
+import { EnrichIcon, UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -327,10 +327,65 @@ function CandidateCard({
   const [c, setC] = useState<StagingCandidate>(candidate);
   const [missing, setMissing] = useState<string[]>([]);
   const commit = useIngestCommit();
+  // Autofill: paste a datasheet link (or attach the PDF) and a purchase link, and
+  // the backend fills the remaining identity from the datasheet + enrichment.
+  const enrich = useJob<IngestEnrichResult>();
+  const [dsUrl, setDsUrl] = useState("");
+  const [dsFile, setDsFile] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string[]>([]);
+  const filling = enrich.status === "running";
 
   function set<K extends keyof StagingCandidate>(key: K, value: StagingCandidate[K]) {
     setC((prev) => ({ ...prev, [key]: value }));
   }
+
+  async function handleAutofill() {
+    if (filling) return;
+    setNotes([]);
+    try {
+      const { job_id } = await api.ingestEnrich({
+        candidate: c,
+        datasheet_url: dsUrl.trim() || undefined,
+        datasheet_file: dsFile ?? undefined,
+      });
+      await enrich.run(job_id);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Autofill failed", "err");
+    }
+  }
+
+  async function attachPdf() {
+    const hostApi = (
+      window as unknown as {
+        pywebview?: { api?: { pick_datasheet_file?: () => Promise<string[]> } };
+      }
+    ).pywebview?.api;
+    if (!hostApi?.pick_datasheet_file) {
+      toast(
+        "Open Stockroom as the app to attach a PDF from disk, or paste its link instead.",
+        "neutral",
+      );
+      return;
+    }
+    try {
+      const paths = await hostApi.pick_datasheet_file();
+      if (paths && paths.length > 0) setDsFile(paths[0]);
+    } catch {
+      // the picker was cancelled or is unavailable; nothing to do
+    }
+  }
+
+  useEffect(() => {
+    if (enrich.status === "done" && enrich.result) {
+      setC(enrich.result.candidate);
+      setNotes(enrich.result.notes);
+      const n = enrich.result.filled.length;
+      toast(
+        n > 0 ? `Filled ${n} field${n === 1 ? "" : "s"}.` : "Nothing new was found.",
+        n > 0 ? "ok" : "neutral",
+      );
+    }
+  }, [enrich.status, enrich.result, toast]);
 
   function handleCommit() {
     setMissing([]);
@@ -378,6 +433,7 @@ function CandidateCard({
             set("purchase", v.trim() ? [{ vendor: "manual", url: v.trim() }] : [])
           }
         />
+        <Field label="Datasheet URL" value={dsUrl} mono onChange={setDsUrl} />
         {c.footprint_variants.length > 1 ? (
           <div className="flex items-center gap-3">
             <span className="w-[116px] flex-none text-xs text-t3">Footprint</span>
@@ -415,6 +471,20 @@ function CandidateCard({
         </div>
       ) : null}
 
+      {notes.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-1">
+          {notes.map((n) => (
+            <div key={n} className="text-xs text-warn">
+              {n}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {enrich.status === "error" ? (
+        <div className="mt-3 text-xs text-err">Autofill failed. {enrich.error}</div>
+      ) : null}
+
       {missing.length > 0 ? (
         <div className="mt-3">
           <div className="mb-1.5 text-xs text-err">
@@ -430,8 +500,27 @@ function CandidateCard({
         </div>
       ) : null}
 
-      <div className="mt-4 flex justify-end">
-        <Button variant="accent" onClick={handleCommit} disabled={commit.isPending}>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Button
+            onClick={handleAutofill}
+            disabled={filling || commit.isPending}
+            icon={<EnrichIcon />}
+          >
+            {filling ? "Filling..." : "Autofill"}
+          </Button>
+          <Button small onClick={attachPdf} disabled={filling}>
+            Attach PDF
+          </Button>
+          {dsFile ? (
+            <span className="max-w-[200px] truncate text-xs text-t3">{baseName(dsFile)}</span>
+          ) : null}
+        </div>
+        <Button
+          variant="accent"
+          onClick={handleCommit}
+          disabled={commit.isPending || filling}
+        >
           {commit.isPending ? "Adding..." : "Add To Library"}
         </Button>
       </div>

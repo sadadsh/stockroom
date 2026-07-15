@@ -6,7 +6,7 @@ import pytest
 from tests.backend.conftest import requires_kicad_cli
 from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import DetectedSource
-from stockroom.ingest.staging import StagingCandidate, build_candidates
+from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
 from stockroom.model.part import Provenance, Purchase
 
 
@@ -118,3 +118,100 @@ def test_build_candidates_partial_is_model_only():
     assert c.symbol_lib_path is None
     assert c.model_path == model
     assert any("only a 3D model" in g for g in c.gaps)
+
+
+# -- merge_candidates: a part often arrives split across two vendor files -------
+
+
+def _full(name="TESTPART", mpn="", model=None, datasheet=None) -> StagingCandidate:
+    gaps = []
+    if model is None:
+        gaps.append("no 3D model in this package")
+    if datasheet is None:
+        gaps.append("no datasheet in this package")
+    return StagingCandidate(
+        vendor="snapeda",
+        symbol_lib_path=Path("/stage/sym.kicad_sym"),
+        symbol_name=name,
+        footprint_variants=[Path("/stage/fp.kicad_mod")],
+        model_path=model,
+        datasheet_path=datasheet,
+        display_name=name,
+        entry_name=name,
+        mpn=mpn,
+        gaps=gaps,
+    )
+
+
+def _fragment(model=None, datasheet=None, mpn="") -> StagingCandidate:
+    return StagingCandidate(
+        vendor="partial",
+        symbol_lib_path=None,
+        symbol_name="",
+        footprint_variants=[],
+        model_path=model,
+        datasheet_path=datasheet,
+        mpn=mpn,
+        gaps=["package contains only a 3D model; attach it to an existing part"],
+    )
+
+
+def test_merge_folds_a_model_fragment_into_the_sole_full_candidate():
+    full = _full()
+    frag = _fragment(model=Path("/drop/only.step"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 1
+    assert merged[0].symbol_name == "TESTPART"
+    assert merged[0].model_path == Path("/drop/only.step")
+    # the absorbed asset's gap is gone, the datasheet gap honestly remains
+    assert not any("3D model" in g for g in merged[0].gaps)
+    assert any("datasheet" in g for g in merged[0].gaps)
+
+
+def test_merge_matches_a_named_fragment_by_mpn_among_many():
+    a = _full(name="PARTA", mpn="MPN-A")
+    b = _full(name="PARTB", mpn="MPN-B")
+    frag = _fragment(model=Path("/drop/b.step"), mpn="mpn-b")
+    merged = merge_candidates([a, b, frag])
+    assert len(merged) == 2
+    by_name = {c.symbol_name: c for c in merged}
+    assert by_name["PARTB"].model_path == Path("/drop/b.step")
+    assert by_name["PARTA"].model_path is None
+
+
+def test_merge_leaves_an_anonymous_fragment_when_ambiguous():
+    a = _full(name="PARTA")
+    b = _full(name="PARTB")
+    frag = _fragment(model=Path("/drop/x.step"))
+    merged = merge_candidates([a, b, frag])
+    # no identity and two possible owners: never guess, keep the attach card
+    assert len(merged) == 3
+
+
+def test_merge_never_overwrites_an_asset_the_full_candidate_already_has():
+    full = _full(model=Path("/zip/original.step"))
+    frag = _fragment(model=Path("/drop/other.step"))
+    merged = merge_candidates([full, frag])
+    # the full candidate keeps its own model; the fragment still needs a decision
+    assert len(merged) == 2
+    assert merged[0].model_path == Path("/zip/original.step")
+
+
+def test_merge_keeps_symbol_bearing_candidates_apart():
+    a = _full(name="PARTA", mpn="SAME")
+    b = _full(name="PARTB", mpn="SAME")
+    assert len(merge_candidates([a, b])) == 2
+
+
+def test_merge_folds_a_datasheet_fragment_too():
+    full = _full()
+    frag = _fragment(datasheet=Path("/drop/part.pdf"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 1
+    assert merged[0].datasheet_path == Path("/drop/part.pdf")
+    assert not any("datasheet" in g for g in merged[0].gaps)
+
+
+def test_merge_is_a_no_op_without_fragments():
+    a, b = _full(name="PARTA"), _full(name="PARTB")
+    assert merge_candidates([a, b]) == [a, b]

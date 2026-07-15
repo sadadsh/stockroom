@@ -212,6 +212,22 @@ export interface StagingCandidate {
   tags: string[];
   purchase: PurchaseDTO[];
   gaps: string[];
+  // carries the datasheet source_url onto the committed record; absent on
+  // candidates staged before it was round-tripped
+  provenance?: {
+    source: string;
+    source_url: string;
+    original_zip_sha256: string;
+    ingested_at: string;
+  } | null;
+}
+
+// POST /api/ingest/enrich -> a background job whose result is this report.
+export interface IngestEnrichResult {
+  candidate: StagingCandidate;
+  filled: string[];
+  notes: string[];
+  missing: string[];
 }
 
 // POST /api/ingest/inspect -> a background job.

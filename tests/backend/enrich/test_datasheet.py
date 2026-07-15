@@ -97,3 +97,41 @@ def test_extract_datasheet_specs_is_lenient_on_a_bad_pdf(tmp_path):
     bad.write_bytes(b"%PDF-1.4\nnot really a pdf\n%%EOF\n")
     r = extract_datasheet_specs(bad)  # must not raise
     assert r.filled_fields() == set() or r.mpn is None
+
+
+def test_datasheet_fill_reads_identity_from_the_stored_pdf(tmp_path, monkeypatch):
+    # the user handed us the datasheet (URL or file); its extraction is the
+    # primary identity source and fills only what is still blank
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+    from stockroom.ingest.staging import StagingCandidate
+
+    def fake_extract(pdf_path, known_mpn=""):
+        return EnrichmentResult(
+            category="ICs",
+            mpn=Sourced(value="TPS62130RGTR", source="datasheet", confidence=0.9),
+            manufacturer=Sourced(value="Texas Instruments", source="datasheet", confidence=0.9),
+        )
+
+    monkeypatch.setattr("stockroom.enrich.datasheet.extract_datasheet_specs", fake_extract)
+    pdf = tmp_path / "d.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    pipeline = EnrichmentPipeline(tmp_path / "cache")
+    c = StagingCandidate(
+        vendor="snapeda", symbol_lib_path=None, symbol_name="X",
+        footprint_variants=[], datasheet_path=pdf,
+        manufacturer="Already Set", category="ICs",
+    )
+    pipeline.datasheet_fill(c)
+    assert c.mpn == "TPS62130RGTR"  # blank -> filled from the datasheet
+    assert c.manufacturer == "Already Set"  # never overwrites a value
+
+
+def test_datasheet_fill_without_a_datasheet_is_a_no_op(tmp_path):
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+    from stockroom.ingest.staging import StagingCandidate
+
+    c = StagingCandidate(vendor="snapeda", symbol_lib_path=None, symbol_name="X",
+                         footprint_variants=[])
+    out = EnrichmentPipeline(tmp_path / "cache").datasheet_fill(c)
+    assert out.mpn == ""

@@ -281,3 +281,22 @@ def test_second_add_only_adds_to_target_lib(tmp_path, fixtures_dir):
     assert '(symbol "SECOND"' in after_second
     diffs = semantic_diff(after_first, after_second)
     assert diffs and all(d.startswith("ADDED") for d in diffs)
+
+
+def test_inspect_merges_a_bare_model_file_into_the_sole_candidate(tmp_path, fixtures_dir):
+    # the owner's real flow: the vendor gives symbol+footprint in one file and the
+    # 3D model separately; dropping both must stage ONE part, not a part + an
+    # orphan attach-me fragment
+    pipe = _pipeline(tmp_path)
+    z = tmp_path / "part.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.write(fixtures_dir / "one_symbol.kicad_sym", "MyPart.kicad_sym")
+        zf.write(fixtures_dir / "one_footprint.kicad_mod", "MyPart.kicad_mod")
+    step = tmp_path / "MyPart.step"
+    step.write_bytes(b"ISO-10303-21;\n")
+    cands = pipe.inspect(inputs=[z, step], workdir=tmp_path / "work")
+    assert len(cands) == 1
+    c = cands[0]
+    assert c.symbol_name == "TESTPART"
+    assert c.model_path is not None
+    assert not any("3D model" in g for g in c.gaps)
