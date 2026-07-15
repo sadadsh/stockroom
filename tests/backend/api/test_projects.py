@@ -1632,8 +1632,9 @@ def _make_board_project(dir_path):
     board and fab export has something to plot."""
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
-    (dir_path / "board.kicad_pcb").write_text(
-        _FIXTURE_PCB.read_text(encoding="utf-8"), encoding="utf-8")
+    # copy the fixture BYTE-for-byte (write_text would translate LF to CRLF on Windows and
+    # drift from the served bytes / the byte-preserving layer); a real KiCad board is LF.
+    (dir_path / "board.kicad_pcb").write_bytes(_FIXTURE_PCB.read_bytes())
     return dir_path
 
 
@@ -1723,7 +1724,8 @@ def test_project_file_returns_the_registered_board_bytes(client, tmp_path):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
     r = client.get(f"/api/projects/{rec['id']}/file", params={"path": "board.kicad_pcb"})
     assert r.status_code == 200
-    assert r.text == _FIXTURE_PCB.read_text(encoding="utf-8")
+    # the endpoint serves the exact file bytes; compare bytes, not newline-normalized text
+    assert r.content == _FIXTURE_PCB.read_bytes()
 
 
 def test_project_file_rejects_an_unregistered_path_as_404(client, tmp_path):
