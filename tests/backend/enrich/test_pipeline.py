@@ -164,6 +164,57 @@ class _StubHttpFetcher:
         return FetchResult(url, 200, data.decode("latin-1"), data, "application/pdf", url)
 
 
+class _UrlFetcher:
+    """A RenderedDomFetcher that serves different HTML per URL (a substring match),
+    so a test can prove WHICH url was actually fetched, not just that some fetch
+    happened."""
+    def __init__(self, by_url):
+        self._by_url = by_url
+        self.urls = []
+
+    def rendered_html(self, url, timeout=20.0):
+        from stockroom.enrich.fetch import FetchResult
+        self.urls.append(url)
+        html = next((h for pat, h in self._by_url.items() if pat in url), "<html></html>")
+        return FetchResult(url, 200, html, html.encode(), "text/html", url)
+
+
+_LD_PRODUCT_WITH_PRICE = (
+    '<html><head><script type="application/ld+json">'
+    '{"@context":"https://schema.org","@type":"Product","mpn":"TPS62130RGTR",'
+    '"brand":{"name":"Texas Instruments"},"description":"3A step-down converter",'
+    '"offers":{"@type":"Offer","price":"2.50","priceCurrency":"USD"}}'
+    "</script></head></html>"
+)
+
+
+def test_enrich_candidate_scrapes_the_pasted_purchase_url(tmp_path):
+    """The owner's Autofill flow: a candidate carrying only a purchase link (no MPN)
+    fills its identity by fetching THAT product page directly, not an MPN search."""
+    from stockroom.model.part import Purchase
+
+    purchase_url = "https://www.mouser.com/ProductDetail/xyz"
+    fetcher = _UrlFetcher({"mouser.com/ProductDetail": _LD_PRODUCT_WITH_PRICE})
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=fetcher, limiter=_NoWaitLimiter(),
+    )
+    c = _candidate(
+        entry_name="", display_name="Widget", mpn="", manufacturer="", description="",
+        purchase=[Purchase(vendor="Mouser", url=purchase_url)],
+    )
+    pipe.enrich_candidate(c)
+    # the exact pasted URL was fetched (not an LCSC search built from a blank MPN)
+    assert any("mouser.com/ProductDetail/xyz" in u for u in fetcher.urls)
+    # identity is filled straight from the scraped product page
+    assert c.mpn == "TPS62130RGTR"
+    assert c.manufacturer == "Texas Instruments"
+    assert c.description == "3A step-down converter"
+    # the pasted purchase link is preserved (vendor + url) and gains the scraped price
+    assert c.purchase[0].url == purchase_url
+    assert c.purchase[0].vendor == "Mouser"
+    assert c.purchase[0].price_breaks == [{"qty": 1, "price": 2.5}]
+
+
 def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
     http = _StubHttpFetcher(mode="pdf")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(_LD_WITH_DATASHEET),
