@@ -70,6 +70,17 @@ def enrich_router(require_token) -> APIRouter:
                                  want=body.get("want"))
         return _result_dto(result)
 
+    @r.post("/from-url")
+    def enrich_from_url(request: Request, body: dict) -> dict:
+        """Paste a distributor product URL (a Mouser link) -> fetch it through the real
+        browser and return EVERYTHING the page exposes: identity, price breaks, stock, a
+        datasheet URL, package, and the full parametric spec set. This is the "paste a
+        link and autofill all of it" seam; a blocked/dead page returns empty fields, not
+        an error."""
+        ctx = request.app.state.ctx
+        pipeline = _make_pipeline(ctx)
+        return _result_dto(pipeline.extract_from_url(str(body.get("url", ""))))
+
     @r.post("/bulk")
     def enrich_bulk(request: Request, body: dict) -> dict:
         ctx = request.app.state.ctx
