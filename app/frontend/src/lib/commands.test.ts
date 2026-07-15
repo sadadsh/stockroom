@@ -25,8 +25,8 @@ describe("command registry", () => {
     // exercise the guard. Inject a NAV with one unavailable entry: it must not
     // become a command. Load-bearing (drop the .filter(available) and this is red).
     const nav: NavEntry[] = [
-      { route: "components", title: "Components", glyph: "", group: "primary", available: true },
-      { route: "settings", title: "Settings", glyph: "", group: "foot", available: false },
+      { route: "components", title: "Library", group: "primary", available: true },
+      { route: "settings", title: "Settings", group: "foot", available: false },
     ];
     const ids = navCommands(nav).map((c) => c.id);
     expect(ids).toContain("nav.components");

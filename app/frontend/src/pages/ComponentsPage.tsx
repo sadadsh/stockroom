@@ -166,13 +166,6 @@ export function ComponentsPage() {
 
   return (
     <>
-      <div className="flex h-14 flex-none items-center px-[18px]">
-        <div className="text-lg font-semibold text-t1">Components</div>
-        <div className="ml-auto text-2xs text-t3">
-          {partsQuery.data ? `${partsQuery.data.count} Parts` : ""}
-        </div>
-      </div>
-
       <div className="flex min-h-0 flex-1">
         {/* picker */}
         <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
@@ -186,6 +179,11 @@ export function ComponentsPage() {
               completeOnly={completeOnly}
               onCompleteOnly={setCompleteOnly}
             />
+            {partsQuery.data ? (
+              <div className="pt-1.5 text-right text-2xs text-t3">
+                {partsQuery.data.count} Parts
+              </div>
+            ) : null}
           </div>
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             <PickerBody

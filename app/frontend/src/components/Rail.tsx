@@ -1,17 +1,27 @@
 /**
  * The left navigation rail (the mockup's .rail). Items are derived from NAV's
- * available destinations and navigate through the router, so the rail always
- * reflects exactly what the app can do, never an inert label. New surfaces
- * appear here automatically the moment their NAV entry is marked available.
+ * top-level destinations and navigate through the router; a folded Library tab
+ * route keeps the Library entry highlighted (railRouteFor), so the rail always
+ * reflects where the user is. Icons are the app's SVG set in a fixed box so
+ * every item has identical sizing.
  */
-import { availableNav, type NavEntry } from "../lib/nav";
-import { useRouter } from "../lib/router";
+import type { ComponentType } from "react";
+import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
+import { useRouter, type Route } from "../lib/router";
+import { LibraryIcon, ProjectsIcon, SettingsIcon } from "./icons";
+
+const RAIL_ICONS: Partial<Record<Route, ComponentType<{ className?: string }>>> = {
+  components: LibraryIcon,
+  projects: ProjectsIcon,
+  settings: SettingsIcon,
+};
 
 export function Rail() {
   const { route, navigate } = useRouter();
-  const items = availableNav();
+  const items = railNav();
   const primary = items.filter((item) => item.group === "primary");
   const foot = items.filter((item) => item.group === "foot");
+  const active = railRouteFor(route);
 
   return (
     <nav
@@ -23,7 +33,7 @@ export function Rail() {
         <RailItem
           key={item.route}
           item={item}
-          selected={route === item.route}
+          selected={active === item.route}
           onSelect={() => navigate(item.route)}
         />
       ))}
@@ -32,7 +42,7 @@ export function Rail() {
           <RailItem
             key={item.route}
             item={item}
-            selected={route === item.route}
+            selected={active === item.route}
             onSelect={() => navigate(item.route)}
           />
         ))}
@@ -50,19 +60,22 @@ function RailItem({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const Icon = RAIL_ICONS[item.route];
   return (
     <button
       type="button"
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={
-        "mb-px flex items-center gap-2.5 rounded-control px-2.5 py-2 text-left text-sm transition-colors " +
+        "mb-px flex h-8 items-center gap-2.5 rounded-control px-2.5 text-left text-sm transition-colors " +
         (selected
           ? "bg-raise2 text-t1"
           : "text-t3 hover:bg-[var(--c-hover)] hover:text-t2")
       }
     >
-      <span className="w-4 text-center text-sm opacity-85">{item.glyph}</span>
+      <span aria-hidden className="flex h-4 w-4 flex-none items-center justify-center">
+        {Icon ? <Icon className="h-4 w-4" /> : null}
+      </span>
       {item.title}
     </button>
   );

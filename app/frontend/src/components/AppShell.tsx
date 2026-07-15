@@ -37,7 +37,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [handleDrop]);
   return (
-    <div className="flex min-h-screen w-full bg-surface text-t1">
+    // h-screen (not min-h-screen) so a tall page scrolls INSIDE its own pane and
+    // the window never grows a body scrollbar that shifts the rail between pages.
+    <div className="flex h-screen w-full overflow-hidden bg-surface text-t1">
       <Rail />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       <DropOverlay onDrop={handleDrop} />

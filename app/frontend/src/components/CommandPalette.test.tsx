@@ -89,8 +89,8 @@ describe("CommandPalette", () => {
 
     // Go To group: the rail's available destinations, prefix stripped.
     expect(within(dialog).getByText("Go To")).toBeInTheDocument();
-    expect(within(dialog).getByText("Components")).toBeInTheDocument();
-    expect(within(dialog).getByText("Ingest")).toBeInTheDocument();
+    expect(within(dialog).getByText("Library")).toBeInTheDocument();
+    expect(within(dialog).getByText("Add Parts")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
     // Projects has shipped (M7a), so it is now offered.
     expect(within(dialog).getByText("Projects")).toBeInTheDocument();
@@ -119,15 +119,15 @@ describe("CommandPalette", () => {
     await user.type(screen.getByLabelText("Search Commands and Parts"), "settings");
 
     expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.queryByText("Components")).toBeNull();
-    expect(screen.queryByText("Ingest")).toBeNull();
+    expect(screen.queryByText("Library")).toBeNull();
+    expect(screen.queryByText("Add Parts")).toBeNull();
   });
 
   it("navigates when a destination command is clicked", async () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    await user.click(screen.getByText("Ingest"));
+    await user.click(screen.getByText("Add Parts"));
 
     expect(screen.getByTestId("route")).toHaveTextContent("ingest");
     // Running a command closes the palette.
@@ -138,11 +138,11 @@ describe("CommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // Empty query: [Components, Ingest, Duplicates, Settings, Switch Theme].
-    // Down, down, up lands back on Ingest (index 1). This is load-bearing for BOTH
-    // arrows: a broken ArrowDown would keep the highlight on Components, and a
-    // broken ArrowUp would leave it on Duplicates, so either regression routes
-    // somewhere other than Ingest.
+    // Empty query: [Library, Add Parts, Duplicates, Doctor, Projects, Settings,
+    // Switch Theme]. Down, down, up lands back on Add Parts (index 1). This is
+    // load-bearing for BOTH arrows: a broken ArrowDown would keep the highlight on
+    // Library, and a broken ArrowUp would leave it on Duplicates, so either
+    // regression routes somewhere other than ingest.
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}{Enter}");
     expect(screen.getByTestId("route")).toHaveTextContent("ingest");
   });
@@ -151,16 +151,16 @@ describe("CommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // From the first item (Components), one ArrowUp wraps to the last item (the
+    // From the first item (Library), one ArrowUp wraps to the last item (the
     // theme action); running it flips the theme. A no-op or non-wrapping ArrowUp
-    // would run Components instead and leave the theme unchanged.
+    // would run Library instead and leave the theme unchanged.
     await user.keyboard("{ArrowUp}{Enter}");
     await waitFor(() =>
       expect(document.documentElement.dataset.theme).toBe("light"),
     );
   });
 
-  it("finds parts by any field and jumps to the part on Components when picked", async () => {
+  it("finds parts by any field and jumps to the part on the Library Parts tab when picked", async () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
