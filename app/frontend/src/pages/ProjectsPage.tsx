@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import {
   useProjectsQuery,
+  useProjectQuery,
   useBuildability,
   useProjectAudit,
   useProjectBom,
@@ -94,6 +95,7 @@ import type {
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
+import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const INPUT_CLS =
@@ -423,6 +425,7 @@ function ProjectDetailView({
       </div>
 
       <BuildabilitySection key={`build-${project.id}`} projectId={project.id} />
+      <ProjectViewerSection key={`viewer-${project.id}`} projectId={project.id} />
 
       {auditQuery.isLoading ? (
         <Card className="px-4 py-3.5">
@@ -1503,6 +1506,36 @@ function StockCell({ line }: { line: ProcurementLine }) {
         <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
       ) : null}
     </span>
+  );
+}
+
+// -- Board viewer (interactive kicanvas board / schematic render, M7 #11) --------
+
+function ProjectViewerSection({ projectId }: { projectId: string }) {
+  const query = useProjectQuery(projectId);
+  const detail = query.data ?? null;
+  const files: ViewFile[] = detail
+    ? [
+        ...detail.board_paths.map((p) => ({ path: p, label: p, kind: "Board" as const })),
+        ...detail.sheet_paths.map((p) => ({ path: p, label: p, kind: "Schematic" as const })),
+      ]
+    : [];
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="viewer-section">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Board Viewer</Eyebrow>
+        <p className="text-xs text-t3">
+          An interactive view of the project's board and schematic, rendered in-app with pan,
+          zoom and layer controls.
+        </p>
+      </div>
+      {query.isLoading ? (
+        <p className="text-sm text-t3">Loading viewer...</p>
+      ) : (
+        <ProjectViewer projectId={projectId} files={files} />
+      )}
+    </div>
   );
 }
 

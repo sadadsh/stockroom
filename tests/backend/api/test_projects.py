@@ -1714,3 +1714,42 @@ def test_fab_export_passes_options_through(client, tmp_path, monkeypatch):
     assert seen["drill_map"] is False
     assert seen["include_pos"] is False
     assert seen["protel_ext"] is False
+
+
+# ---- kicanvas raw project-file endpoint (M7 #11) ----------------------------
+
+
+def test_project_file_returns_the_registered_board_bytes(client, tmp_path):
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    r = client.get(f"/api/projects/{rec['id']}/file", params={"path": "board.kicad_pcb"})
+    assert r.status_code == 200
+    assert r.text == _FIXTURE_PCB.read_text(encoding="utf-8")
+
+
+def test_project_file_rejects_an_unregistered_path_as_404(client, tmp_path):
+    proj = _make_board_project(tmp_path / "brd")
+    (proj / "secret.txt").write_text("secret", encoding="utf-8")
+    rec = _register(client, proj)
+    assert client.get(f"/api/projects/{rec['id']}/file",
+                      params={"path": "secret.txt"}).status_code == 404
+
+
+def test_project_file_rejects_path_traversal_as_404(client, tmp_path):
+    # a ../ escape is not a registered project file: never serve outside the project
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    (tmp_path / "outside.txt").write_text("nope", encoding="utf-8")
+    assert client.get(f"/api/projects/{rec['id']}/file",
+                      params={"path": "../outside.txt"}).status_code == 404
+    assert client.get(f"/api/projects/{rec['id']}/file",
+                      params={"path": "../../etc/passwd"}).status_code == 404
+
+
+def test_project_file_unknown_id_is_404(client):
+    assert client.get("/api/projects/nope/file",
+                      params={"path": "board.kicad_pcb"}).status_code == 404
+
+
+def test_project_file_requires_the_token(anon_client, client, tmp_path):
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    assert anon_client.get(f"/api/projects/{rec['id']}/file",
+                           params={"path": "board.kicad_pcb"}).status_code == 401

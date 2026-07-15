@@ -526,6 +526,34 @@ export const api = {
     return apiGet<FabStatus>(`/api/projects/${encodeURIComponent(id)}/fab`);
   },
 
+  // Raw bytes (as text) of one REGISTERED project KiCad file, for the in-app kicanvas viewer
+  // (M7 #11). Fetched WITH the bearer and inlined as a kicanvas-source, so the viewer never
+  // issues its own unauthenticated fetch. An unregistered path / unknown id / escape is a 404.
+  async projectFile(id: string, path: string): Promise<string> {
+    const token = apiToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const url = new URL(apiBase() + `/api/projects/${encodeURIComponent(id)}/file`);
+    url.searchParams.set("path", path);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { headers });
+    } catch (err) {
+      throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    }
+    if (!res.ok) {
+      let msg = `request failed (${res.status})`;
+      try {
+        const body = await res.json();
+        msg = body.detail || body.error || body.message || msg;
+      } catch {
+        /* non-JSON error body */
+      }
+      throw new ApiError(res.status, msg);
+    }
+    return res.text();
+  },
+
   // Download the manufacturing bundle (gerbers + drill + placement) plotted via kicad-cli as
   // a zip (M7i). Fetches with the bearer token and saves via a temporary object URL. Options
   // map straight to the export query params; a missing/failed kicad-cli surfaces as an
