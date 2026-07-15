@@ -62,6 +62,10 @@ class AppContext:
     app_repo: GitRepo | None = None
     uv_sync: Callable[[], None] = lambda: None
     request_restart: Callable[[], None] = lambda: None
+    # The most recent automatic KiCad wiring outcome (a WiringReport: boot, profile
+    # or library switch, or a KiCad settings change), so Doctor/Settings can surface
+    # honestly what happened without re-running it. None until the first attempt.
+    last_wiring: object | None = None
 
     def rebuild_index(self) -> None:
         self.index.close()
@@ -91,12 +95,32 @@ class AppContext:
         self.project_index.close()
         self.project_index = ProjectIndex.build(self.libraries_root / ".projects")
 
+    def rewire_kicad(self) -> None:
+        """Repoint KiCad at the active profile (SR_LIB + table rows + category libs),
+        never raising: auto_wire skips when KiCad is absent and captures failures
+        into the report. Called on boot, on every switch, and on a KiCad settings
+        change - the fix for SR_LIB going stale when the profile/library switched."""
+        from stockroom.kicad.wiring import auto_wire
+
+        self.last_wiring = auto_wire(self.kicad_dir, self.profile, cli=self.cli)
+
+    def apply_kicad_settings(self) -> None:
+        """Rebuild every engine piece derived from the KiCad overrides LIVE (no
+        restart): the cli, the ops that captured it, the effective config dir - then
+        rewire so the new KiCad sees the active library immediately."""
+        self.cli = KiCadCli(self.config.kicad_cli_override or None)
+        self.ops = LibraryOps(self.profile, self.repo, self.cli)
+        self.project_ops = ProjectOps(self.project_store, self.cli)
+        self.kicad_dir = kicad_config_dir(override=self.config.kicad_config_override)
+        self.rewire_kicad()
+
     def switch_profile(self, name: str) -> None:
         self.profile = self.profile_store.get(name)
         self.ops = LibraryOps(self.profile, self.repo, self.cli)
         self.config.active_profile = name
         self.config.save()
         self.rebuild_index()
+        self.rewire_kicad()
 
     def switch_library(self, new_root: Path) -> None:
         """Repoint the whole engine at a different library root (M9b onboarding / switch),
@@ -125,6 +149,7 @@ class AppContext:
         self.bom_cache.clear()
         self.config.libraries_root = str(new_root)
         self.config.save()
+        self.rewire_kicad()
 
 
 def build_context(

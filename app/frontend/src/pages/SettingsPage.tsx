@@ -338,10 +338,47 @@ function SyncSection() {
 
 function KiCadSection() {
   const sys = useSystemInfo();
+  const settings = useSettings();
+  const save = useUpdateSettings();
+  const { toast } = useToast();
+  // null = untouched (show the saved value), so the inputs stay prefilled from
+  // the server without an effect and a save simply reseeds them
+  const [cfgDraft, setCfgDraft] = useState<string | null>(null);
+  const [cliDraft, setCliDraft] = useState<string | null>(null);
+
+  const cfgSaved = settings.data?.kicad_config_override ?? "";
+  const cliSaved = settings.data?.kicad_cli_override ?? "";
+  const cfgValue = cfgDraft ?? cfgSaved;
+  const cliValue = cliDraft ?? cliSaved;
+  const dirty = cfgValue.trim() !== cfgSaved || cliValue.trim() !== cliSaved;
+
+  function onSave() {
+    if (!dirty || save.isPending) return;
+    save.mutate(
+      {
+        kicad_config_override: cfgValue.trim(),
+        kicad_cli_override: cliValue.trim(),
+      },
+      {
+        onSuccess: (r) => {
+          setCfgDraft(null);
+          setCliDraft(null);
+          toast(
+            r.kicad_wired
+              ? "KiCad settings applied. The library is wired."
+              : "KiCad settings applied.",
+            "ok",
+          );
+        },
+        onError: (e) => toast(errMsg(e), "err"),
+      },
+    );
+  }
+
   return (
     <Section
       title="KiCad"
-      hint="Where the app writes KiCad library tables, and whether the command-line tools that render previews were found."
+      hint="Where the app writes KiCad library tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile or library switch. Leave the overrides blank to auto-detect."
     >
       {sys.isLoading ? (
         <p className="py-1 text-sm text-t3">Reading KiCad status...</p>
@@ -364,8 +401,60 @@ function KiCadSection() {
             label="KiCad Running"
             value={sys.data.kicad_running ? "Yes" : "No"}
           />
+          <StatusRow
+            label="Library Wiring"
+            value={
+              settings.isLoading ? (
+                "Loading..."
+              ) : settings.data?.kicad_wired ? (
+                <span className="text-ok">Wired to the active library</span>
+              ) : (
+                <span className="text-warn">
+                  Not wired yet (the Doctor page can wire it manually)
+                </span>
+              )
+            }
+          />
         </>
       ) : null}
+
+      <div className="mt-3.5 flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label
+            htmlFor="kicad-config-override"
+            className="w-52 flex-none text-xs text-t3"
+          >
+            Config Directory Override
+          </label>
+          <input
+            id="kicad-config-override"
+            value={cfgValue}
+            onChange={(e) => setCfgDraft(e.target.value)}
+            placeholder="Auto-detected"
+            className={INPUT_CLS}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label
+            htmlFor="kicad-cli-override"
+            className="w-52 flex-none text-xs text-t3"
+          >
+            KiCad CLI Override
+          </label>
+          <input
+            id="kicad-cli-override"
+            value={cliValue}
+            onChange={(e) => setCliDraft(e.target.value)}
+            placeholder="Auto-discovered"
+            className={INPUT_CLS}
+          />
+        </div>
+        <div>
+          <Button onClick={onSave} disabled={!dirty || save.isPending}>
+            {save.isPending ? "Applying..." : "Save Overrides"}
+          </Button>
+        </div>
+      </div>
     </Section>
   );
 }

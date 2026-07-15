@@ -17,14 +17,38 @@ def _os_name() -> str:
     return os.name
 
 
-def kicad_config_dir(version: str = "10.0", override: str = "") -> Path:
+def _version_key(name: str) -> tuple[int, ...]:
+    """Numeric sort key for version-named dirs so 10.0 ranks above 9.0 (a plain
+    string sort would pick 9.0 as 'newest'). Mirrors kicad/cli.py discovery."""
+    return tuple(int(p) if p.isdigit() else -1 for p in name.split("."))
+
+
+def detect_kicad_version(base: Path) -> str | None:
+    """The newest version-named config dir under KiCad's config base (the KiCad the
+    user actually runs), or None when KiCad has never run on this machine."""
+    try:
+        dirs = [d for d in Path(base).iterdir() if d.is_dir() and d.name[:1].isdigit()]
+    except OSError:
+        return None
+    if not dirs:
+        return None
+    return max(dirs, key=lambda d: _version_key(d.name)).name
+
+
+def kicad_config_dir(version: str | None = None, override: str = "") -> Path:
+    """The per-user KiCad config dir. An explicit Settings override wins; otherwise
+    the newest installed version's dir under the OS base, defaulting to 10.0 when
+    KiCad has never run (its first run then merges our files)."""
     if override:
         return Path(override)
     if _os_name() == "nt":
-        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-        return Path(base) / "kicad" / version
-    xdg = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(xdg) / "kicad" / version
+        base_str = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+    else:
+        base_str = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    base = Path(base_str) / "kicad"
+    if version is None:
+        version = detect_kicad_version(base) or "10.0"
+    return base / version
 
 
 def _default_lister() -> str:

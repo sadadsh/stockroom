@@ -91,6 +91,14 @@ def _write_category_libs(lib) -> None:
         _SYMBOL_LIB_HEADER + ")\n", encoding="utf-8", newline=""
     )
     lib.footprint_lib_path("Modules").mkdir(parents=True, exist_ok=True)
+    # every remaining category as a valid empty lib, so the auto KiCad wiring that
+    # now runs on switch/boot never needs kicad-cli inside the API suite
+    from stockroom.model.category import CATEGORIES
+
+    for cat in CATEGORIES:
+        sym = lib.symbol_lib_path(cat)
+        if not sym.exists():
+            sym.write_text(_SYMBOL_LIB_HEADER + ")\n", encoding="utf-8", newline="")
 
 
 def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:

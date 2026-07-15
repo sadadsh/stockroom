@@ -1,6 +1,8 @@
 import json
 import shutil
 
+import pytest
+
 from stockroom.kicad.common_json import read_env_var, write_env_var
 
 
@@ -57,3 +59,34 @@ def test_takes_backup_before_writing(fixtures_dir, tmp_path):
     backups = list(tmp_path.glob("kicad_common.json.*.bak"))
     assert len(backups) == 1
     assert backups[0].read_text() == original
+
+
+def test_write_creates_missing_file_and_parents(tmp_path):
+    # KiCad installed but never run: no config dir, no kicad_common.json. The
+    # writer materializes a minimal one (KiCad merges its own defaults on first
+    # run) instead of crashing the wiring with FileNotFoundError.
+    p = tmp_path / "kicad" / "10.0" / "kicad_common.json"
+    assert write_env_var(p, "SR_LIB", "/lib") is True
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["environment"]["vars"]["SR_LIB"] == "/lib"
+    # nothing existed, so nothing was backed up
+    assert list(p.parent.glob("*.bak")) == []
+
+
+def test_read_missing_file_returns_none(tmp_path):
+    assert read_env_var(tmp_path / "absent" / "kicad_common.json", "SR_LIB") is None
+
+
+def test_read_invalid_json_returns_none(tmp_path):
+    p = tmp_path / "kicad_common.json"
+    p.write_text("{broken", encoding="utf-8")
+    assert read_env_var(p, "SR_LIB") is None
+
+
+def test_write_still_raises_on_unparseable_existing_file(tmp_path):
+    # honest failure: never clobber a KiCad-owned file we cannot parse
+    p = tmp_path / "kicad_common.json"
+    p.write_text("{broken", encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        write_env_var(p, "SR_LIB", "/x")
+    assert p.read_text(encoding="utf-8") == "{broken"

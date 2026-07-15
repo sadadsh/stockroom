@@ -35,6 +35,10 @@ class WiringReport:
     libs_created: list[str] = field(default_factory=list)
     kicad_running: bool = False
     restart_needed: bool = False
+    # auto_wire outcomes: why wiring was not attempted / what failed mid-way.
+    # Both empty on a fully applied wiring.
+    skipped: str = ""
+    error: str = ""
 
 
 class KiCadWiring:
@@ -63,15 +67,17 @@ class KiCadWiring:
 
     def apply(self, profile: Profile) -> WiringReport:
         report = WiringReport()
-        # 1. category libraries on disk
-        self._ensure_category_libs(profile, report)
+        # KiCad installed but never run: its version config dir does not exist yet
+        self.kicad_dir.mkdir(parents=True, exist_ok=True)
 
-        # 2. SR_LIB points at the active profile folder (absolute)
+        # 1. SR_LIB points at the active profile folder (absolute). FIRST, so a
+        # switch on a machine whose kicad-cli is missing still repoints KiCad at
+        # the right library before the category-lib step can fail.
         sr_value = str(profile.root.resolve())
         report.sr_lib_value = sr_value
         write_env_var(self.kicad_dir / "kicad_common.json", _SR_LIB, sr_value)
 
-        # 3. register every category in both global tables (idempotent append)
+        # 2. register every category in both global tables (idempotent append)
         sym_path = self.kicad_dir / "sym-lib-table"
         fp_path = self.kicad_dir / "fp-lib-table"
         sym_table = self._load_or_new(sym_path, "sym_lib_table")
@@ -94,10 +100,44 @@ class KiCadWiring:
         sym_table.save(sym_path)
         fp_table.save(fp_path)
 
+        # 3. category libraries on disk (LAST: the only step that needs kicad-cli)
+        self._ensure_category_libs(profile, report)
+
         # 4. aware: a running KiCad must restart to load table changes
         report.kicad_running = bool(self._running_detector())
         made_changes = (
             report.symbol_rows_added or report.footprint_rows_added or report.libs_created
         )
         report.restart_needed = report.kicad_running and bool(made_changes)
+        return report
+
+
+def kicad_present(kicad_dir: Path, cli=None) -> bool:
+    """Evidence that KiCad exists on this machine: its CLI was discovered, or its
+    config dir (or the version-parent base, e.g. ~/.config/kicad) exists."""
+    if cli is not None and getattr(cli, "available", False):
+        return True
+    kdir = Path(kicad_dir)
+    try:
+        return kdir.is_dir() or kdir.parent.is_dir()
+    except OSError:
+        return False
+
+
+def auto_wire(
+    kicad_dir: Path, profile: Profile, cli=None, running_detector=detect_running_kicad
+) -> WiringReport:
+    """The never-raises wiring used on boot and on every profile/library switch, so
+    KiCad always points at the active library without a manual Doctor click. Skips
+    honestly when KiCad is not on this machine (never invents a config tree for it);
+    captures a mid-wiring failure into the report instead of breaking the caller."""
+    if not kicad_present(kicad_dir, cli):
+        report = WiringReport()
+        report.skipped = "KiCad was not found on this machine (no CLI, no config dir)"
+        return report
+    try:
+        return KiCadWiring(kicad_dir, cli=cli, running_detector=running_detector).apply(profile)
+    except Exception as exc:  # noqa: BLE001 - boot/switch must survive any wiring failure
+        report = WiringReport()
+        report.error = f"{type(exc).__name__}: {exc}"
         return report

@@ -59,6 +59,7 @@ import type {
   SetNetclassPatternsResult,
   SetNetClassesResult,
   SettingsInfo,
+  SettingsPatch,
   StagingCandidate,
   SyncResult,
   SyncStatus,
@@ -378,7 +379,7 @@ export const api = {
     return apiGet<SettingsInfo>("/api/settings");
   },
 
-  updateSettings(patch: { mouser_api_key?: string; github_token?: string }): Promise<SettingsInfo> {
+  updateSettings(patch: SettingsPatch): Promise<SettingsInfo> {
     return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
   },
 

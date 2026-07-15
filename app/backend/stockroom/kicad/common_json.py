@@ -19,13 +19,31 @@ def _load(path: Path) -> dict:
 
 
 def read_env_var(path: Path, name: str) -> str | None:
-    data = _load(Path(path))
+    """None when the file is absent or unparseable: this is a status probe, and a
+    KiCad that has never run simply has no vars yet."""
+    try:
+        data = _load(Path(path))
+    except (OSError, json.JSONDecodeError):
+        return None
     vars_ = (data.get("environment") or {}).get("vars") or {}
     return vars_.get(name)
 
 
 def write_env_var(path: Path, name: str, value: str) -> bool:
     path = Path(path)
+    if not path.exists():
+        # KiCad installed but never run: materialize a minimal config holding just
+        # the var (KiCad merges its own defaults on first run). Nothing existed, so
+        # there is nothing to back up. An EXISTING but unparseable file still
+        # raises: never clobber a KiCad-owned file we cannot parse.
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(
+            {"environment": {"vars": {name: value}}},
+            indent=2, sort_keys=True, ensure_ascii=False,
+        ) + "\n"
+        path.write_text(text, encoding="utf-8")
+        json.loads(path.read_text(encoding="utf-8"))  # parse-validate the result
+        return True
     data = _load(path)
     env = data.get("environment")
     if not isinstance(env, dict):
