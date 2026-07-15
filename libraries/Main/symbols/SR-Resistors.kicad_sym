@@ -118,7 +118,7 @@
         )
       )
     )
-    (property "MPN" "708-RMCF0603FT1K13" (at 0 0 0) (effects (hide yes)))
+    (property "MPN" "RMCF0603FT1K13" (at 0 0 0) (effects (hide yes)))
     (property "Manufacturer" "SEI Stackpole" (at 0 0 0) (effects (hide yes)))
     (property "Description" "Thick Film Resistors - SMD 1.13KOhms 0603 0.1W 1% Std Power AEC-Q200" (at 0 0 0) (effects (hide yes)))
     (property "Datasheet" "${SR_LIB}/datasheets/708_rmcf0603ft1k13.pdf" (at 0 0 0) (effects (hide yes)))
