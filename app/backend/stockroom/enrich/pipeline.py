@@ -22,7 +22,7 @@ from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
-from stockroom.model.part import Purchase
+from stockroom.model.part import Provenance, Purchase
 
 # Canonical field -> StagingCandidate attribute it fills. Only these simple text
 # fields flow straight onto the M3 candidate; price/URL become a Purchase.
@@ -139,10 +139,67 @@ class EnrichmentPipeline:
         self.cache.put(mpn, _result_to_cache(result))
         return result
 
+    def enrich_from_product_url(self, candidate: StagingCandidate, url: str,
+                                overwrite: set[str] | None = None) -> StagingCandidate:
+        """Fill a candidate's blank identity straight from a distributor product page
+        the user pasted (a purchase link). The pasted link is a direct primary source,
+        so we fetch THAT exact page (never an MPN search) and read mpn/manufacturer/
+        description/datasheet/price from its schema.org Product data. Per-field (never
+        clobbers an existing value unless opted in) and never raises: a dead link or an
+        unparseable page contributes nothing (enrichment never blocks)."""
+        overwrite = overwrite or set()
+        url = (url or "").strip()
+        if not url:
+            return candidate
+        try:
+            self.limiter.acquire()
+            page = self.fetcher.rendered_html(url)
+        except (EnrichError, OSError):
+            return candidate  # a dead purchase link never blocks the fill
+        result = extract_all(page.text, page.final_url or url, SITE_EXTRACTORS)
+
+        for field_name, attr in _CANDIDATE_FIELDS.items():
+            sourced = getattr(result, field_name)
+            if sourced is None:
+                continue
+            if not getattr(candidate, attr, "") or attr in overwrite:
+                setattr(candidate, attr, str(sourced.value))
+
+        # Attach the scraped price/stock to the purchase entry the user pasted, keeping
+        # its vendor and url intact (a pasted Mouser link stays a Mouser link).
+        existing = next((p for p in candidate.purchase if p.url == url), None)
+        if existing is not None:
+            if result.price_breaks and (not existing.price_breaks or "purchase" in overwrite):
+                existing.price_breaks = [
+                    {"qty": b.qty, "price": b.price} for b in result.price_breaks
+                ]
+            stock = result.stock.value if result.stock else None
+            if stock is not None and (existing.stock is None or "purchase" in overwrite):
+                existing.stock = stock
+
+        # Thread the datasheet onto provenance and fetch+store the PDF (the passport's
+        # datasheet requirement checks a stored path), mirroring enrich_candidate.
+        if result.datasheet_url is not None:
+            if candidate.provenance is None:
+                candidate.provenance = Provenance(source="manual")
+            if not candidate.provenance.source_url or "datasheet" in overwrite:
+                candidate.provenance.source_url = str(result.datasheet_url.value)
+            if candidate.datasheet_path is None or "datasheet" in overwrite:
+                self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
+        return candidate
+
     def enrich_candidate(self, candidate: StagingCandidate,
                          overwrite: set[str] | None = None) -> StagingCandidate:
         overwrite = overwrite or set()
+        # A pasted purchase link is a direct primary source: scrape THAT page first so
+        # a candidate with only a distributor link still fills everything (owner ask).
+        if candidate.purchase and candidate.purchase[0].url:
+            self.enrich_from_product_url(candidate, candidate.purchase[0].url, overwrite)
         mpn = candidate.mpn or candidate.entry_name or candidate.display_name
+        if not mpn:
+            # Nothing to search on (no MPN even after the product-page scrape); the
+            # blank fields stay blank rather than firing a junk empty-query search.
+            return candidate
         result = self.enrich(mpn, candidate.category)
 
         for field_name, attr in _CANDIDATE_FIELDS.items():

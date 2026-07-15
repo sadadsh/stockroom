@@ -222,6 +222,44 @@ describe("IngestPage — candidate autofill", () => {
     expect(screen.getByLabelText("Manufacturer")).toHaveValue("Texas Instruments");
   });
 
+  it("autofills from the pasted purchase link (sends purchase_url)", async () => {
+    const user = await inspectOnce([{ ...CANDIDATE, mpn: "", manufacturer: "", purchase: [] }]);
+    await screen.findByLabelText("Name");
+
+    const filled = {
+      ...CANDIDATE,
+      mpn: "MCT06030D1101BP500",
+      manufacturer: "Vishay",
+      purchase: [{ vendor: "Mouser", url: "https://www.mouser.com/ProductDetail/xyz" }],
+    };
+    mockApi.ingestEnrich.mockResolvedValue({ job_id: "j3" });
+    mockApi.openJobStream.mockResolvedValue(
+      streamOf([
+        `event: result\ndata: ${JSON.stringify({
+          result: { candidate: filled, filled: ["mpn", "manufacturer"], notes: [], missing: [] },
+        })}\n\n`,
+        "event: done\ndata: {}\n\n",
+      ]),
+    );
+
+    await user.type(
+      screen.getByLabelText("Purchase URL"),
+      "https://www.mouser.com/ProductDetail/xyz",
+    );
+    await user.click(screen.getByRole("button", { name: "Autofill" }));
+
+    expect(mockApi.ingestEnrich).toHaveBeenCalledTimes(1);
+    const body = mockApi.ingestEnrich.mock.calls[0][0];
+    // the pasted purchase link is threaded to the backend so it can scrape that page
+    expect(body.purchase_url).toBe("https://www.mouser.com/ProductDetail/xyz");
+    expect(body.candidate.purchase?.[0]?.url).toBe(
+      "https://www.mouser.com/ProductDetail/xyz",
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("Part Number")).toHaveValue("MCT06030D1101BP500"),
+    );
+  });
+
   it("surfaces the autofill notes honestly", async () => {
     const user = await inspectOnce([CANDIDATE]);
     await screen.findByLabelText("Name");

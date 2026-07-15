@@ -219,6 +219,10 @@ function CandidateCard({
       const { job_id } = await api.ingestEnrich({
         candidate: c,
         datasheet_url: dsUrl.trim() || undefined,
+        // Send the purchase link explicitly so the backend derives its real vendor
+        // (Mouser/DigiKey/LCSC from the host) and scrapes that product page to fill
+        // the rest of the identity, not just what a datasheet holds.
+        purchase_url: (c.purchase?.[0]?.url ?? "").trim() || undefined,
         datasheet_file: dsFile ?? undefined,
       });
       await enrich.run(job_id);
