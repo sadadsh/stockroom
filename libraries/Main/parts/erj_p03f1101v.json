@@ -1,0 +1,51 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/AOA0000C331.pdf"
+  },
+  "description": "Resistor, 1.1 kOhm, 1%, 0603",
+  "display_name": "ERJ-P03F1101V",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0603_1608Metric"
+  },
+  "hashes": null,
+  "id": "erj_p03f1101v",
+  "manufacturer": "Panasonic",
+  "model": null,
+  "mpn": "ERJ-P03F1101V",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V?qs=sGAEpiMZZMtG0KNrPCHnjYpPrk%252BOMd4bdFNd%2Ftqgjvc%3D"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V?qs=sGAEpiMZZMtG0KNrPCHnjYpPrk%252BOMd4bdFNd%2Ftqgjvc%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+    "Footprint": "Resistor_SMD:R_0603_1608Metric",
+    "Package": "0603",
+    "Power": "0.2 W",
+    "Resistance": "1.1 kOhm",
+    "Symbol": "Device:R",
+    "Tolerance": "1%"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R"
+  },
+  "tags": []
+}
