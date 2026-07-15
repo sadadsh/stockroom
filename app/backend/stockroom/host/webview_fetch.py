@@ -45,13 +45,47 @@ class WebViewRenderedDomFetcher:
         )
 
 
+# Text a bot-manager interstitial (Akamai / Cloudflare) shows while its JS proof of
+# work runs, BEFORE it redirects to the real page. If the DOM still reads like this we
+# must keep waiting, or we would return the challenge HTML and extract nothing.
+_CHALLENGE_MARKERS = (
+    "access denied",
+    "verifying you are human",
+    "checking your browser",
+    "enable javascript and cookies",
+    "unusual traffic",
+    "reference #",
+    "please wait while we verify",
+)
+
+
+def _looks_challenged(window) -> bool:
+    """True when the current DOM reads like a bot-manager interstitial rather than the
+    real product page. Defensive: any evaluate_js failure means "cannot tell", treated
+    as NOT challenged, so a page that simply has no body never blocks past readyState
+    complete (no regression for a normal page, which carries none of these markers)."""
+    try:
+        probe = window.evaluate_js(
+            "(document.title + ' ' + ((document.body && document.body.innerText) || ''))"
+            ".slice(0, 500).toLowerCase()"
+        ) or ""
+    except Exception:
+        return False
+    return any(marker in probe for marker in _CHALLENGE_MARKERS)
+
+
 def _wait_for_settle(window, timeout: float) -> None:
+    """Return once the DOM has loaded, stopped changing, AND no longer looks like a bot
+    challenge, or the timeout elapses. Waiting through the challenge is what lets a real
+    browser (WebView2 on the user's residential IP) reach a page an HTTP client is 403'd
+    from. On timeout we return whatever is there: a still-challenged page extracts to an
+    empty result, surfaced honestly as "nothing came back", never invented data."""
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
         ready = window.evaluate_js("document.readyState")
         length = window.evaluate_js("document.documentElement.outerHTML.length")
-        if ready == "complete" and length == last:
+        if ready == "complete" and length == last and not _looks_challenged(window):
             return
         last = length
         time.sleep(0.25)
