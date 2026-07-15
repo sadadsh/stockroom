@@ -39,6 +39,10 @@ class StagingCandidate:
     purchase: list[Purchase] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     provenance: Provenance | None = None
+    # Every parametric/procurement field enrichment recovered (package, ratings,
+    # tolerances, compliance, ...). A plain str->str bag so the whole set a distributor
+    # page exposes reaches the record, not just the handful of identity fields.
+    specs: dict = field(default_factory=dict)
 
     @property
     def chosen_footprint(self) -> Path | None:
@@ -74,6 +78,7 @@ class StagingCandidate:
             provenance=self.provenance,
             datasheet_meta=datasheet_meta,
             purchase=list(self.purchase),
+            specs=dict(self.specs),
         )
 
 

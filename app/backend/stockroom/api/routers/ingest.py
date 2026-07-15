@@ -71,6 +71,9 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
             for p in c.purchase
         ],
         "gaps": list(c.gaps),
+        # the enriched spec bag rides the inspect -> edit -> commit trip so every field
+        # a distributor page yielded reaches the committed record, not just identity
+        "specs": dict(c.specs),
         # provenance carries the datasheet source_url that to_staged_part records
         # on the committed part, so it must survive the inspect -> edit -> commit trip
         "provenance": (
@@ -113,6 +116,7 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
         tags=list(d.get("tags", [])),
         purchase=[Purchase(**p) for p in d.get("purchase", [])],
         gaps=list(d.get("gaps", [])),
+        specs=dict(d.get("specs", {})),
     )
 
 
