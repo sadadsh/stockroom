@@ -164,3 +164,82 @@ def test_unresolvable_package_left_blank_but_still_passive():
 
 def test_empty_inputs_are_not_passive():
     assert passive_add_plan(mpn="", category="", package="", specs={}, description="") is None
+
+
+# --- adversarial-review fixes: the stock R/C/L resolver is only correct for a plain,
+# 2-terminal, non-polarized chip passive; networks/arrays/polarized/variable parts must
+# NOT be offered as file-less (they need their own symbol/footprint/3D). ---
+def test_resistor_array_is_not_file_less():
+    plan = passive_add_plan(
+        mpn="CAT16-1002F4LF",
+        category="Resistor Networks & Arrays",
+        package="1206 (3216 Metric)",
+        specs={"Resistance": "10 kOhms", "Number of Resistors": "4", "Tolerance": "1%"},
+        description="Resistor Networks & Arrays 10 kOhms 1% 4 Resistors",
+    )
+    assert plan is None
+
+
+def test_tantalum_capacitor_is_not_file_less():
+    plan = passive_add_plan(
+        mpn="T491A106K010AT",
+        category="Tantalum Capacitors",
+        package="1206 (3216 Metric)",
+        specs={"Capacitance": "10 uF", "Tolerance": "10%", "Voltage Rating": "10 V"},
+        description="Tantalum Capacitors - SMD 10 uF 10 V 10%",
+    )
+    assert plan is None
+
+
+def test_aluminum_electrolytic_is_not_file_less():
+    plan = passive_add_plan(
+        mpn="EEE-1EA100WR",
+        category="Aluminum Electrolytic Capacitors - SMD",
+        package="",
+        specs={"Capacitance": "10 uF"},
+        description="Aluminum Electrolytic Capacitors 10 uF 25 V",
+    )
+    assert plan is None
+
+
+def test_trimmer_is_not_file_less():
+    plan = passive_add_plan(
+        mpn="3296W-1-103LF",
+        category="Trimmer Resistors / Potentiometers",
+        package="",
+        specs={"Resistance": "10 kOhms"},
+        description="Trimmer Resistors 10K 3296",
+    )
+    assert plan is None
+
+
+def test_multi_element_by_spec_is_not_file_less():
+    plan = passive_add_plan(
+        mpn="X",
+        category="Resistors",
+        package="0603",
+        specs={"Resistance": "10 kOhms", "Number of Resistors": "4"},
+        description="",
+    )
+    assert plan is None
+
+
+def test_active_part_mentioning_a_passive_in_prose_is_not_file_less():
+    # No exact value-spec key + a non-passive category: prose that merely says "resistor"
+    # must not classify a buck converter as a file-less passive.
+    plan = passive_add_plan(
+        mpn="TPS62130RGTR",
+        category="Integrated Circuits",
+        package="",
+        specs={"Topology": "Buck"},
+        description="Step-down converter with a resistor divider feedback",
+    )
+    assert plan is None
+
+
+def test_five_digit_case_does_not_substring_to_a_wrong_case():
+    # "01005" is not a mapped stock case; it must resolve to "" (a package picker),
+    # NEVER to the substring "0100" (a different, wrong footprint).
+    plan = passive_add_plan(mpn="X", category="Resistors", package="01005", specs={}, description="")
+    assert plan is not None
+    assert plan["package"] == ""

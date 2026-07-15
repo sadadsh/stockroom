@@ -52,7 +52,11 @@ export function mergeResultIntoCandidate(
         {
           vendor: vendorFromUrl(url),
           url,
-          price_breaks: result.price_breaks.map((b) => ({ qty: b.qty, price: b.price })),
+          price_breaks: result.price_breaks.map((b) => ({
+            qty: b.qty,
+            price: b.price,
+            currency: b.currency,
+          })),
           stock: stockNum,
         },
       ]

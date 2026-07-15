@@ -52,6 +52,8 @@ export function IngestPage() {
     setLooking(true);
     setResult(null);
     setStaged(null);
+    // Drop any in-flight ZIP inspect so its result never merges onto this new lookup.
+    job.reset();
     try {
       const r = isUrl(v) ? await api.enrichFromUrl(v) : await api.enrichPart(v);
       setResult(r);
@@ -69,7 +71,7 @@ export function IngestPage() {
     } finally {
       setLooking(false);
     }
-  }, [input, looking, toast]);
+  }, [input, looking, toast, job]);
 
   const inspect = useCallback(
     async (paths: string[], lcscIds: string[]) => {
@@ -150,7 +152,16 @@ export function IngestPage() {
 
   const busy = job.status === "running";
   const plan = result?.add_plan ?? null;
-  const nonPassive = result !== null && plan === null;
+  const pulledSomething =
+    result !== null &&
+    (!!sv(result.mpn) ||
+      !!sv(result.manufacturer) ||
+      !!sv(result.description) ||
+      Object.keys(result.specs).some((k) => k !== "product_url"));
+  // A real non-passive part (data pulled, needs its assets) vs a fetch that came back
+  // empty (blocked/not a product page) - the latter must NOT assert "needs files".
+  const nonPassive = result !== null && plan === null && pulledSomething;
+  const blockedFetch = result !== null && plan === null && !pulledSomething;
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
@@ -208,6 +219,22 @@ export function IngestPage() {
               }}
               toast={toast}
             />
+          </Card>
+        ) : null}
+
+        {blockedFetch ? (
+          <Card className="mt-4 px-4 py-4">
+            <div className="flex flex-col gap-3">
+              <span className="text-sm text-warn">
+                Nothing was pulled. The page may have blocked the fetch, or the link is not a
+                product page. Try a different link, or drop a vendor ZIP.
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+                  Browse For ZIP
+                </Button>
+              </div>
+            </div>
           </Card>
         ) : null}
 
