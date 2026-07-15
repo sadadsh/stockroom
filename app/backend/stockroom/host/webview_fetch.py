@@ -74,21 +74,38 @@ def _looks_challenged(window) -> bool:
     return any(marker in probe for marker in _CHALLENGE_MARKERS)
 
 
+# A bot interstitial (Akamai / Cloudflare) renders almost no VISIBLE text while its
+# JS runs the proof of work, then redirects to the real page. A real product page
+# renders thousands of characters. Verified live: the Mouser challenge page has 0 body
+# text (readyState already "complete", title just "mouser.com"), then the real page
+# loads with ~3500. So the load-detection signal is a substantial, STABLE body of text,
+# NOT readyState (which is "complete" on the challenge too) and NOT visible challenge
+# wording (this challenge shows none).
+_MIN_REAL_TEXT = 400
+
+
 def _wait_for_settle(window, timeout: float) -> None:
-    """Return once the DOM has loaded, stopped changing, AND no longer looks like a bot
-    challenge, or the timeout elapses. Waiting through the challenge is what lets a real
-    browser (WebView2 on the user's residential IP) reach a page an HTTP client is 403'd
-    from. On timeout we return whatever is there: a still-challenged page extracts to an
-    empty result, surfaced honestly as "nothing came back", never invented data."""
+    """Return once the page has rendered a substantial, stable body of visible text and
+    no longer looks like a bot challenge, or the timeout elapses. Waiting past the
+    (text-less) challenge is what lets a real browser reach a page an HTTP client is
+    403'd from. On timeout we return whatever is there: a still-challenged page extracts
+    to an empty result, surfaced honestly as "nothing came back", never invented data."""
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
         ready = window.evaluate_js("document.readyState")
-        length = window.evaluate_js("document.documentElement.outerHTML.length")
-        if ready == "complete" and length == last and not _looks_challenged(window):
+        text_len = window.evaluate_js(
+            "(document.body && document.body.innerText || '').length"
+        ) or 0
+        if (
+            ready == "complete"
+            and text_len == last
+            and text_len >= _MIN_REAL_TEXT
+            and not _looks_challenged(window)
+        ):
             return
-        last = length
-        time.sleep(0.25)
+        last = text_len
+        time.sleep(0.3)
 
 
 def _default_window():

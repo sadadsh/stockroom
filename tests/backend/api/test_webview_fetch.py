@@ -67,43 +67,46 @@ def test_default_window_uses_the_dedicated_fetch_window_not_the_spa_window(monke
     assert fetcher._window_provider() == "FETCH-WINDOW"
 
 
-def test_settle_waits_through_a_bot_challenge_then_returns_the_real_page():
-    # The fetch must NOT return the Akamai/Cloudflare interstitial: it waits until the
-    # challenge JS redirects to the real page. Verified live on Windows - a real WebView2
-    # reads a full Mouser product page (28 specs) that an HTTP client is 403'd from.
+def test_settle_waits_through_a_textless_bot_challenge_then_returns_the_real_page():
+    # Verified live on Windows: the Akamai challenge page has readyState "complete" but
+    # ZERO body text (a silent JS challenge, no "Access Denied" wording); the real page
+    # then loads with thousands of characters. So the settle must wait for substantial,
+    # stable visible text, not readyState and not challenge wording. Regression lock for
+    # the empty-page-returned bug.
     class _ChallengeThenReal:
         def __init__(self):
-            self.checks = 0
+            self.probes = 0
             self.loaded = None
 
         def load_url(self, url):
             self.loaded = url
 
         def _real(self):
-            return self.checks >= 3
+            return self.probes >= 4
 
         def evaluate_js(self, script):
-            html = (
-                "<html><body>ERJ-P03F1101V real product __NEXT_DATA__</body></html>"
-                if self._real()
-                else "<html><body>Access Denied reference #12.34 blocked</body></html>"
-            )
             if "readyState" in script:
                 return "complete"
-            if "outerHTML.length" in script:
-                return len(html)
+            if "innerText" in script and "length" in script:  # the text-length probe
+                self.probes += 1
+                return 1500 if self._real() else 0  # challenge renders no text
+            if "slice" in script:  # the _looks_challenged probe (title + text)
+                return "cr0603 real product page" if self._real() else "mouser.com"
             if "outerHTML" in script:
-                return html
+                return (
+                    "<html><body>CR0603 real product __NEXT_DATA__</body></html>"
+                    if self._real()
+                    else "<html><body></body></html>"
+                )
             if "location.href" in script:
                 return "https://www.mouser.com/x"
-            self.checks += 1  # the challenge probe (document.title + innerText)
-            return "access denied reference #" if not self._real() else "erj product"
+            return None
 
     win = _ChallengeThenReal()
     fetcher = WebViewRenderedDomFetcher(window_provider=lambda: win)
     r = fetcher.rendered_html("https://www.mouser.com/x", timeout=5.0)
-    assert "__NEXT_DATA__" in r.text  # the REAL page, not the interstitial
-    assert "Access Denied" not in r.text
+    assert "__NEXT_DATA__" in r.text  # the REAL page, not the empty interstitial
+    assert win.loaded == "https://www.mouser.com/x"
 
 
 @pytest.mark.windows_only
