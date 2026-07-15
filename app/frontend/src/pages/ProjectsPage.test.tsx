@@ -2477,4 +2477,46 @@ describe("Project tabs (IA)", () => {
     expect(screen.queryByTestId("editor-section")).toBeNull();
     expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
   });
+
+  it("moves between tabs with the arrow keys (roving tabindex)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    // roving tabindex: only the active tab is in the tab order
+    expect(overview).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: "Health" })).toHaveAttribute("tabindex", "-1");
+
+    overview.focus();
+    await user.keyboard("{ArrowRight}");
+    const health = screen.getByRole("tab", { name: "Health" });
+    expect(health).toHaveAttribute("aria-selected", "true");
+    expect(health).toHaveFocus();
+    expect(await screen.findByTestId("checks-section")).toBeInTheDocument();
+
+    // End jumps to the last tab, Home back to the first
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Net Classes" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("wires each tab to its panel (aria-controls + role=tabpanel + aria-labelledby)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    const panelId = overview.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveAttribute("id", panelId);
+    // the panel points back at the tab that labels it
+    expect(panel.getAttribute("aria-labelledby")).toBe(overview.getAttribute("id"));
+  });
 });
