@@ -34,9 +34,97 @@ _CANDIDATE_FIELDS = {
 
 
 def _default_url_for(mpn: str, category: str) -> str:
-    """A best-effort product-search URL for a bare MPN. Real per-site URL
-    resolution is a site extractor concern; this is the generic fallback."""
-    return f"https://www.lcsc.com/search?q={quote(mpn)}"
+    """A best-effort product URL for a bare MPN, used only by the generic ScrapeSource
+    fallback. LCSC catalogue resolution now lives in LcscSource (jlcsearch -> the real
+    product page), so this only needs to handle the two cases the scrape can still use:
+    a pasted LCSC C-id goes straight to its product-detail page (which carries the
+    __NEXT_DATA__ the extractor reads); anything else falls back to the LCSC search."""
+    ident = (mpn or "").strip()
+    from stockroom.ingest.lcsc import is_lcsc_id
+
+    if is_lcsc_id(ident):
+        return f"https://www.lcsc.com/product-detail/{ident.upper()}.html"
+    return f"https://www.lcsc.com/search?q={quote(ident)}"
+
+
+class LcscSource:
+    """Source #1: the LCSC catalogue, no API key. Resolves an MPN to its LCSC part
+    number via the free jlcsearch endpoint (package, price breaks, live stock), then
+    reads the LCSC product page's __NEXT_DATA__ for the FULL field set the JS-blind
+    scrape misses: manufacturer, description, a direct datasheet PDF, and every spec /
+    compliance / tariff / ordering field the page exposes. Structured and no-JS, so it
+    fills what the dead search-URL scrape never could. Contributes an empty result on a
+    catalogue miss or any network failure, so the registry walk is never blocked."""
+
+    name = "lcsc"
+    _PRODUCT_URL = "https://www.lcsc.com/product-detail/{lcsc}.html"
+
+    def __init__(self, http_fetcher, jlcsearch=None, limiter=None):
+        self._http = http_fetcher
+        from stockroom.enrich.jlcsearch import JlcSearchClient
+
+        self._jlc = jlcsearch or JlcSearchClient(http_fetcher)
+        self._limiter = limiter
+
+    def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult:
+        from stockroom.enrich.extract import _looks_like_datasheet_url
+        from stockroom.enrich.sites.lcsc import parse_lcsc_product
+
+        r = EnrichmentResult(category=category)
+        try:
+            hit = self._jlc.search(mpn)
+        except EnrichError:
+            return r  # a jlcsearch failure never blocks the walk
+        if hit is None:
+            return r  # not in the LCSC catalogue
+
+        # jlcsearch leg: identity we already have without the second fetch.
+        if hit.lcsc:
+            r.dist_pns["lcsc"] = hit.lcsc
+        if hit.package:
+            r.package = Sourced(hit.package, "lcsc", "medium")
+        if hit.stock is not None:
+            r.stock = Sourced(hit.stock, "lcsc", "medium")
+        if hit.price_breaks:
+            r.price_breaks = list(hit.price_breaks)
+        if hit.mpn:
+            r.mpn = Sourced(hit.mpn, "lcsc", "medium")
+        if not hit.lcsc:
+            return r
+
+        product_url = self._PRODUCT_URL.format(lcsc=hit.lcsc)
+        r.product_url = Sourced(product_url, "lcsc", "medium")
+        # the product_url spec is what the pipeline turns into a Purchase (carrying the
+        # price breaks) - this is the link that makes Build & Cost work.
+        r.specs.setdefault("product_url", Sourced(product_url, "lcsc", "medium"))
+
+        # product-page leg: the full field set from __NEXT_DATA__.
+        if self._limiter is not None:
+            self._limiter.acquire()
+        try:
+            page = self._http.get(product_url)
+            product = parse_lcsc_product(page.text)
+        except EnrichError:
+            return r  # the jlcsearch identity still stands; the page just did not load
+        if product is None:
+            return r
+
+        if product.mpn:
+            r.mpn = Sourced(product.mpn, "lcsc", "medium")
+        if product.manufacturer:
+            r.manufacturer = Sourced(product.manufacturer, "lcsc", "medium")
+        if product.description:
+            r.description = Sourced(product.description, "lcsc", "medium")
+        if product.package and r.package is None:
+            r.package = Sourced(product.package, "lcsc", "medium")
+        if product.datasheet_url and _looks_like_datasheet_url(product.datasheet_url):
+            r.datasheet_url = Sourced(product.datasheet_url, "lcsc", "medium")
+        lifecycle = product.specs.get("Lifecycle")
+        if lifecycle:
+            r.lifecycle = Sourced(lifecycle, "lcsc", "medium")
+        for label, value in product.specs.items():
+            r.specs.setdefault(label, Sourced(value, "lcsc", "medium"))
+        return r
 
 
 class PassiveFastPathSource:
@@ -147,7 +235,7 @@ class DatasheetSource:
 class EnrichmentPipeline:
     def __init__(self, cache_dir, fetcher: RenderedDomFetcher | None = None,
                  mouser=None, limiter=None, url_for=None, http_fetcher=None,
-                 mouser_limiter=None):
+                 mouser_limiter=None, jlcsearch=None):
         self.cache = TtlCache(Path(cache_dir))
         self.fetcher = fetcher or HttpRenderedDomFetcher()
         self.limiter = limiter or SlidingWindowLimiter(limit=10, window=60.0)
@@ -166,6 +254,7 @@ class EnrichmentPipeline:
         # network and its exact stock assets win.
         sources = [
             PassiveFastPathSource(),
+            LcscSource(self.http_fetcher, jlcsearch=jlcsearch, limiter=self.limiter),
             ScrapeSource(self.fetcher, self.limiter, url_for=url_for),
             DatasheetSource(fetcher=self.http_fetcher, cache_dir=self._datasheet_dir),
         ]
