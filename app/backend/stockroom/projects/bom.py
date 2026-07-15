@@ -131,6 +131,55 @@ def _lead_weeks(v):
     return int(n)
 
 
+# -- Package / RoHS derivation (the wide-BOM columns, offline) ------------------
+
+
+def package_from_footprint(footprint: str) -> str:
+    """A compact package code for the BOM's Package column, derived from a KiCad footprint
+    name offline (no network). A passive footprint (R_0603_1608Metric, R_0402) yields its
+    imperial EIA code (0603, 0402); an IC footprint (SOIC-8_3.9x4.9mm_P1.27mm, SOT-23) yields
+    its package family (SOIC-8, SOT-23). Returns "" when the name carries no recognizable
+    package (a blank is honest, never a guess); the library prefix (Resistor_SMD:) is stripped
+    first. Display-only, so it is never a grouping key."""
+    name = (footprint or "").split(":")[-1].strip()
+    if not name:
+        return ""
+    m = re.match(r"^[A-Za-z]+_(\d{3,5})(?:_|$)", name)  # R_0603_1608Metric / R_0402 -> imperial code
+    if m:
+        return m.group(1)
+    family = name.split("_", 1)[0]
+    # A real package family carries a size number or a hyphen (SOT-23, SOIC-8, QFN-32, TO-92);
+    # a bare word (Crystal, MountingHole) is not a package -> honest blank.
+    return family if re.search(r"[-\d]", family) else ""
+
+
+# Spec values that read as RoHS compliant vs not, matched case-insensitively against the value
+# of any spec whose key names RoHS (Mouser "RoHS Status", LCSC compliance, a plain "RoHS" row).
+_ROHS_YES = ("compliant", "yes", "compatible", "lead free", "lead-free", "rohs3", "rohs 3")
+
+
+def rohs_from_specs(specs) -> str:
+    """A compact RoHS verdict ("Yes" / "No" / "" ) for the BOM's RoHS column, read from a
+    part's specs dict (Mouser/LCSC label the compliance in a "RoHS"-named key). Compliant
+    values ("RoHS3 Compliant", "Lead Free", "Compliant", "Yes") map to "Yes"; explicitly
+    non-compliant values to "No"; an unreadable value passes through verbatim; a missing RoHS
+    key or a blank value is "" (unknown, never a guessed compliance)."""
+    if not isinstance(specs, dict):
+        return ""
+    for key, val in specs.items():
+        if "rohs" in str(key).lower():
+            s = str(val or "").strip()
+            if not s:
+                return ""
+            low = s.lower()
+            if low.startswith("non") or low.startswith("not") or "non-compliant" in low:
+                return "No"
+            if any(t in low for t in _ROHS_YES):
+                return "Yes"
+            return s
+    return ""
+
+
 # -- schematic read (Stockroom sexp, replacing fp_render.parse_sexpr) ----------
 
 
@@ -257,6 +306,10 @@ def _bom_from_components(comps, lookup=None,
                      "has_real_mpn": bool(g["mpn"]),
                      "footprint": g["footprint"], "datasheet": g["datasheet"] or "",
                      "description": g["description"] or "", "part_name": g["part_name"] or "",
+                     # Wide-BOM columns: package is derived offline from the footprint as a
+                     # baseline (an authoritative enrich/library package overrides it below);
+                     # rohs/category start blank and fill from the enrich layer or the library.
+                     "package": package_from_footprint(g["footprint"]), "rohs": "", "category": "",
                      "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"])})
     rows.sort(key=lambda r: (r["value"].lower(), r["footprint"].lower(),
                              _natural_ref(r["refs"][0]) if r["refs"] else ("", 0)))
@@ -351,7 +404,46 @@ def library_price_index(library_parts) -> dict:
             entry["description"] = p.description
         if best is not None and getattr(best, "url", ""):
             entry["url"] = best.url
+        # Wide-BOM columns from the part's captured specs / category, so a library-priced line
+        # carries its package + RoHS + category without a network round-trip.
+        specs = getattr(p, "specs", None)
+        if isinstance(specs, dict):
+            pkg = str(specs.get("Package") or "").strip()
+            if pkg:
+                entry["package"] = pkg
+            rohs = rohs_from_specs(specs)
+            if rohs:
+                entry["rohs"] = rohs
+        if getattr(p, "category", ""):
+            entry["category"] = p.category
         index[mpn] = entry
+    return index
+
+
+def library_spec_index(library_parts) -> dict:
+    """mpn -> {package, rohs, category} from a library part's captured specs + category, so a
+    BOM line matched to a library part surfaces those wide-table columns even when the line is
+    UNPRICED (library_price_index only indexes priced parts). Only non-blank fields are emitted;
+    a part with no MPN, or nothing to contribute, is skipped."""
+    index: dict = {}
+    for p in (library_parts or ()):
+        mpn = (getattr(p, "mpn", "") or "").strip()
+        if not mpn:
+            continue
+        specs = getattr(p, "specs", None)
+        entry: dict = {}
+        if isinstance(specs, dict):
+            pkg = str(specs.get("Package") or "").strip()
+            if pkg:
+                entry["package"] = pkg
+            rohs = rohs_from_specs(specs)
+            if rohs:
+                entry["rohs"] = rohs
+        cat = (getattr(p, "category", "") or "").strip()
+        if cat:
+            entry["category"] = cat
+        if entry:
+            index[mpn] = entry
     return index
 
 
@@ -827,7 +919,11 @@ def _price_rows(rows, price_lookup, qty_key: str):
             r["lifecycle"] = res.get("lifecycle")
         if res.get("lead_time") not in (None, ""):
             r["lead_time"] = res.get("lead_time")
-        for k in ("source", "lcsc_pn", "mouser_pn", "digikey_pn", "url", "category"):
+        # The enrich spec-table package (Mouser/LCSC) is authoritative, so it OVERRIDES the
+        # footprint-derived baseline; rohs/category only fill a value the row does not carry.
+        if res.get("package"):
+            r["package"] = res["package"]
+        for k in ("source", "lcsc_pn", "mouser_pn", "digikey_pn", "url", "category", "rohs"):
             v = res.get(k)
             if v and not r.get(k):
                 r[k] = v
@@ -926,6 +1022,17 @@ def enrichment_to_bom_lookup(result) -> dict | None:
         out["datasheet"] = _val(result.datasheet_url)
     if result.description is not None:
         out["description"] = _val(result.description)
+    # Wide-BOM columns: package (from the distributor's spec table, authoritative), the RoHS
+    # verdict (from a RoHS-named spec) and the enrich category. Each emitted only when present.
+    if result.package is not None:
+        pkg = _val(result.package)
+        if pkg:
+            out["package"] = pkg
+    rohs = rohs_from_specs({k: _val(v) for k, v in (result.specs or {}).items()})
+    if rohs:
+        out["rohs"] = rohs
+    if result.category:
+        out["category"] = result.category
     # M7d procurement fields the sourcing-risk + export layer reads off the priced row.
     if result.lifecycle is not None:
         out["lifecycle"] = _val(result.lifecycle)
@@ -1014,6 +1121,18 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
     built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index)
     rows = built["rows"]
 
+    # Fill each line's still-blank wide-BOM columns (package / rohs / category) from its matching
+    # library part's captured specs, so a library-matched line surfaces them even when unpriced
+    # (the enrich layer already overrode package + filled rohs/category for a priced line above).
+    if parts:
+        spec_index = library_spec_index(parts)
+        for r in rows:
+            entry = spec_index.get((r.get("mpn") or "").strip())
+            if entry:
+                for k, v in entry.items():
+                    if v and not r.get(k):
+                        r[k] = v
+
     n = _board_count(boards)
     summary = bom_cost_summary(rows)
     # For a run of more than one board, project the headline total at the run quantity so
@@ -1034,6 +1153,12 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
     rate = _coerce_rate(tax_rate)
     build = annotate_build_pricing(rows, n, rate)
 
+    # Fold the procurement view onto the one BOM: each line gets a stock_risk + orderable and
+    # the result carries the risk/lead roll-ups, so the wide table + its risk headline read a
+    # single source (local import breaks the bom<->procurement import cycle).
+    from stockroom.projects.procurement import annotate_procurement_fields
+    proc = annotate_procurement_fields(rows, n)
+
     _p(95, "Summarizing")
     return {
         "project": name,
@@ -1048,6 +1173,8 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
         "by_source": bom_cost_by_source(rows, n) if priced else None,
         "cost_at_qty": bom_cost_at_qty(rows, n) if (priced and n > 1) else None,
         "build": build,
+        "risks": proc["risks"],
+        "lead": proc["lead"],
     }
 
 
@@ -1073,6 +1200,11 @@ def reprice_bom(bom_result, boards, tax_rate=0.0) -> dict:
     summary["state"] = _bom_state(len(rows), priced, summary)
     summary["priced"] = priced
 
+    # Re-fold procurement over the re-costed lines: the stock-risk verdict depends on the build
+    # quantity, so a reprice must recompute it (and the roll-ups) or the table would go stale.
+    from stockroom.projects.procurement import annotate_procurement_fields
+    proc = annotate_procurement_fields(rows, n)
+
     result["lines"] = rows
     result["boards"] = n
     result["tax_rate"] = rate
@@ -1080,4 +1212,6 @@ def reprice_bom(bom_result, boards, tax_rate=0.0) -> dict:
     result["by_source"] = bom_cost_by_source(rows, n) if priced else None
     result["cost_at_qty"] = bom_cost_at_qty(rows, n) if (priced and n > 1) else None
     result["build"] = build
+    result["risks"] = proc["risks"]
+    result["lead"] = proc["lead"]
     return result
