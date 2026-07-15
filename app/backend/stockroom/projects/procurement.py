@@ -157,6 +157,25 @@ def bom_procurement_summary(rows, boards=1) -> str:
     return "BOM: " + " · ".join(pieces)
 
 
+# -- per-line procurement annotation (shared by the BOM builder + the endpoint) -----
+
+
+def annotate_procurement_fields(rows, boards=1) -> dict:
+    """Attach the per-line procurement verdict (`stock_risk` + `orderable`) to each row IN
+    PLACE for a build of `boards` boards, and return the {risks, lead} roll-ups. The single
+    place the folded BOM table's stock-risk tint, orderability and risk/lead headline are
+    computed, so a row can never disagree with the aggregate. Pure over the given rows (only
+    adds the two keys), offline, never raises. `orderable` = the line carries a usable price
+    AND its known stock covers the run (no err/warn); an unknown-stock priced line is
+    orderable (nothing says it is short), an unpriced line is not (no way to buy it yet)."""
+    n = _board_count(boards)
+    for r in rows:
+        risk = bom_line_stock_risk(r, n)
+        r["stock_risk"] = risk
+        r["orderable"] = bool(bom_line_is_priced(r)) and risk["kind"] is None
+    return {"risks": bom_sourcing_risks(rows, n), "lead": bom_lead_time(rows)}
+
+
 # -- project orchestrator ------------------------------------------------------
 
 
@@ -177,23 +196,16 @@ def project_procurement(bom_result) -> dict:
     built = bom_result.get("ran_at") is not None
     priced = bool(bom_result.get("priced"))
 
-    lines = []
-    for r in rows:
-        risk = bom_line_stock_risk(r, boards)
-        line = dict(r)
-        line["stock_risk"] = risk
-        # Orderable = priced AND stock is known and covers the run (no err/warn). An
-        # unknown-stock priced line is orderable (nothing says it is short); an unpriced
-        # line is not orderable (no way to buy it yet).
-        line["orderable"] = bool(bom_line_is_priced(r)) and risk["kind"] is None
-        lines.append(line)
+    # Annotate COPIES so the cached BOM result is never mutated by a read of the endpoint.
+    lines = [dict(r) for r in rows]
+    roll = annotate_procurement_fields(lines, boards)
 
     return {
         "built": built,
         "priced": priced,
         "boards": boards,
         "lines": lines,
-        "risks": bom_sourcing_risks(rows, boards),
-        "lead": bom_lead_time(rows),
+        "risks": roll["risks"],
+        "lead": roll["lead"],
         "summary": bom_procurement_summary(rows, boards) if rows else "",
     }

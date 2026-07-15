@@ -617,7 +617,11 @@ from stockroom.projects.bom import (  # noqa: E402
     library_enrich,
     library_match_index,
     library_price_index,
+    library_spec_index,
+    package_from_footprint,
+    rohs_from_specs,
 )
+from stockroom.projects.procurement import annotate_procurement_fields  # noqa: E402
 
 
 def _lib_resistor():
@@ -692,3 +696,139 @@ def test_project_bom_combines_library_identity_and_price(tmp_path):
     assert line["qty"] == 2 and line["manufacturer"] == "Yageo"
     assert line["source"] == "library" and line["unit_price"] == 0.10
     assert result["by_source"]["sources"].get("library") is not None
+
+
+# -- wide-BOM fields: package / rohs / category + folded procurement (M7 wide table) ---
+
+
+def test_package_from_footprint_reads_passive_eia_and_ic_family():
+    assert package_from_footprint("Resistor_SMD:R_0603_1608Metric") == "0603"
+    assert package_from_footprint("Capacitor_SMD:C_0402_1005Metric") == "0402"
+    assert package_from_footprint("Resistor_SMD:R_0402") == "0402"  # no metric suffix
+    assert package_from_footprint("L_1210_3225Metric") == "1210"  # bare name, no lib prefix
+    assert package_from_footprint("Package_SO:SOIC-8_3.9x4.9mm_P1.27mm") == "SOIC-8"
+    assert package_from_footprint("Package_TO_SOT_SMD:SOT-23") == "SOT-23"
+    assert package_from_footprint("Package_QFP:TQFP-100_14x14mm_P0.5mm") == "TQFP-100"
+    assert package_from_footprint("MountingHole:MountingHole_3.2mm") == ""  # not a package
+    assert package_from_footprint("Device:Crystal") == ""  # a bare word is not a package
+    assert package_from_footprint("") == ""
+
+
+def test_rohs_from_specs_normalizes_compliance():
+    assert rohs_from_specs({"RoHS": "RoHS3 Compliant"}) == "Yes"
+    assert rohs_from_specs({"RoHS Status": "Lead Free"}) == "Yes"
+    assert rohs_from_specs({"EU RoHS": "Compliant"}) == "Yes"
+    assert rohs_from_specs({"RoHS": "Non-Compliant"}) == "No"
+    assert rohs_from_specs({"RoHS": "Not Compliant"}) == "No"
+    assert rohs_from_specs({"Package": "0402"}) == ""  # no RoHS key -> blank
+    assert rohs_from_specs({"RoHS": ""}) == ""  # blank value -> blank
+    assert rohs_from_specs({}) == ""
+    assert rohs_from_specs(None) == ""
+
+
+def test_enrichment_to_bom_lookup_carries_package_rohs_and_category():
+    result = EnrichmentResult()
+    result.category = "Resistors"
+    result.mpn = Sourced("ERJ-P03F1101V", "mouser", "high")
+    result.package = Sourced("0603", "mouser", "high")
+    result.price_breaks = [PriceBreak(qty=1, price=0.10)]
+    result.specs = {"RoHS": Sourced("RoHS Compliant", "mouser", "high")}
+    row = enrichment_to_bom_lookup(result)
+    assert row["package"] == "0603"
+    assert row["rohs"] == "Yes"
+    assert row["category"] == "Resistors"
+
+
+def test_price_rows_overrides_footprint_package_and_fills_rohs():
+    # the enrich spec-table package (authoritative) wins over the footprint-derived baseline;
+    # rohs/category fill only when the row does not already carry them.
+    rows = [{"mpn": "X", "qty": 1, "package": "SOIC-8", "rohs": "", "category": ""}]
+    _price_rows(rows, lambda m: {"unit_price": 1.0, "package": "SO-8", "rohs": "Yes",
+                                 "category": "ICs"}, "qty")
+    assert rows[0]["package"] == "SO-8"  # enrich overrides the baseline
+    assert rows[0]["rohs"] == "Yes"
+    assert rows[0]["category"] == "ICs"
+
+
+def test_price_rows_keeps_footprint_package_when_enrich_has_none():
+    rows = [{"mpn": "X", "qty": 1, "package": "0603", "rohs": "Yes"}]
+    _price_rows(rows, lambda m: {"unit_price": 1.0, "rohs": "No"}, "qty")
+    assert rows[0]["package"] == "0603"  # no enrich package -> baseline stands
+    assert rows[0]["rohs"] == "Yes"  # a rohs already set is not clobbered
+
+
+def test_bom_rows_carry_package_from_footprint(tmp_path):
+    _write_sch(tmp_path / "b.kicad_sch",
+               _sym("R1", "10k", fp="Resistor_SMD:R_0603_1608Metric"))
+    rows = bom_from_project([str(tmp_path / "b.kicad_sch")])["rows"]
+    assert rows[0]["package"] == "0603"
+    assert rows[0]["rohs"] == "" and rows[0]["category"] == ""
+
+
+def test_library_price_index_carries_package_rohs_category():
+    p = PartRecord(id="r", display_name="10k", category="Resistors", mpn="RC0402FR-0710KL",
+                   specs={"Package": "0402", "RoHS": "RoHS Compliant"},
+                   purchase=[Purchase(vendor="Mouser", url="u",
+                                      price_breaks=[{"qty": 1, "price": 0.1}], stock=100)])
+    entry = library_price_index([p])["RC0402FR-0710KL"]
+    assert entry["package"] == "0402" and entry["rohs"] == "Yes"
+    assert entry["category"] == "Resistors"
+
+
+def test_library_spec_index_maps_mpn_to_package_rohs_category():
+    p = PartRecord(id="u", display_name="MCU", category="ICs", mpn="STM32",
+                   specs={"Package": "LQFP-48", "RoHS Status": "Compliant"})
+    idx = library_spec_index([p])
+    assert idx["STM32"] == {"package": "LQFP-48", "rohs": "Yes", "category": "ICs"}
+    # a part with no mpn is not indexed
+    assert library_spec_index([PartRecord(id="x", display_name="x", category="C")]) == {}
+
+
+def test_annotate_procurement_fields_mutates_rows_and_returns_rollups():
+    rows = [{"mpn": "A", "qty": 2, "unit_price": 1.0, "extended": 2.0, "stock": 0,
+             "lead_time": "10 Weeks"}]
+    roll = annotate_procurement_fields(rows, boards=1)
+    assert rows[0]["stock_risk"]["kind"] == "err"
+    assert rows[0]["orderable"] is False
+    assert roll["risks"]["no_stock"] == 1
+    assert roll["lead"]["max_weeks"] == 10
+
+
+def test_project_bom_folds_procurement_and_library_specs(tmp_path):
+    # a library part carries specs (Package/RoHS) that no schematic prop or footprint gives; the
+    # built BOM line surfaces them, plus the folded per-line stock risk + orderable + the roll-ups.
+    _write_sch(tmp_path / "b.kicad_sch",
+               _sym("U1", "STM32F103", lib="MCU:STM32", mpn="STM32F103", mfr="ST"))
+    part = PartRecord(id="u", display_name="MCU", category="ICs", mpn="STM32F103",
+                      manufacturer="ST",
+                      specs={"Package": "LQFP-48", "RoHS": "Compliant"},
+                      purchase=[Purchase(vendor="Mouser", url="https://mouser.com/u",
+                                         price_breaks=[{"qty": 1, "price": 2.0}], stock=0)])
+    result = project_bom(str(tmp_path), None, ["b.kicad_sch"], name="B", boards=1,
+                         library_parts=[part])
+    line = next(r for r in result["lines"] if r.get("mpn") == "STM32F103")
+    assert line["package"] == "LQFP-48"
+    assert line["rohs"] == "Yes"
+    assert line["category"] == "ICs"
+    # folded procurement: 0 stock -> stock risk err, not orderable
+    assert line["stock_risk"]["kind"] == "err"
+    assert line["orderable"] is False
+    # top-level risk/lead roll-ups fold onto the result
+    assert result["risks"]["no_stock"] == 1
+    assert result["lead"]["any"] is False
+
+
+def test_reprice_bom_refolds_procurement_risk():
+    cached = {
+        "project": "P", "priced": True, "boards": 1, "line_count": 1, "component_count": 1,
+        "lines": [{"mpn": "A", "qty": 40, "unit_price": 0.05, "stock": 100,
+                   "price_breaks": [{"qty": 1, "price": 0.05}]}],
+        "summary": {}, "by_source": None, "cost_at_qty": None,
+    }
+    # at 1 board (qty 40, stock 100) it is covered; at 4 boards (qty 160 > 100) it is short.
+    out1 = reprice_bom(cached, boards=1, tax_rate=0)
+    assert out1["lines"][0]["stock_risk"]["kind"] is None
+    assert out1["risks"]["insufficient_stock"] == 0
+    out4 = reprice_bom(cached, boards=4, tax_rate=0)
+    assert out4["lines"][0]["stock_risk"]["kind"] == "warn"
+    assert out4["risks"]["insufficient_stock"] == 1
