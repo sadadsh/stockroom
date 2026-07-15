@@ -36,6 +36,7 @@ vi.mock("../api/client", async (importActual) => {
       getChecks: vi.fn(),
       runBom: vi.fn(),
       getBom: vi.fn(),
+      repriceBom: vi.fn(),
       getProcurement: vi.fn(),
       getFab: vi.fn(),
       downloadFabExport: vi.fn(),
@@ -191,6 +192,7 @@ const BUILT: BomResult = {
   priced: true,
   line_count: 2,
   component_count: 3,
+  tax_rate: 9.52,
   lines: [
     {
       refs: ["R1", "R2"],
@@ -201,8 +203,16 @@ const BUILT: BomResult = {
       has_real_mpn: false,
       footprint: "Resistor_SMD:R_0402",
       datasheet: "",
-      description: "",
+      description: "Bulk Resistor",
       basic: true,
+      // Unpriced: the build economics still compute a final order qty (2 per board x 1
+      // board), but every cost field stays honestly null (never a fabricated price).
+      moq: null,
+      final_qty: 2,
+      final_unit_price: null,
+      final_extended: null,
+      tax_tariff: null,
+      line_total: null,
     },
     {
       refs: ["U1"],
@@ -213,12 +223,20 @@ const BUILT: BomResult = {
       has_real_mpn: true,
       footprint: "",
       datasheet: "",
-      description: "",
+      description: "USB-C Power Mux",
       basic: false,
       unit_price: 1.25,
       extended: 1.25,
       stock: 5000,
       source: "Mouser",
+      // Priced, with a MOQ of 10 exceeding the 1-per-board x 10-boards need (10 exactly),
+      // so the order rounds to the MOQ and costs at that ladder break.
+      moq: 10,
+      final_qty: 10,
+      final_unit_price: 1.25,
+      final_extended: 12.5,
+      tax_tariff: 1.19,
+      line_total: 13.69,
     },
   ],
   summary: {
@@ -232,6 +250,46 @@ const BUILT: BomResult = {
   },
   by_source: { sources: { Mouser: { total_cost: 1.25, lines: 1 } }, currency: "USD" },
   cost_at_qty: null,
+  build: {
+    build_qty: 10,
+    tax_rate: 9.52,
+    subtotal: 12.5,
+    tax_total: 1.19,
+    grand_total: 13.69,
+    priced_lines: 1,
+    unpriced_lines: 1,
+    currency: "USD",
+  },
+};
+
+// The result of reprising BUILT at a bigger build (20 boards, same tax rate): the priced
+// line's order economics scale, the passive's Final Qty doubles, and the roll-up updates,
+// all WITHOUT touching line_count/component_count (a reprice never re-groups).
+const REPRICED: BomResult = {
+  ...BUILT,
+  boards: 20,
+  lines: [
+    { ...BUILT.lines[0], final_qty: 40 },
+    {
+      ...BUILT.lines[1],
+      moq: 10,
+      final_qty: 20,
+      final_unit_price: 1.1,
+      final_extended: 22.0,
+      tax_tariff: 2.09,
+      line_total: 24.09,
+    },
+  ],
+  build: {
+    build_qty: 20,
+    tax_rate: 9.52,
+    subtotal: 22.0,
+    tax_total: 2.09,
+    grand_total: 24.09,
+    priced_lines: 1,
+    unpriced_lines: 1,
+    currency: "USD",
+  },
 };
 
 // Build an SSE body from event frames, matching the fetch-based job stream the client
@@ -599,6 +657,9 @@ const BUILDABILITY_NOT_READY = {
 };
 
 beforeEach(() => {
+  // The Build Quantity / Tax-Tariff guided inputs persist to localStorage; clear it so one
+  // test's typed value never leaks into the next test's seed defaults.
+  localStorage.clear();
   mockApi.listProjects.mockResolvedValue([NETDECK, BENCH]);
   mockApi.getProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.projectAudit.mockResolvedValue(AUDIT);
@@ -607,6 +668,7 @@ beforeEach(() => {
   mockApi.getBuildability.mockResolvedValue(BUILDABILITY_NOT_READY);
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
+  mockApi.repriceBom.mockResolvedValue(NOT_BUILT);
   mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
   mockApi.getFab.mockResolvedValue(FAB_READY);
   mockApi.downloadFabExport.mockResolvedValue(undefined);
@@ -982,17 +1044,40 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
 
-    await waitFor(() => expect(mockApi.runBom).toHaveBeenCalledWith("netdeck"));
+    // The guided inputs default to boards=1, tax=0% before any cached build seeds them.
+    await waitFor(() =>
+      expect(mockApi.runBom).toHaveBeenCalledWith("netdeck", { boards: 1, tax_rate: 0 }),
+    );
     const result = await screen.findByTestId("bom-result");
     // partial verdict: costed total plus an honest unpriced-line count (never hidden)
     expect(within(result).getByText("$1.25 Costed")).toBeInTheDocument();
     expect(within(result).getByText("1 Unpriced Line")).toBeInTheDocument();
+    // the build roll-up for the 10-board run the cached BOM carries
+    const rollup = within(result).getByTestId("bom-build-rollup");
+    expect(rollup).toHaveTextContent("For 10 Boards");
+    expect(rollup).toHaveTextContent("Subtotal $12.50");
+    expect(rollup).toHaveTextContent("Tax + Tariff $1.19");
+    expect(rollup).toHaveTextContent("Grand Total $13.69");
     // the grouped lines: the merged passive (Basic) and the priced IC
     const lines = within(result).getByTestId("bom-lines");
     expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
     expect(within(lines).getByText("Basic")).toBeInTheDocument();
     expect(within(lines).getByText("R1, R2")).toBeInTheDocument();
-    expect(within(lines).getByText("$1.25")).toBeInTheDocument();
+    expect(within(lines).getByText("USB-C Power Mux")).toBeInTheDocument();
+    expect(within(lines).getByText("Mouser")).toBeInTheDocument();
+    // the new build-economics columns: MOQ 10 forces Final Qty up to 10, priced at $1.25
+    // unit, $12.50 at that quantity, $1.19 tax/tariff, $13.69 total
+    const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(within(priceRow).getAllByText("10")).toHaveLength(2); // Min Qty and Final Qty
+    expect(within(priceRow).getByText("$1.25")).toBeInTheDocument(); // Unit Cost
+    expect(within(priceRow).getByText("$12.50")).toBeInTheDocument(); // Cost @ Qty
+    expect(within(priceRow).getByText("$1.19")).toBeInTheDocument(); // Tax/Tariff
+    expect(within(priceRow).getByText("$13.69")).toBeInTheDocument(); // Total Cost
+    // the unpriced passive still gets a real Final Qty, but every cost cell reads "-"
+    const passiveRow = within(lines).getByText("R1, R2").closest("tr") as HTMLElement;
+    expect(within(passiveRow).getByText("2")).toBeInTheDocument(); // Final Qty
+    // Vendor, Min Qty, Unit Cost, Cost @ Qty, Tax/Tariff, Total Cost: none priced/sourced
+    expect(within(passiveRow).getAllByText("-")).toHaveLength(6);
   });
 
   it("surfaces an honest error when the BOM build cannot start", async () => {
@@ -1010,7 +1095,17 @@ describe("ProjectsPage", () => {
   it("shows an honest Unpriced verdict when a build could source nothing", async () => {
     mockApi.getBom.mockResolvedValue({
       ...BUILT,
-      lines: [BUILT.lines[1]].map((l) => ({ ...l, unit_price: undefined, extended: undefined, source: undefined })),
+      lines: [BUILT.lines[1]].map((l) => ({
+        ...l,
+        unit_price: undefined,
+        extended: undefined,
+        source: undefined,
+        moq: null,
+        final_unit_price: null,
+        final_extended: null,
+        tax_tariff: null,
+        line_total: null,
+      })),
       line_count: 1,
       priced: true,
       summary: {
@@ -1066,6 +1161,79 @@ describe("ProjectsPage", () => {
     expect(await screen.findByTestId("bom-result")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rebuild BOM" })).toBeInTheDocument();
     expect(mockApi.runBom).not.toHaveBeenCalled();
+  });
+
+  it("seeds Build Quantity and Tax/Tariff from the cached build", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
+
+    expect(screen.getByTestId("build-qty-input")).toHaveValue(10); // BUILT.build.build_qty
+    expect(screen.getByTestId("tax-rate-input")).toHaveValue(9.52); // BUILT.tax_rate
+  });
+
+  it("reprices an already-built BOM when Build Quantity changes, without a rebuild", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    mockApi.repriceBom.mockResolvedValue(REPRICED);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
+
+    const input = screen.getByTestId("build-qty-input");
+    await user.clear(input);
+    await user.type(input, "20");
+    await user.tab(); // blur applies the pending reprice immediately, no debounce wait
+
+    await waitFor(() =>
+      expect(mockApi.repriceBom).toHaveBeenCalledWith("netdeck", { boards: 20, tax_rate: 9.52 }),
+    );
+    // a reprice never rebuilds: no job is started
+    expect(mockApi.runBom).not.toHaveBeenCalled();
+
+    const rollup = await screen.findByTestId("bom-build-rollup");
+    expect(rollup).toHaveTextContent("For 20 Boards");
+    expect(rollup).toHaveTextContent("Grand Total $24.09");
+    const lines = within(screen.getByTestId("bom-result")).getByTestId("bom-lines");
+    const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(within(priceRow).getByText("$22.00")).toBeInTheDocument(); // Cost @ Qty, repriced
+    expect(within(priceRow).getByText("$24.09")).toBeInTheDocument(); // Total Cost, repriced
+
+    // a re-price changes the sourcing/diff cost side exactly like a rebuild does
+    expect(mockApi.getProcurement.mock.calls.length + mockApi.getBomDiff.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it("reprices when Tax/Tariff changes, and the value sticks in localStorage across a restart", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    mockApi.repriceBom.mockResolvedValue(REPRICED);
+    const { unmount } = renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
+
+    const taxInput = screen.getByTestId("tax-rate-input");
+    await user.clear(taxInput);
+    await user.type(taxInput, "12.5");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(mockApi.repriceBom).toHaveBeenCalledWith("netdeck", { boards: 10, tax_rate: 12.5 }),
+    );
+    expect(localStorage.getItem("sr.bom.taxRate")).toBe("12.5");
+    unmount();
+
+    // A fresh mount (an app restart) on a project that has never been built: the persisted
+    // preference still seeds the guided input, never silently resetting to the 0% default.
+    mockApi.getBom.mockResolvedValue(NOT_BUILT);
+    renderPage();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    expect(await screen.findByTestId("tax-rate-input")).toHaveValue(12.5);
   });
 
   // -- Procurement (M7d) --

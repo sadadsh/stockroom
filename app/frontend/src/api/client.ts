@@ -532,14 +532,27 @@ export const api = {
   // Build a grouped, priced BOM (M7c) off the request path as a job (the built BOM
   // arrives on the job's SSE result event). No kicad-cli needed; pricing is best-effort
   // through the enrich layer, so a line that cannot be sourced stays honestly unpriced.
-  runBom(id: string): Promise<JobRef> {
-    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`);
+  // `opts` carries the build quantity + tax/tariff rate the per-line economics cost at;
+  // both default server-side (1 board, 0% tax) when omitted.
+  runBom(id: string, opts?: { boards?: number; tax_rate?: number }): Promise<JobRef> {
+    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`, {
+      body: opts ?? {},
+    });
   },
 
   // The cached last build, or an honest not-built shape (ran_at null) before the first
   // build. Read on selecting a project so a prior build renders without rebuilding.
   getBom(id: string): Promise<BomResult> {
     return apiGet<BomResult>(`/api/projects/${encodeURIComponent(id)}/bom`);
+  },
+
+  // Re-cost the CACHED BOM for a new build quantity / tax/tariff rate, purely over the
+  // already-built lines (no schematic re-read, no network, no job/SSE): synchronous.
+  // Before any build it returns the same honest not-built shape as getBom.
+  repriceBom(id: string, opts: { boards?: number; tax_rate?: number }): Promise<BomResult> {
+    return request<BomResult>("POST", `/api/projects/${encodeURIComponent(id)}/bom/reprice`, {
+      body: opts,
+    });
   },
 
   // The per-line orderability + sourcing/stock risk + lead time computed over the cached

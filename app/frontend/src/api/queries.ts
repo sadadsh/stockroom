@@ -389,6 +389,18 @@ export function useProjectBom(id: string | null) {
   });
 }
 
+// Re-cost the cached BOM for a new build quantity / tax rate, purely over the already-built
+// lines: synchronous, no job, no SSE. Unlike most mutations here this does NOT invalidate on
+// success itself; the result IS the fresh BOM, so the caller writes it straight into
+// ["project-bom", id] via setQueryData (a refetch would just re-fetch what is already in
+// hand) and invalidates the procurement/diff caches that depend on it.
+export function useRepriceBom() {
+  return useMutation({
+    mutationFn: ({ id, boards, tax_rate }: { id: string; boards?: number; tax_rate?: number }) =>
+      api.repriceBom(id, { boards, tax_rate }),
+  });
+}
+
 // The M7g ready-to-build verdict: completeness + ERC/DRC + BOM + git fused. Read-only; the
 // section reactively refetches it when the checks/BOM caches change so it never disagrees
 // with the sections below.
