@@ -148,6 +148,7 @@ def projects_router(require_token) -> APIRouter:
         if ctx.project_ops.get(project_id) is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         boards = (body or {}).get("boards", 1)
+        tax_rate = (body or {}).get("tax_rate", 0.0)
 
         def work(progress):
             price_lookup = _bom_price_lookup(ctx)
@@ -155,7 +156,7 @@ def projects_router(require_token) -> APIRouter:
             # from the library's stored prices first, the enrich layer second.
             library_parts = _library_parts(ctx)
             result = ctx.project_ops.bom(
-                project_id, boards=boards, library_parts=library_parts,
+                project_id, boards=boards, tax_rate=tax_rate, library_parts=library_parts,
                 price_lookup=price_lookup, progress=progress,
             )
             # A DELETE may have landed (and evicted the cache) during this network-bound
@@ -177,10 +178,35 @@ def projects_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such project: {project_id}")
         cached = ctx.bom_cache.get(project_id)
         if cached is None:
-            return {"project": rec.name, "ran_at": None, "boards": 1, "priced": False,
-                    "line_count": 0, "component_count": 0, "lines": [],
-                    "summary": None, "by_source": None, "cost_at_qty": None}
+            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
+                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
+                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
         return cached
+
+    @r.post("/{project_id}/bom/reprice")
+    def reprice_bom_route(request: Request, project_id: str, body: dict | None = None) -> dict:
+        # Re-cost the CACHED BOM for a new build quantity + tax/tariff rate, PURELY over the
+        # already-built lines (no schematic re-read, no network, no kicad-cli): changing the
+        # build size or the tax rate is just quantity + percentage math over the stored price
+        # ladders, so it is synchronous and instant. Re-caches so procurement/exports and a
+        # re-open see the same numbers. No cached build yet -> an honest not-built shape.
+        # Unknown id -> 404.
+        from stockroom.projects.bom import reprice_bom
+
+        ctx = request.app.state.ctx
+        rec = ctx.project_ops.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        boards = (body or {}).get("boards", 1)
+        tax_rate = (body or {}).get("tax_rate", 0.0)
+        cached = ctx.bom_cache.get(project_id)
+        if cached is None:
+            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
+                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
+                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
+        result = reprice_bom(cached, boards, tax_rate)
+        ctx.bom_cache[project_id] = result
+        return result
 
     @r.get("/{project_id}/procurement")
     def get_procurement(request: Request, project_id: str) -> dict:

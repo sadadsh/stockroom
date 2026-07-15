@@ -405,6 +405,35 @@ def test_get_bom_for_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/bom").status_code == 404
 
 
+def test_reprice_bom_recosts_the_cached_build_for_a_new_qty_and_tax(client, app_ctx, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    app_ctx.bom_cache[rec["id"]] = {
+        "project": rec["name"], "ran_at": "t", "boards": 1, "priced": True,
+        "line_count": 1, "component_count": 1,
+        "lines": [{"mpn": "X", "qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]}],
+        "summary": {"priced": True}, "by_source": None, "cost_at_qty": None,
+    }
+    body = client.post(
+        f"/api/projects/{rec['id']}/bom/reprice", json={"boards": 10, "tax_rate": 8.25}
+    ).json()
+    assert body["boards"] == 10 and body["tax_rate"] == 8.25
+    line = body["lines"][0]
+    assert line["final_qty"] == 100 and line["final_extended"] == 5.0
+    assert body["build"]["grand_total"] == round(5.0 + 5.0 * 8.25 / 100, 2)
+    # re-cached so a subsequent GET / procurement sees the same numbers
+    assert app_ctx.bom_cache[rec["id"]]["boards"] == 10
+
+
+def test_reprice_bom_before_a_build_is_an_honest_not_built_shape(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    body = client.post(f"/api/projects/{rec['id']}/bom/reprice", json={"boards": 5}).json()
+    assert body["ran_at"] is None and body["lines"] == [] and body["build"] is None
+
+
+def test_reprice_bom_for_an_unknown_project_is_a_404(client):
+    assert client.post("/api/projects/nope/bom/reprice", json={}).status_code == 404
+
+
 def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()

@@ -81,8 +81,8 @@ class ProjectOps:
             cli, name=rec.name, progress=progress,
         )
 
-    def bom(self, project_id: str, boards=1, library_parts=None, price_lookup=None,
-            progress=None) -> dict:
+    def bom(self, project_id: str, boards=1, tax_rate=0.0, library_parts=None,
+            price_lookup=None, progress=None) -> dict:
         """Build a grouped, optionally priced BOM for the registered project, COMBINING the KiCad
         schematic with the Stockroom library (M7c). `library_parts` (the active profile's
         PartRecords, injected by the router) fills each component's blank identity from its matching
@@ -94,7 +94,8 @@ class ProjectOps:
             raise FileNotFoundError(f"no such project: {project_id}")
         return project_bom(
             rec.root, rec.pro_path, rec.sheet_paths,
-            name=rec.name, boards=boards, library_parts=_resolve_parts(library_parts),
+            name=rec.name, boards=boards, tax_rate=tax_rate,
+            library_parts=_resolve_parts(library_parts),
             price_lookup=price_lookup, progress=progress,
         )
 

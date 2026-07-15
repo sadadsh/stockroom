@@ -11,6 +11,9 @@ from stockroom.projects.bom import (
     _bom_components,
     _board_count,
     _row_cost_at_qty,
+    annotate_build_pricing,
+    bom_build_rollup,
+    reprice_bom,
     bom_cost_at_qty,
     bom_cost_by_source,
     bom_cost_summary,
@@ -20,7 +23,9 @@ from stockroom.projects.bom import (
     enrichment_to_bom_lookup,
     is_basic_part,
     line_extended,
+    line_moq,
     price_at_qty,
+    price_line_at_build,
     project_bom,
     _coerce_price,
     _price_rows,
@@ -281,6 +286,92 @@ def test_price_at_qty_picks_applicable_break():
 def test_price_at_qty_tolerates_unsorted_ladder():
     ladder = [{"qty": 100, "price": 0.05}, {"qty": 1, "price": 0.10}, {"qty": 10, "price": 0.08}]
     assert price_at_qty(ladder, 50) == 0.08
+
+
+# --- Build-quantity + tax/tariff line economics (owner ask 2026-07-15) ---
+
+def test_line_moq_is_the_smallest_break_or_none():
+    assert line_moq([{"qty": 10, "price": 0.08}, {"qty": 1, "price": 0.10}]) == 1
+    assert line_moq([{"qty": 100, "price": 0.05}]) == 100
+    assert line_moq([]) is None
+    assert line_moq(None) is None
+
+
+def test_price_line_at_build_rounds_up_to_moq_and_prices_at_final_qty():
+    # 2 per board x 10 boards = 20 needed, but the part's MOQ (smallest break) is 100.
+    ladder = [{"qty": 100, "price": 0.05}, {"qty": 500, "price": 0.03}]
+    row = {"qty": 2, "price_breaks": ladder, "unit_price": 0.10}
+    line = price_line_at_build(row, build_qty=10, tax_rate=8.25)
+    assert line["moq"] == 100
+    assert line["final_qty"] == 100                 # raised from 20 up to the MOQ
+    assert line["final_unit_price"] == 0.05         # priced AT the 100-qty break
+    assert line["final_extended"] == 5.0            # 0.05 * 100
+    assert line["tax_tariff"] == round(5.0 * 8.25 / 100, 4)   # 0.4125
+    assert line["line_total"] == round(5.0 + 0.4125, 4)      # 5.4125
+    assert row == {"qty": 2, "price_breaks": ladder, "unit_price": 0.10}  # never mutated
+
+
+def test_price_line_at_build_uses_need_when_it_exceeds_moq():
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    # 30 per board x 5 boards = 150 needed, above the MOQ of 1
+    line = price_line_at_build({"qty": 30, "price_breaks": ladder}, build_qty=5, tax_rate=0)
+    assert line["final_qty"] == 150
+    assert line["final_unit_price"] == 0.05         # the 100-qty volume break applies
+    assert line["final_extended"] == 7.5
+    assert line["tax_tariff"] == 0.0                # a 0 rate adds nothing
+    assert line["line_total"] == 7.5
+
+
+def test_price_line_at_build_unpriced_line_keeps_qty_but_no_money():
+    line = price_line_at_build({"qty": 3}, build_qty=4, tax_rate=8.0)
+    assert line["final_qty"] == 12 and line["moq"] is None
+    assert line["final_unit_price"] is None
+    assert line["final_extended"] is None
+    assert line["tax_tariff"] is None and line["line_total"] is None
+
+
+def test_bom_build_rollup_subtotal_tax_and_grand_total():
+    rows = [
+        {"qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]},   # -> 100 @ 0.05 = 5.00
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},     # -> 10  @ 2.00 = 20.00
+        {"qty": 5, "unit_price": None},                              # unpriced
+    ]
+    roll = bom_build_rollup(rows, build_qty=10, tax_rate=10)
+    assert roll["build_qty"] == 10 and roll["tax_rate"] == 10.0
+    assert roll["subtotal"] == 25.0
+    assert roll["tax_total"] == 2.5
+    assert roll["grand_total"] == 27.5
+    assert roll["priced_lines"] == 2 and roll["unpriced_lines"] == 1
+
+
+def test_annotate_build_pricing_writes_the_columns_onto_each_row():
+    rows = [{"qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]}]
+    roll = annotate_build_pricing(rows, boards=10, tax_rate=8.25)
+    r = rows[0]
+    assert r["moq"] == 100 and r["final_qty"] == 100
+    assert r["final_unit_price"] == 0.05 and r["final_extended"] == 5.0
+    assert r["line_total"] == round(5.0 + 5.0 * 8.25 / 100, 4)
+    assert roll["grand_total"] == round(5.0 + 5.0 * 8.25 / 100, 2)
+
+
+def test_reprice_bom_recomputes_over_cached_lines_without_a_rebuild():
+    cached = {
+        "project": "P", "priced": True, "boards": 1, "line_count": 2, "component_count": 3,
+        "lines": [
+            {"mpn": "A", "qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]},
+            {"mpn": "B", "qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},
+        ],
+        "summary": {"total_cost": 2.1}, "by_source": None, "cost_at_qty": None,
+    }
+    out = reprice_bom(cached, boards=10, tax_rate=10)
+    assert out["boards"] == 10 and out["tax_rate"] == 10.0
+    # per-line columns reflect the new build quantity
+    assert out["lines"][0]["final_qty"] == 100 and out["lines"][0]["final_extended"] == 5.0
+    assert out["lines"][1]["final_qty"] == 10 and out["lines"][1]["final_extended"] == 20.0
+    # the roll-up totals the re-costed lines + tax
+    assert out["build"]["subtotal"] == 25.0 and out["build"]["grand_total"] == 27.5
+    # the source result is not mutated (a new dict + copied rows)
+    assert cached["boards"] == 1 and "final_qty" not in cached["lines"][0]
 
 
 def test_price_rows_uses_volume_price_for_line_qty():

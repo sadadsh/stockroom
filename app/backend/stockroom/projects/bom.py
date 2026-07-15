@@ -590,6 +590,114 @@ def line_extended(unit_price, qty):
     return round(p * q, 4) if (p is not None and q) else None
 
 
+def _coerce_rate(v) -> float:
+    """A tax/tariff percentage ('8.25', '8.25%', 8.25, None) -> a non-negative float,
+    or 0.0 when unparseable (a rate we cannot read never inflates a total)."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v) if v >= 0 else 0.0
+    s = str(v).strip().rstrip("%").replace(",", "")
+    try:
+        r = float(s)
+    except (TypeError, ValueError):
+        return 0.0
+    return r if r >= 0 else 0.0
+
+
+def line_moq(price_breaks) -> int | None:
+    """A line's minimum order quantity: the smallest quantity on its price ladder (the
+    fewest a distributor will sell). None when the ladder is empty or unparseable (an
+    unpriced or value-only part has no MOQ)."""
+    if not price_breaks:
+        return None
+    try:
+        qtys = [int(b["qty"]) for b in price_breaks]
+    except (TypeError, ValueError, KeyError):
+        return None
+    return min(qtys) if qtys else None
+
+
+def price_line_at_build(row, build_qty, tax_rate=0.0) -> dict:
+    """The order economics for ONE BOM line at a build of `build_qty` boards, taxed at
+    `tax_rate` percent. Pure: never mutates `row`. Returns:
+      moq              the smallest price-break quantity (the minimum orderable), or None
+      final_qty        per_board_qty * build_qty, RAISED to the MOQ (you cannot order
+                       fewer than the minimum), unit-priced at that quantity
+      final_unit_price the ladder price at final_qty (a bigger run buys a cheaper break),
+                       else the stored qty-1 unit_price; None when the line is unpriced
+      final_extended   final_unit_price * final_qty; None when unpriced
+      tax_tariff       final_extended * tax_rate / 100; None when unpriced
+      line_total       final_extended + tax_tariff; None when unpriced
+    """
+    per_board = _bom_line_qty(row)
+    build = _board_count(build_qty)
+    needed = per_board * build
+    ladder = row.get("price_breaks")
+    moq = line_moq(ladder)
+
+    final_qty = needed
+    if needed > 0 and moq is not None and moq > needed:
+        final_qty = moq  # round up to the minimum order
+
+    unit = _coerce_price(price_at_qty(ladder, final_qty)) if ladder else None
+    if unit is None:
+        unit = _coerce_price(row.get("unit_price"))
+    extended = round(unit * final_qty, 4) if (unit is not None and final_qty) else None
+
+    rate = _coerce_rate(tax_rate)
+    tax = round(extended * rate / 100.0, 4) if extended is not None else None
+    total = round(extended + tax, 4) if extended is not None else None
+    return {
+        "moq": moq,
+        "final_qty": final_qty,
+        "final_unit_price": unit,
+        "final_extended": extended,
+        "tax_tariff": tax,
+        "line_total": total,
+    }
+
+
+def bom_build_rollup(rows, build_qty, tax_rate=0.0) -> dict:
+    """Roll a priced BOM up for a build of `build_qty` boards taxed at `tax_rate`%: the
+    subtotal (sum of every priced line's final_extended), the tax/tariff total on that
+    subtotal, and the grand total, plus priced/unpriced counts. Pure. Mirrors
+    price_line_at_build so the roll-up and the per-line columns always agree."""
+    build = _board_count(build_qty)
+    rate = _coerce_rate(tax_rate)
+    subtotal = 0.0
+    priced = unpriced = 0
+    for r in rows:
+        line = price_line_at_build(r, build, rate)
+        if line["final_extended"] is None:
+            unpriced += 1
+        else:
+            subtotal += line["final_extended"]
+            priced += 1
+    subtotal = round(subtotal, 2)
+    tax_total = round(subtotal * rate / 100.0, 2)
+    return {
+        "build_qty": build,
+        "tax_rate": rate,
+        "subtotal": subtotal,
+        "tax_total": tax_total,
+        "grand_total": round(subtotal + tax_total, 2),
+        "priced_lines": priced,
+        "unpriced_lines": unpriced,
+        "currency": "USD",
+    }
+
+
+def annotate_build_pricing(rows, boards=1, tax_rate=0.0) -> dict:
+    """Attach the per-line build economics (moq / final_qty / final_unit_price /
+    final_extended / tax_tariff / line_total) to each row IN PLACE for a build of `boards`
+    boards taxed at `tax_rate`%, and return the roll-up. The single place the per-line
+    columns and the roll-up are computed, so the table and the totals always agree."""
+    for r in rows:
+        r.update(price_line_at_build(r, boards, tax_rate))
+    return bom_build_rollup(rows, boards, tax_rate)
+
+
 def bom_cost_summary(rows) -> dict:
     """Roll up a BOM's line costs. Sums the extended cost of every PRICED line and
     counts unpriced lines separately, so a partial total is never mistaken for the whole.
@@ -862,7 +970,7 @@ def _bom_state(line_count: int, priced: bool, summary: dict) -> str:
     return "costed"
 
 
-def project_bom(root, pro_path, sheet_paths, name="", boards=1,
+def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
                 price_lookup=None, progress=None, library_parts=None) -> dict:
     """Build a grouped, optionally priced BOM for a registered project (M7c), combining the KiCad
     schematic with the Stockroom library (M7c library-combining).
@@ -920,11 +1028,18 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
     summary["state"] = _bom_state(built["line_count"], priced, summary)
     summary["priced"] = priced
 
+    # Attach the per-line build economics (MOQ, final order qty, unit cost at that qty,
+    # cost@qty, tax/tariff, line total) and the priced roll-up. Annotated for every build,
+    # priced or not, so the quantity columns show even when a line is unpriced.
+    rate = _coerce_rate(tax_rate)
+    build = annotate_build_pricing(rows, n, rate)
+
     _p(95, "Summarizing")
     return {
         "project": name,
         "ran_at": _utc_now_iso(),
         "boards": n,
+        "tax_rate": rate,
         "priced": priced,
         "line_count": built["line_count"],
         "component_count": built["component_count"],
@@ -932,4 +1047,37 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
         "summary": summary,
         "by_source": bom_cost_by_source(rows, n) if priced else None,
         "cost_at_qty": bom_cost_at_qty(rows, n) if (priced and n > 1) else None,
+        "build": build,
     }
+
+
+def reprice_bom(bom_result, boards, tax_rate=0.0) -> dict:
+    """Re-cost an EXISTING BOM result for a new build quantity + tax/tariff rate, PURELY
+    over its already-built lines (their stored price_breaks) - no schematic re-read, no
+    network. Returns a NEW result dict with re-annotated lines, an updated build roll-up,
+    boards, tax_rate, and the scaled summary/by_source/cost_at_qty. The cached BOM's raw
+    lines are the source of truth; only the quantity + tax math changes."""
+    n = _board_count(boards)
+    rate = _coerce_rate(tax_rate)
+    result = dict(bom_result)
+    rows = [dict(r) for r in (bom_result.get("lines") or [])]
+    priced = bool(bom_result.get("priced"))
+
+    build = annotate_build_pricing(rows, n, rate)
+    summary = bom_cost_summary(rows)
+    if priced and n > 1:
+        at_qty = bom_cost_at_qty(rows, n)
+        summary["total_cost"] = at_qty["total_cost"]
+        summary["priced_lines"] = at_qty["priced_lines"]
+        summary["unpriced_lines"] = at_qty["unpriced_lines"]
+    summary["state"] = _bom_state(len(rows), priced, summary)
+    summary["priced"] = priced
+
+    result["lines"] = rows
+    result["boards"] = n
+    result["tax_rate"] = rate
+    result["summary"] = summary
+    result["by_source"] = bom_cost_by_source(rows, n) if priced else None
+    result["cost_at_qty"] = bom_cost_at_qty(rows, n) if (priced and n > 1) else None
+    result["build"] = build
+    return result
