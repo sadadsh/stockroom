@@ -22,7 +22,10 @@ def test_jsonld_product_extracts_the_high_value_fields():
     assert r.manufacturer.value == "Texas Instruments"
     assert "step-down" in r.description.value
     assert r.price_breaks and r.price_breaks[0].price == 1.23
-    assert r.stock.value  # InStock mapped truthy
+    # A boolean schema.org InStock flag is NOT a numeric stock count: it must NOT be
+    # fabricated into stock=1 (roadmap #12), which would drive false shortage warnings and
+    # pre-empt the real distributor stock. Unknown stock stays None (an honest non-risk).
+    assert r.stock is None
 
 
 def test_opengraph_extracts_title_and_description_at_medium_confidence():

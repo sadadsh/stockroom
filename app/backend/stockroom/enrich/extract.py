@@ -133,11 +133,12 @@ def extract_jsonld_product(html: str) -> EnrichmentResult:
             ds = _datasheet_url(obj)
             if ds:
                 r.datasheet_url = Sourced(ds, "jsonld", "high")
-            breaks, in_stock = _offers_to_breaks(obj.get("offers"))
+            breaks, _in_stock = _offers_to_breaks(obj.get("offers"))
             if breaks:
                 r.price_breaks = breaks
-            if in_stock:
-                r.stock = Sourced(1, "jsonld", "medium")
+            # A schema.org availability flag is a BOOLEAN, not a stock count: never fabricate
+            # it into stock=1 (roadmap #12). A real numeric stock comes from the distributor
+            # API (mouser.py); an unscraped stock stays None, an honest non-risk.
             return r  # first Product wins
     return r
 
