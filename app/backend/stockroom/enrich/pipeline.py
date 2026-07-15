@@ -39,6 +39,54 @@ def _default_url_for(mpn: str, category: str) -> str:
     return f"https://www.lcsc.com/search?q={quote(mpn)}"
 
 
+def _synth_passive_description(spec) -> str:
+    """A deterministic, offline description for a decoded passive, e.g.
+    "Resistor, 1.1 kOhm, 1%, 0603". Built only from facts actually decoded."""
+    head = {"resistor": "Resistor", "capacitor": "Capacitor",
+            "inductor": "Inductor"}.get(spec.kind, spec.kind.title())
+    parts = [head] + [p for p in (spec.value, spec.tolerance, spec.package) if p]
+    return ", ".join(parts)
+
+
+class PassiveFastPathSource:
+    """Source #0: the offline passive fast path. A resistor/capacitor/inductor MPN
+    decodes deterministically (no network, no API) into its value/tolerance/package/
+    power and resolves the KiCad stock symbol/footprint/3D it should use, so a passive
+    enriches fully with zero network (the owner's "drop the MPN and you are done"
+    path). Contributes nothing for a non-passive MPN, so the registry walk continues."""
+
+    name = "passive"
+
+    def __init__(self, footprints_root=None):
+        self._footprints_root = footprints_root
+
+    def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult:
+        from stockroom.enrich.passive import parse_passive_mpn, resolve_passive_assets
+
+        r = EnrichmentResult(category=category)
+        spec = parse_passive_mpn(mpn)
+        if spec is None:
+            return r  # not a decodable passive; the walk continues untouched
+        if spec.mpn:
+            r.mpn = Sourced(spec.mpn, "passive", "high")
+        if spec.manufacturer:
+            r.manufacturer = Sourced(spec.manufacturer, "passive", "high")
+        if spec.package:
+            r.package = Sourced(spec.package, "passive", "high")
+        desc = _synth_passive_description(spec)
+        if desc:
+            r.description = Sourced(desc, "passive", "medium")
+        for key, val in spec.to_specs().items():
+            r.specs.setdefault(key, Sourced(val, "passive", "high"))
+        if spec.package:
+            assets = resolve_passive_assets(spec.kind, spec.package, self._footprints_root)
+            if assets is not None:
+                r.specs.setdefault("Symbol", Sourced(assets.symbol, "passive", "high"))
+                r.specs.setdefault("Footprint", Sourced(assets.footprint, "passive", "high"))
+                r.specs.setdefault("3D Model", Sourced(assets.model_3d, "passive", "high"))
+        return r
+
+
 class ScrapeSource:
     name = "scrape"
 
@@ -120,10 +168,13 @@ class EnrichmentPipeline:
         # HttpFetcher; injectable so tests never touch the network.
         self.http_fetcher = http_fetcher or HttpFetcher()
         self._datasheet_dir = Path(cache_dir) / "datasheets"
-        # Default registry: scrape (surfaces a datasheet_url) -> datasheet (follows
-        # it, the ban-proof primary source) -> optional Mouser. Each fills only what
-        # is still missing (spec section 6.1).
+        # Default registry: passive fast path (offline, deterministic, no network) ->
+        # scrape (surfaces a datasheet_url) -> datasheet (follows it, the ban-proof
+        # primary source) -> optional Mouser. Each fills only what is still missing
+        # (spec section 6.1); the passive path runs first so a passive never needs the
+        # network and its exact stock assets win.
         sources = [
+            PassiveFastPathSource(),
             ScrapeSource(self.fetcher, self.limiter, url_for=url_for),
             DatasheetSource(fetcher=self.http_fetcher, cache_dir=self._datasheet_dir),
         ]
