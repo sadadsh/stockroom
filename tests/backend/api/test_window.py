@@ -4,8 +4,10 @@ import pytest
 
 from stockroom.host.window import (
     active_window,
+    drop_forward_js,
     dropped_paths_to_inspect_body,
     inject_script,
+    native_drop_paths,
     should_inject,
 )
 
@@ -24,6 +26,54 @@ def test_dropped_paths_empty_is_an_empty_inspect_body():
 
 def test_active_window_is_none_before_a_window_runs():
     assert active_window() is None
+
+
+# -- native drop (WebView2 only exposes real paths to pywebview-registered handlers) --
+
+
+def test_native_drop_paths_extracts_pywebview_full_paths():
+    event = {
+        "dataTransfer": {
+            "files": [
+                {"name": "part.zip", "pywebviewFullPath": "C:\\Users\\me\\part.zip"},
+                {"name": "model.step", "pywebviewFullPath": "C:\\Users\\me\\model.step"},
+            ]
+        }
+    }
+    assert native_drop_paths(event) == [
+        "C:\\Users\\me\\part.zip",
+        "C:\\Users\\me\\model.step",
+    ]
+
+
+def test_native_drop_paths_skips_files_without_a_path():
+    event = {
+        "dataTransfer": {
+            "files": [
+                {"name": "a.zip"},  # WebView2 exposed no path for this one
+                "not-a-dict",
+                {"name": "b.zip", "pywebviewFullPath": ""},
+                {"name": "c.zip", "pywebviewFullPath": "C:\\c.zip"},
+            ]
+        }
+    }
+    assert native_drop_paths(event) == ["C:\\c.zip"]
+
+
+def test_native_drop_paths_tolerates_a_malformed_event():
+    assert native_drop_paths({}) == []
+    assert native_drop_paths({"dataTransfer": None}) == []
+    assert native_drop_paths({"dataTransfer": {"files": None}}) == []
+    assert native_drop_paths(None) == []
+
+
+def test_drop_forward_js_is_guarded_and_json_safe():
+    tricky = 'C:\\Users\\quo"te\\part.zip'
+    js = drop_forward_js([tricky])
+    # guarded: a renderer that has not registered the hook is a no-op, not an error
+    assert js.startswith("window.__STOCKROOM_NATIVE_DROP__ &&")
+    # JSON-encoded so a quote or backslash in a path cannot break out of the script
+    assert json.dumps([tricky]) in js
 
 
 def test_inject_script_hands_the_spa_the_base_and_token():

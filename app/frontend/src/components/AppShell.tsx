@@ -3,7 +3,7 @@
  * their own body (header + panes); the shell owns the rail and the surface
  * background so every page reads consistent.
  */
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useEffect, type ReactNode } from "react";
 import { Rail } from "./Rail";
 import { DropOverlay } from "./DropOverlay";
 import { CommandPalette } from "./CommandPalette";
@@ -21,6 +21,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     },
     [navigate],
   );
+  // The real drop channel on Windows: WebView2 only exposes dropped-file paths to
+  // the HOST (via pywebview's DOM API), which forwards them through this hook. The
+  // in-window DropOverlay still provides the drag scrim and covers any backend that
+  // does expose pywebviewFullPath to the DOM.
+  useEffect(() => {
+    window.__STOCKROOM_NATIVE_DROP__ = (paths) => {
+      const clean = Array.isArray(paths)
+        ? paths.filter((p): p is string => typeof p === "string" && p.length > 0)
+        : [];
+      if (clean.length > 0) handleDrop(clean);
+    };
+    return () => {
+      delete window.__STOCKROOM_NATIVE_DROP__;
+    };
+  }, [handleDrop]);
   return (
     <div className="flex min-h-screen w-full bg-surface text-t1">
       <Rail />

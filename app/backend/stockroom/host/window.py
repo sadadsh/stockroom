@@ -53,6 +53,36 @@ def dropped_paths_to_inspect_body(paths: list[str]) -> dict:
     return {"paths": list(paths), "lcsc_ids": []}
 
 
+def native_drop_paths(event) -> list[str]:
+    """The real filesystem paths from a pywebview DOM drop event. WebView2 exposes
+    a dropped file's path (pywebviewFullPath) ONLY to handlers registered through
+    pywebview's DOM API, so this is the one channel that ever sees them. Defensive
+    against any malformed event shape: junk yields [], never a crash."""
+    try:
+        files = (event or {}).get("dataTransfer", {}).get("files") or []
+    except AttributeError:
+        return []
+    paths: list[str] = []
+    for f in files:
+        if not isinstance(f, dict):
+            continue
+        path = f.get("pywebviewFullPath")
+        if isinstance(path, str) and path:
+            paths.append(path)
+    return paths
+
+
+def drop_forward_js(paths: list[str]) -> str:
+    """The renderer call that hands native drop paths to the SPA's ingest queue.
+    Guarded so a renderer that has not registered the hook is a no-op, and
+    JSON-encoded so a quote or backslash in a path cannot break out of the script."""
+    encoded = json.dumps(list(paths))
+    return (
+        "window.__STOCKROOM_NATIVE_DROP__ && "
+        f"window.__STOCKROOM_NATIVE_DROP__({encoded});"
+    )
+
+
 def inject_script(base_url: str, token: str) -> str:
     """The renderer bootstrap: set the two globals the SPA actually reads: the
     frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__,
@@ -106,24 +136,60 @@ def run_window(base_url: str, token: str) -> None:
     )
     _ACTIVE_WINDOW = window
 
+    def _spa_is_current() -> bool:
+        try:
+            current = window.get_current_url()
+        except Exception:  # noqa: BLE001 - a backend without get_current_url fails closed
+            current = None
+        return should_inject(current, base_url)
+
+    def _on_native_drop(event) -> None:
+        # Forward the dropped files' real paths into the SPA's ingest queue, but only
+        # while the loopback SPA is the loaded page (never a remote page).
+        if not _spa_is_current():
+            return
+        paths = native_drop_paths(event)
+        if paths:
+            window.evaluate_js(drop_forward_js(paths))
+
+    drop_bound = {"value": False}
+
+    def _bind_native_drop() -> None:
+        # WebView2 exposes dropped-file paths ONLY to handlers registered through
+        # pywebview's DOM API; the frontend's window.addEventListener('drop') gets File
+        # objects with NO path. So the host registers the real handler here and hands
+        # the paths to the SPA via the guarded __STOCKROOM_NATIVE_DROP__ hook. Bound
+        # once (loaded fires on every SPA reload). Degrades honestly: on a pywebview
+        # without DOM events the native file picker still covers adding parts.
+        if drop_bound["value"]:
+            return
+        try:
+            from webview.dom import DOMEventHandler
+
+            window.dom.document.events.dragover += DOMEventHandler(
+                lambda e: None, prevent_default=True, stop_propagation=False, debounce=500
+            )
+            window.dom.document.events.drop += DOMEventHandler(
+                _on_native_drop, prevent_default=True, stop_propagation=False
+            )
+            drop_bound["value"] = True
+        except Exception:  # noqa: BLE001 - drag-drop is an enhancement over the picker
+            pass
+
     def _on_loaded():
         # Re-inject on every SPA load (after a self-update reload or route change the
         # renderer must always carry the base + token), but ONLY when the loaded page
         # is the loopback SPA origin (never a remote page), so the token can never leak
         # to remote web content (defense in depth on top of the dedicated fetch window).
-        try:
-            current = window.get_current_url()
-        except Exception:  # noqa: BLE001 - a backend without get_current_url fails closed
-            current = None
-        if should_inject(current, base_url):
-            window.evaluate_js(inject_script(base_url, token))
+        if not _spa_is_current():
+            return
+        window.evaluate_js(inject_script(base_url, token))
+        _bind_native_drop()
 
     window.events.loaded += _on_loaded
-    # Adding a vendor ZIP goes through the native file picker exposed as
-    # window.pywebview.api.pick_ingest_files (js_api above): the frontend Ingest page gets real
-    # filesystem paths and runs its normal inspect flow. Plain-DOM drag-drop is NOT relied on:
-    # pywebview only injects a dropped file's full path when a drop handler is registered through
-    # its own Python DOM API, so a browser-style window.addEventListener('drop') yields no paths.
+    # Adding a vendor ZIP also works through the native file picker exposed as
+    # window.pywebview.api.pick_ingest_files (js_api above), the fallback path that
+    # never depends on the drag-drop DOM registration above.
     try:
         webview.start()  # blocks until the window closes
     finally:
