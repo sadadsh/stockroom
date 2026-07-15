@@ -135,6 +135,40 @@ def test_inductor_is_detected():
     assert spec.kind == "inductor"
 
 
+def test_murata_power_inductor_does_not_emit_a_wrong_value():
+    # LQH/LQM power inductors carry a type code (e.g. "CN") that the nH decoder used
+    # to misread as a value ~10^5 off (LQH32CN100K23 is 10 uH, not 0.1 nH). Murata
+    # case codes are also per-series and not a clean EIA case, so we now emit NEITHER
+    # a value NOR a package offline (jlcsearch fills them); only the kind is asserted.
+    spec = parse_passive_mpn("LQH32CN100K23")
+    assert spec is not None and spec.kind == "inductor"
+    assert spec.value == "" and spec.value_henries is None
+    assert spec.package == ""
+
+
+def test_erj_pa3_does_not_inherit_the_p03_power_rating():
+    # ERJ-PA3 (0603 anti-surge) is rated 0.25 W, NOT the ERJ-P03's 0.20 W. Only the
+    # grounded ERJ-P03 hardcodes a power; PA3 must not be mislabelled 0.2 W.
+    spec = parse_passive_mpn("ERJ-PA3F1002V")
+    assert spec is not None and spec.kind == "resistor"
+    assert spec.value_ohms == pytest.approx(10000.0)
+    assert spec.tolerance == "1%"
+    assert spec.package == "0603"
+    assert spec.power != "0.2 W"
+
+
+def test_erj_p03_still_gets_its_grounded_power():
+    assert parse_passive_mpn("ERJ-P03F1101V").power == "0.2 W"
+
+
+def test_resolve_2220_and_1218_map_to_real_kicad_footprints():
+    # Verified against the installed KiCad 10 libraries.
+    c = resolve_passive_assets("capacitor", "2220", footprints_root=None)
+    assert c is not None and c.footprint == "Capacitor_SMD:C_2220_5750Metric"
+    r = resolve_passive_assets("resistor", "1218", footprints_root=None)
+    assert r is not None and r.footprint == "Resistor_SMD:R_1218_3246Metric"
+
+
 def test_non_passive_mpn_returns_none():
     assert parse_passive_mpn("STM32F103C8T6") is None
     assert parse_passive_mpn("LM317T") is None
