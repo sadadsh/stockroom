@@ -94,13 +94,15 @@ jobs:
 
             Download `Stockroom.exe` below and run it. On first launch it clones the app repo to
             `%LOCALAPPDATA%\Stockroom\app`, provisions the environment with uv, opens the WebView2
-            window, and shows the onboarding screen (open, clone, or create your library). Updates are a
-            git pull from the in-app Update control; the exe itself never re-downloads.
+            window, and opens straight on the bundled library. Updates flow by git pull: the launcher
+            reconciles the latest code on every launch and the in-app Update control does the same, so
+            once you install this build, future commits self-update automatically (no re-download).
 
             Requirements on the target machine: git and uv (https://astral.sh/uv) on PATH, the WebView2
             runtime (bundled with current Windows), internet on first run, and 64-bit Windows. KiCad 10
-            for the ERC/DRC and preview features.
+            for the ERC/DRC, fab-export, and preview features.
 
-            Marked pre-release: the exe is built and its launcher chain is tested on Linux, but the actual
-            Windows launch (the WebView2 window, first-run onboarding, and a self-update cycle) has not
-            yet been verified on a real Windows machine. Promote to a full release once that passes.
+            Marked pre-release: the full fresh-device flow (clone, uv sync, every backend feature, ERC/DRC
+            and fab export via the real Windows kicad-cli) is verified on real Windows; the remaining
+            manual check is the WebView2 window's on-screen rendering. Promote to a full release once
+            that visual pass is done.
