@@ -586,6 +586,30 @@ export interface BomLine {
   mouser_pn?: string;
   lcsc_pn?: string;
   digikey_pn?: string;
+  // Per-line build economics (M7... reprice): the order quantity and cost at a chosen
+  // build size + tax/tariff rate. Present after a build/reprice; optional so an older
+  // cached shape (before this field existed) still typechecks. final_qty is always a
+  // real number once attached (never invented, but never absent either); the cost
+  // fields are null when the line itself could not be priced.
+  moq?: number | null;
+  final_qty?: number;
+  final_unit_price?: number | null;
+  final_extended?: number | null;
+  tax_tariff?: number | null;
+  line_total?: number | null;
+}
+
+// The BOM roll-up for one build: build_qty boards at tax_rate percent, summed over every
+// priced line's final_extended (+ tax). Only present once a build has been costed.
+export interface BuildRollup {
+  build_qty: number;
+  tax_rate: number;
+  subtotal: number;
+  tax_total: number;
+  grand_total: number;
+  priced_lines: number;
+  unpriced_lines: number;
+  currency: string;
 }
 
 // The BOM cost roll-up. state is the honest verdict: "empty" (no lines), "built"
@@ -625,6 +649,10 @@ export interface BomResult {
     unpriced_lines: number;
     currency: string;
   } | null;
+  // The tax/tariff rate (percent) the cached build was costed at, and the build-size cost
+  // roll-up. Optional so an older cached shape (before this field existed) still typechecks.
+  tax_rate?: number;
+  build?: BuildRollup | null;
 }
 
 // --- Procurement (M7d) ---

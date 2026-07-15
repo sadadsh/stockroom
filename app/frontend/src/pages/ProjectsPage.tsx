@@ -16,7 +16,7 @@
  * blank frame); loading and error surfaces are explicit; a connection failure shows
  * a retry surface, never a crash.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import {
@@ -51,6 +51,7 @@ import {
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
+  useRepriceBom,
 } from "../api/queries";
 import type {
   AuditFinding,
@@ -62,6 +63,7 @@ import type {
   BomExportKind,
   BomLine,
   BomResult,
+  BuildRollup,
   CheckFinding,
   CheckRun,
   ChecksResult,
@@ -1106,19 +1108,42 @@ function countLabel(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
-// -- Build And Cost (BOM grouping + cost, M7c) -------------------------------
+// -- Build And Cost (BOM grouping + cost, M7c + build-economics reprice) -----
+
+const BUILD_QTY_KEY = "sr.bom.buildQty";
+const TAX_RATE_KEY = "sr.bom.taxRate";
 
 function formatMoney(n: number, currency: string): string {
   const sym = currency === "USD" ? "$" : "";
   return `${sym}${n.toFixed(2)}`;
 }
 
-function unitPriceLabel(line: BomLine): string {
-  if (line.unit_price === undefined || line.unit_price === null || line.unit_price === "") {
-    return "";
+// A per-line build-economics cell: "-" for a field that was never priced, never a
+// fabricated $0.00.
+function moneyOrDash(n: number | null | undefined, currency = "USD"): string {
+  return n == null ? "-" : formatMoney(n, currency);
+}
+
+// A guided-input value persisted in localStorage so the Build Quantity / Tax-Tariff inputs
+// "stick" across an app restart. A read/write failure (private mode, quota) falls back to
+// the given default for this session only, never a crash.
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    return fallback;
   }
-  const n = typeof line.unit_price === "number" ? line.unit_price : Number(line.unit_price);
-  return Number.isFinite(n) ? `$${n.toFixed(4)}` : String(line.unit_price);
+}
+
+function writeStoredNumber(key: string, value: number): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    /* storage unavailable; the input still works for this session */
+  }
 }
 
 // The Build And Cost section: build a grouped, priced BOM as a job, then show the cached
@@ -1126,13 +1151,24 @@ function unitPriceLabel(line: BomLine): string {
 // Honest states throughout: a project with no parts is "Nothing to Build", a build whose
 // parts could not be sourced is "Unpriced" (never a fabricated cost), and an unbuilt
 // project shows a "not built yet" prompt.
+//
+// Build Quantity and Tax/Tariff are two guided inputs (a stepper, a percent field) seeded
+// from the cached build and persisted in localStorage so they stick across a restart. A
+// change reprices the ALREADY-BUILT BOM instantly (POST .../bom/reprice, no rebuild,
+// debounced ~400ms or applied immediately on blur) so the table and roll-up never sit
+// stale on the old quantity; before a build the values are simply held for the next run.
 function BomSection({ projectId }: { projectId: string }) {
   const bomQuery = useProjectBom(projectId);
   const job = useJob<BomResult>();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const reprice = useRepriceBom();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [boards, setBoardsState] = useState<number>(() => readStoredNumber(BUILD_QTY_KEY, 1));
+  const [taxRate, setTaxRateState] = useState<number>(() => readStoredNumber(TAX_RATE_KEY, 0));
+  const seededRef = useRef(false);
+  const repriceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (job.status === "done") {
@@ -1143,11 +1179,85 @@ function BomSection({ projectId }: { projectId: string }) {
     }
   }, [job.status, projectId, qc]);
 
+  const data: BomResult | null =
+    job.status === "done" && job.result ? job.result : (bomQuery.data ?? null);
+  const hasBuilt = data != null && data.ran_at != null;
+
+  // Seed the guided inputs from the loaded build the FIRST time data arrives, but only
+  // where nothing was persisted yet: a persisted value is the deliberate last-used
+  // setting and always wins, so it sticks across both a project switch and a restart.
+  useEffect(() => {
+    if (seededRef.current || !data) return;
+    seededRef.current = true;
+    if (window.localStorage.getItem(BUILD_QTY_KEY) == null) {
+      setBoardsState(data.build?.build_qty ?? 1);
+    }
+    if (window.localStorage.getItem(TAX_RATE_KEY) == null) {
+      setTaxRateState(data.tax_rate ?? 0);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (repriceTimer.current) clearTimeout(repriceTimer.current);
+    };
+  }, []);
+
+  async function doReprice(nextBoards: number, nextTax: number) {
+    if (!hasBuilt) return; // hold the values for the next build; nothing to reprice yet
+    try {
+      await reprice.mutateAsync(
+        { id: projectId, boards: nextBoards, tax_rate: nextTax },
+        {
+          onSuccess: (result) => {
+            qc.setQueryData(["project-bom", projectId], result);
+            // A reprice changes the sourcing/diff cost side exactly like a rebuild does.
+            qc.invalidateQueries({ queryKey: ["project-procurement", projectId] });
+            qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
+          },
+        },
+      );
+    } catch (e) {
+      toast(errMsg(e, "Could not reprice the BOM."), "err");
+    }
+  }
+
+  function scheduleReprice(nextBoards: number, nextTax: number) {
+    if (repriceTimer.current) clearTimeout(repriceTimer.current);
+    repriceTimer.current = setTimeout(() => {
+      repriceTimer.current = null;
+      void doReprice(nextBoards, nextTax);
+    }, 400);
+  }
+
+  // Applied on blur: fires the pending reprice immediately instead of waiting out the
+  // debounce, so tabbing away from the field feels instant.
+  function applyPendingNow() {
+    if (!repriceTimer.current) return;
+    clearTimeout(repriceTimer.current);
+    repriceTimer.current = null;
+    void doReprice(boards, taxRate);
+  }
+
+  function onBoardsChange(n: number) {
+    const v = Number.isFinite(n) ? Math.max(1, Math.round(n)) : 1;
+    setBoardsState(v);
+    writeStoredNumber(BUILD_QTY_KEY, v);
+    scheduleReprice(v, taxRate);
+  }
+
+  function onTaxChange(n: number) {
+    const v = Number.isFinite(n) && n >= 0 ? n : 0;
+    setTaxRateState(v);
+    writeStoredNumber(TAX_RATE_KEY, v);
+    scheduleReprice(boards, v);
+  }
+
   async function onRun() {
     setStarting(true);
     setStartError(null);
     try {
-      const { job_id } = await api.runBom(projectId);
+      const { job_id } = await api.runBom(projectId, { boards, tax_rate: taxRate });
       job.run(job_id);
     } catch (e) {
       const msg = errMsg(e, "Could not start the BOM build.");
@@ -1159,13 +1269,10 @@ function BomSection({ projectId }: { projectId: string }) {
   }
 
   const busy = starting || job.status === "running";
-  const data: BomResult | null =
-    job.status === "done" && job.result ? job.result : (bomQuery.data ?? null);
-  const hasBuilt = data != null && data.ran_at != null;
 
   return (
     <div className="mt-7 border-t border-line pt-6" data-testid="bom-section">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Build And Cost</Eyebrow>
           <p className="text-xs text-t3">
@@ -1173,14 +1280,29 @@ function BomSection({ projectId }: { projectId: string }) {
             layer.
           </p>
         </div>
-        <Button variant="accent" small onClick={onRun} disabled={busy}>
-          {busy ? "Building..." : hasBuilt ? "Rebuild BOM" : "Build And Cost"}
-        </Button>
+        <div className="flex flex-wrap items-end gap-3">
+          <BuildQuantityStepper
+            value={boards}
+            onChange={onBoardsChange}
+            onApplyNow={applyPendingNow}
+            disabled={busy}
+          />
+          <TaxTariffInput
+            value={taxRate}
+            onChange={onTaxChange}
+            onApplyNow={applyPendingNow}
+            disabled={busy}
+          />
+          <Button variant="accent" small onClick={onRun} disabled={busy}>
+            {busy ? "Building..." : hasBuilt ? "Rebuild BOM" : "Build And Cost"}
+          </Button>
+        </div>
       </div>
 
       {busy && job.progress?.message ? (
         <p className="mb-2 text-xs text-t3">{job.progress.message}...</p>
       ) : null}
+      {reprice.isPending ? <p className="mb-2 text-xs text-t3">Repricing...</p> : null}
       {startError ? <p className="mb-2 text-sm text-err">{startError}</p> : null}
       {job.status === "error" ? (
         <p className="mb-2 text-sm text-err">{job.error ?? "The BOM build failed."}</p>
@@ -1199,10 +1321,152 @@ function BomSection({ projectId }: { projectId: string }) {
   );
 }
 
+// A stepper (- / + plus a bare numeric field) for the Build Quantity guided input: a
+// whole-number board count, minimum 1. Reads and buttons alike route through `onChange` so
+// every path (typing, clicking) shares the same clamp + persist + reprice-schedule.
+function BuildQuantityStepper({
+  value,
+  onChange,
+  onApplyNow,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onApplyNow: () => void;
+  disabled?: boolean;
+}) {
+  // The input's own draft string, separate from the clamped `value` it reflects: a plain
+  // controlled `value={value}` would re-round every keystroke (typing "5" over a cleared
+  // field would land as "1" mid-edit, so "5" lands after it as "15"). The draft only syncs
+  // FROM the committed value (buttons, blur-revert, a prop change from a reprice); typing
+  // free-edits the draft and commits upward the moment it parses to a real number.
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return (
+    <label className="flex flex-col gap-1 text-2xs text-t3">
+      Build Quantity
+      <div className="flex h-[31px] items-stretch overflow-hidden rounded-control border border-line2 bg-field">
+        <button
+          type="button"
+          aria-label="Decrease Build Quantity"
+          className="flex w-7 flex-none items-center justify-center text-t2 transition-colors hover:bg-raise2 hover:text-t1 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => onChange(value - 1)}
+          disabled={disabled || value <= 1}
+        >
+          -
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          data-testid="build-qty-input"
+          aria-label="Build Quantity"
+          className="w-14 flex-none border-x border-line2 bg-field text-center text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value);
+            if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
+          }}
+          onBlur={() => {
+            setDraft(String(value)); // revert an invalid/empty draft to the last committed value
+            onApplyNow();
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Increase Build Quantity"
+          className="flex w-7 flex-none items-center justify-center text-t2 transition-colors hover:bg-raise2 hover:text-t1 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => onChange(value + 1)}
+          disabled={disabled}
+        >
+          +
+        </button>
+      </div>
+    </label>
+  );
+}
+
+// The Tax/Tariff guided input: a percent field with a `%` suffix affordance, minimum 0,
+// quarter-point steps (fine enough for a real tariff schedule). Same draft/commit split as
+// the Build Quantity stepper, so typing "9.5" over a cleared field never mangles into "09.5".
+function TaxTariffInput({
+  value,
+  onChange,
+  onApplyNow,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onApplyNow: () => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return (
+    <label className="flex flex-col gap-1 text-2xs text-t3">
+      Tax/Tariff
+      <div className="flex h-[31px] items-stretch overflow-hidden rounded-control border border-line2 bg-field">
+        <input
+          type="number"
+          min={0}
+          step={0.25}
+          data-testid="tax-rate-input"
+          aria-label="Tax/Tariff Percent"
+          className="w-16 flex-none bg-field pl-3 text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value);
+            if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
+          }}
+          onBlur={() => {
+            setDraft(String(value));
+            onApplyNow();
+          }}
+        />
+        <span className="flex w-6 flex-none items-center justify-center border-l border-line2 text-xs text-t3">
+          %
+        </span>
+      </div>
+    </label>
+  );
+}
+
 // A BOM cost source ("library" / "mouser" / "digikey") as a Title Case chip label. "library" is
 // your own combined library, priced offline from its stored data before any distributor.
 function titleCaseSource(name: string): string {
   return name.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Known distributor hosts, so a line's purchase URL can name the real vendor even when its
+// stored source is something generic (e.g. "library", priced offline from a Mouser link
+// saved on the part) - the same host-mapping idiom the part detail's Sourcing card uses.
+const _KNOWN_VENDOR_HOSTS: Record<string, string> = {
+  lcsc: "LCSC",
+  mouser: "Mouser",
+  digikey: "DigiKey",
+};
+
+// The BOM line Vendor cell: map a known distributor host from the purchase URL first, else
+// Title Case the stored source. "-" when the line carries neither (never a fabricated vendor).
+function vendorLabel(source: string, url?: string): string {
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname.toLowerCase() : "";
+  } catch {
+    host = "";
+  }
+  for (const [token, name] of Object.entries(_KNOWN_VENDOR_HOSTS)) {
+    if (host.includes(token)) return name;
+  }
+  const s = (source || "").trim();
+  return s ? titleCaseSource(s) : "-";
 }
 
 function BomResultView({ result }: { result: BomResult }) {
@@ -1226,11 +1490,37 @@ function BomResultView({ result }: { result: BomResult }) {
         ))}
       </div>
 
+      {result.build && result.priced ? <BuildRollupLine build={result.build} /> : null}
+
       {result.lines.length === 0 ? (
         <p className="text-xs text-t3">No parts to build a BOM from.</p>
       ) : (
         <BomLinesTable lines={result.lines} priced={result.priced} />
       )}
+    </div>
+  );
+}
+
+// The build-size cost roll-up: subtotal, tax + tariff, and an emphasized grand total, for
+// the N boards the cached BOM was last (re)priced at.
+function BuildRollupLine({ build }: { build: BuildRollup }) {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-4 rounded-control border border-line2 bg-raise2 px-3 py-2"
+      data-testid="bom-build-rollup"
+    >
+      <span className="text-2xs text-t3">
+        For {build.build_qty} Board{build.build_qty === 1 ? "" : "s"}
+      </span>
+      <span className="text-xs text-t2">
+        Subtotal {formatMoney(build.subtotal, build.currency)}
+      </span>
+      <span className="text-xs text-t2">
+        Tax + Tariff {formatMoney(build.tax_total, build.currency)}
+      </span>
+      <span className="text-sm font-semibold text-t1">
+        Grand Total {formatMoney(build.grand_total, build.currency)}
+      </span>
     </div>
   );
 }
@@ -1258,59 +1548,98 @@ function BomVerdictBadge({ summary }: { summary: NonNullable<BomResult["summary"
   }
 }
 
+// The BOM line table: identity (Reference / Value / Description / Mfr # / Vendor) plus,
+// once the build is priced, the per-line build economics (Min Qty / Final Qty / Unit Cost /
+// Cost @ Qty / Tax/Tariff / Total Cost) at the current Build Quantity + Tax/Tariff. A wide
+// table: it scrolls horizontally inside its own container so the page body never does.
 function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean }) {
   return (
     <Card className="overflow-hidden" data-testid="bom-lines">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-line text-2xs text-t3">
-            <th className="px-4 py-2 font-medium">Qty</th>
-            <th className="px-4 py-2 font-medium">Value</th>
-            <th className="px-4 py-2 font-medium">Part</th>
-            <th className="px-4 py-2 font-medium">Footprint</th>
-            {priced ? <th className="px-4 py-2 font-medium">Unit</th> : null}
-            {priced ? <th className="px-4 py-2 font-medium">Ext</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, i) => (
-            <tr key={`${line.mpn || line.value}-${i}`} className="border-b border-line last:border-b-0">
-              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
-              <td className="px-4 py-2 align-top text-t1">
-                {line.value || "-"}
-                <span className="mt-0.5 block text-2xs text-t3" title={line.refs.join(", ")}>
-                  {line.refs.join(", ")}
-                </span>
-              </td>
-              <td className="px-4 py-2 align-top">
-                {line.mpn ? (
-                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                ) : line.basic ? (
-                  <Badge tone="neutral">Basic</Badge>
-                ) : (
-                  <Badge tone="neutral">No MPN</Badge>
-                )}
-                {line.manufacturer ? (
-                  <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>
-                ) : null}
-              </td>
-              <td className="px-4 py-2 align-top font-mono text-2xs text-t3">
-                {line.footprint || "-"}
-              </td>
-              {priced ? (
-                <td className="px-4 py-2 align-top text-t2">{unitPriceLabel(line) || "-"}</td>
-              ) : null}
-              {priced ? (
-                <td className="px-4 py-2 align-top text-t2">
-                  {line.extended !== undefined && line.extended !== null
-                    ? `$${line.extended.toFixed(2)}`
-                    : "-"}
-                </td>
-              ) : null}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-2xs text-t3">
+              <th className="px-4 py-2 font-medium">Reference</th>
+              <th className="px-4 py-2 font-medium">Value</th>
+              <th className="px-4 py-2 font-medium">Description</th>
+              <th className="px-4 py-2 font-medium">Mfr #</th>
+              <th className="px-4 py-2 font-medium">Vendor</th>
+              {priced ? <th className="px-4 py-2 font-medium">Min Qty</th> : null}
+              {priced ? <th className="px-4 py-2 font-medium">Final Qty</th> : null}
+              {priced ? <th className="px-4 py-2 font-medium">Unit Cost</th> : null}
+              {priced ? <th className="px-4 py-2 font-medium">Cost @ Qty</th> : null}
+              {priced ? <th className="px-4 py-2 font-medium">Tax/Tariff</th> : null}
+              {priced ? <th className="px-4 py-2 font-medium">Total Cost</th> : null}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {lines.map((line, i) => {
+              const refsText = line.refs.join(", ");
+              return (
+                <tr
+                  key={`${line.mpn || line.value}-${i}`}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <td
+                    className="max-w-[9rem] truncate px-4 py-2 align-top text-t2"
+                    title={refsText}
+                  >
+                    {refsText || "-"}
+                  </td>
+                  <td className="px-4 py-2 align-top text-t1">{line.value || "-"}</td>
+                  <td
+                    className="max-w-[14rem] truncate px-4 py-2 align-top text-2xs text-t3"
+                    title={line.description}
+                  >
+                    {line.description || "-"}
+                  </td>
+                  <td className="px-4 py-2 align-top">
+                    {line.mpn ? (
+                      <span className="font-mono text-xs text-t2">{line.mpn}</span>
+                    ) : line.basic ? (
+                      <Badge tone="neutral">Basic</Badge>
+                    ) : (
+                      <Badge tone="neutral">No MPN</Badge>
+                    )}
+                    {line.manufacturer ? (
+                      <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-2 align-top text-t2">
+                    {vendorLabel(line.source ?? "", line.url)}
+                  </td>
+                  {priced ? (
+                    <td className="px-4 py-2 align-top text-t2">{line.moq ?? "-"}</td>
+                  ) : null}
+                  {priced ? (
+                    <td className="px-4 py-2 align-top text-t2">{line.final_qty ?? "-"}</td>
+                  ) : null}
+                  {priced ? (
+                    <td className="px-4 py-2 align-top text-t2">
+                      {moneyOrDash(line.final_unit_price)}
+                    </td>
+                  ) : null}
+                  {priced ? (
+                    <td className="px-4 py-2 align-top text-t2">
+                      {moneyOrDash(line.final_extended)}
+                    </td>
+                  ) : null}
+                  {priced ? (
+                    <td className="px-4 py-2 align-top text-t2">
+                      {moneyOrDash(line.tax_tariff)}
+                    </td>
+                  ) : null}
+                  {priced ? (
+                    <td className="px-4 py-2 align-top font-medium text-t1">
+                      {moneyOrDash(line.line_total)}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
