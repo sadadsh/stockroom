@@ -301,6 +301,12 @@ class GitRepo:
     def has_remote(self) -> bool:
         return bool(self._run("remote", check=False).stdout.strip())
 
+    def fetch(self) -> tuple[bool, str]:
+        """Update the remote-tracking refs (no working-tree change). Returns
+        (ok, reason) so a caller can report an unreachable remote honestly."""
+        proc = self._run("fetch", "--prune", check=False)
+        return proc.returncode == 0, proc.stderr.strip()
+
     def current_branch(self) -> str:
         return self._run("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
 

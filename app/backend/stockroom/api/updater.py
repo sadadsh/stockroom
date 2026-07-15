@@ -58,8 +58,17 @@ class AppUpdater:
     def check(self) -> dict:
         if not self.repo.has_remote():
             return {"update_available": False, "state": UpdateState.NO_REMOTE}
-        # ahead_behind reads the local view; a real check fetches first, but the
-        # fetch is a network op wrapped by update() itself. Report best-effort.
+        # A real check must FETCH first: ahead_behind reads the local view of the
+        # remote refs, so without a fetch the running app can never learn that a
+        # new release exists and the Apply button never appears (the stuck-update
+        # bug). An unreachable remote is reported honestly, never as Up To Date.
+        ok, reason = self.repo.fetch()
+        if not ok:
+            return {
+                "update_available": False,
+                "state": UpdateState.OFFLINE,
+                "detail": reason,
+            }
         ab = self.repo.ahead_behind()
         behind = ab[1] if ab else 0
         return {"update_available": behind > 0, "behind": behind}

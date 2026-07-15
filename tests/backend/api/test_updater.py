@@ -91,10 +91,24 @@ def test_update_reconciles_a_disjoint_local_commit_by_rebase(tmp_path):
     assert ran["uv"] and ran["restart"]
 
 
-def test_check_reports_when_an_update_is_available(tmp_path):
+def test_check_fetches_so_a_fresh_remote_commit_is_seen(tmp_path):
     o, origin, c, clone = _origin_and_clone(tmp_path)
     (origin / "app.py").write_text("v2\n", encoding="utf-8")
     o.commit("v2", [origin / "app.py"])
-    c.repo_fetch() if hasattr(c, "repo_fetch") else None  # fetch handled inside check()
+    # NO manual fetch here: check() itself must fetch, or the running app can
+    # never learn a new release exists and the Apply button never appears (the
+    # owner's "update button does not work, must relaunch" bug).
     info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
-    assert "update_available" in info
+    assert info["update_available"] is True
+    assert info["behind"] == 1
+
+
+def test_check_reports_an_unreachable_remote_honestly(tmp_path):
+    import shutil as _shutil
+
+    o, origin, c, clone = _origin_and_clone(tmp_path)
+    _shutil.rmtree(origin)  # the remote cannot be fetched anymore
+    info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
+    assert info["update_available"] is False
+    assert info["state"] == UpdateState.OFFLINE
+    assert info["detail"]  # the reason is carried, never a silent Up To Date
