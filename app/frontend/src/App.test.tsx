@@ -75,9 +75,14 @@ describe("App shell", () => {
     expect(screen.getByText("Stockroom")).toBeInTheDocument();
     expect(await screen.findByText("LM358")).toBeInTheDocument();
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+    // the default route renders inside the Library tab shell with Parts active
+    expect(screen.getByRole("tab", { name: "Parts" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
-  it("navigates to the Ingest page from the rail", async () => {
+  it("reaches Add Parts through the Library tabs", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
     mockApi.facets.mockResolvedValue({
       by_category: {},
@@ -100,7 +105,7 @@ describe("App shell", () => {
     );
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Ingest/ }));
+    await user.click(screen.getByRole("tab", { name: "Add Parts" }));
 
     // The Ingest page's own control renders once the route switches.
     expect(screen.getByLabelText("LCSC Part IDs")).toBeInTheDocument();

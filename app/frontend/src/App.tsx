@@ -1,9 +1,6 @@
 import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
-import { ComponentsPage } from "./pages/ComponentsPage";
-import { DoctorPage } from "./pages/DoctorPage";
-import { DuplicatesPage } from "./pages/DuplicatesPage";
-import { IngestPage } from "./pages/IngestPage";
+import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
@@ -27,20 +24,19 @@ export default function App() {
 function renderRoute(route: Route) {
   switch (route) {
     case "components":
-      return <ComponentsPage />;
     case "ingest":
-      return <IngestPage />;
     case "duplicates":
-      return <DuplicatesPage />;
+    case "doctor":
+      // The library surfaces are tabs of the Library flagship; the route names
+      // the active tab so the palette and drop overlay keep deep-linking.
+      return <LibraryPage tab={route} />;
     case "projects":
       return <ProjectsPage />;
-    case "doctor":
-      return <DoctorPage />;
     case "settings":
       return <SettingsPage />;
     default:
       // Unreachable in practice (the rail and palette only offer available
-      // routes); fall back to the Components home rather than a blank frame.
-      return <ComponentsPage />;
+      // routes); fall back to the Library home rather than a blank frame.
+      return <LibraryPage tab="components" />;
   }
 }
