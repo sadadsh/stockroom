@@ -163,6 +163,42 @@ def test_pasted_product_url_carries_every_spec_to_the_candidate_and_staged_part(
     assert staged.specs["Resistance"] == "1.1 kOhm"
 
 
+def test_extract_from_url_autofills_everything_from_a_mouser_page(tmp_path):
+    # The owner's headline flow: paste a Mouser URL alone -> get EVERYTHING (identity,
+    # price, datasheet, package, and the full parametric spec table) with no file.
+    html = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=_StubFetcher(html),
+        limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+        jlcsearch=_NullJlc(),
+    )
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
+    )
+    assert r.mpn.value == "ERJ-P03F1101V"
+    assert r.manufacturer.value == "Panasonic"
+    assert r.price_breaks and r.price_breaks[0].price > 0
+    assert r.datasheet_url is not None
+    assert r.package.value == "0603 (1608 Metric)"
+    assert r.specs["Resistance"].value == "1.1 kOhms"
+    assert r.specs["Tolerance"].value == "±1%"
+    assert "product_url" in r.specs
+
+
+def test_extract_from_url_is_empty_on_a_blocked_page(tmp_path):
+    # A 403/challenge page (what a plain HTTP client gets from Mouser) yields nothing,
+    # honestly - never a crash, never invented data.
+    class _Dead:
+        def rendered_html(self, url, timeout=20.0):
+            from stockroom.enrich.errors import EnrichError
+            raise EnrichError("akamai 403")
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_Dead(),
+                              limiter=_NoWaitLimiter(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url("https://www.mouser.com/x")
+    assert r.mpn is None and not r.specs
+
+
 def test_datasheet_field_is_preferred_over_a_scrape_field():
     # datasheet gives the MPN at high confidence; a scrape gives a WRONG MPN.
     ds = EnrichmentResult(category="ICs")

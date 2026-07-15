@@ -336,6 +336,28 @@ class EnrichmentPipeline:
                 self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
 
+    def extract_from_url(self, url: str) -> EnrichmentResult:
+        """Fetch a distributor product page and extract EVERYTHING it exposes, from a
+        URL alone (no candidate, no file): identity, price breaks, stock, datasheet,
+        package, and the full parametric spec table. The fetch goes through the
+        rendered-DOM fetcher (the real WebView2 browser on Windows), so Akamai /
+        Cloudflare JS challenges that 403 a plain HTTP client are passed. Never raises:
+        a blocked or dead page returns an empty result, honestly (spec 2.2)."""
+        url = (url or "").strip()
+        if not url:
+            return EnrichmentResult()
+        try:
+            self.limiter.acquire()
+            page = self.fetcher.rendered_html(url)
+        except (EnrichError, OSError):
+            return EnrichmentResult()
+        result = extract_all(page.text, page.final_url or url, SITE_EXTRACTORS)
+        if page.final_url or url:
+            result.specs.setdefault(
+                "product_url", Sourced(page.final_url or url, "scrape", "medium")
+            )
+        return result
+
     def enrich_candidate(self, candidate: StagingCandidate,
                          overwrite: set[str] | None = None) -> StagingCandidate:
         overwrite = overwrite or set()
