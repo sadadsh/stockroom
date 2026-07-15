@@ -257,6 +257,15 @@ def projects_router(require_token) -> APIRouter:
             headers={"Content-Disposition": f'attachment; filename="{out["filename"]}"'},
         )
 
+    @r.get("/{project_id}/file")
+    def project_file(request: Request, project_id: str, path: str):
+        # Serve the raw bytes of one REGISTERED project KiCad file for the in-app kicanvas
+        # viewer (M7 #11). Read-only, authed. Only a registered path is served (allowlist, no
+        # traversal); an unknown id / unregistered path / escape / missing file is a 404. The
+        # bytes are returned as text/plain so the viewer can inline them as a kicanvas-source.
+        data = request.app.state.ctx.project_ops.project_file(project_id, path)
+        return Response(content=data, media_type="text/plain; charset=utf-8")
+
     @r.get("/{project_id}/revisions")
     def project_revisions(request: Request, project_id: str) -> dict:
         # The project's git history, for the revision-diff pickers (M7d). A project not under

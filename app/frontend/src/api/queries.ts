@@ -421,6 +421,17 @@ export function useProjectFab(id: string | null) {
   });
 }
 
+// Raw text of one registered project KiCad file, for the kicanvas viewer (M7 #11). Disabled
+// until both an id and a path are set; a project file rarely changes mid-session so it is cached.
+export function useProjectFile(id: string | null, path: string | null) {
+  return useQuery({
+    queryKey: ["project-file", id, path],
+    queryFn: () => api.projectFile(id as string, path as string),
+    enabled: !!id && !!path,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // The project's git history (M7d) for the revision-diff pickers. Disabled until a project is
 // selected; under_git false / empty for a project not under git.
 export function useProjectRevisions(id: string | null) {

@@ -11,6 +11,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from stockroom.kicad import conform, project_settings, stackup
@@ -140,6 +141,29 @@ class ProjectOps:
             drill_format=drill_format, drill_map=drill_map,
             include_pos=include_pos, pos_format=pos_format, protel_ext=protel_ext,
         )
+
+    def project_file(self, project_id: str, rel: str) -> bytes:
+        """Return the raw bytes of one of the project's REGISTERED KiCad files (a board, a sheet,
+        or the .kicad_pro), for the in-app kicanvas viewer (M7 #11). Read-only. Only a path the
+        project actually registered is served: an ALLOWLIST, so there is no traversal and no
+        arbitrary-file read, and the resolved path must still land inside the project root
+        (defense in depth). Raises FileNotFoundError for an unknown id, an unregistered path, an
+        escape, or a file missing on disk."""
+        rec = self.store.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        allowed = set(rec.board_paths) | set(rec.sheet_paths)
+        if rec.pro_path:
+            allowed.add(rec.pro_path)
+        if rel not in allowed:
+            raise FileNotFoundError(f"not a registered project file: {rel}")
+        root = Path(rec.root).resolve()
+        resolved = (root / rel).resolve()
+        if os.path.commonpath([str(root), str(resolved)]) != str(root):
+            raise FileNotFoundError(f"path escapes the project: {rel}")
+        if not resolved.is_file():
+            raise FileNotFoundError(f"file not found: {rel}")
+        return resolved.read_bytes()
 
     def revisions(self, project_id: str, max_count: int = 50) -> dict:
         """The registered project's git history (the commits touching its schematic sheets

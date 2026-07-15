@@ -39,6 +39,7 @@ vi.mock("../api/client", async (importActual) => {
       getProcurement: vi.fn(),
       getFab: vi.fn(),
       downloadFabExport: vi.fn(),
+      projectFile: vi.fn(),
       getRevisions: vi.fn(),
       getBomDiff: vi.fn(),
       downloadBomExport: vi.fn(),
@@ -609,6 +610,7 @@ beforeEach(() => {
   mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
   mockApi.getFab.mockResolvedValue(FAB_READY);
   mockApi.downloadFabExport.mockResolvedValue(undefined);
+  mockApi.projectFile.mockResolvedValue("(kicad_pcb (version 20240108))");
   mockApi.getRevisions.mockResolvedValue(REVS_NONE);
   mockApi.getBomDiff.mockResolvedValue(DIFF);
   mockApi.downloadBomExport.mockResolvedValue(undefined);
