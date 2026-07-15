@@ -255,29 +255,47 @@ function BulkLookupSection() {
       ) : null}
 
       {report ? (
-        <div className="mt-5" data-testid="bulk-report">
-          <div className="mb-2 text-xs text-t3">
-            {complete} of {report.items.length} complete.
+        <div className="mt-6" data-testid="bulk-report">
+          <div className="mb-2.5 flex items-baseline gap-2">
+            <span className="text-lg font-semibold tabular-nums text-t1">
+              {complete}
+              <span className="text-t3">/{report.items.length}</span>
+            </span>
+            <span className="text-xs text-t3">complete</span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            {report.items.map((item) => (
-              <div
-                key={item.mpn}
-                className="flex items-center gap-3 rounded-control border border-line px-3 py-2 text-sm"
-                data-testid={`bulk-item-${item.mpn}`}
-              >
-                <Dot tone={item.complete ? "ok" : item.error ? "err" : "warn"} />
-                <span className="font-medium text-t1">{item.mpn}</span>
-                <span className="text-xs text-t3">
-                  {item.complete
-                    ? "Complete"
-                    : item.error
-                      ? item.error
-                      : `Missing ${item.missing.join(", ")}`}
-                </span>
-              </div>
-            ))}
-          </div>
+          <Card className="overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-2xs text-t3">
+                  <th className="px-4 py-2 font-medium">Part Number</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.items.map((item) => (
+                  <tr
+                    key={item.mpn}
+                    className="border-b border-line last:border-b-0"
+                    data-testid={`bulk-item-${item.mpn}`}
+                  >
+                    <td className="px-4 py-2 align-top font-mono text-xs text-t2">{item.mpn}</td>
+                    <td className="px-4 py-2 align-top">
+                      <span className="inline-flex items-center gap-2">
+                        <Dot tone={item.complete ? "ok" : item.error ? "err" : "warn"} />
+                        <span className="text-t2">
+                          {item.complete
+                            ? "Complete"
+                            : item.error
+                              ? item.error
+                              : `Missing ${item.missing.join(", ")}`}
+                        </span>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
         </div>
       ) : null}
     </div>

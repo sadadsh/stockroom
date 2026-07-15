@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 import type React from "react";
 import { ApiError } from "../api/client";
 import { useProjectFile } from "../api/queries";
-import { Button } from "./primitives";
 
 // The vendored bundle self-registers <kicanvas-embed> / <kicanvas-source>; they are not known
 // to JSX, so declare them (children carry the inlined file text).
@@ -114,18 +113,30 @@ export function ProjectViewer({ projectId, files }: { projectId: string; files: 
   return (
     <div data-testid="project-viewer">
       {files.length > 1 ? (
-        <div className="mb-3 flex flex-wrap gap-2" data-testid="viewer-tabs">
-          {files.map((f) => (
-            <Button
-              key={f.path}
-              small
-              variant={f.path === active ? "accent" : "default"}
-              onClick={() => setActive(f.path)}
-              data-testid={`viewer-tab-${f.path}`}
-            >
-              {f.label}
-            </Button>
-          ))}
+        <div
+          role="tablist"
+          className="mb-3 inline-flex flex-wrap gap-1 rounded-control bg-raise p-1"
+          data-testid="viewer-tabs"
+        >
+          {files.map((f) => {
+            const on = f.path === active;
+            return (
+              <button
+                key={f.path}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setActive(f.path)}
+                data-testid={`viewer-tab-${f.path}`}
+                className={
+                  "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors " +
+                  (on ? "bg-raise2 text-t1" : "text-t2 hover:text-t1")
+                }
+              >
+                {f.label}
+              </button>
+            );
+          })}
         </div>
       ) : null}
 
