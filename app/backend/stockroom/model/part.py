@@ -110,6 +110,11 @@ class PartRecord:
     tags: list[str] = field(default_factory=list)
     mpn: str = ""
     manufacturer: str = ""
+    # A passive (R/C/L) references KiCad STOCK symbol/footprint/3D by lib_id rather
+    # than owning copied asset files (the generic package is already in KiCad). The
+    # completion gate is relaxed accordingly: a passive needs no owned 3D model, and
+    # its symbol/footprint are satisfied by the stock lib_ids (spec: drop-in passives).
+    passive: bool = False
     datasheet: Datasheet | None = None
     purchase: list[Purchase] = field(default_factory=list)
     symbol: LibRef | None = None
@@ -135,6 +140,7 @@ class PartRecord:
             "tags": list(self.tags),
             "mpn": self.mpn,
             "manufacturer": self.manufacturer,
+            "passive": self.passive,
             "datasheet": asdict(self.datasheet) if self.datasheet else None,
             "purchase": [asdict(p) for p in self.purchase],
             "symbol": asdict(self.symbol) if self.symbol else None,
@@ -156,6 +162,7 @@ class PartRecord:
             tags=list(d.get("tags", [])),
             mpn=d.get("mpn", ""),
             manufacturer=d.get("manufacturer", ""),
+            passive=bool(d.get("passive", False)),
             datasheet=Datasheet(**d["datasheet"]) if d.get("datasheet") else None,
             purchase=[Purchase(**p) for p in d.get("purchase", [])],
             symbol=LibRef(**d["symbol"]) if d.get("symbol") else None,
@@ -185,8 +192,13 @@ class PartRecord:
             "description": bool(self.description.strip()),
             "symbol": self.symbol is not None and bool(self.symbol.name),
             "footprint": self.footprint is not None and bool(self.footprint.name),
-            "model": self.model is not None and bool(self.model.file),
-            "datasheet": self.datasheet is not None and bool(self.datasheet.file),
+            # A passive inherits the stock footprint's own 3D model, so it needs no
+            # owned model file to be complete.
+            "model": self.passive or (self.model is not None and bool(self.model.file)),
+            # A datasheet is satisfied by a stored PDF OR a datasheet URL (owner: keep
+            # datasheet URLs as a first-class field; a known link should not block).
+            "datasheet": self.datasheet is not None
+            and (bool(self.datasheet.file) or bool(self.datasheet.source_url)),
             "purchase": any(bool(p.url) for p in self.purchase),
         }
 

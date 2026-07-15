@@ -15,6 +15,7 @@ import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast, type ToastTone } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
+import { PassiveAddCard } from "../components/PassiveAddCard";
 import { EnrichIcon, UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
@@ -102,6 +103,9 @@ export function IngestPage() {
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
         <div className="max-w-[760px] pb-10">
+          <div className="mb-4">
+            <PassiveAddCard toast={toast} />
+          </div>
           <Card className="px-4 py-3.5">
             <label
               htmlFor="lcsc-ids"

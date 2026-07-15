@@ -175,6 +175,14 @@ class PassiveSpec:
     voltage: str = ""
     dielectric: str = ""
 
+    def summary(self) -> str:
+        """A short human description built from the decoded facts, e.g.
+        "Resistor, 1.1 kOhm, 1%, 0603"."""
+        head = {"resistor": "Resistor", "capacitor": "Capacitor",
+                "inductor": "Inductor"}.get(self.kind, self.kind.title())
+        parts = [head] + [p for p in (self.value, self.tolerance, self.package) if p]
+        return ", ".join(parts)
+
     def to_specs(self) -> dict[str, str]:
         """Display-ready spec rows, Title Case keys (design contract), only the facts
         actually known. Feeds PartRecord.specs so a passive carries its key specs."""

@@ -39,15 +39,6 @@ def _default_url_for(mpn: str, category: str) -> str:
     return f"https://www.lcsc.com/search?q={quote(mpn)}"
 
 
-def _synth_passive_description(spec) -> str:
-    """A deterministic, offline description for a decoded passive, e.g.
-    "Resistor, 1.1 kOhm, 1%, 0603". Built only from facts actually decoded."""
-    head = {"resistor": "Resistor", "capacitor": "Capacitor",
-            "inductor": "Inductor"}.get(spec.kind, spec.kind.title())
-    parts = [head] + [p for p in (spec.value, spec.tolerance, spec.package) if p]
-    return ", ".join(parts)
-
-
 class PassiveFastPathSource:
     """Source #0: the offline passive fast path. A resistor/capacitor/inductor MPN
     decodes deterministically (no network, no API) into its value/tolerance/package/
@@ -73,7 +64,7 @@ class PassiveFastPathSource:
             r.manufacturer = Sourced(spec.manufacturer, "passive", "high")
         if spec.package:
             r.package = Sourced(spec.package, "passive", "high")
-        desc = _synth_passive_description(spec)
+        desc = spec.summary()
         if desc:
             r.description = Sourced(desc, "passive", "medium")
         for key, val in spec.to_specs().items():

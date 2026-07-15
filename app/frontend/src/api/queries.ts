@@ -193,6 +193,19 @@ export function useIngestCommit() {
   });
 }
 
+// Add a passive with no files (an MPN or a Mouser URL). A new part changes the
+// parts list and the category/manufacturer facets, so refresh both.
+export function usePassiveAdd() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: import("./types").PassiveAddBody) => api.passiveAdd(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["facets"] });
+    },
+  });
+}
+
 // --- Previews (M6d): symbol/footprint SVG + 3D model GLB ---
 
 // Read-only binary blobs rendered by the backend and cached there by content hash,

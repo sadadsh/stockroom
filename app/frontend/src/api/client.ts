@@ -24,6 +24,8 @@ import type {
   HistoryResponse,
   JobRef,
   PartDetail,
+  PassiveAddBody,
+  PassivePreview,
   DesignResult,
   DesignRules,
   NetClass,
@@ -227,6 +229,16 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Preview a file-less passive add (decode + resolve stock assets) without
+  // committing; and commit one. Both take a bare MPN or a Mouser product URL.
+  passivePreview(body: PassiveAddBody): Promise<PassivePreview> {
+    return request<PassivePreview>("POST", "/api/library/passive/preview", { body });
+  },
+
+  passiveAdd(body: PassiveAddBody): Promise<PartDetail> {
+    return request<PartDetail>("POST", "/api/library/passive", { body });
   },
 
   // Parts that share an MPN or a footprint name, straight from the derived index
