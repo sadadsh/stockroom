@@ -107,7 +107,7 @@ describe("App shell", () => {
 
     await user.click(screen.getByRole("tab", { name: "Add Parts" }));
 
-    // The Ingest page's own control renders once the route switches.
-    expect(screen.getByLabelText("LCSC Part IDs")).toBeInTheDocument();
+    // The Add A Part page's own control renders once the route switches.
+    expect(screen.getByLabelText("Product link or part number")).toBeInTheDocument();
   });
 });

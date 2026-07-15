@@ -213,6 +213,17 @@ export interface EnrichPriceBreak {
   currency: string;
 }
 
+// The passive-or-not determination the unified Add-A-Part flow branches on. Non-null
+// means the pulled page describes a file-less passive (R/C/L) that adds with KiCad
+// stock symbol/footprint/3D, carrying the fields the file-less add needs; null means
+// the part needs its symbol/footprint/3D dropped.
+export interface PassiveAddPlan {
+  kind: string;
+  package: string;
+  value: string;
+  tolerance: string;
+}
+
 export interface EnrichmentResult {
   category: string;
   mpn: SourcedField | null;
@@ -223,6 +234,9 @@ export interface EnrichmentResult {
   package: SourcedField | null;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
+  // The backend always emits this; optional so fixtures/older payloads without it
+  // still type-check. null (or absent) means the part is not a file-less passive.
+  add_plan?: PassiveAddPlan | null;
   schema_version: number;
 }
 
@@ -257,6 +271,9 @@ export interface StagingCandidate {
   tags: string[];
   purchase: PurchaseDTO[];
   gaps: string[];
+  // the enriched spec bag the inspect -> edit -> commit trip carries onto the record
+  // (every parametric field a distributor page yielded); absent on a bare ZIP candidate.
+  specs?: Record<string, unknown>;
   // carries the datasheet source_url onto the committed record; absent on
   // candidates staged before it was round-tripped
   provenance?: {

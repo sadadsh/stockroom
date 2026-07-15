@@ -241,6 +241,28 @@ export function usePreviewGlb(id: string, enabled: boolean) {
   });
 }
 
+// Stock previews by footprint lib_id (the Add-A-Part flow shows a passive's built-in
+// footprint + 3D model before it is committed, so there is no part id to key on).
+export function useStockPreviewSvg(fp: string, enabled = true) {
+  return useQuery({
+    queryKey: ["stock-preview-svg", fp],
+    queryFn: () => api.stockPreviewSvg(fp),
+    enabled: enabled && !!fp,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+export function useStockModelGlb(fp: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["stock-preview-glb", fp],
+    queryFn: () => api.stockModelGlb(fp),
+    enabled: enabled && !!fp,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
 // --- Settings page server state (M6g) ---
 
 export function useSettings() {
