@@ -227,4 +227,20 @@ describe("Bulk Lookup (spec 8.1)", () => {
     expect(screen.getByTestId("bulk-run")).toBeDisabled();
     expect(mockApi.enrichBulk).not.toHaveBeenCalled();
   });
+
+  it("routes a pasted BOM CSV to the csv parser, not the MPN-list parser", async () => {
+    mockApi.enrichBulk.mockResolvedValue({ job_id: "b2" });
+    mockApi.openJobStream.mockResolvedValue(bulkResultStream({ items: [] }));
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("bulk-input"));
+    await user.paste("Reference,MPN,Qty\nR1,TPS62130RGTR,2");
+    await user.click(screen.getByTestId("bulk-run"));
+    await waitFor(() =>
+      expect(mockApi.enrichBulk).toHaveBeenCalledWith({
+        csv: "Reference,MPN,Qty\nR1,TPS62130RGTR,2",
+        category: "Other",
+      }),
+    );
+  });
 });

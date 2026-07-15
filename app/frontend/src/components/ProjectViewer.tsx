@@ -92,6 +92,16 @@ export function ProjectViewer({ projectId, files }: { projectId: string; files: 
     };
   }, []);
 
+  // Re-sync the selected file when `files` changes: if the current selection is not among them
+  // (the first render had none because the detail query was still loading / had errored, then a
+  // refetch populated them), point at the first file. Without this a single-file project, which
+  // shows no tab bar to click, would stay stuck on "Loading viewer..." forever.
+  useEffect(() => {
+    if (files.length > 0 && !files.some((f) => f.path === active)) {
+      setActive(files[0].path);
+    }
+  }, [files, active]);
+
   if (files.length === 0) {
     return (
       <Centered>

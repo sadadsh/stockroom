@@ -15,7 +15,14 @@ a registered project's .kicad_sch / .kicad_pcb in-app. The bundle self-registers
 INLINE <kicanvas-source> text (the bytes are fetched with the per-launch bearer token
 and inlined), so the viewer never issues its own unauthenticated fetch.
 
-This file is the upstream esbuild bundle, committed verbatim and unmodified.
+LOCAL MODIFICATION (Stockroom): the upstream bundle injects, at import time, a
+<link rel="stylesheet" href="https://fonts.googleapis.com/..."> to the Google Fonts CDN
+(Material Symbols Outlined + Nunito). That would beacon to Google on every viewer open,
+break the offline-first / strict-CSP posture, and contradict the "no network in the render
+path" promise above. The single href has been repointed to the self-hosted
+"/vendor/kicanvas-fonts.css" (this directory), which @font-face's the woff2 files under
+vendor/fonts/ (downloaded from the same Google Fonts request, rewritten to local paths).
+This is the ONLY change from upstream; the bundle is otherwise the upstream esbuild output.
 
 MIT License
 
