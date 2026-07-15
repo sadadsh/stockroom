@@ -42,6 +42,10 @@ export function mountModelScene(
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  // Gently auto-spin like SnapEDA's viewer; the per-frame controls.update() in the
+  // render loop advances it. Dragging still works and simply overrides the spin.
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 1.6;
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();

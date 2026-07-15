@@ -58,6 +58,9 @@ export interface PriceBreak {
 export interface PurchaseRef {
   vendor: string;
   url: string;
+  // The distributor's own order number (e.g. Mouser "667-ERJ-P03F1101V"), distinct
+  // from the manufacturer MPN. Optional so older records without it still type-check.
+  part_number?: string;
   price_breaks: PriceBreak[];
   stock: number | null;
   currency: string;
@@ -129,6 +132,7 @@ export interface PassiveAddBody {
   category?: string;
   manufacturer?: string;
   datasheet_url?: string;
+  purchase_part_number?: string;
 }
 
 export interface ApiErrorBody {

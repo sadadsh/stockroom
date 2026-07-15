@@ -48,9 +48,13 @@ def parse_mouser_product_url(url: str) -> tuple[str, str] | None:
     of identity (Mouser blocks scraping). Returns None if the URL is not a Mouser
     product-detail link."""
     try:
-        segments = [s for s in urlsplit(url).path.split("/") if s]
+        parts = urlsplit(url)
     except ValueError:
         return None
+    host = (parts.hostname or "").lower()
+    if not (host == "mouser.com" or host.endswith(".mouser.com")):
+        return None
+    segments = [s for s in parts.path.split("/") if s]
     if "ProductDetail" not in segments:
         return None
     tail = segments[segments.index("ProductDetail") + 1:]
@@ -66,12 +70,24 @@ def _split_lib_id(lib_id: str) -> tuple[str, str]:
     return lib, name
 
 
+def _passive_display_name(spec) -> str:
+    """A human name that says what the passive IS, e.g. "1.1 kOhm 1% 0603 Resistor",
+    so the library list is readable instead of a wall of MPNs (the MPN stays in the
+    mpn field for search + the id)."""
+    kind = {"resistor": "Resistor", "capacitor": "Capacitor",
+            "inductor": "Inductor"}.get(spec.kind, spec.kind.title())
+    parts = [p for p in (spec.value, spec.tolerance, spec.package) if p]
+    parts.append(kind)
+    return " ".join(parts)
+
+
 def build_passive_record(
     source: str,
     *,
     category: str | None = None,
     manufacturer: str | None = None,
     datasheet_url: str | None = None,
+    purchase_part_number: str | None = None,
     footprints_root=None,
 ) -> PassiveBuild:
     """Build (but do not commit) a passive PartRecord from `source` (a bare MPN or a
@@ -130,7 +146,7 @@ def build_passive_record(
 
     record = PartRecord(
         id="",
-        display_name=mpn,
+        display_name=_passive_display_name(spec) or mpn,
         category=cat,
         description=spec.summary(),
         mpn=mpn,
@@ -140,7 +156,11 @@ def build_passive_record(
         footprint=LibRef(lib=fp_lib, name=fp_name),
         model=None,
         datasheet=datasheet,
-        purchase=[Purchase(vendor="Mouser", url=purchase_url)],
+        purchase=[Purchase(
+            vendor="Mouser",
+            url=purchase_url,
+            part_number=(purchase_part_number or "").strip(),
+        )],
         provenance=Provenance(source="passive-decode", source_url=purchase_url),
         specs=specs,
     )

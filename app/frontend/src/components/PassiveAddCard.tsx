@@ -24,6 +24,7 @@ export function PassiveAddCard({
   const [category, setCategory] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [datasheetUrl, setDatasheetUrl] = useState("");
+  const [mouserPn, setMouserPn] = useState("");
   const [previewing, setPreviewing] = useState(false);
   const facets = useFacetsQuery();
   const add = usePassiveAdd();
@@ -58,6 +59,7 @@ export function PassiveAddCard({
     setCategory("");
     setManufacturer("");
     setDatasheetUrl("");
+    setMouserPn("");
   }
 
   function doAdd() {
@@ -68,6 +70,7 @@ export function PassiveAddCard({
         category: category.trim() || undefined,
         manufacturer: manufacturer.trim() || undefined,
         datasheet_url: datasheetUrl.trim() || undefined,
+        purchase_part_number: mouserPn.trim() || undefined,
       },
       {
         onSuccess: (rec) => {
@@ -166,6 +169,14 @@ export function PassiveAddCard({
             onChange={setDatasheetUrl}
             placeholder="https://..."
             hint="Required. Paste the datasheet link (Mouser blocks auto-fetch)."
+          />
+
+          <TextField
+            label="Mouser Part Number"
+            value={mouserPn}
+            onChange={setMouserPn}
+            placeholder="667-ERJ-P03F1101V"
+            hint="Optional. The distributor order number, if you have it."
           />
 
           <div className="flex flex-col gap-1">

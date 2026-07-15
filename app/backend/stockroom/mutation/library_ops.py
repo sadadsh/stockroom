@@ -373,6 +373,17 @@ class LibraryOps:
         old_cat = record.category
         if new_category == old_cat:
             return record
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        # A passive owns no symbol/footprint files and its stock lib_ids
+        # (Device:R, Resistor_SMD:...) do not depend on the category, so moving it is
+        # just a category field change on the record.
+        if record.passive:
+            with Transaction(self.repo) as txn:
+                record.category = new_category
+                json_path.write_text(record.dumps(), encoding="utf-8")
+                txn.track(json_path)
+                txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
+            return record
         name = record.symbol.name
         old_sym = self.lib.symbol_lib_path(old_cat)
         new_sym = self.lib.symbol_lib_path(new_category)
@@ -406,17 +417,25 @@ class LibraryOps:
 
     def delete_part(self, part_id: str) -> None:
         record = self.load_record(part_id)
-        name = record.symbol.name
-        sym_lib_path = self.lib.symbol_lib_path(record.category)
-        fp_path = self.lib.footprint_lib_path(record.category) / f"{name}.kicad_mod"
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
-            sym_lib_path.write_text(self._remove_symbol_node(sym_lib_path, name), encoding="utf-8", newline="")
-            txn.track(sym_lib_path)
-            for p in (fp_path, json_path):
-                if p.exists():
-                    p.unlink()
-                    txn.track(p)
+            # A passive owns no symbol/footprint files (it references KiCad stock
+            # lib_ids), so there is nothing to remove from the category lib/.pretty;
+            # only the JSON record (and any owned datasheet PDF) is deleted.
+            if not record.passive:
+                name = record.symbol.name
+                sym_lib_path = self.lib.symbol_lib_path(record.category)
+                fp_path = self.lib.footprint_lib_path(record.category) / f"{name}.kicad_mod"
+                sym_lib_path.write_text(
+                    self._remove_symbol_node(sym_lib_path, name), encoding="utf-8", newline=""
+                )
+                txn.track(sym_lib_path)
+                if fp_path.exists():
+                    fp_path.unlink()
+                    txn.track(fp_path)
+            if json_path.exists():
+                json_path.unlink()
+                txn.track(json_path)
             if record.model and record.model.file:
                 mp = self.lib.root / record.model.file
                 if mp.exists():
@@ -440,6 +459,11 @@ class LibraryOps:
         for json_path in sorted(parts_dir.glob("*.json")):
             record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
             if record.symbol is None:
+                continue
+            # A passive owns no symbol in the category lib (it references KiCad stock,
+            # which Stockroom never mutates), so it can never drift and must not be
+            # reported as a missing symbol.
+            if record.passive:
                 continue
             sym_lib_path = self.lib.symbol_lib_path(record.category)
             try:
