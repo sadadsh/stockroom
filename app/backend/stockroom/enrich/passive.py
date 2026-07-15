@@ -389,6 +389,96 @@ def detect_passive(mpn: str = "", category: str = "", refdes: str = "",
     return None
 
 
+# The parametric spec that names each passive kind (a resistor page carries a
+# "Resistance" row, etc.). Matched EXACTLY (after whitespace/case folding) so a
+# MOSFET's "On-Resistance (RDS(on))" or a crystal's "Load Capacitance" never fires.
+_VALUE_SPEC_KEY: dict[str, str] = {
+    "resistor": "resistance", "capacitor": "capacitance", "inductor": "inductance",
+}
+
+
+def _norm_key(s: str) -> str:
+    return re.sub(r"\s+", "", (s or "")).lower()
+
+
+def _normalize_eia(raw: str) -> str:
+    """Pull a KiCad-stock EIA imperial chip case (0402/0603/...) out of a distributor
+    package string ("0603 (1608 Metric)", "R0603", "0402") -> "0603"/"0402". Returns
+    "" when no recognized stock case appears (a metric-only "1608" is not a stock key)."""
+    for tok in re.findall(r"\d{3,4}", raw or ""):
+        if tok in _EIA_TO_METRIC:
+            return tok
+    return ""
+
+
+def _package_from(package: str, specs: dict[str, str]) -> str:
+    """The EIA case for the part: the given package first, then any package-ish spec
+    row (a key mentioning "package" or "case", e.g. "Package / Case"), normalized to a
+    stock case. "" when none resolves (the UI then reveals a package picker)."""
+    eia = _normalize_eia(package)
+    if eia:
+        return eia
+    for label, val in specs.items():
+        nk = _norm_key(label)
+        if "package" in nk or "case" in nk:
+            eia = _normalize_eia(str(val))
+            if eia:
+                return eia
+    return ""
+
+
+def _spec_value(specs: dict[str, str], exact_key: str) -> str:
+    for label, val in specs.items():
+        if _norm_key(label) == exact_key:
+            return str(val).strip()
+    return ""
+
+
+def _passive_plan_kind(mpn: str, category: str, specs: dict[str, str],
+                       description: str) -> str | None:
+    """Decide the passive kind (resistor/capacitor/inductor) from the pulled fields, or
+    None. Conservative on purpose - a false positive tells the user "no files needed"
+    for a non-passive. Signal order: category / MPN family (detect_passive) -> an EXACT
+    value-spec key -> a whole-word kind in the description. Ferrite beads and any active
+    part yield None (they take the asset-drop path)."""
+    k = detect_passive(mpn=mpn, category=category)
+    if k in ("resistor", "capacitor", "inductor"):
+        return k
+    keys = {_norm_key(s) for s in specs}
+    for kind, vkey in _VALUE_SPEC_KEY.items():
+        if vkey in keys:
+            return kind
+    desc = (description or "").lower()
+    for kind in ("resistor", "capacitor", "inductor"):
+        if re.search(rf"\b{kind}s?\b", desc):
+            return kind
+    return None
+
+
+def passive_add_plan(*, mpn: str = "", category: str = "", package: str = "",
+                     specs: dict[str, str] | None = None,
+                     description: str = "") -> dict | None:
+    """The passive-determination step of the unified "Add A Part" flow.
+
+    Given the fields a product page (or an MPN lookup) yielded, decide whether the
+    part is an addable file-less passive and, if so, return the {kind, package, value,
+    tolerance} the file-less passive add (build_passive_record) needs. Returns None for
+    a non-passive (or a ferrite/other kind with no stock R/C/L footprint family), so
+    the caller routes it to the drop-the-symbol/footprint/3D path instead. A detected
+    passive whose case is unresolved still returns a plan with package="" (kind is
+    known), so the UI reveals a package picker rather than silently dropping the part."""
+    specs = {str(k): str(v) for k, v in (specs or {}).items()}
+    kind = _passive_plan_kind(mpn, category, specs, description)
+    if kind is None:
+        return None
+    return {
+        "kind": kind,
+        "package": _package_from(package, specs),
+        "value": _spec_value(specs, _VALUE_SPEC_KEY[kind]),
+        "tolerance": _spec_value(specs, "tolerance"),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # KiCad stock-asset resolution (offline).
 # --------------------------------------------------------------------------- #

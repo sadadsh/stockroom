@@ -33,6 +33,24 @@ def _sourced_dto(s: Sourced | None) -> dict | None:
     return {"value": s.value, "source": s.source, "confidence": s.confidence}
 
 
+def _add_plan(r: EnrichmentResult) -> dict | None:
+    """The passive-or-not determination the unified Add-A-Part flow branches on: the
+    {kind, package, value, tolerance} a file-less passive add needs, or None when the
+    part is not an addable file-less passive (it then takes the drop-the-assets path)."""
+    from stockroom.enrich.passive import passive_add_plan
+
+    def v(s):
+        return "" if s is None else str(s.value)
+
+    return passive_add_plan(
+        mpn=v(r.mpn),
+        category=r.category,
+        package=v(r.package),
+        specs={k: str(s.value) for k, s in r.specs.items() if s is not None},
+        description=v(r.description),
+    )
+
+
 def _result_dto(r: EnrichmentResult) -> dict:
     return {
         "category": r.category,
@@ -46,6 +64,9 @@ def _result_dto(r: EnrichmentResult) -> dict:
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],
         "specs": {k: _sourced_dto(v) for k, v in r.specs.items()},
+        # The passive determination for the unified Add-A-Part flow (null = non-passive,
+        # needs the symbol/footprint/3D dropped).
+        "add_plan": _add_plan(r),
         "schema_version": r.schema_version,
     }
 

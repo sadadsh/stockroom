@@ -366,3 +366,59 @@ def test_footprint_preview_hides_the_reference_and_value_text(app_ctx):
     on_disk = fp_file.read_text(encoding="utf-8")
     dstart = on_disk.index('(property "Reference"')
     assert "(hide yes)" not in on_disk[dstart:dstart + 200]
+
+
+# --------------------------------------------------------------------------- #
+# Stock preview-by-lib_id (the unified Add-A-Part flow shows a passive's built-in
+# footprint + 3D model BEFORE it is committed, so there is no part id to key on).
+# --------------------------------------------------------------------------- #
+def test_stock_footprint_svg_400_on_a_bad_lib_id(client):
+    assert client.get("/api/previews/stock/footprint.svg?fp=Resistor_SMD").status_code == 400
+    assert client.get("/api/previews/stock/footprint.svg?fp=../../etc:passwd").status_code == 400
+
+
+def test_stock_footprint_svg_404_when_not_installed(client):
+    r = client.get("/api/previews/stock/footprint.svg?fp=No_Such_Lib:No_Such_Fp")
+    assert r.status_code == 404
+
+
+def test_stock_footprint_svg_renders_by_lib_id(app_ctx, monkeypatch, tmp_path):
+    mod = tmp_path / "Resistor_SMD.pretty" / "R_0603_1608Metric.kicad_mod"
+    mod.parent.mkdir(parents=True)
+    mod.write_text('(footprint "R_0603_1608Metric")', encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.stock_footprint_file", lambda lib, name: mod
+    )
+    cli = _RecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        r = c.get("/api/previews/stock/footprint.svg?fp=Resistor_SMD:R_0603_1608Metric")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/svg+xml")
+        assert c.get(
+            "/api/previews/stock/footprint.svg?fp=Resistor_SMD:R_0603_1608Metric&bw=true"
+        ).status_code == 200
+    # color then bw reach the renderer with distinct flags (distinct cache keys)
+    assert cli.fp_bw == [False, True]
+
+
+def test_stock_model_glb_renders_by_lib_id(app_ctx, monkeypatch, tmp_path):
+    from stockroom.kicad.model_convert import GLB_MAGIC
+
+    src = tmp_path / "R_0603_1608Metric.wrl"
+    src.write_text("stub", encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.stock_model_file", lambda lib, name: src
+    )
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.model_to_glb", lambda p: GLB_MAGIC + b"rest"
+    )
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        r = c.get("/api/previews/stock/model.glb?fp=Resistor_SMD:R_0603_1608Metric")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf-binary"
+        assert r.content[:4] == GLB_MAGIC
+
+
+def test_stock_model_glb_404_when_not_installed(client):
+    r = client.get("/api/previews/stock/model.glb?fp=No_Such_Lib:No_Such")
+    assert r.status_code == 404
