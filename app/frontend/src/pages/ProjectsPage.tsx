@@ -1532,6 +1532,10 @@ function ProjectViewerSection({ projectId }: { projectId: string }) {
       </div>
       {query.isLoading ? (
         <p className="text-sm text-t3">Loading viewer...</p>
+      ) : query.isError ? (
+        <p className="text-sm text-err" data-testid="viewer-detail-error">
+          Could not load the project files.
+        </p>
       ) : (
         <ProjectViewer projectId={projectId} files={files} />
       )}

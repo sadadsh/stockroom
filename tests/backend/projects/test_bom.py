@@ -141,6 +141,18 @@ def test_bom_splits_resistor_and_inductor_of_the_same_value_and_blank_footprint(
     assert {tuple(r["refs"]) for r in rows} == {("R1",), ("L1",)}
 
 
+def test_bom_still_merges_same_footprint_symbol_name_variants(tmp_path):
+    # Roadmap #9 must NOT over-split: two of the SAME part whose symbol names differ but are
+    # not in the alias table (Device:R vs Device:R_US), same value AND footprint, blank
+    # MPN/mfr, are one physical part and must stay one line. The symbol token only
+    # discriminates when the footprint is blank (the footprint already discriminates otherwise).
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", lib="Device:R", fp="Resistor_SMD:R_0402"),
+                   _sym("R2", "10k", lib="Device:R_US", fp="Resistor_SMD:R_0402"))
+    rows = bom_from_kicad_schematic(str(f))["rows"]
+    assert len(rows) == 1 and rows[0]["qty"] == 2 and set(rows[0]["refs"]) == {"R1", "R2"}
+
+
 def test_consolidated_bom_splits_resistor_and_inductor_across_boards(tmp_path):
     ra = _write_sch(tmp_path / "a.kicad_sch", _sym("R1", "10k", lib="Device:R"))
     lb = _write_sch(tmp_path / "b.kicad_sch", _sym("L1", "10k", lib="Device:L"))

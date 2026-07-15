@@ -86,4 +86,22 @@ describe("ProjectViewer", () => {
     await screen.findByTestId("kicanvas-embed");
     expect(screen.queryByTestId("viewer-tabs")).not.toBeInTheDocument();
   });
+
+  it("re-syncs the selection when files arrive after an initially-empty render (no stuck loading)", async () => {
+    // First render with no files (detail still loading), then files populate. A single-file
+    // project has no tab to click, so active must auto-point at the first file or it hangs.
+    mockApi.projectFile.mockResolvedValue("(kicad_pcb board)");
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (files: ViewFile[]) => (
+      <QueryClientProvider client={qc}>
+        <ProjectViewer projectId="p1" files={files} />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(view([]));
+    expect(screen.getByText(/no board or schematic to view/i)).toBeInTheDocument();
+
+    rerender(view([FILES[0]]));
+    // active auto-syncs to files[0], the file fetches, and the viewer mounts (not stuck loading).
+    expect(await screen.findByTestId("kicanvas-embed")).toBeInTheDocument();
+  });
 });

@@ -192,10 +192,14 @@ function BulkLookupSection() {
     if (!value) return;
     job.reset();
     try {
-      // A comma or newline separated paste is an MPN list; a value with commas AND a header row
-      // is a BOM CSV. The backend parses either, so send the raw text as `text` (the MPN-list
-      // path), which also splits comma / whitespace separated ids.
-      const { job_id } = await api.enrichBulk({ text: value, category });
+      // A BOM CSV carries commas (columns); a plain part-number list is one MPN per line. Route a
+      // comma-bearing paste to the CSV parser (which reads the MPN column by its header) and a
+      // plain list to the MPN-list parser, so the advertised "or a BOM CSV" input actually works
+      // instead of treating each CSV row as one garbage MPN.
+      const body = value.includes(",")
+        ? { csv: value, category }
+        : { text: value, category };
+      const { job_id } = await api.enrichBulk(body);
       await job.run(job_id);
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Bulk lookup failed", "err");

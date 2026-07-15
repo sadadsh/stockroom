@@ -222,12 +222,14 @@ def _bom_from_components(comps, lookup=None,
         # Value field. Promote it, but NEVER for a passive, whose Value is a value.
         if not smpn and ident["manufacturer"] and not is_basic_part(ref, value, None):
             smpn = value if value and value.lower() not in _PLACEHOLDERS else None
-        # Fallback key on the KiBoM-normalized value + footprint + manufacturer + symbol
-        # family, so equivalent values merge while different makers OR different part types
-        # (a Device:R and a Device:L both "10k" with a blank footprint, roadmap #9) stay apart.
+        # Fallback key on the KiBoM-normalized value + footprint + manufacturer, plus the symbol
+        # family ONLY when the footprint is blank: a present footprint already discriminates part
+        # type (so Device:R and Device:R_US on one footprint stay merged), while a blank footprint
+        # needs the symbol to keep a Device:R "10k" and a Device:L "10k" apart (roadmap #9).
+        footprint = props.get("Footprint", "")
+        sym = kibom.normalize_symbol(part_name) if not footprint else ""
         key = smpn or (
-            "VF", kibom.normalize_value(value), props.get("Footprint", ""),
-            ident["manufacturer"] or "", kibom.normalize_symbol(part_name),
+            "VF", kibom.normalize_value(value), footprint, ident["manufacturer"] or "", sym,
         )
         g = groups.setdefault(key, {
             "mpn": smpn, "manufacturer": ident["manufacturer"],
@@ -414,9 +416,11 @@ def consolidated_bom(boards: dict, lookup=None, price_lookup=None) -> dict:
     for board, sheets in boards.items():
         for sheet in sheets:
             for r in bom_from_kicad_schematic(sheet)["rows"]:
+                # Symbol family only when the footprint is blank (see _bom_from_components): a
+                # present footprint already discriminates part type, so do not over-split it.
+                sym = kibom.normalize_symbol(r.get("part_name") or "") if not r["footprint"] else ""
                 key = r["mpn"] or ("VF", kibom.normalize_value(r["value"]), r["footprint"],
-                                   r.get("manufacturer") or "",
-                                   kibom.normalize_symbol(r.get("part_name") or ""))
+                                   r.get("manufacturer") or "", sym)
                 m = merged.setdefault(key, {
                     "mpn": r["mpn"], "manufacturer": r["manufacturer"], "value": r["value"],
                     "has_real_mpn": bool(r["mpn"]),
