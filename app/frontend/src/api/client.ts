@@ -340,6 +340,14 @@ export const api = {
     });
   },
 
+  // Bulk-enrich a pasted list of MPNs (one per line) or a BOM CSV (spec section 8.1). Returns a
+  // job ref; the SSE stream ends with a BulkReport of per-MPN completeness. Triage only: it
+  // reports what enrichment found, it does not add parts (each still needs a symbol to pass the
+  // complete-to-add gate).
+  enrichBulk(input: { text?: string; csv?: string; category?: string }): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/enrich/bulk", { body: input });
+  },
+
   // Add a staging candidate to the library. On success returns the new record; on
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {

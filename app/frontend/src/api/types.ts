@@ -219,6 +219,20 @@ export interface JobRef {
   job_id: string;
 }
 
+// Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
+// reports whether enrichment could resolve the part's identity and, if not, exactly what is
+// still missing to complete it (or the error that stopped it). It does NOT add parts.
+export interface BulkReportItem {
+  mpn: string;
+  complete: boolean;
+  missing: string[];
+  error: string;
+}
+
+export interface BulkReport {
+  items: BulkReportItem[];
+}
+
 // GET/PATCH /api/settings -> the redacted per-machine settings surface. The raw
 // Mouser key never crosses the wire; only its presence and a last-4 hint do.
 export interface SettingsInfo {

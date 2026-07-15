@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { PartDetail, StagingCandidate } from "../api/types";
+import type { BulkReport, PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { IngestPage } from "./IngestPage";
 
@@ -16,6 +16,7 @@ vi.mock("../api/client", async (im) => {
       ingestInspect: vi.fn(),
       openJobStream: vi.fn(),
       ingestCommit: vi.fn(),
+      enrichBulk: vi.fn(),
     },
   };
 });
@@ -182,5 +183,48 @@ describe("IngestPage", () => {
     const user = await inspectOnce([]);
     expect(await screen.findByText(/No parts found/i)).toBeInTheDocument();
     void user;
+  });
+});
+
+function bulkResultStream(report: BulkReport): ReadableStream<Uint8Array> {
+  return streamOf([
+    'event: progress\ndata: {"pct":50,"message":"enriching 2 parts"}\n\n',
+    `event: result\ndata: ${JSON.stringify({ result: report })}\n\n`,
+    "event: done\ndata: {}\n\n",
+  ]);
+}
+
+describe("Bulk Lookup (spec 8.1)", () => {
+  it("looks up pasted MPNs and shows a per-part completeness report", async () => {
+    mockApi.enrichBulk.mockResolvedValue({ job_id: "b1" });
+    mockApi.openJobStream.mockResolvedValue(
+      bulkResultStream({
+        items: [
+          { mpn: "TPS62130RGTR", complete: true, missing: [], error: "" },
+          { mpn: "WIDGET99", complete: false, missing: ["manufacturer", "symbol"], error: "" },
+        ],
+      }),
+    );
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByTestId("bulk-input"), "TPS62130RGTR\nWIDGET99");
+    await user.click(screen.getByTestId("bulk-run"));
+
+    const report = await screen.findByTestId("bulk-report");
+    expect(report).toHaveTextContent("1 of 2 complete");
+    expect(screen.getByTestId("bulk-item-TPS62130RGTR")).toHaveTextContent("Complete");
+    expect(screen.getByTestId("bulk-item-WIDGET99")).toHaveTextContent(
+      /Missing manufacturer, symbol/,
+    );
+    expect(mockApi.enrichBulk).toHaveBeenCalledWith({
+      text: "TPS62130RGTR\nWIDGET99",
+      category: "Other",
+    });
+  });
+
+  it("disables the lookup for an empty input", () => {
+    wrap(<IngestPage />);
+    expect(screen.getByTestId("bulk-run")).toBeDisabled();
+    expect(mockApi.enrichBulk).not.toHaveBeenCalled();
   });
 });
