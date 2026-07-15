@@ -25,6 +25,16 @@ class _NoWaitLimiter:
         pass
 
 
+class _NullJlc:
+    """A jlcsearch client that always misses, so LcscSource is inert in tests that
+    exercise the scrape/datasheet path and assert exact fetch counts (an injected
+    stub fetcher bypasses the conftest network guard, so LcscSource would otherwise
+    add a jlcsearch GET)."""
+
+    def search(self, mpn):
+        return None
+
+
 def _candidate(**kw):
     base = dict(
         vendor="snapeda",
@@ -218,7 +228,7 @@ def test_enrich_candidate_scrapes_the_pasted_purchase_url(tmp_path):
 def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
     http = _StubHttpFetcher(mode="pdf")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(_LD_WITH_DATASHEET),
-                              limiter=_NoWaitLimiter(), http_fetcher=http)
+                              limiter=_NoWaitLimiter(), http_fetcher=http, jlcsearch=_NullJlc())
     r = pipe.enrich("TPS62130RGTR", "ICs")
     assert r.datasheet_url.value == "https://ti.com/lit/ds/tps62130.pdf"
     # the DatasheetSource followed the URL, fetched the real PDF, extracted the package
@@ -230,7 +240,7 @@ def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
 def test_enrich_candidate_fetches_and_stores_the_datasheet_pdf(tmp_path):
     http = _StubHttpFetcher(mode="pdf")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(_LD_WITH_DATASHEET),
-                              limiter=_NoWaitLimiter(), http_fetcher=http)
+                              limiter=_NoWaitLimiter(), http_fetcher=http, jlcsearch=_NullJlc())
     c = _candidate(mpn="TPS62130RGTR", datasheet_path=None)
     pipe.enrich_candidate(c)
     # the passport's datasheet requirement is now satisfiable: a real stored PDF

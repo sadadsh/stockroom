@@ -1,0 +1,3712 @@
+{
+  "props": {
+    "pageProps": {
+      "tdkData": null,
+      "catalogList": [
+        {
+          "categoryId": 5,
+          "categoryNameEn": "Cable Assemblies",
+          "url": "/category/5.html",
+          "childCategoryList": [
+            {
+              "categoryId": 62,
+              "categoryNameEn": "Barrel Connector Cables Assemblies",
+              "url": "/category/62.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 694,
+                  "categoryNameEn": "Barrel Audio Cables",
+                  "url": "/category/694.html"
+                },
+                {
+                  "categoryId": 695,
+                  "categoryNameEn": "Barrel Power Cables",
+                  "url": "/category/695.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 63,
+              "categoryNameEn": "Between Series Adapter Cables Assemblies",
+              "url": "/category/63.html"
+            },
+            {
+              "categoryId": 64,
+              "categoryNameEn": "Circular Cable Assemblies",
+              "url": "/category/64.html"
+            },
+            {
+              "categoryId": 65,
+              "categoryNameEn": "Coaxial Cables (RF) Assemblies",
+              "url": "/category/65.html"
+            },
+            {
+              "categoryId": 66,
+              "categoryNameEn": "D-Shaped, Centronics Cables Assemblies",
+              "url": "/category/66.html"
+            },
+            {
+              "categoryId": 67,
+              "categoryNameEn": "D-Sub Cables Assemblies",
+              "url": "/category/67.html"
+            },
+            {
+              "categoryId": 68,
+              "categoryNameEn": "Fiber Optic Cables Assemblies",
+              "url": "/category/68.html"
+            },
+            {
+              "categoryId": 69,
+              "categoryNameEn": "Firewire Cables (IEEE 1394) Assemblies",
+              "url": "/category/69.html"
+            },
+            {
+              "categoryId": 70,
+              "categoryNameEn": "Flat Flex Jumpers, Cables (FFC, FPC) Assemblies",
+              "url": "/category/70.html"
+            },
+            {
+              "categoryId": 71,
+              "categoryNameEn": "Flat Flex Ribbon Jumpers, Cables Assemblies",
+              "url": "/category/71.html"
+            },
+            {
+              "categoryId": 72,
+              "categoryNameEn": "Jumper Wires, Pre-Crimped Leads Assemblies",
+              "url": "/category/72.html"
+            },
+            {
+              "categoryId": 74,
+              "categoryNameEn": "LGH Cables Assemblies",
+              "url": "/category/74.html"
+            },
+            {
+              "categoryId": 75,
+              "categoryNameEn": "Modular Cables Assemblies",
+              "url": "/category/75.html"
+            },
+            {
+              "categoryId": 73,
+              "categoryNameEn": "Modular/Ethernet Cables (RJ45, RJ11)",
+              "url": "/category/73.html"
+            },
+            {
+              "categoryId": 1401,
+              "categoryNameEn": "Optical Audio Cables Assemblies",
+              "url": "/category/1401.html"
+            },
+            {
+              "categoryId": 76,
+              "categoryNameEn": "Pluggable Cables Assemblies",
+              "url": "/category/76.html"
+            },
+            {
+              "categoryId": 77,
+              "categoryNameEn": "Power, Line Cables and Extension Cords Assemblies",
+              "url": "/category/77.html"
+            },
+            {
+              "categoryId": 78,
+              "categoryNameEn": "Rectangular Cable Assemblies",
+              "url": "/category/78.html"
+            },
+            {
+              "categoryId": 79,
+              "categoryNameEn": "Smart Cables Assemblies",
+              "url": "/category/79.html"
+            },
+            {
+              "categoryId": 80,
+              "categoryNameEn": "Solid State Lighting Cables Assemblies",
+              "url": "/category/80.html"
+            },
+            {
+              "categoryId": 81,
+              "categoryNameEn": "Specialized Cable Assemblies",
+              "url": "/category/81.html"
+            },
+            {
+              "categoryId": 82,
+              "categoryNameEn": "USB Cables Assemblies",
+              "url": "/category/82.html"
+            },
+            {
+              "categoryId": 83,
+              "categoryNameEn": "Video Cables (DVI, HDMI) Assemblies",
+              "url": "/category/83.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 6,
+          "categoryNameEn": "Cables, Wires",
+          "url": "/category/6.html",
+          "childCategoryList": [
+            {
+              "categoryId": 84,
+              "categoryNameEn": "Coaxial Cables (RF)",
+              "url": "/category/84.html"
+            },
+            {
+              "categoryId": 85,
+              "categoryNameEn": "Fiber Optic Cables",
+              "url": "/category/85.html"
+            },
+            {
+              "categoryId": 86,
+              "categoryNameEn": "Flat Flex Cables (FFC, FPC)",
+              "url": "/category/86.html"
+            },
+            {
+              "categoryId": 87,
+              "categoryNameEn": "Flat Ribbon Cables",
+              "url": "/category/87.html"
+            },
+            {
+              "categoryId": 88,
+              "categoryNameEn": "Modular - Flat Cable",
+              "url": "/category/88.html"
+            },
+            {
+              "categoryId": 89,
+              "categoryNameEn": "Multiple Conductor Cables",
+              "url": "/category/89.html"
+            },
+            {
+              "categoryId": 90,
+              "categoryNameEn": "Single Conductor Cables (Hook-Up Wire)",
+              "url": "/category/90.html"
+            },
+            {
+              "categoryId": 91,
+              "categoryNameEn": "Wire Wrap",
+              "url": "/category/91.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 8,
+          "categoryNameEn": "Circuit Protection",
+          "url": "/category/8.html",
+          "childCategoryList": [
+            {
+              "categoryId": 113,
+              "categoryNameEn": "Circuit breaker accessories",
+              "url": "/category/113.html"
+            },
+            {
+              "categoryId": 1411,
+              "categoryNameEn": "Circuit Breakers",
+              "url": "/category/1411.html"
+            },
+            {
+              "categoryId": 1406,
+              "categoryNameEn": "Circuit Protection Accessories",
+              "url": "/category/1406.html"
+            },
+            {
+              "categoryId": 121,
+              "categoryNameEn": "Equipment circuit breaker",
+              "url": "/category/121.html"
+            },
+            {
+              "categoryId": 123,
+              "categoryNameEn": "Fuseholders",
+              "url": "/category/123.html"
+            },
+            {
+              "categoryId": 124,
+              "categoryNameEn": "Fuses",
+              "url": "/category/124.html"
+            },
+            {
+              "categoryId": 125,
+              "categoryNameEn": "Gas Discharge Tube Arresters (GDT)",
+              "url": "/category/125.html"
+            },
+            {
+              "categoryId": 122,
+              "categoryNameEn": "Ground Fault Circuit Interrupter (GFCI)",
+              "url": "/category/122.html"
+            },
+            {
+              "categoryId": 126,
+              "categoryNameEn": "Inrush Current Limiters (ICL)",
+              "url": "/category/126.html"
+            },
+            {
+              "categoryId": 114,
+              "categoryNameEn": "Miniature Circuit Breaker",
+              "url": "/category/114.html"
+            },
+            {
+              "categoryId": 119,
+              "categoryNameEn": "Miniature leakage protection circuit breaker",
+              "url": "/category/119.html"
+            },
+            {
+              "categoryId": 116,
+              "categoryNameEn": "Miniature Residual Current Circuit Breaker",
+              "url": "/category/116.html"
+            },
+            {
+              "categoryId": 117,
+              "categoryNameEn": "Molded case circuit breakers",
+              "url": "/category/117.html"
+            },
+            {
+              "categoryId": 115,
+              "categoryNameEn": "Motor Protective Circuit Breaker",
+              "url": "/category/115.html"
+            },
+            {
+              "categoryId": 1407,
+              "categoryNameEn": "Power Distribution, Surge Protectors",
+              "url": "/category/1407.html"
+            },
+            {
+              "categoryId": 127,
+              "categoryNameEn": "PTC Resettable Fuses",
+              "url": "/category/127.html"
+            },
+            {
+              "categoryId": 118,
+              "categoryNameEn": "Residual Current Circuit Breaker",
+              "url": "/category/118.html"
+            },
+            {
+              "categoryId": 120,
+              "categoryNameEn": "Safety circuit breaker",
+              "url": "/category/120.html"
+            },
+            {
+              "categoryId": 128,
+              "categoryNameEn": "Surge Suppression ICs",
+              "url": "/category/128.html"
+            },
+            {
+              "categoryId": 129,
+              "categoryNameEn": "Thermal Cutoffs (Thermal Fuses)",
+              "url": "/category/129.html"
+            },
+            {
+              "categoryId": 130,
+              "categoryNameEn": "Transient Voltage Suppressors (TVS)",
+              "url": "/category/130.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 699,
+                  "categoryNameEn": "Mixed Technology",
+                  "url": "/category/699.html"
+                },
+                {
+                  "categoryId": 700,
+                  "categoryNameEn": "Surge Protection Devices (SPDs)",
+                  "url": "/category/700.html"
+                },
+                {
+                  "categoryId": 701,
+                  "categoryNameEn": "Thyristors (TSS)",
+                  "url": "/category/701.html"
+                },
+                {
+                  "categoryId": 702,
+                  "categoryNameEn": "TVS Diodes",
+                  "url": "/category/702.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 131,
+              "categoryNameEn": "Varistors, MOVs",
+              "url": "/category/131.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 10,
+          "categoryNameEn": "Connectors, Interconnects",
+          "url": "/category/10.html",
+          "childCategoryList": [
+            {
+              "categoryId": 150,
+              "categoryNameEn": "AC Power Connectors",
+              "url": "/category/150.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 703,
+                  "categoryNameEn": "Plugs and Receptacles",
+                  "url": "/category/703.html"
+                },
+                {
+                  "categoryId": 704,
+                  "categoryNameEn": "Power Entry Connector Accessories",
+                  "url": "/category/704.html"
+                },
+                {
+                  "categoryId": 705,
+                  "categoryNameEn": "Power Entry Modules (PEM)",
+                  "url": "/category/705.html"
+                },
+                {
+                  "categoryId": 1305,
+                  "categoryNameEn": "Travel adapters",
+                  "url": "/category/1305.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 151,
+              "categoryNameEn": "Backplane Connectors",
+              "url": "/category/151.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 706,
+                  "categoryNameEn": "ARINC",
+                  "url": "/category/706.html"
+                },
+                {
+                  "categoryId": 707,
+                  "categoryNameEn": "ARINC Inserts",
+                  "url": "/category/707.html"
+                },
+                {
+                  "categoryId": 708,
+                  "categoryNameEn": "Backplane Connector Accessories",
+                  "url": "/category/708.html"
+                },
+                {
+                  "categoryId": 709,
+                  "categoryNameEn": "Backplane Connector Contacts",
+                  "url": "/category/709.html"
+                },
+                {
+                  "categoryId": 710,
+                  "categoryNameEn": "Backplane Connector Housings",
+                  "url": "/category/710.html"
+                },
+                {
+                  "categoryId": 711,
+                  "categoryNameEn": "DIN 41612",
+                  "url": "/category/711.html"
+                },
+                {
+                  "categoryId": 712,
+                  "categoryNameEn": "Hard Metric, Standard",
+                  "url": "/category/712.html"
+                },
+                {
+                  "categoryId": 713,
+                  "categoryNameEn": "Specialized Connectors",
+                  "url": "/category/713.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 152,
+              "categoryNameEn": "Banana and Tip Connectors",
+              "url": "/category/152.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 714,
+                  "categoryNameEn": "Banana and Tip Connector Accessories",
+                  "url": "/category/714.html"
+                },
+                {
+                  "categoryId": 715,
+                  "categoryNameEn": "Banana and Tip Connector Adapters",
+                  "url": "/category/715.html"
+                },
+                {
+                  "categoryId": 716,
+                  "categoryNameEn": "Binding Posts",
+                  "url": "/category/716.html"
+                },
+                {
+                  "categoryId": 717,
+                  "categoryNameEn": "Jacks, Plugs",
+                  "url": "/category/717.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 153,
+              "categoryNameEn": "Barrel Connectors",
+              "url": "/category/153.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 718,
+                  "categoryNameEn": "Audio Connectors",
+                  "url": "/category/718.html"
+                },
+                {
+                  "categoryId": 720,
+                  "categoryNameEn": "Barrel Connector Adapters",
+                  "url": "/category/720.html"
+                },
+                {
+                  "categoryId": 721,
+                  "categoryNameEn": "Power Connectors",
+                  "url": "/category/721.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 154,
+              "categoryNameEn": "Between Series Adapters",
+              "url": "/category/154.html"
+            },
+            {
+              "categoryId": 155,
+              "categoryNameEn": "Blade Type Power Connectors",
+              "url": "/category/155.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 722,
+                  "categoryNameEn": "Blade Type Power Connector Accessories",
+                  "url": "/category/722.html"
+                },
+                {
+                  "categoryId": 723,
+                  "categoryNameEn": "Blade Type Power Connector Assemblies",
+                  "url": "/category/723.html"
+                },
+                {
+                  "categoryId": 724,
+                  "categoryNameEn": "Blade Type Power Connector Contacts",
+                  "url": "/category/724.html"
+                },
+                {
+                  "categoryId": 725,
+                  "categoryNameEn": "Blade Type Power Connector Housings",
+                  "url": "/category/725.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 156,
+              "categoryNameEn": "Card Edge Connectors",
+              "url": "/category/156.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 726,
+                  "categoryNameEn": "Card Edge Connector Accessories",
+                  "url": "/category/726.html"
+                },
+                {
+                  "categoryId": 727,
+                  "categoryNameEn": "Card Edge Connector Adapters",
+                  "url": "/category/727.html"
+                },
+                {
+                  "categoryId": 728,
+                  "categoryNameEn": "Card Edge Connector Contacts",
+                  "url": "/category/728.html"
+                },
+                {
+                  "categoryId": 729,
+                  "categoryNameEn": "Card Edge Connector Housings",
+                  "url": "/category/729.html"
+                },
+                {
+                  "categoryId": 730,
+                  "categoryNameEn": "Edgeboard Connectors",
+                  "url": "/category/730.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 157,
+              "categoryNameEn": "Circular Connectors",
+              "url": "/category/157.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 731,
+                  "categoryNameEn": "Backshells and Cable Clamps",
+                  "url": "/category/731.html"
+                },
+                {
+                  "categoryId": 732,
+                  "categoryNameEn": "Circular Connector Accessories",
+                  "url": "/category/732.html"
+                },
+                {
+                  "categoryId": 733,
+                  "categoryNameEn": "Circular Connector Adapters",
+                  "url": "/category/733.html"
+                },
+                {
+                  "categoryId": 734,
+                  "categoryNameEn": "Circular Connector Assemblies",
+                  "url": "/category/734.html"
+                },
+                {
+                  "categoryId": 735,
+                  "categoryNameEn": "Circular Connector Contacts",
+                  "url": "/category/735.html"
+                },
+                {
+                  "categoryId": 736,
+                  "categoryNameEn": "Circular Connector Housings",
+                  "url": "/category/736.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 158,
+              "categoryNameEn": "Coaxial Connectors (RF)",
+              "url": "/category/158.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 737,
+                  "categoryNameEn": "Coaxial Connector (RF) Accessories",
+                  "url": "/category/737.html"
+                },
+                {
+                  "categoryId": 738,
+                  "categoryNameEn": "Coaxial Connector (RF) Adapters",
+                  "url": "/category/738.html"
+                },
+                {
+                  "categoryId": 739,
+                  "categoryNameEn": "Coaxial Connector (RF) Assemblies",
+                  "url": "/category/739.html"
+                },
+                {
+                  "categoryId": 740,
+                  "categoryNameEn": "Coaxial Connector (RF) Contacts",
+                  "url": "/category/740.html"
+                },
+                {
+                  "categoryId": 741,
+                  "categoryNameEn": "Coaxial Connector (RF) Terminators",
+                  "url": "/category/741.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 1318,
+              "categoryNameEn": "Connector Adapter Kits",
+              "url": "/category/1318.html"
+            },
+            {
+              "categoryId": 159,
+              "categoryNameEn": "Contacts",
+              "url": "/category/159.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 742,
+                  "categoryNameEn": "Contacts, Spring Loaded (Pogo Pins), and Pressure",
+                  "url": "/category/742.html"
+                },
+                {
+                  "categoryId": 743,
+                  "categoryNameEn": "Leadframe",
+                  "url": "/category/743.html"
+                },
+                {
+                  "categoryId": 744,
+                  "categoryNameEn": "Multi Purpose",
+                  "url": "/category/744.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 160,
+              "categoryNameEn": "D-Sub, D-Shaped Connectors",
+              "url": "/category/160.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 745,
+                  "categoryNameEn": "Centronics Connectors",
+                  "url": "/category/745.html"
+                },
+                {
+                  "categoryId": 746,
+                  "categoryNameEn": "D-Sub Connector",
+                  "url": "/category/746.html"
+                },
+                {
+                  "categoryId": 747,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Accessories",
+                  "url": "/category/747.html"
+                },
+                {
+                  "categoryId": 748,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Adapters",
+                  "url": "/category/748.html"
+                },
+                {
+                  "categoryId": 749,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Backshells, Hoods",
+                  "url": "/category/749.html"
+                },
+                {
+                  "categoryId": 750,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Contacts",
+                  "url": "/category/750.html"
+                },
+                {
+                  "categoryId": 751,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Housings",
+                  "url": "/category/751.html"
+                },
+                {
+                  "categoryId": 752,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Jackscrews",
+                  "url": "/category/752.html"
+                },
+                {
+                  "categoryId": 753,
+                  "categoryNameEn": "D-Sub, D-Shaped Connector Terminators",
+                  "url": "/category/753.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 161,
+              "categoryNameEn": "FFC, FPC (Flat Flexible) Connectors",
+              "url": "/category/161.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 754,
+                  "categoryNameEn": "FFC, FPC (Flat Flexible) Connector Accessories",
+                  "url": "/category/754.html"
+                },
+                {
+                  "categoryId": 755,
+                  "categoryNameEn": "FFC, FPC (Flat Flexible) Connector Assemblies",
+                  "url": "/category/755.html"
+                },
+                {
+                  "categoryId": 756,
+                  "categoryNameEn": "FFC, FPC (Flat Flexible) Connector Contacts",
+                  "url": "/category/756.html"
+                },
+                {
+                  "categoryId": 757,
+                  "categoryNameEn": "FFC, FPC (Flat Flexible) Connector Housings",
+                  "url": "/category/757.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 162,
+              "categoryNameEn": "Fiber Optic Connectors",
+              "url": "/category/162.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 758,
+                  "categoryNameEn": "Fiber Optic Connector Accessories",
+                  "url": "/category/758.html"
+                },
+                {
+                  "categoryId": 759,
+                  "categoryNameEn": "Fiber Optic Connector Adapters",
+                  "url": "/category/759.html"
+                },
+                {
+                  "categoryId": 760,
+                  "categoryNameEn": "Fiber Optic Connector Assemblies",
+                  "url": "/category/760.html"
+                },
+                {
+                  "categoryId": 761,
+                  "categoryNameEn": "Fiber Optic Connector Housings",
+                  "url": "/category/761.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 163,
+              "categoryNameEn": "Heavy Duty Connectors",
+              "url": "/category/163.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 762,
+                  "categoryNameEn": "Heavy Duty Connector Accessories",
+                  "url": "/category/762.html"
+                },
+                {
+                  "categoryId": 763,
+                  "categoryNameEn": "Heavy Duty Connector Assemblies",
+                  "url": "/category/763.html"
+                },
+                {
+                  "categoryId": 764,
+                  "categoryNameEn": "Heavy Duty Connector Contacts",
+                  "url": "/category/764.html"
+                },
+                {
+                  "categoryId": 765,
+                  "categoryNameEn": "Heavy Duty Connector Frames",
+                  "url": "/category/765.html"
+                },
+                {
+                  "categoryId": 766,
+                  "categoryNameEn": "Heavy Duty Connector Housings, Hoods, Bases",
+                  "url": "/category/766.html"
+                },
+                {
+                  "categoryId": 767,
+                  "categoryNameEn": "Heavy Duty Connector Inserts, Modules",
+                  "url": "/category/767.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 164,
+              "categoryNameEn": "Keystone Connectors",
+              "url": "/category/164.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 768,
+                  "categoryNameEn": "Keystone Connector Accessories",
+                  "url": "/category/768.html"
+                },
+                {
+                  "categoryId": 769,
+                  "categoryNameEn": "Keystone Faceplates, Frames",
+                  "url": "/category/769.html"
+                },
+                {
+                  "categoryId": 770,
+                  "categoryNameEn": "Keystone Inserts",
+                  "url": "/category/770.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 165,
+              "categoryNameEn": "LGH Connectors",
+              "url": "/category/165.html"
+            },
+            {
+              "categoryId": 166,
+              "categoryNameEn": "Memory Connectors",
+              "url": "/category/166.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 771,
+                  "categoryNameEn": "Inline Module Sockets",
+                  "url": "/category/771.html"
+                },
+                {
+                  "categoryId": 772,
+                  "categoryNameEn": "Memory Connector Accessories",
+                  "url": "/category/772.html"
+                },
+                {
+                  "categoryId": 773,
+                  "categoryNameEn": "PC Card Sockets",
+                  "url": "/category/773.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 167,
+              "categoryNameEn": "Modular Connectors",
+              "url": "/category/167.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 775,
+                  "categoryNameEn": "Modular/Ethernet Connector Accessories",
+                  "url": "/category/775.html"
+                },
+                {
+                  "categoryId": 776,
+                  "categoryNameEn": "Modular/Ethernet Connector Adapters",
+                  "url": "/category/776.html"
+                },
+                {
+                  "categoryId": 777,
+                  "categoryNameEn": "Modular/Ethernet Connector Jacks",
+                  "url": "/category/777.html"
+                },
+                {
+                  "categoryId": 778,
+                  "categoryNameEn": "Modular/Ethernet Connector Jacks With Magnetics",
+                  "url": "/category/778.html"
+                },
+                {
+                  "categoryId": 779,
+                  "categoryNameEn": "Modular/Ethernet Connector Plug Housings",
+                  "url": "/category/779.html"
+                },
+                {
+                  "categoryId": 780,
+                  "categoryNameEn": "Modular/Ethernet Connector Plugs",
+                  "url": "/category/780.html"
+                },
+                {
+                  "categoryId": 781,
+                  "categoryNameEn": "Modular/Ethernet Connector Wiring Blocks",
+                  "url": "/category/781.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 1327,
+              "categoryNameEn": "Patchbay, Jack Panel Accessories",
+              "url": "/category/1327.html"
+            },
+            {
+              "categoryId": 168,
+              "categoryNameEn": "Photovoltaic (Solar Panel) Connectors",
+              "url": "/category/168.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 783,
+                  "categoryNameEn": "Photovoltaic (Solar Panel) Connector Accessories",
+                  "url": "/category/783.html"
+                },
+                {
+                  "categoryId": 784,
+                  "categoryNameEn": "Photovoltaic (Solar Panel) Connector Assemblies",
+                  "url": "/category/784.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 169,
+              "categoryNameEn": "Pluggable Connectors",
+              "url": "/category/169.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 786,
+                  "categoryNameEn": "Pluggable Connector Accessories",
+                  "url": "/category/786.html"
+                },
+                {
+                  "categoryId": 787,
+                  "categoryNameEn": "Pluggable Connector Assemblies",
+                  "url": "/category/787.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 170,
+              "categoryNameEn": "Rectangular Connectors",
+              "url": "/category/170.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 788,
+                  "categoryNameEn": "Arrays, Edge Type, Mezzanine (Board to Board)",
+                  "url": "/category/788.html"
+                },
+                {
+                  "categoryId": 789,
+                  "categoryNameEn": "Board In, Direct Wire to Board",
+                  "url": "/category/789.html"
+                },
+                {
+                  "categoryId": 790,
+                  "categoryNameEn": "Board Spacers, Stackers (Board to Board)",
+                  "url": "/category/790.html"
+                },
+                {
+                  "categoryId": 791,
+                  "categoryNameEn": "Free Hanging, Panel Mount",
+                  "url": "/category/791.html"
+                },
+                {
+                  "categoryId": 792,
+                  "categoryNameEn": "Headers, Male Pins",
+                  "url": "/category/792.html"
+                },
+                {
+                  "categoryId": 793,
+                  "categoryNameEn": "Headers, Receptacles, Female Sockets",
+                  "url": "/category/793.html"
+                },
+                {
+                  "categoryId": 794,
+                  "categoryNameEn": "Headers, Specialty Pin",
+                  "url": "/category/794.html"
+                },
+                {
+                  "categoryId": 795,
+                  "categoryNameEn": "Rectangular Connector Accessories",
+                  "url": "/category/795.html"
+                },
+                {
+                  "categoryId": 796,
+                  "categoryNameEn": "Rectangular Connector Adapters",
+                  "url": "/category/796.html"
+                },
+                {
+                  "categoryId": 797,
+                  "categoryNameEn": "Rectangular Connector Contacts",
+                  "url": "/category/797.html"
+                },
+                {
+                  "categoryId": 798,
+                  "categoryNameEn": "Rectangular Connector Housings",
+                  "url": "/category/798.html"
+                },
+                {
+                  "categoryId": 799,
+                  "categoryNameEn": "Spring Loaded",
+                  "url": "/category/799.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 171,
+              "categoryNameEn": "Shunts, Jumpers",
+              "url": "/category/171.html"
+            },
+            {
+              "categoryId": 172,
+              "categoryNameEn": "Sockets for ICs, Transistors",
+              "url": "/category/172.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 800,
+                  "categoryNameEn": "IC Sockets",
+                  "url": "/category/800.html"
+                },
+                {
+                  "categoryId": 801,
+                  "categoryNameEn": "Socket Accessories",
+                  "url": "/category/801.html"
+                },
+                {
+                  "categoryId": 802,
+                  "categoryNameEn": "Socket Adapters",
+                  "url": "/category/802.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 173,
+              "categoryNameEn": "Solid State Lighting Connectors",
+              "url": "/category/173.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 803,
+                  "categoryNameEn": "Solid State Lighting Connector Accessories",
+                  "url": "/category/803.html"
+                },
+                {
+                  "categoryId": 804,
+                  "categoryNameEn": "Solid State Lighting Connector Assemblies",
+                  "url": "/category/804.html"
+                },
+                {
+                  "categoryId": 805,
+                  "categoryNameEn": "Solid State Lighting Connector Contacts",
+                  "url": "/category/805.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 174,
+              "categoryNameEn": "Terminal Blocks",
+              "url": "/category/174.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 806,
+                  "categoryNameEn": "Barrier Blocks",
+                  "url": "/category/806.html"
+                },
+                {
+                  "categoryId": 807,
+                  "categoryNameEn": "Din Rail, Channel",
+                  "url": "/category/807.html"
+                },
+                {
+                  "categoryId": 808,
+                  "categoryNameEn": "Headers, Plugs and Sockets",
+                  "url": "/category/808.html"
+                },
+                {
+                  "categoryId": 809,
+                  "categoryNameEn": "Interface Modules",
+                  "url": "/category/809.html"
+                },
+                {
+                  "categoryId": 810,
+                  "categoryNameEn": "Panel Mount",
+                  "url": "/category/810.html"
+                },
+                {
+                  "categoryId": 811,
+                  "categoryNameEn": "Power Distribution",
+                  "url": "/category/811.html"
+                },
+                {
+                  "categoryId": 812,
+                  "categoryNameEn": "Specialized Terminal Blocks",
+                  "url": "/category/812.html"
+                },
+                {
+                  "categoryId": 813,
+                  "categoryNameEn": "Terminal Block Accessories",
+                  "url": "/category/813.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1416,
+                      "categoryNameEn": "Accessories",
+                      "url": "/category/1416.html"
+                    },
+                    {
+                      "categoryId": 1417,
+                      "categoryNameEn": "Terminal Block Jumpers",
+                      "url": "/category/1417.html"
+                    },
+                    {
+                      "categoryId": 1418,
+                      "categoryNameEn": "Terminal Block Marker Strips",
+                      "url": "/category/1418.html"
+                    },
+                    {
+                      "categoryId": 1419,
+                      "categoryNameEn": "Terminal Block Wire Ferrules",
+                      "url": "/category/1419.html"
+                    }
+                  ]
+                },
+                {
+                  "categoryId": 817,
+                  "categoryNameEn": "Terminal Block Adapters",
+                  "url": "/category/817.html"
+                },
+                {
+                  "categoryId": 818,
+                  "categoryNameEn": "Terminal Block Contacts",
+                  "url": "/category/818.html"
+                },
+                {
+                  "categoryId": 819,
+                  "categoryNameEn": "Wire to Board",
+                  "url": "/category/819.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 175,
+              "categoryNameEn": "Terminal Junction Systems",
+              "url": "/category/175.html"
+            },
+            {
+              "categoryId": 176,
+              "categoryNameEn": "Terminal Strips and Turret Boards",
+              "url": "/category/176.html"
+            },
+            {
+              "categoryId": 177,
+              "categoryNameEn": "Terminals",
+              "url": "/category/177.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 820,
+                  "categoryNameEn": "Barrel, Bullet Connectors",
+                  "url": "/category/820.html"
+                },
+                {
+                  "categoryId": 821,
+                  "categoryNameEn": "Foil Connectors",
+                  "url": "/category/821.html"
+                },
+                {
+                  "categoryId": 822,
+                  "categoryNameEn": "Housings, Boots",
+                  "url": "/category/822.html"
+                },
+                {
+                  "categoryId": 823,
+                  "categoryNameEn": "Knife Connectors",
+                  "url": "/category/823.html"
+                },
+                {
+                  "categoryId": 824,
+                  "categoryNameEn": "Lugs",
+                  "url": "/category/824.html"
+                },
+                {
+                  "categoryId": 825,
+                  "categoryNameEn": "Magnetic Wire Connectors",
+                  "url": "/category/825.html"
+                },
+                {
+                  "categoryId": 826,
+                  "categoryNameEn": "PC Pin Receptacles, Socket Connectors",
+                  "url": "/category/826.html"
+                },
+                {
+                  "categoryId": 827,
+                  "categoryNameEn": "PC Pin, Single Post Connectors",
+                  "url": "/category/827.html"
+                },
+                {
+                  "categoryId": 828,
+                  "categoryNameEn": "Quick Connects, Quick Disconnect Connectors",
+                  "url": "/category/828.html"
+                },
+                {
+                  "categoryId": 829,
+                  "categoryNameEn": "Ring Connectors",
+                  "url": "/category/829.html"
+                },
+                {
+                  "categoryId": 830,
+                  "categoryNameEn": "Screw Connectors",
+                  "url": "/category/830.html"
+                },
+                {
+                  "categoryId": 831,
+                  "categoryNameEn": "Solder Lug Connectors",
+                  "url": "/category/831.html"
+                },
+                {
+                  "categoryId": 832,
+                  "categoryNameEn": "Spade Connectors",
+                  "url": "/category/832.html"
+                },
+                {
+                  "categoryId": 833,
+                  "categoryNameEn": "Specialized Connectors Terminals",
+                  "url": "/category/833.html"
+                },
+                {
+                  "categoryId": 834,
+                  "categoryNameEn": "Terminal Accessories",
+                  "url": "/category/834.html"
+                },
+                {
+                  "categoryId": 835,
+                  "categoryNameEn": "Terminal Adapters",
+                  "url": "/category/835.html"
+                },
+                {
+                  "categoryId": 836,
+                  "categoryNameEn": "Turret Connectors",
+                  "url": "/category/836.html"
+                },
+                {
+                  "categoryId": 837,
+                  "categoryNameEn": "Wire Pin Connectors",
+                  "url": "/category/837.html"
+                },
+                {
+                  "categoryId": 838,
+                  "categoryNameEn": "Wire Splice Connectors",
+                  "url": "/category/838.html"
+                },
+                {
+                  "categoryId": 839,
+                  "categoryNameEn": "Wire to Board Connectors",
+                  "url": "/category/839.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 178,
+              "categoryNameEn": "USB, DVI, HDMI Connectors",
+              "url": "/category/178.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 840,
+                  "categoryNameEn": "USB, DVI, HDMI Connector Accessories",
+                  "url": "/category/840.html"
+                },
+                {
+                  "categoryId": 841,
+                  "categoryNameEn": "USB, DVI, HDMI Connector Adapters",
+                  "url": "/category/841.html"
+                },
+                {
+                  "categoryId": 842,
+                  "categoryNameEn": "USB, DVI, HDMI Connector Assemblies",
+                  "url": "/category/842.html"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "categoryId": 11,
+          "categoryNameEn": "Development Boards, Kits, Programmers",
+          "url": "/category/11.html",
+          "childCategoryList": [
+            {
+              "categoryId": 179,
+              "categoryNameEn": "Development Boards, Kits, Programmers Accessories",
+              "url": "/category/179.html"
+            },
+            {
+              "categoryId": 180,
+              "categoryNameEn": "Evaluation Boards",
+              "url": "/category/180.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 843,
+                  "categoryNameEn": "Analog to Digital Converters (ADCs) Evaluation Boards",
+                  "url": "/category/843.html"
+                },
+                {
+                  "categoryId": 844,
+                  "categoryNameEn": "Audio Amplifier Evaluation Boards",
+                  "url": "/category/844.html"
+                },
+                {
+                  "categoryId": 845,
+                  "categoryNameEn": "DC/DC & AC/DC (Off-Line) SMPS Evaluation Boards",
+                  "url": "/category/845.html"
+                },
+                {
+                  "categoryId": 846,
+                  "categoryNameEn": "Digital to Analog Converters (DACs) Evaluation Boards",
+                  "url": "/category/846.html"
+                },
+                {
+                  "categoryId": 847,
+                  "categoryNameEn": "Embedded Complex Logic (FPGA, CPLD) Evaluation Boards",
+                  "url": "/category/847.html"
+                },
+                {
+                  "categoryId": 848,
+                  "categoryNameEn": "Embedded MCU, DSP Evaluation Boards",
+                  "url": "/category/848.html"
+                },
+                {
+                  "categoryId": 849,
+                  "categoryNameEn": "Evaluation and Demonstration Boards and Kits",
+                  "url": "/category/849.html"
+                },
+                {
+                  "categoryId": 850,
+                  "categoryNameEn": "Expansion Boards, Daughter Cards",
+                  "url": "/category/850.html"
+                },
+                {
+                  "categoryId": 851,
+                  "categoryNameEn": "LED Driver Evaluation Boards",
+                  "url": "/category/851.html"
+                },
+                {
+                  "categoryId": 852,
+                  "categoryNameEn": "Linear Voltage Regulator Evaluation Boards",
+                  "url": "/category/852.html"
+                },
+                {
+                  "categoryId": 853,
+                  "categoryNameEn": "Op Amp Evaluation Boards",
+                  "url": "/category/853.html"
+                },
+                {
+                  "categoryId": 854,
+                  "categoryNameEn": "RF, RFID, Wireless Evaluation Boards",
+                  "url": "/category/854.html"
+                },
+                {
+                  "categoryId": 855,
+                  "categoryNameEn": "Sensor Evaluation Boards",
+                  "url": "/category/855.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 181,
+              "categoryNameEn": "Programmers, Emulators, and Debuggers",
+              "url": "/category/181.html"
+            },
+            {
+              "categoryId": 182,
+              "categoryNameEn": "Programming Adapters, Sockets",
+              "url": "/category/182.html"
+            },
+            {
+              "categoryId": 1335,
+              "categoryNameEn": "Solderless Breadboards",
+              "url": "/category/1335.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 12,
+          "categoryNameEn": "Discrete Semiconductors",
+          "url": "/category/12.html",
+          "childCategoryList": [
+            {
+              "categoryId": 184,
+              "categoryNameEn": "Current Regulation - Diodes, Transistors",
+              "url": "/category/184.html"
+            },
+            {
+              "categoryId": 185,
+              "categoryNameEn": "Diodes",
+              "url": "/category/185.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 856,
+                  "categoryNameEn": "Bridge Rectifiers",
+                  "url": "/category/856.html"
+                },
+                {
+                  "categoryId": 1427,
+                  "categoryNameEn": "Rectifiers",
+                  "url": "/category/1427.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1429,
+                      "categoryNameEn": "Diode Arrays",
+                      "url": "/category/1429.html"
+                    },
+                    {
+                      "categoryId": 1430,
+                      "categoryNameEn": "Single Diodes",
+                      "url": "/category/1430.html"
+                    }
+                  ]
+                },
+                {
+                  "categoryId": 859,
+                  "categoryNameEn": "RF Diodes",
+                  "url": "/category/859.html"
+                },
+                {
+                  "categoryId": 860,
+                  "categoryNameEn": "Variable Capacitance (Varicaps, Varactors)",
+                  "url": "/category/860.html"
+                },
+                {
+                  "categoryId": 1428,
+                  "categoryNameEn": "Zener",
+                  "url": "/category/1428.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1431,
+                      "categoryNameEn": "Single Zener Diodes",
+                      "url": "/category/1431.html"
+                    },
+                    {
+                      "categoryId": 1432,
+                      "categoryNameEn": "Zener Diode Arrays",
+                      "url": "/category/1432.html"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "categoryId": 191,
+              "categoryNameEn": "JFETs",
+              "url": "/category/191.html"
+            },
+            {
+              "categoryId": 186,
+              "categoryNameEn": "Power Driver Modules",
+              "url": "/category/186.html"
+            },
+            {
+              "categoryId": 192,
+              "categoryNameEn": "Programmable Unijunction Transistors",
+              "url": "/category/192.html"
+            },
+            {
+              "categoryId": 193,
+              "categoryNameEn": "Special Purpose Transistors",
+              "url": "/category/193.html"
+            },
+            {
+              "categoryId": 187,
+              "categoryNameEn": "Thyristors",
+              "url": "/category/187.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 863,
+                  "categoryNameEn": "DIACs, SIDACs",
+                  "url": "/category/863.html"
+                },
+                {
+                  "categoryId": 864,
+                  "categoryNameEn": "SCRs",
+                  "url": "/category/864.html"
+                },
+                {
+                  "categoryId": 865,
+                  "categoryNameEn": "SCRs - Modules",
+                  "url": "/category/865.html"
+                },
+                {
+                  "categoryId": 866,
+                  "categoryNameEn": "TRIACs",
+                  "url": "/category/866.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 1420,
+              "categoryNameEn": "Transistors",
+              "url": "/category/1420.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1421,
+                  "categoryNameEn": "Bipolar (BJT)",
+                  "url": "/category/1421.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1422,
+                      "categoryNameEn": "Bipolar RF Transistors",
+                      "url": "/category/1422.html"
+                    },
+                    {
+                      "categoryId": 1423,
+                      "categoryNameEn": "Bipolar Transistor Arrays",
+                      "url": "/category/1423.html"
+                    },
+                    {
+                      "categoryId": 1424,
+                      "categoryNameEn": "Bipolar Transistor Arrays, Pre-Biased",
+                      "url": "/category/1424.html"
+                    },
+                    {
+                      "categoryId": 1425,
+                      "categoryNameEn": "Single Bipolar Transistors",
+                      "url": "/category/1425.html"
+                    },
+                    {
+                      "categoryId": 1426,
+                      "categoryNameEn": "Single, Pre-Biased Bipolar Transistors",
+                      "url": "/category/1426.html"
+                    }
+                  ]
+                },
+                {
+                  "categoryId": 1433,
+                  "categoryNameEn": "FETs, MOSFETs",
+                  "url": "/category/1433.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1434,
+                      "categoryNameEn": "FET, MOSFET Arrays",
+                      "url": "/category/1434.html"
+                    },
+                    {
+                      "categoryId": 1435,
+                      "categoryNameEn": "RF FETs, MOSFETs",
+                      "url": "/category/1435.html"
+                    },
+                    {
+                      "categoryId": 1436,
+                      "categoryNameEn": "Single FETs, MOSFETs",
+                      "url": "/category/1436.html"
+                    }
+                  ]
+                },
+                {
+                  "categoryId": 1437,
+                  "categoryNameEn": "IGBTs",
+                  "url": "/category/1437.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1438,
+                      "categoryNameEn": "IGBT Arrays",
+                      "url": "/category/1438.html"
+                    },
+                    {
+                      "categoryId": 1439,
+                      "categoryNameEn": "IGBT Modules",
+                      "url": "/category/1439.html"
+                    },
+                    {
+                      "categoryId": 1440,
+                      "categoryNameEn": "Single IGBTs",
+                      "url": "/category/1440.html"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "categoryId": 13,
+          "categoryNameEn": "Embedded Computers",
+          "url": "/category/13.html",
+          "childCategoryList": [
+            {
+              "categoryId": 194,
+              "categoryNameEn": "Embedded Computer Accessories",
+              "url": "/category/194.html"
+            },
+            {
+              "categoryId": 195,
+              "categoryNameEn": "Embedded Computer Interface Boards",
+              "url": "/category/195.html"
+            },
+            {
+              "categoryId": 196,
+              "categoryNameEn": "Single Board Computers (SBCs)",
+              "url": "/category/196.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 15,
+          "categoryNameEn": "Hardware, Fasteners, Accessories",
+          "url": "/category/15.html",
+          "childCategoryList": [
+            {
+              "categoryId": 230,
+              "categoryNameEn": "Anchors",
+              "url": "/category/230.html"
+            },
+            {
+              "categoryId": 234,
+              "categoryNameEn": "Bearings",
+              "url": "/category/234.html"
+            },
+            {
+              "categoryId": 218,
+              "categoryNameEn": "Board Spacers, Standoffs",
+              "url": "/category/218.html"
+            },
+            {
+              "categoryId": 233,
+              "categoryNameEn": "Board Supports",
+              "url": "/category/233.html"
+            },
+            {
+              "categoryId": 223,
+              "categoryNameEn": "Bolts",
+              "url": "/category/223.html"
+            },
+            {
+              "categoryId": 1408,
+              "categoryNameEn": "Boxes, Enclosures, Racks",
+              "url": "/category/1408.html"
+            },
+            {
+              "categoryId": 232,
+              "categoryNameEn": "Fastener Assortment Kits",
+              "url": "/category/232.html"
+            },
+            {
+              "categoryId": 217,
+              "categoryNameEn": "Hardware Accessories",
+              "url": "/category/217.html"
+            },
+            {
+              "categoryId": 1332,
+              "categoryNameEn": "Keys",
+              "url": "/category/1332.html"
+            },
+            {
+              "categoryId": 1334,
+              "categoryNameEn": "Locks & Latches",
+              "url": "/category/1334.html"
+            },
+            {
+              "categoryId": 229,
+              "categoryNameEn": "Nails",
+              "url": "/category/229.html"
+            },
+            {
+              "categoryId": 220,
+              "categoryNameEn": "Nuts",
+              "url": "/category/220.html"
+            },
+            {
+              "categoryId": 1398,
+              "categoryNameEn": "O-Ring Materials for Hydraulic Fluids",
+              "url": "/category/1398.html"
+            },
+            {
+              "categoryId": 228,
+              "categoryNameEn": "Pins",
+              "url": "/category/228.html"
+            },
+            {
+              "categoryId": 1331,
+              "categoryNameEn": "Pipe clamps",
+              "url": "/category/1331.html"
+            },
+            {
+              "categoryId": 225,
+              "categoryNameEn": "Retaining Rings",
+              "url": "/category/225.html"
+            },
+            {
+              "categoryId": 231,
+              "categoryNameEn": "Retaining Rings and Clips",
+              "url": "/category/231.html"
+            },
+            {
+              "categoryId": 221,
+              "categoryNameEn": "Rivets",
+              "url": "/category/221.html"
+            },
+            {
+              "categoryId": 222,
+              "categoryNameEn": "Screws",
+              "url": "/category/222.html"
+            },
+            {
+              "categoryId": 227,
+              "categoryNameEn": "Shims",
+              "url": "/category/227.html"
+            },
+            {
+              "categoryId": 226,
+              "categoryNameEn": "Springs",
+              "url": "/category/226.html"
+            },
+            {
+              "categoryId": 1289,
+              "categoryNameEn": "Taps & Tap Wrenches",
+              "url": "/category/1289.html"
+            },
+            {
+              "categoryId": 1329,
+              "categoryNameEn": "Throat clamps",
+              "url": "/category/1329.html"
+            },
+            {
+              "categoryId": 224,
+              "categoryNameEn": "Washers",
+              "url": "/category/224.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 16,
+          "categoryNameEn": "Industrial Automation and Controls",
+          "url": "/category/16.html",
+          "childCategoryList": [
+            {
+              "categoryId": 1316,
+              "categoryNameEn": "ESD Brush",
+              "url": "/category/1316.html"
+            },
+            {
+              "categoryId": 239,
+              "categoryNameEn": "Human Machine Interface (HMI)",
+              "url": "/category/239.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 886,
+                  "categoryNameEn": "Machine Interface",
+                  "url": "/category/886.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 1320,
+              "categoryNameEn": "Industrial - Power Distribution, Surge Protectors",
+              "url": "/category/1320.html"
+            },
+            {
+              "categoryId": 240,
+              "categoryNameEn": "Industrial Automation Accessories",
+              "url": "/category/240.html"
+            },
+            {
+              "categoryId": 237,
+              "categoryNameEn": "Industrial Controllers",
+              "url": "/category/237.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 879,
+                  "categoryNameEn": "Controller Accessories",
+                  "url": "/category/879.html"
+                },
+                {
+                  "categoryId": 882,
+                  "categoryNameEn": "PLC Modules",
+                  "url": "/category/882.html"
+                },
+                {
+                  "categoryId": 883,
+                  "categoryNameEn": "Process, Temperature",
+                  "url": "/category/883.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 241,
+              "categoryNameEn": "Industrial Equipment",
+              "url": "/category/241.html"
+            },
+            {
+              "categoryId": 243,
+              "categoryNameEn": "Industrial Sensors",
+              "url": "/category/243.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 887,
+                  "categoryNameEn": "Color Sensors - Industrial",
+                  "url": "/category/887.html"
+                },
+                {
+                  "categoryId": 888,
+                  "categoryNameEn": "Encoders - Industrial",
+                  "url": "/category/888.html"
+                },
+                {
+                  "categoryId": 889,
+                  "categoryNameEn": "Float, Level Sensors - Industrial",
+                  "url": "/category/889.html"
+                },
+                {
+                  "categoryId": 890,
+                  "categoryNameEn": "Flow Sensors - Industrial",
+                  "url": "/category/890.html"
+                },
+                {
+                  "categoryId": 891,
+                  "categoryNameEn": "Force Sensors, Load Cells - Industrial",
+                  "url": "/category/891.html"
+                },
+                {
+                  "categoryId": 1345,
+                  "categoryNameEn": "Industrial Sensors Accessories",
+                  "url": "/category/1345.html"
+                },
+                {
+                  "categoryId": 892,
+                  "categoryNameEn": "Photoelectric - Industrial",
+                  "url": "/category/892.html"
+                },
+                {
+                  "categoryId": 893,
+                  "categoryNameEn": "Position, Proximity, Speed (Modules) - Industrial",
+                  "url": "/category/893.html"
+                },
+                {
+                  "categoryId": 894,
+                  "categoryNameEn": "Pressure Sensors, Transducers - Industrial",
+                  "url": "/category/894.html"
+                },
+                {
+                  "categoryId": 895,
+                  "categoryNameEn": "Proximity Sensors - Industrial",
+                  "url": "/category/895.html"
+                },
+                {
+                  "categoryId": 896,
+                  "categoryNameEn": "Temperature Sensors - Analog and Digital Output - Industrial",
+                  "url": "/category/896.html"
+                },
+                {
+                  "categoryId": 897,
+                  "categoryNameEn": "Thermostats - Mechanical - Industrial",
+                  "url": "/category/897.html"
+                },
+                {
+                  "categoryId": 898,
+                  "categoryNameEn": "Ultrasonic Receivers, Transmitters - Industrial",
+                  "url": "/category/898.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 244,
+              "categoryNameEn": "Industrial Specialized",
+              "url": "/category/244.html"
+            },
+            {
+              "categoryId": 246,
+              "categoryNameEn": "Machine Safety",
+              "url": "/category/246.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 901,
+                  "categoryNameEn": "Light Curtains",
+                  "url": "/category/901.html"
+                },
+                {
+                  "categoryId": 903,
+                  "categoryNameEn": "Mats",
+                  "url": "/category/903.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 247,
+              "categoryNameEn": "Machine Vision",
+              "url": "/category/247.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 905,
+                  "categoryNameEn": "Camera/Sensors",
+                  "url": "/category/905.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 248,
+              "categoryNameEn": "Monitors",
+              "url": "/category/248.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 908,
+                  "categoryNameEn": "Current/Voltage Transducer Monitors",
+                  "url": "/category/908.html"
+                },
+                {
+                  "categoryId": 909,
+                  "categoryNameEn": "Relay Output Monitors",
+                  "url": "/category/909.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 249,
+              "categoryNameEn": "Panel Meters",
+              "url": "/category/249.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 910,
+                  "categoryNameEn": "Counters, Hour Meters",
+                  "url": "/category/910.html"
+                },
+                {
+                  "categoryId": 911,
+                  "categoryNameEn": "Meters",
+                  "url": "/category/911.html"
+                },
+                {
+                  "categoryId": 912,
+                  "categoryNameEn": "Panel Meter Accessories",
+                  "url": "/category/912.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 1307,
+              "categoryNameEn": "Pilot & Indicator Lights",
+              "url": "/category/1307.html"
+            },
+            {
+              "categoryId": 250,
+              "categoryNameEn": "Pneumatics, Hydraulics",
+              "url": "/category/250.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 913,
+                  "categoryNameEn": "Actuators/Cylinders",
+                  "url": "/category/913.html"
+                },
+                {
+                  "categoryId": 914,
+                  "categoryNameEn": "Fittings, Couplings, and Distributors",
+                  "url": "/category/914.html"
+                },
+                {
+                  "categoryId": 1339,
+                  "categoryNameEn": "Flowmeters",
+                  "url": "/category/1339.html"
+                },
+                {
+                  "categoryId": 1341,
+                  "categoryNameEn": "Hose Fittings",
+                  "url": "/category/1341.html"
+                },
+                {
+                  "categoryId": 915,
+                  "categoryNameEn": "Pneumatics Accessories",
+                  "url": "/category/915.html"
+                },
+                {
+                  "categoryId": 916,
+                  "categoryNameEn": "Preparation/Treatment",
+                  "url": "/category/916.html"
+                },
+                {
+                  "categoryId": 1340,
+                  "categoryNameEn": "PTFE Tape",
+                  "url": "/category/1340.html"
+                },
+                {
+                  "categoryId": 1338,
+                  "categoryNameEn": "Pump Accessories",
+                  "url": "/category/1338.html"
+                },
+                {
+                  "categoryId": 1337,
+                  "categoryNameEn": "Pumps",
+                  "url": "/category/1337.html"
+                },
+                {
+                  "categoryId": 917,
+                  "categoryNameEn": "Shock Absorbers, Dampers",
+                  "url": "/category/917.html"
+                },
+                {
+                  "categoryId": 918,
+                  "categoryNameEn": "Tubing, Hose, Piping",
+                  "url": "/category/918.html"
+                },
+                {
+                  "categoryId": 919,
+                  "categoryNameEn": "Valves and Control",
+                  "url": "/category/919.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 251,
+              "categoryNameEn": "Protection Relays & Systems",
+              "url": "/category/251.html"
+            },
+            {
+              "categoryId": 253,
+              "categoryNameEn": "Signal Conditioners and Isolators",
+              "url": "/category/253.html"
+            },
+            {
+              "categoryId": 254,
+              "categoryNameEn": "Time Delay Relays",
+              "url": "/category/254.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 17,
+          "categoryNameEn": "Integrated Circuits (ICs)",
+          "url": "/category/17.html",
+          "childCategoryList": [
+            {
+              "categoryId": 255,
+              "categoryNameEn": "Audio Special Purpose",
+              "url": "/category/255.html"
+            },
+            {
+              "categoryId": 256,
+              "categoryNameEn": "Clock/Timing",
+              "url": "/category/256.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 923,
+                  "categoryNameEn": "Application Specific Clock/Timing",
+                  "url": "/category/923.html"
+                },
+                {
+                  "categoryId": 924,
+                  "categoryNameEn": "Clock Buffers, Drivers",
+                  "url": "/category/924.html"
+                },
+                {
+                  "categoryId": 925,
+                  "categoryNameEn": "Clock Generators, PLLs, Frequency Synthesizers",
+                  "url": "/category/925.html"
+                },
+                {
+                  "categoryId": 928,
+                  "categoryNameEn": "Programmable Timers and Oscillators",
+                  "url": "/category/928.html"
+                },
+                {
+                  "categoryId": 929,
+                  "categoryNameEn": "Real Time Clocks",
+                  "url": "/category/929.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 257,
+              "categoryNameEn": "Data Acquisition",
+              "url": "/category/257.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 930,
+                  "categoryNameEn": "ADCs/DACs - Special Purpose",
+                  "url": "/category/930.html"
+                },
+                {
+                  "categoryId": 931,
+                  "categoryNameEn": "Analog Front End (AFE)",
+                  "url": "/category/931.html"
+                },
+                {
+                  "categoryId": 932,
+                  "categoryNameEn": "Analog to Digital Converters (ADC)",
+                  "url": "/category/932.html"
+                },
+                {
+                  "categoryId": 933,
+                  "categoryNameEn": "Digital Potentiometers",
+                  "url": "/category/933.html"
+                },
+                {
+                  "categoryId": 934,
+                  "categoryNameEn": "Digital to Analog Converters (DAC)",
+                  "url": "/category/934.html"
+                },
+                {
+                  "categoryId": 935,
+                  "categoryNameEn": "Touch Screen Controllers",
+                  "url": "/category/935.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 258,
+              "categoryNameEn": "Embedded",
+              "url": "/category/258.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 936,
+                  "categoryNameEn": "Application Specific Microcontrollers",
+                  "url": "/category/936.html"
+                },
+                {
+                  "categoryId": 937,
+                  "categoryNameEn": "CPLDs (Complex Programmable Logic Devices)",
+                  "url": "/category/937.html"
+                },
+                {
+                  "categoryId": 938,
+                  "categoryNameEn": "DSP (Digital Signal Processors)",
+                  "url": "/category/938.html"
+                },
+                {
+                  "categoryId": 939,
+                  "categoryNameEn": "FPGAs (Field Programmable Gate Array)",
+                  "url": "/category/939.html"
+                },
+                {
+                  "categoryId": 940,
+                  "categoryNameEn": "FPGAs (Field Programmable Gate Array) with Microcontrollers",
+                  "url": "/category/940.html"
+                },
+                {
+                  "categoryId": 941,
+                  "categoryNameEn": "Microcontrollers",
+                  "url": "/category/941.html"
+                },
+                {
+                  "categoryId": 942,
+                  "categoryNameEn": "Microcontrollers, Microprocessor, FPGA Modules",
+                  "url": "/category/942.html"
+                },
+                {
+                  "categoryId": 943,
+                  "categoryNameEn": "Microprocessors",
+                  "url": "/category/943.html"
+                },
+                {
+                  "categoryId": 944,
+                  "categoryNameEn": "PLDs (Programmable Logic Device)",
+                  "url": "/category/944.html"
+                },
+                {
+                  "categoryId": 945,
+                  "categoryNameEn": "System On Chip (SoC)",
+                  "url": "/category/945.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 259,
+              "categoryNameEn": "Interface",
+              "url": "/category/259.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 946,
+                  "categoryNameEn": "Analog Switches - Special Purpose",
+                  "url": "/category/946.html"
+                },
+                {
+                  "categoryId": 947,
+                  "categoryNameEn": "Analog Switches, Multiplexers, Demultiplexers",
+                  "url": "/category/947.html"
+                },
+                {
+                  "categoryId": 948,
+                  "categoryNameEn": "CODECS",
+                  "url": "/category/948.html"
+                },
+                {
+                  "categoryId": 950,
+                  "categoryNameEn": "Direct Digital Synthesis (DDS)",
+                  "url": "/category/950.html"
+                },
+                {
+                  "categoryId": 951,
+                  "categoryNameEn": "Drivers, Receivers, Transceivers",
+                  "url": "/category/951.html"
+                },
+                {
+                  "categoryId": 952,
+                  "categoryNameEn": "Encoders, Decoders, Converters",
+                  "url": "/category/952.html"
+                },
+                {
+                  "categoryId": 953,
+                  "categoryNameEn": "Filters - Active",
+                  "url": "/category/953.html"
+                },
+                {
+                  "categoryId": 954,
+                  "categoryNameEn": "I/O Expanders",
+                  "url": "/category/954.html"
+                },
+                {
+                  "categoryId": 949,
+                  "categoryNameEn": "Interface Controllers",
+                  "url": "/category/949.html"
+                },
+                {
+                  "categoryId": 955,
+                  "categoryNameEn": "Modems - ICs and Modules",
+                  "url": "/category/955.html"
+                },
+                {
+                  "categoryId": 956,
+                  "categoryNameEn": "Modules",
+                  "url": "/category/956.html"
+                },
+                {
+                  "categoryId": 957,
+                  "categoryNameEn": "Sensor and Detector Interfaces",
+                  "url": "/category/957.html"
+                },
+                {
+                  "categoryId": 958,
+                  "categoryNameEn": "Sensor, Capacitive Touch",
+                  "url": "/category/958.html"
+                },
+                {
+                  "categoryId": 959,
+                  "categoryNameEn": "Serializers, Deserializers",
+                  "url": "/category/959.html"
+                },
+                {
+                  "categoryId": 960,
+                  "categoryNameEn": "Signal Buffers, Repeaters, Splitters",
+                  "url": "/category/960.html"
+                },
+                {
+                  "categoryId": 961,
+                  "categoryNameEn": "Signal Terminators",
+                  "url": "/category/961.html"
+                },
+                {
+                  "categoryId": 962,
+                  "categoryNameEn": "Specialized",
+                  "url": "/category/962.html"
+                },
+                {
+                  "categoryId": 963,
+                  "categoryNameEn": "Telecom",
+                  "url": "/category/963.html"
+                },
+                {
+                  "categoryId": 964,
+                  "categoryNameEn": "UARTs (Universal Asynchronous Receiver Transmitter)",
+                  "url": "/category/964.html"
+                },
+                {
+                  "categoryId": 965,
+                  "categoryNameEn": "Voice Record and Playback",
+                  "url": "/category/965.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 260,
+              "categoryNameEn": "Linear",
+              "url": "/category/260.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 966,
+                  "categoryNameEn": "Amplifiers",
+                  "url": "/category/966.html",
+                  "childCategoryList": [
+                    {
+                      "categoryId": 1415,
+                      "categoryNameEn": "Audio Amplifiers",
+                      "url": "/category/1415.html"
+                    },
+                    {
+                      "categoryId": 1441,
+                      "categoryNameEn": "Instrumentation, Op Amps, Buffer Amps",
+                      "url": "/category/1441.html"
+                    },
+                    {
+                      "categoryId": 1443,
+                      "categoryNameEn": "Special Purpose Amplifiers",
+                      "url": "/category/1443.html"
+                    },
+                    {
+                      "categoryId": 1442,
+                      "categoryNameEn": "Video Amps and Modules",
+                      "url": "/category/1442.html"
+                    }
+                  ]
+                },
+                {
+                  "categoryId": 967,
+                  "categoryNameEn": "Analog Multipliers, Dividers",
+                  "url": "/category/967.html"
+                },
+                {
+                  "categoryId": 968,
+                  "categoryNameEn": "Linear Comparators",
+                  "url": "/category/968.html"
+                },
+                {
+                  "categoryId": 969,
+                  "categoryNameEn": "Video Processing",
+                  "url": "/category/969.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 261,
+              "categoryNameEn": "Logic",
+              "url": "/category/261.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 970,
+                  "categoryNameEn": "Buffers, Drivers, Receivers, Transceivers",
+                  "url": "/category/970.html"
+                },
+                {
+                  "categoryId": 972,
+                  "categoryNameEn": "Counters, Dividers",
+                  "url": "/category/972.html"
+                },
+                {
+                  "categoryId": 973,
+                  "categoryNameEn": "FIFOs Memory",
+                  "url": "/category/973.html"
+                },
+                {
+                  "categoryId": 974,
+                  "categoryNameEn": "Flip Flops",
+                  "url": "/category/974.html"
+                },
+                {
+                  "categoryId": 975,
+                  "categoryNameEn": "Gates and Inverters",
+                  "url": "/category/975.html"
+                },
+                {
+                  "categoryId": 976,
+                  "categoryNameEn": "Gates and Inverters - Multi-Function, Configurable",
+                  "url": "/category/976.html"
+                },
+                {
+                  "categoryId": 977,
+                  "categoryNameEn": "Latches",
+                  "url": "/category/977.html"
+                },
+                {
+                  "categoryId": 971,
+                  "categoryNameEn": "Logic Comparators",
+                  "url": "/category/971.html"
+                },
+                {
+                  "categoryId": 978,
+                  "categoryNameEn": "Multivibrators",
+                  "url": "/category/978.html"
+                },
+                {
+                  "categoryId": 979,
+                  "categoryNameEn": "Parity Generators and Checkers",
+                  "url": "/category/979.html"
+                },
+                {
+                  "categoryId": 980,
+                  "categoryNameEn": "Shift Registers",
+                  "url": "/category/980.html"
+                },
+                {
+                  "categoryId": 981,
+                  "categoryNameEn": "Signal Switches, Multiplexers, Decoders",
+                  "url": "/category/981.html"
+                },
+                {
+                  "categoryId": 982,
+                  "categoryNameEn": "Specialty Logic",
+                  "url": "/category/982.html"
+                },
+                {
+                  "categoryId": 983,
+                  "categoryNameEn": "Translators, Level Shifters",
+                  "url": "/category/983.html"
+                },
+                {
+                  "categoryId": 984,
+                  "categoryNameEn": "Universal Bus Functions",
+                  "url": "/category/984.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 262,
+              "categoryNameEn": "Memory",
+              "url": "/category/262.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 990,
+                  "categoryNameEn": "Configuration PROMs for FPGAs",
+                  "url": "/category/990.html"
+                },
+                {
+                  "categoryId": 1288,
+                  "categoryNameEn": "Memory (ICs)",
+                  "url": "/category/1288.html"
+                },
+                {
+                  "categoryId": 992,
+                  "categoryNameEn": "Memory Controllers",
+                  "url": "/category/992.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 263,
+              "categoryNameEn": "Power Management (PMIC)",
+              "url": "/category/263.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1003,
+                  "categoryNameEn": "AC DC Converters, Offline Switchers",
+                  "url": "/category/1003.html"
+                },
+                {
+                  "categoryId": 1004,
+                  "categoryNameEn": "Battery Chargers ICs",
+                  "url": "/category/1004.html"
+                },
+                {
+                  "categoryId": 1005,
+                  "categoryNameEn": "Battery Management",
+                  "url": "/category/1005.html"
+                },
+                {
+                  "categoryId": 1006,
+                  "categoryNameEn": "Current Regulation/Management",
+                  "url": "/category/1006.html"
+                },
+                {
+                  "categoryId": 1007,
+                  "categoryNameEn": "DC DC Switching Controllers",
+                  "url": "/category/1007.html"
+                },
+                {
+                  "categoryId": 1008,
+                  "categoryNameEn": "Display Drivers",
+                  "url": "/category/1008.html"
+                },
+                {
+                  "categoryId": 1009,
+                  "categoryNameEn": "Energy Metering",
+                  "url": "/category/1009.html"
+                },
+                {
+                  "categoryId": 1010,
+                  "categoryNameEn": "Full Half-Bridge (H Bridge) Drivers",
+                  "url": "/category/1010.html"
+                },
+                {
+                  "categoryId": 1011,
+                  "categoryNameEn": "Gate Drivers",
+                  "url": "/category/1011.html"
+                },
+                {
+                  "categoryId": 1012,
+                  "categoryNameEn": "Hot Swap Controllers",
+                  "url": "/category/1012.html"
+                },
+                {
+                  "categoryId": 1013,
+                  "categoryNameEn": "Laser Drivers",
+                  "url": "/category/1013.html"
+                },
+                {
+                  "categoryId": 1014,
+                  "categoryNameEn": "LED Drivers ICs",
+                  "url": "/category/1014.html"
+                },
+                {
+                  "categoryId": 1015,
+                  "categoryNameEn": "Lighting, Ballast Controllers",
+                  "url": "/category/1015.html"
+                },
+                {
+                  "categoryId": 1016,
+                  "categoryNameEn": "Motor Drivers, Controllers",
+                  "url": "/category/1016.html"
+                },
+                {
+                  "categoryId": 1017,
+                  "categoryNameEn": "OR Controllers, Ideal Diodes",
+                  "url": "/category/1017.html"
+                },
+                {
+                  "categoryId": 1018,
+                  "categoryNameEn": "PFC (Power Factor Correction)",
+                  "url": "/category/1018.html"
+                },
+                {
+                  "categoryId": 1019,
+                  "categoryNameEn": "Power Distribution Switches, Load Drivers",
+                  "url": "/category/1019.html"
+                },
+                {
+                  "categoryId": 1020,
+                  "categoryNameEn": "Power Management - Specialized",
+                  "url": "/category/1020.html"
+                },
+                {
+                  "categoryId": 1021,
+                  "categoryNameEn": "Power Over Ethernet (PoE) Controllers",
+                  "url": "/category/1021.html"
+                },
+                {
+                  "categoryId": 1022,
+                  "categoryNameEn": "Power Supply Controllers, Monitors",
+                  "url": "/category/1022.html"
+                },
+                {
+                  "categoryId": 1023,
+                  "categoryNameEn": "RMS to DC Converters",
+                  "url": "/category/1023.html"
+                },
+                {
+                  "categoryId": 1024,
+                  "categoryNameEn": "Special Purpose Regulators",
+                  "url": "/category/1024.html"
+                },
+                {
+                  "categoryId": 1025,
+                  "categoryNameEn": "Supervisors",
+                  "url": "/category/1025.html"
+                },
+                {
+                  "categoryId": 1026,
+                  "categoryNameEn": "Thermal Management",
+                  "url": "/category/1026.html"
+                },
+                {
+                  "categoryId": 1027,
+                  "categoryNameEn": "V/F and F/V Converters",
+                  "url": "/category/1027.html"
+                },
+                {
+                  "categoryId": 1028,
+                  "categoryNameEn": "Voltage Reference",
+                  "url": "/category/1028.html"
+                },
+                {
+                  "categoryId": 1029,
+                  "categoryNameEn": "Voltage Regulators - DC DC Switching Regulators",
+                  "url": "/category/1029.html"
+                },
+                {
+                  "categoryId": 1030,
+                  "categoryNameEn": "Voltage Regulators - Linear + Switching",
+                  "url": "/category/1030.html"
+                },
+                {
+                  "categoryId": 1031,
+                  "categoryNameEn": "Voltage Regulators - Linear Regulator Controllers",
+                  "url": "/category/1031.html"
+                },
+                {
+                  "categoryId": 1032,
+                  "categoryNameEn": "Voltage Regulators - Linear, Low Drop Out (LDO) Regulators",
+                  "url": "/category/1032.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 264,
+              "categoryNameEn": "Specialized ICs",
+              "url": "/category/264.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 18,
+          "categoryNameEn": "Isolators",
+          "url": "/category/18.html",
+          "childCategoryList": [
+            {
+              "categoryId": 265,
+              "categoryNameEn": "Digital Isolators",
+              "url": "/category/265.html"
+            },
+            {
+              "categoryId": 266,
+              "categoryNameEn": "Isolators - Gate Drivers",
+              "url": "/category/266.html"
+            },
+            {
+              "categoryId": 267,
+              "categoryNameEn": "Optocouplers, Optoisolators",
+              "url": "/category/267.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1033,
+                  "categoryNameEn": "Logic Output Optoisolators",
+                  "url": "/category/1033.html"
+                },
+                {
+                  "categoryId": 1034,
+                  "categoryNameEn": "Transistor, Photovoltaic Output Optoisolators",
+                  "url": "/category/1034.html"
+                },
+                {
+                  "categoryId": 1035,
+                  "categoryNameEn": "Triac, SCR Output Optoisolators",
+                  "url": "/category/1035.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 268,
+              "categoryNameEn": "Special Purpose Isolators",
+              "url": "/category/268.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 28,
+          "categoryNameEn": "Optoelectronics",
+          "url": "/category/28.html",
+          "childCategoryList": [
+            {
+              "categoryId": 386,
+              "categoryNameEn": "Circuit Board Indicators, Arrays, Light Bars, Bar Graphs",
+              "url": "/category/386.html"
+            },
+            {
+              "categoryId": 388,
+              "categoryNameEn": "Display Backlights",
+              "url": "/category/388.html"
+            },
+            {
+              "categoryId": 390,
+              "categoryNameEn": "Display, Monitor - LCD Driver/Controller",
+              "url": "/category/390.html"
+            },
+            {
+              "categoryId": 392,
+              "categoryNameEn": "Fiber Optic Attenuators",
+              "url": "/category/392.html"
+            },
+            {
+              "categoryId": 393,
+              "categoryNameEn": "Fiber Optic Receivers",
+              "url": "/category/393.html"
+            },
+            {
+              "categoryId": 394,
+              "categoryNameEn": "Fiber Optic Switches, Multiplexers, Demultiplexers",
+              "url": "/category/394.html"
+            },
+            {
+              "categoryId": 395,
+              "categoryNameEn": "Fiber Optic Transceiver Modules",
+              "url": "/category/395.html"
+            },
+            {
+              "categoryId": 396,
+              "categoryNameEn": "Fiber Optic Transmitters - Discrete",
+              "url": "/category/396.html"
+            },
+            {
+              "categoryId": 397,
+              "categoryNameEn": "Fiber Optic Transmitters - Drive Circuitry Integrated",
+              "url": "/category/397.html"
+            },
+            {
+              "categoryId": 400,
+              "categoryNameEn": "Incandescent, Neon Lamps",
+              "url": "/category/400.html"
+            },
+            {
+              "categoryId": 403,
+              "categoryNameEn": "Laser Diodes, Modules",
+              "url": "/category/403.html"
+            },
+            {
+              "categoryId": 404,
+              "categoryNameEn": "LCD, OLED Character and Numeric",
+              "url": "/category/404.html"
+            },
+            {
+              "categoryId": 405,
+              "categoryNameEn": "LCD, OLED, Graphic",
+              "url": "/category/405.html"
+            },
+            {
+              "categoryId": 406,
+              "categoryNameEn": "LED Addressable, Specialty",
+              "url": "/category/406.html"
+            },
+            {
+              "categoryId": 407,
+              "categoryNameEn": "LED Character and Numeric",
+              "url": "/category/407.html"
+            },
+            {
+              "categoryId": 408,
+              "categoryNameEn": "LED COBs, Engines, Modules, Strips",
+              "url": "/category/408.html"
+            },
+            {
+              "categoryId": 409,
+              "categoryNameEn": "LED Color Lighting",
+              "url": "/category/409.html"
+            },
+            {
+              "categoryId": 410,
+              "categoryNameEn": "LED Dot Matrix and Cluster",
+              "url": "/category/410.html"
+            },
+            {
+              "categoryId": 411,
+              "categoryNameEn": "LED Emitters - Infrared, UV, Visible",
+              "url": "/category/411.html"
+            },
+            {
+              "categoryId": 412,
+              "categoryNameEn": "LED Indication - Discrete",
+              "url": "/category/412.html"
+            },
+            {
+              "categoryId": 415,
+              "categoryNameEn": "LED White Lighting",
+              "url": "/category/415.html"
+            },
+            {
+              "categoryId": 416,
+              "categoryNameEn": "Lenses",
+              "url": "/category/416.html"
+            },
+            {
+              "categoryId": 417,
+              "categoryNameEn": "Light Pipes",
+              "url": "/category/417.html"
+            },
+            {
+              "categoryId": 423,
+              "categoryNameEn": "Optic Spacers, Standoffs",
+              "url": "/category/423.html"
+            },
+            {
+              "categoryId": 419,
+              "categoryNameEn": "Optoelectronics Accessories",
+              "url": "/category/419.html"
+            },
+            {
+              "categoryId": 421,
+              "categoryNameEn": "Reflectors",
+              "url": "/category/421.html"
+            },
+            {
+              "categoryId": 425,
+              "categoryNameEn": "Vacuum Fluorescent (VFD)",
+              "url": "/category/425.html"
+            },
+            {
+              "categoryId": 426,
+              "categoryNameEn": "Xenon Lighting",
+              "url": "/category/426.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 30,
+          "categoryNameEn": "Passives",
+          "url": "/category/30.html",
+          "childCategoryList": [
+            {
+              "categoryId": 495,
+              "categoryNameEn": "Capacitors",
+              "url": "/category/495.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1139,
+                  "categoryNameEn": "Aluminum - Polymer Capacitors",
+                  "url": "/category/1139.html"
+                },
+                {
+                  "categoryId": 1140,
+                  "categoryNameEn": "Aluminum Electrolytic Capacitors",
+                  "url": "/category/1140.html"
+                },
+                {
+                  "categoryId": 1141,
+                  "categoryNameEn": "Capacitor Networks, Arrays",
+                  "url": "/category/1141.html"
+                },
+                {
+                  "categoryId": 1142,
+                  "categoryNameEn": "Ceramic Capacitors",
+                  "url": "/category/1142.html"
+                },
+                {
+                  "categoryId": 1143,
+                  "categoryNameEn": "Electric Double Layer Capacitors (EDLC), Supercapacitors",
+                  "url": "/category/1143.html"
+                },
+                {
+                  "categoryId": 1144,
+                  "categoryNameEn": "Film Capacitors",
+                  "url": "/category/1144.html"
+                },
+                {
+                  "categoryId": 1145,
+                  "categoryNameEn": "Mica and PTFE Capacitors",
+                  "url": "/category/1145.html"
+                },
+                {
+                  "categoryId": 1146,
+                  "categoryNameEn": "Motor Start, Motor Run Capacitors (AC)",
+                  "url": "/category/1146.html"
+                },
+                {
+                  "categoryId": 1147,
+                  "categoryNameEn": "Niobium Oxide Capacitors",
+                  "url": "/category/1147.html"
+                },
+                {
+                  "categoryId": 1148,
+                  "categoryNameEn": "Silicon Capacitors",
+                  "url": "/category/1148.html"
+                },
+                {
+                  "categoryId": 1149,
+                  "categoryNameEn": "Tantalum - Polymer Capacitors",
+                  "url": "/category/1149.html"
+                },
+                {
+                  "categoryId": 1150,
+                  "categoryNameEn": "Tantalum Capacitors",
+                  "url": "/category/1150.html"
+                },
+                {
+                  "categoryId": 1151,
+                  "categoryNameEn": "Thin Film Capacitors",
+                  "url": "/category/1151.html"
+                },
+                {
+                  "categoryId": 1152,
+                  "categoryNameEn": "Trimmers, Variable Capacitors",
+                  "url": "/category/1152.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 496,
+              "categoryNameEn": "Crystals, Oscillators, Resonators",
+              "url": "/category/496.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1154,
+                  "categoryNameEn": "Crystal, Oscillator, Resonator Accessories",
+                  "url": "/category/1154.html"
+                },
+                {
+                  "categoryId": 1155,
+                  "categoryNameEn": "Crystals",
+                  "url": "/category/1155.html"
+                },
+                {
+                  "categoryId": 1157,
+                  "categoryNameEn": "Oscillators",
+                  "url": "/category/1157.html"
+                },
+                {
+                  "categoryId": 1158,
+                  "categoryNameEn": "Pin Configurable/Selectable Oscillators",
+                  "url": "/category/1158.html"
+                },
+                {
+                  "categoryId": 1159,
+                  "categoryNameEn": "Programmable Oscillators",
+                  "url": "/category/1159.html"
+                },
+                {
+                  "categoryId": 1160,
+                  "categoryNameEn": "Resonators",
+                  "url": "/category/1160.html"
+                },
+                {
+                  "categoryId": 1161,
+                  "categoryNameEn": "Stand Alone Programmers",
+                  "url": "/category/1161.html"
+                },
+                {
+                  "categoryId": 1162,
+                  "categoryNameEn": "VCOs (Voltage Controlled Oscillators)",
+                  "url": "/category/1162.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 497,
+              "categoryNameEn": "Filters",
+              "url": "/category/497.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1163,
+                  "categoryNameEn": "Cable Ferrites",
+                  "url": "/category/1163.html"
+                },
+                {
+                  "categoryId": 1164,
+                  "categoryNameEn": "Ceramic Filters",
+                  "url": "/category/1164.html"
+                },
+                {
+                  "categoryId": 1165,
+                  "categoryNameEn": "Common Mode Chokes",
+                  "url": "/category/1165.html"
+                },
+                {
+                  "categoryId": 1168,
+                  "categoryNameEn": "EMI/RFI Filters (LC, RC Networks)",
+                  "url": "/category/1168.html"
+                },
+                {
+                  "categoryId": 1169,
+                  "categoryNameEn": "Feed Through Capacitors",
+                  "url": "/category/1169.html"
+                },
+                {
+                  "categoryId": 1170,
+                  "categoryNameEn": "Ferrite Beads and Chips",
+                  "url": "/category/1170.html"
+                },
+                {
+                  "categoryId": 1172,
+                  "categoryNameEn": "Filter Accessories",
+                  "url": "/category/1172.html"
+                },
+                {
+                  "categoryId": 1174,
+                  "categoryNameEn": "Monolithic Crystals",
+                  "url": "/category/1174.html"
+                },
+                {
+                  "categoryId": 1175,
+                  "categoryNameEn": "Power Line Filter Modules",
+                  "url": "/category/1175.html"
+                },
+                {
+                  "categoryId": 1176,
+                  "categoryNameEn": "RF Filters",
+                  "url": "/category/1176.html"
+                },
+                {
+                  "categoryId": 1177,
+                  "categoryNameEn": "SAW Filters",
+                  "url": "/category/1177.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 498,
+              "categoryNameEn": "Inductors, Coils, Chokes",
+              "url": "/category/498.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1178,
+                  "categoryNameEn": "Adjustable Inductors",
+                  "url": "/category/1178.html"
+                },
+                {
+                  "categoryId": 1179,
+                  "categoryNameEn": "Arrays, Signal Transformers",
+                  "url": "/category/1179.html"
+                },
+                {
+                  "categoryId": 1180,
+                  "categoryNameEn": "Delay Lines",
+                  "url": "/category/1180.html"
+                },
+                {
+                  "categoryId": 1181,
+                  "categoryNameEn": "Fixed Inductors",
+                  "url": "/category/1181.html"
+                },
+                {
+                  "categoryId": 1182,
+                  "categoryNameEn": "Wireless Charging Coils",
+                  "url": "/category/1182.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 499,
+              "categoryNameEn": "Magnetics - Transformer, Inductor Components",
+              "url": "/category/499.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1184,
+                  "categoryNameEn": "Bobbins (Coil Formers), Mounts, Hardware",
+                  "url": "/category/1184.html"
+                },
+                {
+                  "categoryId": 1185,
+                  "categoryNameEn": "Ferrite Cores",
+                  "url": "/category/1185.html"
+                },
+                {
+                  "categoryId": 1186,
+                  "categoryNameEn": "Magnet Wire",
+                  "url": "/category/1186.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 500,
+              "categoryNameEn": "Potentiometers, Variable Resistors",
+              "url": "/category/500.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1188,
+                  "categoryNameEn": "Adjustable Power Resistor",
+                  "url": "/category/1188.html"
+                },
+                {
+                  "categoryId": 1191,
+                  "categoryNameEn": "Rotary Potentiometers, Rheostats",
+                  "url": "/category/1191.html"
+                },
+                {
+                  "categoryId": 1192,
+                  "categoryNameEn": "Scale Dials",
+                  "url": "/category/1192.html"
+                },
+                {
+                  "categoryId": 1193,
+                  "categoryNameEn": "Slide Potentiometers",
+                  "url": "/category/1193.html"
+                },
+                {
+                  "categoryId": 1194,
+                  "categoryNameEn": "Thumbwheel Potentiometers",
+                  "url": "/category/1194.html"
+                },
+                {
+                  "categoryId": 1195,
+                  "categoryNameEn": "Trimmer Potentiometers",
+                  "url": "/category/1195.html"
+                },
+                {
+                  "categoryId": 1196,
+                  "categoryNameEn": "Value Display Potentiometers",
+                  "url": "/category/1196.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 501,
+              "categoryNameEn": "Resistors",
+              "url": "/category/501.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1198,
+                  "categoryNameEn": "Chassis Mount Resistors",
+                  "url": "/category/1198.html"
+                },
+                {
+                  "categoryId": 1199,
+                  "categoryNameEn": "Chip Resistor - Surface Mount",
+                  "url": "/category/1199.html"
+                },
+                {
+                  "categoryId": 1336,
+                  "categoryNameEn": "Current Sense Resistors",
+                  "url": "/category/1336.html"
+                },
+                {
+                  "categoryId": 1201,
+                  "categoryNameEn": "Resistor Kits",
+                  "url": "/category/1201.html"
+                },
+                {
+                  "categoryId": 1200,
+                  "categoryNameEn": "Resistor Networks, Arrays",
+                  "url": "/category/1200.html"
+                },
+                {
+                  "categoryId": 1197,
+                  "categoryNameEn": "Resistors Accessories",
+                  "url": "/category/1197.html"
+                },
+                {
+                  "categoryId": 1202,
+                  "categoryNameEn": "Specialized Resistors",
+                  "url": "/category/1202.html"
+                },
+                {
+                  "categoryId": 1203,
+                  "categoryNameEn": "Through Hole Resistors",
+                  "url": "/category/1203.html"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "categoryId": 32,
+          "categoryNameEn": "Power Supplies",
+          "url": "/category/32.html",
+          "childCategoryList": [
+            {
+              "categoryId": 509,
+              "categoryNameEn": "Power Suppliers - Board Mount",
+              "url": "/category/509.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1375,
+                  "categoryNameEn": "AC DC Converters",
+                  "url": "/category/1375.html"
+                },
+                {
+                  "categoryId": 1377,
+                  "categoryNameEn": "Board Mount Power Supply Accessorie",
+                  "url": "/category/1377.html"
+                },
+                {
+                  "categoryId": 1378,
+                  "categoryNameEn": "DC DC Converters",
+                  "url": "/category/1378.html"
+                },
+                {
+                  "categoryId": 1379,
+                  "categoryNameEn": "LED Drivers",
+                  "url": "/category/1379.html"
+                }
+              ]
+            },
+            {
+              "categoryId": 510,
+              "categoryNameEn": "Power Supplies - External/Internal (Off-Board)",
+              "url": "/category/510.html",
+              "childCategoryList": [
+                {
+                  "categoryId": 1376,
+                  "categoryNameEn": "AC AC Wall Power Adapters",
+                  "url": "/category/1376.html"
+                },
+                {
+                  "categoryId": 1380,
+                  "categoryNameEn": "AC DC Configurable Power Supplies (Factory Assembled)",
+                  "url": "/category/1380.html"
+                },
+                {
+                  "categoryId": 1381,
+                  "categoryNameEn": "AC DC Configurable Power Supply Chassis",
+                  "url": "/category/1381.html"
+                },
+                {
+                  "categoryId": 1382,
+                  "categoryNameEn": "AC DC Configurable Power Supply Modules",
+                  "url": "/category/1382.html"
+                },
+                {
+                  "categoryId": 1383,
+                  "categoryNameEn": "AC DC Converters (Off-Board)",
+                  "url": "/category/1383.html"
+                },
+                {
+                  "categoryId": 1384,
+                  "categoryNameEn": "AC DC Desktop, Wall Power Adapters",
+                  "url": "/category/1384.html"
+                },
+                {
+                  "categoryId": 1390,
+                  "categoryNameEn": "Computer Power Supply Units",
+                  "url": "/category/1390.html"
+                },
+                {
+                  "categoryId": 1391,
+                  "categoryNameEn": "DC AC Inverters",
+                  "url": "/category/1391.html"
+                },
+                {
+                  "categoryId": 1385,
+                  "categoryNameEn": "DC DC Converters (Off-Board)",
+                  "url": "/category/1385.html"
+                },
+                {
+                  "categoryId": 1392,
+                  "categoryNameEn": "DC Power Supplies",
+                  "url": "/category/1392.html"
+                },
+                {
+                  "categoryId": 1386,
+                  "categoryNameEn": "External/Internal Power Supply Accessories",
+                  "url": "/category/1386.html"
+                },
+                {
+                  "categoryId": 1387,
+                  "categoryNameEn": "Industrial, DIN Rail Power Supplies",
+                  "url": "/category/1387.html"
+                },
+                {
+                  "categoryId": 1388,
+                  "categoryNameEn": "LED Drivers (Off-Board)",
+                  "url": "/category/1388.html"
+                },
+                {
+                  "categoryId": 1389,
+                  "categoryNameEn": "Power over Ethernet (PoE)",
+                  "url": "/category/1389.html"
+                },
+                {
+                  "categoryId": 1393,
+                  "categoryNameEn": "Uninterruptible Power Supply (UPS) Systems",
+                  "url": "/category/1393.html"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "categoryId": 34,
+          "categoryNameEn": "Relays",
+          "url": "/category/34.html",
+          "childCategoryList": [
+            {
+              "categoryId": 531,
+              "categoryNameEn": "Automotive Relays",
+              "url": "/category/531.html"
+            },
+            {
+              "categoryId": 530,
+              "categoryNameEn": "Contactors (Electromechanical)",
+              "url": "/category/530.html"
+            },
+            {
+              "categoryId": 529,
+              "categoryNameEn": "Contactors (Solid State)",
+              "url": "/category/529.html"
+            },
+            {
+              "categoryId": 532,
+              "categoryNameEn": "High Frequency (RF) Relays",
+              "url": "/category/532.html"
+            },
+            {
+              "categoryId": 528,
+              "categoryNameEn": "Industrial Relays",
+              "url": "/category/528.html"
+            },
+            {
+              "categoryId": 533,
+              "categoryNameEn": "Power Relays",
+              "url": "/category/533.html"
+            },
+            {
+              "categoryId": 536,
+              "categoryNameEn": "Reed Relays",
+              "url": "/category/536.html"
+            },
+            {
+              "categoryId": 526,
+              "categoryNameEn": "Relay Modules",
+              "url": "/category/526.html"
+            },
+            {
+              "categoryId": 537,
+              "categoryNameEn": "Relay Sockets",
+              "url": "/category/537.html"
+            },
+            {
+              "categoryId": 527,
+              "categoryNameEn": "Relay Switches",
+              "url": "/category/527.html"
+            },
+            {
+              "categoryId": 524,
+              "categoryNameEn": "Relays Accessories",
+              "url": "/category/524.html"
+            },
+            {
+              "categoryId": 1308,
+              "categoryNameEn": "Safety Relays",
+              "url": "/category/1308.html"
+            },
+            {
+              "categoryId": 534,
+              "categoryNameEn": "Signal Relays",
+              "url": "/category/534.html"
+            },
+            {
+              "categoryId": 538,
+              "categoryNameEn": "Solid State Relays (SSR)",
+              "url": "/category/538.html"
+            }
+          ]
+        },
+        {
+          "categoryId": 35,
+          "categoryNameEn": "RF and Wireless",
+          "url": "/category/35.html",
+          "childCategoryList": [
+            {
+              "categoryId": 539,
+              "categoryNameEn": "Attenuators",
+              "url": "/category/539.html"
+            },
+            {
+              "categoryId": 540,
+              "categoryNameEn": "Balun",
+              "url": "/category/540.html"
+            },
+            {
+              "categoryId": 541,
+              "categoryNameEn": "RF Accessories",
+              "url": "/category/541.html"
+            },
+            {
+              "categoryId": 542,
+              "categoryNameEn": "RF Amplifiers",
+              "url": "/category/542.html"
+            },
+            {
+              "categoryId": 543,
+              "categoryNameEn": "RF Antennas",
+              "url": "/category/543.html"
+            },
+            {
+              "categoryId": 544,
+              "categoryNameEn": "RF Circulators and Isolators",
+              "url": "/category/544.html"
+            },
+            {
+              "categoryId": 545,
+              "categoryNameEn": "RF Demodulators",
+              "url": "/category/545.html"
+            },
+            {
+              "categoryId": 546,
+              "categoryNameEn": "RF Detectors",
+              "url": "/category/546.html"
+            },
+            {
+              "categoryId": 547,
+              "categoryNameEn": "RF Directional Coupler",
+              "url": "/category/547.html"
+            },
+            {
+              "categoryId": 548,
+              "categoryNameEn": "RF Front End (LNA + PA)",
+              "url": "/category/548.html"
+            },
+            {
+              "categoryId": 549,
+              "categoryNameEn": "RF Misc ICs and Modules",
+              "url": "/category/549.html"
+            },
+            {
+              "categoryId": 550,
+              "categoryNameEn": "RF Mixers",
+              "url": "/category/550.html"
+            },
+            {
+              "categoryId": 551,
+              "categoryNameEn": "RF Modulators",
+              "url": "/category/551.html"
+            },
+            {
+              "categoryId": 552,
+              "categoryNameEn": "RF Multiplexers",
+              "url": "/category/552.html"
+            },
+            {
+              "categoryId": 553,
+              "categoryNameEn": "RF Power Controller ICs",
+              "url": "/category/553.html"
+            },
+            {
+              "categoryId": 554,
+              "categoryNameEn": "RF Power Dividers/Splitters",
+              "url": "/category/554.html"
+            },
+            {
+              "categoryId": 555,
+              "categoryNameEn": "RF Receiver, Transmitter, and Transceiver Finished Units",
+              "url": "/category/555.html"
+            },
+            {
+              "categoryId": 556,
+              "categoryNameEn": "RF Receivers",
+              "url": "/category/556.html"
+            },
+            {
+              "categoryId": 557,
+              "categoryNameEn": "RF Shields",
+              "url": "/category/557.html"
+            },
+            {
+              "categoryId": 558,
+              "categoryNameEn": "RF Switches",
+              "url": "/category/558.html"
+            },
+            {
+              "categoryId": 559,
+              "categoryNameEn": "RF Transceiver ICs",
+              "url": "/category/559.html"
+            },
+            {
+              "categoryId": 560,
+              "categoryNameEn": "RF Transceiver Modules and Modems",
+              "url": "/category/560.html"
+            },
+            {
+              "categoryId": 561,
+              "categoryNameEn": "RF Transmitters",
+              "url": "/category/561.html"
+            },
+            {
+              "categoryId": 562,
+              "categoryNameEn": "RFI and EMI - Contacts, Fingerstock and Gaskets",
+              "url": "/category/562.html"
+            },
+            {
+              "categoryId": 563,
+              "categoryNameEn": "RFI and EMI - Shielding and Absorbing Materials",
+              "url": "/category/563.html"
+            },
+            {
+              "categoryId": 565,
+              "categoryNameEn": "RFID Antennas",
+              "url": "/category/565.html"
+            },
+            {
+              "categoryId": 566,
+              "categoryNameEn": "RFID Reader Modules",
+              "url": "/category/566.html"
+            },
+            {
+              "categoryId": 567,
+              "categoryNameEn": "RFID Transponders, Tags",
+              "url": "/category/567.html"
+            },
+            {
+              "categoryId": 568,
+              "categoryNameEn": "RFID, RF Access, Monitoring ICs",
+              "url": "/category/568.html"
+            },
+            {
+              "categoryId": 569,
+              "categoryNameEn": "Subscriber Identification Module (SIM) Cards",
+              "url": "/category/569.html"
+            }
+          ]
+        }
+      ],
+      "initialBreakpoint": "lg",
+      "locale": "en",
+      "webData": {
+        "parentCatalogList": [
+          {
+            "catalogId": 30,
+            "catalogNameEn": "Passives"
+          },
+          {
+            "catalogId": 501,
+            "catalogNameEn": "Resistors"
+          }
+        ],
+        "isCableCategory": false,
+        "productId": 61542,
+        "productCode": "C60490",
+        "productModel": "RC0402FR-0710KL",
+        "productNameEn": "RES 10kΩ ±1% 62.5mW 0402",
+        "productKeyAttributes": "RES 10kΩ ±1% 62.5mW 0402",
+        "parentCatalogId": 308,
+        "parentCatalogName": "Resistors",
+        "catalogId": 1199,
+        "catalogName": "Chip Resistor - Surface Mount",
+        "brandId": 396,
+        "brandNameEn": "YAGEO",
+        "encapStandard": "0402",
+        "split": 100,
+        "productUnit": "Piece",
+        "minPacketUnit": "Reel",
+        "minBuyNumber": 100,
+        "maxBuyNumber": -1,
+        "minPacketNumber": 10000,
+        "isEnvironment": true,
+        "allHotLevel": null,
+        "isHot": true,
+        "isPreSale": false,
+        "isReel": true,
+        "reelPrice": 3,
+        "stockNumber": 857900,
+        "stockSz": 857900,
+        "domesticStockVO": {
+          "total": 857900,
+          "shipImmediately": 857900,
+          "ship3Days": 0
+        },
+        "overseasStockVO": {
+          "total": 857900,
+          "shipImmediately": 857900,
+          "ship3Days": 0
+        },
+        "productPriceList": [
+          {
+            "ladder": 100,
+            "productPrice": "0.0059",
+            "usdPrice": 0.0059,
+            "cnyProductPriceList": null,
+            "discountRate": "1",
+            "currencyPrice": 0.0059,
+            "currencySymbol": "$",
+            "isForeignDiscount": null,
+            "ladderLevel": null,
+            "discountPrice": "0.0059",
+            "extPrice": "0.59",
+            "isRealOff": false
+          },
+          {
+            "ladder": 1000,
+            "productPrice": "0.0050",
+            "usdPrice": 0.005,
+            "cnyProductPriceList": null,
+            "discountRate": "1",
+            "currencyPrice": 0.005,
+            "currencySymbol": "$",
+            "isForeignDiscount": null,
+            "ladderLevel": null,
+            "discountPrice": "0.0050",
+            "extPrice": "5.00",
+            "isRealOff": false
+          },
+          {
+            "ladder": 3000,
+            "productPrice": "0.0046",
+            "usdPrice": 0.0046,
+            "cnyProductPriceList": null,
+            "discountRate": "1",
+            "currencyPrice": 0.0046,
+            "currencySymbol": "$",
+            "isForeignDiscount": null,
+            "ladderLevel": null,
+            "discountPrice": "0.0046",
+            "extPrice": "13.80",
+            "isRealOff": false
+          },
+          {
+            "ladder": 10000,
+            "productPrice": "0.0043",
+            "usdPrice": 0.0043,
+            "cnyProductPriceList": null,
+            "discountRate": "1",
+            "currencyPrice": 0.0043,
+            "currencySymbol": "$",
+            "isForeignDiscount": null,
+            "ladderLevel": null,
+            "discountPrice": "0.0043",
+            "extPrice": "43.00",
+            "isRealOff": false
+          },
+          {
+            "ladder": 50000,
+            "productPrice": "0.0041",
+            "usdPrice": 0.0041,
+            "cnyProductPriceList": null,
+            "discountRate": "1",
+            "currencyPrice": 0.0041,
+            "currencySymbol": "$",
+            "isForeignDiscount": null,
+            "ladderLevel": null,
+            "discountPrice": "0.0041",
+            "extPrice": "205.00",
+            "isRealOff": false
+          }
+        ],
+        "productImages": [
+          "https://assets.lcsc.com/images/lcsc/900x900/20250824_YAGEO-RC0402FR-0710KL_C60490_front.jpg",
+          "https://assets.lcsc.com/images/lcsc/900x900/20250824_YAGEO-RC0402FR-0710KL_C60490_back.jpg",
+          "https://assets.lcsc.com/images/lcsc/900x900/20250824_YAGEO-RC0402FR-0710KL_C60490_blank.jpg"
+        ],
+        "edaSvgInfo": {
+          "schSvg": "//image.easyeda.com/component_svgs/prod/3cf56641f0344ae891411d9aba2576ae.svg?t=1720462180",
+          "pcbSvg": "//image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1720462180"
+        },
+        "faqs": [
+          {
+            "question": "What are the key electrical and physical specifications of the YAGEO RC0402FR-0710KL resistor?",
+            "answer": "The YAGEO RC0402FR-0710KL is a 10kΩ thick-film chip resistor with a tight ±1% tolerance, suited to stable signal-level applications such as voltage dividers and pull-up networks. It uses an 0402 (1005 metric) package, measuring about 1.0mm × 0.5mm with a low profile around 0.35mm high. It is rated 62.5mW (1/16W) and 50V, making it well suited to space-constrained, low-power PCB designs where electrical stability matters."
+          },
+          {
+            "question": "Can the YAGEO RC0402FR-0710KL be used in 3.3V and 5V logic and analog circuits?",
+            "answer": "Yes. The RC0402FR-0710KL works in 3.3V and 5V digital and analog circuits, including Arduino, ESP32, STM32, and Raspberry Pi systems, where 10kΩ is a standard pull-up/pull-down value for GPIO stabilisation. At 5V it draws only 0.5mA (5V ÷ 10kΩ) and dissipates about 2.5mW, far below its 62.5mW rating. That makes it safe for signal conditioning, ADC biasing, and logic interfacing, but not for power delivery or high-current paths."
+          },
+          {
+            "question": "How reliable is the YAGEO RC0402FR-0710KL under long-term thermal and electrical stress?",
+            "answer": "The RC0402FR-0710KL operates from −55°C to +155°C, suiting industrial-grade environments, and has a temperature coefficient of ±100ppm/°C for predictable drift. Long-term reliability depends on power derating: operation at higher ambient temperatures calls for reduced load to limit resistance drift. The thick-film construction gives stable general-purpose performance, though continuous operation near maximum power can slightly affect long-term tolerance stability."
+          },
+          {
+            "question": "What packaging format and procurement options are available for the YAGEO RC0402FR-0710KL?",
+            "answer": "The RC0402FR-0710KL is supplied on standard tape-and-reel for automated SMT assembly, with a full reel of about 10,000 pieces. Cut-tape and small quantities are widely available for prototyping and evaluation. For production, full-reel ordering is preferred to ensure stable pick-and-place feeding and consistent throughput. Availability can vary with distributor stock and regional supply."
+          },
+          {
+            "question": "What PCB layout practices should be followed when using a 0402 10kΩ resistor like the YAGEO RC0402FR-0710KL?",
+            "answer": "Use an IPC-compliant 0402 land pattern (about 1.0mm × 0.5mm footprint) to ensure good solder wetting and placement accuracy, and standard lead-free reflow profiles with peaks up to 260°C for short durations. A symmetric pad layout helps prevent uneven surface tension during reflow, which can cause tombstoning. In high-impedance circuits, place the resistor close to signal nodes to reduce noise pickup and maintain signal integrity."
+          }
+        ],
+        "pdfUrl": "https://datasheet.lcsc.com/datasheet/pdf/b426be3ce22c6de3e0c3a2248e49159e.pdf?productCode=C60490",
+        "productDescEn": null,
+        "productIntroEn": "62.5mW 10kΩ 50V Thick Film Resistor ±100ppm/℃ ±1% 0402 Chip Resistor - Surface Mount RoHS",
+        "paramVOList": [
+          {
+            "paramCode": "param_10837_n",
+            "paramName": "功率",
+            "paramNameEn": "Power(Watts)",
+            "paramValue": "62.5mW",
+            "paramValueEn": "62.5mW",
+            "paramValueEnForSearch": 0.0625,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 20
+          },
+          {
+            "paramCode": "param_11205_n",
+            "paramName": "阻值",
+            "paramNameEn": "Resistance",
+            "paramValue": "10kΩ",
+            "paramValueEn": "10kΩ",
+            "paramValueEnForSearch": 10000,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 7
+          },
+          {
+            "paramCode": "param_11312_s",
+            "paramName": "工作温度",
+            "paramNameEn": "Operating Temperature",
+            "paramValue": "-55℃~+155℃",
+            "paramValueEn": "-55℃~+155℃",
+            "paramValueEnForSearch": null,
+            "isMain": false,
+            "sortNumber": 1,
+            "sort": 10
+          },
+          {
+            "paramCode": "param_11204_n",
+            "paramName": "最大工作电压",
+            "paramNameEn": "Voltage Rating",
+            "paramValue": "50V",
+            "paramValueEn": "50V",
+            "paramValueEnForSearch": 50,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 18
+          },
+          {
+            "paramCode": "param_11202",
+            "paramName": "电阻类型",
+            "paramNameEn": "Type",
+            "paramValue": "厚膜电阻",
+            "paramValueEn": "Thick Film Resistor",
+            "paramValueEnForSearch": -1,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 1
+          },
+          {
+            "paramCode": "param_11185_s",
+            "paramName": "温度系数",
+            "paramNameEn": "Temperature Coefficient",
+            "paramValue": "±100ppm/℃",
+            "paramValueEn": "±100ppm/℃",
+            "paramValueEnForSearch": null,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 25
+          },
+          {
+            "paramCode": "param_11206_s",
+            "paramName": "精度",
+            "paramNameEn": "Tolerance",
+            "paramValue": "±1%",
+            "paramValueEn": "±1%",
+            "paramValueEnForSearch": null,
+            "isMain": true,
+            "sortNumber": 1,
+            "sort": 13
+          }
+        ],
+        "wmCatalogId": 1199,
+        "wmCatalogNameEn": "Chip Resistor - Surface Mount",
+        "productArrange": "Tape & Reel (TR)",
+        "productWeight": 1.0578e-05,
+        "foreignWeight": 1e-05,
+        "isForeignOnsale": true,
+        "isForeignDisplay": true,
+        "isNotOverstock": false,
+        "productCycle": "normal",
+        "isHasBattery": false,
+        "pdfLinkUrl": null,
+        "isShowForeignPrice": true,
+        "isRealPrice": true,
+        "productLadderPrice": null,
+        "ladderDiscountRate": null,
+        "eccn": "EAR99",
+        "currencyType": "USD",
+        "currencySymbol": "$",
+        "title": "YAGEO RC0402FR-0710KL",
+        "weight": 0.01,
+        "hasThirdPartyStock": false,
+        "flashSaleProductPO": null,
+        "htsMap": {
+          "BR": "85332110",
+          "TARIC": "8533210000",
+          "IN": "85332111",
+          "CN": "8533211000",
+          "MX": "8533.21.01",
+          "CA": "8533210000",
+          "US": "8533210020"
+        },
+        "isAsianBrand": true,
+        "isMro": false,
+        "isInfringement": false
+      },
+      "hotList": [],
+      "overviewData": {
+        "productNameEn": null,
+        "productIntroEn": null,
+        "pdfApplicationAreasEn": null,
+        "productFeaturesEn": null
+      },
+      "dataIsNull": false,
+      "_sentryTraceData": "21846d79932e0fd345c0a5eef2a23848-a9575508b035128d",
+      "_sentryBaggage": "sentry-environment=pro,sentry-release=nextjs-item-app%402026-07-09,sentry-public_key=4bd99c0425e32dd79d70b21be0d80d7b,sentry-trace_id=21846d79932e0fd345c0a5eef2a23848"
+    },
+    "__N_SSP": true
+  },
+  "page": "/product-detail/[productCode]",
+  "query": {
+    "productCode": "C60490.html"
+  },
+  "buildId": "0KYkaStzXTLnvQHkbR-60",
+  "assetPrefix": "https://static.lcsc.com/item",
+  "isFallback": false,
+  "isExperimentalCompile": false,
+  "dynamicIds": [
+    3162,
+    71167,
+    38335,
+    64137
+  ],
+  "gssp": true,
+  "scriptLoader": [
+    {
+      "id": "gtm-script",
+      "strategy": "afterInteractive",
+      "dangerouslySetInnerHTML": {
+        "__html": "\n                  (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n                  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n                  j=d.createElement(s),dl=l!=='dataLayer'?'&l='+l:'';j.defer=true;j.src=\n                  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n                  })(window,document,'script','dataLayer','GTM-5VJ4HKV');\n                "
+      }
+    }
+  ]
+}
