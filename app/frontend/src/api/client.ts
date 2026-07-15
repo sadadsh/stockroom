@@ -346,6 +346,13 @@ export const api = {
     return request<EnrichmentResult>("POST", "/api/enrich/part", { body });
   },
 
+  // Paste a distributor product URL (a Mouser link) -> fetch it through the real
+  // browser and get back EVERY field the page exposes (identity, price, datasheet,
+  // package, full spec table). A blocked/dead page returns empty fields, not an error.
+  enrichFromUrl(url: string): Promise<EnrichmentResult> {
+    return request<EnrichmentResult>("POST", "/api/enrich/from-url", { body: { url } });
+  },
+
   // Inspect dropped file paths / LCSC ids into staging candidates. Returns a job
   // id; the candidates arrive on the job's SSE result event (openJobStream).
   ingestInspect(paths: string[], lcsc_ids: string[]): Promise<JobRef> {
