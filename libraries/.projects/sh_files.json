@@ -1,0 +1,16 @@
+{
+  "audit_digest": null,
+  "board_paths": [
+    "SH Files.kicad_pcb"
+  ],
+  "git_root": "C:/git/NETDECK",
+  "id": "sh_files",
+  "name": "SH Files",
+  "pro_path": "SH Files.kicad_pro",
+  "registered_at": "2026-07-15T20:22:20Z",
+  "root": "C:/git/NETDECK/Development/SH Files",
+  "sheet_paths": [
+    "Plug-In Cards.kicad_sch",
+    "SH Files.kicad_sch"
+  ]
+}
