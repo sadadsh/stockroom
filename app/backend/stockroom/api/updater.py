@@ -1,10 +1,15 @@
-"""App-repo self-update: git pull --ff-only, then uv sync, then a graceful restart
+"""App-repo self-update: pull the latest code, then uv sync, then a graceful restart
 (spec section 12; knowledge-transfer section 2, update flow). This is the CODE/UI/
-DATA repo, distinct from the library sync in routers/sync.py. It reuses the same
-ff-only + non-ff detection the library SyncEngine uses (GitRepo.pull_ff), and on a
-non-fast-forward it DOES NOT guess: it surfaces DIVERGED and leaves resolution to
-the owner (spec section 2.2, honest degradation). uv_runner and restart are
-injected so this is pure, fixture-repo-testable logic with no real shell-out."""
+DATA repo, distinct from the library sync in routers/sync.py.
+
+It tries a fast-forward first; on a non-fast-forward it RECONCILES by rebase, because
+the in-repo library means a local part commit (libraries/) and a remote app-code commit
+(app/) touch DISJOINT paths (the same reason the launcher's boot-time _reconcile_pull
+rebases). A plain ff-only would get permanently stuck the moment the first part is added,
+forcing the user to re-download a release to update. Only a TRUE conflict (the rare
+same-file case) is surfaced as DIVERGED, never guessed (spec section 2.2, honest
+degradation). uv_runner and restart are injected so this is pure, fixture-repo-testable
+logic with no real shell-out."""
 
 from __future__ import annotations
 
@@ -59,18 +64,29 @@ class AppUpdater:
         behind = ab[1] if ab else 0
         return {"update_available": behind > 0, "behind": behind}
 
-    def update(self) -> UpdateResult:
-        if not self.repo.has_remote():
-            return UpdateResult(state=UpdateState.NO_REMOTE, detail="no remote configured")
-        pull = self.repo.pull_ff()
-        if not pull.ok:
-            if _looks_offline(pull.reason):
-                return UpdateResult(state=UpdateState.OFFLINE, detail=pull.reason)
-            # a non-fast-forward is never guessed: surface it (spec section 2.2)
-            return UpdateResult(state=UpdateState.DIVERGED, detail=pull.reason)
-        if not pull.updated:
-            return UpdateResult(state=UpdateState.UP_TO_DATE)
+    def _apply(self) -> UpdateResult:
         # files changed: sync deps then request a graceful restart + reload
         self._uv()
         self._restart()
         return UpdateResult(state=UpdateState.UPDATED, updated=True, restart_requested=True)
+
+    def update(self) -> UpdateResult:
+        if not self.repo.has_remote():
+            return UpdateResult(state=UpdateState.NO_REMOTE, detail="no remote configured")
+        pull = self.repo.pull_ff()
+        if pull.ok:
+            return self._apply() if pull.updated else UpdateResult(state=UpdateState.UP_TO_DATE)
+        if _looks_offline(pull.reason):
+            return UpdateResult(state=UpdateState.OFFLINE, detail=pull.reason)
+        # A non-fast-forward is the in-repo library case: local part commits (libraries/) diverge
+        # main from the remote app-code commits (app/), on DISJOINT paths. RECONCILE by rebase so
+        # the self-update keeps flowing AND the user's parts are preserved (matching the launcher's
+        # boot-time _reconcile_pull). A plain ff-only would get permanently stuck the moment the
+        # first part is added, forcing a re-download. A TRUE conflict (the rare same-file case)
+        # aborts the rebase and is surfaced honestly as DIVERGED, never guessed (spec section 2.2).
+        reb = self.repo.pull_rebase()
+        if reb.ok:
+            return self._apply() if reb.updated else UpdateResult(state=UpdateState.UP_TO_DATE)
+        if _looks_offline(reb.reason):
+            return UpdateResult(state=UpdateState.OFFLINE, detail=reb.reason)
+        return UpdateResult(state=UpdateState.DIVERGED, detail=reb.reason)
