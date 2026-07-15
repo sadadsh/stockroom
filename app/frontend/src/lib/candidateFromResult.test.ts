@@ -62,7 +62,7 @@ describe("mergeResultIntoCandidate", () => {
     // purchase: the pasted link + its vendor + price breaks + stock
     expect(merged.purchase[0].url).toBe("https://www.mouser.com/x");
     expect(merged.purchase[0].vendor).toBe("Mouser");
-    expect(merged.purchase[0].price_breaks).toEqual([{ qty: 1, price: 2.5 }]);
+    expect(merged.purchase[0].price_breaks).toEqual([{ qty: 1, price: 2.5, currency: "USD" }]);
     expect(merged.purchase[0].stock).toBe(1500);
   });
 

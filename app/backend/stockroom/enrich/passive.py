@@ -404,11 +404,43 @@ def _norm_key(s: str) -> str:
 def _normalize_eia(raw: str) -> str:
     """Pull a KiCad-stock EIA imperial chip case (0402/0603/...) out of a distributor
     package string ("0603 (1608 Metric)", "R0603", "0402") -> "0603"/"0402". Returns
-    "" when no recognized stock case appears (a metric-only "1608" is not a stock key)."""
-    for tok in re.findall(r"\d{3,4}", raw or ""):
-        if tok in _EIA_TO_METRIC:
+    "" when no recognized stock case appears (a metric-only "1608", or a 5-digit case
+    like "01005", is NOT one of these keys and must never be matched by a sub-slice)."""
+    for tok in re.findall(r"\d+", raw or ""):
+        if len(tok) in (3, 4) and tok in _EIA_TO_METRIC:
             return tok
     return ""
+
+
+# A part is only a FILE-LESS stock passive if it is a plain 2-terminal, non-polarized
+# chip R/C/L: the stock resolver gives Device:R/C/L + a 2-pad SMD footprint, which is
+# electrically WRONG for a network/array (multi-pad), a polarized cap (tantalum /
+# electrolytic need Device:CP + a polarized footprint), or a variable/adjustable part.
+# Any of these signals in the category/description/specs routes the part to the
+# drop-the-assets path instead (an honest asset add beats a confidently-wrong one).
+_NOT_FILELESS_TOKENS: tuple[str, ...] = (
+    "network", "array", "tantalum", "electrolytic", "polarized", "polarised",
+    "trimmer", "potentiometer", "rheostat", "varistor", "thermistor",
+    "supercapacitor", "super capacitor", "ultracapacitor",
+)
+
+
+def _not_file_less(category: str, description: str, specs: dict[str, str]) -> bool:
+    text = " ".join(
+        [category or "", description or ""] + [f"{k} {v}" for k, v in specs.items()]
+    ).lower()
+    if any(tok in text for tok in _NOT_FILELESS_TOKENS):
+        return True
+    # A multi-element part missed by the keywords: "Number of Resistors: 4" etc.
+    for label, val in specs.items():
+        nl = _norm_key(label)
+        if nl.startswith("numberof") and any(
+            x in nl for x in ("resistor", "capacitor", "inductor", "element", "circuit")
+        ):
+            m = re.search(r"\d+", str(val))
+            if m and int(m.group()) > 1:
+                return True
+    return False
 
 
 def _package_from(package: str, specs: dict[str, str]) -> str:
@@ -436,21 +468,22 @@ def _spec_value(specs: dict[str, str], exact_key: str) -> str:
 
 def _passive_plan_kind(mpn: str, category: str, specs: dict[str, str],
                        description: str) -> str | None:
-    """Decide the passive kind (resistor/capacitor/inductor) from the pulled fields, or
-    None. Conservative on purpose - a false positive tells the user "no files needed"
-    for a non-passive. Signal order: category / MPN family (detect_passive) -> an EXACT
-    value-spec key -> a whole-word kind in the description. Ferrite beads and any active
-    part yield None (they take the asset-drop path)."""
+    """Decide the file-less passive kind (resistor/capacitor/inductor) from the pulled
+    fields, or None. Conservative on purpose - a false positive tells the user "no files
+    needed" for a part the stock 2-pad resolver cannot represent. First reject anything
+    that is NOT a plain chip passive (network/array, polarized/electrolytic, variable,
+    multi-element). Then accept only on a POSITIVE signal: category / MPN family
+    (detect_passive) or an EXACT value-spec key ("Resistance"/"Capacitance"/
+    "Inductance"). Prose alone is NOT enough (an IC that merely mentions "resistor" must
+    not qualify). Ferrite beads and any active part yield None (asset-drop path)."""
+    if _not_file_less(category, description, specs):
+        return None
     k = detect_passive(mpn=mpn, category=category)
     if k in ("resistor", "capacitor", "inductor"):
         return k
     keys = {_norm_key(s) for s in specs}
     for kind, vkey in _VALUE_SPEC_KEY.items():
         if vkey in keys:
-            return kind
-    desc = (description or "").lower()
-    for kind in ("resistor", "capacitor", "inductor"):
-        if re.search(rf"\b{kind}s?\b", desc):
             return kind
     return None
 

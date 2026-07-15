@@ -241,7 +241,11 @@ export function PassiveAddSection({
           ) : null}
 
           <div>
-            <Button variant="accent" onClick={doAdd} disabled={add.isPending}>
+            <Button
+              variant="accent"
+              onClick={doAdd}
+              disabled={add.isPending || remaining.length > 0}
+            >
               {add.isPending ? "Adding..." : "Add To Library"}
             </Button>
           </div>
