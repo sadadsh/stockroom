@@ -122,6 +122,21 @@ class _HostApi:
         )
         return list(result) if result else []
 
+    def pick_datasheet_file(self) -> list[str]:
+        """A native picker for the part's datasheet PDF, so Autofill can attach a
+        file already on disk (the frontend sends its path as datasheet_file)."""
+        import webview
+
+        win = active_window()
+        if win is None:
+            return []
+        result = win.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=False,
+            file_types=("Datasheet PDF (*.pdf)", "All files (*.*)"),
+        )
+        return list(result) if result else []
+
 
 def run_window(base_url: str, token: str) -> None:
     """Open the WebView2 window onto the FastAPI-served frontend and block until it

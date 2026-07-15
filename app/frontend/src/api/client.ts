@@ -349,6 +349,18 @@ export const api = {
     return request<JobRef>("POST", "/api/enrich/bulk", { body: input });
   },
 
+  // Fill a staged candidate: apply the pasted datasheet/purchase links, read
+  // identity from the stored datasheet, then enrich what is still blank. Returns a
+  // job ref; the SSE result carries the updated candidate plus an honest report.
+  ingestEnrich(body: {
+    candidate: StagingCandidate;
+    datasheet_url?: string;
+    purchase_url?: string;
+    datasheet_file?: string;
+  }): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/ingest/enrich", { body });
+  },
+
   // Add a staging candidate to the library. On success returns the new record; on
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {

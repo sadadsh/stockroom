@@ -180,6 +180,29 @@ class EnrichmentPipeline:
             self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
 
+    def datasheet_fill(self, candidate: StagingCandidate) -> StagingCandidate:
+        """Fill blank identity fields straight from the candidate's own stored
+        datasheet PDF (the user-provided primary source), before any scraping.
+        Never overwrites a value and never raises: an unreadable PDF contributes
+        nothing (enrichment never blocks)."""
+        if candidate.datasheet_path is None:
+            return candidate
+        from stockroom.enrich import datasheet as _datasheet
+
+        try:
+            result = _datasheet.extract_datasheet_specs(
+                candidate.datasheet_path, known_mpn=candidate.mpn
+            )
+        except (EnrichError, OSError):
+            return candidate
+        for field_name, attr in _CANDIDATE_FIELDS.items():
+            sourced = getattr(result, field_name, None)
+            if sourced is None:
+                continue
+            if not getattr(candidate, attr, ""):
+                setattr(candidate, attr, str(sourced.value))
+        return candidate
+
     def fetch_and_store_datasheet(self, candidate: StagingCandidate, url: str) -> Path | None:
         """Follow a datasheet URL, validate a real PDF, store it under the pipeline's
         datasheet dir, and set candidate.datasheet_path. Returns the path, or None if

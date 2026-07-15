@@ -14,7 +14,7 @@ from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import detect_source
 from stockroom.ingest.lcsc import fetch_lcsc
 from stockroom.ingest.sandbox import unpack_inputs
-from stockroom.ingest.staging import StagingCandidate, build_candidates
+from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.footprint import Footprint
 from stockroom.model.part import ModelRef, PartRecord, Provenance
@@ -71,7 +71,10 @@ class IngestPipeline:
                 c.mpn = c.mpn or lcsc_id.upper()
                 candidates.append(c)
 
-        return candidates
+        # A part often arrives split across two vendor files (symbol+footprint in
+        # one, the 3D model or datasheet in another): fold the fragments into the
+        # candidate they complete instead of staging orphan attach-me cards.
+        return merge_candidates(candidates)
 
     def commit(self, candidate: StagingCandidate) -> PartRecord:
         # Committing is ENTRY into the library, so the strict complete-to-add gate
