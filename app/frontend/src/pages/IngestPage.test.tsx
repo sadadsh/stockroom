@@ -211,7 +211,8 @@ describe("Bulk Lookup (spec 8.1)", () => {
     await user.click(screen.getByTestId("bulk-run"));
 
     const report = await screen.findByTestId("bulk-report");
-    expect(report).toHaveTextContent("1 of 2 complete");
+    expect(report).toHaveTextContent("1/2");
+    expect(report).toHaveTextContent("complete");
     expect(screen.getByTestId("bulk-item-TPS62130RGTR")).toHaveTextContent("Complete");
     expect(screen.getByTestId("bulk-item-WIDGET99")).toHaveTextContent(
       /Missing manufacturer, symbol/,

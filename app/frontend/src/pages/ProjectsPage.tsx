@@ -1514,10 +1514,19 @@ function StockCell({ line }: { line: ProcurementLine }) {
 function ProjectViewerSection({ projectId }: { projectId: string }) {
   const query = useProjectQuery(projectId);
   const detail = query.data ?? null;
+  const short = (p: string) => p.replace(/\.(kicad_pcb|kicad_sch)$/i, "");
   const files: ViewFile[] = detail
     ? [
-        ...detail.board_paths.map((p) => ({ path: p, label: p, kind: "Board" as const })),
-        ...detail.sheet_paths.map((p) => ({ path: p, label: p, kind: "Schematic" as const })),
+        ...detail.board_paths.map((p) => ({
+          path: p,
+          label: `Board · ${short(p)}`,
+          kind: "Board" as const,
+        })),
+        ...detail.sheet_paths.map((p) => ({
+          path: p,
+          label: `Schematic · ${short(p)}`,
+          kind: "Schematic" as const,
+        })),
       ]
     : [];
 
@@ -1611,7 +1620,7 @@ function FabSection({ projectId }: { projectId: string }) {
             board={board}
             onBoard={setBoard}
           />
-          <div>
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="accent"
               onClick={onExport}
@@ -1620,6 +1629,14 @@ function FabSection({ projectId }: { projectId: string }) {
             >
               {downloading ? "Plotting..." : "Export Fab Bundle"}
             </Button>
+            <span className="text-2xs text-t3" data-testid="fab-contents">
+              {"Zips gerbers, the "}
+              {opts.drillFormat === "gerber" ? "Gerber" : "Excellon"}
+              {" drill file"}
+              {opts.drillMap ? " and its map" : ""}
+              {opts.includePos ? ", and a placement file" : ""}
+              {"."}
+            </span>
           </div>
         </div>
       )}
