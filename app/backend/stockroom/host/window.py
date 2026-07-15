@@ -146,6 +146,16 @@ def run_window(base_url: str, token: str) -> None:
     global _ACTIVE_WINDOW
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
+    # pywebview blocks ALL downloads by default, which silently kills every export
+    # in the app (the BOM CSV, the fab zip, the audit markdown are Blob+anchor
+    # downloads). Enable them so WebView2 shows its normal download flow. Module
+    # global, so the hidden fetch window inherits it too: acceptable, its vendor
+    # pages are user-initiated enrichment fetches and a download needs user action.
+    try:
+        webview.settings["ALLOW_DOWNLOADS"] = True
+    except Exception:  # noqa: BLE001 - an older pywebview without settings still runs
+        pass
+
     window = webview.create_window(
         "Stockroom", url=base_url, width=1400, height=900, js_api=_HostApi()
     )
