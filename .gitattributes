@@ -1,0 +1,35 @@
+# Stockroom is a BYTE-PRESERVING, git-synced KiCad tool. Windows git defaults to
+# core.autocrlf=true, which would rewrite every checked-out text file (the in-repo
+# library, KiCad sources, fixtures) to CRLF on a Windows device. That drifts line
+# endings between a Windows user and a Linux collaborator, churns diffs, and makes a
+# committed library file no longer byte-identical across platforms. Force LF on checkout
+# everywhere so a part edited on Windows and one edited on Linux stay byte-consistent.
+* text=auto eol=lf
+
+# KiCad sources are always LF (KiCad's own convention); never let them become CRLF.
+*.kicad_pcb  text eol=lf
+*.kicad_sch  text eol=lf
+*.kicad_sym  text eol=lf
+*.kicad_mod  text eol=lf
+*.kicad_pro  text eol=lf
+*.kicad_prl  text eol=lf
+*.kicad_wks  text eol=lf
+*.pretty     text eol=lf
+
+# Binary assets: leave the bytes exactly as committed (no line-ending or text munging).
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.glb   binary
+*.gltf  binary
+*.step  binary
+*.stp   binary
+*.wrl   binary
+*.zip   binary

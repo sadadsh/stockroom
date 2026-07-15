@@ -260,7 +260,9 @@ def test_can_edit_an_inserted_key_after_reload(tmp_fixture):
 
 def test_untouched_board_serializes_byte_identically(tmp_fixture):
     path = tmp_fixture("minimal.kicad_pcb")
-    original = path.read_text(encoding="utf-8")
+    # read the EXACT bytes (the layer preserves line endings via newline=""); a
+    # newline-normalizing read_text would spuriously differ on a CRLF checkout.
+    original = path.read_bytes().decode("utf-8")
     assert Board.load(path).serialize() == original
 
 
