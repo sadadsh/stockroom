@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -95,6 +96,42 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
     return text
 
 
+_FP_TOKEN = re.compile(r"^[A-Za-z0-9_.\-]+$")
+
+
+def _split_lib_id(fp: str) -> tuple[str, str]:
+    """Parse a "<lib>:<name>" footprint lib_id into (lib, name), each restricted to the
+    KiCad-safe token charset so it can never traverse out of the stock library dir."""
+    lib, sep, name = (fp or "").partition(":")
+    if not sep or not _FP_TOKEN.match(lib) or not _FP_TOKEN.match(name):
+        raise ApiError(400, f"not a valid footprint lib_id: {fp!r}")
+    return lib, name
+
+
+def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> str:
+    """Render a footprint's SVG with the Reference (REF**) and Value text hidden so the
+    preview shows clean pad/silk art, not the designator splashed over it. The source
+    .kicad_mod is never touched. A footprint that will not parse falls back to the raw
+    export (honest degradation: a preview with a refdes beats no preview)."""
+    out_dir = td / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    render_pretty = fp_file.parent
+    try:
+        fp = Footprint.load(fp_file)
+        fp.hide_field("Reference")
+        fp.hide_field("Value")
+        clean_pretty = td / "clean.pretty"
+        clean_pretty.mkdir(parents=True, exist_ok=True)
+        (clean_pretty / f"{name}.kicad_mod").write_text(
+            fp.serialize(), encoding="utf-8", newline=""
+        )
+        render_pretty = clean_pretty
+    except Exception:  # noqa: BLE001 - unparseable footprint: raw preview, not a 500
+        pass
+    svg = cli.fp_export_svg(render_pretty, name, out_dir, black_and_white=bw)
+    return Path(svg).read_text(encoding="utf-8")
+
+
 def previews_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/previews", dependencies=[Depends(require_token)])
 
@@ -171,32 +208,54 @@ def previews_router(require_token) -> APIRouter:
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            out_dir = Path(td) / "out"
-            out_dir.mkdir(parents=True, exist_ok=True)
-            # Render a copy with the Reference (REF**) and Value text hidden so the
-            # preview shows clean pad/silk art, not the designator splashed over it.
-            # The real footprint file is never touched (a board needs its refdes). A
-            # footprint that will not parse falls back to the raw export (honest
-            # degradation: a preview with a refdes beats no preview).
-            render_pretty, render_name = pretty, rec.footprint.name
-            try:
-                fp = Footprint.load(fp_file)
-                fp.hide_field("Reference")
-                fp.hide_field("Value")
-                clean_pretty = Path(td) / f"{rec.category}.pretty"
-                clean_pretty.mkdir(parents=True, exist_ok=True)
-                (clean_pretty / f"{rec.footprint.name}.kicad_mod").write_text(
-                    fp.serialize(), encoding="utf-8", newline=""
-                )
-                render_pretty = clean_pretty
-            except Exception:  # noqa: BLE001 - unparseable footprint: raw preview, not a 500
-                pass
-            svg = ctx.cli.fp_export_svg(
-                render_pretty, render_name, out_dir, black_and_white=bw
-            )
-            text = Path(svg).read_text(encoding="utf-8")
+            text = _clean_footprint_svg(ctx.cli, fp_file, rec.footprint.name, bw, Path(td))
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
+
+    @r.get("/stock/footprint.svg")
+    def stock_footprint_svg(request: Request, fp: str, bw: bool = False) -> Response:
+        """Render a KiCad STOCK footprint by its lib_id (e.g. fp=Resistor_SMD:R_0603_1608Metric)
+        with no committed part, so the unified Add-A-Part flow can show a passive's built-in
+        footprint before it is added. A lib_id that is not installed is a 404."""
+        ctx = request.app.state.ctx
+        lib, name = _split_lib_id(fp)
+        fp_file = stock_footprint_file(lib, name)
+        if fp_file is None:
+            raise FileNotFoundError(f"KiCad stock footprint {lib}:{name} is not installed")
+        variant = "_bw" if bw else ""
+        key = f"stockfp_{lib}_{name}_{_hash_file(fp_file)}{variant}.svg"
+        cached = _cache_dir(ctx) / key
+        if cached.exists():
+            return _svg_response(cached.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as td:
+            text = _clean_footprint_svg(ctx.cli, fp_file, name, bw, Path(td))
+        cached.write_text(text, encoding="utf-8")
+        return _svg_response(text)
+
+    @r.get("/stock/model.glb")
+    def stock_model_glb(request: Request, fp: str) -> Response:
+        """Convert a KiCad STOCK 3D model by its footprint lib_id to a GLB with no committed
+        part, so the Add-A-Part flow can show a passive's built-in 3D model before it is
+        added. A lib_id with no installed stock model is a 404; absent 3D tooling is a 502."""
+        ctx = request.app.state.ctx
+        lib, name = _split_lib_id(fp)
+        src = stock_model_file(lib, name)
+        if src is None:
+            raise FileNotFoundError(f"KiCad stock 3D model for {lib}:{name} is not installed")
+        key = f"stockmodel_{lib}_{name}_{_hash_file(src)}.glb"
+        cached = _cache_dir(ctx) / key
+        if cached.exists():
+            data = cached.read_bytes()
+            if data[:4] == GLB_MAGIC:
+                return Response(content=data, media_type="model/gltf-binary")
+        try:
+            data = model_to_glb(src)
+        except ModelToolingMissing as exc:
+            raise ApiError(502, str(exc)) from exc
+        except ModelConversionError as exc:
+            raise ApiError(502, str(exc)) from exc
+        cached.write_bytes(data)
+        return Response(content=data, media_type="model/gltf-binary")
 
     @r.get("/model/{part_id}.glb")
     def model_glb(request: Request, part_id: str) -> Response:
