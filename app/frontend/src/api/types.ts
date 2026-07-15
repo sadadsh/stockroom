@@ -240,6 +240,23 @@ export interface SettingsInfo {
   mouser_api_key_hint: string;
   github_token_set: boolean;
   github_token_hint: string;
+  // KiCad wiring: the per-machine overrides (plain paths, not secrets), the
+  // effective locations they resolve to, and whether SR_LIB currently points at
+  // the active profile's library.
+  kicad_config_override: string;
+  kicad_cli_override: string;
+  kicad_config_dir: string;
+  kicad_cli_path: string;
+  kicad_cli_available: boolean;
+  kicad_wired: boolean;
+}
+
+// The PATCH /api/settings body: only the sent fields are touched.
+export interface SettingsPatch {
+  mouser_api_key?: string;
+  github_token?: string;
+  kicad_config_override?: string;
+  kicad_cli_override?: string;
 }
 
 // GET /api/profiles, POST /api/profiles

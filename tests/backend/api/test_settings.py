@@ -104,3 +104,59 @@ def test_patch_empty_github_token_clears_the_credential(client, app_ctx):
     assert app_ctx.config.github_token == ""
     got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
     assert got.returncode != 0  # the credential header was removed
+
+
+# -- KiCad overrides + wiring status (not secrets: shown raw) -------------------
+
+
+def test_get_settings_reports_kicad_state(client, app_ctx):
+    body = client.get("/api/settings").json()
+    assert body["kicad_config_override"] == ""
+    assert body["kicad_cli_override"] == ""
+    assert body["kicad_config_dir"] == app_ctx.kicad_dir.as_posix()
+    assert isinstance(body["kicad_cli_available"], bool)
+    assert body["kicad_cli_path"] == (app_ctx.cli.binary or "")
+    assert body["kicad_wired"] is False  # nothing has wired the fixture config dir yet
+
+
+def test_patch_kicad_cli_override_rebuilds_the_live_engine(client, app_ctx):
+    old_cli = app_ctx.cli
+    r = client.patch("/api/settings", json={"kicad_cli_override": "/nonexistent/kicad-cli"})
+    assert r.status_code == 200
+    assert app_ctx.config.kicad_cli_override == "/nonexistent/kicad-cli"
+    assert app_ctx.cli is not old_cli
+    # the engines that captured the old cli were rebuilt onto the new one
+    assert app_ctx.ops.cli is app_ctx.cli
+    assert app_ctx.project_ops.cli is app_ctx.cli
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["kicad_cli_override"] == "/nonexistent/kicad-cli"
+
+
+def test_patch_kicad_config_override_repoints_and_rewires(client, app_ctx, tmp_path):
+    from stockroom.kicad.common_json import read_env_var
+
+    target = tmp_path / "kicad-override"
+    target.mkdir()
+    r = client.patch("/api/settings", json={"kicad_config_override": str(target)})
+    assert r.status_code == 200
+    assert app_ctx.kicad_dir == target
+    # the automatic rewire repointed SR_LIB at the active profile in the NEW dir
+    assert read_env_var(target / "kicad_common.json", "SR_LIB") == str(
+        app_ctx.profile.root.resolve()
+    )
+    assert client.get("/api/settings").json()["kicad_wired"] is True
+
+
+def test_patch_clearing_kicad_config_override_returns_to_autodetect(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    # keep the autodetected default inside the test's tmp dir on every OS
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    target = tmp_path / "kicad-override"
+    target.mkdir()
+    client.patch("/api/settings", json={"kicad_config_override": str(target)})
+    assert app_ctx.kicad_dir == target
+    client.patch("/api/settings", json={"kicad_config_override": ""})
+    assert app_ctx.config.kicad_config_override == ""
+    assert app_ctx.kicad_dir != target

@@ -29,6 +29,19 @@ vi.mock("../api/client", async (importActual) => {
 
 const mockApi = vi.mocked(api);
 
+const BASE_SETTINGS: SettingsInfo = {
+  mouser_api_key_set: false,
+  mouser_api_key_hint: "",
+  github_token_set: false,
+  github_token_hint: "",
+  kicad_config_override: "",
+  kicad_cli_override: "",
+  kicad_config_dir: "/home/x/.config/kicad/10.0",
+  kicad_cli_path: "/usr/bin/kicad-cli",
+  kicad_cli_available: true,
+  kicad_wired: true,
+};
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -47,12 +60,7 @@ function renderPage() {
 beforeEach(() => {
   localStorage.clear();
   delete document.documentElement.dataset.theme;
-  mockApi.getSettings.mockResolvedValue({
-    mouser_api_key_set: false,
-    mouser_api_key_hint: "",
-    github_token_set: false,
-    github_token_hint: "",
-  });
+  mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
   mockApi.listProfiles.mockResolvedValue({
     profiles: ["Main", "Archive"],
     active: "Main",
@@ -79,6 +87,7 @@ beforeEach(() => {
   });
   mockApi.deleteProfile.mockResolvedValue(undefined);
   mockApi.updateSettings.mockResolvedValue({
+    ...BASE_SETTINGS,
     mouser_api_key_set: true,
     mouser_api_key_hint: "Y123",
     github_token_set: true,
@@ -206,15 +215,14 @@ describe("SettingsPage — distributor key", () => {
     await userEvent.type(input, "MOUSERKEY123");
     await userEvent.type(input, "{Enter}{Enter}");
     expect(mockApi.updateSettings).toHaveBeenCalledTimes(1);
-    resolve({ mouser_api_key_set: true, mouser_api_key_hint: "Y123", github_token_set: false, github_token_hint: "" });
+    resolve({ ...BASE_SETTINGS, mouser_api_key_set: true, mouser_api_key_hint: "Y123" });
   });
 
   it("shows the hint when a key is set and can clear it", async () => {
     mockApi.getSettings.mockResolvedValue({
+      ...BASE_SETTINGS,
       mouser_api_key_set: true,
       mouser_api_key_hint: "1234",
-      github_token_set: false,
-      github_token_hint: "",
     });
     renderPage();
     expect(await screen.findByText(/1234/)).toBeInTheDocument();
@@ -279,6 +287,42 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(screen.getByText("/home/x/.config/kicad")).toBeInTheDocument();
   });
 
+  it("shows the wiring status when SR_LIB points at the active library", async () => {
+    renderPage();
+    expect(
+      await screen.findByText(/wired to the active library/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an honest not-wired status", async () => {
+    mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS, kicad_wired: false });
+    renderPage();
+    expect(await screen.findByText(/not wired yet/i)).toBeInTheDocument();
+  });
+
+  it("prefills the kicad overrides and saves both together", async () => {
+    mockApi.getSettings.mockResolvedValue({
+      ...BASE_SETTINGS,
+      kicad_cli_override: "/opt/kicad/kicad-cli",
+    });
+    renderPage();
+    // the prefill arrives with the settings query, so wait for the value itself
+    await screen.findByDisplayValue("/opt/kicad/kicad-cli");
+    const cfg = screen.getByLabelText(/config directory override/i);
+    await userEvent.type(cfg, "/custom/kicad/10.0");
+    await userEvent.click(screen.getByRole("button", { name: /save overrides/i }));
+    expect(mockApi.updateSettings).toHaveBeenCalledWith({
+      kicad_config_override: "/custom/kicad/10.0",
+      kicad_cli_override: "/opt/kicad/kicad-cli",
+    });
+  });
+
+  it("disables saving overrides until something changed", async () => {
+    renderPage();
+    await screen.findByLabelText(/config directory override/i);
+    expect(screen.getByRole("button", { name: /save overrides/i })).toBeDisabled();
+  });
+
   it("applies an available update", async () => {
     mockApi.checkUpdate.mockResolvedValue({ update_available: true, behind: 3 });
     renderPage();
@@ -297,12 +341,7 @@ describe("SettingsPage — sync + kicad + update", () => {
 });
 
   it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
-    mockApi.getSettings.mockResolvedValue({
-      mouser_api_key_set: false,
-      mouser_api_key_hint: "",
-      github_token_set: false,
-      github_token_hint: "",
-    });
+    mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
     await screen.findByText("GitHub");
     const input = screen.getByLabelText("GitHub Personal Access Token");

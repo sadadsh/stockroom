@@ -1,12 +1,15 @@
 """Per-machine settings surface (spec section 11). Reads the redacted per-machine
-config and writes the one field wired end-to-end today: the Mouser API key. The
-key is a secret, so GET returns only presence plus a last-4 hint, never the raw
-value. PATCH applies it live on the running context (the next enrich reads
-ctx.config.mouser_api_key, so no restart) and persists to the config.json."""
+config and writes the fields wired end-to-end: the Mouser API key, the GitHub
+token, and the KiCad overrides. The keys are secrets, so GET returns only
+presence plus a last-4 hint, never the raw value; the KiCad overrides are plain
+paths and are shown raw. Every PATCH applies live on the running context (no
+restart) and persists to the config.json."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+
+from stockroom.kicad.common_json import read_env_var
 
 
 def _hint(key: str) -> str:
@@ -16,7 +19,8 @@ def _hint(key: str) -> str:
     return key[-4:] if len(key) >= 4 else ""
 
 
-def _settings_dto(config) -> dict:
+def _settings_dto(ctx) -> dict:
+    config = ctx.config
     return {
         "mouser_api_key_set": bool(config.mouser_api_key),
         "mouser_api_key_hint": _hint(config.mouser_api_key),
@@ -24,6 +28,17 @@ def _settings_dto(config) -> dict:
         # user can confirm which token is connected without the surface exposing the secret.
         "github_token_set": bool(config.github_token),
         "github_token_hint": _hint(config.github_token),
+        # KiCad wiring state: the overrides (not secrets), the effective locations
+        # they resolve to, and whether SR_LIB currently points at the active profile.
+        "kicad_config_override": config.kicad_config_override,
+        "kicad_cli_override": config.kicad_cli_override,
+        "kicad_config_dir": ctx.kicad_dir.as_posix(),
+        "kicad_cli_path": ctx.cli.binary or "",
+        "kicad_cli_available": ctx.cli.available,
+        "kicad_wired": (
+            read_env_var(ctx.kicad_dir / "kicad_common.json", "SR_LIB")
+            == str(ctx.profile.root.resolve())
+        ),
     }
 
 
@@ -33,7 +48,7 @@ def settings_router(require_token) -> APIRouter:
     @r.get("")
     def get_settings(request: Request) -> dict:
         ctx = request.app.state.ctx
-        return _settings_dto(ctx.config)
+        return _settings_dto(ctx)
 
     @r.patch("")
     def update_settings(request: Request, body: dict) -> dict:
@@ -54,6 +69,15 @@ def settings_router(require_token) -> APIRouter:
                 github_auth.configure(ctx.repo, ctx.config.github_token)
             except Exception:  # noqa: BLE001 - applying the credential is best-effort
                 pass
-        return _settings_dto(ctx.config)
+        if "kicad_cli_override" in body or "kicad_config_override" in body:
+            if "kicad_cli_override" in body:
+                ctx.config.kicad_cli_override = str(body["kicad_cli_override"] or "").strip()
+            if "kicad_config_override" in body:
+                ctx.config.kicad_config_override = str(body["kicad_config_override"] or "").strip()
+            ctx.config.save()
+            # Rebuild the cli/ops/config-dir LIVE and rewire KiCad at the active
+            # library, so the change takes effect without a restart.
+            ctx.apply_kicad_settings()
+        return _settings_dto(ctx)
 
     return r

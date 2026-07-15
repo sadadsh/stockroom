@@ -56,3 +56,45 @@ def test_switch_library_preserves_host_wired_hooks(tmp_path):
 
     assert ctx.rendered_dom_fetcher is sentinel
     assert ctx.request_restart is restart
+
+
+def _precreate_category_libs(profile) -> None:
+    from stockroom.model.category import CATEGORIES, category_symbol_lib
+
+    empty = '(kicad_symbol_lib\r\n\t(version 20251024)\r\n\t(generator "x")\r\n)\r\n'
+    profile.library.symbols_dir.mkdir(parents=True, exist_ok=True)
+    for cat in CATEGORIES:
+        (profile.library.symbols_dir / category_symbol_lib(cat)).write_text(empty, newline="")
+
+
+def test_switch_profile_rewires_sr_lib(tmp_path):
+    # the stale-SR_LIB bug: after a profile switch KiCad kept showing the OLD
+    # profile's library; switching must repoint SR_LIB immediately
+    from stockroom.kicad.common_json import read_env_var
+
+    a = _library(tmp_path / "A")
+    kdir = tmp_path / "k"
+    kdir.mkdir()
+    ctx = build_context(a, kicad_dir=kdir, config=MachineConfig(active_profile="Main"), token="T")
+    alt = ctx.profile_store.create("Alt")
+    _precreate_category_libs(alt)
+
+    ctx.switch_profile("Alt")
+
+    assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(alt.root.resolve())
+    assert ctx.last_wiring is not None
+
+
+def test_switch_library_rewires_sr_lib(tmp_path):
+    from stockroom.kicad.common_json import read_env_var
+
+    a, b = _library(tmp_path / "A"), _library(tmp_path / "B")
+    kdir = tmp_path / "k"
+    kdir.mkdir()
+    ctx = build_context(a, kicad_dir=kdir, config=MachineConfig(active_profile="Main"), token="T")
+    _precreate_category_libs(ProfileStore(b, GitRepo(b)).get("Main"))
+
+    ctx.switch_library(b)
+
+    assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(ctx.profile.root.resolve())
+    assert str(b) in read_env_var(kdir / "kicad_common.json", "SR_LIB")
