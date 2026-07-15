@@ -123,6 +123,21 @@ class LibraryIndex:
         r = self._conn.execute("SELECT * FROM parts WHERE id = ?", (part_id,)).fetchone()
         return _to_row(r) if r else None
 
+    def find_by_mpn(self, mpn: str) -> list[IndexRow]:
+        """Exact-part match for a BOM line: case and separator insensitive
+        (TPS-62130-RGTR matches tps62130rgtr) but never substring-loose, so a
+        prefix or a different suffix is honestly a miss."""
+        key = _mpn_key(mpn)
+        if not key:
+            return []
+        return [
+            _to_row(r)
+            for r in self._conn.execute(
+                "SELECT * FROM parts WHERE mpn <> '' ORDER BY display_name COLLATE NOCASE"
+            )
+            if _mpn_key(r["mpn"]) == key
+        ]
+
     def facets(self) -> Facets:
         by_category = {
             r["category"]: r["n"]
@@ -167,6 +182,11 @@ class LibraryIndex:
 
     def close(self) -> None:
         self._conn.close()
+
+
+def _mpn_key(text: str) -> str:
+    """Case/separator-insensitive MPN token: alphanumerics only, lowercased."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
 def _row_values(rec: PartRecord) -> tuple:

@@ -249,6 +249,22 @@ export interface BulkReport {
   items: BulkReportItem[];
 }
 
+// POST /api/library/bom-match: a pasted BOM line matched against the library.
+export interface BomMatchItem {
+  mpn: string;
+  part_id: string | null;
+  display_name: string;
+  is_complete: boolean;
+  missing: string[];
+  matches: number;
+}
+
+export interface BomMatchReport {
+  items: BomMatchItem[];
+  in_library: number;
+  total: number;
+}
+
 // GET/PATCH /api/settings -> the redacted per-machine settings surface. The raw
 // Mouser key never crosses the wire; only its presence and a last-4 hint do.
 export interface SettingsInfo {
@@ -371,6 +387,9 @@ export interface UpdateCheck {
   update_available: boolean;
   state?: string;
   behind?: number;
+  // set when the check could not reach the remote (state "offline"), so the UI
+  // never shows a silent Up To Date it did not verify
+  detail?: string;
 }
 
 // POST /api/update/apply

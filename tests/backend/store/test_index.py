@@ -97,3 +97,17 @@ def test_persists_to_a_real_db_file(tmp_path):
     assert idx.count() == 1
     idx.close()
     assert db.exists()  # a rebuildable per-machine cache file, never committed
+
+
+def test_find_by_mpn_is_punctuation_and_case_insensitive(tmp_path):
+    # a BOM line rarely spells the MPN exactly as the record does; matching is
+    # normalized (case + separators) but never substring-loose
+    pd = tmp_path / "parts"
+    _write(pd, _complete("a", "Alpha", mpn="TPS62130RGTR"))
+    _write(pd, _complete("b", "Beta", mpn="LM358DR"))
+    idx = LibraryIndex.build(pd)
+    assert [r.id for r in idx.find_by_mpn("tps-62130-rgtr")] == ["a"]
+    assert [r.id for r in idx.find_by_mpn("TPS62130RGTR")] == ["a"]
+    assert idx.find_by_mpn("TPS62130") == []  # a prefix is NOT the same part
+    assert idx.find_by_mpn("") == []
+    assert idx.find_by_mpn("WIDGET99") == []

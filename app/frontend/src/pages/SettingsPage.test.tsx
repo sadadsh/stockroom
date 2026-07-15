@@ -263,7 +263,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     renderPage();
     await screen.findByText("Archive");
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
-    expect(await screen.findByText(/cannot sign in to the library remote/i)).toBeInTheDocument();
+    expect(await screen.findByText(/refused this token/i)).toBeInTheDocument();
     expect(screen.queryByText(/diverged/i)).toBeNull();
   });
 

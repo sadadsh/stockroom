@@ -4,17 +4,19 @@
  * window-wide drop (which lands on Add Parts) all deep-link into the right tab;
  * the shell only owns the header and the tab strip, the bodies stay whole pages.
  */
+import { BomPage } from "./BomPage";
 import { ComponentsPage } from "./ComponentsPage";
 import { DoctorPage } from "./DoctorPage";
 import { DuplicatesPage } from "./DuplicatesPage";
 import { IngestPage } from "./IngestPage";
 import { useRouter } from "../lib/router";
 
-export type LibraryTab = "components" | "ingest" | "duplicates" | "doctor";
+export type LibraryTab = "components" | "ingest" | "bom" | "duplicates" | "doctor";
 
 const TABS: { route: LibraryTab; label: string }[] = [
   { route: "components", label: "Parts" },
   { route: "ingest", label: "Add Parts" },
+  { route: "bom", label: "BOM" },
   { route: "duplicates", label: "Duplicates" },
   { route: "doctor", label: "Doctor" },
 ];
@@ -47,6 +49,8 @@ export function LibraryPage({ tab }: { tab: LibraryTab }) {
         <ComponentsPage />
       ) : tab === "ingest" ? (
         <IngestPage />
+      ) : tab === "bom" ? (
+        <BomPage />
       ) : tab === "duplicates" ? (
         <DuplicatesPage />
       ) : (

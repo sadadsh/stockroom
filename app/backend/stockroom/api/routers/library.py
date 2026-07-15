@@ -77,6 +77,34 @@ def library_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         return FacetsDTO.from_facets(ctx.index.facets()).model_dump()
 
+    @r.post("/bom-match")
+    def bom_match(request: Request, body: dict) -> dict:
+        """Match a pasted BOM (an MPN list or a BOM CSV) against the library: per
+        line, the part that already exists (and whether it is complete) or an
+        honest miss. Pure index reads, so it is synchronous and offline."""
+        from stockroom.enrich.bulk import parse_bom_csv, parse_mpn_list
+
+        ctx = request.app.state.ctx
+        mpns = parse_bom_csv(body["csv"]) if "csv" in body else parse_mpn_list(body.get("text", ""))
+        items = []
+        in_library = 0
+        for mpn in mpns:
+            rows = ctx.index.find_by_mpn(mpn)
+            if rows:
+                in_library += 1
+                row = rows[0]
+                items.append({
+                    "mpn": mpn, "part_id": row.id, "display_name": row.display_name,
+                    "is_complete": row.is_complete, "missing": list(row.missing),
+                    "matches": len(rows),
+                })
+            else:
+                items.append({
+                    "mpn": mpn, "part_id": None, "display_name": "",
+                    "is_complete": False, "missing": [], "matches": 0,
+                })
+        return {"items": items, "in_library": in_library, "total": len(items)}
+
     @r.get("/parts/{part_id}")
     def part_detail(request: Request, part_id: str) -> dict:
         ctx = request.app.state.ctx

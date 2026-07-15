@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useIngestCommit } from "../api/queries";
-import type { BulkReport, IngestEnrichResult, StagingCandidate } from "../api/types";
+import type { IngestEnrichResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast, type ToastTone } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
@@ -165,136 +165,9 @@ export function IngestPage() {
             </div>
           ) : null}
 
-          <BulkLookupSection />
         </div>
       </div>
     </>
-  );
-}
-
-// Bulk MPN / BOM-CSV enrichment triage (spec section 8.1): paste part numbers (or a BOM CSV)
-// and see, per line, whether enrichment can resolve a complete identity and what is still
-// missing. This is a lookup, not an import: it never adds parts (each still needs a symbol to
-// pass the complete-to-add gate), so the report is honest about what remains.
-function BulkLookupSection() {
-  const [text, setText] = useState("");
-  const [category, setCategory] = useState("Other");
-  const job = useJob<BulkReport>();
-  const { toast } = useToast();
-  const running = job.status === "running";
-
-  async function run() {
-    const value = text.trim();
-    if (!value) return;
-    job.reset();
-    try {
-      // A BOM CSV carries commas (columns); a plain part-number list is one MPN per line. Route a
-      // comma-bearing paste to the CSV parser (which reads the MPN column by its header) and a
-      // plain list to the MPN-list parser, so the advertised "or a BOM CSV" input actually works
-      // instead of treating each CSV row as one garbage MPN.
-      const body = value.includes(",")
-        ? { csv: value, category }
-        : { text: value, category };
-      const { job_id } = await api.enrichBulk(body);
-      await job.run(job_id);
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Bulk lookup failed", "err");
-    }
-  }
-
-  const report = job.result;
-  const complete = report ? report.items.filter((i) => i.complete).length : 0;
-
-  return (
-    <div className="mt-8 border-t border-line pt-6" data-testid="bulk-lookup">
-      <Eyebrow className="mb-0.5">Bulk Lookup</Eyebrow>
-      <p className="mb-3 text-xs text-t3">
-        Paste part numbers (one per line) or a BOM CSV to look each one up through enrichment.
-        This reports what was found and what is still missing to complete each part; it does not
-        add them.
-      </p>
-      <Card className="px-4 py-3.5">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={"TPS62130RGTR\nLM358DR\nSTM32F401RET6"}
-          disabled={running}
-          rows={4}
-          data-testid="bulk-input"
-          className="min-h-0 w-full resize-y rounded-control border border-line2 bg-field px-3 py-2 text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-t3">
-            Category
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled={running}
-              data-testid="bulk-category"
-              className="w-40 rounded-control border border-line2 bg-field px-2 py-1.5 text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
-            />
-          </label>
-          <Button
-            variant="accent"
-            onClick={run}
-            disabled={running || !text.trim()}
-            data-testid="bulk-run"
-          >
-            {running ? "Looking Up..." : "Look Up"}
-          </Button>
-        </div>
-      </Card>
-
-      {running ? <Progress progress={job.progress} /> : null}
-      {job.status === "error" ? (
-        <div className="mt-4 text-sm text-err">Bulk lookup failed. {job.error}</div>
-      ) : null}
-
-      {report ? (
-        <div className="mt-6" data-testid="bulk-report">
-          <div className="mb-2.5 flex items-baseline gap-2">
-            <span className="text-lg font-semibold tabular-nums text-t1">
-              {complete}
-              <span className="text-t3">/{report.items.length}</span>
-            </span>
-            <span className="text-xs text-t3">complete</span>
-          </div>
-          <Card className="overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line text-2xs text-t3">
-                  <th className="px-4 py-2 font-medium">Part Number</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.items.map((item) => (
-                  <tr
-                    key={item.mpn}
-                    className="border-b border-line last:border-b-0"
-                    data-testid={`bulk-item-${item.mpn}`}
-                  >
-                    <td className="px-4 py-2 align-top font-mono text-xs text-t2">{item.mpn}</td>
-                    <td className="px-4 py-2 align-top">
-                      <span className="inline-flex items-center gap-2">
-                        <Dot tone={item.complete ? "ok" : item.error ? "err" : "warn"} />
-                        <span className="text-t2">
-                          {item.complete
-                            ? "Complete"
-                            : item.error
-                              ? item.error
-                              : `Missing ${item.missing.join(", ")}`}
-                        </span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        </div>
-      ) : null}
-    </div>
   );
 }
 
