@@ -19,11 +19,11 @@ group's first member:
      because the footprint already discriminates part type in the key, so keeping the
      unit would wrongly keep "4.7k" and "4.7kohm" apart. This mirrors KiBoM's
      compareValues, which treats a unitless side as compatible.
-  2. KiBoM's symbol-name alias table (C == C_Small) is NOT reproduced: Stockroom keys
-     on footprint, not symbol name, so two same-footprint parts already merge whatever
-     their symbol is, and two different-footprint parts must stay apart. An alias map
-     would be unreachable code. The merge it targets is delivered (and tested) by
-     footprint + normalize_value grouping.
+  2. KiBoM's symbol-name alias table (C == C_Small) IS reproduced (normalize_symbol),
+     now that roadmap #9 threads the symbol name into the fallback grouping key: two
+     parts of the same value with a BLANK footprint (e.g. a Device:R "10k" and a
+     Device:L "10k") would otherwise wrongly merge, so the symbol family separates them;
+     the alias table keeps C == C_Small == Cap merging as one family.
 
 No em dashes anywhere (standing owner rule).
 """
@@ -138,6 +138,35 @@ def normalize_value(value: str) -> str:
         return (value or "").strip().lower()
     val, mult, _unit = r
     return "{0:.15f}".format(val * 1.0 * mult)
+
+
+# -- symbol-name aliases (kibom/preferences.aliases) --------------------------
+# Collapse a component symbol's name variants to one canonical family token so the
+# fallback grouping key (which includes the symbol name since roadmap #9) merges a C and
+# a C_Small but keeps a resistor and an inductor of the same value apart. Each inner list
+# is one family; its head is canonical. Reproduced from KiBoM preferences.aliases
+# (SchrodingersGat/KiBoM); zener stays its own family (a zener is not a plain diode).
+_SYMBOL_ALIASES: list[list[str]] = [
+    ["c", "c_small", "cap", "capacitor"],
+    ["r", "r_small", "res", "resistor"],
+    ["l", "l_small", "inductor"],
+    ["d", "diode", "d_small"],
+    ["zener", "zenersmall"],
+    ["sw", "switch"],
+]
+_ALIAS_TO_HEAD = {name: family[0] for family in _SYMBOL_ALIASES for name in family}
+
+
+def normalize_symbol(part_name: str) -> str:
+    """A canonical symbol-family token so the BOM fallback key merges equivalent symbols
+    (C == C_Small == Cap) while keeping unlike parts apart (a Device:R and a Device:L of
+    the same value do NOT merge, roadmap #9). The name is case-folded + stripped; a name
+    in the KiBoM alias table collapses to its family head; any other name passes through
+    as its case-folded self; a blank (a component with no lib_id) returns '' so grouping
+    degrades to the pre-#9 footprint + value behavior. Reproduced from KiBoM
+    preferences.aliases."""
+    name = (part_name or "").strip().lower()
+    return _ALIAS_TO_HEAD.get(name, name)
 
 
 # -- do-not-fit + regex exclude (kibom/component.py, kibom/preferences.py) -----

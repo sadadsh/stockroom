@@ -210,9 +210,11 @@ def _bom_from_components(comps, lookup=None,
     but different manufacturers stay distinct lines."""
     groups: dict = {}
     for comp in comps:
-        # Accept either (ref, props) or (ref, lib_id, props): the library-combining path enriches
-        # to (ref, props), the plain path passes (ref, lib_id, props) straight from _bom_components.
+        # Accept either (ref, props) or (ref, lib_id, props): both the library-combining path and
+        # the plain path pass (ref, lib_id, props); the 2-tuple form is tolerated defensively.
         ref, props = comp[0], comp[-1]
+        lib_id = comp[1] if len(comp) == 3 else ""
+        part_name = lib_id.split(":")[-1]
         ident = part_identity(props, fallback=props.get("Value", ""))
         value = (props.get("Value") or "").strip()
         smpn = strict_mpn(props)
@@ -220,17 +222,20 @@ def _bom_from_components(comps, lookup=None,
         # Value field. Promote it, but NEVER for a passive, whose Value is a value.
         if not smpn and ident["manufacturer"] and not is_basic_part(ref, value, None):
             smpn = value if value and value.lower() not in _PLACEHOLDERS else None
-        # Fallback key on the KiBoM-normalized value + footprint + manufacturer, so
-        # equivalent values merge while different makers stay apart.
+        # Fallback key on the KiBoM-normalized value + footprint + manufacturer + symbol
+        # family, so equivalent values merge while different makers OR different part types
+        # (a Device:R and a Device:L both "10k" with a blank footprint, roadmap #9) stay apart.
         key = smpn or (
             "VF", kibom.normalize_value(value), props.get("Footprint", ""),
-            ident["manufacturer"] or "",
+            ident["manufacturer"] or "", kibom.normalize_symbol(part_name),
         )
         g = groups.setdefault(key, {
             "mpn": smpn, "manufacturer": ident["manufacturer"],
             "datasheet": ident["datasheet"], "description": ident["description"],
             "value": props.get("Value", ""), "footprint": props.get("Footprint", ""),
-            "refs": []})
+            "part_name": part_name, "refs": []})
+        if not g["part_name"] and part_name:  # prefer the first non-blank symbol name in the group
+            g["part_name"] = part_name
         g["refs"].append(ref)
 
     if lookup:
@@ -249,7 +254,7 @@ def _bom_from_components(comps, lookup=None,
                      "mpn": g["mpn"] or "", "manufacturer": g["manufacturer"] or "",
                      "has_real_mpn": bool(g["mpn"]),
                      "footprint": g["footprint"], "datasheet": g["datasheet"] or "",
-                     "description": g["description"] or "",
+                     "description": g["description"] or "", "part_name": g["part_name"] or "",
                      "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"])})
     rows.sort(key=lambda r: (r["value"].lower(), r["footprint"].lower(),
                              _natural_ref(r["refs"][0]) if r["refs"] else ("", 0)))
@@ -284,9 +289,10 @@ def library_match_index(library_parts):
 def library_enrich(comps, match_index):
     """Fill each component's BLANK identity fields (MPN / Manufacturer / Datasheet / Description /
     Footprint) from its matching library part, so the BOM combines the KiCad schematic with the
-    library. `comps` are (ref, lib_id, props) triples; returns (ref, props) pairs with blanks
-    filled (never overwriting a value the schematic already carries, so a deliberate schematic
-    override stands). An unmatched component passes through unchanged (honest)."""
+    library. `comps` are (ref, lib_id, props) triples; returns (ref, lib_id, props) triples with
+    blanks filled (never overwriting a value the schematic already carries, so a deliberate
+    schematic override stands). lib_id is carried through so the grouping key keeps the symbol
+    family (roadmap #9). An unmatched component passes through unchanged (honest)."""
     from stockroom.projects import fill
 
     out = []
@@ -298,7 +304,7 @@ def library_enrich(comps, match_index):
                 for ch in fill.proposed_changes(match["part"], props):
                     if ch["kind"] == "fill":  # blanks only, never an overwrite
                         enriched[ch["prop"]] = ch["new"]
-        out.append((ref, enriched))
+        out.append((ref, lib_id, enriched))
     return out
 
 
@@ -409,13 +415,14 @@ def consolidated_bom(boards: dict, lookup=None, price_lookup=None) -> dict:
         for sheet in sheets:
             for r in bom_from_kicad_schematic(sheet)["rows"]:
                 key = r["mpn"] or ("VF", kibom.normalize_value(r["value"]), r["footprint"],
-                                   r.get("manufacturer") or "")
+                                   r.get("manufacturer") or "",
+                                   kibom.normalize_symbol(r.get("part_name") or ""))
                 m = merged.setdefault(key, {
                     "mpn": r["mpn"], "manufacturer": r["manufacturer"], "value": r["value"],
                     "has_real_mpn": bool(r["mpn"]),
                     "footprint": r["footprint"], "datasheet": r["datasheet"],
-                    "description": r["description"], "total_qty": 0,
-                    "per_board": {}, "refs_by_board": {}})
+                    "description": r["description"], "part_name": r.get("part_name", ""),
+                    "total_qty": 0, "per_board": {}, "refs_by_board": {}})
                 m["total_qty"] += r["qty"]
                 m["per_board"][board] = m["per_board"].get(board, 0) + r["qty"]
                 m["refs_by_board"][board] = sorted(

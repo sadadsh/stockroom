@@ -116,6 +116,45 @@ def test_normalize_value_merges_metric_equivalents():
     assert kibom.normalize_value("100nF") == kibom.normalize_value("100n")
 
 
+def test_normalize_symbol_collapses_kibom_aliases(tmp_path):
+    # C == C_Small == Cap, R == R_Small == res, L == inductor, D == diode: one family token.
+    assert kibom.normalize_symbol("C") == kibom.normalize_symbol("C_Small")
+    assert kibom.normalize_symbol("Cap") == kibom.normalize_symbol("Capacitor")
+    assert kibom.normalize_symbol("R") == kibom.normalize_symbol("R_Small") == kibom.normalize_symbol("res")
+    assert kibom.normalize_symbol("L") == kibom.normalize_symbol("Inductor")
+    assert kibom.normalize_symbol("D") == kibom.normalize_symbol("Diode")
+    # but different families stay apart, and a blank degrades to '' (pre-#9 behavior)
+    assert kibom.normalize_symbol("R") != kibom.normalize_symbol("L")
+    assert kibom.normalize_symbol("") == ""
+    # an unknown symbol passes through as its case-folded self
+    assert kibom.normalize_symbol("TPS2121") == "tps2121"
+
+
+def test_bom_splits_resistor_and_inductor_of_the_same_value_and_blank_footprint(tmp_path):
+    # Roadmap #9: a Device:R "10k" and a Device:L "10k", both with blank footprint / MPN /
+    # manufacturer, are DIFFERENT parts and must not merge into one qty-2 line.
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", lib="Device:R"),
+                   _sym("L1", "10k", lib="Device:L"))
+    rows = bom_from_kicad_schematic(str(f))["rows"]
+    assert len(rows) == 2
+    assert {tuple(r["refs"]) for r in rows} == {("R1",), ("L1",)}
+
+
+def test_consolidated_bom_splits_resistor_and_inductor_across_boards(tmp_path):
+    ra = _write_sch(tmp_path / "a.kicad_sch", _sym("R1", "10k", lib="Device:R"))
+    lb = _write_sch(tmp_path / "b.kicad_sch", _sym("L1", "10k", lib="Device:L"))
+    from stockroom.projects.bom import consolidated_bom
+    out = consolidated_bom({"A": [str(ra)], "B": [str(lb)]})
+    assert out["line_count"] == 2
+
+
+def test_bom_row_carries_the_symbol_part_name(tmp_path):
+    f = _write_sch(tmp_path / "s.kicad_sch", _sym("U1", "STM32", lib="MCU:STM32F4"))
+    rows = bom_from_kicad_schematic(str(f))["rows"]
+    assert rows[0]["part_name"] == "STM32F4"
+
+
 def test_normalize_value_keeps_unlike_values_apart_and_falls_back():
     assert kibom.normalize_value("4.7k") != kibom.normalize_value("47k")
     # an unparseable value (an MPN, a label) folds to its case-folded self, never merged
@@ -496,7 +535,7 @@ def test_library_enrich_fills_blank_identity_from_the_matched_part():
     # library, matched by symbol name.
     index = library_match_index([_lib_resistor()])
     comps = [("R1", "SR-Resistors:R_10k", {"Reference": "R1", "Value": "10k"})]
-    _ref, props = library_enrich(comps, index)[0]
+    _ref, _lib, props = library_enrich(comps, index)[0]
     assert props["MPN"] == "RC0402FR-0710KL" and props["Manufacturer"] == "Yageo"
 
 
@@ -504,14 +543,14 @@ def test_library_enrich_never_overwrites_a_schematic_value():
     index = library_match_index([_lib_resistor()])
     comps = [("R1", "SR-Resistors:R_10k",
               {"Reference": "R1", "Value": "10k", "MPN": "USER-CHOSEN"})]
-    _ref, props = library_enrich(comps, index)[0]
+    _ref, _lib, props = library_enrich(comps, index)[0]
     assert props["MPN"] == "USER-CHOSEN"  # a deliberate schematic override stands
 
 
 def test_library_enrich_passes_an_unmatched_component_through(tmp_path):
     index = library_match_index([_lib_resistor()])
     comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]  # no library match
-    _ref, props = library_enrich(comps, index)[0]
+    _ref, _lib, props = library_enrich(comps, index)[0]
     assert "MPN" not in props  # nothing fabricated
 
 
