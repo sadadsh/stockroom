@@ -96,6 +96,10 @@ export interface PartDetail {
   tags: string[];
   mpn: string;
   manufacturer: string;
+  // True for a passive (R/C/L) that references KiCad stock symbol/footprint/3D
+  // rather than owning copied asset files. Optional so older fixtures/records
+  // without the flag still type-check; the backend always emits it.
+  passive?: boolean;
   datasheet: DatasheetRef | null;
   purchase: PurchaseRef[];
   symbol: LibRef | null;
@@ -107,6 +111,24 @@ export interface PartDetail {
   // Persisted canonical spec data (M6i). A free-form value bag keyed by spec name;
   // specs.pinout is a list of {pin, name}. Per-key provenance lives in `enrichment`.
   specs: Record<string, unknown>;
+}
+
+// POST /api/library/passive/preview -> a decoded, not-yet-committed passive record,
+// the passport fields still to fill, and whether the resolved stock footprint is
+// installed on this machine.
+export interface PassivePreview {
+  record: PartDetail;
+  gaps: string[];
+  stock_present: boolean;
+}
+
+// The body for a file-less passive preview/add: an MPN or a Mouser product URL,
+// plus optional category/manufacturer overrides and a datasheet URL.
+export interface PassiveAddBody {
+  input: string;
+  category?: string;
+  manufacturer?: string;
+  datasheet_url?: string;
 }
 
 export interface ApiErrorBody {

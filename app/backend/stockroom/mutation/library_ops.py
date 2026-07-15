@@ -272,6 +272,35 @@ class LibraryOps:
                        f"{'datasheet, ' if datasheet else ''}record")
         return record
 
+    def add_passive_part(self, record: PartRecord, require_complete: bool = True) -> PartRecord:
+        """Commit a file-less passive part. A passive references KiCad STOCK
+        symbol/footprint/3D by lib_id (the generic package is already in KiCad), so no
+        asset files are copied and no category symbol lib entry is created: this writes
+        ONLY the JSON record, inside one atomic git Transaction (a single scoped commit,
+        or zero trace on failure). The complete-to-add gate still applies, passive-aware
+        (stock refs satisfy symbol/footprint, no owned model required, a datasheet URL
+        counts). An archive profile is grandfathered, as with add_part."""
+        if require_complete and not self.profile.is_archive:
+            missing = record.missing_fields()
+            if missing:
+                raise IncompleteError(missing)
+        part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
+        record.id = part_id
+        fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
+        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        sym = record.symbol
+        fp = record.footprint
+        with Transaction(self.repo) as txn:
+            txn.track_dir(*fresh_dirs)
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(
+                f"Add {record.display_name} (passive, {record.category}): stock "
+                f"{sym.lib}:{sym.name} symbol + {fp.lib}:{fp.name} footprint reference, record"
+            )
+        return record
+
     def load_record(self, part_id: str) -> PartRecord:
         path = self.lib.parts_dir / f"{part_id}.json"
         return PartRecord.loads(path.read_text(encoding="utf-8"))

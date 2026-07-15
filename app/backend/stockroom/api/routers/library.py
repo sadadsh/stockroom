@@ -8,7 +8,9 @@ import json
 
 from fastapi import APIRouter, Depends, Request, Response
 
+from stockroom.api.errors import ApiError
 from stockroom.api.schemas import EditFieldBody, FacetsDTO, MoveBody, PartSummary, SetSpecsBody
+from stockroom.ingest.passive_add import PassiveAddError, build_passive_record
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
@@ -104,6 +106,44 @@ def library_router(require_token) -> APIRouter:
                     "is_complete": False, "missing": [], "matches": 0,
                 })
         return {"items": items, "in_library": in_library, "total": len(items)}
+
+    def _build_passive(body: dict):
+        try:
+            return build_passive_record(
+                body.get("input", ""),
+                category=(body.get("category") or None),
+                manufacturer=(body.get("manufacturer") or None),
+                datasheet_url=(body.get("datasheet_url") or None),
+            )
+        except PassiveAddError as exc:
+            # A bad/undecodable input is the caller's problem (422), not a bad gateway.
+            raise ApiError(422, str(exc)) from exc
+
+    @r.post("/passive/preview")
+    def passive_preview(request: Request, body: dict) -> dict:
+        """Preview a file-less passive add from an MPN or a Mouser URL WITHOUT
+        committing: the decoded identity/specs, the resolved KiCad stock symbol/
+        footprint/3D references, the Mouser buy link, and the passport gaps still to
+        fill. Offline and synchronous."""
+        build = _build_passive(body)
+        return {
+            "record": build.record.to_dict(),
+            "gaps": build.gaps,
+            "stock_present": build.stock_present,
+        }
+
+    @r.post("/passive")
+    def passive_add(request: Request, body: dict) -> dict:
+        """Add a passive with NO dropped files: build the record (KiCad stock symbol/
+        footprint/3D references) and commit it through the complete-to-add gate, then
+        rebuild the index and auto-push. 422 if the input is not an auto-addable
+        passive, or the passport is incomplete (missing datasheet/purchase)."""
+        ctx = request.app.state.ctx
+        build = _build_passive(body)
+        record = ctx.ops.add_passive_part(build.record)  # IncompleteError -> 422
+        ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
+        return record.to_dict()
 
     @r.get("/parts/{part_id}")
     def part_detail(request: Request, part_id: str) -> dict:

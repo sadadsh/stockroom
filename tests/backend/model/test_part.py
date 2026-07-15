@@ -28,6 +28,53 @@ def _sample() -> PartRecord:
     )
 
 
+def _passive_sample() -> PartRecord:
+    # A file-less passive: symbol/footprint reference KiCad STOCK libs (Device:R,
+    # Resistor_SMD:R_0603_1608Metric), no owned 3D model, a datasheet URL (no PDF),
+    # and a Mouser purchase link. This is the "drop the MPN, no files" record.
+    return PartRecord(
+        id="erj-p03f1101v",
+        display_name="ERJ-P03F1101V",
+        category="Resistors",
+        description="Resistor, 1.1 kOhm, 1%, 0603",
+        mpn="ERJ-P03F1101V",
+        manufacturer="Panasonic",
+        passive=True,
+        symbol=LibRef(lib="Device", name="R"),
+        footprint=LibRef(lib="Resistor_SMD", name="R_0603_1608Metric"),
+        datasheet=Datasheet(source_url="https://mouser.com/erj.pdf"),
+        purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V")],
+        specs={"Resistance": "1.1 kOhm", "Tolerance": "1%", "Package": "0603", "Power": "0.2 W"},
+    )
+
+
+def test_passive_is_complete_with_stock_refs_url_datasheet_and_no_owned_model():
+    p = _passive_sample()
+    assert p.model is None  # no owned 3D file; the stock footprint carries its own
+    assert p.missing_fields() == []
+    assert p.is_complete()
+
+
+def test_passive_flag_round_trips():
+    p = _passive_sample()
+    again = PartRecord.from_dict(p.to_dict())
+    assert again.passive is True
+    assert again == p
+
+
+def test_datasheet_url_alone_satisfies_the_gate_for_any_part():
+    p = _sample()
+    p.datasheet = Datasheet(source_url="https://ti.com/x.pdf")  # URL, no downloaded PDF
+    assert "datasheet" not in " ".join(p.missing_fields())
+
+
+def test_non_passive_still_requires_an_owned_model():
+    p = _sample()
+    p.model = None
+    assert p.passive is False
+    assert p.missing_fields() == ["3D model"]
+
+
 def test_round_trip_preserves_every_field():
     p = _sample()
     again = PartRecord.from_dict(p.to_dict())
