@@ -12,6 +12,9 @@ declare global {
   interface Window {
     __API_BASE__?: string;
     __STOCKROOM_TOKEN__?: string;
+    // The WebView2 host forwards native drag-drop file paths through this hook
+    // (registered by AppShell); a plain browser drop cannot see filesystem paths.
+    __STOCKROOM_NATIVE_DROP__?: (paths: string[]) => void;
   }
 }
 
