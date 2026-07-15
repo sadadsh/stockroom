@@ -10,7 +10,7 @@ import { DoctorPage } from "./DoctorPage";
 import { DuplicatesPage } from "./DuplicatesPage";
 import { IngestPage } from "./IngestPage";
 import { useRouter } from "../lib/router";
-import { TabStrip, type TabItem } from "../components/primitives";
+import { TabPanel, TabStrip, type TabItem } from "../components/primitives";
 
 export type LibraryTab = "components" | "ingest" | "bom" | "duplicates" | "doctor";
 
@@ -28,19 +28,27 @@ export function LibraryPage({ tab }: { tab: LibraryTab }) {
     <>
       <div className="flex h-14 flex-none items-center gap-5 px-[18px]">
         <div className="text-lg font-semibold text-t1">Library</div>
-        <TabStrip tabs={TABS} active={tab} onSelect={navigate} aria-label="Library sections" />
+        <TabStrip
+          tabs={TABS}
+          active={tab}
+          onSelect={navigate}
+          idBase="library"
+          aria-label="Library sections"
+        />
       </div>
-      {tab === "components" ? (
-        <ComponentsPage />
-      ) : tab === "ingest" ? (
-        <IngestPage />
-      ) : tab === "bom" ? (
-        <BomPage />
-      ) : tab === "duplicates" ? (
-        <DuplicatesPage />
-      ) : (
-        <DoctorPage />
-      )}
+      <TabPanel idBase="library" tab={tab} className="flex min-h-0 flex-1 flex-col">
+        {tab === "components" ? (
+          <ComponentsPage />
+        ) : tab === "ingest" ? (
+          <IngestPage />
+        ) : tab === "bom" ? (
+          <BomPage />
+        ) : tab === "duplicates" ? (
+          <DuplicatesPage />
+        ) : (
+          <DoctorPage />
+        )}
+      </TabPanel>
     </>
   );
 }

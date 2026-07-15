@@ -94,7 +94,16 @@ import type {
 } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow, TabStrip, type TabItem } from "../components/primitives";
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  Eyebrow,
+  TabPanel,
+  TabStrip,
+  type TabItem,
+} from "../components/primitives";
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
@@ -210,6 +219,7 @@ export function ProjectsPage() {
         <div className="min-w-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
           {selected ? (
             <ProjectDetailView
+              key={selected.id}
               project={selected}
               onRemove={() => setPendingDelete(selected)}
               removeBusy={del.isPending}
@@ -416,14 +426,10 @@ function ProjectDetailView({
   onRemove: () => void;
   removeBusy: boolean;
 }) {
+  // The whole view is keyed by project id at the call site, so a project switch
+  // remounts it and this lands back on Overview with a fresh, flash-free state (no
+  // post-paint reset effect, no stale tab briefly rendered against the new project).
   const [tab, setTab] = useState<ProjectTab>("overview");
-
-  // Land on Overview whenever the selected project changes, so a tab open on one
-  // project never carries over to another. Each tab body is also keyed by the
-  // project id, so its sections and any in-progress drafts reset with the project.
-  useEffect(() => {
-    setTab("overview");
-  }, [project.id]);
 
   return (
     <div className="max-w-[860px] pb-12">
@@ -449,21 +455,24 @@ function ProjectDetailView({
         tabs={PROJECT_TABS}
         active={tab}
         onSelect={setTab}
+        idBase="project"
         className="mb-6"
         aria-label="Project sections"
       />
 
-      {tab === "overview" ? (
-        <OverviewTab key={project.id} projectId={project.id} />
-      ) : tab === "health" ? (
-        <HealthTab key={project.id} projectId={project.id} />
-      ) : tab === "bom" ? (
-        <BomTab key={project.id} projectId={project.id} />
-      ) : tab === "setup" ? (
-        <SetupTab key={project.id} projectId={project.id} />
-      ) : (
-        <NetClassesTab key={project.id} projectId={project.id} />
-      )}
+      <TabPanel idBase="project" tab={tab} className={TAB_BODY_CLS}>
+        {tab === "overview" ? (
+          <OverviewTab projectId={project.id} />
+        ) : tab === "health" ? (
+          <HealthTab projectId={project.id} />
+        ) : tab === "bom" ? (
+          <BomTab projectId={project.id} />
+        ) : tab === "setup" ? (
+          <SetupTab projectId={project.id} />
+        ) : (
+          <NetClassesTab projectId={project.id} />
+        )}
+      </TabPanel>
     </div>
   );
 }
@@ -471,10 +480,10 @@ function ProjectDetailView({
 // Overview: the readiness verdict card and the board viewer.
 function OverviewTab({ projectId }: { projectId: string }) {
   return (
-    <div className={TAB_BODY_CLS}>
+    <>
       <BuildabilitySection projectId={projectId} />
       <ProjectViewerSection projectId={projectId} />
-    </div>
+    </>
   );
 }
 
@@ -487,7 +496,7 @@ function HealthTab({ projectId }: { projectId: string }) {
   const [kindFilter, setKindFilter] = useState<string | null>(null);
 
   return (
-    <div className={TAB_BODY_CLS}>
+    <>
       {auditQuery.isLoading ? (
         <Card className="px-4 py-3.5">
           <p className="py-1 text-sm text-t3">Auditing the project...</p>
@@ -508,7 +517,7 @@ function HealthTab({ projectId }: { projectId: string }) {
 
       <ChecksSection projectId={projectId} />
       <PrepareSection projectId={projectId} />
-    </div>
+    </>
   );
 }
 
@@ -516,12 +525,12 @@ function HealthTab({ projectId }: { projectId: string }) {
 // fab (gerber/drill/placement) exports.
 function BomTab({ projectId }: { projectId: string }) {
   return (
-    <div className={TAB_BODY_CLS}>
+    <>
       <BomSection projectId={projectId} />
       <ProcurementSection projectId={projectId} />
       <RevisionDiffSection projectId={projectId} />
       <FabSection projectId={projectId} />
-    </div>
+    </>
   );
 }
 
@@ -530,23 +539,19 @@ function BomTab({ projectId }: { projectId: string }) {
 // object conform, and the project title-block fields).
 function SetupTab({ projectId }: { projectId: string }) {
   return (
-    <div className={TAB_BODY_CLS}>
+    <>
       <BoardSetupSection projectId={projectId} />
       <ProSettingsSection projectId={projectId} />
       <StackupSection projectId={projectId} />
       <ConformSection projectId={projectId} />
       <FieldsSection projectId={projectId} />
-    </div>
+    </>
   );
 }
 
 // Net Classes: net classes, board design rules, and netclass patterns.
 function NetClassesTab({ projectId }: { projectId: string }) {
-  return (
-    <div className={TAB_BODY_CLS}>
-      <EditorSection projectId={projectId} />
-    </div>
-  );
+  return <EditorSection projectId={projectId} />;
 }
 
 function AuditView({

@@ -3,7 +3,7 @@
  * Interactive labels are Title Case, and there are no em dashes in any copy
  * (owner rules). Radii use the 8/6 tokens (rounded-card / rounded-control).
  */
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -198,37 +198,68 @@ export interface TabItem<T extends string> {
   label: string;
 }
 
+// The stable ids that tie a tab to the panel it reveals, so the two halves of the
+// ARIA tabs pattern (the tab in TabStrip, the panel in TabPanel) agree without the
+// caller hand-wiring them.
+export const tabButtonId = (idBase: string, id: string) => `${idBase}-tab-${id}`;
+export const tabPanelId = (idBase: string, id: string) => `${idBase}-panel-${id}`;
+
 // The one guided tab control for the whole app: a segmented pill row, not a set
 // of loose buttons. The Library flagship and the per-project Projects surface both
-// render through this, so a tab reads and behaves identically everywhere. Each
-// option is a real `role="tab"` with `aria-selected`, so the keyboard and screen
-// reader see a tablist; the active pill is the raised `bg-raise2` fill.
+// render through this, so a tab reads and behaves identically everywhere. It is a
+// full WAI-ARIA tablist: each option is a real `role="tab"` with `aria-selected`
+// and `aria-controls` pointing at its `TabPanel`; a roving tabindex plus arrow /
+// Home / End keys move between tabs the way a screen reader announces the tablist
+// implies. The active pill is the raised `bg-raise2` fill.
 export function TabStrip<T extends string>({
   tabs,
   active,
   onSelect,
+  idBase,
   className,
   "aria-label": ariaLabel,
 }: {
   tabs: readonly TabItem<T>[];
   active: T;
   onSelect: (id: T) => void;
+  idBase: string;
   className?: string;
   "aria-label"?: string;
 }) {
+  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const last = tabs.length - 1;
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = index === last ? 0 : index + 1;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = index === 0 ? last : index - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = last;
+    if (next < 0) return;
+    e.preventDefault();
+    onSelect(tabs[next].id);
+    // Move focus to follow the selection, so keyboard and pointer land in the same place.
+    const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[role="tab"]',
+    );
+    buttons?.[next]?.focus();
+  }
+
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
       className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
     >
-      {tabs.map((t) => (
+      {tabs.map((t, i) => (
         <button
           key={t.id}
           type="button"
           role="tab"
+          id={tabButtonId(idBase, t.id)}
           aria-selected={active === t.id}
+          aria-controls={tabPanelId(idBase, t.id)}
+          tabIndex={active === t.id ? 0 : -1}
           onClick={() => onSelect(t.id)}
+          onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
             "rounded-control px-3 py-1 text-sm transition-colors",
             active === t.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2",
@@ -237,6 +268,33 @@ export function TabStrip<T extends string>({
           {t.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// The content half of the ARIA tabs pattern: a `role="tabpanel"` region labelled by
+// its tab, so activating a tab has a programmatic target instead of leaving the tab
+// role dangling. `tab` is the active tab id; the ids are derived the same way as the
+// TabStrip button's, so the two always line up.
+export function TabPanel({
+  idBase,
+  tab,
+  className,
+  children,
+}: {
+  idBase: string;
+  tab: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={tabPanelId(idBase, tab)}
+      aria-labelledby={tabButtonId(idBase, tab)}
+      className={className}
+    >
+      {children}
     </div>
   );
 }
