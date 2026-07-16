@@ -1,0 +1,104 @@
+{
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tpd2e009"
+  },
+  "description": "ESD Protection Diodes / TVS Diodes",
+  "display_name": "TPD2E009DRTR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-23-3",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tpd2e009dbzr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPD2E009DBZR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD2E009DBZR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.79,
+          "qty": 1
+        },
+        {
+          "price": 0.486,
+          "qty": 10
+        },
+        {
+          "price": 0.313,
+          "qty": 100
+        },
+        {
+          "price": 0.239,
+          "qty": 500
+        },
+        {
+          "price": 0.215,
+          "qty": 1000
+        },
+        {
+          "price": 0.184,
+          "qty": 3000
+        },
+        {
+          "price": 0.168,
+          "qty": 6000
+        },
+        {
+          "price": 0.158,
+          "qty": 9000
+        },
+        {
+          "price": 0.148,
+          "qty": 24000
+        }
+      ],
+      "stock": 4392,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD2E009DBZR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Breakdown Voltage": "7 V",
+    "Cd - Diode Capacitance": "0.9 pF",
+    "Clamping Voltage": "8 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Ipp - Peak Pulse Current": "1 A",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Number of Channels": "2 Channel",
+    "Operating Supply Voltage": "6 V",
+    "Packaging": "Reel",
+    "Polarity": "Unidirectional",
+    "Product": "ESD Suppressors",
+    "Product Category": "ESD Protection Diodes / TVS Diodes",
+    "RoHS": "Details",
+    "Series": "TPD2E009",
+    "Subcategory": "ESD Protection Diodes / TVS Diodes",
+    "Termination Style": "SMD/SMT",
+    "Unit Weight": "0.000310 oz",
+    "Vesd - Voltage ESD Air Gap": "8 kV",
+    "Vesd - Voltage ESD Contact": "8 kV",
+    "Vf - Forward Voltage": "800 mV",
+    "Working Voltage": "5.5 V"
+  },
+  "symbol": null,
+  "tags": []
+}

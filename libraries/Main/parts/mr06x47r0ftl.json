@@ -1,0 +1,106 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/317/1/ASC_MR.pdf"
+  },
+  "description": "Resistor",
+  "display_name": "47",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "mr06x47r0ftl",
+  "manufacturer": "Walsin",
+  "model": null,
+  "mpn": "MR06X47R0FTL",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.13,
+          "qty": 1
+        },
+        {
+          "price": 0.033,
+          "qty": 10
+        },
+        {
+          "price": 0.016,
+          "qty": 100
+        },
+        {
+          "price": 0.012,
+          "qty": 250
+        },
+        {
+          "price": 0.01,
+          "qty": 500
+        },
+        {
+          "price": 0.009,
+          "qty": 1000
+        },
+        {
+          "price": 0.005,
+          "qty": 5000
+        },
+        {
+          "price": 0.003,
+          "qty": 10000
+        }
+      ],
+      "stock": 49137,
+      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Walsin",
+    "Case Code - in": "0603",
+    "Case Code - mm": "1608",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Height": "0.45 mm (0.018 in)",
+    "Length": "1.6 mm (0.063 in)",
+    "Manufacturer": "Walsin",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Power Rating": "125 mW (1/8 W)",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
+    "Resistance": "47 Ohms",
+    "RoHS": "Details",
+    "Series": "MR",
+    "Subcategory": "Resistors",
+    "Technology": "Thick Film",
+    "Temperature Coefficient": "100 PPM / C",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "1 %",
+    "Unit Weight": "0.000071 oz",
+    "Voltage Rating": "75 V",
+    "Width": "0.8 mm (0.031 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R",
+    "tool": "kicad"
+  },
+  "tags": []
+}

@@ -1,0 +1,99 @@
+{
+  "category": "Switches",
+  "datasheet": null,
+  "description": "SPST Analog Switch SOT-23-5",
+  "display_name": "TS5A3166DBVR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-23-5",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "ts5a3166dbvr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TS5A3166DBVR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.43,
+          "qty": 1
+        },
+        {
+          "price": 0.302,
+          "qty": 10
+        },
+        {
+          "price": 0.27,
+          "qty": 25
+        },
+        {
+          "price": 0.233,
+          "qty": 100
+        },
+        {
+          "price": 0.216,
+          "qty": 250
+        },
+        {
+          "price": 0.206,
+          "qty": 500
+        },
+        {
+          "price": 0.197,
+          "qty": 1000
+        },
+        {
+          "price": 0.186,
+          "qty": 3000
+        },
+        {
+          "price": 0.181,
+          "qty": 6000
+        }
+      ],
+      "stock": 6529,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Configuration": "1 x SPST",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Channels": "1 Channel",
+    "Off Time - Max": "11.5 ns",
+    "On Resistance - Max": "900 mOhms",
+    "On Time - Max": "7 ns",
+    "Packaging": "Reel",
+    "Product Category": "Analog Switch ICs",
+    "Product Type": "Analog Switch ICs",
+    "RoHS": "Details",
+    "Series": "TS5A3166",
+    "Subcategory": "Switch ICs",
+    "Supply Current - Max": "800 nA",
+    "Supply Type": "Single Supply",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "1.65 V",
+    "Switch Continuous Current": "100 mA",
+    "Unit Weight": "0.000222 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

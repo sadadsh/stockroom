@@ -1,0 +1,100 @@
+{
+  "category": "Connectors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/61300411121.pdf"
+  },
+  "description": "Headers & Wire Housings",
+  "display_name": "Conn_01x04_Pin",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Connector_PinHeader_2.54mm",
+    "name": "PinHeader_1x04_P2.54mm_Vertical",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "61300411121",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "61300411121",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300411121"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.19,
+          "qty": 1
+        },
+        {
+          "price": 0.163,
+          "qty": 10
+        },
+        {
+          "price": 0.135,
+          "qty": 25
+        },
+        {
+          "price": 0.113,
+          "qty": 50
+        },
+        {
+          "price": 0.102,
+          "qty": 100
+        },
+        {
+          "price": 0.094,
+          "qty": 1000
+        }
+      ],
+      "stock": 52015,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300411121",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Board-to-Board",
+    "Brand": "Wurth Elektronik",
+    "Contact Gender": "Pin (Male)",
+    "Contact Material": "Copper Alloy",
+    "Contact Plating": "Gold",
+    "Current Rating": "3 A",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "Flammability Rating": "UL 94 V-0",
+    "Housing Color": "Black",
+    "Housing Material": "Polyamide (PA)",
+    "Insulation Resistance": "1 GOhms",
+    "Manufacturer": "Wurth Elektronik",
+    "Mating Post Length": "6 mm (0.236 in)",
+    "Maximum Operating Temperature": "+ 105 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Angle": "Straight",
+    "Mounting Style": "Through Hole",
+    "Number of Positions": "4 Position",
+    "Number of Rows": "1 Row",
+    "Packaging": "Bulk",
+    "Pitch": "2.54 mm (0.1 in)",
+    "Product": "Headers",
+    "Product Category": "Headers & Wire Housings",
+    "Product Type": "Headers & Wire Housings",
+    "RoHS": "Details",
+    "Series": "WR-PHD",
+    "Subcategory": "Headers & Wire Housings",
+    "Termination Post Length": "3 mm (0.118 in)",
+    "Termination Style": "Solder Pin",
+    "Type": "Pin Strip",
+    "Unit Weight": "0.007408 oz",
+    "Voltage Rating": "250 V"
+  },
+  "symbol": null,
+  "tags": []
+}

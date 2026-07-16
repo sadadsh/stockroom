@@ -1,0 +1,101 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/sn74lvc1gu04"
+  },
+  "description": "Single Inverter Gate, SOT-553",
+  "display_name": "74LVC1GU04DRLR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-553",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "sn74lvc1gu04drlr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "SN74LVC1GU04DRLR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.36,
+          "qty": 1
+        },
+        {
+          "price": 0.246,
+          "qty": 10
+        },
+        {
+          "price": 0.219,
+          "qty": 25
+        },
+        {
+          "price": 0.189,
+          "qty": 100
+        },
+        {
+          "price": 0.175,
+          "qty": 250
+        },
+        {
+          "price": 0.166,
+          "qty": 500
+        },
+        {
+          "price": 0.159,
+          "qty": 1000
+        },
+        {
+          "price": 0.157,
+          "qty": 2000
+        },
+        {
+          "price": 0.148,
+          "qty": 4000
+        }
+      ],
+      "stock": 6693,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "High Level Output Current": "- 32 mA",
+    "Input Type": "CMOS, TTL",
+    "Logic Family": "LVC",
+    "Logic Type": "Inverting",
+    "Low Level Output Current": "32 mA",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Circuits": "1 Circuit",
+    "Packaging": "Reel",
+    "Product Category": "Inverters",
+    "Product Type": "Inverters",
+    "RoHS": "Details",
+    "Series": "SN74LVC1GU04",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "1.65 V",
+    "Unit Weight": "0.000099 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

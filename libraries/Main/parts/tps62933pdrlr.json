@@ -1,0 +1,104 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps62933p"
+  },
+  "description": "Buck Converter SOT583-8",
+  "display_name": "TPS62933P",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-583-8",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps62933pdrlr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS62933PDRLR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.38,
+          "qty": 1
+        },
+        {
+          "price": 1.01,
+          "qty": 10
+        },
+        {
+          "price": 0.912,
+          "qty": 25
+        },
+        {
+          "price": 0.808,
+          "qty": 100
+        },
+        {
+          "price": 0.758,
+          "qty": 250
+        },
+        {
+          "price": 0.729,
+          "qty": 500
+        },
+        {
+          "price": 0.708,
+          "qty": 1000
+        },
+        {
+          "price": 0.697,
+          "qty": 2000
+        },
+        {
+          "price": 0.664,
+          "qty": 4000
+        }
+      ],
+      "stock": 12149,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Input Voltage": "3.8 V to 30 V",
+    "Input Voltage - Max": "30 V",
+    "Input Voltage - Min": "3.8 V",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 150 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Outputs": "1 Output",
+    "Output Current": "3 A",
+    "Output Voltage": "800 mV to 22 V",
+    "Packaging": "Reel",
+    "Product Category": "Switching Voltage Regulators",
+    "Product Type": "Switching Voltage Regulators",
+    "Quiescent Current": "12 uA",
+    "RoHS": "Details",
+    "Series": "TPS62933P",
+    "Shutdown": "Shutdown",
+    "Subcategory": "PMIC - Power Management ICs",
+    "Supply Voltage - Min": "3.8 V",
+    "Switching Frequency": "200 kHz to 2.2 MHz",
+    "Topology": "Buck",
+    "Type": "Synchronous Buck Converter"
+  },
+  "symbol": null,
+  "tags": []
+}

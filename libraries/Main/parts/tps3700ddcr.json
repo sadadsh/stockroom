@@ -1,0 +1,102 @@
+{
+  "category": "ICs",
+  "datasheet": null,
+  "description": "Analog Comparators",
+  "display_name": "TPS3700DDCR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-23-6",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps3700ddcr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS3700DDCR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.52,
+          "qty": 1
+        },
+        {
+          "price": 1.87,
+          "qty": 10
+        },
+        {
+          "price": 1.71,
+          "qty": 25
+        },
+        {
+          "price": 1.53,
+          "qty": 100
+        },
+        {
+          "price": 1.45,
+          "qty": 250
+        },
+        {
+          "price": 1.4,
+          "qty": 500
+        },
+        {
+          "price": 1.35,
+          "qty": 1000
+        },
+        {
+          "price": 1.29,
+          "qty": 3000
+        },
+        {
+          "price": 1.27,
+          "qty": 6000
+        }
+      ],
+      "stock": 0,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Comparator Type": "Window",
+    "Development Kit": "TPS3700EVM-114",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Number of Channels": "1 Channel",
+    "Operating Supply Current": "5.5 uA",
+    "Output Current per Channel": "40 mA",
+    "Output Type": "Open Drain",
+    "Packaging": "Reel",
+    "Product": "Analog Comparators",
+    "Product Category": "Analog Comparators",
+    "Product Type": "Analog Comparators",
+    "Propagation Delay Time": "29 us",
+    "Response Time": "29 us",
+    "RoHS": "Details",
+    "Series": "TPS3700",
+    "Shutdown": "No Shutdown",
+    "Subcategory": "Amplifier ICs",
+    "Supply Voltage - Max": "18 V",
+    "Supply Voltage - Min": "1.8 V",
+    "Unit Weight": "0.000229 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

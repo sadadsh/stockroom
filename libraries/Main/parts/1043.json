@@ -1,0 +1,87 @@
+{
+  "category": "Other",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/201/1/1043.pdf"
+  },
+  "description": "Cylindrical Battery Contacts, Clips, Holders & Springs",
+  "display_name": "1043 Holder for 18650",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "BAT_1043",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "1043",
+  "manufacturer": "Keystone",
+  "model": null,
+  "mpn": "1043",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.99,
+          "qty": 1
+        },
+        {
+          "price": 2.49,
+          "qty": 10
+        },
+        {
+          "price": 2.48,
+          "qty": 100
+        },
+        {
+          "price": 2.44,
+          "qty": 500
+        },
+        {
+          "price": 1.92,
+          "qty": 1000
+        },
+        {
+          "price": 1.61,
+          "qty": 2500
+        },
+        {
+          "price": 1.6,
+          "qty": 5000
+        }
+      ],
+      "stock": 9773,
+      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Battery Cell Size": "18650",
+    "Brand": "Keystone Electronics",
+    "Contact Plating": "Gold",
+    "Factory Pack Quantity: Factory Pack Quantity": "100",
+    "Manufacturer": "Keystone Electronics",
+    "Mounting Style": "Snap In",
+    "Number of Batteries": "1 Battery",
+    "Packaging": "Tray",
+    "Product": "Battery Holders",
+    "Product Category": "Cylindrical Battery Contacts, Clips, Holders & Springs",
+    "Product Type": "Cylindrical Battery Contacts, Clips, Holders & Springs",
+    "RoHS": "Details",
+    "Subcategory": "Battery",
+    "Type": "Tray",
+    "Unit Weight": "0.509684 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

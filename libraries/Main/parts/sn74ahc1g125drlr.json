@@ -1,0 +1,107 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/sn74ahc1g125"
+  },
+  "description": "Single Buffer Gate Tri-State, Low-Voltage CMOS",
+  "display_name": "74AHC1G125",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-553",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "sn74ahc1g125drlr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "SN74AHC1G125DRLR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74AHC1G125DRLR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.22,
+          "qty": 1
+        },
+        {
+          "price": 0.148,
+          "qty": 10
+        },
+        {
+          "price": 0.131,
+          "qty": 25
+        },
+        {
+          "price": 0.112,
+          "qty": 100
+        },
+        {
+          "price": 0.103,
+          "qty": 250
+        },
+        {
+          "price": 0.098,
+          "qty": 500
+        },
+        {
+          "price": 0.093,
+          "qty": 1000
+        },
+        {
+          "price": 0.092,
+          "qty": 2000
+        },
+        {
+          "price": 0.091,
+          "qty": 4000
+        }
+      ],
+      "stock": 6492,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74AHC1G125DRLR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "High Level Output Current": "- 8 mA",
+    "Logic Family": "AHC",
+    "Logic Type": "True",
+    "Low Level Output Current": "8 mA",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Channels": "1 Channel",
+    "Number of Input Lines": "1 Input",
+    "Number of Output Lines": "1 Output",
+    "Operating Supply Current": "10 uA",
+    "Output Type": "3-State",
+    "Packaging": "Reel",
+    "Polarity": "Non-Inverting",
+    "Product Category": "Buffers & Line Drivers",
+    "Product Type": "Buffers & Line Drivers",
+    "Propagation Delay Time": "11.5 ns",
+    "Quiescent Current": "1 uA",
+    "RoHS": "Details",
+    "Series": "SN74AHC1G125",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "2 V",
+    "Unit Weight": "0.000099 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

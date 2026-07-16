@@ -1,0 +1,85 @@
+{
+  "category": "ICs",
+  "datasheet": null,
+  "description": "Voltage-Level Shifter VSSOP-8",
+  "display_name": "TXS0102DCUR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_SO",
+    "name": "VSSOP-8_2.3x2mm_P0.5mm",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "txs0102dcur",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TXS0102DCUR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.63,
+          "qty": 1
+        },
+        {
+          "price": 0.445,
+          "qty": 10
+        },
+        {
+          "price": 0.399,
+          "qty": 25
+        },
+        {
+          "price": 0.348,
+          "qty": 100
+        },
+        {
+          "price": 0.324,
+          "qty": 250
+        },
+        {
+          "price": 0.31,
+          "qty": 500
+        },
+        {
+          "price": 0.31,
+          "qty": 3000
+        }
+      ],
+      "stock": 111490,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Packaging": "Reel",
+    "Product Category": "Translation - Voltage Levels",
+    "Product Type": "Translation - Voltage Levels",
+    "Propagation Delay Time": "260 ns",
+    "RoHS": "Details",
+    "Series": "TXS0102",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "1.65 V, 2.3 V",
+    "Type": "2-bit Bidirectional Voltage-Level Translator",
+    "Unit Weight": "0.000339 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

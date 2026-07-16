@@ -1,0 +1,105 @@
+{
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps22918-q1"
+  },
+  "description": "Power Switch ICs - Power Distribution",
+  "display_name": "TPS22918DBVR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SOT95P280X145-6N",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps22918tdbvrq1",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS22918TDBVRQ1",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.76,
+          "qty": 1
+        },
+        {
+          "price": 0.54,
+          "qty": 10
+        },
+        {
+          "price": 0.484,
+          "qty": 25
+        },
+        {
+          "price": 0.423,
+          "qty": 100
+        },
+        {
+          "price": 0.393,
+          "qty": 250
+        },
+        {
+          "price": 0.376,
+          "qty": 500
+        },
+        {
+          "price": 0.361,
+          "qty": 1000
+        },
+        {
+          "price": 0.346,
+          "qty": 3000
+        },
+        {
+          "price": 0.337,
+          "qty": 6000
+        }
+      ],
+      "stock": 10229,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 105 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Number of Outputs": "1 Output",
+    "Off Time - Max": "2 us",
+    "On Resistance - Max": "59 mOhms",
+    "On Time - Max": "1.95 ms",
+    "Operating Supply Voltage": "1 V to 5.5 V",
+    "Output Current": "2 A",
+    "Packaging": "Reel",
+    "Product": "Load Switches",
+    "Product Category": "Power Switch ICs - Power Distribution",
+    "Product Type": "Power Switch ICs - Power Distribution",
+    "Qualification": "AEC-Q100",
+    "RoHS": "Details",
+    "Series": "TPS22918",
+    "Subcategory": "Switch ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "1 V",
+    "Type": "Load Switch",
+    "Unit Weight": "0.003280 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

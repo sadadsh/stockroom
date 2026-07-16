@@ -1,0 +1,103 @@
+{
+  "category": "Capacitors",
+  "datasheet": null,
+  "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+  "display_name": "2.2n",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Capacitor_SMD",
+    "name": "C_0402_1005Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "cl05b222kb5nnnc",
+  "manufacturer": "Samsung",
+  "model": null,
+  "mpn": "CL05B222KB5NNNC",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B222KB5NNNC"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.016,
+          "qty": 10
+        },
+        {
+          "price": 0.013,
+          "qty": 100
+        },
+        {
+          "price": 0.009,
+          "qty": 500
+        },
+        {
+          "price": 0.008,
+          "qty": 1000
+        },
+        {
+          "price": 0.007,
+          "qty": 2500
+        },
+        {
+          "price": 0.006,
+          "qty": 5000
+        },
+        {
+          "price": 0.004,
+          "qty": 10000
+        }
+      ],
+      "stock": 12169,
+      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B222KB5NNNC",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Samsung Electro-Mechanics",
+    "Capacitance": "2200 pF",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Class": "Class 2",
+    "Dielectric": "X7R",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Height": "0.55 mm (0.022 in)",
+    "Length": "1 mm (0.039 in)",
+    "Manufacturer": "Samsung Electro-Mechanics",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Packaging": "Reel",
+    "Part # Aliases": "CL05B222KB5NNN",
+    "Product": "General Type MLCCs",
+    "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Product Type": "Ceramic Capacitors",
+    "RoHS": "Details",
+    "Series": "CL-Standard",
+    "Subcategory": "Capacitors",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "10 %",
+    "Type": "Multilayer Ceramic Capacitor",
+    "Unit Weight": "0.000053 oz",
+    "Voltage Rating DC": "50 VDC",
+    "Width": "0.5 mm (0.02 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "C",
+    "tool": "kicad"
+  },
+  "tags": []
+}

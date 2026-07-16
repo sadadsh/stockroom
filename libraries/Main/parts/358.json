@@ -1,0 +1,38 @@
+{
+  "category": "Connectors",
+  "datasheet": null,
+  "description": "358",
+  "display_name": "358",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Connector_PinSocket_2.54mm",
+    "name": "PinSocket_1x10_P2.54mm_Vertical",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "358",
+  "manufacturer": "Adafruit Industries",
+  "model": null,
+  "mpn": "358",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/c/?q=358"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/c/?q=358",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {},
+  "symbol": null,
+  "tags": []
+}

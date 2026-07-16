@@ -1,0 +1,101 @@
+{
+  "category": "ICs",
+  "datasheet": null,
+  "description": "Boost converter 6-SOT-5X3",
+  "display_name": "TPS61023",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-563",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps61023drlt",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS61023DRLT",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.43,
+          "qty": 1
+        },
+        {
+          "price": 1.04,
+          "qty": 10
+        },
+        {
+          "price": 0.942,
+          "qty": 25
+        },
+        {
+          "price": 0.836,
+          "qty": 100
+        },
+        {
+          "price": 0.784,
+          "qty": 250
+        },
+        {
+          "price": 0.738,
+          "qty": 500
+        },
+        {
+          "price": 0.711,
+          "qty": 1000
+        },
+        {
+          "price": 0.701,
+          "qty": 2500
+        },
+        {
+          "price": 0.688,
+          "qty": 5000
+        }
+      ],
+      "stock": 47115,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Development Kit": "TPS61023EVM-052",
+    "Factory Pack Quantity: Factory Pack Quantity": "250",
+    "Input Voltage": "500 mV to 5.5 V",
+    "Input Voltage - Max": "5.5 V",
+    "Input Voltage - Min": "500 mV",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Outputs": "1 Output",
+    "Output Current": "3.7 A",
+    "Output Voltage": "2.2 V to 5.5 V",
+    "Packaging": "Reel",
+    "Product Category": "Switching Voltage Regulators",
+    "Product Type": "Switching Voltage Regulators",
+    "Quiescent Current": "900 nA",
+    "RoHS": "Details",
+    "Series": "TPS61023",
+    "Shutdown": "Shutdown",
+    "Subcategory": "PMIC - Power Management ICs",
+    "Supply Voltage - Min": "500 mV",
+    "Switching Frequency": "1 MHz",
+    "Topology": "Boost",
+    "Unit Weight": "0.000293 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

@@ -1,0 +1,99 @@
+{
+  "category": "Other",
+  "datasheet": null,
+  "description": "Flip Flops",
+  "display_name": "SN74LVC1G74DCUR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SOP50P310X90-8N",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "sn74lvc1g74dcur",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "SN74LVC1G74DCUR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.6,
+          "qty": 1
+        },
+        {
+          "price": 0.422,
+          "qty": 10
+        },
+        {
+          "price": 0.379,
+          "qty": 25
+        },
+        {
+          "price": 0.33,
+          "qty": 100
+        },
+        {
+          "price": 0.307,
+          "qty": 250
+        },
+        {
+          "price": 0.293,
+          "qty": 500
+        },
+        {
+          "price": 0.287,
+          "qty": 1000
+        },
+        {
+          "price": 0.267,
+          "qty": 3000
+        },
+        {
+          "price": 0.26,
+          "qty": 6000
+        }
+      ],
+      "stock": 52601,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "High Level Output Current": "- 32 mA",
+    "Input Type": "CMOS, TTL",
+    "Logic Family": "LVC",
+    "Logic Type": "Monostable Multivibrator",
+    "Low Level Output Current": "32 mA",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Circuits": "1 Circuit",
+    "Output Type": "Differential",
+    "Packaging": "Reel",
+    "Product Category": "Flip Flops",
+    "Product Type": "Flip Flops",
+    "Propagation Delay Time": "1.6 ns",
+    "RoHS": "Details",
+    "Series": "SN74LVC1G74",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "1.65 V",
+    "Unit Weight": "0.001058 oz"
+  },
+  "symbol": null,
+  "tags": []
+}

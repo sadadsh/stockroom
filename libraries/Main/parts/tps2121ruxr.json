@@ -1,0 +1,81 @@
+{
+  "category": "Switches",
+  "datasheet": null,
+  "description": "Power Switch ICs - Power Distribution",
+  "display_name": "TPS2121RUXR",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "IC_TPS2121RUXR",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps2121ruxr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS2121RUXR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.44,
+          "qty": 1
+        },
+        {
+          "price": 1.82,
+          "qty": 10
+        },
+        {
+          "price": 1.66,
+          "qty": 25
+        },
+        {
+          "price": 1.49,
+          "qty": 100
+        },
+        {
+          "price": 1.49,
+          "qty": 3000
+        }
+      ],
+      "stock": 14171,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Current Limit": "4.5 A",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Outputs": "1 Output",
+    "On Resistance - Max": "70 mOhms",
+    "Operating Supply Voltage": "2.8 V to 22 V",
+    "Packaging": "Reel",
+    "Product": "Power Switch ICs",
+    "Product Category": "Power Switch ICs - Power Distribution",
+    "Product Type": "Power Switch ICs - Power Distribution",
+    "RoHS": "Details",
+    "Series": "TPS2121",
+    "Subcategory": "Switch ICs",
+    "Supply Voltage - Max": "22 V",
+    "Supply Voltage - Min": "2.8 V",
+    "Type": "Power MUX",
+    "Unit Weight": "0.000988 oz"
+  },
+  "symbol": null,
+  "tags": []
+}
