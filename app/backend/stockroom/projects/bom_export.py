@@ -210,11 +210,12 @@ def _xlsx_number(num: float) -> str:
     return format(num, ".6f").rstrip("0").rstrip(".")
 
 
-# Shared workbook scaffolding. Style ids referenced by cells: s="1" bold (header / totals
-# label); s="2" currency 0.00; s="3" bold currency (totals).
+# Shared workbook scaffolding. Style ids referenced by cells: s=1 bold (header / totals label),
+# s=2 hyperlink (blue underline), s=3 currency ($#,##0.00), s=4 bold currency (totals).
 _XLSX_STYLES_BOLD = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    '<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/></numFmts>'
     '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>'
     '<font><b/><sz val="11"/><name val="Calibri"/></font>'
     # font 2: the hyperlink look (blue + underline) so a link cell reads as a clickable link
@@ -223,9 +224,11 @@ _XLSX_STYLES_BOLD = (
     '<fill><patternFill patternType="gray125"/></fill></fills>'
     '<borders count="1"><border/></borders>'
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+    '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs>'
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     '</styleSheet>')
 # Adds a currency number format ($#,##0.00) as styles 2 (plain) and 3 (bold, for totals).
@@ -315,11 +318,11 @@ def bom_xlsx(rows) -> bytes:
             ("Footprint", "t"), ("Package", "t"), ("Datasheet", "t"), ("Mouser Link", "t"),
             ("Description", "t"), ("Basic", "t"), ("RoHS", "t"), ("Country of Origin", "t")]
     if priced:
-        cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "n"), ("Ext Price", "n"),
+        cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "m"), ("Ext Price", "m"),
                  ("Stock", "i"), ("Lifecycle", "t")]
     if build:
-        cols += [("Min Qty", "i"), ("Final Qty", "i"), ("Order Unit Cost", "n"),
-                 ("Cost @ Qty", "n"), ("Tariff %", "n"), ("Tax/Tariff", "n"), ("Total Cost", "n")]
+        cols += [("Min Qty", "i"), ("Final Qty", "i"), ("Order Unit Cost", "m"),
+                 ("Cost @ Qty", "m"), ("Tariff %", "n"), ("Tax/Tariff", "m"), ("Total Cost", "m")]
 
     def values(r):
         refs = r.get("refs", [])
@@ -356,7 +359,7 @@ def bom_xlsx(rows) -> bytes:
 
     def cell(ref, kind, raw, header=False):
         style = ' s="1"' if header else ""
-        if kind in ("n", "i") and not header:
+        if kind in ("n", "i", "m") and not header:
             n = _num(raw)
             if n is None:
                 return f'<c r="{ref}"{style}/>'  # blank, not a text "0"
@@ -364,7 +367,8 @@ def bom_xlsx(rows) -> bytes:
                 return f'<c r="{ref}"{style}><v>{int(round(n))}</v></c>'
             num = round(float(n), 6)  # currency precision, never sci-notation
             text = _xlsx_number(num)
-            return f'<c r="{ref}"{style}><v>{text}</v></c>'
+            cs = ' s="3"' if kind == "m" else style  # currency ($#,##0.00) for money cells
+            return f'<c r="{ref}"{cs}><v>{text}</v></c>'
         s = "" if raw is None else str(raw)
         if s == "":
             return f'<c r="{ref}"{style}/>'
@@ -405,6 +409,23 @@ def bom_xlsx(rows) -> bytes:
                 parts.append(cell(ref, k, val))
         row_xml.append(f'<row r="{ri}">{"".join(parts)}</row>')
 
+    # A bold TOTAL row summing the build-economics money columns - the numbers you actually pay.
+    total_row_ix = None
+    if build and all_vals:
+        total_row_ix = len(all_vals) + 2
+        sums = {name: round(sum((_num(v.get(name)) or 0) for v in all_vals), 4)
+                for name in ("Cost @ Qty", "Tax/Tariff", "Total Cost")}
+        tcells = []
+        for i, (name, _k) in enumerate(cols):
+            ref = f"{_xlsx_col(i)}{total_row_ix}"
+            if i == 0:
+                tcells.append(f'<c r="{ref}" s="1" t="inlineStr"><is><t>TOTAL</t></is></c>')
+            elif name in sums:
+                tcells.append(f'<c r="{ref}" s="4"><v>{_xlsx_number(sums[name])}</v></c>')
+            else:
+                tcells.append(f'<c r="{ref}"/>')
+        row_xml.append(f'<row r="{total_row_ix}">{"".join(tcells)}</row>')
+
     hl_xml = sheet_rels = ""
     if hyperlinks:
         hl_xml = "<hyperlinks>" + "".join(
@@ -420,11 +441,12 @@ def bom_xlsx(rows) -> bytes:
 
     last = _xlsx_col(len(cols) - 1)
     nr = len(all_vals) + 1
+    dim_last = total_row_ix or nr  # extend the sheet dimension over the TOTAL row when present
     sheet = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-        f'<dimension ref="A1:{last}{nr}"/>'
+        f'<dimension ref="A1:{last}{dim_last}"/>'
         '<sheetViews><sheetView tabSelected="1" workbookViewId="0">'
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
         '<selection pane="bottomLeft"/></sheetView></sheetViews>'

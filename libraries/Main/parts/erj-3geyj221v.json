@@ -1,12 +1,12 @@
 {
   "category": "Resistors",
   "datasheet": {
-    "fetched_at": "",
     "file": "",
-    "source_url": "https://www.mouser.com/catalog/specsheets/YAGEO_PYu_RC_Group_51_RoHS_L_12.pdf"
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/RDO0000C334.pdf",
+    "fetched_at": ""
   },
   "description": "Resistor",
-  "display_name": "220\u03a9 1% 0603 YAGEO RC0603FR-07220RL",
+  "display_name": "220\u03a9 5% 0603 Panasonic ERJ-3GEYJ221V",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -14,22 +14,22 @@
     "tool": "kicad"
   },
   "hashes": null,
-  "id": "rc0603fr-07220rl",
-  "manufacturer": "YAGEO",
+  "id": "erj-3geyj221v",
+  "manufacturer": "Panasonic",
   "model": null,
-  "mpn": "RC0603FR-07220RL",
+  "mpn": "ERJ-3GEYJ221V",
   "passive": true,
   "provenance": {
-    "ingested_at": "",
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
     "original_zip_sha256": "",
-    "source": "finale-sauce-source",
-    "source_url": "https://www.mouser.in/en/ProductDetail/YAGEO/RC0603FR-07220RL?qs=VU8sRB4EgwA1IyQ0vhXEEw%3D%3D"
+    "ingested_at": ""
   },
   "purchase": [
     {
-      "currency": "USD",
-      "fetched_at": "",
-      "part_number": "603-RC0603FR-07220RL",
+      "vendor": "Mouser",
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
+      "part_number": "667-ERJ-3GEYJ221V",
       "price_breaks": [
         {
           "qty": 1,
@@ -38,44 +38,64 @@
         },
         {
           "qty": 10,
-          "price": 0.014,
+          "price": 0.023,
           "currency": "USD"
         },
         {
           "qty": 100,
-          "price": 0.008,
+          "price": 0.019,
+          "currency": "USD"
+        },
+        {
+          "qty": 250,
+          "price": 0.015,
+          "currency": "USD"
+        },
+        {
+          "qty": 500,
+          "price": 0.013,
           "currency": "USD"
         },
         {
           "qty": 1000,
-          "price": 0.007,
+          "price": 0.011,
           "currency": "USD"
         },
         {
           "qty": 5000,
-          "price": 0.003,
+          "price": 0.007,
+          "currency": "USD"
+        },
+        {
+          "qty": 10000,
+          "price": 0.006,
+          "currency": "USD"
+        },
+        {
+          "qty": 25000,
+          "price": 0.005,
           "currency": "USD"
         }
       ],
-      "stock": 0,
-      "url": "https://www.mouser.in/en/ProductDetail/YAGEO/RC0603FR-07220RL?qs=VU8sRB4EgwA1IyQ0vhXEEw%3D%3D",
-      "vendor": "Mouser"
+      "stock": 41255,
+      "currency": "USD",
+      "fetched_at": ""
     }
   ],
   "specs": {
-    "Application": "High Reliability",
+    "Application": "Automotive Grade",
     "Assembly Country of Origin": "Not available",
-    "Brand": "YAGEO",
+    "Brand": "Panasonic",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
     "Country of Diffusion": "Not available",
-    "Country of Origin": "Taiwan",
+    "Country of Origin": "China",
     "ECCN": "EAR99",
     "Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
     "Lifecycle": "Active",
-    "Manufacturer": "YAGEO",
+    "Manufacturer": "Panasonic",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
@@ -87,17 +107,18 @@
     "Product Type": "Thick Film Resistors",
     "Resistance": "220 Ohms",
     "RoHS": "Details",
-    "Series": "RC L",
+    "Series": "ERJ-xGE",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "200 PPM / C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "5 %",
     "US Tariff %": 8.0,
     "Unit Weight": "0.000071 oz",
-    "Voltage Rating": "75 V",
+    "Voltage Rating": "75 VDC",
     "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Qualification": "AEC-Q200"
   },
   "symbol": {
     "lib": "Device",
