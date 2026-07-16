@@ -155,3 +155,19 @@ def test_bom_match_empty_input_is_an_empty_report(client):
     r = client.post("/api/library/bom-match", json={"text": "   "})
     assert r.status_code == 200
     assert r.json()["items"] == [] and r.json()["total"] == 0
+
+
+def test_attach_footprint_endpoint_tags_kicad_tool(client):
+    r = client.post("/api/library/parts/mystery/footprint",
+                    json={"lib": "Package_SO", "name": "SOIC-8"})
+    assert r.status_code == 200
+    fp = r.json()["footprint"]
+    assert fp["name"] == "SOIC-8" and fp["lib"] == "Package_SO"
+    assert fp["tool"] == "kicad"  # default EDA tag, altium-ready
+    # persisted through the index rebuild
+    assert client.get("/api/library/parts/mystery").json()["footprint"]["name"] == "SOIC-8"
+
+
+def test_attach_symbol_endpoint_requires_a_name(client):
+    r = client.post("/api/library/parts/mystery/symbol", json={"lib": "Device"})
+    assert r.status_code == 422
