@@ -1,0 +1,96 @@
+{
+  "category": "Inductors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/74439346068.pdf"
+  },
+  "description": "Power Inductors - SMD",
+  "display_name": "6.8u WE-XHMI_6060",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Inductor_SMD",
+    "name": "L_Wuerth_XHMI-6060",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "74439346068",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "74439346068",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 4.05,
+          "qty": 1
+        },
+        {
+          "price": 3.68,
+          "qty": 50
+        },
+        {
+          "price": 2.73,
+          "qty": 250
+        },
+        {
+          "price": 2.49,
+          "qty": 700
+        }
+      ],
+      "stock": 6579,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Power",
+    "Brand": "Wurth Elektronik",
+    "Core Material": "Metal Composite",
+    "Core Type": "Wirewound",
+    "Factory Pack Quantity: Factory Pack Quantity": "700",
+    "Height": "5.8 mm",
+    "Inductance": "6.8 uH",
+    "Length": "6.65 mm",
+    "Manufacturer": "Wurth Elektronik",
+    "Maximum DC Current": "6.5 A",
+    "Maximum DC Resistance": "17.6 mOhms",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Product": "Power Inductors",
+    "Product Category": "Power Inductors - SMD",
+    "Product Type": "Power Inductors - SMD",
+    "Qualification": "AEC-Q200",
+    "RoHS": "Details",
+    "Saturation Current": "10 A",
+    "Self Resonant Frequency": "21.5 MHz",
+    "Series": "WE-XHMI",
+    "Shielding": "Shielded",
+    "Subcategory": "Inductors, Chokes & Coils",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
+    "Test Frequency": "100 kHz",
+    "Tolerance": "20 %",
+    "Type": "Power Inductor",
+    "Unit Weight": "0.023951 oz",
+    "Width": "6.45 mm"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "L",
+    "tool": "kicad"
+  },
+  "tags": []
+}
