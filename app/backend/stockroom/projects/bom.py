@@ -782,7 +782,11 @@ def price_line_at_build(row, build_qty, tax_rate=0.0, optimize_breaks=True) -> d
         unit = _coerce_price(row.get("unit_price"))
     extended = round(unit * final_qty, 4) if (unit is not None and final_qty) else None
 
-    rate = _coerce_rate(tax_rate)
+    # A per-part tariff overrides the blanket project rate for THIS line (some parts carry a
+    # country-of-origin tariff others do not). A row-level tariff_rate wins when set; otherwise
+    # the project-wide rate applies. So a mixed order taxes each line at its own rate.
+    line_tariff = row.get("tariff_rate")
+    rate = _coerce_rate(line_tariff if line_tariff not in (None, "") else tax_rate)
     tax = round(extended * rate / 100.0, 4) if extended is not None else None
     total = round(extended + tax, 4) if extended is not None else None
     return {
@@ -803,6 +807,7 @@ def bom_build_rollup(rows, build_qty, tax_rate=0.0) -> dict:
     build = _board_count(build_qty)
     rate = _coerce_rate(tax_rate)
     subtotal = 0.0
+    tax_total = 0.0
     priced = unpriced = 0
     for r in rows:
         line = price_line_at_build(r, build, rate)
@@ -810,9 +815,12 @@ def bom_build_rollup(rows, build_qty, tax_rate=0.0) -> dict:
             unpriced += 1
         else:
             subtotal += line["final_extended"]
+            # Sum each line's OWN tax (its per-part tariff when set, else the blanket rate), so a
+            # mixed-tariff order rolls up correctly - not one rate applied to the whole subtotal.
+            tax_total += line["tax_tariff"] or 0.0
             priced += 1
     subtotal = round(subtotal, 2)
-    tax_total = round(subtotal * rate / 100.0, 2)
+    tax_total = round(tax_total, 2)
     return {
         "build_qty": build,
         "tax_rate": rate,
