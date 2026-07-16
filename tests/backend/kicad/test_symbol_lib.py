@@ -112,3 +112,19 @@ def test_set_property_hidden_never_duplicates_the_hide_effects(tmp_fixture):
     text = path.read_text()
     start = text.index('(property "MPN"')
     assert text[start:start + 300].count("(hide yes)") == 1
+
+
+def test_hide_all_properties_hides_every_visible_field(tmp_fixture):
+    # C1: a preview render hides every property field so the symbol body + pins show,
+    # not a smudge of overlapping Value / Footprint / Datasheet / Reference.
+    lib = SymbolLib.load(tmp_fixture("minimal.kicad_sym"))
+    sym = lib.get_symbol("R_0603")
+    # seed a couple of visible fields so there is something to hide
+    sym.set_property("MPN", "RC0603FR-0710KL")
+    sym.hide_all_properties()
+    for field in ("Reference", "Value", "Footprint", "Datasheet", "MPN"):
+        state = sym.property_hidden(field)
+        assert state in (True, None)  # hidden if present; absent fields stay absent
+    # at least the core fields that exist are now hidden (not still visible)
+    assert sym.property_hidden("Value") is True
+    assert sym.property_hidden("MPN") is True
