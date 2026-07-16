@@ -435,6 +435,18 @@ def library_price_index(library_parts) -> dict:
             rohs = rohs_from_specs(specs)
             if rohs:
                 entry["rohs"] = rohs
+            # v2 Mouser-page import fields captured as specs: the manufacturing origin, the
+            # page's own effective US import-tariff % (drives the per-line tariff math), and the
+            # lifecycle. Only non-blank values are threaded, so a part without them degrades honestly.
+            coo = str(specs.get("Country of Origin") or "").strip()
+            if coo:
+                entry["country_of_origin"] = coo
+            tariff = specs.get("US Tariff %")
+            if tariff not in (None, ""):
+                entry["tariff_rate"] = tariff
+            lifecycle = str(specs.get("Lifecycle") or "").strip()
+            if lifecycle:
+                entry["lifecycle"] = lifecycle
         if getattr(p, "category", ""):
             entry["category"] = p.category
         index[mpn] = entry
