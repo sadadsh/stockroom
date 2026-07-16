@@ -15,7 +15,8 @@ from typing import Any
 
 # Bump when the canonical shape changes; a stored EnrichmentResult records the
 # version it was produced under so a reader can migrate or discard it.
-SCHEMA_VERSION = 1
+# v2: added country_of_origin + tariff_rate (the Mouser page's own US-import fields).
+SCHEMA_VERSION = 2
 
 # Confidence ranked low -> high so a merge can compare sources.
 CONFIDENCE_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}
@@ -67,6 +68,12 @@ _SOURCED_FIELDS: tuple[str, ...] = (
     "lifecycle",
     "lead_time",
     "product_url",
+    # v2 import fields, both lifted from the distributor product page itself (never a
+    # researched/estimated rate): the manufacturing origin country, and the effective US
+    # import-tariff percentage Mouser bakes into its price ladder (DecTariffUnitPrice /
+    # DecUnitPrice). A part with no tariff shown yields 0.0; an unread page leaves them None.
+    "country_of_origin",
+    "tariff_rate",
 )
 
 
@@ -85,6 +92,8 @@ class EnrichmentResult:
     lifecycle: Sourced | None = None
     lead_time: Sourced | None = None
     product_url: Sourced | None = None
+    country_of_origin: Sourced | None = None
+    tariff_rate: Sourced | None = None
     dist_pns: dict[str, str] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
