@@ -199,7 +199,7 @@ export function ComponentsPage() {
       </header>
       <div className="flex min-h-0 flex-1">
         {/* picker */}
-        <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
+        <div className="flex w-[348px] flex-none flex-col px-3.5 pt-3.5">
           <div className="px-2 pt-2">
             <Button
               variant="accent"
