@@ -71,8 +71,8 @@ function StatusRow({ label, value }: { label: string; value: ReactNode }) {
 export function SettingsPage() {
   return (
     <>
-      <div className="flex h-14 flex-none items-center px-[18px]">
-        <div className="text-lg font-semibold text-t1">Settings</div>
+      <div className="flex h-14 flex-none items-center gap-3 border-b border-line px-[18px]">
+        <h1 className="text-lg font-semibold text-t1">Settings</h1>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
         <div className="max-w-[720px] pb-12">
@@ -315,13 +315,20 @@ function SyncSection() {
         <p className="py-1 text-sm text-err">Could not read sync status.</p>
       ) : status.data ? (
         <>
-          <StatusRow label="Branch" value={<span>{status.data.current_branch}</span>} />
+          <StatusRow
+            label="Branch"
+            value={<span className="tnum font-mono">{status.data.current_branch}</span>}
+          />
           <StatusRow
             label="Remote"
             value={
-              status.data.has_remote
-                ? `${status.data.ahead} ahead, ${status.data.behind} behind`
-                : "No remote configured"
+              status.data.has_remote ? (
+                <span className="tnum font-mono">
+                  {status.data.ahead} ahead, {status.data.behind} behind
+                </span>
+              ) : (
+                "No remote configured"
+              )
             }
           />
         </>
