@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/ts5a3166"
+    "source_url": "http://www.ti.com/lit/ds/symlink/ts5a3166.pdf"
   },
-  "description": "SPST Analog Switch SOT-23-5",
-  "display_name": "TS5A3166DBVR",
+  "description": "Single SPST Analog Switch, 5-V/3.3-V, normally OFF, 0.9Ohm Ron, SOT-23-5",
+  "display_name": "TS5A3166DBVR SOT-23-5 TI",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,70 +22,75 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR?qs=0O%2FZFlpUpJWfi7hoK1hGig%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TS5A3166DBVR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.43,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.302,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.27,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.233,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.216,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.206,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.197,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.186,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.181,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 6188,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR?qs=0O%2FZFlpUpJWfi7hoK1hGig%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Texas Instruments",
     "Configuration": "1 x SPST",
+    "Country of Diffusion": "Germany",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -94,6 +99,7 @@
     "Off Time - Max": "11.5 ns",
     "On Resistance - Max": "900 mOhms",
     "On Time - Max": "7 ns",
+    "Package": "SOT-23-5",
     "Packaging": "Reel",
     "Product Category": "Analog Switch ICs",
     "Product Type": "Analog Switch ICs",
@@ -105,14 +111,8 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V",
     "Switch Continuous Current": "100 mA",
-    "Unit Weight": "0.000222 oz",
-    "Country of Origin": "China",
     "US Tariff %": 7.91,
-    "Lifecycle": "Active",
-    "Package": "SOT-23-5",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "Germany",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000222 oz"
   },
   "symbol": null,
   "tags": []

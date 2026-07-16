@@ -1,0 +1,107 @@
+{
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "PTS645SM43SMTR92LFS"
+  },
+  "description": "PTS645",
+  "display_name": "PTS645 C&K PTS645SK43SMTR92-LFS",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SWITCH_43SMTR92LFS",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "pts645sk43smtr92-lfs",
+  "manufacturer": "C&K Switches",
+  "model": null,
+  "mpn": "PTS645SK43SMTR92-LFS",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK43SMTR92-LFS?qs=Imq1NPwxi76wjUe7hzmA%252BA%3D%3D&mgh=1"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.36,
+          "qty": 1
+        },
+        {
+          "price": 0.313,
+          "qty": 10
+        },
+        {
+          "price": 0.2924,
+          "qty": 25
+        },
+        {
+          "price": 0.2616,
+          "qty": 100
+        },
+        {
+          "price": 0.24244,
+          "qty": 250
+        },
+        {
+          "price": 0.22878,
+          "qty": 500
+        }
+      ],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK43SMTR92-LFS?qs=Imq1NPwxi76wjUe7hzmA%252BA%3D%3D&mgh=1",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Actuator": "Round",
+    "Assembly Country of Origin": "Not available",
+    "Brand": "C&K",
+    "Color": "Black",
+    "Contact Form": "SPST",
+    "Contact Plating": "Silver",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "Current Rating": "50 mA",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "Ground Terminal": "No",
+    "Height": "4.3 mm",
+    "Illuminated": "Non-Illuminated",
+    "Length": "6 mm",
+    "Life": "100000 Cycle",
+    "Lifecycle": "Active",
+    "Manufacturer": "C&K Switches",
+    "Maximum Operating Temperature": "+ 60 C",
+    "Minimum Operating Temperature": "- 20 C",
+    "Mounting Direction": "Straight",
+    "Mounting Style": "SMD/SMT",
+    "Operating Force": "1.6 N",
+    "Packaging": "Reel",
+    "Part # Aliases": "Y97HT23B2EAFP PTS645SM43SMTR92LFS Y97HT23B2EAFP",
+    "Product Category": "Tactile Switches",
+    "Product Type": "Tactile Switches",
+    "RoHS": "Details",
+    "Series": "PTS645",
+    "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
+    "Stem Height": "0.85 mm",
+    "Subcategory": "Switches",
+    "Switch Function": "OFF - (ON)",
+    "Termination Style": "Gull Wing Lead",
+    "Tradename": "PTS",
+    "Type": "Tactile",
+    "Unit Weight": "0.019753 oz",
+    "Voltage Rating DC": "12 VDC",
+    "Width": "6 mm"
+  },
+  "symbol": null,
+  "tags": []
+}

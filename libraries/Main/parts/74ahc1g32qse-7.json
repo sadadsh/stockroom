@@ -1,0 +1,113 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "http://www.ti.com/lit/sg/scyt129e/scyt129e.pdf"
+  },
+  "description": "Single OR Gate, Low-Voltage CMOS",
+  "display_name": "74AHC1G32QSE-7 SOT-353-5 Diodes",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-353_SC-70-5",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "74ahc1g32qse-7",
+  "manufacturer": "Diodes Incorporated",
+  "model": null,
+  "mpn": "74AHC1G32QSE-7",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7?qs=bAKSY%2FctAC6EE%252BFwJC1d6Q%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "621-74AHC1G32QSE-7",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 0.14,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 0.092,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 0.081,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 0.069,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 0.063,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 0.059,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 0.056,
+          "qty": 1000
+        },
+        {
+          "currency": "USD",
+          "price": 0.056,
+          "qty": 3000
+        }
+      ],
+      "stock": 7036,
+      "url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7?qs=bAKSY%2FctAC6EE%252BFwJC1d6Q%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Brand": "Diodes Incorporated",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "High Level Output Current": "- 8 mA",
+    "Lifecycle": "Active",
+    "Logic Family": "AHC",
+    "Logic Function": "OR",
+    "Low Level Output Current": "8 mA",
+    "Manufacturer": "Diodes Incorporated",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Gates": "1 Gate",
+    "Number of Input Lines": "2 Input",
+    "Number of Output Lines": "1 Output",
+    "Package": "SOT-353-5",
+    "Packaging": "Reel",
+    "Product": "Single-Function Gates",
+    "Product Category": "Logic Gates",
+    "Product Type": "Logic Gates",
+    "Propagation Delay Time": "4.6 ns",
+    "RoHS": "Details",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "2 V",
+    "US Tariff %": 37.86
+  },
+  "symbol": null,
+  "tags": []
+}

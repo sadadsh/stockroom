@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps2121"
   },
   "description": "Power Switch ICs - Power Distribution",
-  "display_name": "TPS2121RUXR",
+  "display_name": "TPS2121RUXR VQFN-12 TI",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -15,57 +15,62 @@
   },
   "hashes": null,
   "id": "tps2121ruxr",
-  "manufacturer": "Texas Instruments",
+  "manufacturer": "TEXAS INSTRUMENTS",
   "model": null,
   "mpn": "TPS2121RUXR",
   "passive": false,
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR?qs=qSfuJ%252Bfl%2Fd7dCYiVnUfngQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS2121RUXR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.44,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.82,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.66,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.49,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 1.49,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 16194,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR?qs=qSfuJ%252Bfl%2Fd7dCYiVnUfngQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Philippines",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "Philippines",
     "Current Limit": "4.5 A",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -73,6 +78,7 @@
     "Number of Outputs": "1 Output",
     "On Resistance - Max": "70 mOhms",
     "Operating Supply Voltage": "2.8 V to 22 V",
+    "Package": "VQFN-12",
     "Packaging": "Reel",
     "Product": "Power Switch ICs",
     "Product Category": "Power Switch ICs - Power Distribution",
@@ -83,14 +89,8 @@
     "Supply Voltage - Max": "22 V",
     "Supply Voltage - Min": "2.8 V",
     "Type": "Power MUX",
-    "Unit Weight": "0.000988 oz",
-    "Country of Origin": "Philippines",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "VQFN-12",
-    "Assembly Country of Origin": "Philippines",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000988 oz"
   },
   "symbol": null,
   "tags": []

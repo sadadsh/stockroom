@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20008/dcrcw.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "133k",
+  "display_name": "133k 1% 0603 Vishay CRCW0603133KFKTA",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,68 +22,74 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA"
+    "source": "finale-sauce-source",
+    "source_url": "http://mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA?qs=IKjLF%2FNaaZUWED%2FihlRVOQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "71-CRCW0603-133K",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.042,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.035,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.031,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.025,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.018,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 7217,
-      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA",
+      "url": "http://mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA?qs=IKjLF%2FNaaZUWED%2FihlRVOQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Automotive Grade",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Vishay",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Israel",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.55 mm (0.061 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Vishay",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product": "Thick Film Resistors SMD",
@@ -98,16 +104,10 @@
     "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
     "Tolerance": "1 %",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.85 mm (0.033 in)",
-    "Country of Origin": "Israel",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "0603",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "0.85 mm (0.033 in)"
   },
   "symbol": {
     "lib": "Device",

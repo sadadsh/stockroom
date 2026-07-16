@@ -5,8 +5,8 @@
     "file": "",
     "source_url": "https://www.we-online.com/components/products/datasheet/150060GS75000.pdf"
   },
-  "description": "Single Color LEDs",
-  "display_name": "LED",
+  "description": "Light emitting diode",
+  "display_name": "LED 0603 Wurth 150060GS75000",
   "enrichment": {},
   "footprint": {
     "lib": "LED_SMD",
@@ -22,53 +22,57 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000?qs=LlUlMxKIyB0UYkq5lDO8nA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-150060GS75000",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.151,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.142,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.122,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.116,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.116,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 146494,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000?qs=LlUlMxKIyB0UYkq5lDO8nA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Wurth Elektronik",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "4000",
     "Height": "0.7 mm",
     "If - Forward Current": "20 mA",
@@ -78,12 +82,14 @@
     "Lens Dimensions": "1.1 mm x 0.8 mm",
     "Lens Shape": "Rectangular",
     "Lens Transparency": "Water Clear",
+    "Lifecycle": "Active",
     "Luminous Intensity": "430 mcd",
     "Manufacturer": "Wurth Elektronik",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 40 C",
     "Moisture Sensitive": "Yes",
     "Mounting Style": "SMD/SMT",
+    "Package": "0603 (1608 metric)",
     "Packaging": "Reel",
     "Power Rating": "105 mW",
     "Product": "Green LEDs",
@@ -93,18 +99,12 @@
     "Series": "WL-SMCW",
     "Subcategory": "LEDs",
     "Type": "Single Color LEDs",
+    "US Tariff %": 35.0,
     "Unit Weight": "0.000882 oz",
     "Vf - Forward Voltage": "3.2 V",
     "Viewing Angle": "140 deg",
     "Wavelength/Color Temperature": "520 nm",
-    "Width": "0.8 mm",
-    "Country of Origin": "China",
-    "US Tariff %": 35.0,
-    "Lifecycle": "Active",
-    "Package": "0603 (1608 metric)",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "0.8 mm"
   },
   "symbol": null,
   "tags": []

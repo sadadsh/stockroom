@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/317/1/ASC_MR.pdf"
   },
   "description": "Resistor",
-  "display_name": "47",
+  "display_name": "47\u03a9 1% 0603 Walsin MR06X47R0FTL",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,72 +22,78 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL?qs=GedFDFLaBXGoJo8MM4e47Q%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "791-MR06X47R0FTL",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.13,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.033,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.016,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.012,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.01,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.009,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.005,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.003,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 49137,
-      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL",
+      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL?qs=GedFDFLaBXGoJo8MM4e47Q%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Walsin",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Walsin",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "125 mW (1/8 W)",
     "Product Category": "Thick Film Resistors - SMD",
@@ -101,16 +107,10 @@
     "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
     "Tolerance": "1 %",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Country of Origin": "Taiwan",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "0603",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",

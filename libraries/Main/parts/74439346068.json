@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/74439346068.pdf"
   },
   "description": "Power Inductors - SMD",
-  "display_name": "6.8u WE-XHMI_6060",
+  "display_name": "6.8u WE-XHMI_6060 20% 6060 Wurth 74439346068",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -22,50 +22,55 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068?qs=NSAOzM2zc%2FVj5BeHYKNgfQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-74439346068",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 4.05,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 3.68,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 2.73,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 700,
+          "currency": "USD",
           "price": 2.49,
-          "currency": "USD"
+          "qty": 700
         }
       ],
       "stock": 6579,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068?qs=NSAOzM2zc%2FVj5BeHYKNgfQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Power",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Wurth Elektronik",
     "Core Material": "Metal Composite",
     "Core Type": "Wirewound",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "700",
     "Height": "5.8 mm",
     "Inductance": "6.8 uH",
     "Length": "6.65 mm",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum DC Current": "6.5 A",
     "Maximum DC Resistance": "17.6 mOhms",
@@ -88,14 +93,9 @@
     "Test Frequency": "100 kHz",
     "Tolerance": "20 %",
     "Type": "Power Inductor",
-    "Unit Weight": "0.023951 oz",
-    "Width": "6.45 mm",
-    "Country of Origin": "China",
     "US Tariff %": 35.06,
-    "Lifecycle": "Active",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.023951 oz",
+    "Width": "6.45 mm"
   },
   "symbol": {
     "lib": "Device",

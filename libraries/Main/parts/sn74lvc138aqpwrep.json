@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/sn74lvc138a-ep"
+    "source_url": "https://toshiba.semicon-storage.com/info/docget.jsp?did=15392&prodName=74LCX138FT"
   },
   "description": "Encoders, Decoders, Multiplexers & Demultiplexers",
-  "display_name": "74LCV138",
+  "display_name": "74LCV138 TSSOP-16 TI SN74LVC138AQPWREP",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,64 +22,69 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-N74LVC138AQPWREP",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.73,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.04,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.86,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.67,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 1.6,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.55,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 1.44,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 1.41,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 1995,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Malaysia",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "2000",
+    "Lifecycle": "Active",
     "Logic Family": "LVC",
     "Logic Type": "Decoders/Demultiplexers",
     "Manufacturer": "Texas Instruments",
@@ -89,6 +94,7 @@
     "Number of Circuits": "1 Circuit",
     "Number of Input Lines": "3 Input",
     "Number of Output Lines": "8 Output",
+    "Package": "TSSOP-16",
     "Packaging": "Reel",
     "Part # Aliases": "V62/04657-01YE",
     "Product": "Decoders / Demultiplexers",
@@ -100,14 +106,8 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "3.6 V",
     "Supply Voltage - Min": "2 V",
-    "Unit Weight": "0.002183 oz",
-    "Country of Origin": "Malaysia",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "TSSOP-16",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.002183 oz"
   },
   "symbol": null,
   "tags": []

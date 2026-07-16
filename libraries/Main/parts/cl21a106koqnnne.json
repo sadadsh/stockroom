@@ -5,8 +5,8 @@
     "file": "",
     "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL21A106KOQNNN"
   },
-  "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
-  "display_name": "10u",
+  "description": "capacitor, small US symbol",
+  "display_name": "10u 10% X5R 0805 Samsung CL21A106KOQNNNE",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -22,69 +22,75 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE?qs=349EhDEZ59qKIX0T0PKtPw%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "187-CL21A106KOQNNNE",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.11,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.042,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.036,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.027,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.024,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.019,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.017,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 189,
-      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE",
+      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE?qs=349EhDEZ59qKIX0T0PKtPw%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Samsung Electro-Mechanics",
     "Capacitance": "10 uF",
     "Case Code - in": "0805",
     "Case Code - mm": "2012",
     "Class": "Class 2",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
     "Dielectric": "X5R",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "2000",
     "Height": "1.35 mm (0.053 in)",
     "Length": "2 mm (0.079 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Samsung Electro-Mechanics",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 55 C",
+    "Package": "0805 (2012 metric)",
     "Packaging": "Reel",
     "Part # Aliases": "CL21A106KOQNNN",
     "Product": "General Type MLCCs",
@@ -97,16 +103,10 @@
     "Termination Style": "SMD/SMT",
     "Tolerance": "10 %",
     "Type": "Multilayer Ceramic Capacitor",
+    "US Tariff %": 8.18,
     "Unit Weight": "0.000226 oz",
     "Voltage Rating DC": "16 VDC",
-    "Width": "1.25 mm (0.049 in)",
-    "Country of Origin": "Philippines",
-    "US Tariff %": 8.18,
-    "Lifecycle": "Active",
-    "Package": "0805 (2012 metric)",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "1.25 mm (0.049 in)"
   },
   "symbol": {
     "lib": "Device",

@@ -6,7 +6,7 @@
     "source_url": "https://ckswitches.com/media/1422/js.pdf"
   },
   "description": "Slide Switches",
-  "display_name": "JS102011SAQN",
+  "display_name": "JS102011SAQN C&K",
   "enrichment": {},
   "footprint": {
     "lib": "Button_Switch_SMD",
@@ -22,73 +22,78 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN?qs=LgMIjt8LuD%252B69bNM9a%2FozQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "611-JS102011SAQN",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.84,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.727,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.677,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.604,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.559,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.528,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.468,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.446,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.431,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 6938,
-      "url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN",
+      "url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN?qs=LgMIjt8LuD%252B69bNM9a%2FozQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Actuator": "Standard",
+    "Assembly Country of Origin": "China",
     "Brand": "C&K",
     "Contact Form": "SPDT",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
     "Current Rating": "300 mA",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "4000",
     "Illuminated": "Non-Illuminated",
+    "Lifecycle": "Active",
     "Manufacturer": "C&K Switches",
     "Mounting Style": "PCB Mount",
     "Packaging": "Reel",
@@ -101,14 +106,9 @@
     "Termination Style": "SMD/SMT",
     "Travel": "2 mm",
     "Type": "Slide",
-    "Unit Weight": "0.014521 oz",
-    "Voltage Rating DC": "6 VDC",
-    "Country of Origin": "China",
     "US Tariff %": 7.98,
-    "Lifecycle": "Active",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.014521 oz",
+    "Voltage Rating DC": "6 VDC"
   },
   "symbol": null,
   "tags": []

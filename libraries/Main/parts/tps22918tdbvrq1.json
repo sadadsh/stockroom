@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps22918-q1"
   },
   "description": "Power Switch ICs - Power Distribution",
-  "display_name": "TPS22918DBVR",
+  "display_name": "TPS22918DBVR SOT-23-6 TI TPS22918TDBVRQ1",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,69 +22,74 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1?qs=sGAEpiMZZMv0DJfhVcWlK1Yz3z1OExkkjE2ZiqKPcyuhsbfKfPdS3Q%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS22918TDBVRQ1",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.76,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.54,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.484,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.423,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.393,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.376,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.361,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.346,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.337,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 10139,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1?qs=sGAEpiMZZMv0DJfhVcWlK1Yz3z1OExkkjE2ZiqKPcyuhsbfKfPdS3Q%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 105 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -96,6 +101,7 @@
     "On Time - Max": "1.95 ms",
     "Operating Supply Voltage": "1 V to 5.5 V",
     "Output Current": "2 A",
+    "Package": "SOT-23-6",
     "Packaging": "Reel",
     "Product": "Load Switches",
     "Product Category": "Power Switch ICs - Power Distribution",
@@ -107,14 +113,8 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1 V",
     "Type": "Load Switch",
-    "Unit Weight": "0.003280 oz",
-    "Country of Origin": "China",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "SOT-23-6",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.003280 oz"
   },
   "symbol": null,
   "tags": []

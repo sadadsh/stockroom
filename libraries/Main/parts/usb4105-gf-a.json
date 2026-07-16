@@ -1,0 +1,133 @@
+{
+  "category": "Connectors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/catalog/specsheets/Global_Connector_Technology_usb4105.pdf"
+  },
+  "description": "USB4105-GF-A GCT USB Connectors USB Type C,2.0, Rec,SMT, 0.95mmTH Shell Stakes,G/F,RA,Top Mnt,T&R datasheet, inventory, & pricing.",
+  "display_name": "USB4105-GF-A Top-Mount GCT",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "GCT_USB4105-GF-A",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "usb4105-gf-a",
+  "manufacturer": "GCT",
+  "model": {
+    "file": "models/USB4105-GF-A-120.step",
+    "tool": "kicad"
+  },
+  "mpn": "USB4105-GF-A",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "640-USB4105-GF-A",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 0.93,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 0.81,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 0.741,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 0.668,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 0.61,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 0.505,
+          "qty": 800
+        },
+        {
+          "currency": "USD",
+          "price": 0.474,
+          "qty": 2400
+        },
+        {
+          "currency": "USD",
+          "price": 0.451,
+          "qty": 4800
+        },
+        {
+          "currency": "USD",
+          "price": 0.43,
+          "qty": 9600
+        }
+      ],
+      "stock": 481287,
+      "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Assembly Country of Origin": "China",
+    "Brand": "GCT",
+    "Color": "Black",
+    "Contact Material": "Copper Alloy",
+    "Contact Plating": "Gold",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "Current Rating": "5 A",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "800",
+    "Features": "20000 Mating Cycles",
+    "Flammability Rating": "UL 94 V-0",
+    "Gender": "Receptacle (Female)",
+    "Insulation Resistance": "100 MOhms",
+    "Lifecycle": "Active",
+    "Manufacturer": "GCT",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Angle": "Right Angle",
+    "Mounting Style": "Top-Mount",
+    "Number of Contacts": "16 Contact",
+    "Number of Ports": "1 Port",
+    "Package": "Top-Mount",
+    "Packaging": "Reel",
+    "Product": "USB Type C Connectors",
+    "Product Category": "USB Connectors",
+    "Product Type": "USB Connectors",
+    "RoHS": "Details",
+    "Series": "USB4105",
+    "Shell Plating": "Nickel",
+    "Standard": "USB 2.0",
+    "Subcategory": "USB Connectors",
+    "Termination Style": "SMD/SMT",
+    "Type": "PCB Top Mount",
+    "US Tariff %": 30.0,
+    "Unit Weight": "0.027090 oz",
+    "Voltage Rating": "48 VDC"
+  },
+  "symbol": {
+    "lib": "SR-Connectors",
+    "name": "USB4105-GF-A-120",
+    "tool": "kicad"
+  },
+  "tags": []
+}

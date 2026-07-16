@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/72/1/PYU_RT_1_TO_0_01_ROHS_L.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "94.2k",
+  "display_name": "94.2k 0.1% 0603 YAGEO RT0603BRD0794K2L",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,67 +22,73 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L?qs=bQfrgN9vNvwe21O8BIcT9A%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "603-RT0603BRD0794K2L",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.06,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.056,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.052,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.046,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.038,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 8529,
-      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L?qs=bQfrgN9vNvwe21O8BIcT9A%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "YAGEO",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "YAGEO",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product": "Precision Resistors Thin Film SMD",
@@ -97,16 +103,10 @@
     "Termination Style": "SMD/SMT",
     "Tolerance": "0.1 %",
     "Type": "High Stability Chip Resistors",
+    "US Tariff %": 8.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Country of Origin": "Taiwan",
-    "US Tariff %": 8.0,
-    "Lifecycle": "Active",
-    "Package": "0603",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",

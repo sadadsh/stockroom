@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.st.com/resource/en/datasheet/stm32h753vi.pdf"
+    "source_url": "https://www.st.com/resource/en/datasheet/stm32h753zi.pdf"
   },
-  "description": "Arm Cortex-M7 MCU LQFP144",
-  "display_name": "STM32H753ZIT6",
+  "description": "STMicroelectronics Arm Cortex-M7 MCU, 2048KB flash, 1024KB RAM, 480 MHz, 1.62-3.6V, 114 GPIO, LQFP144",
+  "display_name": "STM32H753ZIT6 LQFP-144 ST",
   "enrichment": {},
   "footprint": {
     "lib": "Package_QFP",
@@ -22,61 +22,66 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6?qs=u4fy%2FsgLU9PzR9vtNNw%2FMw%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "511-STM32H753ZIT6",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 17.13,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 14.15,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 13.42,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 12.01,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 11.45,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 360,
+          "currency": "USD",
           "price": 10.94,
-          "currency": "USD"
+          "qty": 360
         }
       ],
       "stock": 14,
-      "url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6",
+      "url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6?qs=u4fy%2FsgLU9PzR9vtNNw%2FMw%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "ADC Resolution": "3 x 16 bit",
+    "Assembly Country of Origin": "Not available",
     "Brand": "STMicroelectronics",
     "Core": "ARM Cortex M7",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "France",
     "DAC Resolution": "12 bit",
     "Data Bus Width": "32 bit",
     "Data RAM Size": "1 MB",
     "Data RAM Type": "SRAM",
+    "ECCN": "5A992.C",
     "Factory Pack Quantity: Factory Pack Quantity": "360",
     "Interface Type": "CAN, I2C, SAI, SDIO, SPI, USART, USB",
+    "Lifecycle": "Active",
     "Manufacturer": "STMicroelectronics",
     "Maximum Clock Frequency": "400 MHz",
     "Maximum Operating Temperature": "+ 85 C",
@@ -85,6 +90,7 @@
     "Mounting Style": "SMD/SMT",
     "Number of ADC Channels": "20 Channel",
     "Number of I/Os": "114 I/O",
+    "Package": "LQFP-144",
     "Packaging": "Tray",
     "Product": "MCU+FPUs",
     "Product Category": "ARM Microcontrollers - MCU",
@@ -97,15 +103,9 @@
     "Supply Voltage - Max": "3.6 V",
     "Supply Voltage - Min": "1.62 V",
     "Tradename": "STM32",
-    "Unit Weight": "0.046385 oz",
-    "Watchdog Timers": "Watchdog Timer, Windowed",
-    "Country of Origin": "France",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "LQFP-144",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "5A992.C"
+    "Unit Weight": "0.046385 oz",
+    "Watchdog Timers": "Watchdog Timer, Windowed"
   },
   "symbol": null,
   "tags": []

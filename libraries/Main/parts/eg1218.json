@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.mouser.com/datasheet/3/315/1/EG1218.pdf"
+    "source_url": "EG1218"
   },
   "description": "Slide Switches",
-  "display_name": "EG1218",
+  "display_name": "EG1218 1218 E-Switch",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,74 +22,79 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218?qs=xDsBkp9LkocT0c8K%252B5e%2FgA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "612-EG1218",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.71,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.617,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.548,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.506,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.475,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.442,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.42,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.39,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.376,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 12328,
-      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218",
+      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218?qs=xDsBkp9LkocT0c8K%252B5e%2FgA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "E-Switch",
     "Contact Form": "SPDT",
     "Contact Material": "Copper Alloy",
     "Contact Plating": "Silver",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
     "Current Rating": "200 mA",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "1000",
     "Illuminated": "Non-Illuminated",
+    "Lifecycle": "Active",
     "Manufacturer": "E-Switch",
     "Maximum Operating Temperature": "+ 70 C",
     "Minimum Operating Temperature": "- 20 C",
@@ -105,14 +110,9 @@
     "Termination Style": "PC Pin",
     "Travel": "2.5 mm",
     "Type": "Slide Switch",
-    "Unit Weight": "0.011323 oz",
-    "Voltage Rating DC": "30 VDC",
-    "Country of Origin": "China",
     "US Tariff %": 30.0,
-    "Lifecycle": "Active",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.011323 oz",
+    "Voltage Rating DC": "30 VDC"
   },
   "symbol": null,
   "tags": []

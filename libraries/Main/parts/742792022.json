@@ -5,8 +5,8 @@
     "file": "",
     "source_url": "https://www.we-online.com/components/products/datasheet/742792022.pdf"
   },
-  "description": "Ferrite Beads",
-  "display_name": "220",
+  "description": "Ferrite bead, small symbol",
+  "display_name": "220 25% 0805 Wurth 742792022",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -22,77 +22,83 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-742792022",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.154,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.15,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.141,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.14,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.136,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.127,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.108,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.108,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 145687,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Wurth Elektronik",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "4000",
     "Height": "0.9 mm",
     "Impedance": "220 Ohms",
     "Length": "2 mm",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum DC Current": "2 A",
     "Maximum DC Resistance": "50 mOhms",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 55 C",
+    "Package": "0805 (2012 metric)",
     "Packaging": "Reel",
     "Product": "Ferrite Chip Beads",
     "Product Category": "Ferrite Beads",
@@ -105,15 +111,9 @@
     "Test Frequency": "100 MHz",
     "Tolerance": "25 %",
     "Type": "SMD EMI Suppression Ferrite Bead WE-CBF",
-    "Unit Weight": "0.000194 oz",
-    "Width": "1.2 mm",
-    "Country of Origin": "Taiwan",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "0805 (2012 metric)",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000194 oz",
+    "Width": "1.2 mm"
   },
   "symbol": {
     "lib": "Device",

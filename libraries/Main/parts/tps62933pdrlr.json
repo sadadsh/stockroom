@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/tps62933p"
+    "source_url": "https://www.ti.com/lit/ds/symlink/tps62933.pdf"
   },
-  "description": "Buck Converter SOT583-8",
-  "display_name": "TPS62933P",
+  "description": "3.8-30V, 3A Synchronous Buck Converters with pulse frequency modulation (PFM) and power good, SOT583-8",
+  "display_name": "TPS62933P SOT-583-8 TI TPS62933PDRLR",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,72 +22,77 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR?qs=vvQtp7zwQdPCuPvhGs%2FYxA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS62933PDRLR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.38,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.01,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.912,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.808,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.758,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.729,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.708,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.697,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.664,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 10754,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR?qs=vvQtp7zwQdPCuPvhGs%2FYxA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Philippines",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "Philippines",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "4000",
     "Input Voltage": "3.8 V to 30 V",
     "Input Voltage - Max": "30 V",
     "Input Voltage - Min": "3.8 V",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 150 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -95,6 +100,7 @@
     "Number of Outputs": "1 Output",
     "Output Current": "3 A",
     "Output Voltage": "800 mV to 22 V",
+    "Package": "SOT-583-8",
     "Packaging": "Reel",
     "Product Category": "Switching Voltage Regulators",
     "Product Type": "Switching Voltage Regulators",
@@ -107,13 +113,7 @@
     "Switching Frequency": "200 kHz to 2.2 MHz",
     "Topology": "Buck",
     "Type": "Synchronous Buck Converter",
-    "Country of Origin": "Philippines",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "SOT-583-8",
-    "Assembly Country of Origin": "Philippines",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "US Tariff %": 0.0
   },
   "symbol": null,
   "tags": []

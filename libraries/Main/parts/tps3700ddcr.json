@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps3700"
   },
   "description": "Analog Comparators",
-  "display_name": "TPS3700DDCR",
+  "display_name": "TPS3700DDCR SOT-23-6 TI",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,71 +22,76 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR?qs=mNuCSSXMdBz5rDLbdTsfrQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS3700DDCR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.52,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.87,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.71,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.53,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 1.45,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 1.4,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.35,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 1.29,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 1.27,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 0,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR?qs=mNuCSSXMdBz5rDLbdTsfrQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Texas Instruments",
     "Comparator Type": "Window",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "China",
     "Development Kit": "TPS3700EVM-114",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -96,6 +101,7 @@
     "Operating Supply Current": "5.5 uA",
     "Output Current per Channel": "40 mA",
     "Output Type": "Open Drain",
+    "Package": "SOT-23-6",
     "Packaging": "Reel",
     "Product": "Analog Comparators",
     "Product Category": "Analog Comparators",
@@ -108,14 +114,8 @@
     "Subcategory": "Amplifier ICs",
     "Supply Voltage - Max": "18 V",
     "Supply Voltage - Min": "1.8 V",
-    "Unit Weight": "0.000229 oz",
-    "Country of Origin": "China",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "SOT-23-6",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000229 oz"
   },
   "symbol": null,
   "tags": []

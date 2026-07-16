@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/201/1/1043.pdf"
   },
   "description": "Cylindrical Battery Contacts, Clips, Holders & Springs",
-  "display_name": "1043 Holder for 18650",
+  "display_name": "1043 Holder for 18650 1043 Keystone",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,61 +22,66 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "534-1043",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.99,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.49,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 2.48,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 2.44,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.92,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 1.61,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 1.6,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 9773,
-      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043",
+      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Battery Cell Size": "18650",
     "Brand": "Keystone Electronics",
     "Contact Plating": "Gold",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "United States",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "100",
+    "Lifecycle": "Active",
     "Manufacturer": "Keystone Electronics",
     "Mounting Style": "Snap In",
     "Number of Batteries": "1 Battery",
@@ -87,13 +92,8 @@
     "RoHS": "Details",
     "Subcategory": "Battery",
     "Type": "Tray",
-    "Unit Weight": "0.509684 oz",
-    "Country of Origin": "United States",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.509684 oz"
   },
   "symbol": null,
   "tags": []

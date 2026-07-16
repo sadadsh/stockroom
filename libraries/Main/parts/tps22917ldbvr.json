@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/tps22917"
+    "source_url": "http://www.ti.com/lit/ds/symlink/tps22917.pdf"
   },
-  "description": "Load Switch SOT23-6",
-  "display_name": "TPS22917LDBVR",
+  "description": "1V to 5.5V, 2A, 80m\u03a9 Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
+  "display_name": "TPS22917LDBVR SOT23-6 TI",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,69 +22,74 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR?qs=doiCPypUmgGbWD5ZXr9T%2FQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS22917LDBVR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.52,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.367,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.328,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.285,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.264,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.252,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.242,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.229,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.223,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 171,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR?qs=doiCPypUmgGbWD5ZXr9T%2FQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Philippines",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "Philippines",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -96,6 +101,7 @@
     "On Time - Max": "100 us",
     "Operating Supply Voltage": "1 V to 5.5 V",
     "Output Current": "2 A",
+    "Package": "SOT23-6",
     "Packaging": "Reel",
     "Product": "Power Switch ICs",
     "Product Category": "Power Switch ICs - Power Distribution",
@@ -106,13 +112,7 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1 V",
     "Type": "Load Switch",
-    "Country of Origin": "Philippines",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "SOT23-6",
-    "Assembly Country of Origin": "Philippines",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "US Tariff %": 0.0
   },
   "symbol": null,
   "tags": []

@@ -6,7 +6,7 @@
     "source_url": "https://www.rohm.com/datasheet?p=KTR03EZPF"
   },
   "description": "Resistor, small symbol",
-  "display_name": "732k",
+  "display_name": "732k 1% 0603 ROHM KTR03EZPF3403",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,78 +22,84 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403?qs=17ckDYBRdekVwQV2ubwDJA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "755-KTR03EZPF3403",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.19,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.088,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.041,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.037,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.034,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.026,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.022,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 25000,
+          "currency": "USD",
           "price": 0.02,
-          "currency": "USD"
+          "qty": 25000
         }
       ],
       "stock": 13778,
-      "url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403",
+      "url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403?qs=17ckDYBRdekVwQV2ubwDJA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Automotive Grade, Industrial Grade",
+    "Assembly Country of Origin": "Not available",
     "Brand": "ROHM Semiconductor",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "ROHM Semiconductor",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product": "Thick Film Resistors SMD",
@@ -107,15 +113,9 @@
     "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
     "Tolerance": "1 %",
-    "Voltage Rating": "350 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Country of Origin": "Philippines",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "0603",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Voltage Rating": "350 V",
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
