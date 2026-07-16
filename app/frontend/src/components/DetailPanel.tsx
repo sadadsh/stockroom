@@ -17,6 +17,8 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CompletenessRing } from "./CompletenessRing";
 import { PreviewImage } from "./PreviewImage";
+import { Glb3DView } from "./Glb3DView";
+import { usePreviewGlb } from "../api/queries";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import {
   CubeArt,
@@ -52,6 +54,10 @@ export function toolLabel(tool: string | undefined): string {
 // Spec keys that are NOT parametric specs: the asset references (shown as Files cards) and the
 // pinout (shown as its own table). Everything else in specs is a real spec the panel lists (B1).
 const SPEC_HIDDEN_KEYS = new Set(["Symbol", "Footprint", "3D Model", "product_url", "pinout"]);
+
+// Spec values that mean "the distributor did not fill this" - dropped so an empty-in-disguise
+// spec never takes a row (lowercased for the comparison).
+const EMPTY_SPEC_VALUES = new Set(["not available", "none", "n/a", "-", "unknown", "not applicable"]);
 
 const _KNOWN_VENDORS: Record<string, string> = {
   lcsc: "LCSC",
@@ -137,6 +143,10 @@ export function DetailPanel({
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
+  // Inline 3D thumbnail (C1/C2): fetch + render the GLB right in the card, auto-rotating and
+  // pointer-events-none so it never fights the card's own click. Enabled only for a part that
+  // actually has a model, so a model-less part pays nothing.
+  const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
   // B1: every parametric spec the record holds (Resistance, Tolerance, Voltage Rating, ...) that
   // the panel used to hide - shown in a Specifications section. Asset/internal keys and the pinout
   // (rendered as its own table) are excluded; only scalar spec values are listed.
@@ -145,7 +155,10 @@ export function DetailPanel({
       !SPEC_HIDDEN_KEYS.has(key) &&
       value != null &&
       typeof value !== "object" &&
-      String(value).trim() !== "",
+      String(value).trim() !== "" &&
+      // A spec the distributor could not fill ("Not available" / "None" / "-") is noise,
+      // not data - never render an empty-in-disguise row.
+      !EMPTY_SPEC_VALUES.has(String(value).trim().toLowerCase()),
   );
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
@@ -274,6 +287,18 @@ export function DetailPanel({
           // model, so the 3D card's tool falls back to the footprint's tool there.
           tool={detail.model?.tool ?? detail.footprint?.tool}
           art={<CubeArt />}
+          thumb={
+            hasModel ? (
+              <div className="pointer-events-none h-[150px] w-full">
+                <Glb3DView
+                  data={modelGlb.data}
+                  isLoading={modelGlb.isLoading}
+                  isError={modelGlb.isError}
+                  error={modelGlb.error}
+                />
+              </div>
+            ) : undefined
+          }
           onOpen={hasModel ? () => setPreview("model") : undefined}
         />
       </div>
@@ -345,8 +370,13 @@ export function DetailPanel({
         />
         <IdRow
           label="Datasheet"
-          value={detail.datasheet?.file || detail.datasheet?.source_url || ""}
-          mono
+          // A clean "View Datasheet" link, not the raw full-length URL splashed across the
+          // row. The URL rides the href; a file-only datasheet shows its filename.
+          value={
+            detail.datasheet?.source_url
+              ? "View Datasheet"
+              : detail.datasheet?.file || ""
+          }
           href={detail.datasheet?.source_url || undefined}
         />
         {onEditField ? (
