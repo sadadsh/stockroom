@@ -1,0 +1,104 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.vishay.com/docs/20008/dcrcw.pdf"
+  },
+  "description": "Resistor, small symbol",
+  "display_name": "133k",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "crcw0603133kfkta",
+  "manufacturer": "Vishay",
+  "model": null,
+  "mpn": "CRCW0603133KFKTA",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.05,
+          "qty": 10
+        },
+        {
+          "price": 0.042,
+          "qty": 100
+        },
+        {
+          "price": 0.035,
+          "qty": 250
+        },
+        {
+          "price": 0.031,
+          "qty": 500
+        },
+        {
+          "price": 0.025,
+          "qty": 5000
+        },
+        {
+          "price": 0.018,
+          "qty": 10000
+        }
+      ],
+      "stock": 7217,
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Automotive Grade",
+    "Brand": "Vishay",
+    "Case Code - in": "0603",
+    "Case Code - mm": "1608",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Height": "0.45 mm (0.018 in)",
+    "Length": "1.55 mm (0.061 in)",
+    "Manufacturer": "Vishay",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Power Rating": "100 mW (1/10 W)",
+    "Product": "Thick Film Resistors SMD",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
+    "Resistance": "133 kOhms",
+    "RoHS": "No - RoHS Version Available",
+    "Series": "D/CRCW",
+    "Subcategory": "Resistors",
+    "Technology": "Thick Film",
+    "Temperature Coefficient": "100 PPM / C",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "1 %",
+    "Unit Weight": "0.000071 oz",
+    "Voltage Rating": "75 V",
+    "Width": "0.85 mm (0.033 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R",
+    "tool": "kicad"
+  },
+  "tags": []
+}

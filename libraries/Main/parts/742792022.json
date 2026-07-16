@@ -1,0 +1,108 @@
+{
+  "category": "Inductors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/742792022.pdf"
+  },
+  "description": "Ferrite Beads",
+  "display_name": "220",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Inductor_SMD",
+    "name": "L_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "742792022",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "742792022",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.154,
+          "qty": 10
+        },
+        {
+          "price": 0.15,
+          "qty": 50
+        },
+        {
+          "price": 0.141,
+          "qty": 100
+        },
+        {
+          "price": 0.14,
+          "qty": 250
+        },
+        {
+          "price": 0.136,
+          "qty": 500
+        },
+        {
+          "price": 0.127,
+          "qty": 1000
+        },
+        {
+          "price": 0.108,
+          "qty": 2500
+        },
+        {
+          "price": 0.108,
+          "qty": 4000
+        }
+      ],
+      "stock": 145767,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Wurth Elektronik",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Height": "0.9 mm",
+    "Impedance": "220 Ohms",
+    "Length": "2 mm",
+    "Manufacturer": "Wurth Elektronik",
+    "Maximum DC Current": "2 A",
+    "Maximum DC Resistance": "50 mOhms",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Packaging": "Reel",
+    "Product": "Ferrite Chip Beads",
+    "Product Category": "Ferrite Beads",
+    "Product Type": "Ferrite Beads",
+    "Qualification": "AEC-Q200",
+    "RoHS": "Details",
+    "Series": "WE-CBF",
+    "Subcategory": "Ferrites",
+    "Termination Style": "SMD/SMT",
+    "Test Frequency": "100 MHz",
+    "Tolerance": "25 %",
+    "Type": "SMD EMI Suppression Ferrite Bead WE-CBF",
+    "Unit Weight": "0.000194 oz",
+    "Width": "1.2 mm"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "L",
+    "tool": "kicad"
+  },
+  "tags": []
+}
