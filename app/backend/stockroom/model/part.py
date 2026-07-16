@@ -26,21 +26,30 @@ KICAD_MIRROR_FIELDS: tuple[str, ...] = (
     "Purchase",
 )
 
-# The strict completion passport (owner directive, 2026-07-12): a part may not enter
-# the primary library unless every one of these is present. Identity + assets + sourcing.
-# Each pair is (presence-flag key, human label); the key names a flag, not a record
-# attribute directly, so the same set gates staged inputs and finished records alike.
+# The completion passport (owner directive, 2026-07-16): a part enters the library on
+# its IDENTITY + SOURCING alone. The KiCad assets (symbol / footprint / 3D model) are NO
+# LONGER gated - a part is added first and its assets are attached afterwards (attach_symbol
+# / attach_footprint / attach_model). This lets a whole BOM land as tracked records
+# immediately, then be completed at leisure. Each pair is (presence-flag key, human label);
+# the key names a flag, not a record attribute directly, so the same set gates staged inputs
+# and finished records alike. symbol/footprint/model presence is still COMPUTED (for the
+# "assets attached?" UI + drift checks), just not REQUIRED here.
 REQUIRED_FIELDS: tuple[tuple[str, str], ...] = (
     ("display_name", "name"),
     ("mpn", "MPN"),
     ("manufacturer", "manufacturer"),
     ("category", "category"),
     ("description", "value/description"),
+    ("datasheet", "datasheet"),
+    ("purchase", "purchase link"),
+)
+
+# The KiCad assets that are attachable AFTER a part is added (no longer gate entry). Used
+# by the UI to show which assets a landed part still needs. (presence-key, human label).
+ATTACHABLE_ASSETS: tuple[tuple[str, str], ...] = (
     ("symbol", "symbol"),
     ("footprint", "footprint"),
     ("model", "3D model"),
-    ("datasheet", "datasheet"),
-    ("purchase", "purchase link"),
 )
 
 
@@ -50,6 +59,13 @@ def missing_from_presence(present: dict[str, bool]) -> list[str]:
     the complete-to-add gate (checked on staged inputs) and PartRecord.is_complete
     (checked on the canonical record), so the two can never drift apart."""
     return [label for key, label in REQUIRED_FIELDS if not present.get(key)]
+
+
+def missing_assets_from_presence(present: dict[str, bool]) -> list[str]:
+    """Human labels of the attachable KiCad assets (symbol / footprint / 3D model) a
+    part does not yet carry. These no longer gate entry (a part is added first, assets
+    attached after), so this drives the "still needs" affordance in the UI, NOT the gate."""
+    return [label for key, label in ATTACHABLE_ASSETS if not present.get(key)]
 
 
 @dataclass
@@ -76,11 +92,18 @@ class Purchase:
 class LibRef:
     lib: str = ""
     name: str = ""
+    # Which EDA tool this symbol/footprint targets. "kicad" today; "altium" (etc.) later,
+    # so one part can carry a symbol/footprint per tool. Surfaced as a pill in the UI.
+    # Defaults to "kicad" so every pre-existing record reads back as a KiCad asset.
+    tool: str = "kicad"
 
 
 @dataclass
 class ModelRef:
     file: str = ""
+    # A 3D model (STEP/WRL) is largely tool-neutral, but tag it too so a future Altium
+    # import can carry its own model without ambiguity.
+    tool: str = "kicad"
 
 
 @dataclass
@@ -208,6 +231,12 @@ class PartRecord:
     def missing_fields(self) -> list[str]:
         """Human labels of the required passport fields this record lacks (empty => complete)."""
         return missing_from_presence(self._presence())
+
+    def missing_assets(self) -> list[str]:
+        """Human labels of the attachable KiCad assets this part still lacks (symbol /
+        footprint / 3D model). Not part of completeness - a part is complete without them
+        now - but tells the UI what can still be attached."""
+        return missing_assets_from_presence(self._presence())
 
     def is_complete(self) -> bool:
         return not self.missing_fields()
