@@ -1,6 +1,10 @@
 {
   "category": "Capacitors",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL10A105KB8NNN"
+  },
   "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
   "display_name": "1uF",
   "enrichment": {},

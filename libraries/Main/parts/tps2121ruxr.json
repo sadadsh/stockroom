@@ -1,6 +1,10 @@
 {
   "category": "Switches",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps2121"
+  },
   "description": "Power Switch ICs - Power Distribution",
   "display_name": "TPS2121RUXR",
   "enrichment": {},

@@ -1,6 +1,10 @@
 {
   "category": "ICs",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/txs0102"
+  },
   "description": "Voltage-Level Shifter VSSOP-8",
   "display_name": "TXS0102DCUR",
   "enrichment": {},

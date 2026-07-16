@@ -1,6 +1,10 @@
 {
   "category": "ICs",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/sn74lvc1g74"
+  },
   "description": "Flip Flops",
   "display_name": "SN74LVC1G74DCUR",
   "enrichment": {},

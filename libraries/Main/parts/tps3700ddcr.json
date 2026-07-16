@@ -1,6 +1,10 @@
 {
   "category": "ICs",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps3700"
+  },
   "description": "Analog Comparators",
   "display_name": "TPS3700DDCR",
   "enrichment": {},

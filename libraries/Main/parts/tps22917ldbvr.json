@@ -1,6 +1,10 @@
 {
   "category": "Switches",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps22917"
+  },
   "description": "Load Switch SOT23-6",
   "display_name": "TPS22917LDBVR",
   "enrichment": {},
