@@ -133,6 +133,10 @@ def _lead_weeks(v):
 
 # -- Package / RoHS derivation (the wide-BOM columns, offline) ------------------
 
+# Two-terminal SMD body packages KiCad names without a size number (a diode's D_SMA), so the
+# package deriver can still resolve them past a single-letter device-class prefix.
+_SMD_BODY_PACKAGES = {"SMA", "SMB", "SMC", "MELF", "MINIMELF", "MICROMELF"}
+
 
 def package_from_footprint(footprint: str) -> str:
     """A compact package code for the BOM's Package column, derived from a KiCad footprint
@@ -147,32 +151,49 @@ def package_from_footprint(footprint: str) -> str:
     m = re.match(r"^[A-Za-z]+_(\d{3,5})(?:_|$)", name)  # R_0603_1608Metric / R_0402 -> imperial code
     if m:
         return m.group(1)
-    family = name.split("_", 1)[0]
-    # A real package family carries a size number or a hyphen (SOT-23, SOIC-8, QFN-32, TO-92);
-    # a bare word (Crystal, MountingHole) is not a package -> honest blank.
-    return family if re.search(r"[-\d]", family) else ""
+    tokens = name.split("_")
+    first = tokens[0]
+    # A real package family carries a size number or a hyphen (SOT-23, SOIC-8, QFN-32, TO-92).
+    if re.search(r"[-\d]", first):
+        return first
+    # A single-letter device-class prefix (a diode's D_SOD-123 / D_SMA) hides the package in the
+    # next token; take it when it names a package (a hyphen/digit, or a known two-body SMD case).
+    if len(first) == 1 and len(tokens) > 1:
+        second = tokens[1]
+        if re.search(r"[-\d]", second) or second.upper() in _SMD_BODY_PACKAGES:
+            return second
+    # A bare word (Crystal, MountingHole) is not a package -> honest blank.
+    return ""
 
 
 # Spec values that read as RoHS compliant vs not, matched case-insensitively against the value
 # of any spec whose key names RoHS (Mouser "RoHS Status", LCSC compliance, a plain "RoHS" row).
 _ROHS_YES = ("compliant", "yes", "compatible", "lead free", "lead-free", "rohs3", "rohs 3")
+# Genuine non-compliance phrasing ONLY (not any "not"/"non" prefix, which also opens unknown
+# statuses like "Not Applicable"/"None" that must never be read as a hard "No").
+_ROHS_NO = ("non-compliant", "noncompliant", "not compliant", "non compliant")
+# Explicit "no verdict" statuses a distributor emits for a part with no RoHS data: unknown, not
+# a compliance verdict, so they map to blank rather than a fabricated Yes/No.
+_ROHS_UNKNOWN = {"none", "n/a", "na", "not applicable", "not specified", "not reviewed",
+                 "unknown", "tbd", "-"}
 
 
 def rohs_from_specs(specs) -> str:
     """A compact RoHS verdict ("Yes" / "No" / "" ) for the BOM's RoHS column, read from a
     part's specs dict (Mouser/LCSC label the compliance in a "RoHS"-named key). Compliant
-    values ("RoHS3 Compliant", "Lead Free", "Compliant", "Yes") map to "Yes"; explicitly
-    non-compliant values to "No"; an unreadable value passes through verbatim; a missing RoHS
-    key or a blank value is "" (unknown, never a guessed compliance)."""
+    values ("RoHS3 Compliant", "Lead Free", "Compliant", "Yes") map to "Yes"; genuinely
+    non-compliant values ("Non-Compliant", "Not Compliant") to "No"; a no-verdict status
+    ("Not Applicable", "None", "Unknown") or a missing/blank RoHS key to "" (unknown, never a
+    guessed compliance); any other value passes through verbatim."""
     if not isinstance(specs, dict):
         return ""
     for key, val in specs.items():
         if "rohs" in str(key).lower():
             s = str(val or "").strip()
-            if not s:
-                return ""
             low = s.lower()
-            if low.startswith("non") or low.startswith("not") or "non-compliant" in low:
+            if not s or low in _ROHS_UNKNOWN:
+                return ""
+            if any(t in low for t in _ROHS_NO):
                 return "No"
             if any(t in low for t in _ROHS_YES):
                 return "Yes"
