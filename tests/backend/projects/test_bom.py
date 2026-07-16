@@ -709,6 +709,11 @@ def test_package_from_footprint_reads_passive_eia_and_ic_family():
     assert package_from_footprint("Package_SO:SOIC-8_3.9x4.9mm_P1.27mm") == "SOIC-8"
     assert package_from_footprint("Package_TO_SOT_SMD:SOT-23") == "SOT-23"
     assert package_from_footprint("Package_QFP:TQFP-100_14x14mm_P0.5mm") == "TQFP-100"
+    # a single-letter device-class prefix (diodes) hides the package in the next token
+    assert package_from_footprint("Diode_SMD:D_SOD-123") == "SOD-123"
+    assert package_from_footprint("Diode_SMD:D_SOD-323") == "SOD-323"
+    assert package_from_footprint("Diode_SMD:D_SMA") == "SMA"
+    assert package_from_footprint("Diode_SMD:D_MELF") == "MELF"
     assert package_from_footprint("MountingHole:MountingHole_3.2mm") == ""  # not a package
     assert package_from_footprint("Device:Crystal") == ""  # a bare word is not a package
     assert package_from_footprint("") == ""
@@ -720,6 +725,13 @@ def test_rohs_from_specs_normalizes_compliance():
     assert rohs_from_specs({"EU RoHS": "Compliant"}) == "Yes"
     assert rohs_from_specs({"RoHS": "Non-Compliant"}) == "No"
     assert rohs_from_specs({"RoHS": "Not Compliant"}) == "No"
+    # a compliant value that merely opens with "non" is not non-compliance
+    assert rohs_from_specs({"RoHS": "Nonhalogenated, RoHS Compliant"}) == "Yes"
+    # an unknown / not-specified status is unknown, never a guessed "No"
+    assert rohs_from_specs({"RoHS Status": "Not Applicable"}) == ""
+    assert rohs_from_specs({"RoHS Status": "None"}) == ""
+    assert rohs_from_specs({"RoHS Status": "Not Reviewed"}) == ""
+    assert rohs_from_specs({"RoHS Status": "Unknown"}) == ""
     assert rohs_from_specs({"Package": "0402"}) == ""  # no RoHS key -> blank
     assert rohs_from_specs({"RoHS": ""}) == ""  # blank value -> blank
     assert rohs_from_specs({}) == ""
