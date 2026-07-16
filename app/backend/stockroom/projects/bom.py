@@ -731,7 +731,7 @@ def line_moq(price_breaks) -> int | None:
     return min(qtys) if qtys else None
 
 
-def price_line_at_build(row, build_qty, tax_rate=0.0) -> dict:
+def price_line_at_build(row, build_qty, tax_rate=0.0, optimize_breaks=True) -> dict:
     """The order economics for ONE BOM line at a build of `build_qty` boards, taxed at
     `tax_rate` percent. Pure: never mutates `row`. Returns:
       moq              the smallest price-break quantity (the minimum orderable), or None
@@ -752,6 +752,30 @@ def price_line_at_build(row, build_qty, tax_rate=0.0) -> dict:
     final_qty = needed
     if needed > 0 and moq is not None and moq > needed:
         final_qty = moq  # round up to the minimum order
+
+    # Price-break optimization: order MORE than needed when a higher break makes the TOTAL
+    # cost lower (a steep quantity discount can beat ordering the exact count). We compare the
+    # total (qty * unit at that qty) at `final_qty` against each break quantity above it, and
+    # take the cheapest total. Because it minimizes TOTAL (not unit) cost, it never overbuys for
+    # a trivial saving: a far-larger break whose total exceeds the smaller run is not chosen.
+    if optimize_breaks and ladder and final_qty > 0:
+        best_qty = final_qty
+        best_unit = _coerce_price(price_at_qty(ladder, final_qty))
+        best_total = best_unit * final_qty if best_unit is not None else None
+        for b in ladder:
+            try:
+                bq = int(b["qty"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if bq <= final_qty:
+                continue  # only consider ordering MORE than the needed/MOQ quantity
+            bu = _coerce_price(price_at_qty(ladder, bq))
+            if bu is None:
+                continue
+            bt = bu * bq
+            if best_total is None or bt < best_total:
+                best_qty, best_total = bq, bt
+        final_qty = best_qty
 
     unit = _coerce_price(price_at_qty(ladder, final_qty)) if ladder else None
     if unit is None:
