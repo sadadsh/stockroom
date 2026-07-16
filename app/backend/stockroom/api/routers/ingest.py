@@ -66,7 +66,8 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         # frontend's StagingCandidate always has a purchase array (a missing key
         # crashes the review card), and edited/scraped purchase links survive commit.
         "purchase": [
-            {"vendor": p.vendor, "url": p.url, "price_breaks": list(p.price_breaks),
+            {"vendor": p.vendor, "url": p.url, "part_number": p.part_number,
+             "price_breaks": list(p.price_breaks),
              "stock": p.stock, "currency": p.currency, "fetched_at": p.fetched_at}
             for p in c.purchase
         ],

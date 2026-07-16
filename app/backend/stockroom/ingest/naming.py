@@ -16,6 +16,10 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("oscillator", "Crystals & Oscillators"),
     ("resonator", "Crystals & Oscillators"),
     ("diode", "Diodes"),
+    # "driver" (LED / motor / gate / MOSFET driver) is an IC and MUST be checked before "led",
+    # or a distributor's "LED Lighting Drivers" category matches the bare "led" -> Diodes first
+    # and mis-classes a switching IC as a diode (first-hit-wins ordering).
+    ("driver", "ICs"),
     ("led", "Diodes"),
     ("transistor", "Transistors"),
     ("mosfet", "Transistors"),

@@ -63,7 +63,9 @@ _TAGS = re.compile(r"<[^>]+>")
 _PACKAGE_LABELS = {"package / case", "package", "case/package"}
 # Fallback package sources, in preference order, used only when no _PACKAGE_LABELS row was found:
 # the imperial case code ("Case Code - in": 0603) is the EIA size the app names packages by.
-_PACKAGE_FALLBACK_LABELS = ("case code - in", "case code", "case code (in)", "size / dimension")
+# Only EIA case-code labels: they carry a clean package token (0603). "Size / Dimension" is
+# deliberately excluded - it is a verbose physical measurement ("1.6mm x 0.8mm"), not a package.
+_PACKAGE_FALLBACK_LABELS = ("case code - in", "case code", "case code (in)")
 
 # The FULL price ladder Mouser renders as <table class="pricing-table"> whose rows are
 # data-testid="PricingTablePriceBreakRow" (a "Cut Tape" sub-heading row sits between the
