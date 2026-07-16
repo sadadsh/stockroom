@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { ToastProvider } from "./lib/toast";
@@ -25,13 +26,16 @@ if (!rootEl) throw new Error("root element not found");
 createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ToastProvider>
-          <RouterProvider>
-            <App />
-          </RouterProvider>
-        </ToastProvider>
-      </ThemeProvider>
+      {/* reducedMotion="user" makes every animation collapse to instant when the OS asks. */}
+      <MotionConfig reducedMotion="user">
+        <ThemeProvider>
+          <ToastProvider>
+            <RouterProvider>
+              <App />
+            </RouterProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </MotionConfig>
     </QueryClientProvider>
   </StrictMode>,
 );

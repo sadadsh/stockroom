@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { motion } from "motion/react";
 import { Dot } from "../components/primitives";
 
 export type ToastTone = "ok" | "err" | "neutral";
@@ -50,16 +51,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
         {items.map((t) => (
-          <button
+          <motion.button
             key={t.id}
             type="button"
             onClick={() => dismiss(t.id)}
             role="status"
+            layout
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="pointer-events-auto flex items-center gap-2.5 rounded-card border border-line bg-raise2 px-3.5 py-2.5 text-left text-sm text-t1 shadow-pop transition-colors hover:brightness-110"
           >
             <Dot tone={t.tone} />
             <span className="max-w-[320px]">{t.message}</span>
-          </button>
+          </motion.button>
         ))}
       </div>
     </ToastContext.Provider>
