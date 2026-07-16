@@ -36,8 +36,8 @@ export function PreviewImage({
       alt={`${kind} preview`}
       draggable={false}
       // Fill the tile (whatever its size) and object-contain so the small-intrinsic KiCad
-      // SVG upscales to the frame without clipping; the padding keeps it off the edges.
-      className="h-full w-full object-contain p-4"
+      // SVG upscales to the frame without clipping; a little padding keeps it off the edges.
+      className="h-full w-full object-contain p-3"
       style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
     />
   );

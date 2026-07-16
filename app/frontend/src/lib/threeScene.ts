@@ -72,7 +72,7 @@ export function mountModelScene(
       const vfov = (camera.fov * Math.PI) / 180;
       const fitH = radius / Math.sin(vfov / 2);
       const fitW = radius / Math.sin(vfov / 2) / Math.min(1, camera.aspect);
-      const dist = Math.max(fitH, fitW) * 1.06;
+      const dist = Math.max(fitH, fitW) * 0.98;
       const dir = new THREE.Vector3(0.55, 0.42, 1).normalize();
       camera.position.copy(dir.multiplyScalar(dist));
       camera.near = radius / 100;
