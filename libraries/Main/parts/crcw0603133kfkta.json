@@ -32,39 +32,39 @@
       "part_number": "71-CRCW0603-133K",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.16,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.05,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.042,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.035,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.031,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.025,
-          "qty": 5000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10000,
           "price": 0.018,
-          "qty": 10000
+          "currency": "USD"
         }
       ],
       "stock": 7217,
@@ -97,17 +97,18 @@
     "Product Type": "Thick Film Resistors",
     "Qualification": "AEC-Q200",
     "Resistance": "133 kOhms",
-    "RoHS": "No - RoHS Version Available",
+    "RoHS": "No\u00a0-\u00a0RoHS Version Available",
     "Series": "D/CRCW",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM/C",
+    "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1%",
+    "Tolerance": "1 %",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.85 mm (0.033 in)"
+    "Width": "0.85 mm (0.033 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000"
   },
   "symbol": {
     "lib": "Device",

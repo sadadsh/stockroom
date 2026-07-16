@@ -32,19 +32,19 @@
       "part_number": "200-QSH06001HDA",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 22.49,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 192,
           "price": 22.45,
-          "qty": 192
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 448,
           "price": 17.26,
-          "qty": 448
+          "currency": "USD"
         }
       ],
       "stock": 202,
@@ -85,7 +85,8 @@
     "Tradename": "Q Strip",
     "US Tariff %": 6.98,
     "Unit Weight": "0.024424 oz",
-    "Voltage Rating": "175 VAC"
+    "Voltage Rating": "175 VAC",
+    "Factory Pack Quantity: Factory Pack Quantity": "64"
   },
   "symbol": null,
   "tags": []

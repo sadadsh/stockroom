@@ -6,7 +6,7 @@
     "source_url": "https://s3.us-west-2.amazonaws.com/catsy.557/Dialight_datasheet_599_Single-Color_0805_2_Taiwan.pdf"
   },
   "description": "Light emitting diode",
-  "display_name": "Green LED, V_f = 2.4 V at 20 mA, 0603 0805 Dialight 599-0160-137F",
+  "display_name": "Green 0805 Dialight 599-0160-137F",
   "enrichment": {},
   "footprint": {
     "lib": "LED_SMD",
@@ -32,44 +32,44 @@
       "part_number": "645-599-0160-137F",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.29,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.195,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.137,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.111,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.102,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2000,
           "price": 0.095,
-          "qty": 2000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 4000,
           "price": 0.08,
-          "qty": 4000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 24000,
           "price": 0.073,
-          "qty": 24000
+          "currency": "USD"
         }
       ],
       "stock": 11820,
@@ -89,7 +89,7 @@
     "If - Forward Current": "20 mA",
     "Length": "2 mm",
     "Lens Color": "Water Clear",
-    "Lifecycle": "Active",
+    "Lifecycle": "New Product",
     "Luminous Intensity": "80 cd",
     "Manufacturer": "Dialight",
     "Maximum Operating Temperature": "+ 85 C",
@@ -109,7 +109,8 @@
     "Vf - Forward Voltage": "2.2 V",
     "Viewing Angle": "140 deg",
     "Wavelength/Color Temperature": "572 nm",
-    "Width": "1.25 mm"
+    "Width": "1.25 mm",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000"
   },
   "symbol": null,
   "tags": []

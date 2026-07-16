@@ -32,34 +32,34 @@
       "part_number": "511-STM32H753ZIT6",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 17.13,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 14.15,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 13.42,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 12.01,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 11.45,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 360,
           "price": 10.94,
-          "qty": 360
+          "currency": "USD"
         }
       ],
       "stock": 14,
@@ -105,7 +105,8 @@
     "Tradename": "STM32",
     "US Tariff %": 0.0,
     "Unit Weight": "0.046385 oz",
-    "Watchdog Timers": "Watchdog Timer, Windowed"
+    "Watchdog Timers": "Watchdog Timer, Windowed",
+    "Factory Pack Quantity: Factory Pack Quantity": "360"
   },
   "symbol": null,
   "tags": []

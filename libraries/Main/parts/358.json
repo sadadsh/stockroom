@@ -32,8 +32,9 @@
       "part_number": "517-358",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 19.95,
-          "qty": 1
+          "currency": "USD"
         }
       ],
       "stock": null,
@@ -58,7 +59,8 @@
     "Subcategory": "Supplies",
     "Type": "Barricade Tape",
     "Unit Weight": "1.102 lbs",
-    "Width": "3 in"
+    "Width": "3 in",
+    "Quantity": "Unit Price"
   },
   "symbol": null,
   "tags": []

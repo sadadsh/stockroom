@@ -32,49 +32,49 @@
       "part_number": "815-ABM8-25-B2-T",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.5,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.434,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.394,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.378,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.357,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.343,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.328,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2000,
           "price": 0.306,
-          "qty": 2000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.297,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 14291,
@@ -114,7 +114,8 @@
     "Type": "Ceramic Crystal",
     "US Tariff %": 30.0,
     "Unit Weight": "0.000564 oz",
-    "Width": "2.5 mm"
+    "Width": "2.5 mm",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000"
   },
   "symbol": null,
   "tags": []

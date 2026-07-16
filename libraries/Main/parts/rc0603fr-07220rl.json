@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/catalog/specsheets/YAGEO_PYu_RC_Group_51_RoHS_L_12.pdf"
   },
   "description": "Resistor",
-  "display_name": "220Ω 1% 0603 YAGEO RC0603FR-07220RL",
+  "display_name": "220\u03a9 1% 0603 YAGEO RC0603FR-07220RL",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -32,29 +32,29 @@
       "part_number": "603-RC0603FR-07220RL",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.1,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.014,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.008,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.007,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.003,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 0,
@@ -90,13 +90,14 @@
     "Series": "RC L",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM/C",
+    "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1%",
+    "Tolerance": "1 %",
     "US Tariff %": 8.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000"
   },
   "symbol": {
     "lib": "Device",

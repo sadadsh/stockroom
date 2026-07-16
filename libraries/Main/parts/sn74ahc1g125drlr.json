@@ -32,49 +32,49 @@
       "part_number": "595-SN74AHC1G125DRLR",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.22,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.148,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.131,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.112,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.103,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.098,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.093,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2000,
           "price": 0.092,
-          "qty": 2000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 4000,
           "price": 0.091,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
       "stock": 6492,
@@ -116,7 +116,8 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "2 V",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.000099 oz"
+    "Unit Weight": "0.000099 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000"
   },
   "symbol": null,
   "tags": []

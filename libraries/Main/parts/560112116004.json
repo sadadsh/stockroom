@@ -32,34 +32,34 @@
       "part_number": "710-560112116004",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.11,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.102,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 50,
           "price": 0.058,
-          "qty": 50
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.039,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2500,
           "price": 0.03,
-          "qty": 2500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.03,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 9744,
@@ -97,12 +97,13 @@
     "Series": "WRIS-RSKS",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM/C",
-    "Tolerance": "1%",
+    "Temperature Coefficient": "100 PPM / C",
+    "Tolerance": "1 %",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000"
   },
   "symbol": {
     "lib": "Device",

@@ -32,32 +32,32 @@
       "part_number": "512-2N7002",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 1.09,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.761,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.482,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.298,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 0.298,
-          "qty": 3000
+          "currency": "USD"
         }
       ],
-      "stock": 526042,
+      "stock": 525994,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002?qs=0dwsXDNhqlz66WJJhrTFjQ%3D%3D",
       "vendor": "Mouser"
     }
@@ -96,7 +96,8 @@
     "Unit Weight": "0.000282 oz",
     "Vds - Drain-Source Breakdown Voltage": "60 V",
     "Vgs - Gate-Source Voltage": "- 20 V, 20 V",
-    "Vgs th - Gate-Source Threshold Voltage": "2.5 V"
+    "Vgs th - Gate-Source Threshold Voltage": "2.5 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

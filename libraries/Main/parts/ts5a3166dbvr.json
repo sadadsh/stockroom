@@ -32,49 +32,49 @@
       "part_number": "595-TS5A3166DBVR",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.43,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.302,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.27,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.233,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.216,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.206,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.197,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 0.186,
-          "qty": 3000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 6000,
           "price": 0.181,
-          "qty": 6000
+          "currency": "USD"
         }
       ],
       "stock": 6188,
@@ -112,7 +112,8 @@
     "Supply Voltage - Min": "1.65 V",
     "Switch Continuous Current": "100 mA",
     "US Tariff %": 7.91,
-    "Unit Weight": "0.000222 oz"
+    "Unit Weight": "0.000222 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

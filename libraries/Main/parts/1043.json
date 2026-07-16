@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/201/1/1043.pdf"
   },
   "description": "Cylindrical Battery Contacts, Clips, Holders & Springs",
-  "display_name": "1043 Holder for 18650 1043 Keystone",
+  "display_name": "1043 Keystone",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -32,42 +32,42 @@
       "part_number": "534-1043",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 2.99,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 2.49,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 2.48,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 2.44,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 1.92,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2500,
           "price": 1.61,
-          "qty": 2500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 1.6,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
-      "stock": 9773,
+      "stock": 9743,
       "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D",
       "vendor": "Mouser"
     }
@@ -93,7 +93,8 @@
     "Subcategory": "Battery",
     "Type": "Tray",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.509684 oz"
+    "Unit Weight": "0.509684 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "100"
   },
   "symbol": null,
   "tags": []

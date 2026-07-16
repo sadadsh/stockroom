@@ -32,24 +32,24 @@
       "part_number": "945-IC51-0644-807",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 126.53,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 96.45,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 96.44,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 96.0,
-          "qty": 100
+          "currency": "USD"
         }
       ],
       "stock": 9,
@@ -80,7 +80,8 @@
     "Termination Style": "SMD/SMT",
     "Type": "Chip Carrier",
     "US Tariff %": 8.0,
-    "Unit Weight": "1.890908 oz"
+    "Unit Weight": "1.890908 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "25"
   },
   "symbol": null,
   "tags": []

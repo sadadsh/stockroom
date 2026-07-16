@@ -32,47 +32,47 @@
       "part_number": "863-ESD9X5.0ST5G",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.16,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.101,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.054,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.045,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.031,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2500,
           "price": 0.027,
-          "qty": 2500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.025,
-          "qty": 5000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 8000,
           "price": 0.021,
-          "qty": 8000
+          "currency": "USD"
         }
       ],
-      "stock": 64742,
+      "stock": 64322,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G?qs=OSf9jACorvbLo4%2Fn72DVLA%3D%3D",
       "vendor": "Mouser"
     }
@@ -108,7 +108,8 @@
     "Unit Weight": "0.001552 oz",
     "Vesd - Voltage ESD Air Gap": "30 kV",
     "Vesd - Voltage ESD Contact": "30 kV",
-    "Working Voltage": "5 V"
+    "Working Voltage": "5 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "8000"
   },
   "symbol": null,
   "tags": []

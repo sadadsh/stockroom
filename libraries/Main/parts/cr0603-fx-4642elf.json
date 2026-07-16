@@ -32,44 +32,44 @@
       "part_number": "652-CR0603FX-4642ELF",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.1,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.016,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.01,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.007,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.006,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 5000,
           "price": 0.004,
-          "qty": 5000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10000,
           "price": 0.003,
-          "qty": 10000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25000,
           "price": 0.002,
-          "qty": 25000
+          "currency": "USD"
         }
       ],
       "stock": 85609,
@@ -105,13 +105,14 @@
     "Series": "CR0603",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM/C",
+    "Temperature Coefficient": "100 PPM / C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1%",
+    "Tolerance": "1 %",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000"
   },
   "symbol": {
     "lib": "Device",

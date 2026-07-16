@@ -32,47 +32,47 @@
       "part_number": "700-MAX4995BAUTT",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 6.99,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 5.39,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 4.98,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 4.54,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 4.39,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 4.36,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 4.35,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2500,
           "price": 3.99,
-          "qty": 2500
+          "currency": "USD"
         }
       ],
-      "stock": 3754,
+      "stock": 3744,
       "url": "https://www.mouser.com/en/ProductDetail/Analog-Devices-Maxim-Integrated/MAX4995BAUT%2bT?qs=7H2Jq%252ByxpJLB5kcRV%252By2dw%3D%3D",
       "vendor": "Mouser"
     }
@@ -108,7 +108,8 @@
     "Supply Voltage - Min": "1.7 V",
     "Type": "Current Limit",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.001270 oz"
+    "Unit Weight": "0.001270 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "2500"
   },
   "symbol": null,
   "tags": []
