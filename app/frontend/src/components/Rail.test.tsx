@@ -35,15 +35,4 @@ describe("Rail", () => {
     expect(navigate).toHaveBeenCalledWith("components");
   });
 
-  it("keeps Library marked active while a folded library tab is the route", () => {
-    state.route = "bom";
-    render(<Rail />);
-    expect(screen.getByRole("button", { name: /Components/ })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByRole("button", { name: /Projects/ })).not.toHaveAttribute(
-      "aria-current",
-    );
-  });
 });

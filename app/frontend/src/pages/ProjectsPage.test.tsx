@@ -205,6 +205,7 @@ const BUILT: BomResult = {
       datasheet: "",
       description: "Bulk Resistor",
       basic: true,
+      in_library: false,  // D1: this line's part is not in the library
       // Wide-BOM columns: the package derives from the footprint offline; rohs unknown; a
       // never-priced line has unknown stock (never a risk) and is not orderable.
       package: "0402",
@@ -231,6 +232,8 @@ const BUILT: BomResult = {
       datasheet: "https://ti.com/tps2121.pdf",
       description: "USB-C Power Mux",
       basic: false,
+      in_library: true,  // D1: this line's part IS in the library
+      library_part_id: "tps2121ruxr",
       unit_price: 1.25,
       extended: 1.25,
       stock: 5000,
@@ -1110,6 +1113,14 @@ describe("ProjectsPage", () => {
     expect(within(passiveRow).getByText("0402")).toBeInTheDocument(); // Package from footprint
     expect(within(passiveRow).getByText("R_0402")).toBeInTheDocument(); // short Footprint
     expect(within(passiveRow).getByText("Unknown")).toBeInTheDocument(); // never-priced stock
+
+    // D1 library coverage: the IC is in the library, the passive is not, and a summary
+    // above the table counts it. This replaces the old paste-a-BOM coverage tool.
+    expect(within(priceRow).getByText("In Library")).toBeInTheDocument();
+    expect(within(passiveRow).getByText("Not in Library")).toBeInTheDocument();
+    expect(within(result).getByTestId("bom-coverage")).toHaveTextContent(
+      "1 of 2 lines are in your library",
+    );
   });
 
   it("surfaces an honest error when the BOM build cannot start", async () => {

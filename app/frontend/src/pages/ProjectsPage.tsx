@@ -1669,14 +1669,24 @@ function RohsCell({ value }: { value?: string }) {
 // Cost @ Qty / Tax/Tariff / Total Cost) at the current Build Quantity + Tax/Tariff. Every cell
 // reads "-" when its value is absent, so an unpriced line still lines up the columns.
 const BOM_COLUMNS = [
-  "Reference", "Qty", "Value", "Description", "MPN", "Manufacturer", "Footprint", "Package",
+  "Reference", "Qty", "Value", "Library", "Description", "MPN", "Manufacturer", "Footprint", "Package",
   "Vendor", "Distributor P/N", "Stock", "Lifecycle", "Lead", "Datasheet", "Product Link", "RoHS",
   "Min Qty", "Final Qty", "Unit Cost", "Cost @ Qty", "Tax/Tariff", "Total Cost",
 ];
 
 function BomLinesTable({ lines }: { lines: BomLine[] }) {
+  const known = lines.filter((l) => l.in_library !== undefined);
+  const covered = known.filter((l) => l.in_library).length;
   return (
-    <Card className="overflow-hidden" data-testid="bom-lines">
+    <>
+      {known.length > 0 ? (
+        <div className="mb-2 text-xs text-t3" data-testid="bom-coverage">
+          <span className="text-t2">{covered}</span> of {known.length}{" "}
+          {known.length === 1 ? "line is" : "lines are"} in your library
+          {covered < known.length ? " (add the rest from the Components tab)" : ""}.
+        </div>
+      ) : null}
+      <Card className="overflow-hidden" data-testid="bom-lines">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1680px] text-left text-sm">
           <thead>
@@ -1696,6 +1706,7 @@ function BomLinesTable({ lines }: { lines: BomLine[] }) {
         </table>
       </div>
     </Card>
+    </>
   );
 }
 
@@ -1711,6 +1722,15 @@ function BomLineRow({ line }: { line: BomLine }) {
       </td>
       <td className="px-3 py-2 align-top text-t2">{line.qty}</td>
       <td className="px-3 py-2 align-top text-t1">{line.value || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        {line.in_library === undefined ? (
+          <span className="text-t3">-</span>
+        ) : line.in_library ? (
+          <Badge tone="ok" size="sm">In Library</Badge>
+        ) : (
+          <Badge tone="neutral" size="sm">Not in Library</Badge>
+        )}
+      </td>
       <td
         className="max-w-[14rem] truncate px-3 py-2 align-top text-2xs text-t3"
         title={line.description}
