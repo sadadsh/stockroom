@@ -279,7 +279,9 @@ def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1",
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-        f'<sheets><sheet name="{name}" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        f'<sheets><sheet name="{name}" sheetId="1" r:id="rId1"/></sheets>'
+        # recalc every formula when the file opens, so the live formulas are authoritative
+        '<calcPr fullCalcOnLoad="1"/></workbook>')
     wb_rels = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -342,7 +344,8 @@ def bom_xlsx(rows) -> bytes:
                       "Unit Price": _coerce_price(r.get("unit_price")), "Ext Price": ext,
                       "Stock": r.get("stock", ""), "Lifecycle": r.get("lifecycle", "")})
         if build:
-            v.update({"Min Qty": r.get("moq"), "Final Qty": r.get("final_qty"),
+            # Min Qty = the per-board quantity (what you place per board), not the distributor MOQ.
+            v.update({"Min Qty": _bom_line_qty(r), "Final Qty": r.get("final_qty"),
                       "Order Unit Cost": r.get("final_unit_price"),
                       "Cost @ Qty": r.get("final_extended"),
                       # per-part US import tariff: the % Mouser shows, and the $ it works out to
@@ -394,6 +397,26 @@ def bom_xlsx(rows) -> bytes:
     # and read as "cut" in a narrow column. Each gets the blue-underline link style (s=2) and a
     # worksheet relationship to the external target.
     url_cols = {"Datasheet", "Mouser Link"}
+    # The derived money columns are emitted as LIVE Excel formulas (each with a cached value so the
+    # sheet reads correctly before a recalc), so editing an input - a unit price, an order qty, a
+    # tariff % - recalculates the costs. Column letters are looked up from the header order.
+    fcol = {name: _xlsx_col(i) for i, (name, _k) in enumerate(cols)}
+    FORMULA_COLS = {"Ext Price", "Cost @ Qty", "Tax/Tariff", "Total Cost"}
+
+    def _formula(name, ri, v):
+        def ok(*ns):
+            return all(n in fcol and _num(v.get(n)) is not None for n in ns)
+        if name == "Ext Price" and ok("Unit Price", "Qty"):
+            return f"{fcol['Unit Price']}{ri}*{fcol['Qty']}{ri}"
+        if name == "Cost @ Qty" and ok("Order Unit Cost", "Final Qty"):
+            return f"{fcol['Order Unit Cost']}{ri}*{fcol['Final Qty']}{ri}"
+        if name == "Tax/Tariff" and ok("Cost @ Qty", "Tariff %"):
+            return f"{fcol['Cost @ Qty']}{ri}*{fcol['Tariff %']}{ri}/100"
+        if name == "Total Cost" and ok("Cost @ Qty"):
+            tax = f"+{fcol['Tax/Tariff']}{ri}" if "Tax/Tariff" in fcol else ""
+            return f"{fcol['Cost @ Qty']}{ri}{tax}"
+        return None
+
     hyperlinks: list[tuple[str, str, str]] = []
     for ri, v in enumerate(all_vals, start=2):
         parts = []
@@ -405,23 +428,32 @@ def bom_xlsx(rows) -> bytes:
                 hyperlinks.append((ref, rid, val))
                 parts.append(f'<c r="{ref}" s="2" t="inlineStr"><is>'
                              f'<t xml:space="preserve">{_xlsx_escape(val)}</t></is></c>')
+                continue
+            fx = _formula(name, ri, v) if name in FORMULA_COLS else None
+            cached = _num(val)
+            if fx and cached is not None:
+                parts.append(f'<c r="{ref}" s="3"><f>{fx}</f>'
+                             f'<v>{_xlsx_number(round(float(cached), 6))}</v></c>')
             else:
                 parts.append(cell(ref, k, val))
         row_xml.append(f'<row r="{ri}">{"".join(parts)}</row>')
 
-    # A bold TOTAL row summing the build-economics money columns - the numbers you actually pay.
+    # A bold TOTAL row that SUMs the build-economics money columns as a live formula.
     total_row_ix = None
     if build and all_vals:
         total_row_ix = len(all_vals) + 2
+        last_data = len(all_vals) + 1
         sums = {name: round(sum((_num(v.get(name)) or 0) for v in all_vals), 4)
                 for name in ("Cost @ Qty", "Tax/Tariff", "Total Cost")}
         tcells = []
         for i, (name, _k) in enumerate(cols):
             ref = f"{_xlsx_col(i)}{total_row_ix}"
+            col = _xlsx_col(i)
             if i == 0:
                 tcells.append(f'<c r="{ref}" s="1" t="inlineStr"><is><t>TOTAL</t></is></c>')
             elif name in sums:
-                tcells.append(f'<c r="{ref}" s="4"><v>{_xlsx_number(sums[name])}</v></c>')
+                tcells.append(f'<c r="{ref}" s="4"><f>SUM({col}2:{col}{last_data})</f>'
+                              f'<v>{_xlsx_number(sums[name])}</v></c>')
             else:
                 tcells.append(f'<c r="{ref}"/>')
         row_xml.append(f'<row r="{total_row_ix}">{"".join(tcells)}</row>')

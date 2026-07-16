@@ -122,6 +122,31 @@ def test_bom_xlsx_money_columns_are_currency_and_a_total_row_sums_them():
     assert "<v>2.42</v>" in sheet                       # Total Cost summed (0.32 + 2.10)
 
 
+def test_bom_xlsx_derived_columns_are_live_formulas_and_min_qty_is_the_per_board_qty():
+    import re
+    rows = [{"mpn": "A", "value": "1", "refs": ["R1", "R2"], "qty": 2, "unit_price": 0.10,
+             "moq": 1, "final_qty": 6, "final_unit_price": 0.08, "final_extended": 0.48,
+             "tariff_rate": 8.0, "tax_tariff": 0.0384, "line_total": 0.5184}]
+    parts = _unzip(bom_xlsx(rows))
+    sheet = parts["xl/worksheets/sheet1.xml"]
+    fs = re.findall(r"<f>(.*?)</f>", sheet)
+    assert any("*" in f for f in fs)      # Ext Price / Cost @ Qty multiply their inputs
+    assert any("/100" in f for f in fs)   # Tax/Tariff = Cost @ Qty * Tariff % / 100
+    assert any("+" in f for f in fs)      # Total Cost = Cost @ Qty + Tax/Tariff
+    assert any(f.startswith("SUM(") for f in fs)               # TOTAL row sums a column
+    assert 'fullCalcOnLoad="1"' in parts["xl/workbook.xml"]    # Excel recalcs on open
+    # Min Qty column carries the per-board Qty (2), not the distributor MOQ (1)
+    hdr = re.search(r'<row r="1">(.*?)</row>', sheet, re.S).group(1)
+    names = re.findall(r'<t[^>]*>([^<]*)</t>', hdr)
+    assert names.index("Min Qty") >= 0 and "Qty" in names
+    row2 = re.search(r'<row r="2">(.*?)</row>', sheet, re.S).group(1)
+    cellvals = {re.search(r'r="([A-Z]+)2"', c).group(1): (re.search(r"<v>(.*?)</v>", c) or re.search(r"<t[^>]*>(.*?)</t>", c))
+                for c in re.findall(r"<c [^>]*?(?:/>|>.*?</c>)", row2, re.S) if re.search(r'r="([A-Z]+)2"', c)}
+    from stockroom.projects.bom_export import _xlsx_col
+    minq_col = _xlsx_col(names.index("Min Qty"))
+    assert cellvals[minq_col] and cellvals[minq_col].group(1) == "2"  # == the per-board Qty
+
+
 def test_bom_xlsx_url_columns_are_real_clickable_hyperlinks():
     # A generated xlsx does NOT auto-linkify plain text, so the Datasheet + Mouser cells must be
     # emitted as real external hyperlinks (a worksheet relationship + a <hyperlink> ref), or they
