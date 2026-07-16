@@ -35,9 +35,9 @@ export function PreviewImage({
       src={url}
       alt={`${kind} preview`}
       draggable={false}
-      // Explicit box + object-contain upscales the small-intrinsic KiCad SVG to fill
-      // the card (max-* alone would leave it tiny).
-      className="h-[136px] w-[86%] object-contain"
+      // Fill the tile (whatever its size) and object-contain so the small-intrinsic KiCad
+      // SVG upscales to the frame without clipping; the padding keeps it off the edges.
+      className="h-full w-full object-contain p-4"
       style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
     />
   );

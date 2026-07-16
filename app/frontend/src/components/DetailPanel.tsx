@@ -1,21 +1,22 @@
 /**
- * The part detail panel (the mockup's renderDetail). Reads the full record from
- * GET /api/library/parts/{id} and lays it out as: identity header with the
- * completeness passport ring, a missing/complete block, the Files section
- * (3D model, symbol, footprint), read-only identity fields, and Sourcing driven
- * by the real purchase records. Everything degrades honestly when a field is
+ * The part detail panel, designed as an instrument readout (not a CRUD form).
+ * Reads the full record from GET /api/library/parts/{id} and lays it out as:
+ * an identity band (name headline + the MPN as a mono serial + a single Ready /
+ * Missing verdict), the Part Canvas (the 3D physical object as the hero with the
+ * schematic symbol + PCB footprint as its embodiments), a borderless datasheet
+ * data grid (identity fields + parametric specs in the mono readout face), then
+ * Pinout, Sourcing, and History. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
-import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
+import { Badge, Button, Card, Eyebrow } from "./primitives";
 import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { CompletenessRing } from "./CompletenessRing";
 import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
 import { usePreviewGlb } from "../api/queries";
@@ -26,12 +27,11 @@ import {
   FootprintArt,
   SymbolArt,
   UploadIcon,
-  WarnIcon,
 } from "./icons";
 
 // The passport has seven required fields (stockroom.model.part.REQUIRED_FIELDS). Symbol,
 // footprint, and 3D model no longer gate completeness: they are attached AFTER a part
-// lands (see the Files section), so they are not part of this score.
+// lands (see the Part Canvas), so they are not part of this score.
 const PASSPORT_TOTAL = 7;
 
 // Known EDA tools mapped to their proper casing; anything else is Title Cased from the raw
@@ -51,8 +51,9 @@ export function toolLabel(tool: string | undefined): string {
   return t.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
 
-// Spec keys that are NOT parametric specs: the asset references (shown as Files cards) and the
-// pinout (shown as its own table). Everything else in specs is a real spec the panel lists (B1).
+// Spec keys that are NOT parametric specs: the asset references (shown in the Part Canvas)
+// and the pinout (shown as its own table). Everything else in specs is a real spec the panel
+// lists (B1).
 const SPEC_HIDDEN_KEYS = new Set(["Symbol", "Footprint", "3D Model", "product_url", "pinout"]);
 
 // Spec values that mean "the distributor did not fill this" - dropped so an empty-in-disguise
@@ -110,7 +111,7 @@ interface Props {
   onApplyPinout?: (sourced: SourcedField) => void;
   // Attaching a symbol / footprint reference AFTER the part exists (assets no longer
   // gate entry). Each takes a lib + name; omit them for a read-only panel and the
-  // missing-asset cards offer no Attach affordance.
+  // missing-asset tiles offer no Attach affordance.
   onAttachSymbol?: (lib: string, name: string) => void;
   onAttachFootprint?: (lib: string, name: string) => void;
   busy?: boolean;
@@ -136,19 +137,19 @@ export function DetailPanel({
   // tabs, so this is only the tab it opens on.
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   // Which missing asset's Attach modal is open (null = closed). Only symbol / footprint
-  // have an attach endpoint, so the 3D model card carries no Attach affordance.
+  // have an attach endpoint, so the 3D model tile carries no Attach affordance.
   const [attachKind, setAttachKind] = useState<"symbol" | "footprint" | null>(null);
   // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
   // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
-  // Inline 3D thumbnail (C1/C2): fetch + render the GLB right in the card, auto-rotating and
-  // pointer-events-none so it never fights the card's own click. Enabled only for a part that
+  // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
+  // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
   const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
   // B1: every parametric spec the record holds (Resistance, Tolerance, Voltage Rating, ...) that
-  // the panel used to hide - shown in a Specifications section. Asset/internal keys and the pinout
+  // the panel used to hide - shown in the datasheet grid. Asset/internal keys and the pinout
   // (rendered as its own table) are excluded; only scalar spec values are listed.
   const specRows = Object.entries(detail?.specs ?? {}).filter(
     ([key, value]) =>
@@ -171,125 +172,73 @@ export function DetailPanel({
     );
   }
   if (!detail) {
-    return (
-      <PanelMessage>Select a part to see its details.</PanelMessage>
-    );
+    return <PanelMessage>Select a part to see its details.</PanelMessage>;
   }
 
   const score = Math.max(0, PASSPORT_TOTAL - missing.length);
-  const subtitle = [detail.mpn || "No Part Number", detail.manufacturer || "Unknown Maker"].join(
-    "  ·  ",
-  );
   // The persisted pinout (M6i) reads from the record's specs, its provenance from
   // the enrichment map. Shown when present, in both read-only and editable modes.
   const pinout = parsePinout(detail.specs);
   const pinoutProvenance = detail.enrichment?.pinout;
 
   return (
-    <div className="max-w-[760px] pb-10">
-      {/* header */}
-      <div className="flex items-center gap-4">
+    <div className="max-w-[1000px] pb-12">
+      {/* identity band: the name headline + the MPN as a mono serial stamp, with a
+          single Ready / Missing verdict standing to the right. */}
+      <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-title font-semibold text-t1">
-            {onEditField ? (
-              <EditableText
-                value={detail.display_name}
-                onSave={(v) => onEditField("display_name", v)}
-                label="Name"
-                placeholder="Name this part"
-                disabled={busy}
-                displayClassName="text-title font-semibold"
-              />
-            ) : (
-              <span className="min-w-0 break-words">{detail.display_name}</span>
-            )}
-            {!isComplete ? (
-              <span className="flex-none text-err" title="Incomplete">
-                <WarnIcon />
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-1 text-sm text-t3">{subtitle}</div>
-        </div>
-        <div className="flex flex-none items-center gap-4">
-          {onDelete ? (
-            // A destructive action never earns primary weight: a dim text-link that
-            // only reddens on hover, not a filled button sitting in prime real estate.
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
+          {onEditField ? (
+            <EditableText
+              value={detail.display_name}
+              onSave={(v) => onEditField("display_name", v)}
+              label="Name"
+              placeholder="Name this part"
               disabled={busy}
-              className="text-xs text-t3 transition-colors hover:text-err disabled:opacity-50"
-            >
-              Delete Part
-            </button>
-          ) : null}
-          <CompletenessRing
-            score={score}
-            total={PASSPORT_TOTAL}
-            complete={isComplete}
+              displayClassName="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]"
+            />
+          ) : (
+            <h1 className="min-w-0 break-words text-[26px] font-semibold leading-[1.1] tracking-[-0.02em] text-t1">
+              {detail.display_name}
+            </h1>
+          )}
+          <SerialLine
+            mpn={detail.mpn}
+            manufacturer={detail.manufacturer}
+            category={detail.category}
           />
         </div>
+        <Verdict complete={isComplete} score={score} total={PASSPORT_TOTAL} />
       </div>
 
-      {/* completeness block */}
-      <div className="mt-4">
-        {isComplete ? (
-          <Badge tone="ok">Complete</Badge>
-        ) : (
-          <div>
-            <div className="mb-2 block text-xs text-t3">Missing</div>
-            <div className="flex flex-wrap gap-1.5">
-              {missing.map((m) => (
-                <Badge key={m} tone="warn">
-                  {m}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* the missing fields, named, only when incomplete (the verdict already states the count) */}
+      {!isComplete && missing.length > 0 ? (
+        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">
+            Needs
+          </span>
+          {missing.map((m) => (
+            <Badge key={m} tone="warn" size="sm">
+              {m}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
 
-      {/* files: three equal cards - the real renders (symbol, footprint) lead; the 3D
-          card no longer dwarfs them just because its model has not rendered. */}
-      <Eyebrow className="mb-2.5 mt-6">Files</Eyebrow>
-      <div className="grid max-w-[760px] grid-cols-3 gap-3">
-        <FileCard
-          name="Symbol"
-          present={!!detail.symbol?.name}
-          tool={detail.symbol?.tool}
-          art={<SymbolArt />}
-          thumb={
-            detail.symbol?.name ? (
-              <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
-            ) : undefined
-          }
-          onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
-          onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
-        />
-        <FileCard
-          name="Footprint"
-          present={!!detail.footprint?.name}
-          tool={detail.footprint?.tool}
-          art={<FootprintArt />}
-          thumb={
-            detail.footprint?.name ? (
-              <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
-            ) : undefined
-          }
-          onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
-          onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
-        />
-        <FileCard
+      {/* Part Canvas: the physical object is the hero. The 3D model is the dominant
+          tile; the schematic symbol and PCB footprint are its embodiments beside it. */}
+      <Eyebrow className="mb-2.5 mt-7">Part Canvas</Eyebrow>
+      <div className="grid h-[320px] grid-cols-[1.55fr_1fr] gap-3">
+        <AssetTile
+          variant="hero"
           name="3D Model"
           present={hasModel}
           // A passive owns no model.file but inherits its stock footprint's built-in
-          // model, so the 3D card's tool falls back to the footprint's tool there.
+          // model, so the tile's tool falls back to the footprint's tool there.
           tool={detail.model?.tool ?? detail.footprint?.tool}
           art={<CubeArt />}
           thumb={
             hasModel ? (
-              <div className="pointer-events-none h-[150px] w-full">
+              <div className="pointer-events-none h-full w-full">
                 <Glb3DView
                   data={modelGlb.data}
                   isLoading={modelGlb.isLoading}
@@ -301,6 +250,36 @@ export function DetailPanel({
           }
           onOpen={hasModel ? () => setPreview("model") : undefined}
         />
+        <div className="grid min-h-0 grid-rows-2 gap-3">
+          <AssetTile
+            variant="tile"
+            name="Symbol"
+            present={!!detail.symbol?.name}
+            tool={detail.symbol?.tool}
+            art={<SymbolArt />}
+            thumb={
+              detail.symbol?.name ? (
+                <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
+              ) : undefined
+            }
+            onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
+            onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
+          />
+          <AssetTile
+            variant="tile"
+            name="Footprint"
+            present={!!detail.footprint?.name}
+            tool={detail.footprint?.tool}
+            art={<FootprintArt />}
+            thumb={
+              detail.footprint?.name ? (
+                <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
+              ) : undefined
+            }
+            onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
+            onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
+          />
+        </div>
       </div>
 
       {/* Attach a missing symbol / footprint reference after the part landed (assets no
@@ -333,17 +312,18 @@ export function DetailPanel({
         onClose={() => setPreview(null)}
       />
 
-      {/* identity fields */}
-      <Eyebrow className="mb-2.5 mt-6">Component Fields</Eyebrow>
-      <div>
-        <IdRow
+      {/* datasheet grid: the editable identity fields, borderless, values in the mono
+          readout face so a part number reads like a stamped identifier. */}
+      <Eyebrow className="mb-1 mt-8">Identity</Eyebrow>
+      <div className="border-t border-line pt-1">
+        <DataRow
           label="Part Number"
           value={detail.mpn}
           mono
           onSave={onEditField ? (v) => onEditField("mpn", v) : undefined}
           busy={busy}
         />
-        <IdRow
+        <DataRow
           label="Manufacturer"
           value={detail.manufacturer}
           onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
@@ -359,35 +339,33 @@ export function DetailPanel({
             busy={busy}
           />
         ) : (
-          <IdRow label="Category" value={detail.category} />
+          <DataRow label="Category" value={detail.category} />
         )}
-        <IdRow
+        <DataRow
           label="Description"
           value={detail.description}
           multiline
           onSave={onEditField ? (v) => onEditField("description", v) : undefined}
           busy={busy}
         />
-        <IdRow
+        <DataRow
           label="Datasheet"
           // A clean "View Datasheet" link, not the raw full-length URL splashed across the
           // row. The URL rides the href; a file-only datasheet shows its filename.
           value={
-            detail.datasheet?.source_url
-              ? "View Datasheet"
-              : detail.datasheet?.file || ""
+            detail.datasheet?.source_url ? "View Datasheet" : detail.datasheet?.file || ""
           }
           href={detail.datasheet?.source_url || undefined}
         />
         {onEditField ? (
-          <IdRow
+          <DataRow
             label="Tags"
             value={detail.tags.join(", ")}
             onSave={(v) => onEditField("tags", splitTags(v))}
             busy={busy}
           />
         ) : detail.tags.length > 0 ? (
-          <IdRow label="Tags" value={detail.tags.join(", ")} />
+          <DataRow label="Tags" value={detail.tags.join(", ")} />
         ) : null}
       </div>
 
@@ -399,8 +377,8 @@ export function DetailPanel({
           persisted specs.pinout, source of truth per M6i). */}
       {pinout.length > 0 ? (
         <>
-          <Eyebrow className="mb-2.5 mt-6">Pinout</Eyebrow>
-          <div className="max-w-[760px]">
+          <Eyebrow className="mb-2.5 mt-8">Pinout</Eyebrow>
+          <div>
             {/* Keyed by part id so the viewer's own filter/sort state resets on a
                 part switch (matches the EnrichPanel key below); a cached-part switch
                 does not unmount the panel, so without this the filter would leak. */}
@@ -433,15 +411,30 @@ export function DetailPanel({
       ) : null}
 
       {/* sourcing */}
-      <Eyebrow className="mb-2.5 mt-6">Sourcing</Eyebrow>
+      <Eyebrow className="mb-2.5 mt-8">Sourcing</Eyebrow>
       <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
 
       {/* git timeline (M6k): the part's commit history + per-commit field/visual diff.
           Keyed by part id so the selected-commit state resets on a part switch. */}
-      <Eyebrow className="mb-2.5 mt-6">History</Eyebrow>
-      <div className="max-w-[760px]">
+      <Eyebrow className="mb-2.5 mt-8">History</Eyebrow>
+      <div>
         <PartTimeline key={detail.id} partId={detail.id} />
       </div>
+
+      {/* a destructive action never earns prime real estate: it lives at the very
+          bottom as a quiet text link that only reddens on hover. */}
+      {onDelete ? (
+        <div className="mt-8 border-t border-line pt-4">
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={busy}
+            className="text-xs text-t3 transition-colors hover:text-err disabled:opacity-50"
+          >
+            Delete Part
+          </button>
+        </div>
+      ) : null}
 
       {onDelete ? (
         <ConfirmDialog
@@ -467,6 +460,82 @@ export function DetailPanel({
   );
 }
 
+// The identity serial line: a category dot, the MPN as the mono stamp (a part IS its
+// part number), then the manufacturer and category as quiet context. Middot-separated,
+// each piece dropping out honestly when the record does not carry it.
+function SerialLine({
+  mpn,
+  manufacturer,
+  category,
+}: {
+  mpn: string;
+  manufacturer: string;
+  category: string;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <span className="h-1.5 w-1.5 flex-none rounded-full bg-t3" aria-hidden="true" />
+      <span className="tnum font-mono text-sm text-t1">
+        {mpn || <span className="font-sans italic text-t3">No Part Number</span>}
+      </span>
+      {manufacturer ? (
+        <>
+          <Middot />
+          <span className="text-sm text-t2">{manufacturer}</span>
+        </>
+      ) : null}
+      {category ? (
+        <>
+          <Middot />
+          <span className="text-sm text-t3">{category}</span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function Middot() {
+  return (
+    <span className="text-t3" aria-hidden="true">
+      ·
+    </span>
+  );
+}
+
+// The single completeness verdict, replacing the old ring + badge + dots trio. Quiet
+// and confident when the part is Ready (an ok dot is the only color); a warn readout
+// that draws the eye when fields are missing (attention belongs on the gap).
+function Verdict({
+  complete,
+  score,
+  total,
+}: {
+  complete: boolean;
+  score: number;
+  total: number;
+}) {
+  if (complete) {
+    return (
+      <div className="flex flex-none items-center gap-2.5 rounded-control bg-raise px-3.5 py-2 shadow-card">
+        <span className="h-2 w-2 flex-none rounded-full bg-ok" aria-hidden="true" />
+        <div className="leading-tight">
+          <div className="text-sm font-semibold text-t1">Ready</div>
+          <div className="tnum font-mono text-2xs text-t3">{total} of {total} fields</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-none items-center gap-2.5 rounded-control bg-[rgba(224,179,84,0.11)] px-3.5 py-2">
+      <span className="h-2 w-2 flex-none rounded-full bg-warn" aria-hidden="true" />
+      <div className="leading-tight">
+        <div className="text-sm font-semibold text-warn">Incomplete</div>
+        <div className="tnum font-mono text-2xs text-t3">{score} of {total} fields</div>
+      </div>
+    </div>
+  );
+}
+
 function CategoryRow({
   value,
   categories,
@@ -481,8 +550,8 @@ function CategoryRow({
   // Always include the current category, even if the facets have not caught up.
   const options = categories.includes(value) ? categories : [value, ...categories];
   return (
-    <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
-      <span className="w-[116px] flex-none pt-1.5 text-xs text-t3">Category</span>
+    <div className="flex gap-5 py-2">
+      <span className="w-[128px] flex-none pt-1.5 text-sm text-t3">Category</span>
       <span className="flex min-w-0 flex-1 items-center">
         <span className="relative inline-block w-[240px] max-w-full">
           <select
@@ -535,7 +604,10 @@ function PanelMessage({
   );
 }
 
-function IdRow({
+// One borderless datasheet row: a fixed-width key in quiet sans, the value in the mono
+// readout face (for machine data) or sans (for prose). Grouping comes from the shared
+// left baseline and whitespace rhythm, not a hairline on every row.
+function DataRow({
   label,
   value,
   mono,
@@ -554,13 +626,12 @@ function IdRow({
 }) {
   const empty = !value;
   return (
-    <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
-      <span className="w-[116px] flex-none pt-1.5 text-xs text-t3">{label}</span>
+    <div className="flex gap-5 py-1.5">
+      <span className="w-[128px] flex-none pt-1.5 text-sm text-t3">{label}</span>
       <span
         className={
           "flex min-w-0 flex-1 items-center gap-1.5 text-base " +
-          (empty && !onSave ? "text-err" : "text-t1") +
-          (mono ? " tnum" : "")
+          (empty && !onSave ? "text-err" : "text-t1")
         }
       >
         {onSave ? (
@@ -580,14 +651,15 @@ function IdRow({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-w-0 items-start gap-1.5 text-t1 underline decoration-line2 underline-offset-2 hover:decoration-current"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 text-t1 underline decoration-line2 underline-offset-2 transition-colors hover:bg-raise2 hover:decoration-current"
           >
-            {/* show the FULL url, wrapped - never truncated (a cut-off link reads as broken) */}
-            <span className="min-w-0 break-all">{value}</span>
-            <ExternalIcon className="mt-1 flex-none text-t3" />
+            <span className="min-w-0 break-words">{value}</span>
+            <ExternalIcon className="flex-none text-t3" />
           </a>
         ) : (
-          <span className="min-w-0 break-words">{value}</span>
+          <span className={"min-w-0 break-words px-1.5 " + (mono ? "tnum font-mono" : "")}>
+            {value}
+          </span>
         )}
       </span>
     </div>
@@ -602,7 +674,12 @@ function splitTags(raw: string): string[] {
     .filter(Boolean);
 }
 
-function FileCard({
+// One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
+// embodiment (symbol / footprint). Present -> the whole tile is a button that expands
+// the preview; missing-with-handler -> a button that opens the Attach modal; missing
+// read-only -> the honest Not Linked state. The recessed `stage` chamber makes a render
+// read as a lit object, not a flat image.
+function AssetTile({
   name,
   present,
   tool,
@@ -610,7 +687,7 @@ function FileCard({
   thumb,
   onOpen,
   onAttach,
-  className,
+  variant,
 }: {
   name: string;
   present: boolean;
@@ -620,23 +697,20 @@ function FileCard({
   tool?: string;
   art: ReactNode;
   // The live render shown when present (falls back to `art` internally on failure);
-  // omit it and `art` is shown directly (the 3D card keeps its glyph, viewed on open).
+  // omit it and `art` is shown directly.
   thumb?: ReactNode;
-  // When present and set, the whole card is a button that expands the preview.
+  // When present and set, the whole tile is a button that expands the preview.
   onOpen?: () => void;
-  // When the asset is MISSING and set, the whole card is a button that opens the
-  // Attach modal (assets are attached after the part lands, so a null asset is not a
-  // dead end). Ignored when the asset is present.
+  // When the asset is MISSING and set, the whole tile is a button that opens the
+  // Attach modal. Ignored when the asset is present.
   onAttach?: () => void;
-  className?: string;
+  variant: "hero" | "tile";
 }) {
   const stage = (
     <div
       className={
-        "flex flex-1 items-center justify-center " +
-        (present
-          ? "bg-[rgba(0,0,0,0.18)] min-h-[150px]"
-          : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[150px] text-t3")
+        "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
+        (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
       }
     >
       {present ? (
@@ -651,7 +725,7 @@ function FileCard({
   );
   const footer = (
     <div className="flex items-center gap-2 px-3 py-2.5">
-      <span className="text-xs font-medium text-t1">{name}</span>
+      <span className="text-xs font-semibold text-t1">{name}</span>
       {present ? (
         <Badge tone="neutral" size="sm">
           {toolLabel(tool)}
@@ -660,30 +734,28 @@ function FileCard({
       <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
         {present ? (
           <>
-            <Dot tone="ok" />
+            <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden="true" />
             {onOpen ? "View" : "Linked"}
           </>
         ) : onAttach ? (
           <>
-            <Dot tone="warn" />
+            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
             Attach
           </>
         ) : (
           <>
-            <Dot tone="warn" />
+            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
             Not Linked
           </>
         )}
       </span>
     </div>
   );
-  const cls =
-    "flex min-w-0 flex-col overflow-hidden shadow-file " + (className ?? "");
-  // The shared card-as-button chrome (Card is a div, not polymorphic), so the whole
-  // tile is one click target for both the preview-expand and the attach affordances.
+  const base =
+    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise shadow-file " +
+    (variant === "hero" ? "h-full" : "");
   const buttonCls =
-    "rounded-card border border-line bg-raise " +
-    cls +
+    base +
     " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
   if (onOpen && present) {
     return (
@@ -711,7 +783,12 @@ function FileCard({
       </button>
     );
   }
-  return <Card className={cls}>{stage}{footer}</Card>;
+  return (
+    <div className={base}>
+      {stage}
+      {footer}
+    </div>
+  );
 }
 
 // The Attach-a-reference modal: a lib + name form that POSTs a symbol / footprint
@@ -800,7 +877,7 @@ function AttachAssetModal({
 
 // B2 progressive disclosure: a deep part can carry ~28 specs; show the first (most important,
 // insertion-ordered) ones and let the rest expand, so the section is scannable, not a wall.
-const SPEC_COLLAPSE_AT = 10;
+const SPEC_COLLAPSE_AT = 12;
 
 function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
   const [showAll, setShowAll] = useState(false);
@@ -808,17 +885,19 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
   const shown = showAll || !collapsible ? rows : rows.slice(0, SPEC_COLLAPSE_AT);
   return (
     <>
-      <Eyebrow className="mb-2.5 mt-6">
+      <Eyebrow className="mb-1 mt-8">
         Specifications <span className="text-t3">({rows.length})</span>
       </Eyebrow>
-      <div className="grid max-w-[760px] grid-cols-1 gap-x-8 sm:grid-cols-2">
+      {/* a datasheet parameter block: two aligned columns, values in the mono readout
+          face with tabular figures, grouped by whitespace not a border on every row. */}
+      <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-12">
         {shown.map(([key, value]) => (
           <div
             key={key}
-            className="flex items-baseline justify-between gap-4 border-b border-line py-1.5"
+            className="flex items-baseline justify-between gap-4 px-1.5 py-[7px]"
           >
             <span className="text-sm text-t3">{key}</span>
-            <span className="text-right text-sm text-t1">{String(value)}</span>
+            <span className="tnum font-mono text-sm text-t1 text-right">{String(value)}</span>
           </div>
         ))}
       </div>
@@ -871,25 +950,20 @@ function VendorCard({ purchase }: { purchase: PurchaseRef }) {
   const priceBreaks = normalizePriceBreaks(purchase.price_breaks);
   const unit = priceBreaks.length > 0 ? priceBreaks[0] : null;
   if (unit) {
-    stats.push([
-      "Unit Price",
-      formatPrice(unit.price, purchase.currency),
-    ]);
+    stats.push(["Unit Price", formatPrice(unit.price, purchase.currency)]);
   }
 
   return (
     <Card className="px-4 py-3.5">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-t1">
+        <span className="text-sm font-semibold text-t1">
           {vendorLabel(purchase.vendor, purchase.url)}
         </span>
         {purchase.part_number ? (
-          <span className="tnum text-xs text-t3">{purchase.part_number}</span>
+          <span className="tnum font-mono text-xs text-t3">{purchase.part_number}</span>
         ) : null}
         {purchase.fetched_at ? (
-          <span className="text-2xs text-t3">
-            Checked {purchase.fetched_at}
-          </span>
+          <span className="text-2xs text-t3">Checked {purchase.fetched_at}</span>
         ) : null}
         <a
           href={purchase.url}
@@ -905,12 +979,9 @@ function VendorCard({ purchase }: { purchase: PurchaseRef }) {
       {stats.length > 0 ? (
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {stats.map(([label, value]) => (
-            <div
-              key={label}
-              className="rounded-card border border-line bg-raise px-3 py-2.5"
-            >
+            <div key={label} className="rounded-card bg-stage px-3 py-2.5">
               <div className="text-2xs text-t3">{label}</div>
-              <div className="tnum mt-0.5 text-base font-semibold text-t1">
+              <div className="tnum mt-0.5 font-mono text-base font-semibold text-t1">
                 {value}
               </div>
             </div>
@@ -920,16 +991,12 @@ function VendorCard({ purchase }: { purchase: PurchaseRef }) {
 
       {priceBreaks.length > 1 ? (
         <div className="mt-3">
-          <div className="mb-2 text-xs font-semibold text-t3">
-            Price Breaks
-          </div>
+          <div className="mb-2 text-xs font-semibold text-t3">Price Breaks</div>
           <div className="flex max-w-[480px] flex-col gap-2">
             {priceBreaks.map((b, i) => (
               <div key={i} className="flex items-center gap-3">
-                <span className="tnum w-12 flex-none text-xs text-t3">
-                  {b.qty}+
-                </span>
-                <span className="tnum ml-auto w-16 text-right text-sm font-semibold text-t1">
+                <span className="tnum font-mono w-12 flex-none text-xs text-t3">{b.qty}+</span>
+                <span className="tnum font-mono ml-auto w-16 text-right text-sm font-semibold text-t1">
                   {formatPrice(b.price, purchase.currency)}
                 </span>
               </div>

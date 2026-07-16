@@ -60,6 +60,10 @@
     --c-hover: rgba(255, 255, 255, 0.03);
     --c-sticky: rgba(15, 15, 16, 0.72);
     --c-ring-track: #26272c;
+    /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
+       darker inset than the card so the 3D model / symbol / footprint read as lit
+       objects in a well, not painted on the surface. Theme-aware. */
+    --c-stage: rgba(0, 0, 0, 0.26);
     /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
        pre-refactor dark value, so the dark app stays byte-identical. */
     --c-icon-line: #8b9099;
@@ -116,6 +120,7 @@
     --c-hover: rgba(0, 0, 0, 0.04);
     --c-sticky: rgba(244, 244, 245, 0.82);
     --c-ring-track: #dfe0e3;
+    --c-stage: rgba(17, 18, 20, 0.045);
     --c-icon-line: #6b7078;
     --c-icon-fill: #6b7078;
     --c-icon-cube: #6b7078;

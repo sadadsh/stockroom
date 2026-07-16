@@ -56,14 +56,25 @@ export function mountModelScene(
     "",
     (gltf) => {
       root.add(gltf.scene);
-      // frame the model: center it on the origin and back the camera off to fit.
+      // frame the model: center it on the origin and back the camera off to fit. Use the
+      // bounding-SPHERE radius (half the box diagonal) so the model never clips at any
+      // auto-rotate angle, then place the camera along a fixed 3/4 view direction at just
+      // the fit distance (a small pad, not the old non-normalized offset that pushed the
+      // camera ~1.6x too far and left the model a tiny object in a big empty chamber).
       const box = new THREE.Box3().setFromObject(gltf.scene);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
       gltf.scene.position.sub(center);
-      const radius = Math.max(size.x, size.y, size.z, 0.001) * 0.5;
-      const dist = radius / Math.sin((camera.fov * Math.PI) / 360);
-      camera.position.set(dist * 0.9, dist * 0.7, dist * 1.2);
+      const radius = Math.max(size.length() * 0.5, 0.001);
+      // The frame is usually wider than tall; fit the sphere to the SHORTER (vertical)
+      // extent so the model reads large, and account for aspect so a portrait frame still
+      // fits horizontally.
+      const vfov = (camera.fov * Math.PI) / 180;
+      const fitH = radius / Math.sin(vfov / 2);
+      const fitW = radius / Math.sin(vfov / 2) / Math.min(1, camera.aspect);
+      const dist = Math.max(fitH, fitW) * 1.06;
+      const dir = new THREE.Vector3(0.55, 0.42, 1).normalize();
+      camera.position.copy(dir.multiplyScalar(dist));
       camera.near = radius / 100;
       camera.far = radius * 100;
       camera.updateProjectionMatrix();

@@ -8,8 +8,11 @@ import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 // The interface face, bundled offline (no CDN) so it renders identically inside
-// WebView2 on Windows. Imported before the token sheet, which names it.
+// WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
+// carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
+// specs, stock, prices, pins) so every value aligns on tabular figures.
 import "@fontsource-variable/work-sans";
+import "@fontsource-variable/jetbrains-mono";
 import "./styles/index.css";
 
 // One shared client. Reads are cheap (served from the warm index) so a short
