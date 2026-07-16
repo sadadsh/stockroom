@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import type { PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
+import { RouterProvider, useRouter } from "../lib/router";
 import { requestPart } from "../lib/partSelection";
 import { ComponentsPage } from "./ComponentsPage";
 
@@ -59,13 +60,25 @@ const DETAIL: PartDetail = {
   specs: {},
 };
 
-function wrap(ui: ReactNode) {
+function wrap(ui: ReactNode, initial: "components" | "ingest" = "components") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const router = { current: "" as string };
+  function Probe() {
+    const { route } = useRouter();
+    router.current = route;
+    return null;
+  }
+  const utils = render(
     <QueryClientProvider client={qc}>
-      <ToastProvider>{ui}</ToastProvider>
+      <ToastProvider>
+        <RouterProvider initial={initial}>
+          <Probe />
+          {ui}
+        </RouterProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
+  return { ...utils, router };
 }
 
 describe("ComponentsPage", () => {
@@ -85,6 +98,23 @@ describe("ComponentsPage", () => {
     expect(await screen.findByText("1 Parts")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+  });
+
+  it("navigates to the Add A Part wizard from the Add Parts toolbar button", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+
+    const { router } = wrap(<ComponentsPage />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Add Parts" }));
+    expect(router.current).toBe("ingest");
   });
 
   it("edits an identity field inline and reports a toast", async () => {
@@ -424,7 +454,9 @@ describe("ComponentsPage", () => {
     render(
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <ComponentsPage />
+          <RouterProvider initial="components">
+            <ComponentsPage />
+          </RouterProvider>
         </ToastProvider>
       </QueryClientProvider>,
     );

@@ -82,7 +82,7 @@ describe("App shell", () => {
     );
   });
 
-  it("reaches Add Parts through the Library tabs", async () => {
+  it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
     mockApi.facets.mockResolvedValue({
       by_category: {},
@@ -105,9 +105,14 @@ describe("App shell", () => {
     );
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("tab", { name: "Add Parts" }));
+    // Add Parts is a primary button on the Parts page now, not a tab.
+    expect(screen.queryByRole("tab", { name: "Add Parts" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Add Parts" }));
 
-    // The Add A Part page's own control renders once the route switches.
+    // The Add A Part wizard renders full-screen with a back affordance and its
+    // own control; the Library tab strip is gone while it is open.
     expect(screen.getByLabelText("Product link or part number")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back To Parts" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Parts" })).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
 import { LibraryPage } from "./pages/LibraryPage";
+import { IngestPage } from "./pages/IngestPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
@@ -24,13 +25,17 @@ export default function App() {
 function renderRoute(route: Route) {
   switch (route) {
     case "components":
-    case "ingest":
     case "bom":
     case "duplicates":
     case "doctor":
       // The library surfaces are tabs of the Library flagship; the route names
       // the active tab so the palette and drop overlay keep deep-linking.
-      return <LibraryPage tab={route} />;
+      return <LibraryPage route={route} />;
+    case "ingest":
+      // Add A Part is a full-screen wizard, not a Library tab: it takes over the
+      // content area (the rail stays lit on Library) with its own back-to-Parts
+      // affordance. Still reached from the Parts toolbar, the palette, and a drop.
+      return <IngestPage />;
     case "projects":
       return <ProjectsPage />;
     case "settings":
@@ -38,6 +43,6 @@ function renderRoute(route: Route) {
     default:
       // Unreachable in practice (the rail and palette only offer available
       // routes); fall back to the Library home rather than a blank frame.
-      return <LibraryPage tab="components" />;
+      return <LibraryPage route="components" />;
   }
 }
