@@ -70,10 +70,19 @@ export interface PurchaseRef {
 export interface LibRef {
   lib: string;
   name: string;
+  // The EDA tool this symbol/footprint reference targets ("kicad" today; "altium"
+  // later, so a part can carry a reference per tool). Optional so older fixtures/
+  // records without it still type-check; the backend always emits it, defaulting to
+  // "kicad", and the panel renders it as a small tool pill.
+  tool?: string;
 }
 
 export interface ModelRef {
   file: string;
+  // The EDA tool the 3D model targets. A model is largely tool-neutral, but it is
+  // tagged too so a future Altium import can carry its own model. Optional, defaults
+  // to "kicad" on the backend.
+  tool?: string;
 }
 
 export interface Provenance {

@@ -135,6 +135,28 @@ export function useMoveCategory() {
   });
 }
 
+// Attach a symbol / footprint reference to an existing part (assets no longer gate
+// entry, so they are attached after the part lands). A write commits and can change
+// the footprint-duplicate set, so it invalidates the same derived caches as any other
+// write (list, facets, duplicates, the affected detail, the grown git timeline).
+export function useAttachSymbol() {
+  const invalidate = useInvalidateAfterWrite();
+  return useMutation({
+    mutationFn: (vars: { id: string; lib: string; name: string; tool?: string }) =>
+      api.attachSymbol(vars.id, vars.lib, vars.name, vars.tool),
+    onSuccess: (_data, vars) => invalidate(vars.id),
+  });
+}
+
+export function useAttachFootprint() {
+  const invalidate = useInvalidateAfterWrite();
+  return useMutation({
+    mutationFn: (vars: { id: string; lib: string; name: string; tool?: string }) =>
+      api.attachFootprint(vars.id, vars.lib, vars.name, vars.tool),
+    onSuccess: (_data, vars) => invalidate(vars.id),
+  });
+}
+
 export function useDeletePart() {
   const qc = useQueryClient();
   return useMutation({

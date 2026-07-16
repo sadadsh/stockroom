@@ -16,6 +16,8 @@ import {
   useMoveCategory,
   useDeletePart,
   useSetSpecs,
+  useAttachSymbol,
+  useAttachFootprint,
 } from "../api/queries";
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
@@ -48,6 +50,8 @@ export function ComponentsPage() {
   const moveCategory = useMoveCategory();
   const deletePart = useDeletePart();
   const setSpecs = useSetSpecs();
+  const attachSymbol = useAttachSymbol();
+  const attachFootprint = useAttachFootprint();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
 
@@ -57,7 +61,9 @@ export function ComponentsPage() {
     editField.isPending ||
     moveCategory.isPending ||
     deletePart.isPending ||
-    setSpecs.isPending;
+    setSpecs.isPending ||
+    attachSymbol.isPending ||
+    attachFootprint.isPending;
 
   function toastError(err: unknown, fallback: string) {
     toast(err instanceof ApiError ? err.message : fallback, "err");
@@ -101,6 +107,28 @@ export function ComponentsPage() {
       {
         onSuccess: () => toast("Pinout Saved", "ok"),
         onError: (err) => toastError(err, "Could not save the pinout"),
+      },
+    );
+  }
+
+  function handleAttachSymbol(lib: string, name: string) {
+    if (!selectedId) return;
+    attachSymbol.mutate(
+      { id: selectedId, lib, name },
+      {
+        onSuccess: () => toast("Symbol Attached", "ok"),
+        onError: (err) => toastError(err, "Could not attach the symbol"),
+      },
+    );
+  }
+
+  function handleAttachFootprint(lib: string, name: string) {
+    if (!selectedId) return;
+    attachFootprint.mutate(
+      { id: selectedId, lib, name },
+      {
+        onSuccess: () => toast("Footprint Attached", "ok"),
+        onError: (err) => toastError(err, "Could not attach the footprint"),
       },
     );
   }
@@ -227,6 +255,8 @@ export function ComponentsPage() {
               categories={categories}
               onDelete={handleDelete}
               onApplyPinout={handleApplyPinout}
+              onAttachSymbol={handleAttachSymbol}
+              onAttachFootprint={handleAttachFootprint}
               busy={detailBusy}
             />
           ) : (
