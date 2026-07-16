@@ -127,6 +127,9 @@ def library_router(require_token) -> APIRouter:
             manufacturer=(body.get("manufacturer") or None),
             datasheet_url=(body.get("datasheet_url") or None),
             purchase_part_number=(body.get("purchase_part_number") or None),
+            specs=(body.get("specs") or None),
+            price_breaks=(body.get("price_breaks") or None),
+            stock=body.get("stock"),
         )
 
     @r.post("/passive/preview")

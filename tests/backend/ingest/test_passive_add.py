@@ -76,6 +76,35 @@ def test_display_name_describes_the_passive_not_just_the_mpn():
     assert build.record.mpn == "ERJ-P03F1101V"  # MPN stays for search + id
 
 
+def test_pulled_specs_and_pricing_ride_onto_the_passive_record():
+    # A7: a passive committed from a distributor link keeps the FULL pulled data (every spec,
+    # the price ladder, live stock), not just the offline decode - the same enrichment result
+    # the non-passive path already carries, so the two branches no longer diverge.
+    build = build_passive_record(
+        "RC0603FR-0710KL",
+        datasheet_url="https://example.com/ds.pdf",
+        specs={
+            "Temperature Coefficient": "100 ppm/C",
+            "Product Category": "Thick Film Resistors - SMD",
+            "Resistance": "IGNORED-decode-wins",
+            "product_url": "https://www.mouser.com/x",
+        },
+        price_breaks=[{"qty": 1, "price": 0.1}, {"qty": 100, "price": 0.05}],
+        stock=5616,
+    )
+    rec = build.record
+    # pulled specs the offline decode does not know are merged onto the record
+    assert rec.specs["Temperature Coefficient"] == "100 ppm/C"
+    assert rec.specs["Product Category"] == "Thick Film Resistors - SMD"
+    # the decode still wins for a key it owns (Resistance from the MPN, not the pulled placeholder)
+    assert rec.specs["Resistance"] != "IGNORED-decode-wins"
+    # the internal product_url marker never becomes a spec row
+    assert "product_url" not in rec.specs
+    # the price ladder + live stock ride onto the purchase, like the non-passive path
+    assert [(b["qty"], b["price"]) for b in rec.purchase[0].price_breaks] == [(1, 0.1), (100, 0.05)]
+    assert rec.purchase[0].stock == 5616
+
+
 def test_distributor_part_number_is_carried_on_the_purchase():
     build = build_passive_record(_OWNER_URL, purchase_part_number="667-ERJ-P03F1101V")
     assert build.record.purchase[0].part_number == "667-ERJ-P03F1101V"

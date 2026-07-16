@@ -66,6 +66,18 @@ export function PassiveAddSection({
   const manufacturers = Object.keys(facets.data?.by_manufacturer ?? {}).sort();
 
   function body() {
+    // A7: carry the FULL pulled result onto the passive commit (every spec, the price ladder, live
+    // stock), the same enrichment result the non-passive path keeps - so the two branches no longer
+    // diverge and a passive from a Mouser link keeps its depth, not just the offline decode.
+    const specs: Record<string, string> = {};
+    for (const [k, v] of Object.entries(result.specs)) {
+      if (k === "product_url" || v == null) continue;
+      specs[k] = String(v.value ?? "");
+    }
+    const stockNum =
+      result.stock != null && Number.isFinite(Number(result.stock.value))
+        ? Number(result.stock.value)
+        : undefined;
     return {
       input,
       kind: kind || undefined,
@@ -74,6 +86,11 @@ export function PassiveAddSection({
       tolerance: tolerance.trim() || undefined,
       category: category.trim() || undefined,
       manufacturer: manufacturer.trim() || undefined,
+      specs: Object.keys(specs).length ? specs : undefined,
+      price_breaks: result.price_breaks?.length
+        ? result.price_breaks.map((b) => ({ qty: b.qty, price: b.price }))
+        : undefined,
+      stock: stockNum,
     };
   }
 

@@ -174,6 +174,9 @@ def build_passive_record(
     manufacturer: str | None = None,
     datasheet_url: str | None = None,
     purchase_part_number: str | None = None,
+    specs: dict | None = None,
+    price_breaks: list | None = None,
+    stock: int | None = None,
     footprints_root=None,
 ) -> PassiveBuild:
     """Build (but do not commit) a passive PartRecord from `source` (a bare MPN or a
@@ -267,10 +270,25 @@ def build_passive_record(
     fp_lib, fp_name = _split_lib_id(resolved.footprint)
     cat = (category or "").strip() or _KIND_CATEGORY.get(spec.kind, "Other")
 
-    specs = dict(spec.to_specs())
-    specs.setdefault("Symbol", resolved.symbol)
-    specs.setdefault("Footprint", resolved.footprint)
-    specs.setdefault("3D Model", resolved.model_3d)
+    record_specs = dict(spec.to_specs())
+    record_specs.setdefault("Symbol", resolved.symbol)
+    record_specs.setdefault("Footprint", resolved.footprint)
+    record_specs.setdefault("3D Model", resolved.model_3d)
+    # A7: merge the pulled distributor specs (every parametric field the page yielded), so a
+    # passive keeps the FULL pull, not just the offline decode - the same enrichment result the
+    # non-passive path carries. The decode + resolved assets win for keys they own; the pull fills
+    # the rest. The internal product_url marker is never turned into a spec row.
+    _ASSET_KEYS = {"Symbol", "Footprint", "3D Model", "product_url"}
+    for label, val in (specs or {}).items():
+        if label in _ASSET_KEYS or not str(val).strip():
+            continue
+        record_specs.setdefault(label, str(val))
+
+    breaks = [
+        {"qty": int(b["qty"]), "price": float(b["price"])}
+        for b in (price_breaks or [])
+        if isinstance(b, dict) and b.get("qty") is not None and b.get("price") is not None
+    ]
 
     datasheet_url = (datasheet_url or "").strip()
     datasheet = Datasheet(source_url=datasheet_url) if datasheet_url else None
@@ -291,11 +309,13 @@ def build_passive_record(
             vendor="Mouser",
             url=purchase_url,
             part_number=(purchase_part_number or "").strip(),
+            price_breaks=breaks,
+            stock=stock,
         )],
         provenance=Provenance(
             source="passive-decode" if decoded is not None else "passive-manual",
             source_url=purchase_url,
         ),
-        specs=specs,
+        specs=record_specs,
     )
     return PassiveBuild(record=record, stock_present=resolved.present, gaps=record.missing_fields())
