@@ -661,6 +661,7 @@ def test_consolidated_bom_sums_across_boards(tmp_path):
 
 from stockroom.model.part import Datasheet, LibRef, PartRecord, Purchase  # noqa: E402
 from stockroom.projects.bom import (  # noqa: E402
+    _bom_from_components,
     combined_price_lookup,
     library_enrich,
     library_match_index,
@@ -707,6 +708,38 @@ def test_library_enrich_passes_an_unmatched_component_through(tmp_path):
     comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]  # no library match
     _ref, _lib, props = library_enrich(comps, index)[0]
     assert "MPN" not in props  # nothing fabricated
+
+
+def test_library_enrich_stamps_the_matched_part_id_for_coverage():
+    # D1: a matched component records WHICH library part covered it, so the project
+    # BOM can flag coverage per line (not just fill blanks).
+    index = library_match_index([_lib_resistor()])
+    comps = [("R1", "SR-Resistors:R_10k", {"Reference": "R1", "Value": "10k"})]
+    _ref, _lib, props = library_enrich(comps, index)[0]
+    assert props["_sr_library_part_id"] == "r10k"
+
+
+def test_library_enrich_leaves_no_coverage_stamp_on_an_unmatched_component():
+    index = library_match_index([_lib_resistor()])
+    comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]
+    _ref, _lib, props = library_enrich(comps, index)[0]
+    assert "_sr_library_part_id" not in props
+
+
+def test_bom_line_flags_library_coverage():
+    # D1: a line whose component carries a library-part stamp is in_library (with the id);
+    # an unstamped component's line is honestly not in the library.
+    comps = [
+        ("R1", "SR-Resistors:R_10k",
+         {"Reference": "R1", "Value": "10k", "MPN": "RC0402FR-0710KL", "_sr_library_part_id": "r10k"}),
+        ("R9", "Device:R", {"Reference": "R9", "Value": "47k"}),
+    ]
+    rows = _bom_from_components(comps)["rows"]
+    by_val = {r["value"]: r for r in rows}
+    assert by_val["10k"]["in_library"] is True
+    assert by_val["10k"]["library_part_id"] == "r10k"
+    assert by_val["47k"]["in_library"] is False
+    assert by_val["47k"]["library_part_id"] == ""
 
 
 def test_library_price_index_maps_mpn_to_stored_price():

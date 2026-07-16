@@ -305,9 +305,14 @@ def _bom_from_components(comps, lookup=None,
             "mpn": smpn, "manufacturer": ident["manufacturer"],
             "datasheet": ident["datasheet"], "description": ident["description"],
             "value": props.get("Value", ""), "footprint": props.get("Footprint", ""),
-            "part_name": part_name, "refs": []})
+            "part_name": part_name, "library_part_id": "", "refs": []})
         if not g["part_name"] and part_name:  # prefer the first non-blank symbol name in the group
             g["part_name"] = part_name
+        # A line is "in library" if any of its components was matched to a library part
+        # (stamped by library_enrich); the first such id represents the line (D1).
+        lib_pid = props.get("_sr_library_part_id", "")
+        if lib_pid and not g["library_part_id"]:
+            g["library_part_id"] = lib_pid
         g["refs"].append(ref)
 
     if lookup:
@@ -331,7 +336,10 @@ def _bom_from_components(comps, lookup=None,
                      # baseline (an authoritative enrich/library package overrides it below);
                      # rohs/category start blank and fill from the enrich layer or the library.
                      "package": package_from_footprint(g["footprint"]), "rohs": "", "category": "",
-                     "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"])})
+                     "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"]),
+                     # D1 coverage: is this line's part in the shared library, and which one.
+                     "in_library": bool(g["library_part_id"]),
+                     "library_part_id": g["library_part_id"]})
     rows.sort(key=lambda r: (r["value"].lower(), r["footprint"].lower(),
                              _natural_ref(r["refs"][0]) if r["refs"] else ("", 0)))
 
@@ -380,6 +388,10 @@ def library_enrich(comps, match_index):
                 for ch in fill.proposed_changes(match["part"], props):
                     if ch["kind"] == "fill":  # blanks only, never an overwrite
                         enriched[ch["prop"]] = ch["new"]
+                # Record WHICH library part covered this component (D1) so the BOM line can
+                # flag coverage, not just fill blanks. A reserved key the line builder reads.
+                # The match index holds plain dicts (from fill.library_match_records).
+                enriched["_sr_library_part_id"] = match["part"].get("id", "")
         out.append((ref, lib_id, enriched))
     return out
 

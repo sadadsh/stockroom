@@ -11,7 +11,6 @@ import type {
   AuditResult,
   BomDiffResult,
   BomExportKind,
-  BomMatchReport,
   BomResult,
   ChecksResult,
   DiffResponse,
@@ -406,12 +405,6 @@ export const api = {
   // complete-to-add gate).
   enrichBulk(input: { text?: string; csv?: string; category?: string }): Promise<JobRef> {
     return request<JobRef>("POST", "/api/enrich/bulk", { body: input });
-  },
-
-  // Match a pasted BOM (MPN list or CSV) against the library: per line, the part
-  // that already exists and whether it is complete. Offline index reads, synchronous.
-  bomMatch(input: { text?: string; csv?: string }): Promise<BomMatchReport> {
-    return request<BomMatchReport>("POST", "/api/library/bom-match", { body: input });
   },
 
   // Fill a staged candidate: apply the pasted datasheet/purchase links, read

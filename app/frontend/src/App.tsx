@@ -24,18 +24,16 @@ export default function App() {
 function renderRoute(route: Route) {
   switch (route) {
     case "components":
-    case "bom":
-      // The library surfaces are tabs of the Components flagship; the route names
-      // the active tab. Add A Part is not a route: it is the AddPartModal, opened
-      // in-window. Duplicates is a Parts filter and Doctor moved to Settings.
-      return <LibraryPage route={route} />;
+      // The Components flagship is just the Parts view now: BOM Coverage moved to
+      // the project BOM, Duplicates is a Parts filter, and Doctor is in Settings.
+      return <LibraryPage />;
     case "projects":
       return <ProjectsPage />;
     case "settings":
       return <SettingsPage />;
     default:
-      // Unreachable in practice (the rail and palette only offer available
-      // routes); fall back to the Library home rather than a blank frame.
-      return <LibraryPage route="components" />;
+      // Unreachable in practice (the rail only offers available routes); fall back
+      // to the Components home rather than a blank frame.
+      return <LibraryPage />;
   }
 }
