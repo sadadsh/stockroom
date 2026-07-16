@@ -32,10 +32,10 @@ export default {
         ok: "var(--c-ok)",
         warn: "var(--c-warn)",
         err: "var(--c-err)",
-        // the copper identity accent (primary actions, focus, active, links)
+        // the neutral accent (primary actions, focus, active state, section ticks, links)
         acc: "var(--c-acc)",
         "acc-on": "var(--c-acc-on)",
-        // the loud copper (hero rim light, glows) and its low-alpha wash
+        // the loud neutral (near-white/near-black) and its low-alpha active-surface wash
         "acc-strong": "var(--c-acc-strong)",
         "acc-soft": "var(--c-acc-soft)",
       },
