@@ -330,6 +330,32 @@ def test_price_line_at_build_unpriced_line_keeps_qty_but_no_money():
     assert line["tax_tariff"] is None and line["line_total"] is None
 
 
+def test_price_line_orders_more_when_a_higher_break_is_cheaper_total():
+    # needed 60; ordering 60 @ $0.10 = $6.00, but 100 @ $0.05 = $5.00 total -> order the 100.
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    line = price_line_at_build({"qty": 20, "price_breaks": ladder}, build_qty=3, tax_rate=0)
+    assert line["final_qty"] == 100
+    assert line["final_unit_price"] == 0.05
+    assert line["final_extended"] == 5.0
+
+
+def test_price_line_does_not_overbuy_when_ordering_more_costs_more_total():
+    # needed 60; the 1000 break is cheaper per-unit but 1000 x $0.04 = $40 > 60 x $0.10 = $6,
+    # so the engine keeps the exact need and does NOT overbuy for a worse total.
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 1000, "price": 0.04}]
+    line = price_line_at_build({"qty": 20, "price_breaks": ladder}, build_qty=3, tax_rate=0)
+    assert line["final_qty"] == 60
+    assert line["final_extended"] == 6.0
+
+
+def test_price_line_break_optimization_can_be_turned_off():
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    line = price_line_at_build(
+        {"qty": 20, "price_breaks": ladder}, build_qty=3, optimize_breaks=False
+    )
+    assert line["final_qty"] == 60  # exact need, no volume upsell when optimization is off
+
+
 def test_bom_build_rollup_subtotal_tax_and_grand_total():
     rows = [
         {"qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]},   # -> 100 @ 0.05 = 5.00
