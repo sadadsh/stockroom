@@ -1,6 +1,10 @@
 {
   "category": "Switches",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/ts5a3166"
+  },
   "description": "SPST Analog Switch SOT-23-5",
   "display_name": "TS5A3166DBVR",
   "enrichment": {},

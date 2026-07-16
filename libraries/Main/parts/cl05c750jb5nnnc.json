@@ -1,6 +1,10 @@
 {
   "category": "Capacitors",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL05C750JB5NNN"
+  },
   "description": "75pF",
   "display_name": "75pF",
   "enrichment": {},

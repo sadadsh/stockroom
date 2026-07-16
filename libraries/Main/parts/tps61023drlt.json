@@ -1,6 +1,10 @@
 {
   "category": "ICs",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps61023"
+  },
   "description": "Boost converter 6-SOT-5X3",
   "display_name": "TPS61023",
   "enrichment": {},

@@ -1,6 +1,10 @@
 {
   "category": "Switches",
-  "datasheet": null,
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ckswitches.com/media/1471/pts645.pdf"
+  },
   "description": "PTS645",
   "display_name": "PTS645",
   "enrichment": {},
