@@ -11,12 +11,13 @@ import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, SourcedField, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast } from "../lib/toast";
+import { useRouter } from "../lib/router";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
 import { PassiveAddSection } from "../components/PassiveAddSection";
-import { UploadIcon } from "../components/icons";
+import { BackIcon, UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -45,6 +46,7 @@ export function IngestPage() {
   const nextId = useRef(0);
   const job = useJob<StagingCandidate[]>();
   const { toast } = useToast();
+  const { navigate } = useRouter();
 
   const lookUp = useCallback(async () => {
     const v = input.trim();
@@ -164,10 +166,20 @@ export function IngestPage() {
   const blockedFetch = result !== null && plan === null && !pulledSomething;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-14 flex-none items-center gap-3 px-[18px]">
+        <Button
+          onClick={() => navigate("components")}
+          icon={<BackIcon />}
+          small
+        >
+          Back To Parts
+        </Button>
+        <div className="text-lg font-semibold text-t1">Add A Part</div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-1">
       <div className="max-w-[760px] pb-10">
         <Card className="px-4 py-3.5">
-          <Eyebrow>Add A Part</Eyebrow>
           <p className="mb-3 mt-1 text-xs text-t3">
             Paste a product link (Mouser, LCSC, DigiKey...) or a part number. Stockroom pulls
             every field and figures out what it needs. A passive is complete with no files; a
@@ -282,6 +294,7 @@ export function IngestPage() {
             No parts found in what you dropped.
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

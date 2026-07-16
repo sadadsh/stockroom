@@ -272,6 +272,79 @@ export function TabStrip<T extends string>({
   );
 }
 
+export interface SegmentItem<T extends string> {
+  id: T;
+  label: string;
+}
+
+// A segmented single-choice control: the same pill row as TabStrip, but a
+// choice, not a page-level tablist. It is a WAI-ARIA radiogroup (each option is
+// a real `role="radio"` with `aria-checked`, a roving tabindex, and arrow / Home
+// / End keys that both move focus and select, the way a radio group announces).
+// Use it to switch a view or toggle a setting in place (the Library Health
+// sub-switch, the density toggle); use TabStrip when each option reveals a
+// whole `TabPanel`. The checked pill is the raised `bg-raise2` fill.
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  size = "default",
+  className,
+  "aria-label": ariaLabel,
+}: {
+  options: readonly SegmentItem<T>[];
+  value: T;
+  onChange: (id: T) => void;
+  size?: "default" | "small";
+  className?: string;
+  "aria-label": string;
+}) {
+  function onKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const last = options.length - 1;
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = index === last ? 0 : index + 1;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = index === 0 ? last : index - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = last;
+    if (next < 0) return;
+    e.preventDefault();
+    onChange(options[next].id);
+    // Follow the selection with focus so keyboard and pointer land together.
+    const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[role="radio"]',
+    );
+    buttons?.[next]?.focus();
+  }
+
+  const pad = size === "small" ? "px-2.5 py-0.5 text-xs" : "px-3 py-1 text-sm";
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
+    >
+      {options.map((opt, i) => (
+        <button
+          key={opt.id}
+          type="button"
+          role="radio"
+          aria-checked={value === opt.id}
+          tabIndex={value === opt.id ? 0 : -1}
+          onClick={() => onChange(opt.id)}
+          onKeyDown={(e) => onKeyDown(e, i)}
+          className={cx(
+            "rounded-control transition-colors",
+            pad,
+            value === opt.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // The content half of the ARIA tabs pattern: a `role="tabpanel"` region labelled by
 // its tab, so activating a tab has a programmatic target instead of leaving the tab
 // role dangling. `tab` is the active tab id; the ids are derived the same way as the

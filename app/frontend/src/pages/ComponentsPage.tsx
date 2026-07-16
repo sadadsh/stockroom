@@ -20,11 +20,12 @@ import {
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
+import { useRouter } from "../lib/router";
 import { onRequestedPart } from "../lib/partSelection";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
-import { UploadIcon } from "../components/icons";
+import { AddPartIcon, UploadIcon } from "../components/icons";
 import { Button } from "../components/primitives";
 
 export function ComponentsPage() {
@@ -48,6 +49,7 @@ export function ComponentsPage() {
   const deletePart = useDeletePart();
   const setSpecs = useSetSpecs();
   const { toast } = useToast();
+  const { navigate } = useRouter();
 
   const parts = partsQuery.data?.parts ?? [];
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
@@ -170,6 +172,14 @@ export function ComponentsPage() {
         {/* picker */}
         <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
           <div className="px-2 pt-2">
+            <Button
+              variant="accent"
+              icon={<AddPartIcon />}
+              onClick={() => navigate("ingest")}
+              className="mb-2.5 w-full justify-center"
+            >
+              Add Parts
+            </Button>
             <Finder
               search={search}
               onSearch={setSearch}
