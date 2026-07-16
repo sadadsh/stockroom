@@ -1,0 +1,51 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/560112116151.pdf"
+  },
+  "description": "Resistor, 1.13 kOhms, 1 %, 0603",
+  "display_name": "1.13 kOhms 1 % 0603 Resistor",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0603_1608Metric"
+  },
+  "hashes": null,
+  "id": "560112116151",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "560112116151",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-manual",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116151?qs=sGAEpiMZZMtG0KNrPCHnjRpfexHZHoPIOe63Hq9ISdAfX3qbuXrk3g%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "710-560112116151",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116151?qs=sGAEpiMZZMtG0KNrPCHnjRpfexHZHoPIOe63Hq9ISdAfX3qbuXrk3g%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+    "Footprint": "Resistor_SMD:R_0603_1608Metric",
+    "Package": "0603",
+    "Resistance": "1.13 kOhms",
+    "Symbol": "Device:R",
+    "Tolerance": "1 %"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R"
+  },
+  "tags": []
+}
