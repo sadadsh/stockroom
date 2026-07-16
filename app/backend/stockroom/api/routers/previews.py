@@ -108,6 +108,12 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
     return lib, name
 
 
+# Bump when the footprint render changes (layers, hidden text, ...): the SVG cache is keyed by
+# the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
+# be served forever without this token. (C1: copper-only render -> "c1".)
+_FP_RENDER_VERSION = "c1"
+
+
 def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> str:
     """Render a footprint's SVG with the Reference (REF**) and Value text hidden so the
     preview shows clean pad/silk art, not the designator splashed over it. The source
@@ -207,7 +213,7 @@ def previews_router(require_token) -> APIRouter:
         # Content-address the key (like the symbol + model endpoints) so an edited
         # footprint re-renders and two profiles sharing a part_id + footprint name in
         # the one shared cache dir never serve each other's geometry.
-        key = f"fp_{part_id}_{_hash_file(fp_file)}{variant}.svg"
+        key = f"fp_{part_id}_{_FP_RENDER_VERSION}_{_hash_file(fp_file)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
@@ -227,7 +233,7 @@ def previews_router(require_token) -> APIRouter:
         if fp_file is None:
             raise FileNotFoundError(f"KiCad stock footprint {lib}:{name} is not installed")
         variant = "_bw" if bw else ""
-        key = f"stockfp_{lib}_{name}_{_hash_file(fp_file)}{variant}.svg"
+        key = f"stockfp_{lib}_{name}_{_FP_RENDER_VERSION}_{_hash_file(fp_file)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
