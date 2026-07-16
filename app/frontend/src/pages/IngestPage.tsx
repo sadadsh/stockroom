@@ -12,7 +12,8 @@ import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
+import { motion } from "motion/react";
+import { mergeResultIntoCandidate, vendorFromUrl } from "../lib/candidateFromResult";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
@@ -192,7 +193,9 @@ export function IngestPage() {
             {looking ? "Looking Up..." : "Look Up"}
           </Button>
         </div>
-        {!result ? (
+        {looking ? (
+          <LookupProgress input={input} />
+        ) : !result ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
               Browse for ZIP
@@ -280,6 +283,32 @@ export function IngestPage() {
           No parts found in what was dropped.
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// Honest progress while a distributor page is fetched and parsed. The fetch is one opaque,
+// multi-second call (WebView2 past Akamai), so this is an INDETERMINATE bar with a phase-
+// describing, vendor-aware message, never a faked percentage over a single fetch.
+function LookupProgress({ input }: { input: string }) {
+  const trimmed = input.trim();
+  const lead = /^https?:\/\//i.test(trimmed)
+    ? `Fetching from ${vendorFromUrl(trimmed)}`
+    : `Looking up ${trimmed}`;
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <div
+        role="progressbar"
+        aria-label="Looking up the part"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-raise2"
+      >
+        <motion.div
+          className="h-full w-1/3 rounded-full bg-acc"
+          animate={{ x: ["-100%", "300%"] }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+      <span className="text-xs text-t3">{lead} and reading specs, pricing and stock...</span>
     </div>
   );
 }

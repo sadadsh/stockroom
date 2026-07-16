@@ -162,6 +162,20 @@ describe("IngestPage — unified Add A Part", () => {
     expect(await screen.findByText(/Added 118 Ohm/i)).toBeInTheDocument();
   });
 
+  it("shows an honest progress indicator while a distributor page is being pulled", async () => {
+    // a lookup that never resolves keeps the fetch in flight, so the progress state is visible.
+    mockApi.enrichFromUrl.mockReturnValue(new Promise<EnrichmentResult>(() => {}));
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    expect(await screen.findByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByText(/Fetching from Mouser/)).toBeInTheDocument();
+  });
+
   it("routes a bare part number through the MPN lookup, not the URL fetch", async () => {
     mockApi.enrichPart.mockResolvedValue({ ...EMPTY_RESULT, add_plan: null });
     wrap(<IngestPage />);
