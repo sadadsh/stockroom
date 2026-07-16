@@ -20,12 +20,12 @@ import {
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
-import { useRouter } from "../lib/router";
+import { useAddPart } from "../lib/addPart";
 import { onRequestedPart } from "../lib/partSelection";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
-import { AddPartIcon, UploadIcon } from "../components/icons";
+import { AddPartIcon } from "../components/icons";
 import { Button } from "../components/primitives";
 
 export function ComponentsPage() {
@@ -49,7 +49,7 @@ export function ComponentsPage() {
   const deletePart = useDeletePart();
   const setSpecs = useSetSpecs();
   const { toast } = useToast();
-  const { navigate } = useRouter();
+  const { open: openAddPart } = useAddPart();
 
   const parts = partsQuery.data?.parts ?? [];
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
@@ -175,7 +175,7 @@ export function ComponentsPage() {
             <Button
               variant="accent"
               icon={<AddPartIcon />}
-              onClick={() => navigate("ingest")}
+              onClick={openAddPart}
               className="mb-2.5 w-full justify-center"
             >
               Add Parts
@@ -303,13 +303,13 @@ function PickerBody({
     return (
       <div className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
         <span className="text-t3">
-          <UploadIcon />
+          <AddPartIcon />
         </span>
         <div className="text-sm font-medium text-t2">
           No Components Yet
         </div>
         <div className="text-xs text-t3">
-          Drop a vendor ZIP to add your first part.
+          Add a part to get started.
         </div>
       </div>
     );

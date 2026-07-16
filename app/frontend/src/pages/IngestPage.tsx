@@ -11,13 +11,12 @@ import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, SourcedField, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { useRouter } from "../lib/router";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
 import { PassiveAddSection } from "../components/PassiveAddSection";
-import { BackIcon, UploadIcon } from "../components/icons";
+import { UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
 // removing one never shifts another's React key (which would remount its sibling
@@ -46,7 +45,6 @@ export function IngestPage() {
   const nextId = useRef(0);
   const job = useJob<StagingCandidate[]>();
   const { toast } = useToast();
-  const { navigate } = useRouter();
 
   const lookUp = useCallback(async () => {
     const v = input.trim();
@@ -166,136 +164,123 @@ export function IngestPage() {
   const blockedFetch = result !== null && plan === null && !pulledSomething;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-14 flex-none items-center gap-3 px-[18px]">
-        <Button
-          onClick={() => navigate("components")}
-          icon={<BackIcon />}
-          small
-        >
-          Back To Parts
-        </Button>
-        <div className="text-lg font-semibold text-t1">Add A Part</div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-1">
-      <div className="max-w-[760px] pb-10">
-        <Card className="px-4 py-3.5">
-          <p className="mb-3 mt-1 text-xs text-t3">
-            Paste a product link (Mouser, LCSC, DigiKey...) or a part number. Stockroom pulls
-            every field and figures out what it needs. A passive is complete with no files; a
-            non-passive needs its symbol, footprint and 3D model.
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              aria-label="Product link or part number"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") lookUp();
-              }}
-              placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
-              disabled={looking}
-              className="min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc disabled:opacity-50"
-            />
-            <Button
-              variant="accent"
-              onClick={lookUp}
-              disabled={looking || !input.trim()}
-              className="flex-none"
-            >
-              {looking ? "Looking Up..." : "Look Up"}
+    <div className="flex flex-col gap-4">
+      {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
+      <div>
+        <p className="mb-2.5 text-xs text-t3">
+          Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls
+          every field. A passive is complete with no files; a non-passive needs its symbol,
+          footprint and 3D model.
+        </p>
+        <div className="flex items-center gap-2.5">
+          <input
+            aria-label="Product link or part number"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") lookUp();
+            }}
+            placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
+            disabled={looking}
+            className="h-11 min-w-0 flex-1 rounded-control border border-line2 bg-field px-3.5 text-base text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
+          />
+          <Button
+            variant="accent"
+            onClick={lookUp}
+            disabled={looking || !input.trim()}
+            className="h-11 flex-none px-5"
+          >
+            {looking ? "Looking Up..." : "Look Up"}
+          </Button>
+        </div>
+        {!result ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+              Browse for ZIP
             </Button>
+            <span className="text-xs text-t3">
+              Or add a part from a vendor ZIP directly (SnapEDA, Ultra Librarian).
+            </span>
           </div>
-          {!result ? (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+        ) : null}
+      </div>
+
+      {result && plan ? (
+        <Card className="px-4 py-4">
+          <PassiveAddSection
+            key={lookedUpInput}
+            result={result}
+            plan={plan}
+            input={lookedUpInput}
+            onAdded={(name) => {
+              toast(`Added ${name}`, "ok");
+              reset();
+            }}
+            toast={toast}
+          />
+        </Card>
+      ) : null}
+
+      {blockedFetch ? (
+        <Card className="px-4 py-4">
+          <div className="flex flex-col gap-3">
+            <span className="text-sm text-warn">
+              Nothing was pulled. The page may have blocked the fetch, or the link is not a
+              product page. Try a different link, or drop a vendor ZIP.
+            </span>
+            <div className="flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                Browse For ZIP
+                Browse for ZIP
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      {nonPassive ? (
+        <Card className="px-4 py-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-sm text-t2">
+              <Badge tone="warn">Needs Files</Badge>
+              <span>This part needs a symbol, footprint and 3D model.</span>
+            </div>
+            <PulledSummary result={result} />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+                Browse for ZIP
               </Button>
               <span className="text-xs text-t3">
-                Or add a part from a vendor ZIP directly (SnapEDA, Ultra Librarian).
+                Drop its vendor ZIP (SnapEDA, Ultra Librarian) anywhere, or browse. The
+                pulled details are kept, so you only add the files.
               </span>
             </div>
-          ) : null}
+          </div>
         </Card>
+      ) : null}
 
-        {result && plan ? (
-          <Card className="mt-4 px-4 py-4">
-            <PassiveAddSection
-              key={lookedUpInput}
-              result={result}
-              plan={plan}
-              input={lookedUpInput}
-              onAdded={(name) => {
-                toast(`Added ${name}`, "ok");
-                reset();
-              }}
+      {busy ? <Progress progress={job.progress} /> : null}
+      {job.status === "error" ? (
+        <div className="text-sm text-err">Inspect failed. {job.error}</div>
+      ) : null}
+
+      {staged && staged.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          <Eyebrow>Review and Add</Eyebrow>
+          {staged.map(({ id, candidate, datasheetUrl }) => (
+            <CandidateCard
+              key={id}
+              candidate={candidate}
+              initialDatasheetUrl={datasheetUrl}
+              onCommitted={() => removeStaged(id)}
               toast={toast}
             />
-          </Card>
-        ) : null}
-
-        {blockedFetch ? (
-          <Card className="mt-4 px-4 py-4">
-            <div className="flex flex-col gap-3">
-              <span className="text-sm text-warn">
-                Nothing was pulled. The page may have blocked the fetch, or the link is not a
-                product page. Try a different link, or drop a vendor ZIP.
-              </span>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                  Browse For ZIP
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ) : null}
-
-        {nonPassive ? (
-          <Card className="mt-4 px-4 py-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm text-t2">
-                <Badge tone="warn">Needs Files</Badge>
-                <span>This part needs a symbol, footprint and 3D model.</span>
-              </div>
-              <PulledSummary result={result} />
-              <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                  Browse For ZIP
-                </Button>
-                <span className="text-xs text-t3">
-                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) anywhere, or browse. The
-                  pulled details are kept, so you only add the files.
-                </span>
-              </div>
-            </div>
-          </Card>
-        ) : null}
-
-        {busy ? <Progress progress={job.progress} /> : null}
-        {job.status === "error" ? (
-          <div className="mt-4 text-sm text-err">Inspect failed. {job.error}</div>
-        ) : null}
-
-        {staged && staged.length > 0 ? (
-          <div className="mt-6 flex flex-col gap-4">
-            <Eyebrow>Review And Add</Eyebrow>
-            {staged.map(({ id, candidate, datasheetUrl }) => (
-              <CandidateCard
-                key={id}
-                candidate={candidate}
-                initialDatasheetUrl={datasheetUrl}
-                onCommitted={() => removeStaged(id)}
-                toast={toast}
-              />
-            ))}
-          </div>
-        ) : staged && staged.length === 0 ? (
-          <div className="mt-8 text-center text-sm text-t3">
-            No parts found in what you dropped.
-          </div>
-        ) : null}
-      </div>
-      </div>
+          ))}
+        </div>
+      ) : staged && staged.length === 0 ? (
+        <div className="py-4 text-center text-sm text-t3">
+          No parts found in what you dropped.
+        </div>
+      ) : null}
     </div>
   );
 }

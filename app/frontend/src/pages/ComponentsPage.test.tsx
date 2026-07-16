@@ -6,7 +6,8 @@ import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import type { PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
-import { RouterProvider, useRouter } from "../lib/router";
+import { RouterProvider } from "../lib/router";
+import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { requestPart } from "../lib/partSelection";
 import { ComponentsPage } from "./ComponentsPage";
 
@@ -60,25 +61,26 @@ const DETAIL: PartDetail = {
   specs: {},
 };
 
-function wrap(ui: ReactNode, initial: "components" | "ingest" = "components") {
+function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = { current: "" as string };
+  const state = { addPartOpen: false };
   function Probe() {
-    const { route } = useRouter();
-    router.current = route;
+    state.addPartOpen = useAddPart().isOpen;
     return null;
   }
   const utils = render(
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <RouterProvider initial={initial}>
-          <Probe />
-          {ui}
+        <RouterProvider initial="components">
+          <AddPartProvider>
+            <Probe />
+            {ui}
+          </AddPartProvider>
         </RouterProvider>
       </ToastProvider>
     </QueryClientProvider>,
   );
-  return { ...utils, router };
+  return { ...utils, state };
 }
 
 describe("ComponentsPage", () => {
@@ -100,7 +102,7 @@ describe("ComponentsPage", () => {
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
   });
 
-  it("navigates to the Add A Part wizard from the Add Parts toolbar button", async () => {
+  it("opens the Add A Part modal from the Add Parts toolbar button", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
     mockApi.facets.mockResolvedValue({
       by_category: { ICs: 1 },
@@ -110,11 +112,12 @@ describe("ComponentsPage", () => {
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
 
-    const { router } = wrap(<ComponentsPage />);
+    const { state } = wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
+    expect(state.addPartOpen).toBe(false);
     await user.click(await screen.findByRole("button", { name: "Add Parts" }));
-    expect(router.current).toBe("ingest");
+    expect(state.addPartOpen).toBe(true);
   });
 
   it("edits an identity field inline and reports a toast", async () => {
@@ -455,7 +458,9 @@ describe("ComponentsPage", () => {
       <QueryClientProvider client={qc}>
         <ToastProvider>
           <RouterProvider initial="components">
-            <ComponentsPage />
+            <AddPartProvider>
+              <ComponentsPage />
+            </AddPartProvider>
           </RouterProvider>
         </ToastProvider>
       </QueryClientProvider>,

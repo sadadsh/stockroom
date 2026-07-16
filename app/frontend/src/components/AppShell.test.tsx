@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import { AppShell } from "./AppShell";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { RouterProvider, useRouter } from "../lib/router";
+import { RouterProvider } from "../lib/router";
+import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 
@@ -14,9 +15,9 @@ vi.mock("../api/client", async (importActual) => {
   };
 });
 
-function RouteProbe() {
-  const { route } = useRouter();
-  return <div data-testid="route">{route}</div>;
+function AddPartProbe() {
+  const { isOpen } = useAddPart();
+  return <div data-testid="addpart-open">{String(isOpen)}</div>;
 }
 
 function renderShell() {
@@ -28,9 +29,11 @@ function renderShell() {
       <ThemeProvider>
         <ToastProvider>
           <RouterProvider>
-            <AppShell>
-              <RouteProbe />
-            </AppShell>
+            <AddPartProvider>
+              <AppShell>
+                <AddPartProbe />
+              </AppShell>
+            </AddPartProvider>
           </RouterProvider>
         </ToastProvider>
       </ThemeProvider>
@@ -39,7 +42,7 @@ function renderShell() {
 }
 
 describe("AppShell native drop bridge", () => {
-  it("registers the host drop hook, queues the paths, and navigates to ingest", () => {
+  it("registers the host drop hook, queues the paths, and opens the Add A Part modal", () => {
     renderShell();
     // the WebView2 host forwards native drop paths through this global (a plain
     // browser drop cannot see filesystem paths, so this is the only real channel)
@@ -54,7 +57,7 @@ describe("AppShell native drop bridge", () => {
     unsubscribe();
 
     expect(received).toEqual([["C:\\Users\\me\\part.zip", "C:\\Users\\me\\model.step"]]);
-    expect(screen.getByTestId("route").textContent).toBe("ingest");
+    expect(screen.getByTestId("addpart-open").textContent).toBe("true");
   });
 
   it("unregisters the hook on unmount", () => {
@@ -64,13 +67,13 @@ describe("AppShell native drop bridge", () => {
     expect(window.__STOCKROOM_NATIVE_DROP__).toBeUndefined();
   });
 
-  it("ignores junk from the bridge without navigating", () => {
+  it("ignores junk from the bridge without opening the modal", () => {
     renderShell();
     act(() => {
       window.__STOCKROOM_NATIVE_DROP__!([]);
       window.__STOCKROOM_NATIVE_DROP__!([42, null] as unknown as string[]);
     });
-    // an empty or non-string-bearing call must not navigate away
-    expect(screen.getByTestId("route").textContent).toBe("components");
+    // an empty or non-string-bearing call must not open the modal
+    expect(screen.getByTestId("addpart-open").textContent).toBe("false");
   });
 });

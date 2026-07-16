@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import type { PartSummary } from "../api/types";
 import { RouterProvider, useRouter } from "../lib/router";
+import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { ThemeProvider } from "../lib/theme";
 import { requestPart } from "../lib/partSelection";
 import { CommandPalette } from "./CommandPalette";
@@ -55,14 +56,22 @@ function RouteProbe() {
   );
 }
 
+function AddPartProbe() {
+  const { isOpen } = useAddPart();
+  return <div data-testid="addpart-open">{String(isOpen)}</div>;
+}
+
 function renderPalette() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
         <RouterProvider>
-          <RouteProbe />
-          <CommandPalette />
+          <AddPartProvider>
+            <RouteProbe />
+            <AddPartProbe />
+            <CommandPalette />
+          </AddPartProvider>
         </RouterProvider>
       </ThemeProvider>
     </QueryClientProvider>,
@@ -90,7 +99,6 @@ describe("CommandPalette", () => {
     // Go To group: the rail's available destinations, prefix stripped.
     expect(within(dialog).getByText("Go To")).toBeInTheDocument();
     expect(within(dialog).getByText("Components")).toBeInTheDocument();
-    expect(within(dialog).getByText("Add Parts")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
     // Projects has shipped (M7a), so it is now offered.
     expect(within(dialog).getByText("Projects")).toBeInTheDocument();
@@ -99,8 +107,9 @@ describe("CommandPalette", () => {
     // The palette derives from availableNav(), so an unbuilt route is never offered.
     // Every real route has shipped, so that exclusion is locked at the unit level in
     // commands.test.ts (navCommands drops an unavailable entry) rather than here.
-    // Actions group: the one global action.
+    // Actions group: Add a Part (opens the modal) plus the theme toggle.
     expect(within(dialog).getByText("Actions")).toBeInTheDocument();
+    expect(within(dialog).getByText("Add a Part")).toBeInTheDocument();
     expect(within(dialog).getByText("Switch to Light Theme")).toBeInTheDocument();
   });
 
@@ -120,17 +129,18 @@ describe("CommandPalette", () => {
 
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.queryByText("Components")).toBeNull();
-    expect(screen.queryByText("Add Parts")).toBeNull();
+    expect(screen.queryByText("Add a Part")).toBeNull();
   });
 
-  it("navigates when a destination command is clicked", async () => {
+  it("opens the Add A Part modal when its action is clicked", async () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    await user.click(screen.getByText("Add Parts"));
+    expect(screen.getByTestId("addpart-open")).toHaveTextContent("false");
+    await user.click(screen.getByText("Add a Part"));
 
-    expect(screen.getByTestId("route")).toHaveTextContent("ingest");
-    // Running a command closes the palette.
+    // The action opens the modal (not a route) and closes the palette.
+    expect(screen.getByTestId("addpart-open")).toHaveTextContent("true");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -138,25 +148,24 @@ describe("CommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // Empty query: [Library, Add Parts, Duplicates, Doctor, Projects, Settings,
-    // Switch Theme]. Down, down, up lands back on Add Parts (index 1). This is
-    // load-bearing for BOTH arrows: a broken ArrowDown would keep the highlight on
-    // Library, and a broken ArrowUp would leave it on Duplicates, so either
-    // regression routes somewhere other than ingest.
+    // Empty query Go To order: [Components, BOM Coverage, Duplicates, Doctor,
+    // Projects, Settings, ...]. Down, down, up lands back on BOM Coverage (index
+    // 1). Load-bearing for BOTH arrows: a broken ArrowDown would stay on
+    // Components, a broken ArrowUp would leave it on Duplicates.
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}{Enter}");
-    expect(screen.getByTestId("route")).toHaveTextContent("ingest");
+    expect(screen.getByTestId("route")).toHaveTextContent("bom");
   });
 
   it("wraps ArrowUp from the first item to the last", async () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // From the first item (Library), one ArrowUp wraps to the last item (the
-    // theme action); running it flips the theme. A no-op or non-wrapping ArrowUp
-    // would run Library instead and leave the theme unchanged.
+    // From the first item (Components), one ArrowUp wraps to the last item (the
+    // Add a Part action, registered after the theme toggle); running it opens the
+    // modal. A no-op or non-wrapping ArrowUp would run Components instead.
     await user.keyboard("{ArrowUp}{Enter}");
     await waitFor(() =>
-      expect(document.documentElement.dataset.theme).toBe("light"),
+      expect(screen.getByTestId("addpart-open")).toHaveTextContent("true"),
     );
   });
 

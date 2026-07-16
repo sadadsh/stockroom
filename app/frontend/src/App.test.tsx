@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { RouterProvider } from "./lib/router";
+import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 
@@ -64,7 +65,9 @@ describe("App shell", () => {
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider initial="components">
-              <App />
+              <AddPartProvider>
+                <App />
+              </AddPartProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>
@@ -97,7 +100,9 @@ describe("App shell", () => {
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider initial="components">
-              <App />
+              <AddPartProvider>
+                <App />
+              </AddPartProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>
@@ -109,10 +114,12 @@ describe("App shell", () => {
     expect(screen.queryByRole("tab", { name: "Add Parts" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Add Parts" }));
 
-    // The Add A Part wizard renders full-screen with a back affordance and its
-    // own control; the Library tab strip is gone while it is open.
-    expect(screen.getByLabelText("Product link or part number")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back To Parts" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Parts" })).toBeNull();
+    // It opens the Add A Part modal (an in-window dialog) with the flow's own
+    // control and a close, over the current page.
+    const dialog = await screen.findByRole("dialog", { name: "Add a Part" });
+    expect(
+      within(dialog).getByLabelText("Product link or part number"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

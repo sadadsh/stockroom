@@ -7,19 +7,20 @@ import { useCallback, useEffect, type ReactNode } from "react";
 import { Rail } from "./Rail";
 import { DropOverlay } from "./DropOverlay";
 import { CommandPalette } from "./CommandPalette";
-import { useRouter } from "../lib/router";
+import { AddPartModal } from "./AddPartModal";
+import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { navigate } = useRouter();
-  // A file dropped anywhere in the window goes to Ingest: queue the native paths,
-  // then navigate there so the Ingest page consumes them and inspects.
+  const { open: openAddPart } = useAddPart();
+  // A file dropped anywhere in the window goes to Add A Part: queue the native
+  // paths, then open the modal so its flow consumes them and inspects.
   const handleDrop = useCallback(
     (paths: string[]) => {
       queuePaths(paths);
-      navigate("ingest");
+      openAddPart();
     },
-    [navigate],
+    [openAddPart],
   );
   // The real drop channel on Windows: WebView2 only exposes dropped-file paths to
   // the HOST (via pywebview's DOM API), which forwards them through this hook. The
@@ -44,6 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       <DropOverlay onDrop={handleDrop} />
       <CommandPalette />
+      <AddPartModal />
     </div>
   );
 }
