@@ -152,6 +152,11 @@ export interface PassiveAddBody {
   manufacturer?: string;
   datasheet_url?: string;
   purchase_part_number?: string;
+  // A7: the full pulled result carried onto the passive commit (parametric specs + the price
+  // ladder + live stock), so a passive from a link keeps the same depth the non-passive path does.
+  specs?: Record<string, string>;
+  price_breaks?: { qty: number; price: number }[];
+  stock?: number;
 }
 
 export interface ApiErrorBody {
