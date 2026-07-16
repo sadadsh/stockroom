@@ -1,18 +1,39 @@
 /**
- * One staged part in the Add-A-Part flow: a candidate produced by inspecting a vendor
+ * One staged part in the Add A Part flow: a candidate produced by inspecting a vendor
  * ZIP (its symbol/footprint/3D), edited until the complete-to-add gate passes, then
  * committed. When it was seeded from a pulled purchase link (the non-passive branch),
  * the pulled identity/specs/purchase already ride on the candidate and the datasheet
  * link is pre-filled, so the only thing the user still supplies is the asset files.
+ * A known datasheet link counts as the datasheet, so nothing more is needed for it.
  */
-import { useEffect, useState } from "react";
-import { ApiError, api } from "../api/client";
+import { useState } from "react";
+import { ApiError } from "../api/client";
 import { useIngestCommit } from "../api/queries";
-import type { IngestEnrichResult, StagingCandidate } from "../api/types";
-import { useJob } from "../lib/useJob";
+import type { StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Badge, Button, Card, Dot } from "./primitives";
-import { EnrichIcon } from "./icons";
+
+const EMPTY_PROVENANCE = {
+  source: "manual",
+  source_url: "",
+  original_zip_sha256: "",
+  ingested_at: "",
+};
+
+// Seed the candidate's datasheet link from the pulled result so editing the field
+// writes straight onto the candidate that gets committed (the link rides provenance).
+function seedDatasheet(candidate: StagingCandidate, url: string): StagingCandidate {
+  if (!url || candidate.provenance?.source_url) return candidate;
+  return {
+    ...candidate,
+    provenance: { ...(candidate.provenance ?? EMPTY_PROVENANCE), source_url: url },
+  };
+}
+
+// Sentence case for a status phrase; Title Case for a required-field label.
+const sentence = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const titleCase = (s: string) =>
+  s.replace(/\b\w/g, (ch) => ch.toUpperCase());
 
 export function CandidateCard({
   candidate,
@@ -25,72 +46,22 @@ export function CandidateCard({
   onCommitted: () => void;
   toast: (message: string, tone?: ToastTone) => void;
 }) {
-  const [c, setC] = useState<StagingCandidate>(candidate);
+  const [c, setC] = useState<StagingCandidate>(() =>
+    seedDatasheet(candidate, initialDatasheetUrl ?? ""),
+  );
   const [missing, setMissing] = useState<string[]>([]);
   const commit = useIngestCommit();
-  // Autofill: paste a datasheet link (or attach the PDF) and a purchase link, and
-  // the backend fills the remaining identity from the datasheet + enrichment.
-  const enrich = useJob<IngestEnrichResult>();
-  const [dsUrl, setDsUrl] = useState(initialDatasheetUrl ?? "");
-  const [dsFile, setDsFile] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string[]>([]);
-  const filling = enrich.status === "running";
 
   function set<K extends keyof StagingCandidate>(key: K, value: StagingCandidate[K]) {
     setC((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleAutofill() {
-    if (filling) return;
-    setNotes([]);
-    try {
-      const { job_id } = await api.ingestEnrich({
-        candidate: c,
-        datasheet_url: dsUrl.trim() || undefined,
-        // Send the purchase link explicitly so the backend derives its real vendor
-        // (Mouser/DigiKey/LCSC from the host) and scrapes that product page to fill
-        // the rest of the identity, not just what a datasheet holds.
-        purchase_url: (c.purchase?.[0]?.url ?? "").trim() || undefined,
-        datasheet_file: dsFile ?? undefined,
-      });
-      await enrich.run(job_id);
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Autofill failed", "err");
-    }
+  function setDatasheetUrl(url: string) {
+    setC((prev) => ({
+      ...prev,
+      provenance: { ...(prev.provenance ?? EMPTY_PROVENANCE), source_url: url },
+    }));
   }
-
-  async function attachPdf() {
-    const hostApi = (
-      window as unknown as {
-        pywebview?: { api?: { pick_datasheet_file?: () => Promise<string[]> } };
-      }
-    ).pywebview?.api;
-    if (!hostApi?.pick_datasheet_file) {
-      toast(
-        "Open Stockroom as the app to attach a PDF from disk, or paste its link instead.",
-        "neutral",
-      );
-      return;
-    }
-    try {
-      const paths = await hostApi.pick_datasheet_file();
-      if (paths && paths.length > 0) setDsFile(paths[0]);
-    } catch {
-      // the picker was cancelled or is unavailable; nothing to do
-    }
-  }
-
-  useEffect(() => {
-    if (enrich.status === "done" && enrich.result) {
-      setC(enrich.result.candidate);
-      setNotes(enrich.result.notes);
-      const n = enrich.result.filled.length;
-      toast(
-        n > 0 ? `Filled ${n} field${n === 1 ? "" : "s"}.` : "Nothing new was found.",
-        n > 0 ? "ok" : "neutral",
-      );
-    }
-  }, [enrich.status, enrich.result, toast]);
 
   function handleCommit() {
     setMissing([]);
@@ -112,7 +83,19 @@ export function CandidateCard({
 
   // Guard the array itself: a candidate may arrive without a purchase field.
   const purchaseUrl = c.purchase?.[0]?.url ?? "";
+  const datasheetUrl = c.provenance?.source_url ?? "";
   const chosenFootprint = c.footprint_variants[c.chosen_footprint_index] ?? "";
+  // A datasheet is satisfied by a stored PDF OR a known link (mirrors the backend gate).
+  const datasheetPresent = !!c.datasheet_path || !!datasheetUrl;
+
+  // Only surface a gap the candidate has not already resolved (a footprint chosen,
+  // a model present, a datasheet linked), and read it as a sentence, not lowercase.
+  const shownGaps = c.gaps.filter((g) => {
+    if (g.includes("datasheet") && datasheetPresent) return false;
+    if (g.includes("3D model") && c.model_path) return false;
+    if (g.includes("footprint") && chosenFootprint) return false;
+    return true;
+  });
 
   return (
     <Card data-candidate className="px-4 py-4">
@@ -138,7 +121,7 @@ export function CandidateCard({
             set("purchase", v.trim() ? [{ vendor: "manual", url: v.trim() }] : [])
           }
         />
-        <Field label="Datasheet URL" value={dsUrl} mono onChange={setDsUrl} />
+        <Field label="Datasheet URL" value={datasheetUrl} mono onChange={setDatasheetUrl} />
         {c.footprint_variants.length > 1 ? (
           <div className="flex items-center gap-3">
             <span className="w-[116px] flex-none text-xs text-t3">Footprint</span>
@@ -163,68 +146,39 @@ export function CandidateCard({
         <Asset label="Symbol" present={!!c.symbol_name} />
         <Asset label="Footprint" present={!!chosenFootprint} />
         <Asset label="3D Model" present={!!c.model_path} />
-        <Asset label="Datasheet" present={!!c.datasheet_path} />
+        <Asset label="Datasheet" present={datasheetPresent} />
       </div>
 
-      {c.gaps.length > 0 ? (
+      {shownGaps.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {c.gaps.map((g) => (
+          {shownGaps.map((g) => (
             <Badge key={g} tone="warn">
-              {g}
+              {sentence(g)}
             </Badge>
           ))}
         </div>
       ) : null}
 
-      {notes.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-1">
-          {notes.map((n) => (
-            <div key={n} className="text-xs text-warn">
-              {n}
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {enrich.status === "error" ? (
-        <div className="mt-3 text-xs text-err">Autofill failed. {enrich.error}</div>
-      ) : null}
-
       {missing.length > 0 ? (
         <div className="mt-3">
           <div className="mb-1.5 text-xs text-err">
-            Still needs before it can be added
+            This part still needs:
           </div>
           <div className="flex flex-wrap gap-1.5">
             {missing.map((m) => (
               <Badge key={m} tone="err">
-                {m}
+                {titleCase(m)}
               </Badge>
             ))}
           </div>
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Button
-            onClick={handleAutofill}
-            disabled={filling || commit.isPending}
-            icon={<EnrichIcon />}
-          >
-            {filling ? "Filling..." : "Autofill"}
-          </Button>
-          <Button small onClick={attachPdf} disabled={filling}>
-            Attach PDF
-          </Button>
-          {dsFile ? (
-            <span className="max-w-[200px] truncate text-xs text-t3">{baseName(dsFile)}</span>
-          ) : null}
-        </div>
+      <div className="mt-4 flex items-center justify-end">
         <Button
           variant="accent"
           onClick={handleCommit}
-          disabled={commit.isPending || filling}
+          disabled={commit.isPending}
         >
           {commit.isPending ? "Adding..." : "Add To Library"}
         </Button>

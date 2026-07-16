@@ -4,7 +4,7 @@ import pytest
 
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.kicad.footprint import Footprint
-from stockroom.model.part import PartRecord, Purchase
+from stockroom.model.part import Datasheet, PartRecord, Purchase
 from stockroom.mutation.library_ops import (
     IncompleteError,
     LibraryOps,
@@ -154,6 +154,23 @@ def test_add_part_rejects_missing_purchase_link(tmp_path, fixtures_dir):
     with pytest.raises(IncompleteError) as ei:
         ops.add_part(staged)
     assert "purchase link" in ei.value.missing
+
+
+def test_datasheet_url_alone_satisfies_the_gate_and_lands_on_the_record(tmp_path, fixtures_dir):
+    """A pulled datasheet LINK (no downloaded PDF) satisfies the datasheet passport
+    field, the same way PartRecord.is_complete accepts a URL. So a non-passive part
+    whose vendor ZIP carried no datasheet but whose product page gave a link is
+    addable, and the link lands on the committed record."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.datasheet_source = None
+    staged.datasheet_meta = Datasheet(source_url="https://www.analog.com/MAX4995B/datasheet")
+    # the gate no longer reports datasheet missing when only the URL is known
+    assert "datasheet" not in staged_missing_fields(staged)
+    record = LibraryOps(profile, repo).add_part(staged)
+    assert record.datasheet is not None
+    assert record.datasheet.source_url == "https://www.analog.com/MAX4995B/datasheet"
+    assert record.datasheet.file == ""  # no PDF was downloaded, just the link
+    assert record.is_complete
 
 
 def test_staged_missing_fields_lists_all_gaps_in_passport_order(tmp_path, fixtures_dir):
