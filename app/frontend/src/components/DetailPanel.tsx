@@ -29,6 +29,10 @@ import {
 // The passport has ten required fields (stockroom.model.part.REQUIRED_FIELDS).
 const PASSPORT_TOTAL = 10;
 
+// Spec keys that are NOT parametric specs: the asset references (shown as Files cards) and the
+// pinout (shown as its own table). Everything else in specs is a real spec the panel lists (B1).
+const SPEC_HIDDEN_KEYS = new Set(["Symbol", "Footprint", "3D Model", "product_url", "pinout"]);
+
 const _KNOWN_VENDORS: Record<string, string> = {
   lcsc: "LCSC",
   mouser: "Mouser",
@@ -103,6 +107,16 @@ export function DetailPanel({
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
+  // B1: every parametric spec the record holds (Resistance, Tolerance, Voltage Rating, ...) that
+  // the panel used to hide - shown in a Specifications section. Asset/internal keys and the pinout
+  // (rendered as its own table) are excluded; only scalar spec values are listed.
+  const specRows = Object.entries(detail?.specs ?? {}).filter(
+    ([key, value]) =>
+      !SPEC_HIDDEN_KEYS.has(key) &&
+      value != null &&
+      typeof value !== "object" &&
+      String(value).trim() !== "",
+  );
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -295,6 +309,27 @@ export function DetailPanel({
           <IdRow label="Tags" value={detail.tags.join(", ")} />
         ) : null}
       </div>
+
+      {/* specifications (B1): every parametric spec the record holds, which the panel used to
+          hide. A two-column key/value grid; the count is shown so the depth is legible. */}
+      {specRows.length > 0 ? (
+        <>
+          <Eyebrow className="mb-2.5 mt-6">
+            Specifications <span className="text-t3">({specRows.length})</span>
+          </Eyebrow>
+          <div className="grid max-w-[600px] grid-cols-1 gap-x-8 sm:grid-cols-2">
+            {specRows.map(([key, value]) => (
+              <div
+                key={key}
+                className="flex items-baseline justify-between gap-4 border-b border-line py-1.5"
+              >
+                <span className="text-sm text-t3">{key}</span>
+                <span className="text-right text-sm text-t1">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {/* pinout: shown whenever the record carries one (read-only view of the
           persisted specs.pinout, source of truth per M6i). */}

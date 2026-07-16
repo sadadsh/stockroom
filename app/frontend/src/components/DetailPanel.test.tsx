@@ -112,6 +112,32 @@ describe("DetailPanel files previews (M6d)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("lists the record's parametric specs in a Specifications section, hiding asset keys (B1)", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          specs: {
+            Resistance: "1.1 kOhms",
+            Tolerance: "1%",
+            Symbol: "Device:R",
+            Footprint: "Resistor_SMD:R_0603_1608Metric",
+            "3D Model": "Resistor_SMD.3dshapes/R_0603.wrl",
+            pinout: [{ pin: "1", name: "A" }],
+          },
+        })}
+        {...BASE}
+      />,
+    );
+    // the two real specs are listed
+    expect(screen.getByText("Resistance")).toBeInTheDocument();
+    expect(screen.getByText("1.1 kOhms")).toBeInTheDocument();
+    expect(screen.getByText("Tolerance")).toBeInTheDocument();
+    // the count reflects only the real specs (asset keys + pinout excluded)
+    expect(screen.getByText("(2)")).toBeInTheDocument();
+    // asset references are shown as Files cards, never listed as specs
+    expect(screen.queryByText("Device:R")).not.toBeInTheDocument();
+  });
+
   it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {
     // A passive owns no model.file but inherits the KiCad stock footprint's built-in 3D model,
     // which the model.glb endpoint resolves from the footprint; the card must read as present.
