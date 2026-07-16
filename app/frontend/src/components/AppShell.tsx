@@ -6,7 +6,6 @@
 import { useCallback, useEffect, type ReactNode } from "react";
 import { Rail } from "./Rail";
 import { DropOverlay } from "./DropOverlay";
-import { CommandPalette } from "./CommandPalette";
 import { AddPartModal } from "./AddPartModal";
 import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
@@ -44,7 +43,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Rail />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       <DropOverlay onDrop={handleDrop} />
-      <CommandPalette />
       <AddPartModal />
     </div>
   );

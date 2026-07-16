@@ -7,7 +7,7 @@
  * Honest degradation: a connection error shows a retry surface (not a crash), and
  * a genuinely empty library shows an empty state that names how to add parts.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
@@ -24,7 +24,6 @@ import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
 import { useAddPart } from "../lib/addPart";
-import { onRequestedPart } from "../lib/partSelection";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
@@ -37,13 +36,6 @@ export function ComponentsPage() {
   const [completeOnly, setCompleteOnly] = useState(false);
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // A cross-page part request (from the Ctrl+K palette) is recorded here
-  // synchronously during the drain so the auto-select-first effect can honor it
-  // instead of racing it. On a warm-cache mount both effects run in the same
-  // commit and the auto-select effect's `selectedId` closure is still null, so a
-  // ref (updated by the drain, which is declared first) is the only thing it can
-  // read to know a request is pending before its own state has re-rendered.
-  const requestedRef = useRef<string | null>(null);
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
@@ -162,20 +154,6 @@ export function ComponentsPage() {
     });
   }
 
-  // A cross-page "select this part" request (fired by the Ctrl+K palette on any
-  // route) arrives here. Record it in the ref FIRST (so the auto-select effect can
-  // honor it in the same commit), clear the filters so the requested part is
-  // guaranteed to be in the list, then select it.
-  useEffect(() => {
-    return onRequestedPart((id) => {
-      requestedRef.current = id;
-      setSearch("");
-      setCategory(null);
-      setCompleteOnly(false);
-      setSelectedId(id);
-    });
-  }, []);
-
   // Auto-select the first part when the current selection falls out of the list
   // (a new search, a category change, or the first successful load). Act only on
   // SETTLED data: while a refetch is in flight TanStack retains the previous
@@ -184,21 +162,6 @@ export function ComponentsPage() {
   const partsFetching = partsQuery.isFetching;
   useEffect(() => {
     if (partsFetching) return;
-    const requested = requestedRef.current;
-    if (requested) {
-      // Honor a pending cross-page request the moment its part is in the settled
-      // list. This must win over auto-select-first even on a warm-cache mount,
-      // where both effects run in the same commit and this effect's `selectedId`
-      // closure is still the pre-request value.
-      if (parts.some((p) => p.id === requested)) {
-        requestedRef.current = null;
-        if (selectedId !== requested) setSelectedId(requested);
-        return;
-      }
-      // The requested part is genuinely absent from the settled list (deleted, or
-      // a stale request): give up on it and fall back to the normal selection.
-      requestedRef.current = null;
-    }
     if (parts.length === 0) {
       if (selectedId !== null) setSelectedId(null);
       return;

@@ -8,7 +8,6 @@ import type { PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
-import { requestPart } from "../lib/partSelection";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -387,118 +386,6 @@ describe("ComponentsPage", () => {
       undefined,
     );
     expect(await screen.findByText("Pinout saved")).toBeInTheDocument();
-  });
-
-  it("consumes a palette part request: clears filters and selects that part even when a search hid it", async () => {
-    const R10K: PartSummary = {
-      id: "r10k",
-      display_name: "R 10k",
-      category: "Passives",
-      mpn: "RC0402-10K",
-      manufacturer: "Yageo",
-      is_complete: true,
-      missing: [],
-    };
-    // listParts honors the q filter so a search can hide the requested part; the
-    // request must clear that filter so the part comes back and gets selected.
-    mockApi.listParts.mockImplementation(async (args) => {
-      const all = [SUMMARY, R10K];
-      const q = (args.q ?? "").toLowerCase();
-      const parts = q
-        ? all.filter(
-            (p) =>
-              p.display_name.toLowerCase().includes(q) ||
-              p.mpn.toLowerCase().includes(q),
-          )
-        : all;
-      return { parts, count: parts.length };
-    });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1, Passives: 1 },
-      by_manufacturer: {},
-      complete: 2,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockImplementation(async (id) =>
-      id === "r10k"
-        ? { ...DETAIL, id: "r10k", display_name: "R 10k", description: "Thick Film Resistor" }
-        : DETAIL,
-    );
-
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-
-    // Filter the list down to just LM358; R 10k is now hidden.
-    await screen.findByText("Dual Operational Amplifier");
-    const search = screen.getByLabelText("Search Parts");
-    await user.type(search, "LM358");
-    await waitFor(() => expect(screen.queryByText("R 10k")).toBeNull());
-
-    // A palette request for the hidden part clears the filter and selects it.
-    act(() => requestPart("r10k"));
-
-    expect(await screen.findByText("Thick Film Resistor")).toBeInTheDocument();
-    expect(mockApi.partDetail).toHaveBeenCalledWith("r10k");
-    expect(screen.getByLabelText("Search Parts")).toHaveValue("");
-  });
-
-  it("honors a palette part request on a FRESH mount with a warm parts cache (no auto-select clobber)", async () => {
-    // The palette pre-warms the shared parts cache via its enabled:open query, so a
-    // fresh ComponentsPage can mount with the list already settled (isFetching
-    // false) on its very first render. In that same commit the request-drain effect
-    // and the auto-select-first effect both run; the requested part (which is NOT
-    // first in the list) must still win. This is the warm-cache cross-page race the
-    // same-page test above cannot see (there a search filter forces isFetching true,
-    // which gates auto-select). Regression lock.
-    const R10K: PartSummary = {
-      id: "r10k",
-      display_name: "R 10k",
-      category: "Passives",
-      mpn: "RC0402-10K",
-      manufacturer: "Yageo",
-      is_complete: true,
-      missing: [],
-    };
-    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY, R10K], count: 2 });
-    mockApi.facets.mockResolvedValue({
-      by_category: { ICs: 1, Passives: 1 },
-      by_manufacturer: {},
-      complete: 2,
-      incomplete: 0,
-    });
-    mockApi.partDetail.mockImplementation(async (id) =>
-      id === "r10k"
-        ? { ...DETAIL, id: "r10k", display_name: "R 10k", description: "Thick Film Resistor" }
-        : DETAIL,
-    );
-
-    // staleTime mirrors production (main.tsx uses 15s) so the warm cache is FRESH
-    // and does NOT refetch on mount -> isFetching is false on the first render,
-    // which is exactly the condition that makes the auto-select/drain race fire.
-    const qc = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-    });
-    // Warm the exact shared key the palette's enabled:open query populates.
-    qc.setQueryData(["parts", "", "", false], { parts: [SUMMARY, R10K], count: 2 });
-    // The request was fired from another route, before this page mounted.
-    requestPart("r10k");
-
-    render(
-      <QueryClientProvider client={qc}>
-        <ToastProvider>
-          <RouterProvider initial="components">
-            <AddPartProvider>
-              <ComponentsPage />
-            </AddPartProvider>
-          </RouterProvider>
-        </ToastProvider>
-      </QueryClientProvider>,
-    );
-
-    // The requested (second) part is selected, not the first part in the list.
-    expect(await screen.findByText("Thick Film Resistor")).toBeInTheDocument();
-    expect(mockApi.partDetail).toHaveBeenCalledWith("r10k");
-    expect(screen.queryByText("Dual Operational Amplifier")).toBeNull();
   });
 
   it("shows the honest empty state when the library has no parts", async () => {

@@ -1,13 +1,10 @@
 /**
  * The single source of truth for the app's destinations. The rail shows only the
- * top-level surfaces (Library, Projects, Settings); the library sub-surfaces
- * (Add Parts, BOM Coverage, Duplicates, Doctor) live under Library and are reached
- * by route so the Ctrl+K palette can still deep-link to each. How each renders is
- * the Library flagship's business: BOM Coverage and the two health tools are tabs
- * (Duplicates + Doctor fold behind one Library Health tab), while Add Parts is a
- * full-screen wizard off the Parts toolbar. Both the rail and the palette derive
- * from this list, so they can never disagree. `available` gates what the user can
- * actually reach: a surface only appears once its page is really built and wired.
+ * top-level surfaces (Components, Projects, Settings); the library sub-surfaces
+ * (BOM Coverage, Doctor) live under Components as tabs, and Add Parts is a
+ * full-screen wizard off the Parts toolbar. The rail derives from this list, so
+ * they can never disagree. `available` gates what the user can actually reach: a
+ * surface only appears once its page is really built and wired.
  */
 import type { Route } from "./router";
 
