@@ -310,26 +310,9 @@ export function DetailPanel({
         ) : null}
       </div>
 
-      {/* specifications (B1): every parametric spec the record holds, which the panel used to
-          hide. A two-column key/value grid; the count is shown so the depth is legible. */}
-      {specRows.length > 0 ? (
-        <>
-          <Eyebrow className="mb-2.5 mt-6">
-            Specifications <span className="text-t3">({specRows.length})</span>
-          </Eyebrow>
-          <div className="grid max-w-[600px] grid-cols-1 gap-x-8 sm:grid-cols-2">
-            {specRows.map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-baseline justify-between gap-4 border-b border-line py-1.5"
-              >
-                <span className="text-sm text-t3">{key}</span>
-                <span className="text-right text-sm text-t1">{String(value)}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
+      {/* specifications (B1) with progressive disclosure (B2): every parametric spec the record
+          holds, collapsed to the key ones so a deep 28-spec part is scannable, not a wall. */}
+      {specRows.length > 0 ? <SpecificationsSection rows={specRows} /> : null}
 
       {/* pinout: shown whenever the record carries one (read-only view of the
           persisted specs.pinout, source of truth per M6i). */}
@@ -602,6 +585,43 @@ function FileCard({
     );
   }
   return <Card className={cls}>{stage}{footer}</Card>;
+}
+
+// B2 progressive disclosure: a deep part can carry ~28 specs; show the first (most important,
+// insertion-ordered) ones and let the rest expand, so the section is scannable, not a wall.
+const SPEC_COLLAPSE_AT = 10;
+
+function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
+  const [showAll, setShowAll] = useState(false);
+  const collapsible = rows.length > SPEC_COLLAPSE_AT;
+  const shown = showAll || !collapsible ? rows : rows.slice(0, SPEC_COLLAPSE_AT);
+  return (
+    <>
+      <Eyebrow className="mb-2.5 mt-6">
+        Specifications <span className="text-t3">({rows.length})</span>
+      </Eyebrow>
+      <div className="grid max-w-[600px] grid-cols-1 gap-x-8 sm:grid-cols-2">
+        {shown.map(([key, value]) => (
+          <div
+            key={key}
+            className="flex items-baseline justify-between gap-4 border-b border-line py-1.5"
+          >
+            <span className="text-sm text-t3">{key}</span>
+            <span className="text-right text-sm text-t1">{String(value)}</span>
+          </div>
+        ))}
+      </div>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-2.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
+        >
+          {showAll ? "Show fewer" : `Show all ${rows.length}`}
+        </button>
+      ) : null}
+    </>
+  );
 }
 
 function Sourcing({
