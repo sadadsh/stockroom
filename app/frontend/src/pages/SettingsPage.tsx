@@ -7,7 +7,10 @@
  * key is only ever shown as a last-4 hint.
  */
 import { useState, type ReactNode } from "react";
-import { ApiError } from "../api/client";
+import { ApiError, api } from "../api/client";
+import type { WiringReport } from "../api/types";
+import { useJob } from "../lib/useJob";
+import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import {
   useActivateProfile,
   useApplyUpdate,
@@ -23,7 +26,7 @@ import {
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Eyebrow } from "../components/primitives";
+import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
@@ -78,6 +81,7 @@ export function SettingsPage() {
           <SyncSection />
           <GitHubSection />
           <KiCadSection />
+          <LibraryHealthSection />
           <DistributorSection />
           <UpdateSection />
         </div>
@@ -341,6 +345,25 @@ function KiCadSection() {
   const settings = useSettings();
   const save = useUpdateSettings();
   const { toast } = useToast();
+  // The manual re-wire job (moved here from the Doctor page in D3): wiring runs
+  // automatically on launch and profile switch, and this button re-runs it on demand.
+  const wireJob = useJob<WiringReport>();
+  const [wiring, setWiring] = useState(false);
+
+  async function onWire() {
+    setWiring(true);
+    try {
+      const { job_id } = await api.wireKicad();
+      wireJob.run(job_id);
+    } catch (e) {
+      toast(errMsg(e), "err");
+    } finally {
+      setWiring(false);
+    }
+  }
+
+  const wireBusy = wiring || wireJob.status === "running";
+  const wireReport = wireJob.status === "done" ? wireJob.result : null;
   // null = untouched (show the saved value), so the inputs stay prefilled from
   // the server without an effect and a save simply reseeds them
   const [cfgDraft, setCfgDraft] = useState<string | null>(null);
@@ -409,13 +432,48 @@ function KiCadSection() {
               ) : settings.data?.kicad_wired ? (
                 <span className="text-ok">Wired to the active profile</span>
               ) : (
-                <span className="text-warn">
-                  Not wired yet (the Doctor page can wire it manually)
-                </span>
+                <span className="text-warn">Not wired yet (use Wire KiCad below)</span>
               )
             }
           />
         </>
+      ) : null}
+
+      {sys.data ? (
+        <div className="mt-3.5 flex flex-col gap-3">
+          <div>
+            <Button onClick={onWire} disabled={wireBusy}>
+              {wireBusy ? "Wiring..." : "Wire KiCad"}
+            </Button>
+          </div>
+          {wireJob.status === "running" && wireJob.progress?.message ? (
+            <p className="text-xs text-t3">{wireJob.progress.message}...</p>
+          ) : null}
+          {wireJob.status === "error" ? (
+            <p className="text-sm text-err">{wireJob.error ?? "Wiring failed."}</p>
+          ) : null}
+          {wireReport ? (
+            <div className="flex flex-col gap-1.5 rounded-control border border-line bg-raise2 p-3 text-xs">
+              <div className="text-t2">
+                Registered {wireReport.categories_registered.length}{" "}
+                {wireReport.categories_registered.length === 1 ? "category" : "categories"}: added{" "}
+                {wireReport.symbol_rows_added} symbol and {wireReport.footprint_rows_added} footprint{" "}
+                {wireReport.footprint_rows_added === 1 ? "row" : "rows"}.
+              </div>
+              {wireReport.restart_needed ? (
+                <div className="flex items-center gap-2 text-warn">
+                  <Dot tone="warn" />
+                  <span>Restart KiCad to load the updated tables.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-ok">
+                  <Dot tone="ok" />
+                  <span>KiCad is wired and ready.</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mt-3.5 flex flex-col gap-2.5">

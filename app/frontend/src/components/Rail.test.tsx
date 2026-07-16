@@ -36,7 +36,7 @@ describe("Rail", () => {
   });
 
   it("keeps Library marked active while a folded library tab is the route", () => {
-    state.route = "doctor";
+    state.route = "bom";
     render(<Rail />);
     expect(screen.getByRole("button", { name: /Components/ })).toHaveAttribute(
       "aria-current",
