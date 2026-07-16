@@ -50,7 +50,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   if (stockNum != null) stats.push(["Stock", `${stockNum.toLocaleString()} in stock`]);
   if (lead) stats.push(["Lead Time", lead]);
   if (lifecycle) stats.push(["Lifecycle", lifecycle]);
-  if (best) stats.push(["Best Price", `From ${money(best.price, best.currency)} / ea`]);
+  if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
 
   if (stats.length === 0 && breaks.length === 0) return null;
 
@@ -67,7 +67,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
       {breaks.length > 0 ? (
         <div className="rounded-card border border-line2 bg-raise2 p-3">
           <div className="mb-2 grid grid-cols-2 text-2xs uppercase tracking-wide text-t3">
-            <span>Quantity</span>
+            <span>Order Size</span>
             <span className="text-right">Unit Price</span>
           </div>
           <div className="flex max-h-44 flex-col gap-1 overflow-y-auto">

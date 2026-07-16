@@ -37,7 +37,7 @@ describe("PulledDepth", () => {
     expect(screen.getByText("15 Weeks")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
     // best price = the lowest unit price across the ladder (the high-quantity break).
-    expect(screen.getByText("From $0.043 / ea")).toBeInTheDocument();
+    expect(screen.getByText("$0.043/ea")).toBeInTheDocument();
   });
 
   it("renders the full price-break ladder with thousands-separated quantities", () => {
