@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
@@ -236,6 +236,80 @@ describe("DetailPanel pinout (M6i)", () => {
     expect(screen.getByText("GND")).toBeInTheDocument();
     expect(screen.getByText("OUT")).toBeInTheDocument();
     expect(screen.queryByText(/no pins match/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel asset tool pills", () => {
+  it("renders a tool pill on each present asset, mapping the tool value to a nice label", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          symbol: { lib: "Device", name: "R", tool: "kicad" },
+          footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric", tool: "altium" },
+          model: { file: "models/r.step", tool: "kicad" },
+        })}
+        {...BASE}
+      />,
+    );
+    // "altium" Title Cases to "Altium" (data-driven for future Altium support)
+    expect(screen.getByText("Altium")).toBeInTheDocument();
+    // "kicad" maps to the proper "KiCad" casing, on the symbol + 3D model cards
+    expect(screen.getAllByText("KiCad").length).toBe(2);
+  });
+
+  it("defaults an absent tool field to KiCad on every present asset", () => {
+    // the base fixture carries symbol/footprint/model with no tool field
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    expect(screen.getAllByText("KiCad")).toHaveLength(3);
+  });
+});
+
+describe("DetailPanel attach-after affordance", () => {
+  it("opens the attach modal for a missing symbol and posts the entered lib + name", async () => {
+    const onAttachSymbol = vi.fn();
+    wrap(
+      <DetailPanel
+        detail={detail({ symbol: null })}
+        {...BASE}
+        onAttachSymbol={onAttachSymbol}
+        onAttachFootprint={vi.fn()}
+      />,
+    );
+    // the missing symbol card is now an Attach button (only one such button exists yet)
+    await userEvent.click(screen.getByRole("button", { name: "Attach Symbol" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Attach Symbol" });
+    await userEvent.type(within(dialog).getByLabelText("Library"), "Device");
+    await userEvent.type(within(dialog).getByLabelText("Name"), "R");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Attach Symbol" }));
+
+    expect(onAttachSymbol).toHaveBeenCalledWith("Device", "R");
+  });
+
+  it("disables Attach until a name is entered (the backend gate requires it)", async () => {
+    wrap(
+      <DetailPanel
+        detail={detail({ footprint: null })}
+        {...BASE}
+        onAttachSymbol={vi.fn()}
+        onAttachFootprint={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Attach Footprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "Attach Footprint" });
+    // name empty -> submit disabled
+    expect(within(dialog).getByRole("button", { name: "Attach Footprint" })).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText("Name"), "R_0603_1608Metric");
+    expect(within(dialog).getByRole("button", { name: "Attach Footprint" })).toBeEnabled();
+  });
+
+  it("offers no Attach affordance in a read-only panel (no handler given)", () => {
+    wrap(<DetailPanel detail={detail({ symbol: null })} {...BASE} />);
+    expect(
+      screen.queryByRole("button", { name: "Attach Symbol" }),
+    ).not.toBeInTheDocument();
+    // it degrades to the honest Not Linked state
+    expect(screen.getByText("Not Linked")).toBeInTheDocument();
   });
 });
 

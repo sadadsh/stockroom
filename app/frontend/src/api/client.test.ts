@@ -180,6 +180,37 @@ describe("api client", () => {
     });
   });
 
+  it("POSTs a symbol reference with lib, name and the default kicad tool", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ id: "r1", symbol: { lib: "Device", name: "R", tool: "kicad" } }),
+    );
+    const res = await api.attachSymbol("r1", "Device", "R");
+    expect(res.symbol?.name).toBe("R");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/symbol");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      lib: "Device",
+      name: "R",
+      tool: "kicad",
+    });
+  });
+
+  it("POSTs a footprint reference and carries an explicit tool", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ id: "r1", footprint: { lib: "L", name: "F", tool: "altium" } }),
+    );
+    await api.attachFootprint("r1", "L", "F", "altium");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/footprint");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      lib: "L",
+      name: "F",
+      tool: "altium",
+    });
+  });
+
   it("reads the redacted settings", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({ mouser_api_key_set: true, mouser_api_key_hint: "1234" }),

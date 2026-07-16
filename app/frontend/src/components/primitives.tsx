@@ -151,14 +151,19 @@ export function Eyebrow({
 }
 
 type BadgeTone = "warn" | "err" | "ok" | "neutral";
+type BadgeSize = "default" | "sm";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
+  size?: BadgeSize;
 }
 
-// A status pill: the mockup's .chip / .mpill / .complete.
+// A status pill: the mockup's .chip / .mpill / .complete. `size="sm"` is the tighter
+// tag used inline in dense rows (the Files footer's tool pill), keeping the same 6px
+// control radius.
 export function Badge({
   tone = "warn",
+  size = "default",
   className,
   children,
   ...rest
@@ -169,10 +174,15 @@ export function Badge({
     ok: "text-ok bg-[rgba(108,192,138,0.14)]",
     neutral: "text-t2 bg-raise2",
   };
+  const sizes: Record<BadgeSize, string> = {
+    default: "px-2.5 py-1 text-xs",
+    sm: "px-1.5 py-0.5 text-2xs",
+  };
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-control px-2.5 py-1 text-xs font-medium",
+        "inline-flex items-center rounded-control font-medium",
+        sizes[size],
         tones[tone],
         className,
       )}

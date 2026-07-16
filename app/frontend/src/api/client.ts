@@ -322,6 +322,26 @@ export const api = {
     });
   },
 
+  // Attach (or repoint) a symbol / footprint REFERENCE on an existing part AFTER it
+  // was added (assets no longer gate entry; they are attachable after). The reference
+  // is a lib_id (no file copied), tagged with the EDA tool it targets ("kicad" default).
+  // `name` is required; an empty name is a 422 from the gate. Returns the updated record.
+  attachSymbol(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/symbol`,
+      { body: { lib, name, tool } },
+    );
+  },
+
+  attachFootprint(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/footprint`,
+      { body: { lib, name, tool } },
+    );
+  },
+
   // Persist canonical spec data (e.g. an enriched pinout) onto the record so a
   // viewer reads the source of truth (M6i). Each entry is {value, source?,
   // confidence?}; the server merges key-by-key (an existing key is kept unless
