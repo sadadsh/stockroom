@@ -33,6 +33,7 @@ const RESULT: EnrichmentResult = {
   datasheet_url: sf("https://st.com/stm32.pdf"),
   stock: sf(1500),
   package: sf("LQFP-48"),
+  dist_pns: { mouser: "581-STM32F103C8T6" },
   price_breaks: [{ qty: 1, price: 2.5, currency: "USD" }],
   specs: {
     "Core Processor": sf("ARM Cortex-M3"),
@@ -64,6 +65,8 @@ describe("mergeResultIntoCandidate", () => {
     expect(merged.purchase[0].vendor).toBe("Mouser");
     expect(merged.purchase[0].price_breaks).toEqual([{ qty: 1, price: 2.5, currency: "USD" }]);
     expect(merged.purchase[0].stock).toBe(1500);
+    // the Mouser order number rides onto the purchase as its part number (A3)
+    expect(merged.purchase[0].part_number).toBe("581-STM32F103C8T6");
   });
 
   it("does not overwrite a ZIP identity the link left blank", () => {

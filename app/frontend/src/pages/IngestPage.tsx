@@ -8,11 +8,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
-import type { EnrichmentResult, SourcedField, StagingCandidate } from "../api/types";
+import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useToast } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
+import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
 import { PassiveAddSection } from "../components/PassiveAddSection";
@@ -28,9 +29,6 @@ interface Staged {
   datasheetUrl: string;
 }
 
-function sv(s: SourcedField | null | undefined): string {
-  return s == null ? "" : String(s.value ?? "");
-}
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
