@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "595-SN74LVC1G08DBVT",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 5486,
-      "url": "https://www.mouser.com/c/?q=SN74LVC1G08DBVT",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G08DBVT",
       "vendor": "Mouser"
     }
   ],

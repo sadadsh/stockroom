@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "667-ERJ-PA2F1242X",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -78,7 +78,7 @@
         }
       ],
       "stock": 28035,
-      "url": "https://www.mouser.com/c/?q=ERJ-PA2F1242X",
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-PA2F1242X",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "71-CRCW0402-3.32-E3",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 91174,
-      "url": "https://www.mouser.com/c/?q=CRCW04023R32FKED",
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED",
       "vendor": "Mouser"
     }
   ],

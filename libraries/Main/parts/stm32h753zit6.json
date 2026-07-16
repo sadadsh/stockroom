@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "511-STM32H753ZIT6",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -63,7 +63,7 @@
         }
       ],
       "stock": 14,
-      "url": "https://www.mouser.com/c/?q=STM32H753ZIT6",
+      "url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6",
       "vendor": "Mouser"
     }
   ],

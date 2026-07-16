@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "700-MAX4995BAUTT",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 3754,
-      "url": "https://www.mouser.com/c/?q=MAX4995BAUT_T",
+      "url": "https://www.mouser.com/en/ProductDetail/Analog-Devices-Maxim-Integrated/MAX4995BAUT%2bT",
       "vendor": "Mouser"
     }
   ],

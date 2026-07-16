@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "603-RT0603BRD0794K2L",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -68,7 +68,7 @@
         }
       ],
       "stock": 8529,
-      "url": "https://www.mouser.com/c/?q=RT0603BRD0794K2L",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "534-1043",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -68,7 +68,7 @@
         }
       ],
       "stock": 9773,
-      "url": "https://www.mouser.com/c/?q=1043",
+      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043",
       "vendor": "Mouser"
     }
   ],

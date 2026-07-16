@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "645-599-0160-137F",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 11820,
-      "url": "https://www.mouser.com/c/?q=599-0160-137F",
+      "url": "https://www.mouser.com/en/ProductDetail/Dialight/599-0160-137F",
       "vendor": "Mouser"
     }
   ],

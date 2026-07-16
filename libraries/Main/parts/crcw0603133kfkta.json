@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "71-CRCW0603-133K",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -68,7 +68,7 @@
         }
       ],
       "stock": 7217,
-      "url": "https://www.mouser.com/c/?q=CRCW0603133KFKTA",
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "710-74439346068",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -53,7 +53,7 @@
         }
       ],
       "stock": 6579,
-      "url": "https://www.mouser.com/c/?q=74439346068",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068",
       "vendor": "Mouser"
     }
   ],

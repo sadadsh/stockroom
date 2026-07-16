@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "200-QTH06001LDA",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -48,7 +48,7 @@
         }
       ],
       "stock": 5176,
-      "url": "https://www.mouser.com/c/?q=QTH-060-01-L-D-A",
+      "url": "https://www.mouser.com/en/ProductDetail/Samtec/QTH-060-01-L-D-A",
       "vendor": "Mouser"
     }
   ],

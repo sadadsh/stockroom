@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "710-150060GS75000",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -63,7 +63,7 @@
         }
       ],
       "stock": 146494,
-      "url": "https://www.mouser.com/c/?q=150060GS75000",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000",
       "vendor": "Mouser"
     }
   ],

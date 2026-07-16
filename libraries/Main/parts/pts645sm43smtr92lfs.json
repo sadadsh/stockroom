@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "611-PTS645SM43SMTR92",
+      "part_number": "",
       "price_breaks": [
         {
           "price": 0.36,
@@ -57,7 +57,7 @@
         }
       ],
       "stock": null,
-      "url": "https://www.mouser.com/c/?q=PTS645SM43SMTR92LFS",
+      "url": "https://www.mouser.com/ProductDetail/CK/PTS645SM43SMTR92LFS",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "652-CR0603FX-2102ELF",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -68,7 +68,7 @@
         }
       ],
       "stock": 137114,
-      "url": "https://www.mouser.com/c/?q=CR0603-FX-2102ELF",
+      "url": "https://www.mouser.com/en/ProductDetail/Bourns/CR0603-FX-2102ELF",
       "vendor": "Mouser"
     }
   ],

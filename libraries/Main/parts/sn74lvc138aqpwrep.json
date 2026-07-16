@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "595-N74LVC138AQPWREP",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 1995,
-      "url": "https://www.mouser.com/c/?q=SN74LVC138AQPWREP",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "603-AC0603FR-07255KL",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -63,7 +63,7 @@
         }
       ],
       "stock": 27471,
-      "url": "https://www.mouser.com/c/?q=AC0603FR-07255KL",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/AC0603FR-07255KL",
       "vendor": "Mouser"
     }
   ],
