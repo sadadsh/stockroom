@@ -107,6 +107,20 @@ def staged_missing_fields(staged: "StagedPart") -> list[str]:
     return missing_from_presence(present)
 
 
+def _reference_commit_message(record: PartRecord) -> str:
+    """A plain, one-line commit subject for a file-less add that adapts to whatever refs
+    the record already carries (a passive lands with stock lib_ids; an asset-less part
+    lands with none, to be attached later)."""
+    refs = []
+    if record.symbol is not None and record.symbol.name:
+        refs.append(f"{record.symbol.lib}:{record.symbol.name} symbol")
+    if record.footprint is not None and record.footprint.name:
+        refs.append(f"{record.footprint.lib}:{record.footprint.name} footprint")
+    kind = "passive" if record.passive else record.category
+    detail = (", ".join(refs) + " reference, ") if refs else ""
+    return f"Add {record.display_name} ({kind}): {detail}record"
+
+
 @dataclass
 class DriftItem:
     part_id: str
@@ -307,6 +321,54 @@ class LibraryOps:
                 f"Add {record.display_name} (passive, {record.category}): stock "
                 f"{sym.lib}:{sym.name} symbol + {fp.lib}:{fp.name} footprint reference, record"
             )
+        return record
+
+    def add_reference_part(self, record: PartRecord, require_complete: bool = True) -> PartRecord:
+        """Commit a file-LESS record: writes ONLY the JSON, inside one atomic git
+        Transaction (a single scoped commit, or zero trace on failure). Every KiCad asset
+        (symbol / footprint / 3D model) is OPTIONAL now (owner 2026-07-16): a part lands on
+        identity + sourcing and its assets are attached AFTERWARDS (attach_symbol /
+        attach_footprint / attach_model). Any refs already on the record (e.g. a passive's
+        stock Device:R lib_ids) are kept verbatim. The completion gate still applies
+        (identity + datasheet + purchase), archive-grandfathered as elsewhere. This is the
+        path a whole-BOM import uses to land every part immediately."""
+        if require_complete and not self.profile.is_archive:
+            missing = record.missing_fields()
+            if missing:
+                raise IncompleteError(missing)
+        part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
+        record.id = part_id
+        fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
+        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            txn.track_dir(*fresh_dirs)
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(_reference_commit_message(record))
+        return record
+
+    def attach_symbol(self, part_id: str, lib: str, name: str, tool: str = "kicad") -> PartRecord:
+        """Attach (or repoint) a symbol REFERENCE on an existing record, tagged with the EDA
+        `tool` ("kicad" today, "altium" later). Reference-only: no symbol file is copied
+        (the lib_id points at an existing library). One atomic commit."""
+        return self._attach_libref(part_id, "symbol", lib, name, tool)
+
+    def attach_footprint(self, part_id: str, lib: str, name: str, tool: str = "kicad") -> PartRecord:
+        """Attach (or repoint) a footprint REFERENCE on an existing record, tagged with the
+        EDA `tool`. Reference-only (lib_id, no file copied). One atomic commit."""
+        return self._attach_libref(part_id, "footprint", lib, name, tool)
+
+    def _attach_libref(self, part_id: str, field: str, lib: str, name: str, tool: str) -> PartRecord:
+        if not name.strip():
+            raise ValueError(f"a {field} reference needs a name")
+        record = self.load_record(part_id)
+        setattr(record, field, LibRef(lib=lib, name=name, tool=tool))
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Attach {tool} {field} {lib}:{name} to {part_id}")
         return record
 
     def load_record(self, part_id: str) -> PartRecord:

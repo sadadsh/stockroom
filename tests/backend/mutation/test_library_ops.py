@@ -98,17 +98,18 @@ def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):
 
 
 def test_add_part_rejects_incomplete_and_leaves_zero_trace(tmp_path, fixtures_dir):
-    """The strict complete-to-add gate: a part missing required assets is refused
-    BEFORE any file write, so the reject leaves zero trace (spec section 6)."""
+    """The complete-to-add gate: a part missing a REQUIRED field (identity/datasheet/
+    purchase) is refused BEFORE any file write, so the reject leaves zero trace (spec
+    section 6). Assets (symbol/footprint/3D) no longer gate (owner 2026-07-16)."""
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
-    staged.model_source = None
-    staged.datasheet_source = None
+    staged.model_source = None       # no longer gates
+    staged.datasheet_source = None   # still gates (no datasheet URL either)
     ops = LibraryOps(profile, repo)
     before = repo.head()
     with pytest.raises(IncompleteError) as ei:
         ops.add_part(staged)
-    assert "3D model" in ei.value.missing
     assert "datasheet" in ei.value.missing
+    assert "3D model" not in ei.value.missing  # assets are attached after entry now
     # zero trace: no commit, clean tree, nothing written
     assert repo.head() == before
     assert repo.is_clean()
@@ -176,9 +177,67 @@ def test_datasheet_url_alone_satisfies_the_gate_and_lands_on_the_record(tmp_path
 def test_staged_missing_fields_lists_all_gaps_in_passport_order(tmp_path, fixtures_dir):
     _, _, staged = _setup(tmp_path, fixtures_dir)
     staged.mpn = ""
-    staged.model_source = None
+    staged.model_source = None  # assets no longer gate (owner 2026-07-16)
     staged.purchase = []
-    assert staged_missing_fields(staged) == ["MPN", "3D model", "purchase link"]
+    assert staged_missing_fields(staged) == ["MPN", "purchase link"]
+
+
+def _refless_record() -> PartRecord:
+    # a complete-by-the-new-gate record with NO KiCad assets: identity + datasheet URL +
+    # purchase link, no symbol/footprint/model. This is the whole-BOM import shape.
+    return PartRecord(
+        id="",
+        display_name="STM32H753ZIT6",
+        category="ICs",
+        description="MCU, Cortex-M7, LQFP144",
+        mpn="STM32H753ZIT6",
+        manufacturer="STMicroelectronics",
+        datasheet=Datasheet(source_url="https://mouser.com/x.pdf"),
+        purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/ProductDetail/511-STM32H753ZIT6")],
+    )
+
+
+def test_add_reference_part_lands_asset_less_record_json_only(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    before = repo.head()
+    rec = ops.add_reference_part(_refless_record())
+    assert rec.id == "stm32h753zit6"
+    jp = profile.library.parts_dir / "stm32h753zit6.json"
+    assert jp.exists()
+    saved = PartRecord.loads(jp.read_text(encoding="utf-8"))
+    assert saved.symbol is None and saved.footprint is None and saved.model is None
+    assert saved.is_complete()  # complete without assets under the new gate
+    assert saved.missing_assets() == ["symbol", "footprint", "3D model"]
+    # no symbol lib / .pretty file was created (reference-only, no assets)
+    assert repo.head() != before and repo.is_clean()
+
+
+def test_add_reference_part_still_gates_on_purchase(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    rec = _refless_record()
+    rec.purchase = []
+    with pytest.raises(IncompleteError) as ei:
+        ops.add_reference_part(rec)
+    assert "purchase link" in ei.value.missing
+    assert repo.is_clean()
+
+
+def test_attach_symbol_and_footprint_tag_the_tool_and_commit(tmp_path, fixtures_dir):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_reference_part(_refless_record())
+    rec = ops.attach_symbol("stm32h753zit6", "SR-ICs", "STM32H753ZIT6")
+    assert rec.symbol.lib == "SR-ICs" and rec.symbol.name == "STM32H753ZIT6"
+    assert rec.symbol.tool == "kicad"  # default EDA tool tag, ready for altium later
+    rec = ops.attach_footprint("stm32h753zit6", "SR-ICs", "LQFP-144", tool="kicad")
+    assert rec.footprint.name == "LQFP-144" and rec.footprint.tool == "kicad"
+    # persisted + still just the JSON touched, tree clean after each atomic commit
+    saved = PartRecord.loads((profile.library.parts_dir / "stm32h753zit6.json").read_text())
+    assert saved.symbol.tool == "kicad" and saved.footprint.tool == "kicad"
+    assert saved.missing_assets() == ["3D model"]
+    assert repo.is_clean()
 
 
 def test_archive_profile_grandfathers_incomplete_parts(tmp_path, fixtures_dir):

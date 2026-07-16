@@ -68,11 +68,23 @@ def test_datasheet_url_alone_satisfies_the_gate_for_any_part():
     assert "datasheet" not in " ".join(p.missing_fields())
 
 
-def test_non_passive_still_requires_an_owned_model():
+def test_assets_no_longer_gate_a_non_passive_part():
+    # owner 2026-07-16: symbol/footprint/3D model no longer gate entry. A non-passive
+    # with full identity + datasheet + purchase is COMPLETE even with no owned model,
+    # and missing_assets() reports what can still be attached after the fact.
     p = _sample()
     p.model = None
     assert p.passive is False
-    assert p.missing_fields() == ["3D model"]
+    assert p.missing_fields() == []
+    assert p.is_complete()
+    assert p.missing_assets() == ["3D model"]  # symbol+footprint present, model not
+
+
+def test_missing_assets_lists_every_unattached_asset():
+    p = PartRecord(id="x", display_name="X", category="ICs")
+    assert p.missing_assets() == ["symbol", "footprint", "3D model"]
+    p.symbol = LibRef(lib="SR-ICs", name="X")
+    assert p.missing_assets() == ["footprint", "3D model"]
 
 
 def test_round_trip_preserves_every_field():
@@ -91,11 +103,13 @@ def test_dumps_is_canonical_json():
     assert parsed["purchase"][0]["stock"] == 42
 
 
-def test_is_complete_false_when_model_missing():
-    p = _sample()  # has full identity + assets + sourcing EXCEPT a 3D model
+def test_is_complete_true_without_owned_assets():
+    # a part with identity + description + datasheet + purchase is complete even with
+    # no symbol/footprint/3D model (assets are attached after entry now).
+    p = _sample()
     assert p.model is None
-    assert p.missing_fields() == ["3D model"]
-    assert not p.is_complete()
+    assert p.missing_fields() == []
+    assert p.is_complete()
 
 
 def test_is_complete_true_with_full_passport():
@@ -112,9 +126,6 @@ def test_missing_fields_lists_all_gaps_in_passport_order():
         "MPN",
         "manufacturer",
         "value/description",
-        "symbol",
-        "footprint",
-        "3D model",
         "datasheet",
         "purchase link",
     ]
