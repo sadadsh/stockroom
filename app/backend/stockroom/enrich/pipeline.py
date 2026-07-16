@@ -49,6 +49,26 @@ def _copy_specs(candidate, result, overwrite: set[str]) -> None:
             candidate.specs[label] = str(sourced.value)
 
 
+def fill_category(result: EnrichmentResult) -> None:
+    """Derive a real component category for a scraped result that has none (A4: a pasted
+    non-passive link left the category "Other"/blank). The distributor's own "Product Category"
+    spec is the strongest signal ("Thick Film Resistors - SMD" -> Resistors), backed by the
+    description; the shared keyword classifier maps it. An unrecognized category is left
+    untouched (never a wrong guess), so the user still picks it in review."""
+    if result.category and result.category != "Other":
+        return
+    from stockroom.ingest.naming import propose_category
+
+    product_category = result.specs.get("Product Category")
+    parts = [
+        str(product_category.value) if product_category is not None else "",
+        str(result.description.value) if result.description is not None else "",
+    ]
+    guess = propose_category(" ".join(p for p in parts if p))
+    if guess != "Other":
+        result.category = guess
+
+
 def _default_url_for(mpn: str, category: str) -> str:
     """A best-effort product URL for a bare MPN, used only by the generic ScrapeSource
     fallback. LCSC catalogue resolution now lives in LcscSource (jlcsearch -> the real
@@ -356,6 +376,7 @@ class EnrichmentPipeline:
             result.specs.setdefault(
                 "product_url", Sourced(page.final_url or url, "scrape", "medium")
             )
+        fill_category(result)
         return result
 
     def enrich_candidate(self, candidate: StagingCandidate,

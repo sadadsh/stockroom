@@ -93,6 +93,28 @@ def test_lifecycle_status_promotes_from_the_spec_row() -> None:
     assert r.specs["Lifecycle Status"].value == "Active"
 
 
+def test_category_is_derived_from_the_product_category_spec() -> None:
+    # A4: a pasted non-passive link must land in a real category, not "Other". fill_category
+    # reads the distributor "Product Category" ("Thick Film Resistors - SMD") -> Resistors.
+    from stockroom.enrich.pipeline import fill_category
+
+    r = _result()
+    assert r.category in ("", "Other")  # extract_all alone does not classify
+    fill_category(r)
+    assert r.category == "Resistors"
+
+
+def test_package_comes_from_the_case_code_not_the_mounting_style() -> None:
+    # A4: the real page carries "Mounting Style: PCB Mount" (how it mounts) and the size only as
+    # "Case Code - in: 0603". The package must be the case code, never "PCB Mount".
+    r = _result()
+    assert r.package is not None
+    assert r.package.value == "0603"
+    # Mounting Style is kept as a plain spec, not mistaken for the package.
+    assert r.specs["Mounting Style"].value == "PCB Mount"
+    assert r.package.value != "PCB Mount"
+
+
 def test_mouser_part_number_lifts_from_the_datalayer() -> None:
     # A3: a Mouser link carries the Mouser order number (667-...) in its dataLayer as
     # event_mouserpn; it belongs in dist_pns["mouser"], normalized to upper case so it reads
