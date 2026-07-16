@@ -187,13 +187,13 @@ export function ProjectsPage() {
 
   return (
     <>
-      <div className="flex h-14 flex-none items-center px-[18px]">
-        <div className="text-lg font-semibold text-t1">Projects</div>
-        <div className="ml-auto text-2xs text-t3">
-          {projectsQuery.data
-            ? `${projects.length} ${projects.length === 1 ? "Project" : "Projects"}`
-            : ""}
-        </div>
+      <div className="flex h-14 flex-none items-center gap-3 border-b border-line px-[18px]">
+        <h1 className="text-lg font-semibold text-t1">Projects</h1>
+        {projectsQuery.data ? (
+          <span className="tnum font-mono text-2xs text-t3">
+            {projects.length} {projects.length === 1 ? "Project" : "Projects"}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -351,7 +351,7 @@ function ProjectRow({
       <span className="truncate font-mono text-2xs text-t3" title={project.root}>
         {project.root}
       </span>
-      <span className="text-2xs text-t3">
+      <span className="tnum font-mono text-2xs text-t3">
         {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
         {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
       </span>
