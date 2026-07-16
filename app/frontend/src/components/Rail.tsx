@@ -36,7 +36,7 @@ export function Rail() {
           viewBox="0 0 18 18"
           fill="none"
           aria-hidden="true"
-          className="flex-none text-t1"
+          className="flex-none text-acc-strong"
         >
           <rect x="2.5" y="2.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
           <rect x="2.5" y="10.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
@@ -87,7 +87,7 @@ function RailItem({
       className={
         "mb-0.5 flex h-8 items-center gap-2.5 rounded-control px-2.5 text-left text-sm transition-colors " +
         (selected
-          ? "bg-raise2 font-medium text-t1"
+          ? "bg-acc-soft font-semibold text-acc-strong"
           : "text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
       }
     >

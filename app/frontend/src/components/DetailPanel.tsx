@@ -10,7 +10,7 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
-import { Badge, Button, Card, Eyebrow } from "./primitives";
+import { Badge, Button, Card } from "./primitives";
 import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
@@ -194,10 +194,10 @@ export function DetailPanel({
               label="Name"
               placeholder="Name this part"
               disabled={busy}
-              displayClassName="text-[26px] font-semibold leading-[1.1] tracking-[-0.02em]"
+              displayClassName="text-[34px] font-semibold leading-[1.05] tracking-[-0.03em]"
             />
           ) : (
-            <h1 className="min-w-0 break-words text-[26px] font-semibold leading-[1.1] tracking-[-0.02em] text-t1">
+            <h1 className="min-w-0 break-words text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-t1">
               {detail.display_name}
             </h1>
           )}
@@ -226,8 +226,8 @@ export function DetailPanel({
 
       {/* Part Canvas: the physical object is the hero. The 3D model is the dominant
           tile; the schematic symbol and PCB footprint are its embodiments beside it. */}
-      <Eyebrow className="mb-2.5 mt-7">Part Canvas</Eyebrow>
-      <div className="grid h-[320px] grid-cols-[1.55fr_1fr] gap-3">
+      <SectionLabel className="mt-7">Part Canvas</SectionLabel>
+      <div className="grid h-[360px] grid-cols-[1.6fr_1fr] gap-3">
         <AssetTile
           variant="hero"
           name="3D Model"
@@ -314,7 +314,7 @@ export function DetailPanel({
 
       {/* datasheet grid: the editable identity fields, borderless, values in the mono
           readout face so a part number reads like a stamped identifier. */}
-      <Eyebrow className="mb-1 mt-8">Identity</Eyebrow>
+      <SectionLabel className="mt-9">Identity</SectionLabel>
       <div className="border-t border-line pt-1">
         <DataRow
           label="Part Number"
@@ -377,7 +377,7 @@ export function DetailPanel({
           persisted specs.pinout, source of truth per M6i). */}
       {pinout.length > 0 ? (
         <>
-          <Eyebrow className="mb-2.5 mt-8">Pinout</Eyebrow>
+          <SectionLabel className="mt-9">Pinout</SectionLabel>
           <div>
             {/* Keyed by part id so the viewer's own filter/sort state resets on a
                 part switch (matches the EnrichPanel key below); a cached-part switch
@@ -411,12 +411,12 @@ export function DetailPanel({
       ) : null}
 
       {/* sourcing */}
-      <Eyebrow className="mb-2.5 mt-8">Sourcing</Eyebrow>
+      <SectionLabel className="mt-9">Sourcing</SectionLabel>
       <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
 
       {/* git timeline (M6k): the part's commit history + per-commit field/visual diff.
           Keyed by part id so the selected-commit state resets on a part switch. */}
-      <Eyebrow className="mb-2.5 mt-8">History</Eyebrow>
+      <SectionLabel className="mt-9">History</SectionLabel>
       <div>
         <PartTimeline key={detail.id} partId={detail.id} />
       </div>
@@ -456,6 +456,24 @@ export function DetailPanel({
           onCancel={() => setConfirmDelete(false)}
         />
       ) : null}
+    </div>
+  );
+}
+
+// A section marker: a short copper tick + the label. The copper tick is the identity
+// throughline that ties every section to the app's material (a trace on the board), and
+// gives the long detail column a scannable rhythm instead of dim floating eyebrows.
+function SectionLabel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={"mb-3 flex items-center gap-2.5 " + (className ?? "")}>
+      <span className="h-3.5 w-[3px] flex-none rounded-full bg-acc" aria-hidden="true" />
+      <span className="text-[12.5px] font-semibold tracking-tight text-t2">{children}</span>
     </div>
   );
 }
@@ -651,10 +669,10 @@ function DataRow({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 text-t1 underline decoration-line2 underline-offset-2 transition-colors hover:bg-raise2 hover:decoration-current"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 font-medium text-acc-strong underline decoration-acc-strong/40 underline-offset-2 transition-colors hover:bg-acc-soft hover:decoration-acc-strong"
           >
             <span className="min-w-0 break-words">{value}</span>
-            <ExternalIcon className="flex-none text-t3" />
+            <ExternalIcon className="flex-none text-acc-strong/70" />
           </a>
         ) : (
           <span className={"min-w-0 break-words px-1.5 " + (mono ? "tnum font-mono" : "")}>
@@ -713,14 +731,28 @@ function AssetTile({
         (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
       }
     >
-      {present ? (
-        thumb ?? art
-      ) : (
-        <>
-          <UploadIcon />
-          <span className="text-xs">No {name}</span>
-        </>
-      )}
+      {/* the hero specimen chamber: a warm copper glow rising from the pedestal, a
+          bright focus pool under the part, and an edge vignette, so the 3D reads as a
+          lit object on a bench, not a thumbnail in a box. */}
+      {variant === "hero" ? (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(46% 40% at 50% 72%, rgba(231,154,92,0.34), transparent 66%), radial-gradient(70% 60% at 50% 44%, rgba(231,154,92,0.10), transparent 70%), radial-gradient(125% 120% at 50% 34%, transparent 48%, rgba(0,0,0,0.42))",
+          }}
+        />
+      ) : null}
+      <div className="relative flex h-full w-full items-center justify-center">
+        {present ? (
+          thumb ?? art
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <UploadIcon />
+            <span className="text-xs">No {name}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
   const footer = (
@@ -752,8 +784,10 @@ function AssetTile({
     </div>
   );
   const base =
-    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise shadow-file " +
-    (variant === "hero" ? "h-full" : "");
+    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border bg-raise " +
+    (variant === "hero"
+      ? "h-full border-[rgba(231,154,92,0.22)] shadow-[0_26px_74px_-30px_rgba(231,154,92,0.34)]"
+      : "border-line shadow-file");
   const buttonCls =
     base +
     " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
@@ -885,9 +919,9 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
   const shown = showAll || !collapsible ? rows : rows.slice(0, SPEC_COLLAPSE_AT);
   return (
     <>
-      <Eyebrow className="mb-1 mt-8">
-        Specifications <span className="text-t3">({rows.length})</span>
-      </Eyebrow>
+      <SectionLabel className="mt-9">
+        Specifications <span className="ml-0.5 font-mono text-t3">({rows.length})</span>
+      </SectionLabel>
       {/* a datasheet parameter block: two aligned columns, values in the mono readout
           face with tabular figures, grouped by whitespace not a border on every row. */}
       <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-12">

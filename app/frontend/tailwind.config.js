@@ -32,9 +32,12 @@ export default {
         ok: "var(--c-ok)",
         warn: "var(--c-warn)",
         err: "var(--c-err)",
-        // accent (a high-contrast pill: light-on-dark in dark, dark-on-light in light)
+        // the copper identity accent (primary actions, focus, active, links)
         acc: "var(--c-acc)",
         "acc-on": "var(--c-acc-on)",
+        // the loud copper (hero rim light, glows) and its low-alpha wash
+        "acc-strong": "var(--c-acc-strong)",
+        "acc-soft": "var(--c-acc-soft)",
       },
       borderRadius: {
         // design contract: 8/6 radii (the 8px card, the 6px control)
