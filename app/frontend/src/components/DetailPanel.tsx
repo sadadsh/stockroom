@@ -541,10 +541,11 @@ function IdRow({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1.5 truncate text-t1 underline decoration-line2 underline-offset-2 hover:decoration-current"
+            className="inline-flex min-w-0 items-start gap-1.5 text-t1 underline decoration-line2 underline-offset-2 hover:decoration-current"
           >
-            <span className="truncate">{value}</span>
-            <ExternalIcon className="flex-none text-t3" />
+            {/* show the FULL url, wrapped - never truncated (a cut-off link reads as broken) */}
+            <span className="min-w-0 break-all">{value}</span>
+            <ExternalIcon className="mt-1 flex-none text-t3" />
           </a>
         ) : (
           <span className="min-w-0 break-words">{value}</span>
