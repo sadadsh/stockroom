@@ -53,18 +53,19 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   if (lead) stats.push(["Lead Time", lead]);
   if (lifecycle) stats.push(["Lifecycle", lifecycle]);
   if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
-  for (const [key, pn] of distPns) stats.push([`${distributorLabel(key)} P/N`, pn]);
 
-  if (stats.length === 0 && breaks.length === 0) return null;
+  if (stats.length === 0 && breaks.length === 0 && distPns.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <Eyebrow>Sourcing</Eyebrow>
-        {distPns.map(([key]) => (
-          <Badge key={key} tone="neutral">
-            {distributorLabel(key)}
-          </Badge>
+        {/* the distributor source flag + its own order number, together as the source identity */}
+        {distPns.map(([key, pn]) => (
+          <span key={key} className="inline-flex items-center gap-1.5">
+            <Badge tone="neutral">{distributorLabel(key)}</Badge>
+            <span className="text-xs text-t2">{pn}</span>
+          </span>
         ))}
       </div>
       {stats.length > 0 ? (
