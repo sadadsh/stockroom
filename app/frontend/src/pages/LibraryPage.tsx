@@ -22,7 +22,7 @@ type LibraryTab = "components" | "bom" | "health";
 const TABS: readonly TabItem<LibraryTab>[] = [
   { id: "components", label: "Parts" },
   { id: "bom", label: "BOM Coverage" },
-  { id: "health", label: "Library Health" },
+  { id: "health", label: "Component Health" },
 ];
 
 // Clicking Library Health lands on the health route already open, else Doctor.
@@ -47,13 +47,13 @@ export function LibraryPage({ route }: { route: LibraryRoute }) {
   return (
     <>
       <div className="flex h-14 flex-none items-center gap-5 px-[18px]">
-        <div className="text-lg font-semibold text-t1">Library</div>
+        <div className="text-lg font-semibold text-t1">Components</div>
         <TabStrip
           tabs={TABS}
           active={activeTab}
           onSelect={onSelect}
           idBase="library"
-          aria-label="Library sections"
+          aria-label="Component sections"
         />
       </div>
       <TabPanel idBase="library" tab={activeTab} className="flex min-h-0 flex-1 flex-col">

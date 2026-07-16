@@ -37,7 +37,7 @@ describe("OnboardingGate", () => {
   it("shows the welcome and the three modes", () => {
     renderGate();
     expect(
-      screen.getByRole("heading", { name: "Set Up Your Library" }),
+      screen.getByRole("heading", { name: "Set Up Your Components" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open Existing" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create New" })).toBeInTheDocument();
@@ -46,15 +46,15 @@ describe("OnboardingGate", () => {
 
   it("disables Set Up Library until the open path is entered", () => {
     renderGate();
-    expect(screen.getByRole("button", { name: "Set Up Library" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Set Up Components" })).toBeDisabled();
   });
 
   it("opens an existing library with the entered path", async () => {
     mockApi.setLibrary.mockResolvedValue({ ...STATUS, first_run: false, libraries_root: "/lib" });
     renderGate();
     const u = userEvent.setup();
-    await u.type(screen.getByPlaceholderText(/stockroom-library/), "/my/lib");
-    await u.click(screen.getByRole("button", { name: "Set Up Library" }));
+    await u.type(screen.getByPlaceholderText(/stockroom-components/), "/my/lib");
+    await u.click(screen.getByRole("button", { name: "Set Up Components" }));
     await waitFor(() =>
       expect(mockApi.setLibrary).toHaveBeenCalledWith({ mode: "open", path: "/my/lib" }),
     );
@@ -65,7 +65,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(screen.getByRole("button", { name: "Create New" }));
-    await u.click(screen.getByRole("button", { name: "Set Up Library" }));
+    await u.click(screen.getByRole("button", { name: "Set Up Components" }));
     await waitFor(() =>
       expect(mockApi.setLibrary).toHaveBeenCalledWith({ mode: "create", path: undefined }),
     );
@@ -75,7 +75,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(screen.getByRole("button", { name: "Clone From Git" }));
-    expect(screen.getByRole("button", { name: "Set Up Library" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Set Up Components" })).toBeDisabled();
   });
 
   it("clones from a git url", async () => {
@@ -84,7 +84,7 @@ describe("OnboardingGate", () => {
     const u = userEvent.setup();
     await u.click(screen.getByRole("button", { name: "Clone From Git" }));
     await u.type(screen.getByPlaceholderText(/github\.com/), "https://x/lib.git");
-    await u.click(screen.getByRole("button", { name: "Set Up Library" }));
+    await u.click(screen.getByRole("button", { name: "Set Up Components" }));
     await waitFor(() =>
       expect(mockApi.setLibrary).toHaveBeenCalledWith({
         mode: "clone",
@@ -99,7 +99,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(
-      screen.getByRole("button", { name: "Continue With the Default Library" }),
+      screen.getByRole("button", { name: "Continue With the Default" }),
     );
     await waitFor(() => expect(mockApi.completeOnboarding).toHaveBeenCalled());
   });
@@ -109,7 +109,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(
-      screen.getByRole("button", { name: "Continue With the Default Library" }),
+      screen.getByRole("button", { name: "Continue With the Default" }),
     );
     await waitFor(() => expect(screen.getByText("git is offline")).toBeInTheDocument());
   });

@@ -171,8 +171,8 @@ function ProfilesSection() {
 
   return (
     <Section
-      title="Library Profiles"
-      hint="Each profile is a separate library on disk. Switching one reloads the whole component view."
+      title="Component Profiles"
+      hint="Each profile is a separate set of components on disk. Switching one reloads the whole component view."
     >
       {profiles.isLoading ? (
         <p className="py-1 text-sm text-t3">Loading profiles...</p>
@@ -272,7 +272,7 @@ function SyncSection() {
         // Divergence and offline are FAILURES, surfaced verbatim and never faked
         // green; no-remote is informational; only a real pull/push/clean is ok.
         if (r.state === "diverged") {
-          toast("Sync failed: the library has diverged from its remote.", "err");
+          toast("Sync failed: your components have diverged from the remote.", "err");
           return;
         }
         if (r.state === "offline") {
@@ -287,7 +287,7 @@ function SyncSection() {
           return;
         }
         if (r.state === "no_remote") {
-          toast("No remote is configured for this library.", "neutral");
+          toast("No remote is configured for these components.", "neutral");
           return;
         }
         const parts: string[] = [];
@@ -302,8 +302,8 @@ function SyncSection() {
 
   return (
     <Section
-      title="Library Sync"
-      hint="Pull and push the library repository. Offline and divergence are reported, never guessed."
+      title="Component Sync"
+      hint="Sync your components with the remote. Offline and divergence are reported, never guessed."
     >
       {status.isLoading ? (
         <p className="py-1 text-sm text-t3">Checking sync status...</p>
@@ -365,7 +365,7 @@ function KiCadSection() {
           setCliDraft(null);
           toast(
             r.kicad_wired
-              ? "KiCad settings applied. The library is wired."
+              ? "KiCad settings applied. Your components are wired."
               : "KiCad settings applied.",
             "ok",
           );
@@ -378,7 +378,7 @@ function KiCadSection() {
   return (
     <Section
       title="KiCad"
-      hint="Where the app writes KiCad library tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile or library switch. Leave the overrides blank to auto-detect."
+      hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile switch. Leave the overrides blank to auto-detect."
     >
       {sys.isLoading ? (
         <p className="py-1 text-sm text-t3">Reading KiCad status...</p>
@@ -402,12 +402,12 @@ function KiCadSection() {
             value={sys.data.kicad_running ? "Yes" : "No"}
           />
           <StatusRow
-            label="Library Wiring"
+            label="KiCad Wiring"
             value={
               settings.isLoading ? (
                 "Loading..."
               ) : settings.data?.kicad_wired ? (
-                <span className="text-ok">Wired to the active library</span>
+                <span className="text-ok">Wired to the active profile</span>
               ) : (
                 <span className="text-warn">
                   Not wired yet (the Doctor page can wire it manually)
@@ -585,7 +585,7 @@ function GitHubSection() {
   return (
     <Section
       title="GitHub"
-      hint="Connect a GitHub personal access token so adding or editing a part pushes it to the library repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
+      hint="Connect a GitHub personal access token so adding or editing a part pushes it to your components repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
     >
       <StatusRow
         label="Connection"

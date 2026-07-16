@@ -17,9 +17,9 @@ import type { OnboardingStatus, SetLibraryBody } from "../api/types";
 type Mode = "open" | "create" | "clone";
 
 const MODES: { key: Mode; label: string; blurb: string }[] = [
-  { key: "open", label: "Open Existing", blurb: "Point at a library folder already on this machine." },
-  { key: "create", label: "Create New", blurb: "Start a fresh, empty library at a new location." },
-  { key: "clone", label: "Clone From Git", blurb: "Copy a library repository from a git URL." },
+  { key: "open", label: "Open Existing", blurb: "Point at a components folder already on this machine." },
+  { key: "create", label: "Create New", blurb: "Start a fresh, empty components folder at a new location." },
+  { key: "clone", label: "Clone From Git", blurb: "Copy a components repository from a git URL." },
 ];
 
 const INPUT =
@@ -60,9 +60,9 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           ? { mode, path: path.trim() || undefined }
           : { mode, url: url.trim(), dest: dest.trim() || undefined };
     setLibrary.mutate(body, {
-      onSuccess: (s) => toast(`Library ready at ${s.libraries_root}`, "ok"),
+      onSuccess: (s) => toast(`Components ready at ${s.libraries_root}`, "ok"),
       onError: (e) =>
-        toast(e instanceof ApiError ? e.message : "Could not set up the library", "err"),
+        toast(e instanceof ApiError ? e.message : "Could not set up your components", "err"),
     });
   }
 
@@ -70,10 +70,10 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
     <div className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
       <Card className="w-full max-w-lg p-6">
         <Eyebrow>Welcome</Eyebrow>
-        <h1 className="mt-1 text-xl font-semibold text-t1">Set Up Your Library</h1>
+        <h1 className="mt-1 text-xl font-semibold text-t1">Set Up Your Components</h1>
         <p className="mt-2 text-sm text-t2">
-          Your library is a git repository of one JSON record per part, plus the KiCad
-          projects you register. Tell Stockroom where it lives to get started.
+          Your components live in a git repository of one JSON record per part, plus the KiCad
+          projects you register. Tell Stockroom where they live to get started.
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -99,12 +99,12 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         <div className="mt-4 space-y-3">
           {mode === "open" && (
             <label className="block">
-              <span className="mb-1 block text-xs text-t3">Library Folder</span>
+              <span className="mb-1 block text-xs text-t3">Components Folder</span>
               <input
                 className={INPUT}
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
-                placeholder="C:\\Users\\you\\stockroom-library"
+                placeholder="C:\\Users\\you\\stockroom-components"
                 spellCheck={false}
               />
             </label>
@@ -112,7 +112,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           {mode === "create" && (
             <label className="block">
               <span className="mb-1 block text-xs text-t3">
-                New Library Folder (blank uses the default)
+                New Components Folder (blank uses the default)
               </span>
               <input
                 className={INPUT}
@@ -131,7 +131,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
                   className={INPUT}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://github.com/you/stockroom-library.git"
+                  placeholder="https://github.com/you/stockroom-components.git"
                   spellCheck={false}
                 />
               </label>
@@ -158,10 +158,10 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
             disabled={busy}
             className="text-sm text-t3 underline-offset-2 hover:text-t1 hover:underline disabled:opacity-50"
           >
-            Continue With the Default Library
+            Continue With the Default
           </button>
           <Button variant="accent" onClick={submit} disabled={!canSubmit}>
-            {busy ? "Working..." : "Set Up Library"}
+            {busy ? "Working..." : "Set Up Components"}
           </Button>
         </div>
 

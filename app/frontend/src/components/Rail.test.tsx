@@ -18,7 +18,7 @@ describe("Rail", () => {
 
   it("shows exactly the top-level destinations: Library, Projects, Settings", () => {
     render(<Rail />);
-    expect(screen.getByRole("button", { name: /Library/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Components/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Projects/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Settings/ })).toBeInTheDocument();
     // the folded Library tabs are not rail destinations anymore
@@ -29,7 +29,7 @@ describe("Rail", () => {
 
   it("marks Library active for the default route and navigates on click", async () => {
     render(<Rail />);
-    const library = screen.getByRole("button", { name: /Library/ });
+    const library = screen.getByRole("button", { name: /Components/ });
     expect(library).toHaveAttribute("aria-current", "page");
     await userEvent.click(library);
     expect(navigate).toHaveBeenCalledWith("components");
@@ -38,7 +38,7 @@ describe("Rail", () => {
   it("keeps Library marked active while a folded library tab is the route", () => {
     state.route = "doctor";
     render(<Rail />);
-    expect(screen.getByRole("button", { name: /Library/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /Components/ })).toHaveAttribute(
       "aria-current",
       "page",
     );

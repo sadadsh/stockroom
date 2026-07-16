@@ -170,7 +170,7 @@ describe("IngestPage — unified Add A Part", () => {
     // determined a passive
     expect(await screen.findByText("Passive")).toBeInTheDocument();
     // the file-less add resolves the stock footprint + shows the add button
-    const addBtn = await screen.findByRole("button", { name: "Add To Library" });
+    const addBtn = await screen.findByRole("button", { name: "Add to Components" });
     await user.click(addBtn);
 
     expect(mockApi.passiveAdd).toHaveBeenCalledTimes(1);
@@ -243,7 +243,7 @@ describe("IngestPage — unified Add A Part", () => {
     await waitFor(() => expect(mockApi.ingestInspect).toHaveBeenCalledWith(["C:/dl/NE555.zip"], []));
     await screen.findByLabelText("Name");
 
-    await user.click(screen.getByRole("button", { name: "Add To Library" }));
+    await user.click(screen.getByRole("button", { name: "Add to Components" }));
     expect(mockApi.ingestCommit).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(/Added NE555P/i)).toBeInTheDocument();
     delete (window as unknown as { pywebview?: unknown }).pywebview;

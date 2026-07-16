@@ -249,7 +249,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     renderPage();
     await screen.findByText("Archive");
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
-    expect(await screen.findByText(/diverged from its remote/i)).toBeInTheDocument();
+    expect(await screen.findByText(/diverged from the remote/i)).toBeInTheDocument();
     expect(screen.queryByText(/already up to date/i)).toBeNull();
   });
 
@@ -290,7 +290,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows the wiring status when SR_LIB points at the active library", async () => {
     renderPage();
     expect(
-      await screen.findByText(/wired to the active library/i),
+      await screen.findByText(/wired to the active profile/i),
     ).toBeInTheDocument();
   });
 

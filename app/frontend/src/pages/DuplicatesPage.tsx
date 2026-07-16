@@ -60,7 +60,7 @@ export function DuplicatesPage() {
       <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
         <div className="max-w-[880px] pb-12">
           {dups.isLoading ? (
-            <p className="py-1 text-sm text-t3">Scanning the library for duplicates...</p>
+            <p className="py-1 text-sm text-t3">Scanning your components for duplicates...</p>
           ) : dups.isError ? (
             <p className="py-1 text-sm text-err">Could not load duplicates.</p>
           ) : dups.data ? (
@@ -91,7 +91,7 @@ export function DuplicatesPage() {
         title="Delete Part"
         body={
           <>
-            Delete <b>{pending?.display_name}</b> from the library? Its symbol,
+            Delete <b>{pending?.display_name}</b> from your components? Its symbol,
             footprint and files are removed and the change is committed.
           </>
         }

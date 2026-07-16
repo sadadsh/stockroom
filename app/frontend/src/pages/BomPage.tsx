@@ -60,8 +60,8 @@ export function BomPage() {
       <div className="max-w-[880px] pb-12">
         <Eyebrow className="mb-0.5">BOM Coverage</Eyebrow>
         <p className="mb-3 text-xs text-t3">
-          Paste part numbers (one per line) or a BOM CSV to see what your library
-          already covers. Look Up Missing checks the web for the rest through
+          Paste part numbers (one per line) or a BOM CSV to see what your components
+          already cover. Look Up Missing checks the web for the rest through
           enrichment; nothing is added from here.
         </p>
         <Card className="px-4 py-3.5">
@@ -80,7 +80,7 @@ export function BomPage() {
               onClick={check}
               disabled={checking || looking || !text.trim()}
             >
-              {checking ? "Checking..." : "Check Against Library"}
+              {checking ? "Checking..." : "Check Against Components"}
             </Button>
             {report && missing.length > 0 ? (
               <Button onClick={lookUpMissing} disabled={looking}>
@@ -104,7 +104,7 @@ export function BomPage() {
                 {report.in_library}
                 <span className="text-t3">/{report.total}</span>
               </span>
-              <span className="text-xs text-t3">in the library</span>
+              <span className="text-xs text-t3">in your components</span>
             </div>
             {report.items.length === 0 ? (
               <p className="text-sm text-t3">Nothing to check in what you pasted.</p>
@@ -114,7 +114,7 @@ export function BomPage() {
                   <thead>
                     <tr className="border-b border-line text-2xs text-t3">
                       <th className="px-4 py-2 font-medium">Part Number</th>
-                      <th className="px-4 py-2 font-medium">Library Part</th>
+                      <th className="px-4 py-2 font-medium">Component</th>
                       <th className="px-4 py-2 font-medium">Status</th>
                     </tr>
                   </thead>
@@ -149,15 +149,15 @@ export function BomPage() {
                               <span className="text-t2">
                                 {item.part_id
                                   ? item.is_complete
-                                    ? "In Library"
-                                    : `In Library, missing ${item.missing.join(", ")}`
+                                    ? "In Components"
+                                    : `In Components, missing ${item.missing.join(", ")}`
                                   : looked
                                     ? looked.error
-                                      ? `Not In Library (lookup failed: ${looked.error})`
+                                      ? `Not In Components (lookup failed: ${looked.error})`
                                       : looked.complete
-                                        ? "Not In Library (identity findable, needs a symbol to add)"
-                                        : `Not In Library (lookup missing ${looked.missing.join(", ")})`
-                                    : "Not In Library"}
+                                        ? "Not In Components (identity findable, needs a symbol to add)"
+                                        : `Not In Components (lookup missing ${looked.missing.join(", ")})`
+                                    : "Not In Components"}
                               </span>
                             </span>
                           </td>

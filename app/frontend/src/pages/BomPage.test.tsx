@@ -69,13 +69,13 @@ describe("BomPage", () => {
     wrap(<BomPage />);
     const user = userEvent.setup();
     await user.type(screen.getByTestId("bom-input"), "TPS62130RGTR\nWIDGET99");
-    await user.click(screen.getByRole("button", { name: "Check Against Library" }));
+    await user.click(screen.getByRole("button", { name: "Check Against Components" }));
 
     expect(mockApi.bomMatch).toHaveBeenCalledWith({ text: "TPS62130RGTR\nWIDGET99" });
     expect(await screen.findByTestId("bom-row-TPS62130RGTR")).toHaveTextContent(
-      "In Library",
+      "In Components",
     );
-    expect(screen.getByTestId("bom-row-WIDGET99")).toHaveTextContent("Not In Library");
+    expect(screen.getByTestId("bom-row-WIDGET99")).toHaveTextContent("Not In Components");
     // the focal count reads coverage at a glance
     expect(screen.getByTestId("bom-coverage")).toHaveTextContent("1/2");
   });
@@ -85,7 +85,7 @@ describe("BomPage", () => {
     wrap(<BomPage />);
     const user = userEvent.setup();
     await user.type(screen.getByTestId("bom-input"), "Ref,MPN,Qty{enter}U1,TPS62130RGTR,1");
-    await user.click(screen.getByRole("button", { name: "Check Against Library" }));
+    await user.click(screen.getByRole("button", { name: "Check Against Components" }));
     const arg = mockApi.bomMatch.mock.calls[0][0];
     expect("csv" in arg).toBe(true);
   });
@@ -109,7 +109,7 @@ describe("BomPage", () => {
     wrap(<BomPage />);
     const user = userEvent.setup();
     await user.type(screen.getByTestId("bom-input"), "TPS62130RGTR\nWIDGET99");
-    await user.click(screen.getByRole("button", { name: "Check Against Library" }));
+    await user.click(screen.getByRole("button", { name: "Check Against Components" }));
     await screen.findByTestId("bom-row-WIDGET99");
 
     await user.click(screen.getByRole("button", { name: "Look Up Missing" }));
