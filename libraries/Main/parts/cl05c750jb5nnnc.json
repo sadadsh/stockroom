@@ -30,7 +30,40 @@
       "currency": "USD",
       "fetched_at": "",
       "part_number": "",
-      "price_breaks": [],
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.021,
+          "qty": 10
+        },
+        {
+          "price": 0.018,
+          "qty": 100
+        },
+        {
+          "price": 0.013,
+          "qty": 500
+        },
+        {
+          "price": 0.011,
+          "qty": 1000
+        },
+        {
+          "price": 0.009,
+          "qty": 2500
+        },
+        {
+          "price": 0.008,
+          "qty": 5000
+        },
+        {
+          "price": 0.006,
+          "qty": 10000
+        }
+      ],
       "stock": null,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05C750JB5NNNC",
       "vendor": "Mouser"
