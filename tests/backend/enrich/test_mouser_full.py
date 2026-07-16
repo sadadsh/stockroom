@@ -34,8 +34,9 @@ def _result():
 
 def test_full_price_ladder_from_the_pricing_table() -> None:
     r = _result()
-    # The real page's pricing table has 9 breaks; the ladder must come through whole,
-    # not truncated to the JSON-LD single offer.
+    # The real page's pricing table lists 9 breaks across its packaging groups (Cut Tape 1..1000
+    # then Full Reel 5000..25000); the extractor keeps EVERY break as one sorted ladder so the
+    # owner sees the deep-volume tiers, not just the first group.
     assert len(r.price_breaks) == 9
     first, last = r.price_breaks[0], r.price_breaks[-1]
     assert (first.qty, first.price) == (1, 0.31)
@@ -43,10 +44,31 @@ def test_full_price_ladder_from_the_pricing_table() -> None:
     # A mid-ladder break with a thousands-separated quantity parses correctly.
     thousand = next(b for b in r.price_breaks if b.qty == 1000)
     assert thousand.price == 0.063
-    # Quantities are strictly increasing (one packaging ladder, no group bleed-through).
+    # The ladder is always sorted ascending and deduped per quantity (monotonic for the BOM layer).
     qtys = [b.qty for b in r.price_breaks]
     assert qtys == sorted(qtys) and len(set(qtys)) == len(qtys)
     assert all(b.currency == "USD" for b in r.price_breaks)
+
+
+def test_price_ladder_is_deterministic_across_packaging_group_order() -> None:
+    # Regression for the retired qty-monotonicity heuristic: two packaging groups where the
+    # SECOND group restarts at a LOWER quantity than the first group's max must NOT drop the
+    # second group (the old code truncated it). The result is the deterministic sorted+deduped
+    # union of every break, whatever order the groups appear in.
+    from stockroom.enrich.sites.mouser_web import _extract_price_breaks
+
+    html = (
+        '<table class="pricing-table"><tbody>'
+        '<tr data-testid="PricingTableHeaderSubHeadingRow"><th>Cut Tape</th></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><th>1</th><td>$0.50</td><td>$0.50</td></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><th>1,000</th><td>$0.20</td><td>$200.00</td></tr>'
+        '<tr data-testid="PricingTableHeaderSubHeadingRow"><th>Full Reel</th></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><th>500</th><td>$0.25</td><td>$125.00</td></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><th>5,000</th><td>$0.12</td><td>$600.00</td></tr>'
+        "</tbody></table>"
+    )
+    breaks = _extract_price_breaks(html)
+    assert [(b.qty, b.price) for b in breaks] == [(1, 0.5), (500, 0.25), (1000, 0.2), (5000, 0.12)]
 
 
 def test_stock_count_from_the_availability_card() -> None:

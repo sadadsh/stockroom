@@ -93,17 +93,19 @@ def _clean_block(block: str) -> str:
 
 
 def _extract_price_breaks(html: str):
-    """Parse the full price ladder from the pricing table. Stops at the first packaging
-    group: if a later row's quantity is not greater than the previous (a second group such
-    as Full Reel restarting at qty 1), the first ladder is what we keep, matching how the
-    BOM costs the smallest orderable package."""
+    """Parse EVERY price break the pricing table lists, across all packaging groups (Cut Tape /
+    MouseReel then Full Reel), returned as one quantity-sorted ladder. A Mouser part often has a
+    deep-volume Full Reel tier the owner explicitly wants to see (ordering many, not just the
+    unit price), so we keep them all rather than truncating to the first group. The result is
+    deterministic (never dependent on an accidental quantity relationship between groups): breaks
+    are sorted ascending by quantity and deduped per quantity keeping the lowest unit price, so
+    the ladder is always monotonic for the BOM cost layer that reads it."""
     from stockroom.enrich.schema import PriceBreak
 
     tbl = _PRICING_TABLE.search(html)
     if not tbl:
         return []
-    breaks: list[PriceBreak] = []
-    prev_qty = 0
+    by_qty: dict[int, PriceBreak] = {}
     for raw in _PRICE_ROW.findall(tbl.group(0)):
         text = _clean_block(raw)
         qm = _QTY.search(text)
@@ -115,11 +117,11 @@ def _extract_price_breaks(html: str):
             price = float(pm.group(2).replace(",", ""))
         except ValueError:
             continue
-        if breaks and qty <= prev_qty:
-            break  # a new packaging group restarted; keep only the first ladder
-        prev_qty = qty
-        breaks.append(PriceBreak(qty=qty, price=price, currency=_CURRENCY.get(pm.group(1), "USD")))
-    return breaks
+        cur = _CURRENCY.get(pm.group(1), "USD")
+        existing = by_qty.get(qty)
+        if existing is None or price < existing.price:
+            by_qty[qty] = PriceBreak(qty=qty, price=price, currency=cur)
+    return [by_qty[q] for q in sorted(by_qty)]
 
 
 def _extract_stock(html: str) -> int | None:
