@@ -51,6 +51,22 @@ describe("PulledDepth", () => {
     expect(screen.getByText("$1,075.00")).toBeInTheDocument(); // 25,000 * 0.043
   });
 
+  it("uses Title-case zero-tracking micro-labels, not the retired letterspaced uppercase", () => {
+    // design-rules.md 1.4/3: the letterspaced UPPERCASE eyebrow is retired; column headers and
+    // stat labels stay Title case with no tracking (mirrors PinoutViewer.test.tsx enforcement).
+    const { container } = render(<PulledDepth result={FULL} />);
+    for (const el of container.querySelectorAll("span, th")) {
+      expect(el.className).not.toMatch(/\buppercase\b/);
+      expect(el.className).not.toMatch(/tracking-/);
+    }
+  });
+
+  it("exposes the price ladder as a real, labelled table", () => {
+    render(<PulledDepth result={FULL} />);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Price Ladder" })).toBeInTheDocument();
+  });
+
   it("renders nothing when a lookup carried no sourcing depth", () => {
     const empty: EnrichmentResult = {
       ...FULL,

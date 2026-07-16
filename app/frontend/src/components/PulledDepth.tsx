@@ -30,7 +30,7 @@ function money(value: number, currency: string): string {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-control border border-line2 bg-field px-3 py-2">
-      <span className="text-2xs uppercase tracking-wide text-t3">{label}</span>
+      <span className="text-2xs font-medium text-t3">{label}</span>
       <span className="text-sm font-medium text-t1">{value}</span>
     </div>
   );
@@ -68,28 +68,34 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
         </div>
       ) : null}
       {breaks.length > 0 ? (
-        <div className="rounded-card border border-line2 bg-raise2 p-3">
-          <div className="mb-2 grid grid-cols-3 text-2xs uppercase tracking-wide text-t3">
-            <span>Order Size</span>
-            <span className="text-right">Unit Price</span>
-            <span className="text-right">Order Total</span>
-          </div>
-          <div className="flex max-h-44 flex-col gap-1 overflow-y-auto">
-            {breaks.map((b) => (
-              <div
-                key={b.qty}
-                className="grid grid-cols-3 border-b border-line pb-1 text-sm last:border-0 last:pb-0"
-              >
-                <span className="tabular-nums text-t2">{b.qty.toLocaleString()}</span>
-                <span className="text-right tabular-nums text-t2">
-                  {money(b.price, b.currency)}
-                </span>
-                <span className="text-right tabular-nums text-t1">
-                  {money(b.qty * b.price, b.currency)}
-                </span>
-              </div>
-            ))}
-          </div>
+        <div
+          className="max-h-44 overflow-y-auto border-t border-line pt-3"
+          role="region"
+          aria-label="Price Ladder"
+          tabIndex={0}
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-2xs font-medium text-t3">
+                <th scope="col" className="pb-2 text-left">Order Size</th>
+                <th scope="col" className="pb-2 text-right">Unit Price</th>
+                <th scope="col" className="pb-2 text-right">Order Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {breaks.map((b) => (
+                <tr key={b.qty} className="border-t border-line">
+                  <td className="py-1 tabular-nums text-t2">{b.qty.toLocaleString()}</td>
+                  <td className="py-1 text-right tabular-nums text-t2">
+                    {money(b.price, b.currency)}
+                  </td>
+                  <td className="py-1 text-right tabular-nums text-t1">
+                    {money(b.qty * b.price, b.currency)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : null}
     </div>
