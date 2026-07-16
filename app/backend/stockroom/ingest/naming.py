@@ -57,6 +57,8 @@ def propose_display_name(symbol_name: str, mpn: str = "") -> str:
 def propose_category(text: str) -> str:
     low = text.lower()
     for keyword, category in _CATEGORY_KEYWORDS:
-        if re.search(rf"\b{re.escape(keyword)}\b", low):
+        # Tolerate a trailing plural 's' so a distributor's plural "Product Category" string
+        # ("Resistors", "Ceramic Capacitors", "Connectors") classifies, not just singular text.
+        if re.search(rf"\b{re.escape(keyword)}s?\b", low):
             return category
     return "Other"

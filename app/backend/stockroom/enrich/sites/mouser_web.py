@@ -57,7 +57,13 @@ _ATTR_PAIR = re.compile(
 # Strips every nested tag from a captured cell so <label>Resistance:</label> -> text.
 _TAGS = re.compile(r"<[^>]+>")
 
-_PACKAGE_LABELS = {"package / case", "package", "case/package", "mounting style"}
+# Labels whose value IS the component package/case. "Mounting Style" is deliberately NOT here:
+# on a real Mouser page it reads "PCB Mount" / "SMD/SMT" (how it mounts, not its size), and letting
+# it win hid the true package (the real ERJ page carries the size only in "Case Code - in": 0603).
+_PACKAGE_LABELS = {"package / case", "package", "case/package"}
+# Fallback package sources, in preference order, used only when no _PACKAGE_LABELS row was found:
+# the imperial case code ("Case Code - in": 0603) is the EIA size the app names packages by.
+_PACKAGE_FALLBACK_LABELS = ("case code - in", "case code", "case code (in)", "size / dimension")
 
 # The FULL price ladder Mouser renders as <table class="pricing-table"> whose rows are
 # data-testid="PricingTablePriceBreakRow" (a "Cut Tape" sub-heading row sits between the
@@ -194,6 +200,16 @@ class MouserWebSite:
                     r.package = Sourced(value, "mouser_web", "medium")
                 else:
                     r.specs.setdefault(label, Sourced(value, "mouser_web", "medium"))
+
+        # A4: when no explicit package row existed, fall back to the case-code spec ("Case Code
+        # - in": 0603 on a real resistor page) rather than leaving the package blank / wrong.
+        if r.package is None:
+            lowered = {k.lower(): v for k, v in r.specs.items()}
+            for label in _PACKAGE_FALLBACK_LABELS:
+                s = lowered.get(label)
+                if s is not None and str(s.value).strip():
+                    r.package = Sourced(str(s.value), "mouser_web", "medium")
+                    break
 
         # A2 depth: the full price ladder, the live stock count, and the factory lead time
         # the generic cascade never reads off a Mouser page.
