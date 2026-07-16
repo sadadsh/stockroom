@@ -169,7 +169,7 @@ export function IngestPage() {
       <div>
         <p className="mb-2.5 text-xs text-t3">
           Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls
-          every field. A passive is complete with no files; a non-passive needs its symbol,
+          it all. A passive is complete with no files; a non-passive needs its symbol,
           footprint and 3D model.
         </p>
         <div className="flex items-center gap-2.5">
@@ -199,7 +199,7 @@ export function IngestPage() {
               Browse for ZIP
             </Button>
             <span className="text-xs text-t3">
-              Or add a part from a vendor ZIP directly (SnapEDA, Ultra Librarian).
+              Or add a part straight from a vendor ZIP (SnapEDA, Ultra Librarian).
             </span>
           </div>
         ) : null}
@@ -225,8 +225,8 @@ export function IngestPage() {
         <Card className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <span className="text-sm text-warn">
-              Nothing was pulled. The page may have blocked the fetch, or the link is not a
-              product page. Try a different link, or drop a vendor ZIP.
+              Nothing was pulled. The page might have blocked the fetch, or the link is not a
+              product page. Use a different link, or drop a vendor ZIP.
             </span>
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
@@ -251,7 +251,7 @@ export function IngestPage() {
               </Button>
               <span className="text-xs text-t3">
                 Drop its vendor ZIP (SnapEDA, Ultra Librarian) anywhere, or browse. The
-                pulled details are kept, so you only add the files.
+                pulled details are kept, so all that is left is the files.
               </span>
             </div>
           </div>
@@ -278,7 +278,7 @@ export function IngestPage() {
         </div>
       ) : staged && staged.length === 0 ? (
         <div className="py-4 text-center text-sm text-t3">
-          No parts found in what you dropped.
+          No parts found in what was dropped.
         </div>
       ) : null}
     </div>
