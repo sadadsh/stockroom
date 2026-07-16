@@ -37,7 +37,7 @@ export function PreviewImage({
       draggable={false}
       // Explicit box + object-contain upscales the small-intrinsic KiCad SVG to fill
       // the card (max-* alone would leave it tiny).
-      className="h-[104px] w-[82%] object-contain"
+      className="h-[136px] w-[86%] object-contain"
       style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
     />
   );
