@@ -60,6 +60,13 @@ def _result_dto(r: EnrichmentResult) -> dict:
         "datasheet_url": _sourced_dto(r.datasheet_url),
         "stock": _sourced_dto(r.stock),
         "package": _sourced_dto(r.package),
+        # A2: the FULL pulled depth, not just identity + specs. These live on the schema (the
+        # Mouser/LCSC paths fill them) but the DTO dropped them, so the UI could never surface
+        # a part's manufacturing status, lead time, product page, or distributor order numbers.
+        "lifecycle": _sourced_dto(r.lifecycle),
+        "lead_time": _sourced_dto(r.lead_time),
+        "product_url": _sourced_dto(r.product_url),
+        "dist_pns": dict(r.dist_pns),
         "price_breaks": [
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],

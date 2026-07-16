@@ -89,9 +89,25 @@ def _datasheet_url(obj: dict) -> str:
     return ""
 
 
-def _offers_to_breaks(offers) -> tuple[list[PriceBreak], bool]:
+def _inventory_level(off: dict) -> int | None:
+    """schema.org inventoryLevel is a genuine numeric stock count (a QuantitativeValue or a
+    bare number), distinct from the availability flag (a boolean we never fabricate into a
+    count). Returns the count when present and parseable, else None."""
+    lvl = off.get("inventoryLevel")
+    if isinstance(lvl, dict):
+        lvl = lvl.get("value")
+    if lvl is None or isinstance(lvl, bool):
+        return None
+    try:
+        return int(float(lvl))
+    except (TypeError, ValueError):
+        return None
+
+
+def _offers_to_breaks(offers) -> tuple[list[PriceBreak], bool, int | None]:
     breaks: list[PriceBreak] = []
     in_stock = False
+    inventory: int | None = None
     seq = offers if isinstance(offers, list) else [offers]
     for off in seq:
         if not isinstance(off, dict):
@@ -106,7 +122,9 @@ def _offers_to_breaks(offers) -> tuple[list[PriceBreak], bool]:
         avail = _first_str(off.get("availability")).lower()
         if "instock" in avail or "in_stock" in avail:
             in_stock = True
-    return breaks, in_stock
+        if inventory is None:
+            inventory = _inventory_level(off)
+    return breaks, in_stock, inventory
 
 
 def extract_jsonld_product(html: str) -> EnrichmentResult:
@@ -133,12 +151,14 @@ def extract_jsonld_product(html: str) -> EnrichmentResult:
             ds = _datasheet_url(obj)
             if ds:
                 r.datasheet_url = Sourced(ds, "jsonld", "high")
-            breaks, _in_stock = _offers_to_breaks(obj.get("offers"))
+            breaks, _in_stock, inventory = _offers_to_breaks(obj.get("offers"))
             if breaks:
                 r.price_breaks = breaks
             # A schema.org availability flag is a BOOLEAN, not a stock count: never fabricate
-            # it into stock=1 (roadmap #12). A real numeric stock comes from the distributor
-            # API (mouser.py); an unscraped stock stays None, an honest non-risk.
+            # it into stock=1 (roadmap #12). But inventoryLevel IS a real numeric stock, so
+            # take it when the offer carries one; an offer with none leaves stock None (honest).
+            if inventory is not None:
+                r.stock = Sourced(inventory, "jsonld", "medium")
             return r  # first Product wins
     return r
 
@@ -239,6 +259,13 @@ def extract_all(html: str, url: str, site_extractors: tuple = ()) -> EnrichmentR
     result.merge_missing(extract_next_data(html))
     for ext in site_extractors:
         if ext.matches(url):
-            result.merge_missing(ext.extract(html, url))
+            site = ext.extract(html, url)
+            # A site-specific pricing table is the authority for the price ladder: its full
+            # break set supersedes a lone generic JSON-LD offer (the real Mouser JSON-LD
+            # carries no offer at all, so without this the full table would still lose to an
+            # empty generic result only by chance). Everything else fills only what is missing.
+            if len(site.price_breaks) > len(result.price_breaks):
+                result.price_breaks = list(site.price_breaks)
+            result.merge_missing(site)
     result.merge_missing(_heuristic(html))
     return result

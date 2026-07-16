@@ -48,6 +48,35 @@ def test_from_url_includes_a_passive_add_plan(client, monkeypatch):
     assert plan == {"kind": "resistor", "package": "0603", "value": "118 Ohms", "tolerance": "1%"}
 
 
+def test_from_url_serializes_procurement_fields(client, monkeypatch):
+    # A2: the DTO must carry the FULL pulled depth, not just identity + specs. lifecycle /
+    # lead_time / product_url / dist_pns / stock live on the schema but were dropped by the
+    # DTO, so the owner's UI could never show them even when a Mouser page yielded them.
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+    class _FakePipeline:
+        def extract_from_url(self, url):
+            r = EnrichmentResult(category="Resistors")
+            r.mpn = Sourced("ERJ-P03F1101V", "mouser_web", "medium")
+            r.stock = Sourced(5616, "mouser_web", "medium")
+            r.lifecycle = Sourced("Active", "mouser_web", "medium")
+            r.lead_time = Sourced("15 Weeks", "mouser_web", "medium")
+            r.product_url = Sourced("https://www.mouser.com/ProductDetail/x", "mouser_web", "medium")
+            r.dist_pns = {"mouser": "667-ERJ-P03F1101V"}
+            r.price_breaks = [PriceBreak(1, 0.31, "USD"), PriceBreak(10, 0.163, "USD")]
+            return r
+
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _FakePipeline())
+    body = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"}).json()
+    assert body["stock"]["value"] == 5616
+    assert body["lifecycle"]["value"] == "Active"
+    assert body["lead_time"]["value"] == "15 Weeks"
+    assert body["product_url"]["value"] == "https://www.mouser.com/ProductDetail/x"
+    assert body["dist_pns"] == {"mouser": "667-ERJ-P03F1101V"}
+    assert len(body["price_breaks"]) == 2
+
+
 def test_from_url_add_plan_null_for_non_passive(client, monkeypatch):
     from stockroom.enrich.schema import EnrichmentResult, Sourced
 
