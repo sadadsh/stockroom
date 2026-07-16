@@ -26,8 +26,20 @@
     --c-err: #e8756c;
     --c-acc: #f3f3f3;
     --c-acc-on: #161616;
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.5);
+    /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
+       hairline top highlight (the inset line), so it reads as lifted off the
+       canvas instead of painted on it. Three steps: a resting card, a lifted/hover
+       card, and the pop layer for menus + the Add A Part window. */
+    --edge-hi: rgba(255, 255, 255, 0.06);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 4px 14px rgba(0, 0, 0, 0.28);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.45),
+      0 12px 30px rgba(0, 0, 0, 0.34);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4),
+      0 28px 64px rgba(0, 0, 0, 0.62);
     --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.16);
+    /* the springy easing used for tactile press + hover lift across controls */
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     /* page backdrop + chrome that lives outside the token classes */
     --body-bg: #090909;
     --root-bg: radial-gradient(
@@ -75,8 +87,17 @@
     --c-err: #cf4a40;
     --c-acc: #1b1b1e;
     --c-acc-on: #f5f5f5;
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.16);
+    /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
+       over soft, low-opacity shadows. */
+    --edge-hi: rgba(255, 255, 255, 0.9);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.06),
+      0 4px 14px rgba(17, 18, 20, 0.07);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09),
+      0 14px 30px rgba(17, 18, 20, 0.11);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1),
+      0 28px 64px rgba(17, 18, 20, 0.2);
     --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     --body-bg: #e9e9eb;
     --root-bg: radial-gradient(
         1100px 560px at 12% -6%,
@@ -111,11 +132,12 @@
   body {
     background: var(--body-bg);
     color: var(--c-t1);
-    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+    font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
     font-size: 13px;
     line-height: 1.5;
     letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   #root {
     background: var(--root-bg);

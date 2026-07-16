@@ -18,7 +18,7 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-card border border-line bg-raise",
+        "rounded-card border border-line bg-raise shadow-card",
         className,
       )}
       {...rest}
@@ -46,17 +46,21 @@ export function Button({
 }: ButtonProps) {
   const base =
     "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border font-medium " +
-    "transition-colors focus-visible:outline focus-visible:outline-2 " +
+    "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-spring " +
+    "will-change-transform active:scale-[0.96] disabled:active:scale-100 " +
+    "focus-visible:outline focus-visible:outline-2 " +
     "focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-50 " +
-    "disabled:cursor-not-allowed";
+    "disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none";
   const size = small ? "h-[27px] px-2.5 text-xs" : "h-[31px] px-3 text-sm";
+  // Default controls sit flat and lift on hover; the primary + destructive actions
+  // rest raised, so a page's main action reads as the one thing standing up.
   const variants: Record<ButtonVariant, string> = {
     default:
-      "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1",
+      "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1 hover:-translate-y-px hover:shadow-card",
     accent:
-      "border-transparent bg-acc text-acc-on hover:brightness-95 font-semibold",
+      "border-transparent bg-acc text-acc-on shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
     danger:
-      "border-transparent bg-err text-white hover:brightness-95 font-semibold",
+      "border-transparent bg-err text-white shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
   };
   return (
     <button
@@ -103,7 +107,8 @@ export function IconButton({
       title={label}
       className={cx(
         "group inline-flex items-center gap-1.5 rounded-control border border-line bg-raise " +
-          "font-medium text-t2 transition-colors hover:bg-raise2 hover:text-t1 " +
+          "font-medium text-t2 transition-[color,background-color,box-shadow,transform] duration-150 " +
+          "ease-spring will-change-transform active:scale-[0.96] hover:bg-raise2 hover:text-t1 hover:shadow-card " +
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
           "focus-visible:outline-acc disabled:cursor-not-allowed disabled:opacity-50",
         size,
