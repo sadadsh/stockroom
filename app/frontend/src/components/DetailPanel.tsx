@@ -652,6 +652,9 @@ function VendorCard({ purchase }: { purchase: PurchaseRef }) {
         <span className="text-sm font-medium text-t1">
           {vendorLabel(purchase.vendor, purchase.url)}
         </span>
+        {purchase.part_number ? (
+          <span className="tnum text-xs text-t3">{purchase.part_number}</span>
+        ) : null}
         {purchase.fetched_at ? (
           <span className="text-2xs text-t3">
             Checked {purchase.fetched_at}
