@@ -89,7 +89,7 @@ describe("CommandPalette", () => {
 
     // Go To group: the rail's available destinations, prefix stripped.
     expect(within(dialog).getByText("Go To")).toBeInTheDocument();
-    expect(within(dialog).getByText("Library")).toBeInTheDocument();
+    expect(within(dialog).getByText("Components")).toBeInTheDocument();
     expect(within(dialog).getByText("Add Parts")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
     // Projects has shipped (M7a), so it is now offered.
@@ -119,7 +119,7 @@ describe("CommandPalette", () => {
     await user.type(screen.getByLabelText("Search Commands and Parts"), "settings");
 
     expect(screen.getByText("Settings")).toBeInTheDocument();
-    expect(screen.queryByText("Library")).toBeNull();
+    expect(screen.queryByText("Components")).toBeNull();
     expect(screen.queryByText("Add Parts")).toBeNull();
   });
 

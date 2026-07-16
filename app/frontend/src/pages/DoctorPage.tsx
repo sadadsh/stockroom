@@ -100,13 +100,13 @@ function HealthSection() {
 
   return (
     <Section
-      title="Library Health"
+      title="Component Health"
       hint="Reconcile every part with its record and every file with the repository. Repair heals what it safely can and lists what needs your hand."
     >
       {scan.isLoading ? (
-        <p className="py-1 text-sm text-t3">Scanning the library...</p>
+        <p className="py-1 text-sm text-t3">Scanning your components...</p>
       ) : scan.isError ? (
-        <p className="py-1 text-sm text-err">Could not scan the library.</p>
+        <p className="py-1 text-sm text-err">Could not scan your components.</p>
       ) : scan.data ? (
         <HealthBody data={scan.data} onRepair={onRepair} repairing={repair.isPending} />
       ) : null}
@@ -128,7 +128,7 @@ function HealthBody({
       <div className="flex items-center gap-2.5 py-1" data-testid="doctor-healthy">
         <Dot tone="ok" />
         <span className="text-sm text-t2">
-          The library is healthy. Every part matches its record and every file is committed.
+          Your components are healthy. Every part matches its record and every file is committed.
         </span>
       </div>
     );
@@ -157,7 +157,7 @@ function HealthBody({
       {fixableCount > 0 ? (
         <div>
           <Button variant="accent" onClick={onRepair} disabled={repairing}>
-            {repairing ? "Repairing..." : "Repair Library"}
+            {repairing ? "Repairing..." : "Repair Components"}
           </Button>
         </div>
       ) : null}
@@ -237,7 +237,7 @@ function WiringSection() {
   return (
     <Section
       title="KiCad Wiring"
-      hint="Register the active profile's symbol and footprint libraries into KiCad so it resolves every part. Safe to re-run; existing rows are left untouched."
+      hint="Register the active profile's symbols and footprints in KiCad so it resolves every part. Safe to re-run; existing rows are left untouched."
     >
       <div className="flex flex-col gap-3">
         {sys.data ? (
@@ -246,7 +246,7 @@ function WiringSection() {
             <span>
               {sys.data.kicad_cli_available
                 ? `KiCad CLI found at ${sys.data.kicad_cli_path}.`
-                : "KiCad CLI was not found; wiring still writes the library tables."}
+                : "KiCad CLI was not found; wiring still writes the KiCad tables."}
             </span>
           </div>
         ) : null}
@@ -276,7 +276,7 @@ function WiringSection() {
             {report.restart_needed ? (
               <div className="flex items-center gap-2 text-warn">
                 <Dot tone="warn" />
-                <span>Restart KiCad to load the updated libraries.</span>
+                <span>Restart KiCad to load the updated tables.</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-ok">

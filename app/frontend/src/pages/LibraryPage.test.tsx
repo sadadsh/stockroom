@@ -30,8 +30,8 @@ beforeEach(() => navigate.mockClear());
 describe("LibraryPage", () => {
   it("renders the Library header with the three grouped tabs", () => {
     render(<LibraryPage route="components" />);
-    expect(screen.getByText("Library")).toBeInTheDocument();
-    for (const label of ["Parts", "BOM Coverage", "Library Health"]) {
+    expect(screen.getByText("Components")).toBeInTheDocument();
+    for (const label of ["Parts", "BOM Coverage", "Component Health"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     // Add Parts is demoted out of the tab strip.
@@ -50,14 +50,14 @@ describe("LibraryPage", () => {
 
   it("lights the Library Health tab for both the doctor and duplicates routes", () => {
     render(<LibraryPage route="doctor" />);
-    expect(screen.getByRole("tab", { name: "Library Health" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Component Health" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(screen.getByTestId("body-doctor")).toBeInTheDocument();
 
     render(<LibraryPage route="duplicates" />);
-    expect(screen.getAllByRole("tab", { name: "Library Health" })[1]).toHaveAttribute(
+    expect(screen.getAllByRole("tab", { name: "Component Health" })[1]).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -72,7 +72,7 @@ describe("LibraryPage", () => {
 
   it("enters Library Health on the doctor route by default", async () => {
     render(<LibraryPage route="components" />);
-    await userEvent.click(screen.getByRole("tab", { name: "Library Health" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Component Health" }));
     expect(navigate).toHaveBeenCalledWith("doctor");
   });
 });

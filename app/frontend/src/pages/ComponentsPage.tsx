@@ -232,7 +232,7 @@ export function ComponentsPage() {
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
               {partsQuery.isLoading
-                ? "Loading Library..."
+                ? "Loading Components..."
                 : "Select A Part To See Its Details."}
             </div>
           )}
@@ -306,7 +306,7 @@ function PickerBody({
           <UploadIcon />
         </span>
         <div className="text-sm font-medium text-t2">
-          Your Library Is Empty
+          No Components Yet
         </div>
         <div className="text-xs text-t3">
           Drop a vendor ZIP to add your first part.

@@ -229,7 +229,7 @@ describe("ComponentsPage", () => {
     await act(async () => {
       resolveRefetch({ parts: [], count: 0 });
     });
-    expect(await screen.findByText("Your Library Is Empty")).toBeInTheDocument();
+    expect(await screen.findByText("No Components Yet")).toBeInTheDocument();
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
   });
 
@@ -478,7 +478,7 @@ describe("ComponentsPage", () => {
 
     wrap(<ComponentsPage />);
 
-    expect(await screen.findByText("Your Library Is Empty")).toBeInTheDocument();
+    expect(await screen.findByText("No Components Yet")).toBeInTheDocument();
   });
 
   it("shows an honest retry surface when the server is unreachable", async () => {

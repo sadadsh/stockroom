@@ -180,7 +180,7 @@ export function CandidateCard({
           onClick={handleCommit}
           disabled={commit.isPending}
         >
-          {commit.isPending ? "Adding..." : "Add To Library"}
+          {commit.isPending ? "Adding..." : "Add to Components"}
         </Button>
       </div>
     </Card>

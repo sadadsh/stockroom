@@ -648,7 +648,7 @@ function AuditView({
         <p className="text-xs text-t3">
           Pin/pad and 3D checks ran on {audit.checked_footprints}{" "}
           {audit.checked_footprints === 1 ? "footprint" : "footprints"};{" "}
-          {audit.unresolved_footprints} could not be resolved from the active library.
+          {audit.unresolved_footprints} could not be resolved from your components.
         </p>
       ) : null}
     </div>
@@ -1439,6 +1439,9 @@ function TaxTariffInput({
 // A BOM cost source ("library" / "mouser" / "digikey") as a Title Case chip label. "library" is
 // your own combined library, priced offline from its stored data before any distributor.
 function titleCaseSource(name: string): string {
+  // The "library" source is your own combined components, priced offline; show it
+  // as "Components" while the underlying source value stays "library".
+  if (name.trim().toLowerCase() === "library") return "Components";
   return name.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -4706,8 +4709,8 @@ function PrepareSection({ projectId }: { projectId: string }) {
         <Eyebrow className="mb-0.5">Prepare</Eyebrow>
         <p className="text-xs text-t3">
           Annotate every unnumbered reference and auto-fill each component's blank identity fields from
-          the shared library, as one byte-preserving commit on the project's own git. Any component the
-          library cannot match stays untouched and can be linked by hand.
+          your shared components, as one byte-preserving commit on the project's own git. Any component
+          that cannot match stays untouched and can be linked by hand.
         </p>
       </div>
 
@@ -4784,7 +4787,7 @@ function PrepareForm({ projectId, data }: { projectId: string; data: PrepareRead
               ? `Prepared: annotated ${result.annotated} references and filled ${result.fill_fields} fields.`
               : "Prepared: nothing needed annotating or filling."
             : nothingToPrepare
-              ? "Nothing to prepare: every reference is numbered and no blank field has a library match."
+              ? "Nothing to prepare: every reference is numbered and no blank field has a component match."
               : `Prepare would annotate ${data.annotate} references and fill ${data.fill_fields} fields.`}
         </p>
         <div className="flex items-center gap-2">
@@ -4878,7 +4881,7 @@ function ManualFillPanel({
       {
         onSuccess: (r) =>
           toast(
-            r.committed ? `Linked ${r.ref} to the library part.` : `${r.ref} already matches; nothing changed.`,
+            r.committed ? `Linked ${r.ref} to the component.` : `${r.ref} already matches; nothing changed.`,
             r.committed ? "ok" : "neutral",
           ),
         onError: (e) => toast(errMsg(e, "Could not link the component."), "err"),
@@ -4893,7 +4896,7 @@ function ManualFillPanel({
     >
       <h3 className="mb-2 text-sm font-medium text-t1">Link a Component</h3>
       <p className="mb-3 text-xs text-t3">
-        Pick a component the library could not match, then a library part to link it to. Its symbol,
+        Pick a component the search could not match, then a part to link it to. Its symbol,
         footprint, and identity fields are set from that part in one commit.
       </p>
       <div className="flex flex-wrap items-end gap-2">
@@ -4913,7 +4916,7 @@ function ManualFillPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Search Library
+          Search Components
           <input
             data-testid="manual-fill-search"
             className="rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
@@ -4923,7 +4926,7 @@ function ManualFillPanel({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Library Part
+          Component
           <select
             data-testid="manual-fill-part"
             className="min-w-[12rem] rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"

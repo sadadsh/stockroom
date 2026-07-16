@@ -112,7 +112,7 @@ describe("DoctorPage", () => {
   it("shows an honest healthy state with no repair button when nothing is wrong", async () => {
     renderPage();
     expect(await screen.findByTestId("doctor-healthy")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Repair Library" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Repair Components" })).toBeNull();
   });
 
   it("lists fixable defects, uncommitted changes, and manual findings", async () => {
@@ -130,7 +130,7 @@ describe("DoctorPage", () => {
     expect(manual).toHaveTextContent("Missing 3D Model");
     expect(manual).toHaveTextContent("re-import the 3D model for this part");
     // and the repair action is offered
-    expect(screen.getByRole("button", { name: "Repair Library" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Repair Components" })).toBeInTheDocument();
   });
 
   it("runs the repair, reports what it did, and refreshes to the healed state", async () => {
@@ -138,7 +138,7 @@ describe("DoctorPage", () => {
     renderPage();
     const user = userEvent.setup();
 
-    const repairBtn = await screen.findByRole("button", { name: "Repair Library" });
+    const repairBtn = await screen.findByRole("button", { name: "Repair Components" });
     await user.click(repairBtn);
 
     await waitFor(() => expect(mockApi.repairLibrary).toHaveBeenCalledTimes(1));
@@ -164,6 +164,6 @@ describe("DoctorPage", () => {
 
     await waitFor(() => expect(mockApi.wireKicad).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Registered 2 categories/)).toBeInTheDocument();
-    expect(screen.getByText(/Restart KiCad to load the updated libraries\./)).toBeInTheDocument();
+    expect(screen.getByText(/Restart KiCad to load the updated tables\./)).toBeInTheDocument();
   });
 });
