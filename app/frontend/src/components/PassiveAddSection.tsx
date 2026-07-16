@@ -43,7 +43,11 @@ export function PassiveAddSection({
   const [category, setCategory] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [datasheetUrl, setDatasheetUrl] = useState("");
-  const [distributorPn, setDistributorPn] = useState("");
+  // Seed the order number from the pulled distributor P/N (a Mouser link -> its 667-... number),
+  // so a Mouser passive commits with its order number already filled instead of hand-typed.
+  const [distributorPn, setDistributorPn] = useState(
+    () => Object.values(result.dist_pns ?? {})[0] ?? "",
+  );
   const [preview, setPreview] = useState<PassivePreviewOk | null>(null);
   const [previewing, setPreviewing] = useState(false);
   // The rare manual path: a detected passive whose case did not resolve to a stock

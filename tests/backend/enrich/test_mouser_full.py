@@ -93,6 +93,14 @@ def test_lifecycle_status_promotes_from_the_spec_row() -> None:
     assert r.specs["Lifecycle Status"].value == "Active"
 
 
+def test_mouser_part_number_lifts_from_the_datalayer() -> None:
+    # A3: a Mouser link carries the Mouser order number (667-...) in its dataLayer as
+    # event_mouserpn; it belongs in dist_pns["mouser"], normalized to upper case so it reads
+    # the same as the manufacturer MPN, ready to become the order/purchase part number.
+    r = _result()
+    assert r.dist_pns.get("mouser") == "667-ERJ-P03F1101V"
+
+
 def test_the_web_extractor_alone_yields_price_stock_and_lead() -> None:
     # A direct unit of the site extractor (no generic cascade): the three depth fields
     # come from the site parser itself, so the pipeline gets them even when JSON-LD is

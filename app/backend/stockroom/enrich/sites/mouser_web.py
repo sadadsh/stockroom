@@ -28,6 +28,14 @@ _MOUSER_DATASHEET = re.compile(
     re.IGNORECASE,
 )
 
+# Mouser's own order number (e.g. "667-ERJ-P03F1101V"), carried in the same analytics
+# dataLayer as event_mouserpn (raw and HTML-escaped). It is the distributor part number an
+# order export needs ("order from Mouser by this P/N"), distinct from the manufacturer MPN.
+_MOUSER_PN = re.compile(
+    r"event_mouserpn(?:&quot;|[\"'])?\s*:\s*(?:&quot;|[\"'])([0-9]+-[A-Za-z0-9./_-]+)",
+    re.IGNORECASE,
+)
+
 # Bare-cell fallback for older/simpler pages: <td>label</td><td>value</td> with no
 # nested markup. Kept as a fallback, applied only when the attr-col pass finds nothing.
 _ROW = re.compile(
@@ -159,6 +167,10 @@ class MouserWebSite:
             v = ds.lower()
             if v.startswith("http") and (v.endswith(".pdf") or "datasheet" in v or ".pdf?" in v):
                 r.datasheet_url = Sourced(ds, "mouser_web", "medium")
+        # The Mouser order number -> dist_pns["mouser"], upper-cased so it reads like the MPN.
+        pn = _MOUSER_PN.search(html)
+        if pn:
+            r.dist_pns["mouser"] = unescape(pn.group(1)).upper()
         found = False
         for raw_label, raw_value in _ATTR_PAIR.findall(html):
             label = _clean(raw_label).rstrip(":").strip()

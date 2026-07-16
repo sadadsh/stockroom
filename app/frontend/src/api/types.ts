@@ -252,6 +252,9 @@ export interface EnrichmentResult {
 export interface PurchaseDTO {
   vendor?: string;
   url?: string;
+  // The distributor's own order number (e.g. Mouser "667-ERJ-P03F1101V"), carried onto the
+  // committed record so an order export can say "order from {vendor} by {this P/N}".
+  part_number?: string;
   price_breaks?: unknown[];
   stock?: number | null;
   currency?: string;

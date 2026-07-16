@@ -7,11 +7,8 @@
  * when a lookup carried none of it, so an empty or blocked fetch shows no hollow panel.
  */
 import type { EnrichmentResult } from "../api/types";
-import { Eyebrow } from "./primitives";
-
-function sv(s: { value: unknown } | null | undefined): string {
-  return s == null ? "" : String(s.value ?? "");
-}
+import { distributorLabel, sv } from "../lib/sourced";
+import { Badge, Eyebrow } from "./primitives";
 
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£" };
 
@@ -49,17 +46,27 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
       ? breaks.reduce((a, b) => (b.price < a.price ? b : a))
       : null;
 
+  const distPns = Object.entries(result.dist_pns ?? {}).filter(([, v]) => v);
+
   const stats: [string, string][] = [];
   if (stockNum != null) stats.push(["Stock", `${stockNum.toLocaleString()} in stock`]);
   if (lead) stats.push(["Lead Time", lead]);
   if (lifecycle) stats.push(["Lifecycle", lifecycle]);
   if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
+  for (const [key, pn] of distPns) stats.push([`${distributorLabel(key)} P/N`, pn]);
 
   if (stats.length === 0 && breaks.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
-      <Eyebrow>Sourcing</Eyebrow>
+      <div className="flex flex-wrap items-center gap-2">
+        <Eyebrow>Sourcing</Eyebrow>
+        {distPns.map(([key]) => (
+          <Badge key={key} tone="neutral">
+            {distributorLabel(key)}
+          </Badge>
+        ))}
+      </div>
       {stats.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {stats.map(([label, value]) => (

@@ -6,10 +6,7 @@
  * then drops a SnapEDA ZIP into carries everything the page gave without re-typing it.
  */
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
-
-function sv(s: { value: unknown } | null | undefined): string {
-  return s == null ? "" : String(s.value ?? "");
-}
+import { sv } from "./sourced";
 
 export function vendorFromUrl(url: string): string {
   let host = "";
@@ -47,11 +44,15 @@ export function mergeResultIntoCandidate(
     result.stock != null && Number.isFinite(Number(result.stock.value))
       ? Number(result.stock.value)
       : null;
+  // The distributor's own order number for THIS vendor (a Mouser link -> dist_pns.mouser), so the
+  // committed purchase carries the P/N an order export needs, not just the manufacturer MPN.
+  const partNumber = result.dist_pns?.[vendorFromUrl(url).toLowerCase()] ?? "";
   const purchase = url
     ? [
         {
           vendor: vendorFromUrl(url),
           url,
+          part_number: partNumber,
           price_breaks: result.price_breaks.map((b) => ({
             qty: b.qty,
             price: b.price,

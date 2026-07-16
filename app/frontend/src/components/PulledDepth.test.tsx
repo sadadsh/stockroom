@@ -40,6 +40,14 @@ describe("PulledDepth", () => {
     expect(screen.getByText("$0.043/ea")).toBeInTheDocument();
   });
 
+  it("flags the distributor source and exposes its order number (A3)", () => {
+    render(<PulledDepth result={FULL} />);
+    // the "Mouser" source badge + the Mouser P/N stat, from dist_pns.
+    expect(screen.getByText("Mouser")).toBeInTheDocument();
+    expect(screen.getByText("Mouser P/N")).toBeInTheDocument();
+    expect(screen.getByText("667-ERJ-P03F1101V")).toBeInTheDocument();
+  });
+
   it("renders the full price-break ladder with unit price AND order total", () => {
     render(<PulledDepth result={FULL} />);
     expect(screen.getByText("25,000")).toBeInTheDocument();
@@ -73,6 +81,7 @@ describe("PulledDepth", () => {
       stock: null,
       lifecycle: null,
       lead_time: null,
+      dist_pns: {},
       price_breaks: [],
     };
     const { container } = render(<PulledDepth result={empty} />);
