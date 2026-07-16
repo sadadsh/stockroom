@@ -1,12 +1,12 @@
 {
   "category": "Capacitors",
   "datasheet": {
-    "fetched_at": "",
     "file": "",
-    "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL31A106KBHNNN"
+    "source_url": "https://www.mouser.com/datasheet/3/508/1/upy-gphc_x5r_4v-to-50v.pdf",
+    "fetched_at": ""
   },
   "description": "capacitor, small US symbol",
-  "display_name": "10u 10% X5R 1206 Samsung CL31A106KBHNNNE",
+  "display_name": "10u 20% X5R 1206 YAGEO CC1206MKX5R9BB106",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -14,80 +14,80 @@
     "tool": "kicad"
   },
   "hashes": null,
-  "id": "cl31a106kbhnnne",
-  "manufacturer": "Samsung",
+  "id": "cc1206mkx5r9bb106",
+  "manufacturer": "YAGEO",
   "model": null,
-  "mpn": "CL31A106KBHNNNE",
+  "mpn": "CC1206MKX5R9BB106",
   "passive": true,
   "provenance": {
-    "ingested_at": "",
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D",
     "original_zip_sha256": "",
-    "source": "finale-sauce-source",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D"
+    "ingested_at": ""
   },
   "purchase": [
     {
-      "currency": "USD",
-      "fetched_at": "",
-      "part_number": "187-CL31A106KBHNNNE",
+      "vendor": "Mouser",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D",
+      "part_number": "603-CC1206MKX5R9BB10",
       "price_breaks": [
         {
           "qty": 1,
-          "price": 0.36,
+          "price": 0.46,
           "currency": "USD"
         },
         {
           "qty": 10,
-          "price": 0.155,
+          "price": 0.306,
           "currency": "USD"
         },
         {
           "qty": 100,
-          "price": 0.138,
+          "price": 0.191,
           "currency": "USD"
         },
         {
           "qty": 500,
-          "price": 0.109,
+          "price": 0.154,
           "currency": "USD"
         },
         {
           "qty": 1000,
-          "price": 0.1,
+          "price": 0.141,
           "currency": "USD"
         },
         {
           "qty": 2000,
-          "price": 0.092,
+          "price": 0.131,
           "currency": "USD"
         },
         {
           "qty": 4000,
-          "price": 0.082,
+          "price": 0.117,
           "currency": "USD"
         }
       ],
-      "stock": 0,
-      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL31A106KBHNNNE?qs=X6jEic%2FHinBsSMnC%2FFnmbg%3D%3D",
-      "vendor": "Mouser"
+      "stock": 2431,
+      "currency": "USD",
+      "fetched_at": ""
     }
   ],
   "specs": {
     "Assembly Country of Origin": "Not available",
-    "Brand": "Samsung Electro-Mechanics",
+    "Brand": "YAGEO",
     "Capacitance": "10 uF",
     "Case Code - in": "1206",
     "Case Code - mm": "3216",
     "Class": "Class 2",
     "Country of Diffusion": "Not available",
-    "Country of Origin": "Philippines",
+    "Country of Origin": "Taiwan",
     "Dielectric": "X5R",
     "ECCN": "EAR99",
     "Factory Pack Quantity": "2000",
-    "Height": "1.8 mm (0.071 in)",
+    "Height": "1.6 mm (0.063 in)",
     "Length": "3.2 mm (0.126 in)",
     "Lifecycle": "Active",
-    "Manufacturer": "Samsung Electro-Mechanics",
+    "Manufacturer": "YAGEO",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 55 C",
     "Package": "1206 (3216 metric)",
@@ -97,13 +97,13 @@
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
     "Product Type": "Ceramic Capacitors",
     "RoHS": "Details",
-    "Series": "CL-Standard",
+    "Series": "CC",
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "10 %",
-    "Type": "Multilayer Ceramic Capacitor",
-    "US Tariff %": 8.06,
+    "Tolerance": "20 %",
+    "Type": "MLCC Surface Mount Ceramic Capacitor",
+    "US Tariff %": 8.04,
     "Unit Weight": "0.000952 oz",
     "Voltage Rating DC": "50 VDC",
     "Width": "1.6 mm (0.063 in)",

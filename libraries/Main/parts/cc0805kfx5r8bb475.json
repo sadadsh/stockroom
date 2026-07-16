@@ -1,12 +1,12 @@
 {
   "category": "Capacitors",
   "datasheet": {
-    "fetched_at": "",
     "file": "",
-    "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL21A106KOQNNN"
+    "source_url": "https://www.mouser.com/datasheet/3/508/1/upy-gphc_x5r_4v-to-50v.pdf",
+    "fetched_at": ""
   },
   "description": "capacitor, small US symbol",
-  "display_name": "10u 10% X5R 0805 Samsung CL21A106KOQNNNE",
+  "display_name": "4.7uF 10% X5R 0805 YAGEO CC0805KFX5R8BB475",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -14,100 +14,105 @@
     "tool": "kicad"
   },
   "hashes": null,
-  "id": "cl21a106koqnnne",
-  "manufacturer": "Samsung",
+  "id": "cc0805kfx5r8bb475",
+  "manufacturer": "YAGEO",
   "model": null,
-  "mpn": "CL21A106KOQNNNE",
+  "mpn": "CC0805KFX5R8BB475",
   "passive": true,
   "provenance": {
-    "ingested_at": "",
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC0805KFX5R8BB475?qs=mzRxyRlhVdvf7w1%2FCVNeQQ%3D%3D",
     "original_zip_sha256": "",
-    "source": "finale-sauce-source",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE?qs=349EhDEZ59qKIX0T0PKtPw%3D%3D"
+    "ingested_at": ""
   },
   "purchase": [
     {
-      "currency": "USD",
-      "fetched_at": "",
-      "part_number": "187-CL21A106KOQNNNE",
+      "vendor": "Mouser",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC0805KFX5R8BB475?qs=mzRxyRlhVdvf7w1%2FCVNeQQ%3D%3D",
+      "part_number": "603-CC0805KFX5R8BB47",
       "price_breaks": [
         {
           "qty": 1,
-          "price": 0.11,
+          "price": 0.39,
           "currency": "USD"
         },
         {
           "qty": 10,
-          "price": 0.042,
+          "price": 0.17,
           "currency": "USD"
         },
         {
           "qty": 100,
-          "price": 0.036,
+          "price": 0.152,
           "currency": "USD"
         },
         {
           "qty": 500,
-          "price": 0.027,
+          "price": 0.12,
           "currency": "USD"
         },
         {
           "qty": 1000,
-          "price": 0.024,
+          "price": 0.111,
           "currency": "USD"
         },
         {
-          "qty": 2000,
-          "price": 0.019,
+          "qty": 2500,
+          "price": 0.098,
           "currency": "USD"
         },
         {
-          "qty": 4000,
-          "price": 0.017,
+          "qty": 5000,
+          "price": 0.092,
+          "currency": "USD"
+        },
+        {
+          "qty": 10000,
+          "price": 0.077,
           "currency": "USD"
         }
       ],
-      "stock": 0,
-      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE?qs=349EhDEZ59qKIX0T0PKtPw%3D%3D",
-      "vendor": "Mouser"
+      "stock": 19998,
+      "currency": "USD",
+      "fetched_at": ""
     }
   ],
   "specs": {
     "Assembly Country of Origin": "Not available",
-    "Brand": "Samsung Electro-Mechanics",
-    "Capacitance": "10 uF",
+    "Brand": "YAGEO",
+    "Capacitance": "4.7 uF",
     "Case Code - in": "0805",
     "Case Code - mm": "2012",
     "Class": "Class 2",
     "Country of Diffusion": "Not available",
-    "Country of Origin": "Philippines",
+    "Country of Origin": "Taiwan",
     "Dielectric": "X5R",
     "ECCN": "EAR99",
     "Factory Pack Quantity": "2000",
     "Height": "1.35 mm (0.053 in)",
     "Length": "2 mm (0.079 in)",
     "Lifecycle": "Active",
-    "Manufacturer": "Samsung Electro-Mechanics",
+    "Manufacturer": "YAGEO",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 55 C",
     "Package": "0805 (2012 metric)",
     "Packaging": "Reel",
-    "Part # Aliases": "CL21A106KOQNNN",
+    "Part # Aliases": "CL21A475KAQNNN",
     "Product": "General Type MLCCs",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
     "Product Type": "Ceramic Capacitors",
     "RoHS": "Details",
-    "Series": "CL-Standard",
+    "Series": "CC",
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
     "Tolerance": "10 %",
-    "Type": "Multilayer Ceramic Capacitor",
-    "US Tariff %": 8.18,
-    "Unit Weight": "0.000226 oz",
-    "Voltage Rating DC": "16 VDC",
-    "Width": "1.25 mm (0.049 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "2000"
+    "Type": "Mid-Voltage Surface Mount Ceramic Multilayer Capacitor",
+    "US Tariff %": 7.95,
+    "Unit Weight": "0.000194 oz",
+    "Voltage Rating DC": "25 VDC",
+    "Width": "1.2 mm (0.049 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000"
   },
   "symbol": {
     "lib": "Device",

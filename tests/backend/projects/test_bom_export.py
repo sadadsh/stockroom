@@ -105,6 +105,23 @@ def test_bom_xlsx_carries_mouser_link_origin_and_tariff():
     assert "<v>7.98</v>" in sheet  # tariff % as a real number Excel can sort/sum
 
 
+def test_bom_xlsx_money_columns_are_currency_and_a_total_row_sums_them():
+    # The Full BOM must look like an order sheet: money columns render as $#,##0.00 (currency
+    # style s=3), and a bold TOTAL row (s=1 label + s=4 bold-currency) sums the build economics.
+    rows = [{"mpn": "A", "value": "1", "refs": ["R1"], "qty": 1, "unit_price": 0.10, "moq": 1,
+             "final_qty": 3, "final_unit_price": 0.10, "final_extended": 0.30, "tax_tariff": 0.02,
+             "line_total": 0.32},
+            {"mpn": "B", "value": "2", "refs": ["R2"], "qty": 1, "unit_price": 1.00, "moq": 1,
+             "final_qty": 2, "final_unit_price": 1.00, "final_extended": 2.00, "tax_tariff": 0.10,
+             "line_total": 2.10}]
+    parts = _unzip(bom_xlsx(rows))
+    styles, sheet = parts["xl/styles.xml"], parts["xl/worksheets/sheet1.xml"]
+    assert '&quot;$&quot;#,##0.00' in styles          # currency number format registered
+    assert 's="3"' in sheet                            # money cells use the currency style
+    assert "TOTAL" in sheet and 's="4"' in sheet       # bold-currency TOTAL row
+    assert "<v>2.42</v>" in sheet                       # Total Cost summed (0.32 + 2.10)
+
+
 def test_bom_xlsx_url_columns_are_real_clickable_hyperlinks():
     # A generated xlsx does NOT auto-linkify plain text, so the Datasheet + Mouser cells must be
     # emitted as real external hyperlinks (a worksheet relationship + a <hyperlink> ref), or they
