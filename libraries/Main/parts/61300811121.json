@@ -29,34 +29,40 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-61300811121",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.39,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.336,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 0.28,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 50,
           "price": 0.234,
-          "qty": 50
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.212,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.193,
-          "qty": 1000
+          "currency": "USD"
         }
       ],
-      "stock": 21535,
+      "stock": 21510,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300811121",
       "vendor": "Mouser"
     }
@@ -92,7 +98,13 @@
     "Termination Post Length": "3 mm (0.118 in)",
     "Termination Style": "Solder Pin",
     "Type": "Pin Strip",
-    "Unit Weight": "0.016932 oz"
+    "Unit Weight": "0.016932 oz",
+    "Country of Origin": "Taiwan",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

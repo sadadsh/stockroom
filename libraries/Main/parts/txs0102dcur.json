@@ -29,38 +29,45 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TXS0102DCUR",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.63,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.445,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 0.399,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.348,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 0.324,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.31,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 3000,
           "price": 0.31,
-          "qty": 3000
+          "currency": "USD"
         }
       ],
-      "stock": 111490,
+      "stock": 111487,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR",
       "vendor": "Mouser"
     }
@@ -82,7 +89,12 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V, 2.3 V",
     "Type": "2-bit Bidirectional Voltage-Level Translator",
-    "Unit Weight": "0.000339 oz"
+    "Unit Weight": "0.000339 oz",
+    "Country of Origin": "Thailand",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "VSSOP-8",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

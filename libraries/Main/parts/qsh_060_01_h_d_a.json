@@ -29,19 +29,22 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "200-QSH06001HDA",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 22.49,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 192,
           "price": 22.45,
-          "qty": 192
+          "currency": "USD"
         },
         {
+          "qty": 448,
           "price": 17.26,
-          "qty": 448
+          "currency": "USD"
         }
       ],
       "stock": 202,
@@ -76,7 +79,13 @@
     "Termination Style": "Solder",
     "Tradename": "Q Strip",
     "Unit Weight": "0.024424 oz",
-    "Voltage Rating": "175 VAC"
+    "Voltage Rating": "175 VAC",
+    "Country of Origin": "Costa Rica",
+    "US Tariff %": 6.98,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

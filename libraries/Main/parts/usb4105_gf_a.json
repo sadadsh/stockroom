@@ -30,16 +30,56 @@
     {
       "currency": "",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "640-USB4105-GF-A",
       "price_breaks": [
         {
-          "currency": "USD",
-          "price": 0.8,
-          "qty": 1
+          "qty": 1,
+          "price": 0.93,
+          "currency": "USD"
+        },
+        {
+          "qty": 10,
+          "price": 0.81,
+          "currency": "USD"
+        },
+        {
+          "qty": 25,
+          "price": 0.741,
+          "currency": "USD"
+        },
+        {
+          "qty": 100,
+          "price": 0.668,
+          "currency": "USD"
+        },
+        {
+          "qty": 250,
+          "price": 0.61,
+          "currency": "USD"
+        },
+        {
+          "qty": 800,
+          "price": 0.505,
+          "currency": "USD"
+        },
+        {
+          "qty": 2400,
+          "price": 0.474,
+          "currency": "USD"
+        },
+        {
+          "qty": 4800,
+          "price": 0.451,
+          "currency": "USD"
+        },
+        {
+          "qty": 9600,
+          "price": 0.43,
+          "currency": "USD"
         }
       ],
-      "stock": null,
-      "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D",
+      "stock": 481287,
+      "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A",
       "vendor": "Mouser"
     }
   ],
@@ -73,7 +113,14 @@
     "Termination Style": "SMD/SMT",
     "Type": "PCB Top Mount",
     "Unit Weight": "0.027090 oz",
-    "Voltage Rating": "48 VDC"
+    "Voltage Rating": "48 VDC",
+    "Country of Origin": "China",
+    "US Tariff %": 30.0,
+    "Lifecycle": "Active",
+    "Mounting Style": "Top-Mount",
+    "Assembly Country of Origin": "China",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "SR-Connectors",

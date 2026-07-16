@@ -29,39 +29,47 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "645-599-0160-137F",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.29,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.195,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.137,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.111,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.102,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 0.095,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 0.08,
-          "qty": 4000
+          "currency": "USD"
         },
         {
+          "qty": 24000,
           "price": 0.073,
-          "qty": 24000
+          "currency": "USD"
         }
       ],
       "stock": 11820,
@@ -94,7 +102,14 @@
     "Vf - Forward Voltage": "2.2 V",
     "Viewing Angle": "140 deg",
     "Wavelength/Color Temperature": "572 nm",
-    "Width": "1.25 mm"
+    "Width": "1.25 mm",
+    "Country of Origin": "Taiwan",
+    "US Tariff %": 7.93,
+    "Lifecycle": "Active",
+    "Package": "0805 (2012 metric)",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

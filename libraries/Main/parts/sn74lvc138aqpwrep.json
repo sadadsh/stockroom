@@ -29,39 +29,47 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-N74LVC138AQPWREP",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 2.73,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 2.04,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 1.86,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 1.67,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 1.6,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 1.55,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 1.44,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 1.41,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
       "stock": 1995,
@@ -92,7 +100,14 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "3.6 V",
     "Supply Voltage - Min": "2 V",
-    "Unit Weight": "0.002183 oz"
+    "Unit Weight": "0.002183 oz",
+    "Country of Origin": "Malaysia",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "TSSOP-16",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

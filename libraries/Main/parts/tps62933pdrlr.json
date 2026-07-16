@@ -29,46 +29,55 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS62933PDRLR",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 1.38,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 1.01,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 0.912,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.808,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 0.758,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.729,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.708,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 0.697,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 0.664,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
-      "stock": 12149,
+      "stock": 10754,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR",
       "vendor": "Mouser"
     }
@@ -97,7 +106,14 @@
     "Supply Voltage - Min": "3.8 V",
     "Switching Frequency": "200 kHz to 2.2 MHz",
     "Topology": "Buck",
-    "Type": "Synchronous Buck Converter"
+    "Type": "Synchronous Buck Converter",
+    "Country of Origin": "Philippines",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "SOT-583-8",
+    "Assembly Country of Origin": "Philippines",
+    "Country of Diffusion": "United States",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

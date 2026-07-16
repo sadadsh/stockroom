@@ -3,7 +3,7 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.adafruit.com/product/358"
+    "source_url": "https://www.mouser.com/datasheet/3/167/1/Scotch_300_Series_Barricade_Tapes_Data_Sheet_78_8125_9670_4_F.pdf"
   },
   "description": "358",
   "display_name": "358",
@@ -41,7 +41,30 @@
       "vendor": "Mouser"
     }
   ],
-  "specs": {},
+  "specs": {
+    "Country of Origin": "United States",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Manufacturer": "3M",
+    "Product Category": "Labels & Industrial Warning Signs",
+    "RoHS": "Details",
+    "Product": "Tapes",
+    "Type": "Barricade Tape",
+    "Material": "Polyethylene (PE)",
+    "Color": "Yellow",
+    "Width": "3 in",
+    "Length": "1000 ft",
+    "Brand": "3M Electronic Specialty",
+    "Description/Function": "Non-Adhesive Barricade Tape",
+    "Product Type": "Labels",
+    "Factory Pack Quantity: Factory Pack Quantity": "8",
+    "Subcategory": "Supplies",
+    "Part # Aliases": "05112857761 7100035358",
+    "Unit Weight": "1.102 lbs",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
+  },
   "symbol": null,
   "tags": []
 }

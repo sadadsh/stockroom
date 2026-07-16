@@ -29,23 +29,27 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-74439346068",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 4.05,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 50,
           "price": 3.68,
-          "qty": 50
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 2.73,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 700,
           "price": 2.49,
-          "qty": 700
+          "currency": "USD"
         }
       ],
       "stock": 6579,
@@ -85,7 +89,13 @@
     "Tolerance": "20 %",
     "Type": "Power Inductor",
     "Unit Weight": "0.023951 oz",
-    "Width": "6.45 mm"
+    "Width": "6.45 mm",
+    "Country of Origin": "China",
+    "US Tariff %": 35.06,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",

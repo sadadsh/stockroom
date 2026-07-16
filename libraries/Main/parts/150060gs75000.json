@@ -29,34 +29,40 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-150060GS75000",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.16,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.151,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 50,
           "price": 0.142,
-          "qty": 50
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.122,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.116,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 0.116,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
-      "stock": 143068,
+      "stock": 146494,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000",
       "vendor": "Mouser"
     }
@@ -91,7 +97,14 @@
     "Vf - Forward Voltage": "3.2 V",
     "Viewing Angle": "140 deg",
     "Wavelength/Color Temperature": "520 nm",
-    "Width": "0.8 mm"
+    "Width": "0.8 mm",
+    "Country of Origin": "China",
+    "US Tariff %": 35.0,
+    "Lifecycle": "Active",
+    "Package": "0603 (1608 metric)",
+    "Assembly Country of Origin": "China",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

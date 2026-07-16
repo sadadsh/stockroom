@@ -29,31 +29,37 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-560112116009",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.11,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.102,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 50,
           "price": 0.058,
-          "qty": 50
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.039,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 2500,
           "price": 0.03,
-          "qty": 2500
+          "currency": "USD"
         },
         {
+          "qty": 5000,
           "price": 0.03,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 12356,
@@ -89,7 +95,14 @@
     "Tolerance": "1 %",
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Country of Origin": "Taiwan",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "0603",
+    "Assembly Country of Origin": "Taiwan",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",

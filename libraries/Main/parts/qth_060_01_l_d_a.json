@@ -29,19 +29,22 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "200-QTH06001LDA",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 5.75,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 96,
           "price": 5.15,
-          "qty": 96
+          "currency": "USD"
         },
         {
+          "qty": 288,
           "price": 4.74,
-          "qty": 288
+          "currency": "USD"
         }
       ],
       "stock": 5176,
@@ -79,7 +82,13 @@
     "Termination Style": "Solder Pin",
     "Tradename": "Q Strip",
     "Unit Weight": "0.050795 oz",
-    "Voltage Rating": "175 VAC"
+    "Voltage Rating": "175 VAC",
+    "Country of Origin": "Malaysia",
+    "US Tariff %": 8.0,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

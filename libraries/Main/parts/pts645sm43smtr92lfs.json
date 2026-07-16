@@ -3,7 +3,7 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.mouser.com/datasheet/2/240/pts645-3050759.pdf"
+    "source_url": "https://ckswitches.com/media/1471/pts645.pdf"
   },
   "description": "PTS645",
   "display_name": "PTS645",
@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "611-PTS645SM43SMTR92",
       "price_breaks": [
         {
           "price": 0.36,
@@ -57,11 +57,51 @@
         }
       ],
       "stock": null,
-      "url": "https://www.mouser.com/ProductDetail/CK/PTS645SM43SMTR92LFS",
+      "url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SM43SMTR92-LFS",
       "vendor": "Mouser"
     }
   ],
-  "specs": {},
+  "specs": {
+    "Country of Origin": "China",
+    "Lifecycle": "Active",
+    "Manufacturer": "C&K Switches",
+    "Product Category": "Tactile Switches",
+    "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
+    "RoHS": "Details",
+    "Illuminated": "Non-Illuminated",
+    "Mounting Style": "SMD/SMT",
+    "Mounting Direction": "Straight",
+    "Stem Height": "0.85 mm",
+    "Actuator": "Round",
+    "Switch Function": "OFF - (ON)",
+    "Operating Force": "1.6 N",
+    "Current Rating": "50 mA",
+    "Voltage Rating DC": "12 VDC",
+    "Ground Terminal": "No",
+    "Contact Form": "SPST",
+    "Termination Style": "Gull Wing Lead",
+    "Color": "Black",
+    "Length": "6 mm",
+    "Width": "6 mm",
+    "Height": "4.3 mm",
+    "Series": "PTS645",
+    "Life": "100000 Cycle",
+    "Packaging": "Reel",
+    "Brand": "C&K",
+    "Contact Plating": "Silver",
+    "Maximum Operating Temperature": "+ 60 C",
+    "Minimum Operating Temperature": "- 20 C",
+    "Product Type": "Tactile Switches",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "Subcategory": "Switches",
+    "Tradename": "PTS",
+    "Type": "Tactile",
+    "Part # Aliases": "Y97HT23B2EAFP PTS645SM43SMTR92LFS Y97HT23B2EAFP",
+    "Unit Weight": "0.019753 oz",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
+  },
   "symbol": null,
   "tags": []
 }

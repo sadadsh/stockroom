@@ -29,39 +29,47 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "700-MAX4995BAUTT",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 6.99,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 5.39,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 4.98,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 4.54,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 4.39,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 4.36,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 4.35,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2500,
           "price": 3.99,
-          "qty": 2500
+          "currency": "USD"
         }
       ],
       "stock": 3754,
@@ -93,7 +101,14 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.7 V",
     "Type": "Current Limit",
-    "Unit Weight": "0.001270 oz"
+    "Unit Weight": "0.001270 oz",
+    "Country of Origin": "Thailand",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "SOT-23-6",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

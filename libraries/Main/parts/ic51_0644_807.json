@@ -29,23 +29,27 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "945-IC51-0644-807",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 126.53,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 96.45,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 96.44,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 96.0,
-          "qty": 100
+          "currency": "USD"
         }
       ],
       "stock": 9,
@@ -70,7 +74,13 @@
     "Subcategory": "IC & Component Sockets",
     "Termination Style": "SMD/SMT",
     "Type": "Chip Carrier",
-    "Unit Weight": "1.890908 oz"
+    "Unit Weight": "1.890908 oz",
+    "Country of Origin": "Philippines",
+    "US Tariff %": 8.0,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

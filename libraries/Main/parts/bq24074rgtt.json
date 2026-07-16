@@ -29,43 +29,52 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-BQ24074RGTT",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 3.19,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 2.39,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 2.19,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 1.97,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 1.86,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 1.76,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 1.71,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2500,
           "price": 1.69,
-          "qty": 2500
+          "currency": "USD"
         },
         {
+          "qty": 5000,
           "price": 1.67,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 1351,
@@ -93,7 +102,14 @@
     "RoHS": "Details",
     "Series": "BQ24074",
     "Subcategory": "PMIC - Power Management ICs",
-    "Unit Weight": "0.000808 oz"
+    "Unit Weight": "0.000808 oz",
+    "Country of Origin": "China",
+    "US Tariff %": 37.93,
+    "Lifecycle": "Active",
+    "Package": "VQFN-16",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

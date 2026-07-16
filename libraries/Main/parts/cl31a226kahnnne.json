@@ -29,35 +29,42 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "187-CL31A226KAHNNNE",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.38,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.166,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.148,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.117,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.108,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 0.097,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 0.089,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
       "stock": 0,
@@ -92,7 +99,14 @@
     "Type": "Multilayer Ceramic Capacitor",
     "Unit Weight": "0.000952 oz",
     "Voltage Rating DC": "25 VDC",
-    "Width": "1.6 mm (0.063 in)"
+    "Width": "1.6 mm (0.063 in)",
+    "Country of Origin": "Philippines",
+    "US Tariff %": 7.89,
+    "Lifecycle": "Active",
+    "Package": "1206 (3216 metric)",
+    "Assembly Country of Origin": "Philippines",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",

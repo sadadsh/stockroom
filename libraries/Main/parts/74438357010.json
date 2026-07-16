@@ -29,30 +29,35 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-74438357010",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 1.68,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 1.6,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 50,
           "price": 1.54,
-          "qty": 50
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 1.4,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 700,
           "price": 1.22,
-          "qty": 700
+          "currency": "USD"
         }
       ],
-      "stock": 11706,
+      "stock": 11702,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010",
       "vendor": "Mouser"
     }
@@ -89,7 +94,13 @@
     "Tolerance": "20 %",
     "Type": "Power Inductor",
     "Unit Weight": "0.011993 oz",
-    "Width": "4.1 mm"
+    "Width": "4.1 mm",
+    "Country of Origin": "Korea, Republic of",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",
