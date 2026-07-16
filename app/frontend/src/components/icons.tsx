@@ -128,22 +128,15 @@ export function ExternalIcon({ className }: { className?: string }) {
 
 // Simple line art for the Symbol, Footprint and 3D Model file cards (mockup).
 export function SymbolArt() {
+  // A neutral schematic-symbol placeholder: a body with pins, no refdes. It must not
+  // imply a part type (a hardcoded "U1" read as an IC even for a resistor), since it can
+  // flash before the real render loads on a cold cache.
   return (
     <svg viewBox="0 0 132 94" width="132" height="94">
       <g style={{ stroke: "var(--c-icon-line)" }} strokeWidth="1.5" fill="none">
         <rect x="40" y="20" width="52" height="54" rx="3" />
         <path d="M40 33H24M40 47H24M40 61H24M92 33h16M92 47h16M92 61h16" />
       </g>
-      <text
-        x="66"
-        y="51"
-        style={{ fill: "var(--c-icon-faint)" }}
-        fontSize="10"
-        textAnchor="middle"
-        fontFamily="monospace"
-      >
-        U1
-      </text>
     </svg>
   );
 }
