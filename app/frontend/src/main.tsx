@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import App from "./App";
 import { RouterProvider } from "./lib/router";
+import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 // The interface face, bundled offline (no CDN) so it renders identically inside
@@ -34,7 +35,9 @@ createRoot(rootEl).render(
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider>
-              <App />
+              <AddPartProvider>
+                <App />
+              </AddPartProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>

@@ -6,7 +6,6 @@ import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
-import { RouterProvider, useRouter } from "../lib/router";
 import { IngestPage } from "./IngestPage";
 
 vi.mock("../api/client", async (im) => {
@@ -108,25 +107,13 @@ function resultStream(candidates: StagingCandidate[]): ReadableStream<Uint8Array
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = { current: "" as string };
-  function Probe() {
-    const { route } = useRouter();
-    router.current = route;
-    return null;
-  }
-  const utils = render(
+  return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <ToastProvider>
-          <RouterProvider initial="ingest">
-            <Probe />
-            {ui}
-          </RouterProvider>
-        </ToastProvider>
+        <ToastProvider>{ui}</ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
-  return { ...utils, router };
 }
 
 beforeEach(() => {
@@ -136,13 +123,6 @@ beforeEach(() => {
 });
 
 describe("IngestPage — unified Add A Part", () => {
-  it("returns to the Parts library through the Back To Parts affordance", async () => {
-    const { router } = wrap(<IngestPage />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Back To Parts" }));
-    expect(router.current).toBe("components");
-  });
-
   it("looks up a passive link and adds it with no files", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({
       ...EMPTY_RESULT,
@@ -218,11 +198,11 @@ describe("IngestPage — unified Add A Part", () => {
     expect(await screen.findByText("Needs Files")).toBeInTheDocument();
     expect(screen.getByText("STM32F103C8T6")).toBeInTheDocument(); // pulled identity shown
 
-    await user.click(screen.getByRole("button", { name: "Browse For ZIP" }));
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
     await waitFor(() => expect(pick).toHaveBeenCalled());
 
     // the staged candidate carries the ZIP's assets AND the pulled identity (link wins)
-    await screen.findByText("Review And Add");
+    await screen.findByText("Review and Add");
     expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6");
     delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
@@ -239,7 +219,7 @@ describe("IngestPage — unified Add A Part", () => {
     wrap(<IngestPage />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Browse For ZIP" }));
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
     await waitFor(() => expect(mockApi.ingestInspect).toHaveBeenCalledWith(["C:/dl/NE555.zip"], []));
     await screen.findByLabelText("Name");
 

@@ -7,7 +7,6 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 
 export type Route =
   | "components"
-  | "ingest"
   | "bom"
   | "duplicates"
   | "projects"

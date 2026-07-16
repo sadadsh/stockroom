@@ -31,6 +31,7 @@ import {
 import { fuzzyScoreFields } from "../lib/fuzzy";
 import { requestPart } from "../lib/partSelection";
 import { useRouter } from "../lib/router";
+import { useAddPart } from "../lib/addPart";
 import { useTheme } from "../lib/theme";
 import { SearchIcon } from "./icons";
 
@@ -55,6 +56,7 @@ function rowLabel(cmd: Command): string {
 
 export function CommandPalette() {
   const { navigate } = useRouter();
+  const { open: openAddPart } = useAddPart();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -78,6 +80,19 @@ export function CommandPalette() {
     });
     return () => unregisterCommand("action.toggle-theme");
   }, [theme, toggle]);
+
+  // Add A Part is a modal, not a destination, so it is a registered action (not a
+  // NAV route) that opens the same window the toolbar button and a drop open.
+  useEffect(() => {
+    registerCommand({
+      id: "action.add-part",
+      title: "Add a Part",
+      group: "Actions",
+      keywords: ["add", "part", "new", "component", "import", "ingest", "vendor", "zip"],
+      run: () => openAddPart(),
+    });
+    return () => unregisterCommand("action.add-part");
+  }, [openAddPart]);
 
   // The global open/close shortcut. Ctrl+K (or Cmd+K on mac) toggles from any
   // surface; preventDefault stops a browser default so the palette owns the key.

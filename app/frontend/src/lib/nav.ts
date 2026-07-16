@@ -25,7 +25,6 @@ export interface NavEntry {
 
 export const NAV: NavEntry[] = [
   { route: "components", title: "Components", group: "primary", available: true },
-  { route: "ingest", title: "Add Parts", group: "primary", available: true, rail: false, parent: "components" },
   { route: "bom", title: "BOM Coverage", group: "primary", available: true, rail: false, parent: "components" },
   { route: "duplicates", title: "Duplicates", group: "primary", available: true, rail: false, parent: "components" },
   { route: "doctor", title: "Doctor", group: "primary", available: true, rail: false, parent: "components" },
