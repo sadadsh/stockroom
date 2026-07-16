@@ -182,9 +182,10 @@ export function DetailPanel({
   const pinoutProvenance = detail.enrichment?.pinout;
 
   return (
-    <div className="max-w-[1000px] pb-12">
+    <div className="max-w-[1240px] pb-12">
       {/* identity band: the name headline + the MPN as a mono serial stamp, with a
           single Ready / Missing verdict standing to the right. */}
+      <div className="border-b border-line pb-5">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
           {onEditField ? (
@@ -194,10 +195,10 @@ export function DetailPanel({
               label="Name"
               placeholder="Name this part"
               disabled={busy}
-              displayClassName="text-[34px] font-semibold leading-[1.05] tracking-[-0.03em]"
+              displayClassName="text-[38px] font-semibold leading-[1.05] tracking-[-0.03em]"
             />
           ) : (
-            <h1 className="min-w-0 break-words text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-t1">
+            <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.05] tracking-[-0.03em] text-t1">
               {detail.display_name}
             </h1>
           )}
@@ -223,62 +224,142 @@ export function DetailPanel({
           ))}
         </div>
       ) : null}
+      </div>
 
-      {/* Part Canvas: the physical object is the hero. The 3D model is the dominant
-          tile; the schematic symbol and PCB footprint are its embodiments beside it. */}
-      <SectionLabel className="mt-7">Part Canvas</SectionLabel>
-      <div className="grid h-[360px] grid-cols-[1.6fr_1fr] gap-3">
-        <AssetTile
-          variant="hero"
-          name="3D Model"
-          present={hasModel}
-          // A passive owns no model.file but inherits its stock footprint's built-in
-          // model, so the tile's tool falls back to the footprint's tool there.
-          tool={detail.model?.tool ?? detail.footprint?.tool}
-          art={<CubeArt />}
-          thumb={
-            hasModel ? (
-              <div className="pointer-events-none h-full w-full">
-                <Glb3DView
-                  data={modelGlb.data}
-                  isLoading={modelGlb.isLoading}
-                  isError={modelGlb.isError}
-                  error={modelGlb.error}
+      {/* Main composition: a laid-out spec sheet, not a scroll. LEFT is the part seen
+          three ways (the 3D hero + its symbol + footprint); RIGHT is the record (identity
+          + sourcing). The horizontal space carries the grouping so nothing stacks dead. */}
+      <div className="mt-7 grid grid-cols-[1.55fr_1fr] items-start gap-6">
+        {/* LEFT: the Part Canvas, then the full spec sheet, so the column fills to
+            balance the record column instead of stranding space below it. */}
+        <div className="flex flex-col gap-7">
+          <div>
+          <SectionLabel>Part Canvas</SectionLabel>
+          <div className="flex flex-col gap-3">
+            <AssetTile
+              variant="hero"
+              name="3D Model"
+              className="h-[336px]"
+              present={hasModel}
+              // A passive owns no model.file but inherits its stock footprint's built-in
+              // model, so the tile's tool falls back to the footprint's tool there.
+              tool={detail.model?.tool ?? detail.footprint?.tool}
+              art={<CubeArt />}
+              thumb={
+                hasModel ? (
+                  <div className="pointer-events-none h-full w-full">
+                    <Glb3DView
+                      data={modelGlb.data}
+                      isLoading={modelGlb.isLoading}
+                      isError={modelGlb.isError}
+                      error={modelGlb.error}
+                    />
+                  </div>
+                ) : undefined
+              }
+              onOpen={hasModel ? () => setPreview("model") : undefined}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <AssetTile
+                variant="tile"
+                name="Symbol"
+                className="h-[152px]"
+                present={!!detail.symbol?.name}
+                tool={detail.symbol?.tool}
+                art={<SymbolArt />}
+                thumb={
+                  detail.symbol?.name ? (
+                    <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
+                  ) : undefined
+                }
+                onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
+                onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
+              />
+              <AssetTile
+                variant="tile"
+                name="Footprint"
+                className="h-[152px]"
+                present={!!detail.footprint?.name}
+                tool={detail.footprint?.tool}
+                art={<FootprintArt />}
+                thumb={
+                  detail.footprint?.name ? (
+                    <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
+                  ) : undefined
+                }
+                onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
+                onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
+              />
+            </div>
+          </div>
+          </div>
+          {/* the datasheet parameter block sits under the canvas in the same column */}
+          {specRows.length > 0 ? <SpecificationsSection rows={specRows} /> : null}
+        </div>
+
+        {/* RIGHT: the record - identity fields + sourcing, filling the column */}
+        <div className="flex flex-col gap-6">
+          <div>
+            <SectionLabel>Identity</SectionLabel>
+            <div className="rounded-card border border-line bg-raise px-4 py-1 shadow-card">
+              <DataRow
+                label="Part Number"
+                value={detail.mpn}
+                mono
+                onSave={onEditField ? (v) => onEditField("mpn", v) : undefined}
+                busy={busy}
+              />
+              <DataRow
+                label="Manufacturer"
+                value={detail.manufacturer}
+                onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
+                busy={busy}
+              />
+              {/* Category moves the symbol + footprint between libraries, so it is a
+                  select over known categories, not an inline field edit. */}
+              {onMoveCategory && categories && categories.length > 0 ? (
+                <CategoryRow
+                  value={detail.category}
+                  categories={categories}
+                  onMove={onMoveCategory}
+                  busy={busy}
                 />
-              </div>
-            ) : undefined
-          }
-          onOpen={hasModel ? () => setPreview("model") : undefined}
-        />
-        <div className="grid min-h-0 grid-rows-2 gap-3">
-          <AssetTile
-            variant="tile"
-            name="Symbol"
-            present={!!detail.symbol?.name}
-            tool={detail.symbol?.tool}
-            art={<SymbolArt />}
-            thumb={
-              detail.symbol?.name ? (
-                <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
-              ) : undefined
-            }
-            onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
-            onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
-          />
-          <AssetTile
-            variant="tile"
-            name="Footprint"
-            present={!!detail.footprint?.name}
-            tool={detail.footprint?.tool}
-            art={<FootprintArt />}
-            thumb={
-              detail.footprint?.name ? (
-                <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
-              ) : undefined
-            }
-            onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
-            onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
-          />
+              ) : (
+                <DataRow label="Category" value={detail.category} />
+              )}
+              <DataRow
+                label="Description"
+                value={detail.description}
+                multiline
+                onSave={onEditField ? (v) => onEditField("description", v) : undefined}
+                busy={busy}
+              />
+              <DataRow
+                label="Datasheet"
+                // A clean "View Datasheet" link, not the raw full-length URL splashed across
+                // the row. The URL rides the href; a file-only datasheet shows its filename.
+                value={
+                  detail.datasheet?.source_url ? "View Datasheet" : detail.datasheet?.file || ""
+                }
+                href={detail.datasheet?.source_url || undefined}
+              />
+              {onEditField ? (
+                <DataRow
+                  label="Tags"
+                  value={detail.tags.join(", ")}
+                  onSave={(v) => onEditField("tags", splitTags(v))}
+                  busy={busy}
+                />
+              ) : detail.tags.length > 0 ? (
+                <DataRow label="Tags" value={detail.tags.join(", ")} />
+              ) : null}
+            </div>
+          </div>
+
+          <div>
+            <SectionLabel>Sourcing</SectionLabel>
+            <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+          </div>
         </div>
       </div>
 
@@ -312,67 +393,6 @@ export function DetailPanel({
         onClose={() => setPreview(null)}
       />
 
-      {/* datasheet grid: the editable identity fields, borderless, values in the mono
-          readout face so a part number reads like a stamped identifier. */}
-      <SectionLabel className="mt-9">Identity</SectionLabel>
-      <div className="border-t border-line pt-1">
-        <DataRow
-          label="Part Number"
-          value={detail.mpn}
-          mono
-          onSave={onEditField ? (v) => onEditField("mpn", v) : undefined}
-          busy={busy}
-        />
-        <DataRow
-          label="Manufacturer"
-          value={detail.manufacturer}
-          onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
-          busy={busy}
-        />
-        {/* Category moves the symbol + footprint between libraries, so it is a
-            select over known categories, not an inline field edit. */}
-        {onMoveCategory && categories && categories.length > 0 ? (
-          <CategoryRow
-            value={detail.category}
-            categories={categories}
-            onMove={onMoveCategory}
-            busy={busy}
-          />
-        ) : (
-          <DataRow label="Category" value={detail.category} />
-        )}
-        <DataRow
-          label="Description"
-          value={detail.description}
-          multiline
-          onSave={onEditField ? (v) => onEditField("description", v) : undefined}
-          busy={busy}
-        />
-        <DataRow
-          label="Datasheet"
-          // A clean "View Datasheet" link, not the raw full-length URL splashed across the
-          // row. The URL rides the href; a file-only datasheet shows its filename.
-          value={
-            detail.datasheet?.source_url ? "View Datasheet" : detail.datasheet?.file || ""
-          }
-          href={detail.datasheet?.source_url || undefined}
-        />
-        {onEditField ? (
-          <DataRow
-            label="Tags"
-            value={detail.tags.join(", ")}
-            onSave={(v) => onEditField("tags", splitTags(v))}
-            busy={busy}
-          />
-        ) : detail.tags.length > 0 ? (
-          <DataRow label="Tags" value={detail.tags.join(", ")} />
-        ) : null}
-      </div>
-
-      {/* specifications (B1) with progressive disclosure (B2): every parametric spec the record
-          holds, collapsed to the key ones so a deep 28-spec part is scannable, not a wall. */}
-      {specRows.length > 0 ? <SpecificationsSection rows={specRows} /> : null}
-
       {/* pinout: shown whenever the record carries one (read-only view of the
           persisted specs.pinout, source of truth per M6i). */}
       {pinout.length > 0 ? (
@@ -395,24 +415,22 @@ export function DetailPanel({
       {/* enrich-to-fill: only in editable mode, and only when there is an MPN to
           look the part up by. Keyed by the MPN so switching parts starts fresh. */}
       {onEditField && detail.mpn ? (
-        <EnrichPanel
-          key={detail.mpn}
-          mpn={detail.mpn}
-          category={detail.category}
-          current={{
-            manufacturer: detail.manufacturer,
-            description: detail.description,
-          }}
-          onApply={onEditField}
-          onApplyPinout={onApplyPinout}
-          hasPinout={pinout.length > 0}
-          busy={busy}
-        />
+        <div className="mt-9">
+          <EnrichPanel
+            key={detail.mpn}
+            mpn={detail.mpn}
+            category={detail.category}
+            current={{
+              manufacturer: detail.manufacturer,
+              description: detail.description,
+            }}
+            onApply={onEditField}
+            onApplyPinout={onApplyPinout}
+            hasPinout={pinout.length > 0}
+            busy={busy}
+          />
+        </div>
       ) : null}
-
-      {/* sourcing */}
-      <SectionLabel className="mt-9">Sourcing</SectionLabel>
-      <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
 
       {/* git timeline (M6k): the part's commit history + per-commit field/visual diff.
           Keyed by part id so the selected-commit state resets on a part switch. */}
@@ -568,10 +586,10 @@ function CategoryRow({
   // Always include the current category, even if the facets have not caught up.
   const options = categories.includes(value) ? categories : [value, ...categories];
   return (
-    <div className="flex gap-5 py-2">
-      <span className="w-[128px] flex-none pt-1.5 text-sm text-t3">Category</span>
+    <div className="flex gap-4 py-2">
+      <span className="w-[96px] flex-none pt-1.5 text-sm text-t3">Category</span>
       <span className="flex min-w-0 flex-1 items-center">
-        <span className="relative inline-block w-[240px] max-w-full">
+        <span className="relative inline-block w-full max-w-[240px]">
           <select
             aria-label="Category"
             value={value}
@@ -644,8 +662,8 @@ function DataRow({
 }) {
   const empty = !value;
   return (
-    <div className="flex gap-5 py-1.5">
-      <span className="w-[128px] flex-none pt-1.5 text-sm text-t3">{label}</span>
+    <div className="flex gap-4 py-1.5">
+      <span className="w-[96px] flex-none pt-1.5 text-sm text-t3">{label}</span>
       <span
         className={
           "flex min-w-0 flex-1 items-center gap-1.5 text-base " +
@@ -706,6 +724,7 @@ function AssetTile({
   onOpen,
   onAttach,
   variant,
+  className,
 }: {
   name: string;
   present: boolean;
@@ -723,6 +742,8 @@ function AssetTile({
   // Attach modal. Ignored when the asset is present.
   onAttach?: () => void;
   variant: "hero" | "tile";
+  // Height / extra classes for the tile shell (the caller sizes it in its layout).
+  className?: string;
 }) {
   const stage = (
     <div
@@ -733,8 +754,9 @@ function AssetTile({
     >
       {/* the hero specimen chamber: a warm copper glow rising from the pedestal, a
           bright focus pool under the part, and an edge vignette, so the 3D reads as a
-          lit object on a bench, not a thumbnail in a box. */}
-      {variant === "hero" ? (
+          lit object on a bench. Only when a specimen is present - no glow under an empty
+          chamber. */}
+      {variant === "hero" && present ? (
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -786,8 +808,9 @@ function AssetTile({
   const base =
     "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border bg-raise " +
     (variant === "hero"
-      ? "h-full border-[rgba(231,154,92,0.22)] shadow-[0_26px_74px_-30px_rgba(231,154,92,0.34)]"
-      : "border-line shadow-file");
+      ? "border-[rgba(231,154,92,0.22)] shadow-[0_26px_74px_-30px_rgba(231,154,92,0.34)] "
+      : "border-line shadow-file ") +
+    (className ?? "");
   const buttonCls =
     base +
     " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
@@ -919,12 +942,12 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
   const shown = showAll || !collapsible ? rows : rows.slice(0, SPEC_COLLAPSE_AT);
   return (
     <>
-      <SectionLabel className="mt-9">
+      <SectionLabel>
         Specifications <span className="ml-0.5 font-mono text-t3">({rows.length})</span>
       </SectionLabel>
       {/* a datasheet parameter block: two aligned columns, values in the mono readout
           face with tabular figures, grouped by whitespace not a border on every row. */}
-      <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-12">
+      <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-10">
         {shown.map(([key, value]) => (
           <div
             key={key}
