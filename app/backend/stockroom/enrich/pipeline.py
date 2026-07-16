@@ -59,12 +59,16 @@ def fill_category(result: EnrichmentResult) -> None:
         return
     from stockroom.ingest.naming import propose_category
 
-    product_category = result.specs.get("Product Category")
-    parts = [
-        str(product_category.value) if product_category is not None else "",
-        str(result.description.value) if result.description is not None else "",
-    ]
-    guess = propose_category(" ".join(p for p in parts if p))
+    # The distributor "Product Category" is the authoritative signal; classify from it ALONE
+    # first, and only fall back to the description when it yields nothing. Blending them let a
+    # description that merely NAMES another component ("resistor divider" on an IC) mis-steer the
+    # category, so the two are tried in priority order, never joined.
+    pc = result.specs.get("Product Category")
+    guess = "Other"
+    if pc is not None and str(pc.value).strip():
+        guess = propose_category(str(pc.value))
+    if guess == "Other" and result.description is not None:
+        guess = propose_category(str(result.description.value))
     if guess != "Other":
         result.category = guess
 

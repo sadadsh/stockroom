@@ -105,6 +105,16 @@ def test_pulled_specs_and_pricing_ride_onto_the_passive_record():
     assert rec.purchase[0].stock == 5616
 
 
+def test_a_malformed_price_break_is_skipped_not_a_crash():
+    # A non-numeric qty/price in a pulled price break must be skipped, never raise (a 500).
+    build = build_passive_record(
+        "RC0603FR-0710KL",
+        datasheet_url="https://example.com/ds.pdf",
+        price_breaks=[{"qty": "n/a", "price": "call"}, {"qty": 10, "price": 0.05}, "junk"],
+    )
+    assert [(b["qty"], b["price"]) for b in build.record.purchase[0].price_breaks] == [(10, 0.05)]
+
+
 def test_distributor_part_number_is_carried_on_the_purchase():
     build = build_passive_record(_OWNER_URL, purchase_part_number="667-ERJ-P03F1101V")
     assert build.record.purchase[0].part_number == "667-ERJ-P03F1101V"

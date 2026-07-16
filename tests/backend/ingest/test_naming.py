@@ -46,3 +46,11 @@ def test_category_matches_distributor_plural_category_strings():
     assert propose_category("Rectangular Connectors - Headers, Male Pins") == "Connectors"
     assert propose_category("Fixed Inductors") == "Inductors"
     assert propose_category("Microcontrollers - MCU") == "ICs"
+
+
+def test_led_driver_is_an_ic_not_a_diode():
+    # "LED ... Driver" is a switching IC; "driver" must win over the bare "led" -> Diodes,
+    # while a plain LED emitter still classifies as a diode (review finding).
+    assert propose_category("LED Lighting Drivers") == "ICs"
+    assert propose_category("LED Driver IC 40V 1.5A Buck") == "ICs"
+    assert propose_category("Red LED 620nm") == "Diodes"

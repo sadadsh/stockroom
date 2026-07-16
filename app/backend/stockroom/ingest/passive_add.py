@@ -284,11 +284,14 @@ def build_passive_record(
             continue
         record_specs.setdefault(label, str(val))
 
-    breaks = [
-        {"qty": int(b["qty"]), "price": float(b["price"])}
-        for b in (price_breaks or [])
-        if isinstance(b, dict) and b.get("qty") is not None and b.get("price") is not None
-    ]
+    breaks = []
+    for b in price_breaks or []:
+        if not isinstance(b, dict):
+            continue
+        try:
+            breaks.append({"qty": int(b["qty"]), "price": float(b["price"])})
+        except (KeyError, TypeError, ValueError):
+            continue  # a malformed break is skipped, never a 500
 
     datasheet_url = (datasheet_url or "").strip()
     datasheet = Datasheet(source_url=datasheet_url) if datasheet_url else None
