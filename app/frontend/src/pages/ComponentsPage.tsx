@@ -7,10 +7,11 @@
  * Honest degradation: a connection error shows a retry surface (not a crash), and
  * a genuinely empty library shows an empty state that names how to add parts.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
+  useDuplicates,
   usePartDetailQuery,
   useEditField,
   useMoveCategory,
@@ -34,6 +35,7 @@ export function ComponentsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [completeOnly, setCompleteOnly] = useState(false);
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // A cross-page part request (from the Ctrl+K palette) is recorded here
   // synchronously during the drain so the auto-select-first effect can honor it
@@ -45,6 +47,7 @@ export function ComponentsPage() {
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
+  const duplicatesQuery = useDuplicates();
   const detailQuery = usePartDetailQuery(selectedId);
   const editField = useEditField();
   const moveCategory = useMoveCategory();
@@ -55,7 +58,20 @@ export function ComponentsPage() {
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
 
-  const parts = partsQuery.data?.parts ?? [];
+  // Ids that share an MPN with another part (a real accidental duplicate). Shared
+  // footprints are normal and never counted. Drives the Duplicate badges and the
+  // Duplicates filter; the filter is applied client-side over the server list.
+  const duplicateIds = useMemo(
+    () =>
+      new Set(
+        (duplicatesQuery.data?.by_mpn ?? []).flatMap((g) => g.parts.map((p) => p.id)),
+      ),
+    [duplicatesQuery.data],
+  );
+  const allParts = partsQuery.data?.parts ?? [];
+  const parts = duplicatesOnly
+    ? allParts.filter((p) => duplicateIds.has(p.id))
+    : allParts;
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
   const detailBusy =
     editField.isPending ||
@@ -216,6 +232,9 @@ export function ComponentsPage() {
               onCategory={setCategory}
               completeOnly={completeOnly}
               onCompleteOnly={setCompleteOnly}
+              duplicatesOnly={duplicatesOnly}
+              onDuplicatesOnly={setDuplicatesOnly}
+              duplicateCount={duplicateIds.size}
             />
             {partsQuery.data ? (
               <div className="pt-1.5 text-right text-2xs text-t3">
@@ -228,14 +247,16 @@ export function ComponentsPage() {
               isLoading={partsQuery.isLoading}
               error={partsQuery.error}
               parts={parts}
+              duplicateIds={duplicateIds}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onRetry={() => partsQuery.refetch()}
-              hasSearchOrFilter={!!search || !!category || completeOnly}
+              hasSearchOrFilter={!!search || !!category || completeOnly || duplicatesOnly}
               onClearFilters={() => {
                 setSearch("");
                 setCategory(null);
                 setCompleteOnly(false);
+                setDuplicatesOnly(false);
               }}
             />
           </div>
@@ -276,6 +297,7 @@ function PickerBody({
   isLoading,
   error,
   parts,
+  duplicateIds,
   selectedId,
   onSelect,
   onRetry,
@@ -285,6 +307,7 @@ function PickerBody({
   isLoading: boolean;
   error: Error | null;
   parts: import("../api/types").PartSummary[];
+  duplicateIds: Set<string>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onRetry: () => void;
@@ -344,5 +367,12 @@ function PickerBody({
       </div>
     );
   }
-  return <PartsList parts={parts} selectedId={selectedId} onSelect={onSelect} />;
+  return (
+    <PartsList
+      parts={parts}
+      duplicateIds={duplicateIds}
+      selectedId={selectedId}
+      onSelect={onSelect}
+    />
+  );
 }

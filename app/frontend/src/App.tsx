@@ -25,7 +25,6 @@ function renderRoute(route: Route) {
   switch (route) {
     case "components":
     case "bom":
-    case "duplicates":
     case "doctor":
       // The library surfaces are tabs of the Components flagship; the route names
       // the active tab so the palette and drop overlay keep deep-linking. Add A

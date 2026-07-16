@@ -99,7 +99,6 @@ describe("CommandPalette", () => {
     // Go to group: the rail's available destinations, prefix stripped.
     expect(within(dialog).getByText("Go to")).toBeInTheDocument();
     expect(within(dialog).getByText("Components")).toBeInTheDocument();
-    expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
     // Projects has shipped (M7a), so it is now offered.
     expect(within(dialog).getByText("Projects")).toBeInTheDocument();
     expect(within(dialog).getByText("Doctor")).toBeInTheDocument();
@@ -148,10 +147,10 @@ describe("CommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // Empty query Go to order: [Components, BOM Coverage, Duplicates, Doctor,
-    // Projects, Settings, ...]. Down, down, up lands back on BOM Coverage (index
-    // 1). Load-bearing for BOTH arrows: a broken ArrowDown would stay on
-    // Components, a broken ArrowUp would leave it on Duplicates.
+    // Empty query Go to order: [Components, BOM Coverage, Doctor, Projects,
+    // Settings, ...]. Down, down, up lands back on BOM Coverage (index 1).
+    // Load-bearing for BOTH arrows: a broken ArrowDown would stay on Components,
+    // a broken ArrowUp would leave it on Doctor.
     await user.keyboard("{ArrowDown}{ArrowDown}{ArrowUp}{Enter}");
     expect(screen.getByTestId("route")).toHaveTextContent("bom");
   });

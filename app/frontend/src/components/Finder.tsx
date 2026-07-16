@@ -16,6 +16,9 @@ interface Props {
   onCategory: (category: string | null) => void;
   completeOnly: boolean;
   onCompleteOnly: (value: boolean) => void;
+  duplicatesOnly: boolean;
+  onDuplicatesOnly: (value: boolean) => void;
+  duplicateCount: number;
 }
 
 export function Finder({
@@ -26,9 +29,13 @@ export function Finder({
   onCategory,
   completeOnly,
   onCompleteOnly,
+  duplicatesOnly,
+  onDuplicatesOnly,
+  duplicateCount,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const activeFilters = (category ? 1 : 0) + (completeOnly ? 1 : 0);
+  const activeFilters =
+    (category ? 1 : 0) + (completeOnly ? 1 : 0) + (duplicatesOnly ? 1 : 0);
   const categories = facets
     ? Object.entries(facets.by_category).sort((a, b) => a[0].localeCompare(b[0]))
     : [];
@@ -92,6 +99,30 @@ export function Finder({
               Complete Only
             </label>
           </div>
+
+          {duplicateCount > 0 ? (
+            <div className="mb-2 flex items-center justify-end">
+              <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
+                <span
+                  className={
+                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px] text-[11px] " +
+                    (duplicatesOnly
+                      ? "border-acc bg-acc text-acc-on"
+                      : "border-line2 text-transparent")
+                  }
+                >
+                  {"✓"}
+                </span>
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={duplicatesOnly}
+                  onChange={(e) => onDuplicatesOnly(e.target.checked)}
+                />
+                Duplicates ({duplicateCount})
+              </label>
+            </div>
+          ) : null}
 
           <div className="mb-2 mt-3 text-2xs font-semibold text-t3">
             Category

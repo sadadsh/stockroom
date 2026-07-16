@@ -26,11 +26,17 @@ vi.mock("../api/client", async (importActual) => {
       deletePart: vi.fn(),
       enrichPart: vi.fn(),
       setSpecs: vi.fn(),
+      getDuplicates: vi.fn(),
     },
   };
 });
 
 const mockApi = vi.mocked(api);
+
+// Default: no duplicates. Individual tests override to exercise the badge + filter.
+beforeEach(() => {
+  mockApi.getDuplicates.mockResolvedValue({ by_mpn: [], by_footprint: [] });
+});
 
 const SUMMARY: PartSummary = {
   id: "lm358",
@@ -100,6 +106,29 @@ describe("ComponentsPage", () => {
     expect(await screen.findByText("1 Parts")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+  });
+
+  it("badges MPN duplicates and the Duplicates filter narrows to just them (D2)", async () => {
+    const dupA: PartSummary = { id: "a", display_name: "Cap A", category: "Passives", mpn: "C1", manufacturer: "X", is_complete: true, missing: [] };
+    const dupB: PartSummary = { id: "b", display_name: "Cap B", category: "Passives", mpn: "C1", manufacturer: "Y", is_complete: true, missing: [] };
+    const solo: PartSummary = { id: "s", display_name: "Solo Part", category: "Passives", mpn: "S1", manufacturer: "Z", is_complete: true, missing: [] };
+    mockApi.listParts.mockResolvedValue({ parts: [dupA, dupB, solo], count: 3 });
+    mockApi.facets.mockResolvedValue({ by_category: { Passives: 3 }, by_manufacturer: {}, complete: 3, incomplete: 0 });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    // A real accidental duplicate: two parts under one MPN. Shared footprints are ignored.
+    mockApi.getDuplicates.mockResolvedValue({ by_mpn: [{ key: "C1", parts: [dupA, dupB] }], by_footprint: [] });
+
+    wrap(<ComponentsPage />);
+    expect(await screen.findByText("Solo Part")).toBeInTheDocument();
+    // Both duplicate members carry a badge; the solo part does not.
+    await waitFor(() => expect(screen.getAllByText("Duplicate")).toHaveLength(2));
+
+    // The Duplicates filter (behind the Filters popover) narrows to just the members.
+    await userEvent.click(screen.getByRole("button", { name: "Filters" }));
+    await userEvent.click(screen.getByText(/Duplicates \(2\)/));
+    expect(screen.queryByText("Solo Part")).toBeNull();
+    expect(screen.getByText("Cap A")).toBeInTheDocument();
+    expect(screen.getByText("Cap B")).toBeInTheDocument();
   });
 
   it("opens the Add A Part modal from the Add Parts toolbar button", async () => {
