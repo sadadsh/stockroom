@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "791-MR06X47R0FTL",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 49137,
-      "url": "https://www.mouser.com/c/?q=MR06X47R0FTL",
+      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL",
       "vendor": "Mouser"
     }
   ],

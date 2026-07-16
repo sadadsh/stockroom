@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "512-2N7002",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -58,7 +58,7 @@
         }
       ],
       "stock": 526042,
-      "url": "https://www.mouser.com/c/?q=2N7002",
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002",
       "vendor": "Mouser"
     }
   ],

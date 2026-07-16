@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "652-CR0603FX-4700ELF",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 874450,
-      "url": "https://www.mouser.com/c/?q=CR0603-FX-4700ELF",
+      "url": "https://www.mouser.com/en/ProductDetail/Bourns/CR0603-FX-4700ELF",
       "vendor": "Mouser"
     }
   ],

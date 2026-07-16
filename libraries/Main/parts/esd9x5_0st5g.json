@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "863-ESD9X5.0ST5G",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 64742,
-      "url": "https://www.mouser.com/c/?q=ESD9X5.0ST5G",
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G",
       "vendor": "Mouser"
     }
   ],

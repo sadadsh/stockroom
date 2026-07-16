@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "603-RC0603FR-07220RL",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -58,7 +58,7 @@
         }
       ],
       "stock": 0,
-      "url": "https://www.mouser.com/c/?q=RC0603FR-07220RL",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RC0603FR-07220RL",
       "vendor": "Mouser"
     }
   ],

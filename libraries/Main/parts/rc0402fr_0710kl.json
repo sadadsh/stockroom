@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "603-RC0402FR-0710KL",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -58,7 +58,7 @@
         }
       ],
       "stock": 6976557,
-      "url": "https://www.mouser.com/c/?q=RC0402FR-0710KL",
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RC0402FR-0710KL",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "612-EG1218",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -78,7 +78,7 @@
         }
       ],
       "stock": 12328,
-      "url": "https://www.mouser.com/c/?q=EG1218",
+      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "187-CL10A225KO8NNNC",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 220172,
-      "url": "https://www.mouser.com/c/?q=CL10A225KO8NNNC",
+      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL10A225KO8NNNC",
       "vendor": "Mouser"
     }
   ],

@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "71-CRCW0603249KFKEC",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -78,7 +78,7 @@
         }
       ],
       "stock": 53712,
-      "url": "https://www.mouser.com/c/?q=CRCW0603249KFKEC",
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603249KFKEC",
       "vendor": "Mouser"
     }
   ],

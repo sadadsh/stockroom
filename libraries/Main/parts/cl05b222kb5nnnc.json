@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "187-CL05B222KB5NNNC",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -73,7 +73,7 @@
         }
       ],
       "stock": 12169,
-      "url": "https://www.mouser.com/c/?q=CL05B222KB5NNNC",
+      "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B222KB5NNNC",
       "vendor": "Mouser"
     }
   ],

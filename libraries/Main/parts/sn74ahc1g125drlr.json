@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "595-SN74AHC1G125DRLR",
+      "part_number": "",
       "price_breaks": [
         {
           "qty": 1,
@@ -78,7 +78,7 @@
         }
       ],
       "stock": 6492,
-      "url": "https://www.mouser.com/c/?q=SN74AHC1G125DRLR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74AHC1G125DRLR",
       "vendor": "Mouser"
     }
   ],
