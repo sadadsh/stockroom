@@ -12,6 +12,7 @@ import { useFacetsQuery, usePassiveAdd } from "../api/queries";
 import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Badge, Button } from "./primitives";
+import { PulledDepth } from "./PulledDepth";
 import { StockAssetPreview } from "./StockAssetPreview";
 import { ComboField, SelectField, TextField } from "./formFields";
 
@@ -196,6 +197,8 @@ export function PassiveAddSection({
               ))}
             </div>
           ) : null}
+
+          <PulledDepth result={result} />
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComboField
