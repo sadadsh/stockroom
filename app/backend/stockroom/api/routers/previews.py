@@ -17,6 +17,7 @@ from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
 from stockroom.kicad.footprint import Footprint
+from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.kicad.stock import (
     stock_footprint_file,
     stock_model_file,
@@ -77,7 +78,7 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
                 raise FileNotFoundError(f"symbol library missing at {rev}")
             hist_lib = tdp / "hist.kicad_sym"
             hist_lib.write_text(lib_text, encoding="utf-8")
-            svgs = ctx.cli.sym_export_svg(hist_lib, name, tdp, black_and_white=bw)
+            svgs = _clean_symbol_svg(ctx.cli, hist_lib, name, bw, tdp)
             text = Path(svgs[0]).read_text(encoding="utf-8")
         else:  # footprint
             name = (rec.get("footprint") or {}).get("name")
@@ -112,6 +113,27 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
 # the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
 # be served forever without this token. (C1: copper-only render -> "c1".)
 _FP_RENDER_VERSION = "c1"
+# Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
+# the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
+# fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
+_SYM_RENDER_VERSION = "c1"
+
+
+def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:
+    """Render a symbol's SVG with EVERY property field hidden (Value / Footprint / Datasheet /
+    MPN / Reference), so the preview shows the clean body + pins + pin names/numbers instead of
+    the fields overlapping into a black smudge (C1). The source lib is never touched; an
+    unparseable lib falls back to the raw render (a preview with fields beats no preview)."""
+    render_lib = lib_path
+    try:
+        symlib = SymbolLib.load(lib_path)
+        symlib.get_symbol(name).hide_all_properties()
+        clean_lib = td / "clean.kicad_sym"
+        clean_lib.write_text(symlib.serialize(), encoding="utf-8", newline="")
+        render_lib = clean_lib
+    except Exception:  # noqa: BLE001 - unparseable/absent symbol: raw preview, not a 500
+        pass
+    return cli.sym_export_svg(render_lib, name, td, black_and_white=bw)
 
 
 def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> str:
@@ -171,14 +193,12 @@ def previews_router(require_token) -> APIRouter:
             if not lib.exists():
                 raise FileNotFoundError(f"symbol library missing for {rec.category}")
         variant = "_bw" if bw else ""
-        key = f"sym_{part_id}_{_hash_file(lib)}{variant}.svg"
+        key = f"sym_{part_id}_{_SYM_RENDER_VERSION}_{_hash_file(lib)}{variant}.svg"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            svgs = ctx.cli.sym_export_svg(
-                lib, rec.symbol.name, Path(td), black_and_white=bw
-            )
+            svgs = _clean_symbol_svg(ctx.cli, lib, rec.symbol.name, bw, Path(td))
             text = Path(svgs[0]).read_text(encoding="utf-8")
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)

@@ -65,6 +65,14 @@ class Symbol:
         elif len(hide_node.children) >= 2 and hide_node.children[1].value != "yes":
             hide_node.children[1].set_value("yes", quote=False)
 
+    def hide_all_properties(self) -> None:
+        """Hide EVERY property field (Reference, Value, Footprint, Datasheet, MPN, ...) so a
+        preview render shows the clean symbol body + pins + pin names/numbers, not the fields
+        splashed and overlapping into a smudge over it. Pin names/numbers are pin data, not
+        properties, so they are left intact. The source lib is only touched on a rendering copy."""
+        for prop in self._node.find_all("property"):
+            self._ensure_hidden(prop)
+
 
 class SymbolLib:
     def __init__(self, doc: SexpDocument):
