@@ -158,7 +158,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
             disabled={busy}
             className="text-sm text-t3 underline-offset-2 hover:text-t1 hover:underline disabled:opacity-50"
           >
-            Continue With the Default
+            Continue with the Default
           </button>
           <Button variant="accent" onClick={submit} disabled={!canSubmit}>
             {busy ? "Working..." : "Set Up Components"}

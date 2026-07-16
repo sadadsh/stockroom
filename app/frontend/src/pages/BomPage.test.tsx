@@ -75,7 +75,7 @@ describe("BomPage", () => {
     expect(await screen.findByTestId("bom-row-TPS62130RGTR")).toHaveTextContent(
       "In Components",
     );
-    expect(screen.getByTestId("bom-row-WIDGET99")).toHaveTextContent("Not In Components");
+    expect(screen.getByTestId("bom-row-WIDGET99")).toHaveTextContent("Not in Components");
     // the focal count reads coverage at a glance
     expect(screen.getByTestId("bom-coverage")).toHaveTextContent("1/2");
   });

@@ -150,7 +150,7 @@ function GroupCard({
     <Card className="px-4 py-3.5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <span className="min-w-0 truncate font-mono text-sm text-t1">{group.key}</span>
-        <span className="flex-none text-xs text-t3">{group.parts.length} parts</span>
+        <span className="flex-none text-xs text-t3">{group.parts.length} Parts</span>
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
         {group.parts.map((part, i) => (

@@ -46,7 +46,7 @@ interface Section {
 
 const PART_LIMIT = 8;
 
-// A nav command titled "Go To Components" sits under the "Go To" header, so drop
+// A nav command titled "Go to Components" sits under the "Go to" header, so drop
 // the redundant group prefix from the row label while keeping the registry title
 // self-describing everywhere else it is used.
 function rowLabel(cmd: Command): string {
@@ -150,7 +150,7 @@ export function CommandPalette() {
       }))
       .filter((x): x is { cmd: Command; score: number } => x.score !== null);
 
-    // Group commands, preserving the order each group first appears (nav "Go To"
+    // Group commands, preserving the order each group first appears (nav "Go to"
     // comes before registered "Actions"), and sort within a group by score.
     const order: string[] = [];
     const byGroup = new Map<string, { cmd: Command; score: number }[]>();

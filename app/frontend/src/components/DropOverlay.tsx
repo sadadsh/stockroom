@@ -66,7 +66,7 @@ export function DropOverlay({ onDrop }: { onDrop: (paths: string[]) => void }) {
         <div className="flex justify-center text-white/70">
           <UploadIcon />
         </div>
-        <div className="mt-2 text-sm font-medium text-white">Drop To Add Parts</div>
+        <div className="mt-2 text-sm font-medium text-white">Drop to Add Parts</div>
         <div className="mt-1 text-xs text-white/60">Release a vendor ZIP to inspect it.</div>
       </div>
     </div>

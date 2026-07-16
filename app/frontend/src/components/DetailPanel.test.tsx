@@ -145,9 +145,9 @@ describe("DetailPanel files previews (M6d)", () => {
     // collapsed to the first 10; the deep ones are hidden behind Show all
     expect(screen.getByText("Spec 0")).toBeInTheDocument();
     expect(screen.queryByText("Spec 14")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Show all 15" }));
+    await userEvent.click(screen.getByRole("button", { name: "Show All 15" }));
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show fewer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show Fewer" })).toBeInTheDocument();
   });
 
   it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {

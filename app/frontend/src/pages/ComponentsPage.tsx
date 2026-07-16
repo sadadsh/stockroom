@@ -85,7 +85,7 @@ export function ComponentsPage() {
     moveCategory.mutate(
       { id: selectedId, category: nextCategory },
       {
-        onSuccess: () => toast(`Moved To ${nextCategory}`, "ok"),
+        onSuccess: () => toast(`Moved to ${nextCategory}`, "ok"),
         onError: (err) => toastError(err, "Could not move"),
       },
     );
@@ -105,7 +105,7 @@ export function ComponentsPage() {
         },
       },
       {
-        onSuccess: () => toast("Pinout Saved", "ok"),
+        onSuccess: () => toast("Pinout saved", "ok"),
         onError: (err) => toastError(err, "Could not save the pinout"),
       },
     );
@@ -116,7 +116,7 @@ export function ComponentsPage() {
     attachSymbol.mutate(
       { id: selectedId, lib, name },
       {
-        onSuccess: () => toast("Symbol Attached", "ok"),
+        onSuccess: () => toast("Symbol attached", "ok"),
         onError: (err) => toastError(err, "Could not attach the symbol"),
       },
     );
@@ -127,7 +127,7 @@ export function ComponentsPage() {
     attachFootprint.mutate(
       { id: selectedId, lib, name },
       {
-        onSuccess: () => toast("Footprint Attached", "ok"),
+        onSuccess: () => toast("Footprint attached", "ok"),
         onError: (err) => toastError(err, "Could not attach the footprint"),
       },
     );
@@ -137,7 +137,7 @@ export function ComponentsPage() {
     if (!selectedId) return;
     deletePart.mutate(selectedId, {
       onSuccess: () => {
-        toast("Part Deleted", "ok");
+        toast("Part deleted", "ok");
         // Drop the selection; the auto-select effect picks the next part once the
         // invalidated list refetches.
         setSelectedId(null);
@@ -262,8 +262,8 @@ export function ComponentsPage() {
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
               {partsQuery.isLoading
-                ? "Loading Components..."
-                : "Select A Part To See Its Details."}
+                ? "Loading components..."
+                : "Select a part to see its details."}
             </div>
           )}
         </div>
@@ -294,7 +294,7 @@ function PickerBody({
   if (isLoading) {
     return (
       <div className="px-3 py-8 text-center text-sm text-t3">
-        Loading Parts...
+        Loading parts...
       </div>
     );
   }

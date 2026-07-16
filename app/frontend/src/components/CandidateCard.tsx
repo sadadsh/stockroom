@@ -73,7 +73,7 @@ export function CandidateCard({
       onError: (err) => {
         if (err instanceof ApiError && err.missing && err.missing.length > 0) {
           setMissing(err.missing);
-          toast("Still Incomplete", "err");
+          toast("Still incomplete", "err");
         } else {
           toast(err instanceof ApiError ? err.message : "Could not add", "err");
         }
