@@ -171,7 +171,7 @@ export function Badge({
   const tones: Record<BadgeTone, string> = {
     warn: "text-warn bg-[rgba(211,162,76,0.11)]",
     err: "text-err bg-[rgba(215,108,98,0.12)]",
-    ok: "text-ok bg-[rgba(108,192,138,0.14)]",
+    ok: "text-ok bg-[rgba(129,171,144,0.14)]",
     neutral: "text-t2 bg-raise2",
   };
   const sizes: Record<BadgeSize, string> = {
