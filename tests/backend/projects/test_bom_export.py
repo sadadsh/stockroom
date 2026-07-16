@@ -70,6 +70,22 @@ def test_bom_xlsx_unpriced_build_drops_the_priced_columns():
     sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
     assert "Unit Price" not in sheet
     assert "Lifecycle" not in sheet
+    assert "Final Qty" not in sheet  # no build economics on a value-only row
+
+
+def test_bom_xlsx_includes_the_build_economics_columns():
+    # A BOM built for a board count carries final_qty etc.; the XLSX (the primary deliverable)
+    # must expose the order quantity + its cost + tariff + total, the numbers you order and budget
+    # from - plus Package/RoHS. Numbers are real <v> cells so Excel can sum them.
+    rows = [{"mpn": "ERJ-P03F1101V", "value": "100", "refs": ["R1", "R2"], "qty": 2,
+             "unit_price": 0.10, "moq": 100, "final_qty": 100, "final_unit_price": 0.05,
+             "final_extended": 5.0, "tax_tariff": 0.4125, "line_total": 5.4125,
+             "package": "0603", "rohs": "Yes"}]
+    sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
+    for col in ("Package", "RoHS", "Min Qty", "Final Qty", "Cost @ Qty", "Tax/Tariff", "Total Cost"):
+        assert col in sheet, f"missing XLSX column: {col}"
+    assert "<v>100</v>" in sheet     # Final Qty (order quantity) as a real number
+    assert "<v>5.4125</v>" in sheet  # Total Cost as a real number Excel can sum
 
 
 # -- procurement_xlsx ----------------------------------------------------------
