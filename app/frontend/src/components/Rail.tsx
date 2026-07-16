@@ -26,17 +26,19 @@ export function Rail() {
   return (
     <nav
       aria-label="Primary"
-      className="flex w-[122px] flex-none flex-col border-r border-line bg-rail px-2.5 py-4"
+      className="flex w-[136px] flex-none flex-col border-r border-line bg-rail"
     >
-      <div className="mx-1 mb-6 mt-0.5 flex items-center gap-2">
+      {/* header zone: same height + hairline as the content header bar, so the top of
+          the app reads as one band; the wordmark's mark left-aligns with the nav icons. */}
+      <div className="flex h-14 flex-none items-center gap-2.5 border-b border-line px-[14px]">
         {/* a small stacked-bins mark: the stockroom, in miniature */}
         <svg
-          width="18"
-          height="18"
+          width="16"
+          height="16"
           viewBox="0 0 18 18"
           fill="none"
           aria-hidden="true"
-          className="flex-none text-acc-strong"
+          className="flex-none text-t1"
         >
           <rect x="2.5" y="2.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
           <rect x="2.5" y="10.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
@@ -47,15 +49,17 @@ export function Rail() {
           Stockroom
         </span>
       </div>
-      {primary.map((item) => (
-        <RailItem
-          key={item.route}
-          item={item}
-          selected={active === item.route}
-          onSelect={() => navigate(item.route)}
-        />
-      ))}
-      <div className="mt-auto pt-3">
+      <div className="flex flex-col gap-0.5 px-1.5 pt-2.5">
+        {primary.map((item) => (
+          <RailItem
+            key={item.route}
+            item={item}
+            selected={active === item.route}
+            onSelect={() => navigate(item.route)}
+          />
+        ))}
+      </div>
+      <div className="mt-auto flex flex-col gap-0.5 px-1.5 pb-4">
         {foot.map((item) => (
           <RailItem
             key={item.route}
@@ -85,7 +89,7 @@ function RailItem({
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={
-        "mb-0.5 flex h-8 items-center gap-2.5 rounded-control px-2.5 text-left text-sm transition-colors " +
+        "flex h-8 items-center gap-2.5 rounded-control px-2 text-left text-sm transition-colors " +
         (selected
           ? "bg-acc-soft font-semibold text-acc-strong"
           : "text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
