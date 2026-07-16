@@ -232,6 +232,13 @@ export interface EnrichmentResult {
   datasheet_url: SourcedField | null;
   stock: SourcedField | null;
   package: SourcedField | null;
+  // A2 procurement depth: a part's manufacturing status, factory lead time, distributor
+  // product page, and the distributor's own order numbers. The backend always emits these;
+  // optional so fixtures/older payloads without them still type-check (null = not pulled).
+  lifecycle?: SourcedField | null;
+  lead_time?: SourcedField | null;
+  product_url?: SourcedField | null;
+  dist_pns?: Record<string, string>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
   // The backend always emits this; optional so fixtures/older payloads without it

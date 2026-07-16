@@ -16,6 +16,7 @@ import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
 import { PassiveAddSection } from "../components/PassiveAddSection";
+import { PulledDepth } from "../components/PulledDepth";
 import { UploadIcon } from "../components/icons";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
@@ -317,6 +318,7 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
       {specCount > 0 ? (
         <span className="text-xs text-t3">{specCount} specs pulled and kept.</span>
       ) : null}
+      <PulledDepth result={result} />
     </div>
   );
 }
