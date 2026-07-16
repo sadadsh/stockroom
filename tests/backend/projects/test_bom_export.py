@@ -88,6 +88,23 @@ def test_bom_xlsx_includes_the_build_economics_columns():
     assert "<v>5.4125</v>" in sheet  # Total Cost as a real number Excel can sum
 
 
+def test_bom_xlsx_carries_mouser_link_origin_and_tariff():
+    # The Full BOM must surface the purchase link (canonical Mouser ProductDetail), the
+    # manufacturing country of origin, and the page's own per-part US import-tariff % - the
+    # real fields the owner buys and budgets from. A priced China-origin build carries all three.
+    rows = [{"mpn": "2N7002", "value": "2N7002", "refs": ["Q1"], "qty": 1, "unit_price": 1.09,
+             "source": "Mouser", "mouser_pn": "512-2N7002",
+             "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002",
+             "country_of_origin": "China", "moq": 1, "final_qty": 3, "final_unit_price": 1.09,
+             "final_extended": 3.27, "tariff_rate": 7.98, "tax_tariff": 0.26, "line_total": 3.53}]
+    sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
+    for col in ("Mouser Link", "Country of Origin", "Tariff %"):
+        assert col in sheet, f"missing XLSX column: {col}"
+    assert "https://www.mouser.com/en/ProductDetail/onsemi/2N7002" in sheet
+    assert "China" in sheet
+    assert "<v>7.98</v>" in sheet  # tariff % as a real number Excel can sort/sum
+
+
 # -- procurement_xlsx ----------------------------------------------------------
 def test_procurement_xlsx_totals_and_tax():
     data = procurement_xlsx(_ROWS, boards=1, pcb_multiple=1, tax_rate=0.10, shipping=5.0)

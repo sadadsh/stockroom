@@ -305,14 +305,14 @@ def bom_xlsx(rows) -> bytes:
     # budget from. XLSX is the primary deliverable, so it must carry these, not just the CSV/table.
     build = any(r.get("final_qty") is not None for r in rows)
     cols = [("Refs", "t"), ("Qty", "i"), ("Value", "t"), ("MPN", "t"), ("Manufacturer", "t"),
-            ("Footprint", "t"), ("Package", "t"), ("Datasheet", "t"), ("Description", "t"),
-            ("Basic", "t"), ("RoHS", "t")]
+            ("Footprint", "t"), ("Package", "t"), ("Datasheet", "t"), ("Mouser Link", "t"),
+            ("Description", "t"), ("Basic", "t"), ("RoHS", "t"), ("Country of Origin", "t")]
     if priced:
         cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "n"), ("Ext Price", "n"),
                  ("Stock", "i"), ("Lifecycle", "t")]
     if build:
         cols += [("Min Qty", "i"), ("Final Qty", "i"), ("Order Unit Cost", "n"),
-                 ("Cost @ Qty", "n"), ("Tax/Tariff", "n"), ("Total Cost", "n")]
+                 ("Cost @ Qty", "n"), ("Tariff %", "n"), ("Tax/Tariff", "n"), ("Total Cost", "n")]
 
     def values(r):
         refs = r.get("refs", [])
@@ -320,8 +320,10 @@ def bom_xlsx(rows) -> bytes:
              "Qty": _bom_line_qty(r), "Value": r.get("value", ""), "MPN": r.get("mpn", ""),
              "Manufacturer": r.get("manufacturer", ""), "Footprint": r.get("footprint", ""),
              "Package": r.get("package", ""), "Datasheet": r.get("datasheet", ""),
+             # the distributor purchase link (canonical Mouser ProductDetail) the owner buys from
+             "Mouser Link": r.get("url", ""),
              "Description": r.get("description", ""), "Basic": "yes" if r.get("basic") else "",
-             "RoHS": r.get("rohs", "")}
+             "RoHS": r.get("rohs", ""), "Country of Origin": r.get("country_of_origin", "")}
         if priced:
             ext = r.get("extended")
             if ext is None:
@@ -333,6 +335,8 @@ def bom_xlsx(rows) -> bytes:
             v.update({"Min Qty": r.get("moq"), "Final Qty": r.get("final_qty"),
                       "Order Unit Cost": r.get("final_unit_price"),
                       "Cost @ Qty": r.get("final_extended"),
+                      # per-part US import tariff: the % Mouser shows, and the $ it works out to
+                      "Tariff %": r.get("tariff_rate"),
                       "Tax/Tariff": r.get("tax_tariff"), "Total Cost": r.get("line_total")})
         return v
 
