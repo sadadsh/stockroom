@@ -111,6 +111,24 @@ describe("DetailPanel files previews (M6d)", () => {
       screen.queryByRole("button", { name: "Open 3D Model Preview" }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {
+    // A passive owns no model.file but inherits the KiCad stock footprint's built-in 3D model,
+    // which the model.glb endpoint resolves from the footprint; the card must read as present.
+    wrap(
+      <DetailPanel
+        detail={detail({
+          passive: true,
+          model: null,
+          footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric" },
+        })}
+        {...BASE}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Open 3D Model Preview" }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("DetailPanel git timeline (M6k)", () => {

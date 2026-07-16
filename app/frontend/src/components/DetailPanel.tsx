@@ -98,6 +98,11 @@ export function DetailPanel({
   // Which preview is expanded in the in-window modal (null = closed). The modal has
   // tabs, so this is only the tab it opens on.
   const [preview, setPreview] = useState<PreviewKind | null>(null);
+  // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
+  // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
+  // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
+  // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
+  const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -187,9 +192,9 @@ export function DetailPanel({
         <FileCard
           className="flex-[1.55]"
           name="3D Model"
-          present={!!detail.model?.file}
+          present={hasModel}
           art={<CubeArt />}
-          onOpen={detail.model?.file ? () => setPreview("model") : undefined}
+          onOpen={hasModel ? () => setPreview("model") : undefined}
         />
         <div className="flex flex-1 flex-col gap-3">
           <FileCard
@@ -230,7 +235,7 @@ export function DetailPanel({
         partId={detail.id}
         partName={detail.display_name}
         available={{
-          model: !!detail.model?.file,
+          model: hasModel,
           symbol: !!detail.symbol?.name,
           footprint: !!detail.footprint?.name,
         }}
