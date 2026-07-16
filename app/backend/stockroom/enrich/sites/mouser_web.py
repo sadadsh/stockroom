@@ -96,6 +96,80 @@ _LEAD_TIME = re.compile(r"Factory Lead-?Time:\s*(\d[\d,]*\s*(?:Weeks?|Wks?|Days?
 # lifecycle field (the BOM procurement risk roll-up reads it), while leaving it a spec row too.
 _LIFECYCLE_LABELS = ("lifecycle status", "lifecycle", "part status", "product lifecycle")
 
+# The compliance / "Origin Classifications" block Mouser renders as a <dt>label:</dt><dd>value</dd>
+# definition list (Country of Origin, Assembly Country of Origin, ECCN, HTS, RoHS Status, ...).
+# The <dt> label often nests a tooltip <button> whose sr-only sentence must NOT be read as the
+# label, so the label is taken as the text BEFORE the first colon. The value is the first <dd>
+# immediately following the labelled <dt>.
+_DT_DD = re.compile(r"<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>", re.IGNORECASE | re.DOTALL)
+
+# The price ladder Mouser embeds as JSON: each break carries DecUnitPrice and, when the part is
+# tariffed for US import, a non-null DecTariffUnitPrice (the per-unit tariff amount). The ratio
+# is the effective US-import-tariff percentage the page itself shows in its price - never a
+# researched or estimated rate.
+_PB_TARIFF = re.compile(
+    r'"DecUnitPrice"\s*:\s*([0-9.]+)\s*,\s*"DecTariffUnitPrice"\s*:\s*(null|[0-9.]+)',
+    re.IGNORECASE,
+)
+
+# Mouser's analytics dataLayer lifecycle token; "none" = the part carries no special status =
+# normal/active production. The real key is a SUFFIX (event_product_lifecycle / item_lifecycle)
+# and the block appears both raw ("...lifecycle":"none") and HTML-escaped (&quot;). Read only when
+# the spec table did not already carry a lifecycle.
+_DL_LIFECYCLE = re.compile(
+    r'lifecycle(?:&quot;|["\'])\s*:\s*(?:&quot;|["\'])([^"&\']*)', re.IGNORECASE
+)
+_LIFECYCLE_MAP = {
+    "none": "Active", "active": "Active", "new": "New Product", "new product": "New Product",
+    "eol": "End of Life", "obsolete": "Obsolete",
+    "nrnd": "Not Recommended for New Designs",
+}
+# Compliance labels lifted onto specs (Country of Origin is ALSO promoted to a first-class field).
+_COMPLIANCE_KEYS = {
+    "assembly country of origin": "Assembly Country of Origin",
+    "country of diffusion": "Country of Diffusion",
+    "eccn": "ECCN",
+    "hts": "HTS Code",
+    "rohs status": "RoHS Status",
+}
+
+
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def _extract_compliance(html: str) -> dict[str, str]:
+    """The origin/compliance dt/dd pairs as {label: value}. Label is the text before the first
+    colon (so a nested tooltip sentence never leaks in); value is the cleaned <dd>. HTML comments
+    are stripped first so a stray `<dt>`/`<dd>` inside a comment cannot poison a pairing."""
+    html = _HTML_COMMENT.sub("", html)
+    out: dict[str, str] = {}
+    for raw_label, raw_value in _DT_DD.findall(html):
+        label = _clean(raw_label).split(":", 1)[0].strip()
+        value = _clean(raw_value)
+        if label and value:
+            out.setdefault(label, value)
+    return out
+
+
+def _extract_tariff_rate(html: str) -> float | None:
+    """Effective US-import-tariff % from the embedded price ladder: DecTariffUnitPrice /
+    DecUnitPrice * 100 at the first break that carries a tariff. A tariffed part returns its
+    rate; a ladder whose every break shows a null tariff returns 0.0 (a CONFIRMED no-tariff,
+    e.g. a non-China origin); a page with no ladder JSON returns None (unknown, never a
+    fabricated 0)."""
+    seen = False
+    for unit, tar in _PB_TARIFF.findall(html):
+        seen = True
+        if tar.lower() == "null":
+            continue
+        try:
+            u, t = float(unit), float(tar)
+        except ValueError:
+            continue
+        if u > 0:
+            return round(t / u * 100, 2)
+    return 0.0 if seen else None
+
 
 def _clean(cell: str) -> str:
     """Strip all nested tags, unescape entities, and trim a captured table cell."""
@@ -232,4 +306,38 @@ class MouserWebSite:
                 if label.lower() in _LIFECYCLE_LABELS:
                     r.lifecycle = Sourced(sourced.value, "mouser_web", "medium")
                     break
+
+        # The Origin Classifications compliance block: country of origin (first-class field the
+        # tariff/import view reads, plus a spec), assembly country / ECCN / HTS as specs, and the
+        # real RoHS status that supersedes the useless "RoHS: Details" the attr table captured.
+        comp = _extract_compliance(html)
+        comp_lc = {k.lower(): v for k, v in comp.items()}  # page labels are Title/UPPER-cased
+        coo = comp_lc.get("country of origin")
+        if coo and coo.lower() not in ("not available", "none", ""):
+            r.country_of_origin = Sourced(coo, "mouser_web", "medium")
+            r.specs.setdefault("Country of Origin", Sourced(coo, "mouser_web", "medium"))
+        for raw_key, spec_key in _COMPLIANCE_KEYS.items():
+            v = comp_lc.get(raw_key)
+            if v and v.lower() not in ("details", ""):
+                r.specs.setdefault(spec_key, Sourced(v, "mouser_web", "medium"))
+        rohs = comp_lc.get("rohs status")
+        if rohs and rohs.lower() not in ("details", ""):
+            # the real status wins over a prior "RoHS: Details" popup-link value
+            r.specs["RoHS"] = Sourced(rohs, "mouser_web", "high")
+
+        # The effective US import tariff Mouser bakes into its price ladder (never a researched
+        # rate). 0.0 is a confirmed no-tariff; None (no ladder) stays honestly empty.
+        rate = _extract_tariff_rate(html)
+        if rate is not None:
+            r.tariff_rate = Sourced(rate, "mouser_web", "medium")
+
+        # Lifecycle from the analytics dataLayer when the spec table carried none ("none" =
+        # no special status = Active production), so the field fills honestly instead of blank.
+        if r.lifecycle is None:
+            m = _DL_LIFECYCLE.search(html)
+            if m:
+                raw = m.group(1).strip()
+                norm = _LIFECYCLE_MAP.get(raw.lower(), raw.title() if raw else "")
+                if norm:
+                    r.lifecycle = Sourced(norm, "mouser_web", "medium")
         return r
