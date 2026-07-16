@@ -20,6 +20,20 @@ class _StubFetcher:
         return FetchResult(url, 200, self._html, self._html.encode(), "text/html", url)
 
 
+class _SequenceFetcher:
+    """Returns a different page on each successive call, to exercise fetch-to-fetch variance
+    (the A6 determinism concern: a link that pulls fully once and thin the next time)."""
+    def __init__(self, *pages):
+        self._pages = list(pages)
+        self.calls = 0
+
+    def rendered_html(self, url, timeout=20.0):
+        from stockroom.enrich.fetch import FetchResult
+        html = self._pages[min(self.calls, len(self._pages) - 1)]
+        self.calls += 1
+        return FetchResult(url, 200, html, html.encode(), "text/html", url)
+
+
 class _NoWaitLimiter:
     def acquire(self):
         pass
@@ -197,6 +211,41 @@ def test_extract_from_url_is_empty_on_a_blocked_page(tmp_path):
                               limiter=_NoWaitLimiter(), jlcsearch=_NullJlc())
     r = pipe.extract_from_url("https://www.mouser.com/x")
     assert r.mpn is None and not r.specs
+
+
+_THIN = "<html><head><meta property='og:description' content='blocked challenge page'></head></html>"
+
+
+def test_extract_from_url_is_deterministic_via_the_url_cache(tmp_path):
+    # A6: once a link pulls a substantive result it is cached, so a SECOND lookup returns the
+    # SAME full result and never re-fetches - even if the page would now serve a thin/blocked body.
+    full = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    fetcher = _SequenceFetcher(full, _THIN)
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=fetcher,
+                              limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+                              jlcsearch=_NullJlc())
+    url = "https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V"
+    r1 = pipe.extract_from_url(url)
+    r2 = pipe.extract_from_url(url)
+    assert r1.mpn.value == "ERJ-P03F1101V"
+    assert r2.mpn is not None and r2.mpn.value == r1.mpn.value  # identical, not the thin page
+    assert fetcher.calls == 1  # the second lookup hit the cache; no re-fetch
+
+
+def test_a_thin_or_blocked_result_is_never_cached(tmp_path):
+    # A thin/blocked first fetch must NOT poison the cache: the retry re-fetches and can still
+    # get the full page (so a one-off block never becomes the permanent answer).
+    full = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    fetcher = _SequenceFetcher(_THIN, full)
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=fetcher,
+                              limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+                              jlcsearch=_NullJlc())
+    url = "https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V"
+    r1 = pipe.extract_from_url(url)
+    r2 = pipe.extract_from_url(url)
+    assert r1.mpn is None  # thin -> not substantive
+    assert r2.mpn is not None and r2.mpn.value == "ERJ-P03F1101V"  # retry got the full page
+    assert fetcher.calls == 2  # thin was not cached, so the retry really re-fetched
 
 
 def test_datasheet_field_is_preferred_over_a_scrape_field():
