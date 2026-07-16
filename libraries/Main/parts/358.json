@@ -1,6 +1,10 @@
 {
-  "category": "Connectors",
-  "datasheet": null,
+  "category": "Modules",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.adafruit.com/product/358"
+  },
   "description": "358",
   "display_name": "358",
   "enrichment": {},
@@ -26,9 +30,14 @@
       "currency": "USD",
       "fetched_at": "",
       "part_number": "",
-      "price_breaks": [],
+      "price_breaks": [
+        {
+          "price": 19.95,
+          "qty": 1
+        }
+      ],
       "stock": null,
-      "url": "https://www.mouser.com/c/?q=358",
+      "url": "https://www.adafruit.com/product/358",
       "vendor": "Mouser"
     }
   ],
