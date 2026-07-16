@@ -47,7 +47,9 @@ export function EditableText({
   if (editing) {
     const shared =
       "w-full rounded-control border border-line2 bg-field px-2 py-1 text-base text-t1 outline-none focus:border-acc " +
-      (mono ? "tnum " : "");
+      // Machine values edit in the mono readout face with tabular figures, so the
+      // field looks like the value it replaces (no face swap on click).
+      (mono ? "font-mono tnum " : "");
     return multiline ? (
       <textarea
         autoFocus
@@ -82,7 +84,7 @@ export function EditableText({
       className={
         "group flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 text-left transition-colors hover:bg-raise2 disabled:cursor-not-allowed disabled:hover:bg-transparent " +
         (empty ? "italic text-t3 " : "text-t1 ") +
-        (mono ? "tnum " : "") +
+        (mono ? "font-mono tnum " : "") +
         (displayClassName ?? "text-base")
       }
     >

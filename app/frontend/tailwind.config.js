@@ -17,6 +17,8 @@ export default {
         surface: "var(--c-surface)",
         raise: "var(--c-raise)",
         raise2: "var(--c-raise2)",
+        // the recessed chamber an asset render sits in (Part Canvas hero)
+        stage: "var(--c-stage)",
         field: "var(--c-field)",
         line: "var(--c-line)",
         line2: "var(--c-line2)",
@@ -43,6 +45,17 @@ export default {
         // Work Sans (bundled offline via @fontsource-variable) is the interface
         // face; Segoe UI / system-ui only cover a load failure.
         sans: ['"Work Sans Variable"', '"Segoe UI"', "system-ui", "sans-serif"],
+        // The machine-data readout face: MPN, spec values, stock, prices, pins.
+        // Bundled offline; Cascadia/Consolas cover a load failure so columns still
+        // align. Reserved strictly for real machine values so mono re-acquires
+        // meaning (and gives tabular-figure alignment down a data grid).
+        mono: [
+          '"JetBrains Mono Variable"',
+          '"Cascadia Mono"',
+          "Consolas",
+          "ui-monospace",
+          "monospace",
+        ],
       },
       fontSize: {
         // the mockup's compact desktop scale
