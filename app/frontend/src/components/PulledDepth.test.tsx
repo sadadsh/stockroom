@@ -40,13 +40,15 @@ describe("PulledDepth", () => {
     expect(screen.getByText("$0.043/ea")).toBeInTheDocument();
   });
 
-  it("renders the full price-break ladder with thousands-separated quantities", () => {
+  it("renders the full price-break ladder with unit price AND order total", () => {
     render(<PulledDepth result={FULL} />);
     expect(screen.getByText("25,000")).toBeInTheDocument();
     expect(screen.getByText("1,000")).toBeInTheDocument();
-    // a clean sub-dollar price keeps its precision and drops trailing zeros.
-    expect(screen.getByText("$0.31")).toBeInTheDocument();
-    expect(screen.getByText("$0.063")).toBeInTheDocument();
+    // a clean sub-dollar UNIT price keeps its precision and drops trailing zeros.
+    expect(screen.getByText("$0.163")).toBeInTheDocument();
+    // the ORDER TOTAL (qty * unit) is what ordering many actually costs: grouped, 2 decimals.
+    expect(screen.getByText("$63.00")).toBeInTheDocument(); // 1,000 * 0.063
+    expect(screen.getByText("$1,075.00")).toBeInTheDocument(); // 25,000 * 0.043
   });
 
   it("renders nothing when a lookup carried no sourcing depth", () => {

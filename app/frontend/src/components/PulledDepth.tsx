@@ -15,13 +15,16 @@ function sv(s: { value: unknown } | null | undefined): string {
 
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£" };
 
-function money(price: number, currency: string): string {
+function money(value: number, currency: string): string {
   const sym = CURRENCY_SYMBOL[currency] ?? "";
-  // Sub-dollar unit prices need more decimals ($0.043) than dollar amounts ($2.50); trim any
-  // trailing zeros so a clean $0.31 does not read as $0.3100.
-  const decimals = price !== 0 && Math.abs(price) < 1 ? 3 : 2;
-  const text = price.toFixed(decimals).replace(/\.?0+$/, "");
-  return `${sym}${text || "0"}`;
+  // A sub-dollar UNIT price keeps its precision and trims trailing zeros ($0.043, $0.31); a
+  // dollar amount (an order total like $1,075.00) reads as conventional currency, grouped with
+  // thousands separators and two decimals so ordering many shows its real total.
+  const opts =
+    Math.abs(value) < 1 && value !== 0
+      ? { minimumFractionDigits: 0, maximumFractionDigits: 4 }
+      : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return `${sym}${value.toLocaleString("en-US", opts)}`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -66,19 +69,23 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
       ) : null}
       {breaks.length > 0 ? (
         <div className="rounded-card border border-line2 bg-raise2 p-3">
-          <div className="mb-2 grid grid-cols-2 text-2xs uppercase tracking-wide text-t3">
+          <div className="mb-2 grid grid-cols-3 text-2xs uppercase tracking-wide text-t3">
             <span>Order Size</span>
             <span className="text-right">Unit Price</span>
+            <span className="text-right">Order Total</span>
           </div>
           <div className="flex max-h-44 flex-col gap-1 overflow-y-auto">
             {breaks.map((b) => (
               <div
                 key={b.qty}
-                className="grid grid-cols-2 border-b border-line pb-1 text-sm last:border-0 last:pb-0"
+                className="grid grid-cols-3 border-b border-line pb-1 text-sm last:border-0 last:pb-0"
               >
                 <span className="tabular-nums text-t2">{b.qty.toLocaleString()}</span>
-                <span className="text-right tabular-nums text-t1">
+                <span className="text-right tabular-nums text-t2">
                   {money(b.price, b.currency)}
+                </span>
+                <span className="text-right tabular-nums text-t1">
+                  {money(b.qty * b.price, b.currency)}
                 </span>
               </div>
             ))}
