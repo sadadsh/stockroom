@@ -262,7 +262,7 @@ export function usePreviewGlb(id: string, enabled: boolean) {
     queryFn: () => api.modelGlb(id),
     enabled: enabled && !!id,
     staleTime: 5 * 60_000,
-    retry: false,
+    retry: 2,
   });
 }
 
