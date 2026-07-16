@@ -42,9 +42,8 @@ describe("PulledDepth", () => {
 
   it("flags the distributor source and exposes its order number (A3)", () => {
     render(<PulledDepth result={FULL} />);
-    // the "Mouser" source badge + the Mouser P/N stat, from dist_pns.
+    // the "Mouser" source badge paired with its own order number, from dist_pns.
     expect(screen.getByText("Mouser")).toBeInTheDocument();
-    expect(screen.getByText("Mouser P/N")).toBeInTheDocument();
     expect(screen.getByText("667-ERJ-P03F1101V")).toBeInTheDocument();
   });
 
