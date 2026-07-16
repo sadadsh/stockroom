@@ -232,7 +232,7 @@ export function DetailPanel({
 
       {/* files */}
       <Eyebrow className="mb-2.5 mt-6">Files</Eyebrow>
-      <div className="flex max-w-[600px] gap-3">
+      <div className="flex max-w-[760px] gap-3">
         <FileCard
           className="flex-[1.55]"
           name="3D Model"
@@ -373,7 +373,7 @@ export function DetailPanel({
       {pinout.length > 0 ? (
         <>
           <Eyebrow className="mb-2.5 mt-6">Pinout</Eyebrow>
-          <div className="max-w-[600px]">
+          <div className="max-w-[760px]">
             {/* Keyed by part id so the viewer's own filter/sort state resets on a
                 part switch (matches the EnrichPanel key below); a cached-part switch
                 does not unmount the panel, so without this the filter would leak. */}
@@ -412,7 +412,7 @@ export function DetailPanel({
       {/* git timeline (M6k): the part's commit history + per-commit field/visual diff.
           Keyed by part id so the selected-commit state resets on a part switch. */}
       <Eyebrow className="mb-2.5 mt-6">History</Eyebrow>
-      <div className="max-w-[600px]">
+      <div className="max-w-[760px]">
         <PartTimeline key={detail.id} partId={detail.id} />
       </div>
 
@@ -596,8 +596,8 @@ function FileCard({
       className={
         "flex flex-1 items-center justify-center " +
         (present
-          ? "bg-[rgba(0,0,0,0.18)] min-h-[118px]"
-          : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[118px] text-t3")
+          ? "bg-[rgba(0,0,0,0.18)] min-h-[150px]"
+          : "flex-col gap-1.5 bg-[rgba(0,0,0,0.1)] min-h-[150px] text-t3")
       }
     >
       {present ? (
@@ -772,7 +772,7 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
       <Eyebrow className="mb-2.5 mt-6">
         Specifications <span className="text-t3">({rows.length})</span>
       </Eyebrow>
-      <div className="grid max-w-[600px] grid-cols-1 gap-x-8 sm:grid-cols-2">
+      <div className="grid max-w-[760px] grid-cols-1 gap-x-8 sm:grid-cols-2">
         {shown.map(([key, value]) => (
           <div
             key={key}
