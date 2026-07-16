@@ -6,7 +6,7 @@
     "source_url": "https://www.onsemi.com/pub/Collateral/NDS7002A-D.PDF"
   },
   "description": "MOSFETs",
-  "display_name": "2N7002",
+  "display_name": "2N7002 SOT-23-3 onsemi",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,58 +22,64 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002?qs=0dwsXDNhqlz66WJJhrTFjQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "512-2N7002",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.09,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.761,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.482,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.298,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.298,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 526042,
-      "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002",
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002?qs=0dwsXDNhqlz66WJJhrTFjQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "onsemi",
     "Channel Mode": "Enhancement",
     "Configuration": "Single",
+    "Country of Diffusion": "Korea, Republic of",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
     "Forward Transconductance - Min": "0.08 S",
     "Id - Continuous Drain Current": "115 mA",
+    "Lifecycle": "Active",
     "Manufacturer": "onsemi",
     "Maximum Operating Temperature": "+ 150 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "SMD/SMT",
     "Number of Channels": "1 Channel",
+    "Package": "SOT-23-3",
     "Packaging": "Reel",
     "Part # Aliases": "2N7002_NL",
     "Pd - Power Dissipation": "350 mW",
@@ -86,17 +92,11 @@
     "Technology": "Si",
     "Transistor Polarity": "N-Channel",
     "Transistor Type": "1 N-Channel",
+    "US Tariff %": 7.98,
     "Unit Weight": "0.000282 oz",
     "Vds - Drain-Source Breakdown Voltage": "60 V",
     "Vgs - Gate-Source Voltage": "- 20 V, 20 V",
-    "Vgs th - Gate-Source Threshold Voltage": "2.5 V",
-    "Country of Origin": "China",
-    "US Tariff %": 7.98,
-    "Lifecycle": "Active",
-    "Package": "SOT-23-3",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "Korea, Republic of",
-    "ECCN": "EAR99"
+    "Vgs th - Gate-Source Threshold Voltage": "2.5 V"
   },
   "symbol": null,
   "tags": []

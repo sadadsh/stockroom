@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/tps61023"
+    "source_url": "http://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=http%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftps61023"
   },
-  "description": "Boost converter 6-SOT-5X3",
-  "display_name": "TPS61023",
+  "description": "Switching Voltage Regulators 3-A boost converter with 0.5-V ultra-low input voltage 6-SOT-5X3 -40 to 125",
+  "display_name": "TPS61023 SOT-563-6 TI TPS61023DRLT",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,73 +22,78 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT?qs=BJlw7L4Cy78Zr3IJIU3gNw%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS61023DRLT",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.43,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.04,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.942,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.836,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.784,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.738,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.711,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.701,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.688,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 47115,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT?qs=BJlw7L4Cy78Zr3IJIU3gNw%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
     "Development Kit": "TPS61023EVM-052",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "250",
     "Input Voltage": "500 mV to 5.5 V",
     "Input Voltage - Max": "5.5 V",
     "Input Voltage - Min": "500 mV",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -96,6 +101,7 @@
     "Number of Outputs": "1 Output",
     "Output Current": "3.7 A",
     "Output Voltage": "2.2 V to 5.5 V",
+    "Package": "SOT-563-6",
     "Packaging": "Reel",
     "Product Category": "Switching Voltage Regulators",
     "Product Type": "Switching Voltage Regulators",
@@ -107,14 +113,8 @@
     "Supply Voltage - Min": "500 mV",
     "Switching Frequency": "1 MHz",
     "Topology": "Boost",
-    "Unit Weight": "0.000293 oz",
-    "Country of Origin": "Philippines",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "SOT-563-6",
-    "Assembly Country of Origin": "Not available",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000293 oz"
   },
   "symbol": null,
   "tags": []

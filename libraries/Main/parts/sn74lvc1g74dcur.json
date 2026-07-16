@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/sn74lvc1g74"
   },
   "description": "Flip Flops",
-  "display_name": "SN74LVC1G74DCUR",
+  "display_name": "SN74LVC1G74DCUR VSSOP-8 TI",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,71 +22,76 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR?qs=DS7Z8uEdLNyRBKrHxqRXjA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-SN74LVC1G74DCUR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.6,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.422,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.379,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.33,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.307,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.293,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.287,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.267,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.26,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 52599,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR?qs=DS7Z8uEdLNyRBKrHxqRXjA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "Germany",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
     "High Level Output Current": "- 32 mA",
     "Input Type": "CMOS, TTL",
+    "Lifecycle": "Active",
     "Logic Family": "LVC",
     "Logic Type": "Monostable Multivibrator",
     "Low Level Output Current": "32 mA",
@@ -96,6 +101,7 @@
     "Mounting Style": "SMD/SMT",
     "Number of Circuits": "1 Circuit",
     "Output Type": "Differential",
+    "Package": "VSSOP-8",
     "Packaging": "Reel",
     "Product Category": "Flip Flops",
     "Product Type": "Flip Flops",
@@ -105,14 +111,8 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V",
-    "Unit Weight": "0.001058 oz",
-    "Country of Origin": "China",
     "US Tariff %": 8.0,
-    "Lifecycle": "Active",
-    "Package": "VSSOP-8",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "Germany",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.001058 oz"
   },
   "symbol": null,
   "tags": []

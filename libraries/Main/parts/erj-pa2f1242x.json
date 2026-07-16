@@ -1,0 +1,127 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/AOA0000C331.pdf"
+  },
+  "description": "Resistor, small symbol",
+  "display_name": "12.5k 1% 0402 Panasonic ERJ-PA2F1242X",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0402_1005Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "erj-pa2f1242x",
+  "manufacturer": "Panasonic",
+  "model": null,
+  "mpn": "ERJ-PA2F1242X",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-PA2F1242X?qs=V%252BBODeGd91LZ4cJzK1GGng%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "667-ERJ-PA2F1242X",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 0.28,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 0.129,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 0.072,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 0.059,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 0.054,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 0.05,
+          "qty": 1000
+        },
+        {
+          "currency": "USD",
+          "price": 0.049,
+          "qty": 5000
+        },
+        {
+          "currency": "USD",
+          "price": 0.033,
+          "qty": 10000
+        },
+        {
+          "currency": "USD",
+          "price": 0.03,
+          "qty": 20000
+        }
+      ],
+      "stock": 28035,
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-PA2F1242X?qs=V%252BBODeGd91LZ4cJzK1GGng%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Brand": "Panasonic",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Japan",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Height": "0.35 mm (0.014 in)",
+    "Length": "1 mm (0.039 in)",
+    "Lifecycle": "Active",
+    "Manufacturer": "Panasonic",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "PCB Mount",
+    "Package": "0402",
+    "Packaging": "Reel",
+    "Power Rating": "250 mW (1/4 W)",
+    "Product": "Thick Film Chip Resistors",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
+    "Resistance": "12.4 kOhms",
+    "RoHS": "Details",
+    "Series": "ERJ-P",
+    "Subcategory": "Resistors",
+    "Technology": "Thick Film",
+    "Temperature Coefficient": "100 PPM / C",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "1 %",
+    "US Tariff %": 0.0,
+    "Unit Weight": "0.000023 oz",
+    "Voltage Rating": "50 V",
+    "Width": "0.5 mm (0.02 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R",
+    "tool": "kicad"
+  },
+  "tags": []
+}

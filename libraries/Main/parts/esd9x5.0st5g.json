@@ -1,0 +1,115 @@
+{
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://assets.nexperia.com/documents/data-sheet/PTVS5V0Z1USK.pdf"
+  },
+  "description": "5V, 1200W TVS unidirectional diode, DSN1608-2",
+  "display_name": "ESD9X5.0ST5G SOD-923-2 onsemi",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Diode_SMD",
+    "name": "D_SOD-923",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "esd9x5.0st5g",
+  "manufacturer": "onsemi",
+  "model": null,
+  "mpn": "ESD9X5.0ST5G",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G?qs=OSf9jACorvbLo4%2Fn72DVLA%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "863-ESD9X5.0ST5G",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 0.101,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 0.054,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 0.045,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 0.031,
+          "qty": 1000
+        },
+        {
+          "currency": "USD",
+          "price": 0.027,
+          "qty": 2500
+        },
+        {
+          "currency": "USD",
+          "price": 0.025,
+          "qty": 5000
+        },
+        {
+          "currency": "USD",
+          "price": 0.021,
+          "qty": 8000
+        }
+      ],
+      "stock": 64742,
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G?qs=OSf9jACorvbLo4%2Fn72DVLA%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Assembly Country of Origin": "China",
+    "Brand": "onsemi",
+    "Breakdown Voltage": "6.2 V",
+    "Cd - Diode Capacitance": "65 pF",
+    "Clamping Voltage": "12.3 V",
+    "Country of Diffusion": "Malaysia",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "8000",
+    "Ipp - Peak Pulse Current": "8.7 A",
+    "Lifecycle": "Active",
+    "Manufacturer": "onsemi",
+    "Maximum Operating Temperature": "+ 150 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Number of Channels": "1 Channel",
+    "Package": "SOD-923-2",
+    "Packaging": "Reel",
+    "Pd - Power Dissipation": "150 mW",
+    "Polarity": "Unidirectional",
+    "Pppm - Peak Pulse Power Dissipation": "107 W",
+    "Product": "ESD Suppressors",
+    "Product Category": "ESD Protection Diodes / TVS Diodes",
+    "RoHS": "Details",
+    "Series": "ESD9X",
+    "Subcategory": "ESD Protection Diodes / TVS Diodes",
+    "Termination Style": "SMD/SMT",
+    "US Tariff %": 0.0,
+    "Unit Weight": "0.001552 oz",
+    "Vesd - Voltage ESD Air Gap": "30 kV",
+    "Vesd - Voltage ESD Contact": "30 kV",
+    "Working Voltage": "5 V"
+  },
+  "symbol": null,
+  "tags": []
+}

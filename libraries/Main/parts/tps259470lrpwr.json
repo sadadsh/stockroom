@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps25947"
   },
   "description": "Hot Swap Voltage Controllers",
-  "display_name": "TPS259470L",
+  "display_name": "TPS259470L VQFN-HR-10 TI TPS259470LRPWR",
   "enrichment": {},
   "footprint": {
     "lib": "Package_DFN_QFN",
@@ -22,71 +22,76 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.co.il/en/ProductDetail/Texas-Instruments/TPS259470LRPWR?qs=iLbezkQI%252BsibLmP55loGPQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS259470LRPWR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.71,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.26,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.14,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.01,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.959,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.922,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.917,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.861,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.842,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 5669,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR",
+      "url": "https://www.mouser.co.il/en/ProductDetail/Texas-Instruments/TPS259470LRPWR?qs=iLbezkQI%252BsibLmP55loGPQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "China",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "United States",
+    "Country of Origin": "China",
     "Current Limit": "500 mA to 6 A",
     "Development Kit": "TPS25947EVM",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -94,6 +99,7 @@
     "Mounting Style": "SMD/SMT",
     "Number of Channels": "1 Channel",
     "Operating Supply Current": "445 uA",
+    "Package": "VQFN-HR-10",
     "Packaging": "Reel",
     "Power Fail Detection": "Yes",
     "Product": "Controllers & Switches",
@@ -104,13 +110,7 @@
     "Subcategory": "PMIC - Power Management ICs",
     "Supply Voltage - Max": "23 V",
     "Supply Voltage - Min": "2.7 V",
-    "Country of Origin": "China",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "VQFN-HR-10",
-    "Assembly Country of Origin": "China",
-    "Country of Diffusion": "United States",
-    "ECCN": "EAR99"
+    "US Tariff %": 0.0
   },
   "symbol": null,
   "tags": []

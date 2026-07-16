@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/560112116009.pdf"
   },
   "description": "Resistor",
-  "display_name": "100",
+  "display_name": "100\u03a9 1% 0603 Wurth 560112116009",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,64 +22,70 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116009"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116009?qs=mELouGlnn3daC%252BuPHZwWig%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "710-560112116009",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.11,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.102,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.058,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.039,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 12356,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116009",
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116009?qs=mELouGlnn3daC%252BuPHZwWig%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "General Purpose",
+    "Assembly Country of Origin": "Taiwan",
     "Brand": "Wurth Elektronik",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "5000",
     "Features": "Anti-Sulfur Resistors",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "SMD/SMT",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product Category": "Thick Film Resistors - SMD",
@@ -93,16 +99,10 @@
     "Technology": "Thick Film",
     "Temperature Coefficient": "100 PPM / C",
     "Tolerance": "1 %",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Country of Origin": "Taiwan",
-    "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "0603",
-    "Assembly Country of Origin": "Taiwan",
-    "Country of Diffusion": "Not available",
-    "ECCN": "EAR99"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",

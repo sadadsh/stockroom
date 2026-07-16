@@ -1,0 +1,114 @@
+{
+  "category": "Capacitors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL05C750JB5NNN"
+  },
+  "description": "capacitor, small US symbol",
+  "display_name": "75pF 5% C0G 0402 Murata GCM1555C1HR75CA16J",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Capacitor_SMD",
+    "name": "C_0402_1005Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "gcm1555c1hr75ca16j",
+  "manufacturer": "Murata Electronics",
+  "model": null,
+  "mpn": "GCM1555C1HR75CA16J",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GCM1555C1HR75CA16J?qs=QzBtWTOodeXZZhEWV%2FO7LA%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.021,
+          "qty": 10
+        },
+        {
+          "price": 0.018,
+          "qty": 100
+        },
+        {
+          "price": 0.013,
+          "qty": 500
+        },
+        {
+          "price": 0.011,
+          "qty": 1000
+        },
+        {
+          "price": 0.009,
+          "qty": 2500
+        },
+        {
+          "price": 0.008,
+          "qty": 5000
+        },
+        {
+          "price": 0.006,
+          "qty": 10000
+        }
+      ],
+      "stock": null,
+      "url": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GCM1555C1HR75CA16J?qs=QzBtWTOodeXZZhEWV%2FO7LA%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Brand": "Samsung Electro-Mechanics",
+    "Capacitance": "75 pF",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Class": "Class 1",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
+    "Dielectric": "C0G (NP0)",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Height": "0.55 mm (0.022 in)",
+    "Length": "1 mm (0.039 in)",
+    "Lifecycle": "Active",
+    "Manufacturer": "Samsung Electro-Mechanics",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Package": "0402 (1005 metric)",
+    "Packaging": "Reel",
+    "Part # Aliases": "CL05C750JB5NNN",
+    "Product": "General Type MLCCs",
+    "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Product Type": "Ceramic Capacitors",
+    "RoHS": "Details",
+    "Series": "CL-Standard",
+    "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
+    "Subcategory": "Capacitors",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "5 %",
+    "Type": "Multilayer Ceramic Capacitor",
+    "Unit Weight": "0.000053 oz",
+    "Voltage Rating DC": "50 VDC",
+    "Width": "0.5 mm (0.02 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "C",
+    "tool": "kicad"
+  },
+  "tags": []
+}

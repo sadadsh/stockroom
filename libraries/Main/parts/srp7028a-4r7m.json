@@ -1,0 +1,127 @@
+{
+  "category": "Inductors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/40/1/srp7028a.pdf"
+  },
+  "description": "Inductor",
+  "display_name": "4.7u 20% Bourns SRP7028A-4R7M",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Inductor_SMD",
+    "name": "L_Bourns_SRP7028A_7.3x6.6mm",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "srp7028a-4r7m",
+  "manufacturer": "Bourns",
+  "model": null,
+  "mpn": "SRP7028A-4R7M",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Bourns/SRP7028A-4R7M?qs=7z%252BmIopC6%2FJgdLFz63lL4Q%3D%3D"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "652-SRP7028A-4R7M",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 1.1,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 0.902,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 0.787,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 0.742,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 0.687,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 0.648,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 0.61,
+          "qty": 1000
+        },
+        {
+          "currency": "USD",
+          "price": 0.563,
+          "qty": 2000
+        }
+      ],
+      "stock": 16159,
+      "url": "https://www.mouser.com/en/ProductDetail/Bourns/SRP7028A-4R7M?qs=7z%252BmIopC6%2FJgdLFz63lL4Q%3D%3D",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Automotive",
+    "Assembly Country of Origin": "Not available",
+    "Brand": "Bourns",
+    "Core Material": "Ferrite",
+    "Core Type": "Wirewound",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "Height": "2.8 mm",
+    "Inductance": "4.7 uH",
+    "Length": "7.3 mm",
+    "Lifecycle": "Active",
+    "Manufacturer": "Bourns",
+    "Maximum DC Current": "5.5 A",
+    "Maximum DC Resistance": "40 mOhms",
+    "Maximum Operating Temperature": "+ 150 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Product": "Power Inductors",
+    "Product Category": "Power Inductors - SMD",
+    "Product Type": "Power Inductors - SMD",
+    "Q Minimum": "20",
+    "Qualification": "AEC-Q200",
+    "RoHS": "Details",
+    "Saturation Current": "10 A",
+    "Self Resonant Frequency": "21 MHz",
+    "Series": "SRP7028A",
+    "Shielding": "Shielded",
+    "Subcategory": "Inductors, Chokes & Coils",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
+    "Test Frequency": "100 kHz",
+    "Tolerance": "20 %",
+    "Type": "Power Inductor",
+    "US Tariff %": 8.0,
+    "Unit Weight": "0.026455 oz",
+    "Width": "6.6 mm"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "L",
+    "tool": "kicad"
+  },
+  "tags": []
+}

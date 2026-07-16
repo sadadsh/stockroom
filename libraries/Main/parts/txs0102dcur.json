@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/txs0102"
+    "source_url": "http://www.ti.com/lit/gpn/txs0102"
   },
-  "description": "Voltage-Level Shifter VSSOP-8",
-  "display_name": "TXS0102DCUR",
+  "description": "2-Bit Bidirectional Voltage-Level Shifter for Open-Drain and Push-Pull Application, VSSOP-8",
+  "display_name": "TXS0102DCUR VSSOP-8 TI",
   "enrichment": {},
   "footprint": {
     "lib": "Package_SO",
@@ -22,63 +22,67 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR?qs=dB0LedT%252BmmBcQ3I%2Fs9XEDA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TXS0102DCUR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.63,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.445,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.399,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.348,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.324,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.31,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.31,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 111487,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR",
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR?qs=dB0LedT%252BmmBcQ3I%2Fs9XEDA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Brand": "Texas Instruments",
+    "Country of Origin": "Thailand",
+    "ECCN": "EAR99",
     "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 40 C",
     "Mounting Style": "SMD/SMT",
+    "Package": "VSSOP-8",
     "Packaging": "Reel",
     "Product Category": "Translation - Voltage Levels",
     "Product Type": "Translation - Voltage Levels",
@@ -89,12 +93,8 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V, 2.3 V",
     "Type": "2-bit Bidirectional Voltage-Level Translator",
-    "Unit Weight": "0.000339 oz",
-    "Country of Origin": "Thailand",
     "US Tariff %": 0.0,
-    "Lifecycle": "Active",
-    "Package": "VSSOP-8",
-    "ECCN": "EAR99"
+    "Unit Weight": "0.000339 oz"
   },
   "symbol": null,
   "tags": []
