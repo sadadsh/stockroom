@@ -1,0 +1,91 @@
+{
+  "category": "Transistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.onsemi.com/pub/Collateral/NDS7002A-D.PDF"
+  },
+  "description": "MOSFETs",
+  "display_name": "2N7002",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "2N7002",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "2n7002",
+  "manufacturer": "ON Semiconductor",
+  "model": null,
+  "mpn": "2N7002",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.09,
+          "qty": 1
+        },
+        {
+          "price": 0.761,
+          "qty": 10
+        },
+        {
+          "price": 0.482,
+          "qty": 100
+        },
+        {
+          "price": 0.298,
+          "qty": 500
+        },
+        {
+          "price": 0.298,
+          "qty": 3000
+        }
+      ],
+      "stock": 526042,
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "onsemi",
+    "Channel Mode": "Enhancement",
+    "Configuration": "Single",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Forward Transconductance - Min": "0.08 S",
+    "Id - Continuous Drain Current": "115 mA",
+    "Manufacturer": "onsemi",
+    "Maximum Operating Temperature": "+ 150 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Channels": "1 Channel",
+    "Packaging": "Reel",
+    "Part # Aliases": "2N7002_NL",
+    "Pd - Power Dissipation": "350 mW",
+    "Product Category": "MOSFETs",
+    "Product Type": "MOSFETs",
+    "Rds On - Drain-Source Resistance": "7.5 Ohms",
+    "RoHS": "Details",
+    "Series": "2N7002",
+    "Subcategory": "Transistors",
+    "Technology": "Si",
+    "Transistor Polarity": "N-Channel",
+    "Transistor Type": "1 N-Channel",
+    "Unit Weight": "0.000282 oz",
+    "Vds - Drain-Source Breakdown Voltage": "60 V",
+    "Vgs - Gate-Source Voltage": "- 20 V, 20 V",
+    "Vgs th - Gate-Source Threshold Voltage": "2.5 V"
+  },
+  "symbol": null,
+  "tags": []
+}
