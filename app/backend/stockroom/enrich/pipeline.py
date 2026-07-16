@@ -69,6 +69,16 @@ def fill_category(result: EnrichmentResult) -> None:
         result.category = guess
 
 
+def _is_substantive(result: EnrichmentResult) -> bool:
+    """True when a scrape actually pulled part data (identity / package / price / a real spec),
+    so the result is worth caching. A result carrying only the product_url marker, or just an
+    OpenGraph description off a blocked/challenge page, is NOT substantive and is never cached as
+    the answer, so the next lookup re-fetches instead of returning the thin miss forever."""
+    if result.mpn is not None or result.package is not None or result.price_breaks:
+        return True
+    return any(key != "product_url" for key in result.specs)
+
+
 def _default_url_for(mpn: str, category: str) -> str:
     """A best-effort product URL for a bare MPN, used only by the generic ScrapeSource
     fallback. LCSC catalogue resolution now lives in LcscSource (jlcsearch -> the real
@@ -273,6 +283,10 @@ class EnrichmentPipeline:
                  mouser=None, limiter=None, url_for=None, http_fetcher=None,
                  mouser_limiter=None, jlcsearch=None):
         self.cache = TtlCache(Path(cache_dir))
+        # A separate URL-keyed cache for the paste-a-link path (A6 determinism): the same link
+        # returns the same result, and only a SUBSTANTIVE result is stored, so a one-off thin or
+        # Akamai-blocked fetch never becomes the cached answer.
+        self.url_cache = TtlCache(Path(cache_dir), prefix="url")
         self.fetcher = fetcher or HttpRenderedDomFetcher()
         self.limiter = limiter or SlidingWindowLimiter(limit=10, window=60.0)
         # The Mouser API has its OWN documented cap (~30/60), separate from the gentler
@@ -366,6 +380,11 @@ class EnrichmentPipeline:
         url = (url or "").strip()
         if not url:
             return EnrichmentResult()
+        # A6: the same link returns the same result. A cache hit skips the (nondeterministic)
+        # network fetch entirely, so repeat lookups are stable.
+        cached = self.url_cache.get(url)
+        if cached is not None:
+            return _result_from_cache(cached, cached.get("category", ""))
         try:
             self.limiter.acquire()
             page = self.fetcher.rendered_html(url)
@@ -377,6 +396,10 @@ class EnrichmentPipeline:
                 "product_url", Sourced(page.final_url or url, "scrape", "medium")
             )
         fill_category(result)
+        # Cache ONLY a substantive pull, so a one-off thin or Akamai-blocked fetch (which yields
+        # just a description) never becomes the cached answer and a retry can still get the page.
+        if _is_substantive(result):
+            self.url_cache.put(url, _result_to_cache(result))
         return result
 
     def enrich_candidate(self, candidate: StagingCandidate,
