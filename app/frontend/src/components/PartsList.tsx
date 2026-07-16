@@ -38,10 +38,10 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-0.5">
       {grouped.map(([category, items]) => (
-        <div key={category}>
-          <div className="sticky top-0 z-[1] bg-[var(--c-sticky)] px-2 pb-1.5 pt-3.5 text-2xs font-semibold text-t3 backdrop-blur">
+        <div key={category} className="flex flex-col gap-0.5">
+          <div className="sticky top-0 z-[1] mb-0.5 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 text-2xs font-semibold text-t3 backdrop-blur">
             {category}
           </div>
           {items.map((p) => {
@@ -51,16 +51,23 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
                 key={p.id}
                 type="button"
                 onClick={() => onSelect(p.id)}
+                aria-current={selected ? "true" : undefined}
                 className={
-                  "flex w-full items-start border-b border-line px-2.5 py-2.5 text-left transition-colors last:border-b-0 " +
-                  (selected
-                    ? "bg-raise2"
-                    : "hover:bg-[var(--c-hover)]")
+                  // Rows separate by whitespace + a rounded selection/hover pill, not a
+                  // hairline on every row (the border-on-everything tell). The selected
+                  // row is the one lift; the MPN reads in the mono index face.
+                  "flex w-full items-start gap-2 rounded-control px-2.5 py-2 text-left transition-colors " +
+                  (selected ? "bg-raise2" : "hover:bg-[var(--c-hover)]")
                 }
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium text-t1">
+                    <span
+                      className={
+                        "truncate text-sm " +
+                        (selected ? "font-semibold text-t1" : "font-medium text-t1")
+                      }
+                    >
                       {p.display_name}
                     </span>
                     {duplicateIds?.has(p.id) ? (
@@ -72,14 +79,14 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
                     ) : null}
                   </div>
                   {p.mpn ? (
-                    <div className="truncate text-2xs text-t3 mt-0.5">
+                    <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
                       {p.mpn}
                     </div>
                   ) : null}
                 </div>
                 {!p.is_complete ? (
                   <span
-                    className="mt-0.5 flex flex-none items-center text-err"
+                    className="mt-0.5 flex flex-none items-center text-warn"
                     title={`Incomplete: missing ${p.missing.join(", ")}`}
                   >
                     <WarnIcon className="h-3.5 w-3.5" />
