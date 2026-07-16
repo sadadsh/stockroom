@@ -1,0 +1,99 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/508/1/PYu-AC_51_RoHS_L_11.pdf"
+  },
+  "description": "Resistor, small symbol",
+  "display_name": "258k",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "ac0603fr_07255kl",
+  "manufacturer": "YAGEO",
+  "model": null,
+  "mpn": "AC0603FR-07255KL",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/AC0603FR-07255KL"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.017,
+          "qty": 10
+        },
+        {
+          "price": 0.009,
+          "qty": 100
+        },
+        {
+          "price": 0.008,
+          "qty": 1000
+        },
+        {
+          "price": 0.004,
+          "qty": 5000
+        },
+        {
+          "price": 0.003,
+          "qty": 25000
+        }
+      ],
+      "stock": 27471,
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/AC0603FR-07255KL",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Automotive Grade",
+    "Brand": "YAGEO",
+    "Case Code - in": "0603",
+    "Case Code - mm": "1608",
+    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Height": "0.45 mm (0.018 in)",
+    "Length": "1.6 mm (0.063 in)",
+    "Manufacturer": "YAGEO",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Power Rating": "100 mW (1/10 W)",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
+    "Resistance": "255 kOhms",
+    "RoHS": "Details",
+    "Series": "AC",
+    "Subcategory": "Resistors",
+    "Technology": "Thick Film",
+    "Temperature Coefficient": "100 PPM / C",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "1 %",
+    "Unit Weight": "0.000071 oz",
+    "Voltage Rating": "75 V",
+    "Width": "0.8 mm (0.031 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R",
+    "tool": "kicad"
+  },
+  "tags": []
+}
