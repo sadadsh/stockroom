@@ -29,7 +29,7 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "187-CL05C750JB5NNNC",
       "price_breaks": [
         {
           "price": 0.1,
@@ -69,7 +69,42 @@
       "vendor": "Mouser"
     }
   ],
-  "specs": {},
+  "specs": {
+    "Country of Origin": "Philippines",
+    "Lifecycle": "Active",
+    "Package": "0402 (1005 metric)",
+    "Manufacturer": "Samsung Electro-Mechanics",
+    "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
+    "RoHS": "Details",
+    "Capacitance": "75 pF",
+    "Voltage Rating DC": "50 VDC",
+    "Dielectric": "C0G (NP0)",
+    "Tolerance": "5 %",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Termination Style": "SMD/SMT",
+    "Termination": "Standard",
+    "Minimum Operating Temperature": "- 55 C",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Length": "1 mm (0.039 in)",
+    "Width": "0.5 mm (0.02 in)",
+    "Height": "0.55 mm (0.022 in)",
+    "Product": "General Type MLCCs",
+    "Series": "CL-Standard",
+    "Packaging": "Reel",
+    "Brand": "Samsung Electro-Mechanics",
+    "Class": "Class 1",
+    "Product Type": "Ceramic Capacitors",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Subcategory": "Capacitors",
+    "Type": "Multilayer Ceramic Capacitor",
+    "Part # Aliases": "CL05C750JB5NNN",
+    "Unit Weight": "0.000053 oz",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
+  },
   "symbol": {
     "lib": "Device",
     "name": "C",

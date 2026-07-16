@@ -29,30 +29,35 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS2121RUXR",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 2.44,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 1.82,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 1.66,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 1.49,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 3000,
           "price": 1.49,
-          "qty": 3000
+          "currency": "USD"
         }
       ],
-      "stock": 14171,
+      "stock": 16194,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR",
       "vendor": "Mouser"
     }
@@ -78,7 +83,14 @@
     "Supply Voltage - Max": "22 V",
     "Supply Voltage - Min": "2.8 V",
     "Type": "Power MUX",
-    "Unit Weight": "0.000988 oz"
+    "Unit Weight": "0.000988 oz",
+    "Country of Origin": "Philippines",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "VQFN-12",
+    "Assembly Country of Origin": "Philippines",
+    "Country of Diffusion": "United States",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

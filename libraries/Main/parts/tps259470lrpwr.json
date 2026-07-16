@@ -29,46 +29,55 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "595-TPS259470LRPWR",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 1.71,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 1.26,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 1.14,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 1.01,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 0.959,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.922,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.917,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 3000,
           "price": 0.861,
-          "qty": 3000
+          "currency": "USD"
         },
         {
+          "qty": 6000,
           "price": 0.842,
-          "qty": 6000
+          "currency": "USD"
         }
       ],
-      "stock": 5699,
+      "stock": 5669,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR",
       "vendor": "Mouser"
     }
@@ -94,7 +103,14 @@
     "Series": "TPS25947",
     "Subcategory": "PMIC - Power Management ICs",
     "Supply Voltage - Max": "23 V",
-    "Supply Voltage - Min": "2.7 V"
+    "Supply Voltage - Min": "2.7 V",
+    "Country of Origin": "China",
+    "US Tariff %": 0.0,
+    "Lifecycle": "Active",
+    "Package": "VQFN-HR-10",
+    "Assembly Country of Origin": "China",
+    "Country of Diffusion": "United States",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

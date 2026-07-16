@@ -29,43 +29,52 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "612-EG1218",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.71,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.617,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 25,
           "price": 0.548,
-          "qty": 25
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.506,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 250,
           "price": 0.475,
-          "qty": 250
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.442,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.42,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 0.39,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 5000,
           "price": 0.376,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 12328,
@@ -97,7 +106,13 @@
     "Travel": "2.5 mm",
     "Type": "Slide Switch",
     "Unit Weight": "0.011323 oz",
-    "Voltage Rating DC": "30 VDC"
+    "Voltage Rating DC": "30 VDC",
+    "Country of Origin": "China",
+    "US Tariff %": 30.0,
+    "Lifecycle": "Active",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": null,
   "tags": []

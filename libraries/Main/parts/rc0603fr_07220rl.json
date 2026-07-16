@@ -29,27 +29,32 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "603-RC0603FR-07220RL",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.1,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.014,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.008,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.007,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 5000,
           "price": 0.003,
-          "qty": 5000
+          "currency": "USD"
         }
       ],
       "stock": 0,
@@ -84,7 +89,14 @@
     "Tolerance": "1 %",
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Country of Origin": "Taiwan",
+    "US Tariff %": 8.0,
+    "Lifecycle": "Active",
+    "Package": "0603",
+    "Assembly Country of Origin": "Not available",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",

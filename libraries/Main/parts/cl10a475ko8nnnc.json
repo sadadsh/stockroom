@@ -29,39 +29,47 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "187-CL10A475KO8NNNC",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.12,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.046,
-          "qty": 10
+          "currency": "USD"
         },
         {
+          "qty": 100,
           "price": 0.04,
-          "qty": 100
+          "currency": "USD"
         },
         {
+          "qty": 500,
           "price": 0.03,
-          "qty": 500
+          "currency": "USD"
         },
         {
+          "qty": 1000,
           "price": 0.026,
-          "qty": 1000
+          "currency": "USD"
         },
         {
+          "qty": 2000,
           "price": 0.025,
-          "qty": 2000
+          "currency": "USD"
         },
         {
+          "qty": 4000,
           "price": 0.019,
-          "qty": 4000
+          "currency": "USD"
         },
         {
+          "qty": 8000,
           "price": 0.017,
-          "qty": 8000
+          "currency": "USD"
         }
       ],
       "stock": 389441,
@@ -96,7 +104,14 @@
     "Type": "Multilayer Ceramic Capacitor",
     "Unit Weight": "0.000222 oz",
     "Voltage Rating DC": "16 VDC",
-    "Width": "0.8 mm (0.031 in)"
+    "Width": "0.8 mm (0.031 in)",
+    "Country of Origin": "Philippines",
+    "US Tariff %": 8.33,
+    "Lifecycle": "Active",
+    "Package": "0603 (1608 metric)",
+    "Assembly Country of Origin": "Philippines",
+    "Country of Diffusion": "Not available",
+    "ECCN": "EAR99"
   },
   "symbol": {
     "lib": "Device",
