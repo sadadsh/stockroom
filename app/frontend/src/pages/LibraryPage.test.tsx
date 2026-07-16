@@ -4,17 +4,14 @@ import { LibraryPage } from "./LibraryPage";
 
 // The tab shell's job is pure wiring: which tab is active, where a click
 // navigates, which body renders. The bodies have their own test suites, so
-// they are stubbed here. Add Parts is no longer a tab (it is a full-screen
-// wizard reached from the Parts toolbar), and Duplicates + Doctor are folded
-// under one Library Health tab with an internal segmented control.
+// they are stubbed here. Add Parts is not a tab (it is a full-screen wizard
+// reached from the Parts toolbar), and Duplicates is now a filter inside Parts,
+// so the flagship's tabs are just Parts, BOM Coverage, and Doctor.
 vi.mock("./ComponentsPage", () => ({
   ComponentsPage: () => <div data-testid="body-parts" />,
 }));
 vi.mock("./BomPage", () => ({
   BomPage: () => <div data-testid="body-bom" />,
-}));
-vi.mock("./DuplicatesPage", () => ({
-  DuplicatesPage: () => <div data-testid="body-duplicates" />,
 }));
 vi.mock("./DoctorPage", () => ({
   DoctorPage: () => <div data-testid="body-doctor" />,
@@ -28,14 +25,15 @@ vi.mock("../lib/router", () => ({
 beforeEach(() => navigate.mockClear());
 
 describe("LibraryPage", () => {
-  it("renders the Library header with the three grouped tabs", () => {
+  it("renders the Library header with the grouped tabs", () => {
     render(<LibraryPage route="components" />);
     expect(screen.getByText("Components")).toBeInTheDocument();
-    for (const label of ["Parts", "BOM Coverage", "Component Health"]) {
+    for (const label of ["Parts", "BOM Coverage", "Doctor"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
-    // Add Parts is demoted out of the tab strip.
+    // Add Parts is demoted out of the tab strip; Duplicates is a Parts filter now.
     expect(screen.queryByRole("tab", { name: "Add Parts" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Duplicates" })).toBeNull();
     expect(screen.getByRole("tab", { name: "Parts" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -48,20 +46,13 @@ describe("LibraryPage", () => {
     expect(screen.queryByTestId("body-parts")).toBeNull();
   });
 
-  it("lights the Library Health tab for both the doctor and duplicates routes", () => {
+  it("lights the Doctor tab and renders it for the doctor route", () => {
     render(<LibraryPage route="doctor" />);
-    expect(screen.getByRole("tab", { name: "Component Health" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Doctor" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(screen.getByTestId("body-doctor")).toBeInTheDocument();
-
-    render(<LibraryPage route="duplicates" />);
-    expect(screen.getAllByRole("tab", { name: "Component Health" })[1]).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByTestId("body-duplicates")).toBeInTheDocument();
   });
 
   it("navigates to a tab's route when it is clicked", async () => {
@@ -70,9 +61,9 @@ describe("LibraryPage", () => {
     expect(navigate).toHaveBeenCalledWith("bom");
   });
 
-  it("enters Library Health on the doctor route by default", async () => {
+  it("navigates to the doctor route when the Doctor tab is clicked", async () => {
     render(<LibraryPage route="components" />);
-    await userEvent.click(screen.getByRole("tab", { name: "Component Health" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Doctor" }));
     expect(navigate).toHaveBeenCalledWith("doctor");
   });
 });

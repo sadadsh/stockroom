@@ -6,11 +6,15 @@
 import { useMemo } from "react";
 import type { PartSummary } from "../api/types";
 import { WarnIcon } from "./icons";
+import { Badge } from "./primitives";
 
 interface Props {
   parts: PartSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  // Part ids that share an MPN with another part (a real accidental duplicate);
+  // each gets a Duplicate badge. Shared footprints are normal and never badged.
+  duplicateIds?: Set<string>;
 }
 
 function groupByCategory(parts: PartSummary[]): Array<[string, PartSummary[]]> {
@@ -24,7 +28,7 @@ function groupByCategory(parts: PartSummary[]): Array<[string, PartSummary[]]> {
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-export function PartsList({ parts, selectedId, onSelect }: Props) {
+export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) {
   const grouped = useMemo(() => groupByCategory(parts), [parts]);
 
   if (parts.length === 0) {
@@ -55,8 +59,17 @@ export function PartsList({ parts, selectedId, onSelect }: Props) {
                 }
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-t1">
-                    {p.display_name}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium text-t1">
+                      {p.display_name}
+                    </span>
+                    {duplicateIds?.has(p.id) ? (
+                      <span className="flex-none" title="Another part shares this MPN">
+                        <Badge tone="warn" size="sm">
+                          Duplicate
+                        </Badge>
+                      </span>
+                    ) : null}
                   </div>
                   {p.mpn ? (
                     <div className="truncate text-2xs text-t3 mt-0.5">
