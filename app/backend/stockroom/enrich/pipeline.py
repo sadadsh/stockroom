@@ -23,6 +23,7 @@ from stockroom.enrich.schema import EnrichmentResult, Sourced
 from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.part import Provenance, Purchase
+from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 
 # Canonical field -> StagingCandidate attribute it fills. Only these simple text
 # fields flow straight onto the M3 candidate; price/URL become a Purchase.
@@ -45,8 +46,14 @@ def _copy_specs(candidate, result, overwrite: set[str]) -> None:
     for label, sourced in result.specs.items():
         if label == "product_url":
             continue
-        if take or label not in candidate.specs:
-            candidate.specs[label] = str(sourced.value)
+        # Canonicalize the label to the record's key-space BEFORE the dedup check, so an
+        # extractor that emits a duplicated-label key updates the existing clean key
+        # instead of adding a twin the persistence layer would then collapse.
+        key = normalize_spec_key(label)
+        if not key:
+            continue
+        if take or key not in candidate.specs:
+            candidate.specs[key] = normalize_spec_value(str(sourced.value))
 
 
 def fill_category(result: EnrichmentResult) -> None:

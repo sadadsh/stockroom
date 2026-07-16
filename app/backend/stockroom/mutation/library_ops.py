@@ -18,6 +18,7 @@ from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footpri
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
+from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.model.part import (
     Datasheet,
     EnrichmentField,
@@ -410,10 +411,18 @@ class LibraryOps:
         untouched. A change-free call is a true no-op (no empty commit)."""
         record = self.load_record(part_id)
         changed = False
-        for key, entry in specs.items():
+        for raw_key, entry in specs.items():
+            # Normalize the incoming key/value to the SAME canonical form the record
+            # persists (part.to_dict), so the guard / no-op / merge below operate on one
+            # key-space. Without this a raw duplicated-label key from the scraper would
+            # slip past the dedup, add a twin, and get silently collapsed on write.
+            key = normalize_spec_key(raw_key)
+            if not key:
+                continue
             if not overwrite and key in record.specs:
                 continue
             value = entry.get("value") if isinstance(entry, dict) else entry
+            value = normalize_spec_value(value)
             source = entry.get("source", "") if isinstance(entry, dict) else ""
             confidence = entry.get("confidence", "") if isinstance(entry, dict) else ""
             if record.specs.get(key) == value and record.enrichment.get(key) == EnrichmentField(

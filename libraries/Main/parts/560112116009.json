@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/560112116009.pdf"
   },
   "description": "Resistor",
-  "display_name": "100\u03a9 1% 0603 Wurth 560112116009",
+  "display_name": "100Ω 1% 0603 Wurth 560112116009",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -76,7 +76,7 @@
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
     "ECCN": "EAR99",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Factory Pack Quantity": "5000",
     "Features": "Anti-Sulfur Resistors",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
@@ -97,8 +97,8 @@
     "Series": "WRIS-RSKS",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
-    "Tolerance": "1 %",
+    "Temperature Coefficient": "100 PPM/C",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",

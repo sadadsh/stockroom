@@ -430,3 +430,25 @@ def test_mouser_source_paces_the_api_with_its_limiter():
     for _ in range(3):
         src.enrich("STM32", "ICs", set())
     assert slept, "the 3rd Mouser lookup within the window must sleep (be rate-limited)"
+
+
+def test_copy_specs_normalizes_label_no_duplicated_twin():
+    # F2 review regression: an extractor that still emits the raw duplicated-label key
+    # must update the record's existing CLEAN key, never add a twin the persistence
+    # layer then silently collapses (dropping a value).
+    from stockroom.enrich.pipeline import _copy_specs
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+    from stockroom.model.part import PartRecord
+
+    twin = "Factory Pack Quantity: Factory Pack Quantity"
+    cand = PartRecord(id="x", display_name="X", category="ICs", specs={"Factory Pack Quantity": "100"})
+    result = EnrichmentResult()
+    result.specs[twin] = Sourced("999", "mouser_web", "medium")
+    # default merge (specs not opted into overwrite): existing clean key kept, no twin
+    _copy_specs(cand, result, set())
+    assert cand.specs["Factory Pack Quantity"] == "100"
+    assert twin not in cand.specs
+    # overwrite updates the clean key in place, still no twin
+    _copy_specs(cand, result, {"specs"})
+    assert cand.specs["Factory Pack Quantity"] == "999"
+    assert twin not in cand.specs
