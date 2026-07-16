@@ -40,8 +40,8 @@ export function registeredCommands(): Command[] {
 export function navCommands(nav: NavEntry[] = NAV): Command[] {
   return nav.filter((entry) => entry.available).map((entry) => ({
     id: `nav.${entry.route}`,
-    title: `Go To ${entry.title}`,
-    group: "Go To",
+    title: `Go to ${entry.title}`,
+    group: "Go to",
     keywords: [entry.route, entry.title],
     run: (ctx) => ctx.navigate(entry.route),
   }));

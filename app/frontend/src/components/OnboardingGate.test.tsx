@@ -99,7 +99,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(
-      screen.getByRole("button", { name: "Continue With the Default" }),
+      screen.getByRole("button", { name: "Continue with the Default" }),
     );
     await waitFor(() => expect(mockApi.completeOnboarding).toHaveBeenCalled());
   });
@@ -109,7 +109,7 @@ describe("OnboardingGate", () => {
     renderGate();
     const u = userEvent.setup();
     await u.click(
-      screen.getByRole("button", { name: "Continue With the Default" }),
+      screen.getByRole("button", { name: "Continue with the Default" }),
     );
     await waitFor(() => expect(screen.getByText("git is offline")).toBeInTheDocument());
   });

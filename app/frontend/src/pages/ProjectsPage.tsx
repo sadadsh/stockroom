@@ -229,8 +229,8 @@ export function ProjectsPage() {
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
               {projectsQuery.isLoading
-                ? "Loading Projects..."
-                : "Select A Project To See Its Health."}
+                ? "Loading projects..."
+                : "Select a project to see its health."}
             </div>
           )}
         </div>
@@ -272,7 +272,7 @@ function ProjectPicker({
 }) {
   if (isLoading) {
     return (
-      <div className="px-3 py-8 text-center text-sm text-t3">Loading Projects...</div>
+      <div className="px-3 py-8 text-center text-sm text-t3">Loading projects...</div>
     );
   }
   if (error) {
@@ -2547,7 +2547,7 @@ function FieldsSection({ projectId }: { projectId: string }) {
               type="text"
               className={`${INPUT_CLS} w-40 !py-1 text-xs`}
               data-testid="fields-new-field"
-              placeholder="Add A Field"
+              placeholder="Add a field"
               value={newField}
               onChange={(e) => setNewField(e.target.value)}
               onKeyDown={(e) => {
@@ -4264,7 +4264,7 @@ function CurrentStackTable({
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium text-t1">Current Stack</h3>
         <Badge tone="neutral">
-          {thickness != null ? `${thickness} mm` : "No thickness"}
+          {thickness != null ? `${thickness} mm` : "No Thickness"}
         </Badge>
         <Badge tone="neutral">Finish: {stack.copper_finish ?? "None"}</Badge>
         <Badge tone="neutral">
@@ -4629,7 +4629,7 @@ function StackupFieldBlock({ projectId, stack }: { projectId: string; stack: Sta
             checked={draft.dielectric_constraints}
             onChange={(e) => updateGlobal({ dielectric_constraints: e.target.checked })}
           />
-          Dielectric constraints
+          Dielectric Constraints
         </label>
       </div>
 

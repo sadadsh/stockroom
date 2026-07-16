@@ -104,7 +104,7 @@ export function BomPage() {
                 {report.in_library}
                 <span className="text-t3">/{report.total}</span>
               </span>
-              <span className="text-xs text-t3">in your components</span>
+              <span className="text-xs text-t3">In your components</span>
             </div>
             {report.items.length === 0 ? (
               <p className="text-sm text-t3">Nothing to check in what you pasted.</p>
@@ -153,11 +153,11 @@ export function BomPage() {
                                     : `In Components, missing ${item.missing.join(", ")}`
                                   : looked
                                     ? looked.error
-                                      ? `Not In Components (lookup failed: ${looked.error})`
+                                      ? `Not in Components (lookup failed: ${looked.error})`
                                       : looked.complete
-                                        ? "Not In Components (identity findable, needs a symbol to add)"
-                                        : `Not In Components (lookup missing ${looked.missing.join(", ")})`
-                                    : "Not In Components"}
+                                        ? "Not in Components (identity findable, needs a symbol to add)"
+                                        : `Not in Components (lookup missing ${looked.missing.join(", ")})`
+                                    : "Not in Components"}
                               </span>
                             </span>
                           </td>

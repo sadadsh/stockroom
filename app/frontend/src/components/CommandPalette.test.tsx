@@ -96,8 +96,8 @@ describe("CommandPalette", () => {
     renderPalette();
     const dialog = await open(user);
 
-    // Go To group: the rail's available destinations, prefix stripped.
-    expect(within(dialog).getByText("Go To")).toBeInTheDocument();
+    // Go to group: the rail's available destinations, prefix stripped.
+    expect(within(dialog).getByText("Go to")).toBeInTheDocument();
     expect(within(dialog).getByText("Components")).toBeInTheDocument();
     expect(within(dialog).getByText("Duplicates")).toBeInTheDocument();
     // Projects has shipped (M7a), so it is now offered.
@@ -148,7 +148,7 @@ describe("CommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
     await open(user);
-    // Empty query Go To order: [Components, BOM Coverage, Duplicates, Doctor,
+    // Empty query Go to order: [Components, BOM Coverage, Duplicates, Doctor,
     // Projects, Settings, ...]. Down, down, up lands back on BOM Coverage (index
     // 1). Load-bearing for BOTH arrows: a broken ArrowDown would stay on
     // Components, a broken ArrowUp would leave it on Duplicates.

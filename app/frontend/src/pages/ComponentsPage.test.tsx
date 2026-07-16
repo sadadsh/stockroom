@@ -163,7 +163,7 @@ describe("ComponentsPage", () => {
     await user.selectOptions(select, "Passives");
 
     expect(mockApi.moveCategory).toHaveBeenCalledWith("lm358", "Passives");
-    expect(await screen.findByText("Moved To Passives")).toBeInTheDocument();
+    expect(await screen.findByText("Moved to Passives")).toBeInTheDocument();
   });
 
   it("deletes a part only after an in-window confirm", async () => {
@@ -187,7 +187,7 @@ describe("ComponentsPage", () => {
     await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(mockApi.deletePart).toHaveBeenCalledWith("lm358");
-    expect(await screen.findByText("Part Deleted")).toBeInTheDocument();
+    expect(await screen.findByText("Part deleted")).toBeInTheDocument();
   });
 
   it("does not re-fetch the just-deleted part off the retained list mid-refetch", async () => {
@@ -224,7 +224,7 @@ describe("ComponentsPage", () => {
     );
 
     // Delete succeeded; the refetch is in flight and the old list is retained.
-    await screen.findByText("Part Deleted");
+    await screen.findByText("Part deleted");
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1); // not re-fetched off the stale list
 
     // Resolve the refetch to an empty library: the honest empty state shows and
@@ -357,7 +357,7 @@ describe("ComponentsPage", () => {
       { pinout: { value: pins, source: "datasheet", confidence: "high" } },
       undefined,
     );
-    expect(await screen.findByText("Pinout Saved")).toBeInTheDocument();
+    expect(await screen.findByText("Pinout saved")).toBeInTheDocument();
   });
 
   it("consumes a palette part request: clears filters and selects that part even when a search hid it", async () => {

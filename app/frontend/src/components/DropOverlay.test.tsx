@@ -12,13 +12,13 @@ function fileWithPath(name: string, path: string): File {
 describe("DropOverlay", () => {
   it("shows and hides the overlay as files are dragged over the window", () => {
     render(<DropOverlay onDrop={vi.fn()} />);
-    expect(screen.queryByText("Drop To Add Parts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drop to Add Parts")).not.toBeInTheDocument();
 
     fireEvent.dragEnter(window, { dataTransfer: { types: ["Files"], files: [] } });
-    expect(screen.getByText("Drop To Add Parts")).toBeInTheDocument();
+    expect(screen.getByText("Drop to Add Parts")).toBeInTheDocument();
 
     fireEvent.dragLeave(window, { dataTransfer: { types: ["Files"] } });
-    expect(screen.queryByText("Drop To Add Parts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drop to Add Parts")).not.toBeInTheDocument();
   });
 
   it("hands the dropped native file paths to onDrop and hides", () => {
@@ -34,12 +34,12 @@ describe("DropOverlay", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith(["/tmp/part.zip"]);
-    expect(screen.queryByText("Drop To Add Parts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drop to Add Parts")).not.toBeInTheDocument();
   });
 
   it("ignores a drag that carries no files", () => {
     render(<DropOverlay onDrop={vi.fn()} />);
     fireEvent.dragEnter(window, { dataTransfer: { types: ["text/plain"] } });
-    expect(screen.queryByText("Drop To Add Parts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drop to Add Parts")).not.toBeInTheDocument();
   });
 });

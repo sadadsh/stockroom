@@ -114,11 +114,11 @@ async function request<T>(
     res = await fetch(url.toString(), init);
   } catch (err) {
     // network / connection refused: the server is not up. Surface it honestly.
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
 
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     let missing: string[] | undefined;
     try {
       const body = await res.json();
@@ -151,10 +151,10 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
   try {
     res = await fetch(apiBase() + path, { headers });
   } catch (err) {
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
       msg = body.detail || body.error || body.message || msg;
@@ -182,10 +182,10 @@ async function fetchDownload(
   try {
     res = await fetch(url.toString(), { headers });
   } catch (err) {
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
       msg = body.detail || body.error || body.message || msg;
@@ -444,7 +444,7 @@ export const api = {
       { headers },
     );
     if (!res.ok || !res.body) {
-      throw new ApiError(res.status || 0, `job stream failed (${res.status})`);
+      throw new ApiError(res.status || 0, `Job stream failed (${res.status})`);
     }
     return res.body;
   },
@@ -638,10 +638,10 @@ export const api = {
     try {
       res = await fetch(url.toString(), { headers });
     } catch (err) {
-      throw new ApiError(0, err instanceof Error ? err.message : "network error");
+      throw new ApiError(0, err instanceof Error ? err.message : "Network error");
     }
     if (!res.ok) {
-      let msg = `request failed (${res.status})`;
+      let msg = `Request failed (${res.status})`;
       try {
         const body = await res.json();
         msg = body.detail || body.error || body.message || msg;

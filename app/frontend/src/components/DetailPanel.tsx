@@ -159,7 +159,7 @@ export function DetailPanel({
   }
   if (!detail) {
     return (
-      <PanelMessage>Select A Part To See Its Details.</PanelMessage>
+      <PanelMessage>Select a part to see its details.</PanelMessage>
     );
   }
 
@@ -183,7 +183,7 @@ export function DetailPanel({
                 value={detail.display_name}
                 onSave={(v) => onEditField("display_name", v)}
                 label="Name"
-                placeholder="Name This Part"
+                placeholder="Name this part"
                 disabled={busy}
                 displayClassName="text-title font-semibold"
               />
@@ -789,7 +789,7 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
           onClick={() => setShowAll((v) => !v)}
           className="mt-2.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
         >
-          {showAll ? "Show fewer" : `Show all ${rows.length}`}
+          {showAll ? "Show Fewer" : `Show All ${rows.length}`}
         </button>
       ) : null}
     </>
