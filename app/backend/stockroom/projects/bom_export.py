@@ -215,14 +215,17 @@ def _xlsx_number(num: float) -> str:
 _XLSX_STYLES_BOLD = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
-    '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+    '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>'
+    '<font><b/><sz val="11"/><name val="Calibri"/></font>'
+    # font 2: the hyperlink look (blue + underline) so a link cell reads as a clickable link
+    '<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font></fonts>'
     '<fills count="2"><fill><patternFill patternType="none"/></fill>'
     '<fill><patternFill patternType="gray125"/></fill></fills>'
     '<borders count="1"><border/></borders>'
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+    '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     '</styleSheet>')
 # Adds a currency number format ($#,##0.00) as styles 2 (plain) and 3 (bold, for totals).
@@ -246,10 +249,12 @@ _XLSX_STYLES_CURRENCY = (
     '</styleSheet>')
 
 
-def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1") -> bytes:
+def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1",
+                  sheet_rels_xml: str = "") -> bytes:
     """Zip a single-worksheet .xlsx from its worksheet + styles XML. Writes the fixed OPC
     parts (content types, relationships, workbook) around them so each writer only builds
-    the sheet and picks a style table. Pure stdlib - no packaging dependency."""
+    the sheet and picks a style table. `sheet_rels_xml`, when given, is the worksheet's own
+    relationships part (external hyperlink targets). Pure stdlib - no packaging dependency."""
     import io as _io
     import zipfile as _zip
     name = _xlsx_escape(sheet_name)[:31] or "Sheet1"  # Excel caps sheet names at 31 chars
@@ -286,6 +291,8 @@ def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1") -
         z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
         z.writestr("xl/styles.xml", styles_xml)
         z.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+        if sheet_rels_xml:
+            z.writestr("xl/worksheets/_rels/sheet1.xml.rels", sheet_rels_xml)
     return buf.getvalue()
 
 
@@ -378,15 +385,45 @@ def bom_xlsx(rows) -> bytes:
     body = ["".join(cell(f"{_xlsx_col(i)}1", "t", name, header=True)
                     for i, (name, _k) in enumerate(cols))]
     row_xml = [f'<row r="1">{body[0]}</row>']
+    # URL columns become real, clickable external hyperlinks. A generated xlsx does NOT
+    # auto-linkify plain text, so without this the Datasheet/Mouser cells are dead when clicked
+    # and read as "cut" in a narrow column. Each gets the blue-underline link style (s=2) and a
+    # worksheet relationship to the external target.
+    url_cols = {"Datasheet", "Mouser Link"}
+    hyperlinks: list[tuple[str, str, str]] = []
     for ri, v in enumerate(all_vals, start=2):
-        cells = "".join(cell(f"{_xlsx_col(i)}{ri}", k, v[name]) for i, (name, k) in enumerate(cols))
-        row_xml.append(f'<row r="{ri}">{cells}</row>')
+        parts = []
+        for i, (name, k) in enumerate(cols):
+            ref = f"{_xlsx_col(i)}{ri}"
+            val = v[name]
+            if name in url_cols and isinstance(val, str) and val.startswith("http"):
+                rid = f"rId{len(hyperlinks) + 1}"
+                hyperlinks.append((ref, rid, val))
+                parts.append(f'<c r="{ref}" s="2" t="inlineStr"><is>'
+                             f'<t xml:space="preserve">{_xlsx_escape(val)}</t></is></c>')
+            else:
+                parts.append(cell(ref, k, val))
+        row_xml.append(f'<row r="{ri}">{"".join(parts)}</row>')
+
+    hl_xml = sheet_rels = ""
+    if hyperlinks:
+        hl_xml = "<hyperlinks>" + "".join(
+            f'<hyperlink ref="{ref}" r:id="{rid}"/>' for ref, rid, _ in hyperlinks) + "</hyperlinks>"
+        sheet_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + "".join(
+                f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/'
+                f'officeDocument/2006/relationships/hyperlink" Target="{_xlsx_escape(url)}" '
+                'TargetMode="External"/>' for _, rid, url in hyperlinks)
+            + "</Relationships>")
 
     last = _xlsx_col(len(cols) - 1)
     nr = len(all_vals) + 1
     sheet = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
         f'<dimension ref="A1:{last}{nr}"/>'
         '<sheetViews><sheetView tabSelected="1" workbookViewId="0">'
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
@@ -395,8 +432,9 @@ def bom_xlsx(rows) -> bytes:
         f'<cols>{cols_xml}</cols>'
         f'<sheetData>{"".join(row_xml)}</sheetData>'
         f'<autoFilter ref="A1:{last}{nr}"/>'
+        f'{hl_xml}'
         '</worksheet>')
-    return _xlsx_package(sheet, _XLSX_STYLES_BOLD, sheet_name="BOM")
+    return _xlsx_package(sheet, _XLSX_STYLES_BOLD, sheet_name="BOM", sheet_rels_xml=sheet_rels)
 
 
 _REFDES_CATEGORY = {

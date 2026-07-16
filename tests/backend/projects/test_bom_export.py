@@ -105,6 +105,25 @@ def test_bom_xlsx_carries_mouser_link_origin_and_tariff():
     assert "<v>7.98</v>" in sheet  # tariff % as a real number Excel can sort/sum
 
 
+def test_bom_xlsx_url_columns_are_real_clickable_hyperlinks():
+    # A generated xlsx does NOT auto-linkify plain text, so the Datasheet + Mouser cells must be
+    # emitted as real external hyperlinks (a worksheet relationship + a <hyperlink> ref), or they
+    # are dead when clicked and read as "cut" in a narrow column.
+    rows = [{"mpn": "2N7002", "value": "2N7002", "refs": ["Q1"], "qty": 1, "unit_price": 1.09,
+             "source": "Mouser", "url": "https://www.mouser.com/c/?q=2N7002",
+             "datasheet": "https://www.onsemi.com/pub/x.pdf",
+             "moq": 1, "final_qty": 3, "final_unit_price": 1.09, "final_extended": 3.27,
+             "tax_tariff": 0.26, "line_total": 3.53}]
+    parts = _unzip(bom_xlsx(rows))
+    assert "xl/worksheets/_rels/sheet1.xml.rels" in parts  # the worksheet's own rels part
+    sheet = parts["xl/worksheets/sheet1.xml"]
+    assert "<hyperlink " in sheet and "r:id=" in sheet
+    rels = parts["xl/worksheets/_rels/sheet1.xml.rels"]
+    assert "https://www.mouser.com/c/?q=2N7002" in rels  # the Mouser link is a real target
+    assert "https://www.onsemi.com/pub/x.pdf" in rels     # the datasheet link is a real target
+    assert 'TargetMode="External"' in rels
+
+
 # -- procurement_xlsx ----------------------------------------------------------
 def test_procurement_xlsx_totals_and_tax():
     data = procurement_xlsx(_ROWS, boards=1, pcb_multiple=1, tax_rate=0.10, shipping=5.0)
