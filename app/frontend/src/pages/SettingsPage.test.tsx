@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
-import type { ProfilesResponse, SettingsInfo } from "../api/types";
+import type { ProfilesResponse, SettingsInfo, WiringReport } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { SettingsPage } from "./SettingsPage";
@@ -23,6 +23,10 @@ vi.mock("../api/client", async (importActual) => {
       checkUpdate: vi.fn(),
       applyUpdate: vi.fn(),
       getSystemInfo: vi.fn(),
+      scanDoctor: vi.fn(),
+      repairLibrary: vi.fn(),
+      wireKicad: vi.fn(),
+      openJobStream: vi.fn(),
     },
   };
 });
@@ -80,6 +84,7 @@ beforeEach(() => {
     kicad_cli_available: true,
     kicad_cli_path: "/usr/bin/kicad-cli",
   });
+  mockApi.scanDoctor.mockResolvedValue({ fixable: [], manual: [], uncommitted: [], healthy: true });
   mockApi.activateProfile.mockResolvedValue({ active: "Archive", part_count: 0 });
   mockApi.createProfile.mockResolvedValue({
     profiles: ["Main", "Archive", "Scratch"],
@@ -350,3 +355,46 @@ describe("SettingsPage — sync + kicad + update", () => {
     await userEvent.click(screen.getByRole("button", { name: "Connect" }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith({ github_token: "ghp_TESTTOKEN" });
   });
+
+// KiCad wiring moved here from the Doctor page (D3): the manual re-wire button
+// now lives in the Settings KiCad section.
+const WIRING: WiringReport = {
+  sr_lib_value: "/lib",
+  categories_registered: ["ICs", "Passives"],
+  symbol_rows_added: 2,
+  footprint_rows_added: 2,
+  libs_created: [],
+  kicad_running: true,
+  restart_needed: true,
+};
+
+function sseStream(frames: string[]): ReadableStream<Uint8Array> {
+  const body = frames.map((f) => f + "\r\n\r\n").join("");
+  const bytes = new TextEncoder().encode(body);
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+describe("SettingsPage — KiCad wiring", () => {
+  it("re-wires KiCad through the job and reports when a restart is needed", async () => {
+    mockApi.wireKicad.mockResolvedValue({ job_id: "job-1" });
+    mockApi.openJobStream.mockResolvedValue(
+      sseStream([
+        `event: result\r\ndata: ${JSON.stringify({ result: WIRING })}`,
+        `event: done\r\ndata: {}`,
+      ]),
+    );
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Wire KiCad" }));
+
+    await waitFor(() => expect(mockApi.wireKicad).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Registered 2 categories/)).toBeInTheDocument();
+    expect(screen.getByText(/Restart KiCad to load the updated tables\./)).toBeInTheDocument();
+  });
+});

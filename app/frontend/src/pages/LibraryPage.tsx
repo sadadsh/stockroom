@@ -1,22 +1,20 @@
 /**
- * The Library flagship: one header and grouped tabs (Parts, BOM Coverage, Doctor).
- * Each tab maps to a real route so the rail, the palette, and the window-wide drop
- * keep deep-linking; Add Parts is not a tab (it is the full-screen wizard reached
- * from the Parts toolbar), and Duplicates is now a filter inside Parts, not a tab.
+ * The Library flagship: one header and two tabs (Parts, BOM Coverage). Each tab
+ * maps to a real route so the rail and the window-wide drop keep working; Add Parts
+ * is not a tab (it is the full-screen wizard reached from the Parts toolbar),
+ * Duplicates is a filter inside Parts, and Doctor moved to Settings.
  */
 import { BomPage } from "./BomPage";
 import { ComponentsPage } from "./ComponentsPage";
-import { DoctorPage } from "./DoctorPage";
 import { useRouter } from "../lib/router";
 import { TabPanel, TabStrip, type TabItem } from "../components/primitives";
 
 // The routes the Library flagship owns as tabs (each tab id IS its route).
-export type LibraryRoute = "components" | "bom" | "doctor";
+export type LibraryRoute = "components" | "bom";
 
 const TABS: readonly TabItem<LibraryRoute>[] = [
   { id: "components", label: "Parts" },
   { id: "bom", label: "BOM Coverage" },
-  { id: "doctor", label: "Doctor" },
 ];
 
 export function LibraryPage({ route }: { route: LibraryRoute }) {
@@ -35,13 +33,7 @@ export function LibraryPage({ route }: { route: LibraryRoute }) {
         />
       </div>
       <TabPanel idBase="library" tab={route} className="flex min-h-0 flex-1 flex-col">
-        {route === "components" ? (
-          <ComponentsPage />
-        ) : route === "bom" ? (
-          <BomPage />
-        ) : (
-          <DoctorPage />
-        )}
+        {route === "components" ? <ComponentsPage /> : <BomPage />}
       </TabPanel>
     </>
   );

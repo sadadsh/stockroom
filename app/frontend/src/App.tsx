@@ -25,10 +25,9 @@ function renderRoute(route: Route) {
   switch (route) {
     case "components":
     case "bom":
-    case "doctor":
       // The library surfaces are tabs of the Components flagship; the route names
-      // the active tab so the palette and drop overlay keep deep-linking. Add A
-      // Part is not a route at all now: it is the AddPartModal, opened in-window.
+      // the active tab. Add A Part is not a route: it is the AddPartModal, opened
+      // in-window. Duplicates is a Parts filter and Doctor moved to Settings.
       return <LibraryPage route={route} />;
     case "projects":
       return <ProjectsPage />;
