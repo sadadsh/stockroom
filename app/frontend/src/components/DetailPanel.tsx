@@ -687,10 +687,10 @@ function DataRow({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 font-medium text-acc-strong underline decoration-acc-strong/40 underline-offset-2 transition-colors hover:bg-acc-soft hover:decoration-acc-strong"
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 font-medium text-t1 underline decoration-line2 underline-offset-2 transition-colors hover:bg-raise2 hover:decoration-current"
           >
             <span className="min-w-0 break-words">{value}</span>
-            <ExternalIcon className="flex-none text-acc-strong/70" />
+            <ExternalIcon className="flex-none text-t3" />
           </a>
         ) : (
           <span className={"min-w-0 break-words px-1.5 " + (mono ? "tnum font-mono" : "")}>
@@ -761,7 +761,7 @@ function AssetTile({
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(46% 40% at 50% 72%, rgba(231,154,92,0.34), transparent 66%), radial-gradient(70% 60% at 50% 44%, rgba(231,154,92,0.10), transparent 70%), radial-gradient(125% 120% at 50% 34%, transparent 48%, rgba(0,0,0,0.42))",
+              "radial-gradient(48% 42% at 50% 70%, var(--c-hero-glow), transparent 66%), radial-gradient(125% 120% at 50% 34%, transparent 50%, rgba(0,0,0,0.34))",
           }}
         />
       ) : null}
@@ -808,7 +808,7 @@ function AssetTile({
   const base =
     "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border bg-raise " +
     (variant === "hero"
-      ? "border-[rgba(231,154,92,0.22)] shadow-[0_26px_74px_-30px_rgba(231,154,92,0.34)] "
+      ? "border-line shadow-raise "
       : "border-line shadow-file ") +
     (className ?? "");
   const buttonCls =
