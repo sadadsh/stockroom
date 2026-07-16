@@ -333,6 +333,33 @@ def test_set_specs_does_not_clobber_without_overwrite(tmp_path, fixtures_dir):
     assert rec.specs["pinout"] == second
 
 
+def test_set_specs_normalizes_a_duplicated_label_key_onto_the_clean_key(tmp_path, fixtures_dir):
+    # F2 review regression: after the migration a record holds the CLEAN key, but the
+    # Mouser scraper can still emit the raw duplicated-label twin. set_specs must key its
+    # guard/no-op/merge off the NORMALIZED form so it updates the clean key - not add a
+    # twin the persistence layer then silently collapses (dropping a value) and not leave
+    # an orphan enrichment key.
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    ops.set_specs("tps62130rgtr", {"Factory Pack Quantity": {"value": "100", "source": "mouser_web"}})
+    twin = "Factory Pack Quantity: Factory Pack Quantity"
+    # overwrite=True with the raw twin + a different value updates the CLEAN key
+    rec = ops.set_specs("tps62130rgtr", {twin: {"value": "999", "source": "mouser_web"}}, overwrite=True)
+    assert rec.specs["Factory Pack Quantity"] == "999"  # updated, not silently dropped
+    assert twin not in rec.specs  # no twin
+    assert twin not in rec.enrichment  # no orphan provenance
+    assert rec.enrichment["Factory Pack Quantity"].source == "mouser_web"
+    # overwrite=False keeps the existing clean value and still never adds a twin
+    rec2 = ops.set_specs("tps62130rgtr", {twin: {"value": "777", "source": "x"}})
+    assert rec2.specs["Factory Pack Quantity"] == "999"
+    assert twin not in rec2.specs
+    # persisted
+    reloaded = ops.load_record("tps62130rgtr")
+    assert reloaded.specs["Factory Pack Quantity"] == "999"
+    assert twin not in reloaded.specs
+
+
 def test_set_specs_noop_writes_no_commit(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)

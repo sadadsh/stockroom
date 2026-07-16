@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from stockroom.model.category import slugify
+from stockroom.model.spec_hygiene import normalize_specs
 
 # KiCad-visible fields mirrored INTO symbol properties so KiCad shows a complete
 # part even without Stockroom (spec section 3). Maps record-derived value ->
@@ -157,6 +158,12 @@ class PartRecord:
     # without a pinout is still complete.
     specs: dict = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # Canonicalize spec keys/values on construction (covers from_dict + direct
+        # build). A later direct mutation of self.specs (as the enrich pipeline does)
+        # is re-cleaned by to_dict, so persisted + served data is always clean.
+        self.specs = normalize_specs(self.specs)
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -175,7 +182,7 @@ class PartRecord:
             "provenance": asdict(self.provenance) if self.provenance else None,
             "hashes": asdict(self.hashes) if self.hashes else None,
             "enrichment": {k: asdict(v) for k, v in self.enrichment.items()},
-            "specs": dict(self.specs),
+            "specs": normalize_specs(self.specs),
         }
 
     @classmethod

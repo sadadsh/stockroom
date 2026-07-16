@@ -190,3 +190,54 @@ def test_new_part_id_handles_empty_base(tmp_path):
     # a base that slugifies to empty still yields a usable id
     got = new_part_id(tmp_path, "///")
     assert got == "part"
+
+
+# --- F2 spec hygiene: PartRecord normalizes specs at every boundary ---
+
+
+def test_partrecord_normalizes_specs_on_construction():
+    r = PartRecord(
+        id="x",
+        display_name="X",
+        category="ICs",
+        specs={
+            "Tolerance": "1 %",
+            "Temperature Coefficient": "100 PPM / C",
+            "Factory Pack Quantity: Factory Pack Quantity": "100",
+        },
+    )
+    assert r.specs["Tolerance"] == "1%"
+    assert r.specs["Temperature Coefficient"] == "100 PPM/C"
+    assert r.specs["Factory Pack Quantity"] == "100"
+    assert "Factory Pack Quantity: Factory Pack Quantity" not in r.specs
+
+
+def test_partrecord_from_dict_normalizes():
+    d = {"id": "x", "display_name": "X", "category": "ICs", "specs": {"Tolerance": "5 %"}}
+    assert PartRecord.from_dict(d).specs["Tolerance"] == "5%"
+
+
+def test_partrecord_to_dict_cleans_late_mutation():
+    # A spec added after construction (as the enrich pipeline does) is still clean on
+    # the way out to disk / the API, because to_dict normalizes too.
+    r = PartRecord(id="x", display_name="X", category="ICs")
+    r.specs["Temperature Coefficient"] = "200 PPM / C"
+    assert r.to_dict()["specs"]["Temperature Coefficient"] == "200 PPM/C"
+
+
+def test_partrecord_preserves_non_string_spec_value():
+    r = PartRecord(id="x", display_name="X", category="ICs", specs={"US Tariff %": 37.0})
+    assert r.specs["US Tariff %"] == 37.0
+    assert r.to_dict()["specs"]["US Tariff %"] == 37.0
+
+
+def test_partrecord_roundtrip_cleans_persisted_malformed_specs():
+    # A record loaded from already-persisted malformed JSON re-serializes clean.
+    malformed = {
+        "id": "x",
+        "display_name": "X",
+        "category": "ICs",
+        "specs": {"Tolerance": "1 %", "Factory Pack Quantity: Factory Pack Quantity": "100"},
+    }
+    reserialized = PartRecord.from_dict(malformed).to_dict()["specs"]
+    assert reserialized == {"Tolerance": "1%", "Factory Pack Quantity": "100"}

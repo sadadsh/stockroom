@@ -5,7 +5,7 @@
     "file": "",
     "source_url": "http://www.ti.com/lit/ds/symlink/tps22917.pdf"
   },
-  "description": "1V to 5.5V, 2A, 80m\u03a9 Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
+  "description": "1V to 5.5V, 2A, 80mΩ Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
   "display_name": "TPS22917LDBVR SOT23-6 TI",
   "enrichment": {},
   "footprint": {
@@ -88,7 +88,7 @@
     "Country of Diffusion": "United States",
     "Country of Origin": "Philippines",
     "ECCN": "EAR99",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Factory Pack Quantity": "3000",
     "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
