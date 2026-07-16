@@ -247,7 +247,10 @@ export function usePreviewSvg(
     queryFn: () => api.previewSvg(kind, id, rev || undefined),
     enabled: enabled && !!id,
     staleTime: 5 * 60_000,
-    retry: false,
+    // The render shells out to kicad-cli; a cold first call can be slow or transiently
+    // fail. Retry (instead of sticking on the fallback glyph forever) so the real
+    // symbol/footprint replaces the placeholder once the render warms up.
+    retry: 2,
   });
 }
 

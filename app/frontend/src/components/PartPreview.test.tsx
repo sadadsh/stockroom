@@ -45,7 +45,11 @@ beforeEach(() => {
 });
 
 function wrap(ui: ReactNode) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // retryDelay:0 keeps the preview query's retry:2 (a real cold-render recovery) instant
+  // in tests, so the fallback-on-error path still settles fast.
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+  });
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>{ui}</ThemeProvider>
