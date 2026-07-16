@@ -198,11 +198,18 @@ export function DetailPanel({
           </div>
           <div className="mt-1 text-sm text-t3">{subtitle}</div>
         </div>
-        <div className="flex flex-none items-center gap-3">
+        <div className="flex flex-none items-center gap-4">
           {onDelete ? (
-            <Button small onClick={() => setConfirmDelete(true)} disabled={busy}>
+            // A destructive action never earns primary weight: a dim text-link that
+            // only reddens on hover, not a filled button sitting in prime real estate.
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              disabled={busy}
+              className="text-xs text-t3 transition-colors hover:text-err disabled:opacity-50"
+            >
               Delete Part
-            </Button>
+            </button>
           ) : null}
           <CompletenessRing
             score={score}
@@ -230,11 +237,37 @@ export function DetailPanel({
         )}
       </div>
 
-      {/* files */}
+      {/* files: three equal cards - the real renders (symbol, footprint) lead; the 3D
+          card no longer dwarfs them just because its model has not rendered. */}
       <Eyebrow className="mb-2.5 mt-6">Files</Eyebrow>
-      <div className="flex max-w-[760px] gap-3">
+      <div className="grid max-w-[760px] grid-cols-3 gap-3">
         <FileCard
-          className="flex-[1.55]"
+          name="Symbol"
+          present={!!detail.symbol?.name}
+          tool={detail.symbol?.tool}
+          art={<SymbolArt />}
+          thumb={
+            detail.symbol?.name ? (
+              <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
+            ) : undefined
+          }
+          onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
+          onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
+        />
+        <FileCard
+          name="Footprint"
+          present={!!detail.footprint?.name}
+          tool={detail.footprint?.tool}
+          art={<FootprintArt />}
+          thumb={
+            detail.footprint?.name ? (
+              <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
+            ) : undefined
+          }
+          onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
+          onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
+        />
+        <FileCard
           name="3D Model"
           present={hasModel}
           // A passive owns no model.file but inherits its stock footprint's built-in
@@ -243,42 +276,6 @@ export function DetailPanel({
           art={<CubeArt />}
           onOpen={hasModel ? () => setPreview("model") : undefined}
         />
-        <div className="flex flex-1 flex-col gap-3">
-          <FileCard
-            name="Symbol"
-            present={!!detail.symbol?.name}
-            tool={detail.symbol?.tool}
-            art={<SymbolArt />}
-            thumb={
-              detail.symbol?.name ? (
-                <PreviewImage
-                  kind="symbol"
-                  partId={detail.id}
-                  fallback={<SymbolArt />}
-                />
-              ) : undefined
-            }
-            onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
-            onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
-          />
-          <FileCard
-            name="Footprint"
-            present={!!detail.footprint?.name}
-            tool={detail.footprint?.tool}
-            art={<FootprintArt />}
-            thumb={
-              detail.footprint?.name ? (
-                <PreviewImage
-                  kind="footprint"
-                  partId={detail.id}
-                  fallback={<FootprintArt />}
-                />
-              ) : undefined
-            }
-            onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
-            onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
-          />
-        </div>
       </div>
 
       {/* Attach a missing symbol / footprint reference after the part landed (assets no
@@ -457,21 +454,33 @@ function CategoryRow({
     <div className="flex gap-4 border-b border-line py-2 last:border-b-0">
       <span className="w-[116px] flex-none pt-1.5 text-xs text-t3">Category</span>
       <span className="flex min-w-0 flex-1 items-center">
-        <select
-          aria-label="Category"
-          value={value}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value !== value) onMove(e.target.value);
-          }}
-          className="rounded-control border border-line2 bg-field px-2 py-1 text-base text-t1 outline-none focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {options.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+        <span className="relative inline-block w-[240px] max-w-full">
+          <select
+            aria-label="Category"
+            value={value}
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.value !== value) onMove(e.target.value);
+            }}
+            className="w-full appearance-none rounded-control border border-line2 bg-field px-2.5 py-1.5 pr-8 text-sm text-t1 outline-none focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {options.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <svg
+            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-t3"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
+            <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </span>
     </div>
   );
