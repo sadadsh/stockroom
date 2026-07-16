@@ -97,7 +97,11 @@ def staged_missing_fields(staged: "StagedPart") -> list[str]:
         "symbol": staged.symbol_source is not None and bool(staged.entry_name),
         "footprint": staged.footprint_source is not None,
         "model": staged.model_source is not None,
-        "datasheet": staged.datasheet_source is not None,
+        # A datasheet is satisfied by a downloaded PDF OR a known link (the same
+        # rule PartRecord.is_complete uses), so a pulled datasheet URL is enough to
+        # add a part; the two completeness checks can never disagree.
+        "datasheet": staged.datasheet_source is not None
+        or (staged.datasheet_meta is not None and bool(staged.datasheet_meta.source_url)),
         "purchase": any(bool(p.url) for p in staged.purchase),
     }
     return missing_from_presence(present)
@@ -231,8 +235,10 @@ class LibraryOps:
                 fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
                 model_ref = ModelRef(file=f"models/{model_name}")
 
-            # 4. datasheet file
-            datasheet = None
+            # 4. datasheet: a downloaded PDF, a known link, or both. A URL-only
+            # datasheet still lands on the record (the link is a first-class field),
+            # so a part added from a pulled link keeps that link.
+            datasheet = staged.datasheet_meta
             if staged.datasheet_source is not None:
                 ds_name = f"{part_id}.pdf"
                 ds_dst = self.lib.datasheets_dir / ds_name
