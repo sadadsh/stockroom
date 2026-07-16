@@ -1,8 +1,8 @@
 /**
- * The Library flagship: one header, four tabs (Parts, Add Parts, Duplicates,
- * Doctor). Each tab is a real route, so the rail, the Ctrl+K palette, and the
- * window-wide drop (which lands on Add Parts) all deep-link into the right tab;
- * the shell only owns the header and the tab strip, the bodies stay whole pages.
+ * The Library flagship: one header, five tabs (Parts, Add Parts, BOM Coverage,
+ * Duplicates, Doctor). Each tab is a real route, so the rail, the Ctrl+K palette,
+ * and the window-wide drop (which lands on Add Parts) all deep-link into the right
+ * tab; the shell only owns the header and the tab strip, the bodies stay whole pages.
  */
 import { BomPage } from "./BomPage";
 import { ComponentsPage } from "./ComponentsPage";
@@ -17,7 +17,7 @@ export type LibraryTab = "components" | "ingest" | "bom" | "duplicates" | "docto
 const TABS: readonly TabItem<LibraryTab>[] = [
   { id: "components", label: "Parts" },
   { id: "ingest", label: "Add Parts" },
-  { id: "bom", label: "BOM" },
+  { id: "bom", label: "BOM Coverage" },
   { id: "duplicates", label: "Duplicates" },
   { id: "doctor", label: "Doctor" },
 ];

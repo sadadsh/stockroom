@@ -1,8 +1,10 @@
 /**
- * The Bill of Materials tab: paste part numbers or a BOM CSV and see, per line,
- * what the library already has (and whether it is complete), with a second pass
- * that looks the missing lines up through enrichment. Honest triage, not an
- * importer: nothing is added here (a part still needs a symbol to pass the
+ * The BOM Coverage tab: paste part numbers or a BOM CSV and see, per line, what
+ * the library already has (and whether it is complete), with a second pass that
+ * looks the missing lines up through enrichment. Named for its scope, distinct
+ * from a project's own BOM (Projects > BOM & Procurement): this answers "does my
+ * library cover this list?", not "what does this board cost?". Honest triage, not
+ * an importer: nothing is added here (a part still needs a symbol to pass the
  * complete-to-add gate), and the report says exactly what remains.
  */
 import { useState } from "react";
@@ -56,10 +58,10 @@ export function BomPage() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
       <div className="max-w-[880px] pb-12">
-        <Eyebrow className="mb-0.5">Bill Of Materials</Eyebrow>
+        <Eyebrow className="mb-0.5">BOM Coverage</Eyebrow>
         <p className="mb-3 text-xs text-t3">
-          Paste part numbers (one per line) or a BOM CSV to see what the library
-          already has. Look Up Missing checks the web for the rest through
+          Paste part numbers (one per line) or a BOM CSV to see what your library
+          already covers. Look Up Missing checks the web for the rest through
           enrichment; nothing is added from here.
         </p>
         <Card className="px-4 py-3.5">
