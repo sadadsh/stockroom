@@ -129,7 +129,10 @@ def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> s
         render_pretty = clean_pretty
     except Exception:  # noqa: BLE001 - unparseable footprint: raw preview, not a 500
         pass
-    svg = cli.fp_export_svg(render_pretty, name, out_dir, black_and_white=bw)
+    # C1: render ONLY the copper (the pads), not the silkscreen + fab body that KiCad's default
+    # export fills the frame with (the "white blob"). A footprint preview is about pad geometry;
+    # pin numbers/names live in the DetailPanel's own Pinout table, not splashed over the pads.
+    svg = cli.fp_export_svg(render_pretty, name, out_dir, black_and_white=bw, layers="F.Cu,B.Cu")
     return Path(svg).read_text(encoding="utf-8")
 
 
