@@ -1,0 +1,112 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
+  },
+  "description": "Resistor, small symbol",
+  "display_name": "4.12k",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Resistor_SMD",
+    "name": "R_0402_1005Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "crcw04024k12fked",
+  "manufacturer": "Vishay",
+  "model": null,
+  "mpn": "CRCW04024K12FKED",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.15,
+          "qty": 1
+        },
+        {
+          "price": 0.089,
+          "qty": 10
+        },
+        {
+          "price": 0.038,
+          "qty": 100
+        },
+        {
+          "price": 0.03,
+          "qty": 250
+        },
+        {
+          "price": 0.027,
+          "qty": 500
+        },
+        {
+          "price": 0.025,
+          "qty": 1000
+        },
+        {
+          "price": 0.018,
+          "qty": 5000
+        },
+        {
+          "price": 0.017,
+          "qty": 10000
+        },
+        {
+          "price": 0.016,
+          "qty": 20000
+        }
+      ],
+      "stock": 10238,
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Automotive Grade",
+    "Brand": "Vishay",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Height": "0.35 mm (0.014 in)",
+    "Length": "1 mm (0.039 in)",
+    "Manufacturer": "Vishay",
+    "Maximum Operating Temperature": "+ 155 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Power Rating": "100 mW (1/10 W)",
+    "Product": "Thick Film Resistors SMD",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
+    "Resistance": "4.12 kOhms",
+    "RoHS": "Details",
+    "Series": "D/CRCW e3",
+    "Subcategory": "Resistors",
+    "Technology": "Thick Film",
+    "Temperature Coefficient": "100 PPM / C",
+    "Termination Style": "SMD/SMT",
+    "Tolerance": "1 %",
+    "Unit Weight": "0.000023 oz",
+    "Voltage Rating": "75 V",
+    "Width": "0.5 mm (0.02 in)"
+  },
+  "symbol": {
+    "lib": "Device",
+    "name": "R",
+    "tool": "kicad"
+  },
+  "tags": []
+}
