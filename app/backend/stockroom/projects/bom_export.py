@@ -299,19 +299,29 @@ def bom_xlsx(rows) -> bytes:
     Returns the .xlsx file as bytes."""
     priced = any(_coerce_price(r.get("unit_price")) is not None or r.get("extended") is not None
                  for r in rows)
+    # The build-economics group is present once a BOM has been built for a board count (every row
+    # carries final_qty then): the ORDER quantity for the build (price-break optimized), its unit
+    # cost, the line cost, the tax/tariff, and the line total - the columns you actually order and
+    # budget from. XLSX is the primary deliverable, so it must carry these, not just the CSV/table.
+    build = any(r.get("final_qty") is not None for r in rows)
     cols = [("Refs", "t"), ("Qty", "i"), ("Value", "t"), ("MPN", "t"), ("Manufacturer", "t"),
-            ("Footprint", "t"), ("Datasheet", "t"), ("Description", "t"), ("Basic", "t")]
+            ("Footprint", "t"), ("Package", "t"), ("Datasheet", "t"), ("Description", "t"),
+            ("Basic", "t"), ("RoHS", "t")]
     if priced:
         cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "n"), ("Ext Price", "n"),
                  ("Stock", "i"), ("Lifecycle", "t")]
+    if build:
+        cols += [("Min Qty", "i"), ("Final Qty", "i"), ("Order Unit Cost", "n"),
+                 ("Cost @ Qty", "n"), ("Tax/Tariff", "n"), ("Total Cost", "n")]
 
     def values(r):
         refs = r.get("refs", [])
         v = {"Refs": ",".join(refs) if isinstance(refs, list) else str(refs),
              "Qty": _bom_line_qty(r), "Value": r.get("value", ""), "MPN": r.get("mpn", ""),
              "Manufacturer": r.get("manufacturer", ""), "Footprint": r.get("footprint", ""),
-             "Datasheet": r.get("datasheet", ""), "Description": r.get("description", ""),
-             "Basic": "yes" if r.get("basic") else ""}
+             "Package": r.get("package", ""), "Datasheet": r.get("datasheet", ""),
+             "Description": r.get("description", ""), "Basic": "yes" if r.get("basic") else "",
+             "RoHS": r.get("rohs", "")}
         if priced:
             ext = r.get("extended")
             if ext is None:
@@ -319,6 +329,11 @@ def bom_xlsx(rows) -> bytes:
             v.update({"Source": r.get("source", ""), "Dist P/N": _dist_pn(r),
                       "Unit Price": _coerce_price(r.get("unit_price")), "Ext Price": ext,
                       "Stock": r.get("stock", ""), "Lifecycle": r.get("lifecycle", "")})
+        if build:
+            v.update({"Min Qty": r.get("moq"), "Final Qty": r.get("final_qty"),
+                      "Order Unit Cost": r.get("final_unit_price"),
+                      "Cost @ Qty": r.get("final_extended"),
+                      "Tax/Tariff": r.get("tax_tariff"), "Total Cost": r.get("line_total")})
         return v
 
     def _num(raw):
