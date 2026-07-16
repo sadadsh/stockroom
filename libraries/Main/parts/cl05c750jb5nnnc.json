@@ -1,0 +1,42 @@
+{
+  "category": "Capacitors",
+  "datasheet": null,
+  "description": "75pF",
+  "display_name": "75pF",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Capacitor_SMD",
+    "name": "C_0402_1005Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "cl05c750jb5nnnc",
+  "manufacturer": "Samsung",
+  "model": null,
+  "mpn": "CL05C750JB5NNNC",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/c/?q=CL05C750JB5NNNC"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/c/?q=CL05C750JB5NNNC",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {},
+  "symbol": {
+    "lib": "Device",
+    "name": "C",
+    "tool": "kicad"
+  },
+  "tags": []
+}

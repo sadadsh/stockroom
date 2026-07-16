@@ -1,0 +1,98 @@
+{
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/150060RS75000.pdf"
+  },
+  "description": "Single Color LEDs",
+  "display_name": "Red LED, V_f ~ 2.0 V typ, 0603",
+  "enrichment": {},
+  "footprint": {
+    "lib": "LED_SMD",
+    "name": "LED_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "150060rs75000",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "150060RS75000",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060RS75000"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.151,
+          "qty": 10
+        },
+        {
+          "price": 0.142,
+          "qty": 50
+        },
+        {
+          "price": 0.122,
+          "qty": 100
+        },
+        {
+          "price": 0.116,
+          "qty": 500
+        },
+        {
+          "price": 0.116,
+          "qty": 4000
+        }
+      ],
+      "stock": 368836,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060RS75000",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Wurth Elektronik",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Height": "0.7 mm",
+    "If - Forward Current": "20 mA",
+    "Illumination Color": "Red",
+    "Length": "1.6 mm",
+    "Lens Color": "Colorless",
+    "Lens Dimensions": "1.1 mm x 0.8 mm",
+    "Lens Shape": "Rectangular",
+    "Lens Transparency": "Water Clear",
+    "Luminous Intensity": "250 mcd",
+    "Manufacturer": "Wurth Elektronik",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Packaging": "Reel",
+    "Power Rating": "72 mW",
+    "Product": "Red LEDs",
+    "Product Category": "Single Color LEDs",
+    "Product Type": "Single Color LEDs",
+    "RoHS": "Details",
+    "Series": "WL-SMCW",
+    "Subcategory": "LEDs",
+    "Type": "Single Color LEDs",
+    "Unit Weight": "0.000811 oz",
+    "Vf - Forward Voltage": "2 V",
+    "Viewing Angle": "140 deg",
+    "Wavelength/Color Temperature": "625 nm",
+    "Width": "0.8 mm"
+  },
+  "symbol": null,
+  "tags": []
+}

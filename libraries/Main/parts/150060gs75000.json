@@ -1,0 +1,98 @@
+{
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.we-online.com/components/products/datasheet/150060GS75000.pdf"
+  },
+  "description": "Single Color LEDs",
+  "display_name": "LED",
+  "enrichment": {},
+  "footprint": {
+    "lib": "LED_SMD",
+    "name": "LED_0603_1608Metric",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "150060gs75000",
+  "manufacturer": "Wurth Elektronik",
+  "model": null,
+  "mpn": "150060GS75000",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.151,
+          "qty": 10
+        },
+        {
+          "price": 0.142,
+          "qty": 50
+        },
+        {
+          "price": 0.122,
+          "qty": 100
+        },
+        {
+          "price": 0.116,
+          "qty": 500
+        },
+        {
+          "price": 0.116,
+          "qty": 4000
+        }
+      ],
+      "stock": 143068,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Wurth Elektronik",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Height": "0.7 mm",
+    "If - Forward Current": "20 mA",
+    "Illumination Color": "Green",
+    "Length": "1.6 mm",
+    "Lens Color": "Colorless",
+    "Lens Dimensions": "1.1 mm x 0.8 mm",
+    "Lens Shape": "Rectangular",
+    "Lens Transparency": "Water Clear",
+    "Luminous Intensity": "430 mcd",
+    "Manufacturer": "Wurth Elektronik",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Packaging": "Reel",
+    "Power Rating": "105 mW",
+    "Product": "Green LEDs",
+    "Product Category": "Single Color LEDs",
+    "Product Type": "Single Color LEDs",
+    "RoHS": "Details",
+    "Series": "WL-SMCW",
+    "Subcategory": "LEDs",
+    "Type": "Single Color LEDs",
+    "Unit Weight": "0.000882 oz",
+    "Vf - Forward Voltage": "3.2 V",
+    "Viewing Angle": "140 deg",
+    "Wavelength/Color Temperature": "520 nm",
+    "Width": "0.8 mm"
+  },
+  "symbol": null,
+  "tags": []
+}

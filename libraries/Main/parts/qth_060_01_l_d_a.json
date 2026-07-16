@@ -1,0 +1,86 @@
+{
+  "category": "Connectors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/85/1/qth.pdf"
+  },
+  "description": "Board to Board & Mezzanine Connectors",
+  "display_name": "QTH-060-01-X-D-A",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SAMTEC_QTH-060-01-X-D-A",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "qth_060_01_l_d_a",
+  "manufacturer": "Samtec",
+  "model": null,
+  "mpn": "QTH-060-01-L-D-A",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Samtec/QTH-060-01-L-D-A"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 5.75,
+          "qty": 1
+        },
+        {
+          "price": 5.15,
+          "qty": 96
+        },
+        {
+          "price": 4.74,
+          "qty": 288
+        }
+      ],
+      "stock": 5176,
+      "url": "https://www.mouser.com/en/ProductDetail/Samtec/QTH-060-01-L-D-A",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Application": "Power, Signal",
+    "Brand": "Samtec",
+    "Contact Material": "Phosphor Bronze",
+    "Contact Plating": "Gold",
+    "Current Rating": "2 A",
+    "Data Rate": "25 Gbps",
+    "Factory Pack Quantity: Factory Pack Quantity": "48",
+    "Flammability Rating": "UL 94 V-0",
+    "Housing Material": "Liquid Crystal Polymer (LCP)",
+    "Manufacturer": "Samtec",
+    "Maximum Data Rate": "25 Gbps",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Mounting Angle": "Vertical",
+    "Mounting Style": "Mounting Peg",
+    "Number of Positions": "120 Position",
+    "Number of Rows": "2 Row",
+    "Packaging": "Tray",
+    "Pitch": "0.5 mm (0.02 in)",
+    "Product": "Headers",
+    "Product Category": "Board to Board & Mezzanine Connectors",
+    "Product Type": "Board to Board & Mezzanine Connectors",
+    "RoHS": "Details",
+    "Series": "QTH",
+    "Stack Height": "5 mm",
+    "Subcategory": "Board to Board & Mezzanine Connectors",
+    "Termination Style": "Solder Pin",
+    "Tradename": "Q Strip",
+    "Unit Weight": "0.050795 oz",
+    "Voltage Rating": "175 VAC"
+  },
+  "symbol": null,
+  "tags": []
+}

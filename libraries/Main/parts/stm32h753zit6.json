@@ -1,0 +1,99 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.st.com/resource/en/datasheet/stm32h753vi.pdf"
+  },
+  "description": "Arm Cortex-M7 MCU LQFP144",
+  "display_name": "STM32H753ZIT6",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_QFP",
+    "name": "LQFP-144_20x20mm_P0.5mm",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "stm32h753zit6",
+  "manufacturer": "STMicroelectronics",
+  "model": null,
+  "mpn": "STM32H753ZIT6",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 17.13,
+          "qty": 1
+        },
+        {
+          "price": 14.15,
+          "qty": 10
+        },
+        {
+          "price": 13.42,
+          "qty": 25
+        },
+        {
+          "price": 12.01,
+          "qty": 100
+        },
+        {
+          "price": 11.45,
+          "qty": 250
+        },
+        {
+          "price": 10.94,
+          "qty": 360
+        }
+      ],
+      "stock": 14,
+      "url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "ADC Resolution": "3 x 16 bit",
+    "Brand": "STMicroelectronics",
+    "Core": "ARM Cortex M7",
+    "DAC Resolution": "12 bit",
+    "Data Bus Width": "32 bit",
+    "Data RAM Size": "1 MB",
+    "Data RAM Type": "SRAM",
+    "Factory Pack Quantity: Factory Pack Quantity": "360",
+    "Interface Type": "CAN, I2C, SAI, SDIO, SPI, USART, USB",
+    "Manufacturer": "STMicroelectronics",
+    "Maximum Clock Frequency": "400 MHz",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Number of ADC Channels": "20 Channel",
+    "Number of I/Os": "114 I/O",
+    "Packaging": "Tray",
+    "Product": "MCU+FPUs",
+    "Product Category": "ARM Microcontrollers - MCU",
+    "Product Type": "ARM Microcontrollers - MCU",
+    "Program Memory Size": "2 MB",
+    "Program Memory Type": "Flash",
+    "RoHS": "Details",
+    "Series": "STM32H7",
+    "Subcategory": "Microcontrollers - MCU",
+    "Supply Voltage - Max": "3.6 V",
+    "Supply Voltage - Min": "1.62 V",
+    "Tradename": "STM32",
+    "Unit Weight": "0.046385 oz",
+    "Watchdog Timers": "Watchdog Timer, Windowed"
+  },
+  "symbol": null,
+  "tags": []
+}

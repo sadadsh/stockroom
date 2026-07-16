@@ -1,0 +1,100 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/bq24075"
+  },
+  "description": "Battery Management",
+  "display_name": "BQ24074",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_DFN_QFN",
+    "name": "VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "bq24074rgtt",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "BQ24074RGTT",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 3.19,
+          "qty": 1
+        },
+        {
+          "price": 2.39,
+          "qty": 10
+        },
+        {
+          "price": 2.19,
+          "qty": 25
+        },
+        {
+          "price": 1.97,
+          "qty": 100
+        },
+        {
+          "price": 1.86,
+          "qty": 250
+        },
+        {
+          "price": 1.76,
+          "qty": 500
+        },
+        {
+          "price": 1.71,
+          "qty": 1000
+        },
+        {
+          "price": 1.69,
+          "qty": 2500
+        },
+        {
+          "price": 1.67,
+          "qty": 5000
+        }
+      ],
+      "stock": 1351,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Battery Type": "Lithium-ion",
+    "Brand": "Texas Instruments",
+    "Development Kit": "BQ24074EVM",
+    "Factory Pack Quantity: Factory Pack Quantity": "250",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 85 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Operating Supply Voltage": "4.3 V to 10.2 V",
+    "Output Current": "1.5 A",
+    "Output Voltage": "4.2 V",
+    "Packaging": "Reel",
+    "Product": "Charge Management",
+    "Product Category": "Battery Management",
+    "Product Type": "Battery Management",
+    "RoHS": "Details",
+    "Series": "BQ24074",
+    "Subcategory": "PMIC - Power Management ICs",
+    "Unit Weight": "0.000808 oz"
+  },
+  "symbol": null,
+  "tags": []
+}
