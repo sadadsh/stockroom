@@ -101,6 +101,8 @@ describe("ComponentsPage", () => {
 
     wrap(<ComponentsPage />);
 
+    // The page header carries the title + the live parts count.
+    expect(await screen.findByRole("heading", { name: "Components" })).toBeInTheDocument();
     expect(await screen.findByText("LM358")).toBeInTheDocument();
     expect(await screen.findByText("1 Parts")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
