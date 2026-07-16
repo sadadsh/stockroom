@@ -6,7 +6,7 @@
     "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL05C750JB5NNN"
   },
   "description": "capacitor, small US symbol",
-  "display_name": "75pF 5% C0G 0402 Murata GCM1555C1HR75CA16J",
+  "display_name": "75pF 0.25pF C0G 0402 Murata GCM1555C1HR75CA16J",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -29,81 +29,92 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "81-GCM1555C1HR75CA6J",
       "price_breaks": [
         {
-          "price": 0.1,
-          "qty": 1
+          "qty": 1,
+          "price": 0.15,
+          "currency": "USD"
         },
         {
-          "price": 0.021,
-          "qty": 10
+          "qty": 10,
+          "price": 0.053,
+          "currency": "USD"
         },
         {
-          "price": 0.018,
-          "qty": 100
+          "qty": 100,
+          "price": 0.029,
+          "currency": "USD"
         },
         {
-          "price": 0.013,
-          "qty": 500
+          "qty": 500,
+          "price": 0.019,
+          "currency": "USD"
         },
         {
-          "price": 0.011,
-          "qty": 1000
+          "qty": 1000,
+          "price": 0.014,
+          "currency": "USD"
         },
         {
+          "qty": 2500,
           "price": 0.009,
-          "qty": 2500
+          "currency": "USD"
         },
         {
+          "qty": 5000,
           "price": 0.008,
-          "qty": 5000
+          "currency": "USD"
         },
         {
-          "price": 0.006,
-          "qty": 10000
+          "qty": 50000,
+          "price": 0.008,
+          "currency": "USD"
         }
       ],
-      "stock": null,
+      "stock": 35585,
       "url": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GCM1555C1HR75CA16J?qs=QzBtWTOodeXZZhEWV%2FO7LA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Assembly Country of Origin": "Not available",
-    "Brand": "Samsung Electro-Mechanics",
-    "Capacitance": "75 pF",
+    "Brand": "Murata Electronics",
+    "Capacitance": "0.75 pF",
     "Case Code - in": "0402",
     "Case Code - mm": "1005",
     "Class": "Class 1",
     "Country of Diffusion": "Not available",
-    "Country of Origin": "Philippines",
+    "Country of Origin": "Japan",
     "Dielectric": "C0G (NP0)",
     "ECCN": "EAR99",
     "Factory Pack Quantity": "10000",
-    "Height": "0.55 mm (0.022 in)",
+    "Height": "0.5 mm (0.02 in)",
     "Length": "1 mm (0.039 in)",
     "Lifecycle": "Active",
-    "Manufacturer": "Samsung Electro-Mechanics",
+    "Manufacturer": "Murata",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 55 C",
     "Package": "0402 (1005 metric)",
     "Packaging": "Reel",
     "Part # Aliases": "CL05C750JB5NNN",
-    "Product": "General Type MLCCs",
+    "Product": "Automotive MLCCs",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
     "Product Type": "Ceramic Capacitors",
     "RoHS": "Details",
-    "Series": "CL-Standard",
+    "Series": "GCM",
     "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "5%",
-    "Type": "Multilayer Ceramic Capacitor",
-    "Unit Weight": "0.000053 oz",
+    "Tolerance": "0.25 pF",
+    "Type": "Chip Multilayer Ceramic Capacitors for Automotive",
+    "Unit Weight": "0.000056 oz",
     "Voltage Rating DC": "50 VDC",
-    "Width": "0.5 mm (0.02 in)"
+    "Width": "0.5 mm (0.02 in)",
+    "Qualification": "AEC-Q200",
+    "Factory Pack Quantity: Factory Pack Quantity": "50000",
+    "US Tariff %": 0.0
   },
   "symbol": {
     "lib": "Device",

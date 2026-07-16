@@ -29,50 +29,55 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "187-CL05C100JB5NNWC",
       "price_breaks": [
         {
-          "currency": "USD",
-          "price": 0.1,
-          "qty": 1
+          "qty": 1,
+          "price": 0.23,
+          "currency": "USD"
         },
         {
-          "currency": "USD",
-          "price": 0.019,
-          "qty": 10
+          "qty": 10,
+          "price": 0.081,
+          "currency": "USD"
         },
         {
-          "currency": "USD",
-          "price": 0.016,
-          "qty": 100
+          "qty": 100,
+          "price": 0.045,
+          "currency": "USD"
         },
         {
-          "currency": "USD",
-          "price": 0.011,
-          "qty": 500
+          "qty": 500,
+          "price": 0.029,
+          "currency": "USD"
         },
         {
-          "currency": "USD",
-          "price": 0.01,
-          "qty": 1000
+          "qty": 1000,
+          "price": 0.022,
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2500,
+          "price": 0.014,
+          "currency": "USD"
+        },
+        {
+          "qty": 5000,
+          "price": 0.012,
+          "currency": "USD"
+        },
+        {
+          "qty": 10000,
+          "price": 0.009,
+          "currency": "USD"
+        },
+        {
+          "qty": 20000,
           "price": 0.008,
-          "qty": 2500
-        },
-        {
-          "currency": "USD",
-          "price": 0.007,
-          "qty": 5000
-        },
-        {
-          "currency": "USD",
-          "price": 0.005,
-          "qty": 10000
+          "currency": "USD"
         }
       ],
-      "stock": 118171,
+      "stock": 99958,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05C100JB5NNWC?qs=CveC9HkIcgk8xP%252BMUb%252BQXw%3D%3D",
       "vendor": "Mouser"
     }
@@ -97,7 +102,7 @@
     "Minimum Operating Temperature": "- 55 C",
     "Package": "0402 (1005 metric)",
     "Packaging": "Reel",
-    "Part # Aliases": "CL05C100JB5NNN",
+    "Part # Aliases": "CL05C100JB5NNW",
     "Product": "General Type MLCCs",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
     "Product Type": "Ceramic Capacitors",
@@ -106,12 +111,13 @@
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "5%",
+    "Tolerance": "5 %",
     "Type": "Multilayer Ceramic Capacitor",
-    "US Tariff %": 8.0,
+    "US Tariff %": 7.83,
     "Unit Weight": "0.000053 oz",
     "Voltage Rating DC": "50 VDC",
-    "Width": "0.5 mm (0.02 in)"
+    "Width": "0.5 mm (0.02 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "10000"
   },
   "symbol": {
     "lib": "Device",

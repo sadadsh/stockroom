@@ -32,49 +32,49 @@
       "part_number": "595-TPS3700DDCR",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 2.52,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 1.87,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 1.71,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 1.53,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 1.45,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 1.4,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 1.35,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 1.29,
-          "qty": 3000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 6000,
           "price": 1.27,
-          "qty": 6000
+          "currency": "USD"
         }
       ],
       "stock": 0,
@@ -115,7 +115,8 @@
     "Supply Voltage - Max": "18 V",
     "Supply Voltage - Min": "1.8 V",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.000229 oz"
+    "Unit Weight": "0.000229 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

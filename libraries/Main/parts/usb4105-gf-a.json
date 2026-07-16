@@ -35,52 +35,52 @@
       "part_number": "640-USB4105-GF-A",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.93,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.81,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.741,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.668,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.61,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 800,
           "price": 0.505,
-          "qty": 800
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2400,
           "price": 0.474,
-          "qty": 2400
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 4800,
           "price": 0.451,
-          "qty": 4800
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 9600,
           "price": 0.43,
-          "qty": 9600
+          "currency": "USD"
         }
       ],
-      "stock": 481287,
+      "stock": 481266,
       "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D",
       "vendor": "Mouser"
     }
@@ -122,7 +122,8 @@
     "Type": "PCB Top Mount",
     "US Tariff %": 30.0,
     "Unit Weight": "0.027090 oz",
-    "Voltage Rating": "48 VDC"
+    "Voltage Rating": "48 VDC",
+    "Factory Pack Quantity: Factory Pack Quantity": "800"
   },
   "symbol": {
     "lib": "SR-Connectors",

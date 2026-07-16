@@ -29,34 +29,55 @@
     {
       "currency": "USD",
       "fetched_at": "",
-      "part_number": "",
+      "part_number": "611-PTS645SK43SMTR92",
       "price_breaks": [
         {
+          "qty": 1,
           "price": 0.36,
-          "qty": 1
+          "currency": "USD"
         },
         {
+          "qty": 10,
           "price": 0.313,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "price": 0.2924,
-          "qty": 25
+          "qty": 25,
+          "price": 0.293,
+          "currency": "USD"
         },
         {
-          "price": 0.2616,
-          "qty": 100
+          "qty": 100,
+          "price": 0.262,
+          "currency": "USD"
         },
         {
-          "price": 0.24244,
-          "qty": 250
+          "qty": 250,
+          "price": 0.243,
+          "currency": "USD"
         },
         {
-          "price": 0.22878,
-          "qty": 500
+          "qty": 500,
+          "price": 0.229,
+          "currency": "USD"
+        },
+        {
+          "qty": 1000,
+          "price": 0.187,
+          "currency": "USD"
+        },
+        {
+          "qty": 2000,
+          "price": 0.176,
+          "currency": "USD"
+        },
+        {
+          "qty": 5000,
+          "price": 0.171,
+          "currency": "USD"
         }
       ],
-      "stock": null,
+      "stock": 87087,
       "url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK43SMTR92-LFS?qs=Imq1NPwxi76wjUe7hzmA%252BA%3D%3D&mgh=1",
       "vendor": "Mouser"
     }
@@ -68,7 +89,7 @@
     "Color": "Black",
     "Contact Form": "SPST",
     "Contact Plating": "Silver",
-    "Country of Diffusion": "Not available",
+    "Country of Diffusion": "China",
     "Country of Origin": "China",
     "Current Rating": "50 mA",
     "ECCN": "EAR99",
@@ -84,9 +105,9 @@
     "Minimum Operating Temperature": "- 20 C",
     "Mounting Direction": "Straight",
     "Mounting Style": "SMD/SMT",
-    "Operating Force": "1.6 N",
+    "Operating Force": "2.6 N",
     "Packaging": "Reel",
-    "Part # Aliases": "Y97HT23B2EAFP PTS645SM43SMTR92LFS Y97HT23B2EAFP",
+    "Part # Aliases": "Y97HT23B5EAFP PTS645SK43SMTR92LFS Y97HT23B5EAFP",
     "Product Category": "Tactile Switches",
     "Product Type": "Tactile Switches",
     "RoHS": "Details",
@@ -98,9 +119,11 @@
     "Termination Style": "Gull Wing Lead",
     "Tradename": "PTS",
     "Type": "Tactile",
-    "Unit Weight": "0.019753 oz",
+    "Unit Weight": "0.580821 oz",
     "Voltage Rating DC": "12 VDC",
-    "Width": "6 mm"
+    "Width": "6 mm",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "US Tariff %": 8.06
   },
   "symbol": null,
   "tags": []

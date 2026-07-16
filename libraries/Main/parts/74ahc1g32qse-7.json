@@ -32,44 +32,44 @@
       "part_number": "621-74AHC1G32QSE-7",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.14,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.092,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.081,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.069,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.063,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.059,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.056,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 0.056,
-          "qty": 3000
+          "currency": "USD"
         }
       ],
       "stock": 7036,
@@ -106,7 +106,8 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "2 V",
-    "US Tariff %": 37.86
+    "US Tariff %": 37.86,
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

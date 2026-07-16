@@ -32,34 +32,34 @@
       "part_number": "710-61300411121",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.19,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.163,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.135,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 50,
           "price": 0.113,
-          "qty": 50
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.102,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.094,
-          "qty": 1000
+          "currency": "USD"
         }
       ],
       "stock": 51814,
@@ -105,7 +105,8 @@
     "Type": "Pin Strip",
     "US Tariff %": 0.0,
     "Unit Weight": "0.007408 oz",
-    "Voltage Rating": "250 V"
+    "Voltage Rating": "250 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000"
   },
   "symbol": null,
   "tags": []

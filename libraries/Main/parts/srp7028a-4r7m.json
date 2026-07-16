@@ -32,44 +32,44 @@
       "part_number": "652-SRP7028A-4R7M",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 1.1,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.902,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.787,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.742,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.687,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.648,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.61,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2000,
           "price": 0.563,
-          "qty": 2000
+          "currency": "USD"
         }
       ],
       "stock": 16159,
@@ -112,11 +112,12 @@
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 kHz",
-    "Tolerance": "20%",
+    "Tolerance": "20 %",
     "Type": "Power Inductor",
     "US Tariff %": 8.0,
     "Unit Weight": "0.026455 oz",
-    "Width": "6.6 mm"
+    "Width": "6.6 mm",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000"
   },
   "symbol": {
     "lib": "Device",

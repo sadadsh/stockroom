@@ -32,52 +32,52 @@
       "part_number": "595-TPD2E009DBZR",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.79,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.486,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.313,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.239,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.215,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 0.184,
-          "qty": 3000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 6000,
           "price": 0.168,
-          "qty": 6000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 9000,
           "price": 0.158,
-          "qty": 9000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 24000,
           "price": 0.148,
-          "qty": 24000
+          "currency": "USD"
         }
       ],
-      "stock": 10330,
+      "stock": 4367,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD2E009DBZR?qs=XGzIaZb%2FFYIsL3UFh35JpQ%3D%3D",
       "vendor": "Mouser"
     }
@@ -113,7 +113,8 @@
     "Vesd - Voltage ESD Air Gap": "8 kV",
     "Vesd - Voltage ESD Contact": "8 kV",
     "Vf - Forward Voltage": "800 mV",
-    "Working Voltage": "5.5 V"
+    "Working Voltage": "5.5 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

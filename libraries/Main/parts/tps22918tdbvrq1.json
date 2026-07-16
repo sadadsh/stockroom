@@ -32,49 +32,49 @@
       "part_number": "595-TPS22918TDBVRQ1",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.76,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.54,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.484,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.423,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 250,
           "price": 0.393,
-          "qty": 250
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.376,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.361,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 3000,
           "price": 0.346,
-          "qty": 3000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 6000,
           "price": 0.337,
-          "qty": 6000
+          "currency": "USD"
         }
       ],
       "stock": 10139,
@@ -114,7 +114,8 @@
     "Supply Voltage - Min": "1 V",
     "Type": "Load Switch",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.003280 oz"
+    "Unit Weight": "0.003280 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000"
   },
   "symbol": null,
   "tags": []

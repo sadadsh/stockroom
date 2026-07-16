@@ -32,37 +32,37 @@
       "part_number": "710-61300811121",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.39,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.336,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 25,
           "price": 0.28,
-          "qty": 25
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 50,
           "price": 0.234,
-          "qty": 50
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.212,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.193,
-          "qty": 1000
+          "currency": "USD"
         }
       ],
-      "stock": 21510,
+      "stock": 21500,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300811121?qs=PhR8RmCirEZRdx%252BVlEmRRA%3D%3D",
       "vendor": "Mouser"
     }
@@ -104,7 +104,8 @@
     "Termination Style": "Solder Pin",
     "Type": "Pin Strip",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.016932 oz"
+    "Unit Weight": "0.016932 oz",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000"
   },
   "symbol": null,
   "tags": []

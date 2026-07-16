@@ -32,42 +32,42 @@
       "part_number": "187-CL21A106KOQNNNE",
       "price_breaks": [
         {
-          "currency": "USD",
+          "qty": 1,
           "price": 0.11,
-          "qty": 1
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 10,
           "price": 0.042,
-          "qty": 10
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 100,
           "price": 0.036,
-          "qty": 100
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 500,
           "price": 0.027,
-          "qty": 500
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 1000,
           "price": 0.024,
-          "qty": 1000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 2000,
           "price": 0.019,
-          "qty": 2000
+          "currency": "USD"
         },
         {
-          "currency": "USD",
+          "qty": 4000,
           "price": 0.017,
-          "qty": 4000
+          "currency": "USD"
         }
       ],
-      "stock": 189,
+      "stock": 0,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL21A106KOQNNNE?qs=349EhDEZ59qKIX0T0PKtPw%3D%3D",
       "vendor": "Mouser"
     }
@@ -101,12 +101,13 @@
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "10%",
+    "Tolerance": "10 %",
     "Type": "Multilayer Ceramic Capacitor",
     "US Tariff %": 8.18,
     "Unit Weight": "0.000226 oz",
     "Voltage Rating DC": "16 VDC",
-    "Width": "1.25 mm (0.049 in)"
+    "Width": "1.25 mm (0.049 in)",
+    "Factory Pack Quantity: Factory Pack Quantity": "2000"
   },
   "symbol": {
     "lib": "Device",
