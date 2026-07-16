@@ -348,6 +348,28 @@ def test_price_line_does_not_overbuy_when_ordering_more_costs_more_total():
     assert line["final_extended"] == 6.0
 
 
+def test_per_part_tariff_overrides_the_blanket_project_rate():
+    # A line with its own tariff_rate is taxed at THAT rate, not the project blanket rate.
+    row = {"qty": 1, "price_breaks": [{"qty": 1, "price": 1.00}], "tariff_rate": 25}
+    line = price_line_at_build(row, build_qty=1, tax_rate=10)
+    assert line["final_extended"] == 1.0
+    assert line["tax_tariff"] == 0.25  # 25% per-part, not the 10% blanket
+    assert line["line_total"] == 1.25
+
+
+def test_rollup_sums_per_line_tariffs_for_a_mixed_order():
+    # One line carries a 25% tariff, the other rides the 10% blanket: the roll-up sums each
+    # line's own tax, so a mixed-tariff order totals correctly.
+    rows = [
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 1.00}], "tariff_rate": 25},  # -> 0.25
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},                     # -> 0.20
+    ]
+    roll = bom_build_rollup(rows, build_qty=1, tax_rate=10)
+    assert roll["subtotal"] == 3.0
+    assert roll["tax_total"] == 0.45  # 0.25 + 0.20, not 3.0 * 10%
+    assert roll["grand_total"] == 3.45
+
+
 def test_price_line_break_optimization_can_be_turned_off():
     ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
     line = price_line_at_build(
