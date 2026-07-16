@@ -6,6 +6,9 @@ import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
+// The interface face, bundled offline (no CDN) so it renders identically inside
+// WebView2 on Windows. Imported before the token sheet, which names it.
+import "@fontsource-variable/work-sans";
 import "./styles/index.css";
 
 // One shared client. Reads are cheap (served from the warm index) so a short

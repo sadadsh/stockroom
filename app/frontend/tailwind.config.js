@@ -40,9 +40,9 @@ export default {
         control: "6px",
       },
       fontFamily: {
-        // DM Sans is the mockup's primary; falls back to Segoe UI (Windows) then
-        // system-ui. If DM Sans is not installed the page still reads correctly.
-        sans: ['"DM Sans"', '"Segoe UI"', "system-ui", "sans-serif"],
+        // Work Sans (bundled offline via @fontsource-variable) is the interface
+        // face; Segoe UI / system-ui only cover a load failure.
+        sans: ['"Work Sans Variable"', '"Segoe UI"', "system-ui", "sans-serif"],
       },
       fontSize: {
         // the mockup's compact desktop scale
@@ -58,8 +58,15 @@ export default {
         tightui: "-0.008em",
       },
       boxShadow: {
+        // Monochrome elevation scale (resting card, lifted/hover, pop layer).
+        card: "var(--shadow-card)",
+        raise: "var(--shadow-raise)",
         pop: "var(--shadow-pop)",
         file: "var(--shadow-file)",
+      },
+      transitionTimingFunction: {
+        // a slight overshoot so presses + hovers feel springy, not linear
+        spring: "var(--ease-spring)",
       },
     },
   },
