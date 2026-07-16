@@ -22,7 +22,9 @@ class WebViewRenderedDomFetcher:
         # app window lazily so the API layer never imports pywebview.
         self._window_provider = window_provider or _default_window
 
-    def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
+    def rendered_html(
+        self, url: str, timeout: float = 20.0, wait_selector: str | None = None
+    ) -> FetchResult:
         window = self._window_provider()
         if window is None:
             # Honest failure, never a silent empty result: an enrich that cannot
@@ -31,8 +33,10 @@ class WebViewRenderedDomFetcher:
         window.load_url(url)
         # wait for the DOM to settle: a load plus a short quiescence. WebView2 does
         # not surface the HTTP status directly, so status is best-effort 200 and the
-        # extraction cascade tolerates a challenge page as an empty result.
-        _wait_for_settle(window, timeout)
+        # extraction cascade tolerates a challenge page as an empty result. wait_selector
+        # holds for a specific element (a distributor's price table, which loads via a LATER
+        # AJAX call than the page shell), so a stable-but-not-yet-priced page is not returned early.
+        _wait_for_settle(window, timeout, wait_selector)
         html = window.evaluate_js("document.documentElement.outerHTML") or ""
         final_url = window.evaluate_js("window.location.href") or url
         return FetchResult(
@@ -84,12 +88,29 @@ def _looks_challenged(window) -> bool:
 _MIN_REAL_TEXT = 400
 
 
-def _wait_for_settle(window, timeout: float) -> None:
+def _has_selector(window, selector: str) -> bool:
+    """True when the live DOM contains an element matching `selector`. Defensive: an
+    evaluate_js failure reads as "present" so a JS quirk never hangs the wait past its
+    real content (the stable-text gate still applies)."""
+    import json as _json
+
+    try:
+        return bool(window.evaluate_js(f"!!document.querySelector({_json.dumps(selector)})"))
+    except Exception:
+        return True
+
+
+def _wait_for_settle(window, timeout: float, wait_selector: str | None = None) -> None:
     """Return once the page has rendered a substantial, stable body of visible text and
     no longer looks like a bot challenge, or the timeout elapses. Waiting past the
     (text-less) challenge is what lets a real browser reach a page an HTTP client is
     403'd from. On timeout we return whatever is there: a still-challenged page extracts
-    to an empty result, surfaced honestly as "nothing came back", never invented data."""
+    to an empty result, surfaced honestly as "nothing came back", never invented data.
+
+    When `wait_selector` is given, the page is not considered settled until that element
+    exists too: a distributor's price table loads via a LATER AJAX call than the shell, so
+    the body text can stabilize while the prices are still absent - returning then would
+    yield a real-but-unpriced page. The stable-text gate still bounds the extra wait."""
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
@@ -102,6 +123,7 @@ def _wait_for_settle(window, timeout: float) -> None:
             and text_len == last
             and text_len >= _MIN_REAL_TEXT
             and not _looks_challenged(window)
+            and (wait_selector is None or _has_selector(window, wait_selector))
         ):
             return
         last = text_len
