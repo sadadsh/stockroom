@@ -1,0 +1,100 @@
+{
+  "category": "Diodes",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.onsemi.com/pub/Collateral/ESD9X3.3ST5G-D.PDF"
+  },
+  "description": "5V 1200W TVS unidirectional diode",
+  "display_name": "ESD9X5.0ST5G",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Diode_SMD",
+    "name": "D_SOD-923",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "esd9x5_0st5g",
+  "manufacturer": "onsemi",
+  "model": null,
+  "mpn": "ESD9X5.0ST5G",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.101,
+          "qty": 10
+        },
+        {
+          "price": 0.054,
+          "qty": 100
+        },
+        {
+          "price": 0.045,
+          "qty": 500
+        },
+        {
+          "price": 0.031,
+          "qty": 1000
+        },
+        {
+          "price": 0.027,
+          "qty": 2500
+        },
+        {
+          "price": 0.025,
+          "qty": 5000
+        },
+        {
+          "price": 0.021,
+          "qty": 8000
+        }
+      ],
+      "stock": 64742,
+      "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "onsemi",
+    "Breakdown Voltage": "6.2 V",
+    "Cd - Diode Capacitance": "65 pF",
+    "Clamping Voltage": "12.3 V",
+    "Factory Pack Quantity: Factory Pack Quantity": "8000",
+    "Ipp - Peak Pulse Current": "8.7 A",
+    "Manufacturer": "onsemi",
+    "Maximum Operating Temperature": "+ 150 C",
+    "Minimum Operating Temperature": "- 55 C",
+    "Number of Channels": "1 Channel",
+    "Packaging": "Reel",
+    "Pd - Power Dissipation": "150 mW",
+    "Polarity": "Unidirectional",
+    "Pppm - Peak Pulse Power Dissipation": "107 W",
+    "Product": "ESD Suppressors",
+    "Product Category": "ESD Protection Diodes / TVS Diodes",
+    "RoHS": "Details",
+    "Series": "ESD9X",
+    "Subcategory": "ESD Protection Diodes / TVS Diodes",
+    "Termination Style": "SMD/SMT",
+    "Unit Weight": "0.001552 oz",
+    "Vesd - Voltage ESD Air Gap": "30 kV",
+    "Vesd - Voltage ESD Contact": "30 kV",
+    "Working Voltage": "5 V"
+  },
+  "symbol": null,
+  "tags": []
+}

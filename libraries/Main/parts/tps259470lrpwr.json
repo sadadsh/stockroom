@@ -1,0 +1,101 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/gpn/tps25947"
+  },
+  "description": "Hot Swap Voltage Controllers",
+  "display_name": "TPS259470L",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_DFN_QFN",
+    "name": "Texas_RPU0010A_VQFN-HR-10_2x2mm_P0.5mm",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "tps259470lrpwr",
+  "manufacturer": "Texas Instruments",
+  "model": null,
+  "mpn": "TPS259470LRPWR",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.71,
+          "qty": 1
+        },
+        {
+          "price": 1.26,
+          "qty": 10
+        },
+        {
+          "price": 1.14,
+          "qty": 25
+        },
+        {
+          "price": 1.01,
+          "qty": 100
+        },
+        {
+          "price": 0.959,
+          "qty": 250
+        },
+        {
+          "price": 0.922,
+          "qty": 500
+        },
+        {
+          "price": 0.917,
+          "qty": 1000
+        },
+        {
+          "price": 0.861,
+          "qty": 3000
+        },
+        {
+          "price": 0.842,
+          "qty": 6000
+        }
+      ],
+      "stock": 5699,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS259470LRPWR",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Texas Instruments",
+    "Current Limit": "500 mA to 6 A",
+    "Development Kit": "TPS25947EVM",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Moisture Sensitive": "Yes",
+    "Mounting Style": "SMD/SMT",
+    "Number of Channels": "1 Channel",
+    "Operating Supply Current": "445 uA",
+    "Packaging": "Reel",
+    "Power Fail Detection": "Yes",
+    "Product": "Controllers & Switches",
+    "Product Category": "Hot Swap Voltage Controllers",
+    "Product Type": "Hot Swap Voltage Controllers",
+    "RoHS": "Details",
+    "Series": "TPS25947",
+    "Subcategory": "PMIC - Power Management ICs",
+    "Supply Voltage - Max": "23 V",
+    "Supply Voltage - Min": "2.7 V"
+  },
+  "symbol": null,
+  "tags": []
+}

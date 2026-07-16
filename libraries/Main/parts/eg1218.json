@@ -1,0 +1,104 @@
+{
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/315/1/EG1218.pdf"
+  },
+  "description": "Slide Switches",
+  "display_name": "EG1218",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SW_EG1218",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "eg1218",
+  "manufacturer": "E-Switch",
+  "model": null,
+  "mpn": "EG1218",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.71,
+          "qty": 1
+        },
+        {
+          "price": 0.617,
+          "qty": 10
+        },
+        {
+          "price": 0.548,
+          "qty": 25
+        },
+        {
+          "price": 0.506,
+          "qty": 100
+        },
+        {
+          "price": 0.475,
+          "qty": 250
+        },
+        {
+          "price": 0.442,
+          "qty": 500
+        },
+        {
+          "price": 0.42,
+          "qty": 1000
+        },
+        {
+          "price": 0.39,
+          "qty": 2000
+        },
+        {
+          "price": 0.376,
+          "qty": 5000
+        }
+      ],
+      "stock": 12328,
+      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "E-Switch",
+    "Contact Form": "SPDT",
+    "Contact Material": "Copper Alloy",
+    "Contact Plating": "Silver",
+    "Current Rating": "200 mA",
+    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "Illuminated": "Non-Illuminated",
+    "Manufacturer": "E-Switch",
+    "Maximum Operating Temperature": "+ 70 C",
+    "Minimum Operating Temperature": "- 20 C",
+    "Mounting Angle": "Straight",
+    "Mounting Style": "Through Hole",
+    "Packaging": "Bulk",
+    "Product Category": "Slide Switches",
+    "Product Type": "Slide Switches",
+    "RoHS": "Details",
+    "Series": "EG12",
+    "Subcategory": "Switches",
+    "Switch Function": "ON - ON",
+    "Termination Style": "PC Pin",
+    "Travel": "2.5 mm",
+    "Type": "Slide Switch",
+    "Unit Weight": "0.011323 oz",
+    "Voltage Rating DC": "30 VDC"
+  },
+  "symbol": null,
+  "tags": []
+}

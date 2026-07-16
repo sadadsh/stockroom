@@ -1,0 +1,100 @@
+{
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://ckswitches.com/media/1422/js.pdf"
+  },
+  "description": "Slide Switches",
+  "display_name": "JS102011SAQN",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Button_Switch_SMD",
+    "name": "SW_SPDT_CK_JS102011SAQN",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "js102011saqn",
+  "manufacturer": "C&K",
+  "model": null,
+  "mpn": "JS102011SAQN",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.84,
+          "qty": 1
+        },
+        {
+          "price": 0.727,
+          "qty": 10
+        },
+        {
+          "price": 0.677,
+          "qty": 25
+        },
+        {
+          "price": 0.604,
+          "qty": 100
+        },
+        {
+          "price": 0.559,
+          "qty": 250
+        },
+        {
+          "price": 0.528,
+          "qty": 500
+        },
+        {
+          "price": 0.468,
+          "qty": 1000
+        },
+        {
+          "price": 0.446,
+          "qty": 2000
+        },
+        {
+          "price": 0.431,
+          "qty": 4000
+        }
+      ],
+      "stock": 6938,
+      "url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Actuator": "Standard",
+    "Brand": "C&K",
+    "Contact Form": "SPDT",
+    "Current Rating": "300 mA",
+    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Illuminated": "Non-Illuminated",
+    "Manufacturer": "C&K Switches",
+    "Mounting Style": "PCB Mount",
+    "Packaging": "Reel",
+    "Product Category": "Slide Switches",
+    "Product Type": "Slide Switches",
+    "RoHS": "Details",
+    "Series": "JS",
+    "Subcategory": "Switches",
+    "Switch Function": "ON - ON",
+    "Termination Style": "SMD/SMT",
+    "Travel": "2 mm",
+    "Type": "Slide",
+    "Unit Weight": "0.014521 oz",
+    "Voltage Rating DC": "6 VDC"
+  },
+  "symbol": null,
+  "tags": []
+}

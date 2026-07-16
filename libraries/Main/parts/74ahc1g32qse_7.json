@@ -1,0 +1,98 @@
+{
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/catalog/specsheets/diod-s-a0011233448-1.pdf"
+  },
+  "description": "Single OR Gate, Low-Voltage CMOS",
+  "display_name": "74AHC1G32QSE-7",
+  "enrichment": {},
+  "footprint": {
+    "lib": "Package_TO_SOT_SMD",
+    "name": "SOT-353_SC-70-5",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "74ahc1g32qse_7",
+  "manufacturer": "Diodes Incorporated",
+  "model": null,
+  "mpn": "74AHC1G32QSE-7",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.14,
+          "qty": 1
+        },
+        {
+          "price": 0.092,
+          "qty": 10
+        },
+        {
+          "price": 0.081,
+          "qty": 25
+        },
+        {
+          "price": 0.069,
+          "qty": 100
+        },
+        {
+          "price": 0.063,
+          "qty": 250
+        },
+        {
+          "price": 0.059,
+          "qty": 500
+        },
+        {
+          "price": 0.056,
+          "qty": 1000
+        },
+        {
+          "price": 0.056,
+          "qty": 3000
+        }
+      ],
+      "stock": 7036,
+      "url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {
+    "Brand": "Diodes Incorporated",
+    "Factory Pack Quantity: Factory Pack Quantity": "3000",
+    "High Level Output Current": "- 8 mA",
+    "Logic Family": "AHC",
+    "Logic Function": "OR",
+    "Low Level Output Current": "8 mA",
+    "Manufacturer": "Diodes Incorporated",
+    "Maximum Operating Temperature": "+ 125 C",
+    "Minimum Operating Temperature": "- 40 C",
+    "Mounting Style": "SMD/SMT",
+    "Number of Gates": "1 Gate",
+    "Number of Input Lines": "2 Input",
+    "Number of Output Lines": "1 Output",
+    "Packaging": "Reel",
+    "Product": "Single-Function Gates",
+    "Product Category": "Logic Gates",
+    "Product Type": "Logic Gates",
+    "Propagation Delay Time": "4.6 ns",
+    "RoHS": "Details",
+    "Subcategory": "Logic ICs",
+    "Supply Voltage - Max": "5.5 V",
+    "Supply Voltage - Min": "2 V"
+  },
+  "symbol": null,
+  "tags": []
+}

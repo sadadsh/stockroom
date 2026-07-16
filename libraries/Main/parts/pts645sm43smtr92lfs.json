@@ -1,0 +1,38 @@
+{
+  "category": "Switches",
+  "datasheet": null,
+  "description": "PTS645",
+  "display_name": "PTS645",
+  "enrichment": {},
+  "footprint": {
+    "lib": "MyFootprints",
+    "name": "SWITCH_43SMTR92LFS",
+    "tool": "kicad"
+  },
+  "hashes": null,
+  "id": "pts645sm43smtr92lfs",
+  "manufacturer": "C&K Switches",
+  "model": null,
+  "mpn": "PTS645SM43SMTR92LFS",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "finale-sauce-bom",
+    "source_url": "https://www.mouser.com/c/?q=PTS645SM43SMTR92LFS"
+  },
+  "purchase": [
+    {
+      "currency": "USD",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [],
+      "stock": null,
+      "url": "https://www.mouser.com/c/?q=PTS645SM43SMTR92LFS",
+      "vendor": "Mouser"
+    }
+  ],
+  "specs": {},
+  "symbol": null,
+  "tags": []
+}
