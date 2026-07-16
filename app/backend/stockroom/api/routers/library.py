@@ -210,6 +210,37 @@ def library_router(require_token) -> APIRouter:
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
 
+    @r.post("/parts/{part_id}/symbol")
+    def attach_symbol(request: Request, part_id: str, body: dict) -> dict:
+        """Attach (or repoint) a symbol REFERENCE on an existing part, tagged with its EDA
+        tool ("kicad" default; "altium" later). Reference-only (a lib_id, no file copied) -
+        the "attach an asset after adding the part" path. 422 if lib/name is missing."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
+        if not name:
+            raise ApiError(422, "a symbol reference needs a name")
+        rec = ctx.ops.attach_symbol(part_id, lib, name, tool=(body.get("tool") or "kicad").strip())
+        ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
+        return rec.to_dict()
+
+    @r.post("/parts/{part_id}/footprint")
+    def attach_footprint(request: Request, part_id: str, body: dict) -> dict:
+        """Attach (or repoint) a footprint REFERENCE on an existing part, tagged with its EDA
+        tool. Reference-only (lib_id, no file copied). 422 if lib/name is missing."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        lib, name = (body.get("lib") or "").strip(), (body.get("name") or "").strip()
+        if not name:
+            raise ApiError(422, "a footprint reference needs a name")
+        rec = ctx.ops.attach_footprint(part_id, lib, name, tool=(body.get("tool") or "kicad").strip())
+        ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
+        return rec.to_dict()
+
     @r.get("/parts/{part_id}/history")
     def part_history(request: Request, part_id: str) -> dict:
         # The per-part timeline: every commit that touched this part's canonical JSON,
