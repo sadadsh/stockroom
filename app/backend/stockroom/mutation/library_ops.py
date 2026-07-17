@@ -37,11 +37,7 @@ from stockroom.mutation.placement import (
     place_footprint,
 )
 from stockroom.mutation.transaction import Transaction
-from stockroom.ingest.describe import (
-    clean_description,
-    clean_display_name,
-    is_placeholder_description,
-)
+from stockroom.ingest.describe import apply_clean_identity
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
 
@@ -312,6 +308,13 @@ class LibraryOps:
             missing = record.missing_fields()
             if missing:
                 raise IncompleteError(missing)
+        # A freshly scraped passive keeps a clean spec-derived name + description instead of
+        # the decoder's raw string or a symbol blurb (same rule as the migration).
+        record.display_name, record.description = apply_clean_identity(
+            record.specs, record.category,
+            display_name=record.display_name, description=record.description,
+            mpn=record.mpn, manufacturer=record.manufacturer,
+        )
         part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
@@ -342,6 +345,12 @@ class LibraryOps:
             missing = record.missing_fields()
             if missing:
                 raise IncompleteError(missing)
+        # A freshly imported/scraped part keeps a clean spec-derived name + description.
+        record.display_name, record.description = apply_clean_identity(
+            record.specs, record.category,
+            display_name=record.display_name, description=record.description,
+            mpn=record.mpn, manufacturer=record.manufacturer,
+        )
         part_id = new_part_id(self.lib.parts_dir, record.mpn or record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
@@ -417,12 +426,18 @@ class LibraryOps:
         for path in sorted(self.lib.parts_dir.glob("*.json")):
             record = PartRecord.loads(path.read_text(encoding="utf-8"))
             change: dict[str, tuple[str, str]] = {}
-            new_name = clean_display_name(record.specs, record.category)
-            if new_name and new_name != record.display_name:
-                change["display_name"] = (record.display_name, new_name)
-            new_desc = clean_description(record.specs, record.category)
-            if new_desc and is_placeholder_description(record.description):
-                change["description"] = (record.description, new_desc)
+            name, desc = apply_clean_identity(
+                record.specs,
+                record.category,
+                display_name=record.display_name,
+                description=record.description,
+                mpn=record.mpn,
+                manufacturer=record.manufacturer,
+            )
+            if name != record.display_name:
+                change["display_name"] = (record.display_name, name)
+            if desc != record.description:
+                change["description"] = (record.description, desc)
             if change:
                 planned.append((path, record, change))
         report = [{"id": r.id, **c} for _p, r, c in planned]
@@ -471,6 +486,23 @@ class LibraryOps:
             record.specs[key] = value
             record.enrichment[key] = EnrichmentField(source=source, confidence=confidence)
             changed = True
+        # When enrichment lands rich specs (a value, a product line), a still-machine name
+        # and a still-placeholder description are rebuilt from them, so a newly scraped part
+        # reads as clean as a migrated one. A clean/custom name + a real description pass
+        # through unchanged (idempotent), so a later pinout-only set_specs never renames.
+        if changed:
+            name, desc = apply_clean_identity(
+                record.specs,
+                record.category,
+                display_name=record.display_name,
+                description=record.description,
+                mpn=record.mpn,
+                manufacturer=record.manufacturer,
+            )
+            if name != record.display_name:
+                record.display_name = name
+            if desc != record.description:
+                record.description = desc
         if not changed:
             return record
         json_path = self.lib.parts_dir / f"{part_id}.json"

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from stockroom.ingest.describe import (
+    apply_clean_identity,
     clean_description,
     clean_display_name,
     format_value,
+    is_machine_name,
     is_placeholder_description,
 )
 
@@ -110,3 +112,39 @@ class TestIsPlaceholderDescription:
         assert not is_placeholder_description("Thick Film Chip Resistor, 1.1 kΩ, 200 mW, 0603")
         assert not is_placeholder_description("Slide Switches")
         assert not is_placeholder_description("Light emitting diode")
+
+
+class TestIsMachineName:
+    def test_a_name_embedding_the_mpn_or_manufacturer_is_machine(self):
+        assert is_machine_name("1.10k 1% 0603 Panasonic ERJ-P03F1101V", "ERJ-P03F1101V", "Panasonic")
+        assert is_machine_name("Conn_01x04_Pin Wurth 61300411121", "61300411121", "Wurth")
+
+    def test_a_clean_or_custom_name_is_not_machine(self):
+        assert not is_machine_name("1.1 kΩ Resistor", "ERJ-P03F1101V", "Panasonic")
+        assert not is_machine_name("My Favourite Part", "ERJ-P03F1101V", "Panasonic")
+
+
+class TestApplyCleanIdentity:
+    def test_new_scraped_passive_gets_clean_name_and_description(self):
+        name, desc = apply_clean_identity(
+            RESISTOR,
+            "Resistors",
+            display_name="1.10k 1% 0603 Panasonic ERJ-P03F1101V",
+            description="Resistor, small symbol",
+            mpn="ERJ-P03F1101V",
+            manufacturer="Panasonic",
+        )
+        assert name == "1.1 kΩ Resistor"
+        assert desc == "Thick Film Chip Resistor, 1.1 kΩ, 200 mW, 0603"
+
+    def test_custom_name_and_real_description_pass_through(self):
+        name, desc = apply_clean_identity(
+            RESISTOR,
+            "Resistors",
+            display_name="My Favourite Resistor",
+            description="A hand-written note",
+            mpn="ERJ-P03F1101V",
+            manufacturer="Panasonic",
+        )
+        assert name == "My Favourite Resistor"
+        assert desc == "A hand-written note"

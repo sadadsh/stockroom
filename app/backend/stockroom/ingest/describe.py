@@ -181,3 +181,43 @@ def is_placeholder_description(desc: str | None) -> bool:
     if re.fullmatch(r"[\d\W]+", text):
         return True
     return False
+
+
+def is_machine_name(name: str, mpn: str = "", manufacturer: str = "") -> bool:
+    """Whether a stored name is a machine-concatenated one, safe to replace: it embeds
+    the MPN or names the manufacturer ("1.10k 1% 0603 Panasonic ERJ-P03F1101V"). A human
+    name ("1.1 kΩ Resistor", "My Favourite Part") embeds neither, so it is left alone."""
+    text = (name or "").lower()
+    if not text:
+        return True
+    if mpn and mpn.lower() in text:
+        return True
+    if manufacturer and re.search(rf"\b{re.escape(manufacturer.lower())}\b", text):
+        return True
+    return False
+
+
+def apply_clean_identity(
+    specs: dict,
+    category: str,
+    *,
+    display_name: str,
+    description: str,
+    mpn: str = "",
+    manufacturer: str = "",
+) -> tuple[str, str]:
+    """The one rule both the migration and new-part ingestion share: replace a machine
+    name with a clean spec-derived one, and a placeholder description with a real one,
+    while leaving anything a human wrote untouched. Returns the (name, description) to
+    persist. Idempotent: a clean name/description passes straight through."""
+    name = display_name
+    if is_machine_name(display_name, mpn, manufacturer):
+        clean = clean_display_name(specs, category)
+        if clean:
+            name = clean
+    desc = description
+    if is_placeholder_description(description):
+        clean = clean_description(specs, category)
+        if clean:
+            desc = clean
+    return name, desc
