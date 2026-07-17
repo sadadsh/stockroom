@@ -37,6 +37,11 @@ from stockroom.mutation.placement import (
     place_footprint,
 )
 from stockroom.mutation.transaction import Transaction
+from stockroom.ingest.describe import (
+    clean_description,
+    clean_display_name,
+    is_placeholder_description,
+)
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
 
@@ -398,6 +403,40 @@ class LibraryOps:
                 txn.track(sym_lib_path)
             txn.commit(f"Edit {part_id}: {field}")
         return record
+
+    def renormalize_descriptions(self, *, dry_run: bool = False) -> list[dict]:
+        """Rebuild machine names + placeholder descriptions from each record's specs (a
+        one-time backfill of a library seeded with concatenated names like "1.10k 1% 0603
+        Panasonic ERJ-P03F1101V" and the KiCad symbol's blurb like "Resistor, small
+        symbol"). A spec-derived name replaces the stored one only when the specs support
+        a clean one; a spec-derived description replaces the stored one only when the
+        stored one is a placeholder. A genuinely custom name/description is left untouched.
+        All changes land in ONE atomic commit, or none. Returns a per-part change report of
+        {id, display_name?: (old, new), description?: (old, new)}."""
+        planned: list[tuple] = []
+        for path in sorted(self.lib.parts_dir.glob("*.json")):
+            record = PartRecord.loads(path.read_text(encoding="utf-8"))
+            change: dict[str, tuple[str, str]] = {}
+            new_name = clean_display_name(record.specs, record.category)
+            if new_name and new_name != record.display_name:
+                change["display_name"] = (record.display_name, new_name)
+            new_desc = clean_description(record.specs, record.category)
+            if new_desc and is_placeholder_description(record.description):
+                change["description"] = (record.description, new_desc)
+            if change:
+                planned.append((path, record, change))
+        report = [{"id": r.id, **c} for _p, r, c in planned]
+        if planned and not dry_run:
+            with Transaction(self.repo) as txn:
+                for path, record, change in planned:
+                    if "display_name" in change:
+                        record.display_name = change["display_name"][1]
+                    if "description" in change:
+                        record.description = change["description"][1]
+                    path.write_text(record.dumps(), encoding="utf-8")
+                    txn.track(path)
+                txn.commit(f"Rebuild {len(planned)} names + descriptions from part specs")
+        return report
 
     def set_specs(self, part_id: str, specs: dict, *, overwrite: bool = False) -> PartRecord:
         """Persist canonical spec data (e.g. the pinout extracted at enrich time) into
