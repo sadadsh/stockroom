@@ -48,3 +48,8 @@ docs/research/
 /.stockroom-enrich-cache/
 /.stockroom-previews/
 .firecrawl/
+
+# Agent tooling: installed skills + SuperDesign workspace (never committed)
+.agents/
+.superdesign/
+/skills-lock.json
