@@ -35,6 +35,16 @@ def test_no_mpn_returns_nothing():
     assert refresh_via_adapters("", [_Adapter("Mouser", True, _priced("X"))]) == []
 
 
+def test_carries_a_lifecycle_only_result_through_the_adapters():
+    # a result with ONLY lifecycle (no mpn/price/stock) must still be surfaced - it feeds the
+    # record's Lifecycle spec. Before _has_data counted lifecycle this was silently dropped.
+    r = EnrichmentResult()
+    r.lifecycle = Sourced("Obsolete", "mouser", "high")
+    out = refresh_via_adapters("X", [_Adapter("Mouser", True, r)])
+    assert [v for v, _ in out] == ["Mouser"]
+    assert out[0][1].lifecycle.value == "Obsolete"
+
+
 def _result(stock=None, lifecycle=None, breaks=(), dk_pn=None):
     r = EnrichmentResult()
     if stock is not None:
@@ -102,3 +112,15 @@ def test_lifecycle_only_result_writes_the_spec_without_a_purchase():
     assert changed is True
     assert rec.specs["Lifecycle"] == "Active"
     assert rec.purchase == []                          # lifecycle alone is not purchase data
+
+
+def test_first_vendor_with_a_lifecycle_wins_even_when_it_matches_the_stored_value():
+    # leader (Mouser) reports "Active" == stored, so nothing changes; a later vendor's disagreeing
+    # lifecycle must NOT override the leader. First-reports-wins, not first-differs-wins.
+    rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X", purchase=[])
+    rec.specs["Lifecycle"] = "Active"
+    changed = apply_procurement_refresh(
+        rec, [("Mouser", _result(lifecycle="Active")),
+              ("DigiKey", _result(lifecycle="Obsolete"))], "T")
+    assert changed is False
+    assert rec.specs["Lifecycle"] == "Active"          # DigiKey never overrode the leader
