@@ -346,6 +346,54 @@ describe("IngestPage — unified Add A Part", () => {
     expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6");
   });
 
+  it("does not merge a just-added part's identity onto a later standalone ZIP", async () => {
+    // The staging merge reads enrich.result, so reset() (run after a passive add) must clear the
+    // lookup too. Otherwise the previous part's identity/specs stay live and get merged onto an
+    // unrelated vendor ZIP browsed afterward - a silent cross-contamination.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
+    mockApi.openJobStream.mockImplementation((jobId: string) =>
+      Promise.resolve(
+        jobId === "e1"
+          ? enrichStream({
+              ...EMPTY_RESULT,
+              mpn: sf("560112116151"),
+              specs: { Resistance: sf("118 Ohms") },
+              add_plan: { kind: "resistor", package: "0603", value: "118 Ohms", tolerance: "1%" },
+            })
+          : resultStream([ZIP_CANDIDATE]),
+      ),
+    );
+    mockApi.passivePreview.mockResolvedValue({
+      status: "ok",
+      record: PASSIVE_RECORD,
+      gaps: [],
+      stock_present: true,
+    });
+    mockApi.passiveAdd.mockResolvedValue(PASSIVE_RECORD);
+    const pick = vi.fn().mockResolvedValue(["C:/dl/STM32.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+
+    // look up + add the passive resistor
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/x",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    await user.click(await screen.findByRole("button", { name: "Add to Components" }));
+    await screen.findByText(/Added 118 Ohm/i); // reset() has run
+
+    // now browse an UNRELATED vendor ZIP (no lookup active): it must stage standalone
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
+    await screen.findByText("Review and Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue(""); // not the resistor's MPN
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
   it("is honest when a link yields nothing addable", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
     mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
