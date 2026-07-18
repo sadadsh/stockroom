@@ -136,6 +136,15 @@ class JobRunner:
         pool.submit(self._drive, job, fn)
         return job.id
 
+    def run_write(self, fn):
+        """Run fn() on the serialized write lane and BLOCK until it returns, propagating its result
+        or exception. Lets a long READ-lane job (a bulk rescan doing slow network lookups) push each
+        individual git commit onto the write lane - so commits stay serialized against every other
+        writer WITHOUT the network I/O ever occupying the single write worker. No deadlock: the read
+        pool and write pool are independent, so a read-lane thread blocking on a write future frees
+        no write capacity it needs."""
+        return self._write_pool.submit(fn).result()
+
     def events(self, job_id: str) -> Iterator[JobEvent]:
         job = self.get(job_id)
         while True:
