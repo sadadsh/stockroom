@@ -23,8 +23,12 @@ class WebViewRenderedDomFetcher:
         self._window_provider = window_provider or _default_window
 
     def rendered_html(
-        self, url: str, timeout: float = 20.0, wait_selector: str | None = None
+        self, url: str, timeout: float = 20.0, wait_selector: str | None = None, on_stage=None
     ) -> FetchResult:
+        # on_stage is accepted for RenderedDomFetcher-protocol conformance (the pipeline passes
+        # it to signal the render phase); WebView2 exposes no navigate->settle boundary to hook,
+        # so it is unused here rather than faked. Present so this fetcher can never TypeError if
+        # wired behind the progress-aware pipeline.
         window = self._window_provider()
         if window is None:
             # Honest failure, never a silent empty result: an enrich that cannot

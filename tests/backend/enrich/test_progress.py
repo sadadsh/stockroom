@@ -138,3 +138,80 @@ def test_enrich_mpn_streams_stages_through_the_walk(tmp_path):
     stages = _stages(events)
     assert "rendering" in stages and "validating" in stages
     assert [e["pct"] for e in events] == sorted(e["pct"] for e in events)  # monotonic
+
+
+# --- review fixes: honest stage labels for the LCSC + Mouser legs -------------
+
+
+class _HitJlc:
+    """A jlcsearch client that returns a real catalogue hit, so LcscSource walks its
+    product-page leg (where the fetch/extract labelling matters)."""
+
+    def __init__(self, product_http):
+        from stockroom.enrich.jlcsearch import JlcHit
+
+        self._hit = JlcHit(mpn="TPS62130RGTR", lcsc="C1234", package="QFN", stock=10)
+        self._product_http = product_http
+
+    def search(self, mpn):
+        return self._hit
+
+
+class _ProductHttp:
+    def __init__(self, html=None, boom=False):
+        self._html = html
+        self._boom = boom
+
+    def get(self, url, referer="", timeout=15.0):
+        from stockroom.enrich.errors import EnrichError
+        from stockroom.enrich.fetch import FetchResult
+
+        if self._boom:
+            raise EnrichError("product page 403")
+        return FetchResult(url, 200, self._html, self._html.encode(), "text/html", url)
+
+
+def _lcsc_source(http):
+    from stockroom.enrich.pipeline import LcscSource
+
+    return LcscSource(http, jlcsearch=_HitJlc(http), limiter=_NoWaitLimiter())
+
+
+def test_lcsc_product_leg_labels_the_fetch_before_the_extract():
+    # The confirmed review bug: the product-page GET was labelled EXTRACTING (pct 80) BEFORE the
+    # network fetch, mislabeling a fetch and pinning the bar high. FETCHING must precede EXTRACTING.
+    html = (FIX / "lcsc_product.html").read_text(encoding="utf-8")
+    events: list[dict] = []
+    _lcsc_source(_ProductHttp(html=html)).enrich("TPS62130RGTR", "ICs", remaining={"mpn"},
+                                                 progress=events.append)
+    stages = _stages(events)
+    assert "extracting" in stages
+    assert stages.index("fetching") < stages.index("extracting")  # fetch labelled before extract
+    # no extracting is emitted before its fetch has been labelled
+    for i, s in enumerate(stages):
+        if s == "extracting":
+            assert "fetching" in stages[:i]
+
+
+def test_lcsc_failed_product_page_never_emits_extracting():
+    # A product page that 403s/times out extracted nothing, so EXTRACTING must NOT fire (it did,
+    # premature at pct 80, before the fix).
+    events: list[dict] = []
+    _lcsc_source(_ProductHttp(boom=True)).enrich("TPS62130RGTR", "ICs", remaining={"mpn"},
+                                                 progress=events.append)
+    assert "extracting" not in _stages(events)  # nothing was extracted, so no such stage
+    assert "fetching" in _stages(events)  # but the fetch attempt was honestly shown
+
+
+def test_mouser_source_emits_fetching_for_its_api_lookup():
+    from stockroom.enrich.pipeline import _MouserSource
+
+    class _Adapter:
+        def lookup(self, mpn):
+            from stockroom.enrich.schema import EnrichmentResult
+
+            return EnrichmentResult(category="ICs")
+
+    events: list[dict] = []
+    _MouserSource(_Adapter()).enrich("STM32F030", "ICs", set(), progress=events.append)
+    assert _stages(events) == ["fetching"]  # the real API round-trip is shown, not silent

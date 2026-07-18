@@ -162,9 +162,13 @@ class LcscSource:
         # product-page leg: the full field set from __NEXT_DATA__.
         if self._limiter is not None:
             self._limiter.acquire()
-        emit(progress, Stage.EXTRACTING, "reading the LCSC page")
+        # The product-page GET is a FETCH; EXTRACTING is only emitted once the page is in hand and
+        # about to be parsed, so a failed/slow fetch is never mislabeled as extraction (and never
+        # pins the bar to 80 for a page that never loaded).
+        emit(progress, Stage.FETCHING, "fetching the LCSC page")
         try:
             page = self._http.get(product_url)
+            emit(progress, Stage.EXTRACTING, "reading the LCSC page")
             product = parse_lcsc_product(page.text)
         except EnrichError:
             return r  # the jlcsearch identity still stands; the page just did not load
@@ -557,12 +561,16 @@ class _MouserSource:
         self._adapter = adapter
         self._limiter = limiter
 
-    def enrich(self, mpn, category, remaining):
+    def enrich(self, mpn, category, remaining, progress=None):
         # Pace the Mouser API path (the exact ban scenario the KiCost limiter exists to
         # prevent). Without this a bulk enrich of many uncached parts fires unthrottled and
         # can trip Mouser's rate cap; the mouser.py docstring's "paced" claim depends on it.
         if self._limiter is not None:
             self._limiter.acquire()
+        # The Mouser API round-trip is real network work; emit FETCHING so the bar reflects the
+        # in-flight lookup instead of freezing at the prior source's pct (every other networked
+        # source emits its stages, so this closes the one remaining silent leg).
+        emit(progress, Stage.FETCHING, "querying Mouser")
         return self._adapter.lookup(mpn)
 
 
