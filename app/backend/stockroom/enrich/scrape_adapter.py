@@ -29,8 +29,12 @@ def _default_engine_factory(cache_dir: Path):
         # Camoufox (genuine-fingerprint Firefox, uBlock disabled) is the render tier: it
         # defeats BOTH Akamai and DataDome on the hardest distributors (Mouser), where
         # patched headless Chromium is hard-blocked. The Scheduler paces per host so the
-        # crawler never self-flags a WAF.
-        browser = await CamoufoxFetcher().start()
+        # crawler never self-flags a WAF. A PERSISTENT profile under the cache dir keeps the
+        # anti-bot clearance cookie across renders/restarts, so a solved challenge is not
+        # re-solved on every request (the re-challenge/throttle spiral).
+        browser = await CamoufoxFetcher(
+            user_data_dir=Path(cache_dir) / "camoufox-profile"
+        ).start()
         return ScrapeEngine(
             cache=ResponseCache(Path(cache_dir)),
             browser=browser,
