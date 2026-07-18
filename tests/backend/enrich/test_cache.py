@@ -122,6 +122,44 @@ def test_put_degrades_to_no_cache_when_a_write_persistently_fails(tmp_path, monk
     assert list(tmp_path.glob(".mpn*.tmp")) == []  # temp cleaned up
 
 
+def test_get_treats_a_non_utf8_body_as_a_miss_and_removes_it(tmp_path):
+    # A corrupt/legacy file with invalid UTF-8 bytes raises UnicodeDecodeError (a ValueError, NOT
+    # an OSError) from read_text. get() must treat it as a miss and drop it, never raise it out
+    # (which would poison the key for the whole TTL, since pipeline.enrich() calls get() unguarded).
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+    key = normalize_mpn("ABC")
+    bad = tmp_path / f"mpn___{key}___1000.json"
+    bad.write_bytes(b"\xff\xfe\x00garbage")
+    assert c.get("ABC") is None
+    assert not bad.exists()
+
+
+def test_put_degrades_to_no_cache_when_the_temp_cannot_be_created(tmp_path, monkeypatch):
+    # An unwritable/full cache dir makes mkstemp raise BEFORE the write. put() must still degrade
+    # to no-cache (its docstring promises exactly this for an unwritable dir), never raise into
+    # the enrich job.
+    import tempfile as _tf
+
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+
+    def denied(*a, **k):
+        raise PermissionError(13, "read-only cache dir")
+
+    monkeypatch.setattr(_tf, "mkstemp", denied)
+    c.put("ABC", {"v": 1})  # must NOT raise
+    assert c.get("ABC") is None
+
+
+def test_get_returns_the_newest_entry_when_an_old_one_lingers(tmp_path):
+    # If _clear cannot remove an old entry (a persistent Windows lock, now swallowed), a newer put
+    # still wins: get() must return the NEWEST stamp, never let a stale older file shadow it.
+    c = TtlCache(tmp_path, ttl=1e9, clock=_Clock())
+    key = normalize_mpn("ABC")
+    (tmp_path / f"mpn___{key}___1000.json").write_text('{"v": 1}', encoding="utf-8")
+    (tmp_path / f"mpn___{key}___1005.json").write_text('{"v": 2}', encoding="utf-8")
+    assert c.get("ABC") == {"v": 2}  # the newest entry, not the older (1000) one
+
+
 def test_get_and_put_never_raise_or_poison_under_concurrency(tmp_path):
     # The parallel read lane runs two enrich jobs for the SAME normalized MPN at once (a bulk
     # import overlapping an Add-A-Part lookup). Unguarded unlinks and a non-atomic write would
