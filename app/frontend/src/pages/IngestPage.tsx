@@ -160,14 +160,29 @@ export function IngestPage() {
     });
   }, [inspect]);
 
+  // When the LAST staged candidate is committed away, tear down the whole part context (like a
+  // passive add) so the just-added part's live lookup cannot contaminate a later ZIP and no
+  // completed job lingers to resurrect. Keyed off staged transitioning NON-EMPTY -> empty; an
+  // inspect that finds nothing (null -> empty) must NOT reset (it shows "No parts found"), hence
+  // the prev-length guard. Reading the transition here (not inside removeStaged) lets removeStaged
+  // use a functional update, so committing several candidates concurrently can never miss the
+  // emptiness check via a stale render-closure.
+  const prevStagedLen = useRef<number | null>(null);
+  useEffect(() => {
+    const wasNonEmpty = (prevStagedLen.current ?? 0) > 0;
+    prevStagedLen.current = staged?.length ?? null;
+    if (staged && staged.length === 0 && wasNonEmpty) reset();
+    // reset is recreated each render; listing it would re-run this on every render. The transition
+    // to empty is the only intended trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
+
   function removeStaged(id: number) {
-    const remaining = (staged ?? []).filter((x) => x.id !== id);
-    // Committing the LAST staged candidate finishes adding this part, so tear the whole part
-    // context down (like a passive add): otherwise the just-added part's lookup stays live and
-    // its identity merges onto an unrelated ZIP browsed next. While candidates remain, keep the
-    // context - they all belong to this same looked-up part.
-    if (remaining.length === 0) reset();
-    else setStaged(remaining);
+    // Functional update: read the LATEST staged, never this render's closure, so committing
+    // several candidates concurrently (each card has its own Add button and async git commit) can
+    // never drop the wrong one or miss the emptiness check. The full teardown fires from the
+    // transition effect above once the list empties.
+    setStaged((s) => (s ? s.filter((x) => x.id !== id) : s));
   }
 
   function reset() {
@@ -178,10 +193,11 @@ export function IngestPage() {
     // Tear down BOTH lifecycles, not just the local mirror. The staging effect merges from
     // enrich.result and keys off job.status, so a stale "done" lookup would contaminate the next
     // ZIP, and a still-"done" ZIP job would let flipping enrich.status done->idle re-fire the
-    // effect and resurrect the just-cleared candidate un-merged. Clearing both leaves a true
-    // blank slate.
+    // effect and resurrect the just-cleared candidate un-merged. Reset a COMPLETED job, but leave
+    // a genuinely in-flight one alone so a native-drag ZIP still inspecting through this teardown
+    // is not silently discarded (it finishes and stages standalone).
     enrich.reset();
-    job.reset();
+    if (job.status !== "running") job.reset();
   }
 
   const busy = job.status === "running";

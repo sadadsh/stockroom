@@ -452,6 +452,50 @@ describe("IngestPage — unified Add A Part", () => {
     delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
 
+  it("commits two staged candidates concurrently without leaving a phantom card", async () => {
+    // Multi-select Browse stages 2+ candidates, each with its own independent Add button and async
+    // git commit. Committing both before the first resolves must not leave a phantom card for an
+    // already-added part or skip the teardown (which would re-open contamination and allow a re-add).
+    // The emptiness decision must read the LATEST staged, not a stale render-closure.
+    const A = { ...ZIP_CANDIDATE, entry_name: "AAA", mpn: "AAA111", display_name: "AAA111" };
+    const B = { ...ZIP_CANDIDATE, entry_name: "BBB", mpn: "BBB222", display_name: "BBB222" };
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
+    mockApi.openJobStream.mockResolvedValue(resultStream([A, B]));
+    let resolveA: (v: PartDetail) => void = () => {};
+    let resolveB: (v: PartDetail) => void = () => {};
+    mockApi.ingestCommit
+      .mockImplementationOnce(() => new Promise((r) => (resolveA = r)))
+      .mockImplementationOnce(() => new Promise((r) => (resolveB = r)));
+    const pick = vi.fn().mockResolvedValue(["C:/dl/two.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
+    await screen.findByText("Review and Add");
+    const addButtons = screen.getAllByRole("button", { name: "Add to Components" });
+    expect(addButtons).toHaveLength(2);
+
+    // commit BOTH before either resolves: both onSuccess closures capture staged = [A, B]
+    await user.click(addButtons[0]);
+    await user.click(addButtons[1]);
+    await act(async () => {
+      resolveA({ id: "a", display_name: "AAA111" } as PartDetail);
+    });
+    await act(async () => {
+      resolveB({ id: "b", display_name: "BBB222" } as PartDetail);
+    });
+
+    await waitFor(() => expect(mockApi.ingestCommit).toHaveBeenCalledTimes(2));
+    // both parts added -> the staging area is fully torn down, no phantom card lingers
+    await waitFor(() =>
+      expect(screen.queryByText("Review and Add")).not.toBeInTheDocument(),
+    );
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
   it("is honest when a link yields nothing addable", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
     mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
