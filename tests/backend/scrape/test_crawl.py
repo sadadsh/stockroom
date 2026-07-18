@@ -45,6 +45,33 @@ def test_crawl_respects_max_pages(tmp_path):
     assert len(results) <= 2
 
 
+def test_crawl_follows_same_host_links_when_seed_has_a_port(tmp_path):
+    # Regression: the scope host was bound from the seed's netloc (WITH port) but
+    # Scope.allows compares the bare hostname (NO port), so a ported seed matched
+    # nothing - the seed itself was rejected out-of-scope and the crawl returned [].
+    pages = {
+        "https://ex.com:8443/": ('<html><body><h1>Home</h1>'
+                                 '<a href="https://ex.com:8443/a">a</a></body></html>'),
+        "https://ex.com:8443/a": ('<html><body><h1>A page</h1>' + ("word " * 50)
+                                  + '</body></html>'),
+    }
+    br = _GraphBrowser(pages)
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path), browser=br)
+    results = asyncio.run(engine.crawl("https://ex.com:8443/", Scope(max_pages=5, max_depth=3)))
+    urls = sorted(r.page.url for r in results)
+    assert urls == ["https://ex.com:8443/", "https://ex.com:8443/a"]
+
+
+def test_crawl_does_not_mutate_the_caller_scope(tmp_path):
+    # Binding the seed host must not scribble on the caller's Scope: a Scope reused
+    # across crawls of different hosts would otherwise stay pinned to the first host.
+    br = _GraphBrowser(_pages())
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path), browser=br)
+    scope = Scope(max_pages=5, max_depth=3)
+    asyncio.run(engine.crawl("https://ex.com/", scope))
+    assert scope.host is None
+
+
 def test_crawl_of_a_dead_seed_returns_empty(tmp_path):
     # a seed that fails to fetch must not hang or raise; the crawl just yields nothing.
     class _Dead:

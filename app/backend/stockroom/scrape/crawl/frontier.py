@@ -36,6 +36,14 @@ def canonical_url(url: str) -> str:
     return urlunsplit((scheme, netloc, path, query, ""))
 
 
+def scope_host(url: str) -> str:
+    """The host used for same-host scope decisions: the bare hostname, lowercased, WITHOUT
+    port or userinfo. Seed binding and Scope.allows MUST share this basis - deriving the
+    scope host from the netloc (with port) while allows() compares the hostname made a
+    ported seed reject its own host and crawl nothing."""
+    return (urlsplit(url).hostname or "").lower()
+
+
 @dataclass
 class Scope:
     host: str | None = None
@@ -48,7 +56,7 @@ class Scope:
         if depth > self.max_depth:
             return False
         parts = urlsplit(url)
-        if self.same_host and self.host and (parts.hostname or "").lower() != self.host.lower():
+        if self.same_host and self.host and scope_host(url) != self.host.lower():
             return False
         if self.path_prefix and not (parts.path or "/").startswith(self.path_prefix):
             return False
