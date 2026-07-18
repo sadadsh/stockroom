@@ -72,6 +72,11 @@ export function mountModelScene(
         else old?.dispose();
         mesh.material = neutral;
       });
+      // KiCad/STEP models are authored Z-up; three.js is Y-up, so an unrotated model renders
+      // lying on its side. Rotate it upright before framing, so the auto-spin turns it about
+      // its own vertical axis.
+      gltf.scene.rotation.x = -Math.PI / 2;
+      gltf.scene.updateMatrixWorld(true);
       // frame the model: center it on the origin and back the camera off to fit. Use the
       // bounding-SPHERE radius (half the box diagonal) so the model never clips at any
       // auto-rotate angle, then place the camera along a fixed 3/4 view direction at just

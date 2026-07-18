@@ -8,7 +8,6 @@
 import type { ReactNode } from "react";
 import { usePreviewSvg } from "../api/queries";
 import { useObjectUrl } from "../lib/useObjectUrl";
-import { useTheme } from "../lib/theme";
 
 export function PreviewImage({
   kind,
@@ -20,7 +19,6 @@ export function PreviewImage({
   fallback: ReactNode;
 }) {
   const query = usePreviewSvg(kind, partId);
-  const { theme } = useTheme();
   const url = useObjectUrl(query.data);
 
   if (query.isError || (!query.isLoading && !url)) {
@@ -42,7 +40,10 @@ export function PreviewImage({
       className={
         "h-full w-full object-contain " + (kind === "footprint" ? "p-10" : "p-3")
       }
-      style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
+      // The KiCad SVGs are black line-art; invert(0.66) turns black -> the SAME neutral gray
+      // (~#a8a8ac) the 3D model renders in, so the symbol / footprint / 3D read as one set on
+      // both themes (a mid gray shows on the light card AND the dark card).
+      style={{ filter: "invert(0.66)" }}
     />
   );
 }
