@@ -11,6 +11,7 @@ start lazily on the first render, so merely constructing the fetcher is cheap.""
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from stockroom.enrich.fetch import FetchResult
@@ -42,14 +43,20 @@ class EngineRenderedDomFetcher:
         self._runtime = runtime
         self._cache_dir = Path(cache_dir) if cache_dir is not None else Path(".scrape-cache")
         self._started = False
+        # The app shares one fetcher across CONCURRENT enrich requests (FastAPI threadpool),
+        # so the lazy start must be serialized or two threads could double-start the runtime.
+        self._lock = threading.Lock()
 
     def _ensure(self) -> ScrapeRuntime:
-        if self._runtime is None:
-            self._runtime = ScrapeRuntime(engine_factory=_default_engine_factory(self._cache_dir))
-        if not self._started:
-            self._runtime.start()
-            self._started = True
-        return self._runtime
+        with self._lock:
+            if self._runtime is None:
+                self._runtime = ScrapeRuntime(
+                    engine_factory=_default_engine_factory(self._cache_dir)
+                )
+            if not self._started:
+                self._runtime.start()
+                self._started = True
+            return self._runtime
 
     def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
         try:
