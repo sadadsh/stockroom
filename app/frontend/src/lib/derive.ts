@@ -40,11 +40,52 @@ function normalizedSpecMap(specs: Record<string, unknown>): Map<string, string> 
   return map;
 }
 
-// The first presentable, non-hidden spec value in insertion order, or null when the bag
-// holds nothing usable. The generic title fallback leans on this.
-function firstMeaningfulValue(specs: Record<string, unknown>): string | null {
+// Spec keys that describe commerce, provenance, or compliance rather than what the part IS.
+// The generic first-spec title fallback must never headline one of these: specs arrive
+// alphabetically, so "Assembly Country of Origin: China" lands first and would otherwise
+// become the masthead ("China Connector"). Normalized at load so a raw key of any casing
+// or punctuation matches. This is a denylist, not an allowlist: a real defining spec the
+// list does not name still headlines, so a new junk key is one line here, never a code change.
+const TITLE_SKIP_KEYS: Set<string> = new Set(
+  [
+    "Country of Origin",
+    "Assembly Country of Origin",
+    "Country of Diffusion",
+    "Brand",
+    "Manufacturer",
+    "Series",
+    "Color",
+    "Colour",
+    "ECCN",
+    "HTS Code",
+    "Part Status",
+    "Lifecycle Status",
+    "Lifecycle",
+    "RoHS",
+    "RoHS Status",
+    "REACH",
+    "REACH Status",
+    "Moisture Sensitivity Level",
+    "Factory Pack Quantity",
+    "Standard Pack Quantity",
+    "Packaging",
+    "Flammability Rating",
+    "Product Type",
+    "Product Category",
+    "Subcategory",
+    "Contact Material",
+    "Contact Plating",
+  ].map(normalizeSpecKey),
+);
+
+// The first presentable, non-hidden, DEFINING spec value in insertion order (commerce /
+// provenance / compliance keys in TITLE_SKIP_KEYS are skipped so a country or brand can
+// never headline), or null when the bag holds nothing usable. The generic title fallback
+// leans on this.
+function firstDefiningValue(specs: Record<string, unknown>): string | null {
   for (const [key, value] of Object.entries(specs)) {
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
+    if (TITLE_SKIP_KEYS.has(normalizeSpecKey(key))) continue;
     if (!isPresentable(value)) continue;
     return String(value).trim();
   }
@@ -71,7 +112,7 @@ const TITLE_REGISTRY: TitleRule[] = [
   { match: "ferrite beads", noun: "Ferrite Bead", specs: ["Impedance", "Current Rating"] },
   { match: "diodes", noun: "Diode", specs: ["Voltage Rating", "Current"] },
   { match: "leds", noun: "LED", specs: ["Color", "Wavelength"] },
-  { match: "connectors", noun: "Connector", specs: ["Number of Positions", "Pitch"] },
+  { match: "connectors", noun: "Connector", specs: ["Number of Positions", "Number of Contacts", "Pitch"] },
   { match: "ics", noun: "IC", specs: [] },
   { match: "integrated circuits", noun: "IC", specs: [] },
 ];
@@ -125,7 +166,7 @@ export function deriveTitle(part: PartDetail): string {
   // A registered category with none of its title specs, or any unregistered category,
   // still earns a sane headline from the first meaningful spec + the noun.
   if (values.length === 0) {
-    const first = firstMeaningfulValue(part.specs);
+    const first = firstDefiningValue(part.specs);
     if (first) values.push(first);
   }
 
