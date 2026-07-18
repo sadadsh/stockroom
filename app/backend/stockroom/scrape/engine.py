@@ -40,6 +40,16 @@ class ScrapeEngine:
         # per-host breaker. Optional; with none the engine is un-governed (S1-S3 behavior).
         self._scheduler = scheduler
 
+    async def aclose(self) -> None:
+        """Close the owned browser tier (called by ScrapeRuntime teardown). Never raises."""
+        browser = self._browser
+        aclose = getattr(browser, "aclose", None)
+        if callable(aclose):
+            try:
+                await aclose()
+            except Exception:  # noqa: BLE001 - teardown never raises
+                pass
+
     def _cached(self, url: str) -> Page | None:
         if self._cache is None:
             return None
