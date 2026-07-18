@@ -24,9 +24,13 @@ def _default_engine_factory(cache_dir: Path):
         from stockroom.scrape.cache.store import ResponseCache
         from stockroom.scrape.crawl.scheduler import Scheduler
         from stockroom.scrape.engine import ScrapeEngine
-        from stockroom.scrape.fetch.browser import BrowserFetcher
+        from stockroom.scrape.fetch.camoufox_browser import CamoufoxFetcher
 
-        browser = await BrowserFetcher().start()
+        # Camoufox (genuine-fingerprint Firefox, uBlock disabled) is the render tier: it
+        # defeats BOTH Akamai and DataDome on the hardest distributors (Mouser), where
+        # patched headless Chromium is hard-blocked. The Scheduler paces per host so the
+        # crawler never self-flags a WAF.
+        browser = await CamoufoxFetcher().start()
         return ScrapeEngine(
             cache=ResponseCache(Path(cache_dir)),
             browser=browser,

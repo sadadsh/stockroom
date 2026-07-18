@@ -10,7 +10,9 @@ dependencies = [
     # backend library (not a GUI toolkit), driven headless as a subprocess, so it runs
     # identically on Windows/macOS/Linux/CI and keeps the stockroom.api import gate green.
     # Chromium is provisioned by `playwright install chromium` (bundled into the exe in S7).
-    "playwright>=1.61",
+    # Playwright drives BOTH the Chromium BrowserFetcher and Camoufox; camoufox constrains
+    # it to <1.61, and the async API we use is stable across 1.60/1.61.
+    "playwright>=1.55,<1.61",
     "pypdf>=4.0",
     "fastapi>=0.111",
     "uvicorn>=0.30",
@@ -27,6 +29,10 @@ dependencies = [
     # the launcher's windowed entry can actually open a window (not ModuleNotFoundError).
     "pywebview>=5 ; sys_platform == 'win32'",
     "selectolax>=0.4.11",
+    # The maximum-stealth render tier (stockroom.scrape.fetch.camoufox_browser): a Firefox
+    # fork with genuine fingerprints that defeats Akamai AND DataDome (Mouser) where patched
+    # Chromium is hard-blocked. Its browser build is provisioned by `camoufox fetch`.
+    "camoufox[geoip]>=0.5.4",
 ]
 
 [dependency-groups]
