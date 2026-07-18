@@ -138,6 +138,48 @@ def test_a_brand_new_spec_key_yields_a_facet_with_no_code_change(spec_client, tm
     assert facets["Whimsy Factor"]["options"] == [{"value": "Sparkly", "count": 1}]
 
 
+def _part_ids(body):
+    return {p["id"] for p in body["parts"]}
+
+
+def test_spec_filter_options_narrows_the_parts_list(spec_client):
+    # Dielectric:X7R is carried only by the capacitor
+    r = spec_client.get("/api/library/parts", params={"spec": "Dielectric:X7R"})
+    assert r.status_code == 200
+    body = r.json()
+    assert _part_ids(body) == {"c1"}
+    assert body["count"] == 1
+
+
+def test_spec_filter_range_narrows_by_normalized_magnitude(spec_client):
+    # 5k..20k keeps r1 (10 kΩ), drops r2 (1 kΩ); SI prefixes normalized like the facet
+    r = spec_client.get(
+        "/api/library/parts",
+        params={"category": "Resistors", "spec": "Resistance:5000~20000"},
+    )
+    assert _part_ids(r.json()) == {"r1"}
+
+
+def test_spec_filter_ands_multiple_keys(spec_client):
+    # a resistance band AND a tolerance band: only r1 (10 kΩ, 1%) satisfies both
+    r = spec_client.get(
+        "/api/library/parts",
+        params={"category": "Resistors", "spec": ["Resistance:5000~20000", "Tolerance:0~2"]},
+    )
+    assert _part_ids(r.json()) == {"r1"}
+
+
+def test_no_spec_filter_returns_every_part(spec_client):
+    r = spec_client.get("/api/library/parts")
+    assert r.json()["count"] == 3
+
+
+def test_a_malformed_spec_token_is_ignored_not_500(spec_client):
+    r = spec_client.get("/api/library/parts", params={"spec": "garbage-no-colon"})
+    assert r.status_code == 200
+    assert r.json()["count"] == 3
+
+
 def test_parametric_facets_require_a_token(tmp_path):
     from fastapi.testclient import TestClient
 

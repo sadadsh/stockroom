@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # SI decimal prefixes. A prefix only applies when a base unit follows it, so a bare
 # ``"m"`` reads as metres (unit), never milli, and ``"k"`` alone is not a magnitude.
@@ -131,6 +131,94 @@ def _build_facet(key: str, values: list) -> ParametricFacet:
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     options = [FacetOption(value=val, count=n) for val, n in ranked[:_TOP_N]]
     return ParametricFacet(key=key, label=key, kind="options", count=len(values), options=options)
+
+
+# --- the server-side spec filter --------------------------------------------
+#
+# The facets above tell the UI which dimensions exist; a SpecConstraint is how a selection
+# narrows the parts list. The filter must AGREE with the facet it came from: option values
+# compare as text (the options facet), a numeric range compares SI-normalized magnitudes via
+# the SAME _parse_numeric as the range facet, so a checkbox never disagrees with the list it
+# produces.
+
+
+@dataclass
+class SpecConstraint:
+    """One parsed filter on a spec key: an OR-set of option values and/or a numeric range.
+    A record must satisfy EVERY constraint (AND across keys); within a key the option values
+    OR together. A bound of ``None`` is open on that side."""
+
+    key: str
+    values: list[str] = field(default_factory=list)
+    min: float | None = None
+    max: float | None = None
+
+
+def _to_bound(text: str) -> float | None:
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def parse_spec_filters(tokens) -> list[SpecConstraint]:
+    """Parse ``["Dielectric:X7R", "Resistance:1000~10000"]`` into one SpecConstraint per key.
+    A token is ``"<key>:<value>"`` (an option) or ``"<key>:<min>~<max>"`` (a range; either
+    bound may be blank for open-ended). Repeated keys merge: option values OR together, a
+    range sets that key's bounds. A malformed token is skipped, never raised - the filter is
+    fed from a URL, so garbage must degrade to no-constraint, not a 500."""
+    by_key: dict[str, SpecConstraint] = {}
+    for token in tokens:
+        if not isinstance(token, str) or ":" not in token:
+            continue
+        raw_key, rest = token.split(":", 1)
+        key = raw_key.strip()
+        rest = rest.strip()
+        if not key or not rest:
+            continue
+        c = by_key.setdefault(key, SpecConstraint(key=key))
+        if "~" in rest:
+            lo, hi = rest.split("~", 1)
+            lo_b, hi_b = _to_bound(lo), _to_bound(hi)
+            if lo_b is not None:
+                c.min = lo_b
+            if hi_b is not None:
+                c.max = hi_b
+        else:
+            c.values.append(rest)
+    return list(by_key.values())
+
+
+def _specs_match(specs: dict, constraints: list[SpecConstraint]) -> bool:
+    for c in constraints:
+        value = specs.get(c.key)
+        if not _is_scalar(value):
+            return False  # a constraint on a spec the record lacks excludes it
+        if c.values:
+            text = value if isinstance(value, str) else str(value)
+            if text not in c.values:
+                return False
+        if c.min is not None or c.max is not None:
+            parsed = _parse_numeric(value)
+            if parsed is None:
+                return False  # a numeric range on a non-numeric value never matches
+            mag, _ = parsed
+            if c.min is not None and mag < c.min:
+                return False
+            if c.max is not None and mag > c.max:
+                return False
+    return True
+
+
+def matches_spec_filters(record, constraints: list[SpecConstraint]) -> bool:
+    """True when ``record`` satisfies EVERY constraint. No constraints -> a vacuous True, so
+    an unfiltered search keeps every record. Reads ``record.specs`` (the open bag)."""
+    if not constraints:
+        return True
+    return _specs_match(record.specs or {}, constraints)
 
 
 def aggregate_parametric(records, category: str | None = None) -> ParametricFacets:
