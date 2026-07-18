@@ -64,6 +64,19 @@ class ScrapeRuntime:
         try:
             self._loop.run_forever()
         finally:
+            # Cancel any in-flight tasks BEFORE closing the loop so their chained concurrent
+            # Futures resolve (as CancelledError) and unblock callers parked in run().result();
+            # a task destroyed while still pending would leave its caller hung forever.
+            try:
+                pending = [t for t in asyncio.all_tasks(self._loop) if not t.done()]
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    self._loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+            except Exception:  # noqa: BLE001
+                pass
             try:
                 self._loop.run_until_complete(self._teardown())
             except Exception:  # noqa: BLE001 - teardown must never raise

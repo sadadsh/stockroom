@@ -16,6 +16,7 @@ from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
+from stockroom.scrape.validate import validate_product
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry
@@ -237,7 +238,10 @@ class ScrapeSource:
         url = self._url_for(mpn, category)
         self._limiter.acquire()
         page = self._fetcher.rendered_html(url)
-        result = extract_all(page.text, page.final_url or url, self._site_extractors)
+        # No-bad-data gate (spec section 7): drop any malformed field the scrape surfaced
+        # (bad MPN charset, negative stock, non-URL datasheet/product link, non-monotonic
+        # price ladder) before it ever reaches a record.
+        result = validate_product(extract_all(page.text, page.final_url or url, self._site_extractors))
         # record the product URL so the pipeline can build a Purchase link
         if page.final_url or url:
             result.specs.setdefault(
@@ -348,7 +352,7 @@ class EnrichmentPipeline:
             page = self.fetcher.rendered_html(url)
         except (EnrichError, OSError):
             return candidate  # a dead purchase link never blocks the fill
-        result = extract_all(page.text, page.final_url or url, SITE_EXTRACTORS)
+        result = validate_product(extract_all(page.text, page.final_url or url, SITE_EXTRACTORS))
 
         for field_name, attr in _CANDIDATE_FIELDS.items():
             sourced = getattr(result, field_name)
@@ -401,7 +405,7 @@ class EnrichmentPipeline:
             page = self.fetcher.rendered_html(url)
         except (EnrichError, OSError):
             return EnrichmentResult()
-        result = extract_all(page.text, page.final_url or url, SITE_EXTRACTORS)
+        result = validate_product(extract_all(page.text, page.final_url or url, SITE_EXTRACTORS))
         if page.final_url or url:
             result.specs.setdefault(
                 "product_url", Sourced(page.final_url or url, "scrape", "medium")
