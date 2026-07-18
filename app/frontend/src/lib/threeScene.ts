@@ -56,6 +56,22 @@ export function mountModelScene(
     "",
     (gltf) => {
       root.add(gltf.scene);
+      // Render every part in ONE neutral surface (the app's 3D renders are monochrome - no
+      // per-material colour), so a model reads by its lit form, not by the GLB's arbitrary
+      // colour. Disposed with the scene below (all meshes share this one material).
+      const neutral = new THREE.MeshStandardMaterial({
+        color: 0xa8a8ac,
+        roughness: 0.62,
+        metalness: 0.08,
+      });
+      gltf.scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const old = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(old)) old.forEach((m) => m.dispose());
+        else old?.dispose();
+        mesh.material = neutral;
+      });
       // frame the model: center it on the origin and back the camera off to fit. Use the
       // bounding-SPHERE radius (half the box diagonal) so the model never clips at any
       // auto-rotate angle, then place the camera along a fixed 3/4 view direction at just

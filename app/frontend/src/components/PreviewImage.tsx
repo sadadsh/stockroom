@@ -35,9 +35,13 @@ export function PreviewImage({
       src={url}
       alt={`${kind} preview`}
       draggable={false}
-      // Fill the tile (whatever its size) and object-contain so the small-intrinsic KiCad
-      // SVG upscales to the frame without clipping; a little padding keeps it off the edges.
-      className="h-full w-full object-contain p-3"
+      // Fit-to-box and object-contain so the small-intrinsic KiCad SVG upscales without
+      // clipping. A footprint's bounding box is TIGHT (courtyard hugs the pads), so it would
+      // otherwise fill the whole tile - give it generous padding so it sits centered with
+      // breathing room; a symbol already carries its own whitespace, so it needs less.
+      className={
+        "h-full w-full object-contain " + (kind === "footprint" ? "p-10" : "p-3")
+      }
       style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
     />
   );
