@@ -939,52 +939,44 @@ function AttachAssetModal({
 
 // B2 progressive disclosure: a deep part can carry ~28 specs; show the first (most important,
 // insertion-ordered) ones and let the rest expand, so the section is scannable, not a wall.
-const SPEC_COLLAPSE_AT = 12;
-
 function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: number }) {
-  const [showAll, setShowAll] = useState(false);
-  const collapsible = count > SPEC_COLLAPSE_AT;
-  // Flatten to one ordered list (groups already come in Electrical -> Physical -> Ratings ->
-  // Other order) so the collapse counts rows across groups; each row carries its group title so
-  // the group eyebrow prints once, before that group's first shown row.
+  // One ordered list (groups already come Electrical -> Physical -> Ratings -> Other); each
+  // row carries its group so the group eyebrow prints once, before that group's first row.
+  // ALL specs render at once (north-star: the datasheet block is never collapsed).
   const flat = groups.flatMap((g) => g.rows.map((r) => ({ ...r, group: g.title })));
-  const shown = showAll || !collapsible ? flat : flat.slice(0, SPEC_COLLAPSE_AT);
   return (
     <>
-      <SectionLabel>
-        Specifications <span className="ml-0.5 font-mono text-t3">({count})</span>
-      </SectionLabel>
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[15px] font-semibold tracking-[-0.014em] text-t1">
+          Specifications
+        </span>
+        <span className="tnum font-mono text-xs text-t3">{count}</span>
+      </div>
       {/* a datasheet parameter block: two aligned columns, values in the mono readout face with
           tabular figures, sectioned by a full-width group eyebrow (Electrical / Physical / ...). */}
-      <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-10">
-        {shown.map((row, i) => {
-          const firstOfGroup = i === 0 || shown[i - 1].group !== row.group;
+      <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-6">
+        {flat.map((row, i) => {
+          const firstOfGroup = i === 0 || flat[i - 1].group !== row.group;
           return (
             <Fragment key={row.key}>
               {firstOfGroup ? (
-                <div className="px-1.5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-t3 first:pt-1 sm:col-span-2">
+                <div className="px-0.5 pb-1.5 pt-4 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5 sm:col-span-2">
                   {row.group}
                 </div>
               ) : null}
-              <div className="flex items-baseline justify-between gap-4 px-1.5 py-[7px]">
-                <span className="text-sm text-t3">{row.label}</span>
-                <span className="tnum font-mono text-sm text-t1 text-right">
+              {/* label over value (stacked): the scraped values run long ("0.45 mm (0.018
+                  in)", "Automotive Grade"), so a side-by-side row pushed them off the card;
+                  stacking gives the value the full column width and it wraps in place. */}
+              <div className="min-w-0 border-b border-line px-0.5 py-2">
+                <div className="text-[11px] text-t3">{row.label}</div>
+                <div className="tnum mt-0.5 break-words font-mono text-[13px] leading-snug text-t1">
                   {row.unit ? `${row.value} ${row.unit}` : row.value}
-                </span>
+                </div>
               </div>
             </Fragment>
           );
         })}
       </div>
-      {collapsible ? (
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          className="mt-2.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
-        >
-          {showAll ? "Show Fewer" : `Show All ${count}`}
-        </button>
-      ) : null}
     </>
   );
 }

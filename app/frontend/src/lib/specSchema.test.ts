@@ -4,6 +4,7 @@ import {
   groupSpecs,
   normalizeSpecKey,
   splitValueUnit,
+  prettifyValue,
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
 } from "./specSchema";
@@ -14,6 +15,27 @@ describe("normalizeSpecKey", () => {
     expect(normalizeSpecKey("voltage_rating")).toBe("voltage rating");
     expect(normalizeSpecKey("Voltage / Rating")).toBe("voltage rating");
     expect(normalizeSpecKey("  Resistance  ")).toBe("resistance");
+  });
+});
+
+describe("prettifyValue", () => {
+  it("substitutes the real unit symbols (Ohm -> Ω, micro u -> µ, PPM -> ppm)", () => {
+    expect(prettifyValue("1.1 kOhms")).toBe("1.1 kΩ");
+    expect(prettifyValue("100 Ohm")).toBe("100 Ω");
+    expect(prettifyValue("0.1 uF")).toBe("0.1 µF");
+    expect(prettifyValue("100 PPM/C")).toBe("100 ppm/°C");
+  });
+
+  it("cleans a stray unary-sign space and a bare Celsius C", () => {
+    expect(prettifyValue("+ 155 C")).toBe("+155 °C");
+    expect(prettifyValue("125 C")).toBe("125 °C");
+  });
+
+  it("never mangles a bare code or a part number (no accidental substitutions)", () => {
+    expect(prettifyValue("0603")).toBe("0603");
+    expect(prettifyValue("0603C")).toBe("0603C"); // no space before C -> not a temperature
+    expect(prettifyValue("Automotive Grade")).toBe("Automotive Grade");
+    expect(prettifyValue("ERJ-P03F1101V")).toBe("ERJ-P03F1101V");
   });
 });
 

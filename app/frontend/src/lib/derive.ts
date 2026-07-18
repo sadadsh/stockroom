@@ -12,7 +12,7 @@
  * so every consumer treats the same values as real.
  */
 import type { PartDetail } from "../api/types";
-import { EMPTY_SPEC_VALUES, SPEC_HIDDEN_KEYS, normalizeSpecKey } from "./specSchema";
+import { EMPTY_SPEC_VALUES, SPEC_HIDDEN_KEYS, normalizeSpecKey, prettifyValue } from "./specSchema";
 
 // --- shared spec-bag helpers -------------------------------------------------
 
@@ -171,7 +171,7 @@ export function deriveTitle(part: PartDetail): string {
   }
 
   if (values.length > 0) {
-    const lead = values.join(" ");
+    const lead = prettifyValue(values.join(" "));
     return noun ? `${lead} ${noun}` : lead;
   }
   // Nothing usable in the specs: the raw name is the honest last resort, then the category,
