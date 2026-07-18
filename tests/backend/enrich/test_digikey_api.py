@@ -102,6 +102,15 @@ def test_lookup_never_raises_on_requester_failure_or_empty():
     assert DigiKeyAdapter("id", "s", requester=lambda m: {"Products": []}).lookup("X").mpn is None
 
 
+def test_lookup_never_raises_on_a_non_dict_products_entry():
+    # a garbled API response with non-dict Products entries must not raise (never-raises constraint)
+    body = {"Products": ["error", None, {"ManufacturerProductNumber": "X"}]}
+    r = DigiKeyAdapter("id", "s", requester=lambda m: body).lookup("X")
+    assert r.mpn.value == "X"                       # the real dict entry is still found
+    r2 = DigiKeyAdapter("id", "s", requester=lambda m: {"Products": ["x", None]}).lookup("X")
+    assert r2 is not None and r2.mpn is None        # all-garbage degrades to empty, not a crash
+
+
 class _Resp(io.BytesIO):
     def __enter__(self):
         return self

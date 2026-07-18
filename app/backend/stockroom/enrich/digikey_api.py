@@ -92,7 +92,7 @@ def _coerce_price(raw) -> float | None:
 
 def _obj_str(v, *keys: str) -> str:
     """A v4 field that may be a nested object OR a bare string -> a clean string. For an object,
-    the first present key wins; a non-str/dict is dropped."""
+    the first non-empty key wins; a non-str/dict is dropped."""
     if isinstance(v, str):
         return v.strip()
     if isinstance(v, dict):
@@ -194,7 +194,8 @@ class DigiKeyAdapter:
         target = normalize_mpn(mpn)
         exact = next(
             (p for p in products
-             if normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
+             if isinstance(p, dict)
+             and normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
             None,
         )
         chosen = exact if exact is not None else products[0]
