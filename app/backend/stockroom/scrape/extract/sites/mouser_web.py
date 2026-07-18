@@ -247,14 +247,37 @@ def _extract_lead_time(html: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+# Two-level public suffixes Mouser's regional storefronts sit under, so "mouser" is read as the
+# registrable-domain label rather than a bare subdomain (mouser.co.il -> registrable mouser.co.il,
+# not co.il). Single-level TLDs (.com/.de/.fr/...) need no entry. A regional TLD absent here just
+# fails to auto-claim (a safe miss), never a false claim on a foreign host.
+_TWO_LEVEL_SUFFIXES = frozenset({
+    "co.il", "co.uk", "co.jp", "co.kr", "co.in", "co.za", "co.nz", "co.th",
+    "com.cn", "com.mx", "com.tw", "com.br", "com.sg", "com.au", "com.hk", "com.my",
+})
+
+
+def _registrable_domain(host: str) -> str:
+    """The registrable domain (eTLD+1) of a hostname, honoring the two-level ccTLDs Mouser uses,
+    so mouser.co.il -> 'mouser.co.il' while mouser.blogspot.com -> 'blogspot.com'."""
+    parts = host.split(".")
+    if len(parts) >= 3 and ".".join(parts[-2:]) in _TWO_LEVEL_SUFFIXES:
+        return ".".join(parts[-3:])
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
 class MouserWebSite:
     def matches(self, url: str) -> bool:
         # Any Mouser storefront TLD (mouser.com, mouser.co.il, mouser.de, ...) serves the SAME
-        # product page, so all of them get the full parametric/compliance extractor. Match
-        # "mouser" as a domain LABEL (preceded by start-or-dot) on the hostname alone, so a host
-        # like "notmouser.com" or a "/mouser." path segment never false-claims.
-        host = urlparse(url).hostname or url
-        return bool(re.search(r"(^|\.)mouser\.", host.lower()))
+        # product page, so all of them get the full parametric/compliance extractor. Claim ONLY
+        # when "mouser" is the REGISTRABLE domain (not merely a DNS label): mouser.blogspot.com /
+        # mouser.evil.com are foreign sites and must NOT be claimed (extract_product runs EVERY
+        # matching adapter, so a false claim contaminates the result). A scheme-less string is
+        # normalized so its host is read from the netloc, never from a path/query that happens to
+        # contain "mouser.com".
+        raw = url if "://" in (url or "") else "//" + (url or "")
+        host = (urlparse(raw).hostname or "").lower()
+        return _registrable_domain(host).split(".", 1)[0] == "mouser"
 
     def extract(self, html: str, url: str) -> EnrichmentResult:
         r = EnrichmentResult()
@@ -363,9 +386,13 @@ class MouserWebSite:
                 if norm:
                     r.lifecycle = Sourced(norm, "mouser_web", "medium")
 
-        # Mirror the resolved lifecycle onto a spec row (the corpus stores Lifecycle as a spec on
-        # every part; the detail view lists specs). setdefault so a real "Lifecycle" attr-row that
-        # the page itself rendered always wins over this promoted copy.
-        if r.lifecycle is not None:
-            r.specs.setdefault("Lifecycle", Sourced(r.lifecycle.value, "mouser_web", "medium"))
+        # Mirror the resolved lifecycle onto a canonical "Lifecycle" spec row (the corpus key; the
+        # detail view lists specs) ONLY when the page did not already render a lifecycle row under
+        # its own label. The promotion above deliberately keeps a page-rendered "Lifecycle Status"/
+        # "Part Status" row as-is; adding a second "Lifecycle" row for it would duplicate the value,
+        # so the mirror fires just for the dataLayer-only case (no lifecycle spec row yet).
+        if r.lifecycle is not None and not any(
+            k.lower() in _LIFECYCLE_LABELS for k in r.specs
+        ):
+            r.specs["Lifecycle"] = Sourced(r.lifecycle.value, "mouser_web", "medium")
         return r

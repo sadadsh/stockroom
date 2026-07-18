@@ -103,6 +103,21 @@ def test_lifecycle_is_also_a_spec_row() -> None:
     assert r.specs["Lifecycle"].value == "Active"
 
 
+def test_lifecycle_synonym_label_does_not_duplicate() -> None:
+    # When the page renders a SYNONYM lifecycle row ("Part Status"), the mirror must NOT also add a
+    # second "Lifecycle" row: the record carries exactly ONE lifecycle spec (the page's own label),
+    # never a duplicate pair with identical values.
+    from stockroom.scrape.extract.sites.mouser_web import _LIFECYCLE_LABELS
+
+    html = ('<td class="attr-col"><label>Part Status:</label></td>'
+            '<td class="attr-value-col">Active</td>')
+    r = MouserWebSite().extract(html, _URL)
+    lc = [k for k in r.specs if k.lower() in _LIFECYCLE_LABELS]
+    assert len(lc) == 1
+    assert r.specs[lc[0]].value == "Active"
+    assert r.lifecycle is not None and r.lifecycle.value == "Active"
+
+
 def test_zero_tariff_is_kept_as_a_confirmed_spec_row() -> None:
     # A confirmed 0.0 (a non-tariffed origin) is real data the corpus stores (49/88 parts are
     # 0.0), never a blank, so it must land as a spec row too.
