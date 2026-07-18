@@ -8,7 +8,7 @@
  * Pinout, Sourcing, and History. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, deriveAttributes } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
@@ -939,13 +939,12 @@ function AttachAssetModal({
   );
 }
 
-// B2 progressive disclosure: a deep part can carry ~28 specs; show the first (most important,
-// insertion-ordered) ones and let the rest expand, so the section is scannable, not a wall.
+// All specs render at once (north-star: the datasheet block is never collapsed). Each
+// category (Electrical / Physical / Ratings / Other) is its own card WITHIN the sheet, so
+// the groups read as clearly distinct blocks. A masonry of columns packs the varying-height
+// group cards without stranding gaps, and each spec stacks its label over the value so a long
+// value wraps in place instead of running off.
 function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: number }) {
-  // One ordered list (groups already come Electrical -> Physical -> Ratings -> Other); each
-  // row carries its group so the group eyebrow prints once, before that group's first row.
-  // ALL specs render at once (north-star: the datasheet block is never collapsed).
-  const flat = groups.flatMap((g) => g.rows.map((r) => ({ ...r, group: g.title })));
   return (
     <>
       <div className="mb-3 flex items-center justify-between">
@@ -954,37 +953,27 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
         </span>
         <span className="tnum font-mono text-xs text-t3">{count}</span>
       </div>
-      {/* a datasheet parameter block: two aligned columns, values in the mono readout face with
-          tabular figures, sectioned by a full-width group eyebrow (Electrical / Physical / ...). */}
-      {/* Two clean columns with a hairline down the middle so the split reads clearly (a
-          3-4 column flow with uneven group sizes was hard to parse). Each cell stacks its
-          label over the value so a long value wraps in place instead of running off. */}
-      <div className="relative">
-        <div
-          className="pointer-events-none absolute inset-y-2 left-1/2 hidden w-px -translate-x-1/2 md:block"
-          style={{ background: "var(--c-line)" }}
-          aria-hidden="true"
-        />
-        <div className="grid grid-cols-1 gap-x-10 md:grid-cols-2">
-          {flat.map((row, i) => {
-            const firstOfGroup = i === 0 || flat[i - 1].group !== row.group;
-            return (
-              <Fragment key={row.key}>
-                {firstOfGroup ? (
-                  <div className="col-span-full px-0.5 pb-1.5 pt-5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5">
-                    {row.group}
-                  </div>
-                ) : null}
-                <div className="min-w-0 border-b border-line px-0.5 py-2">
+      <div className="columns-1 gap-4 md:columns-2">
+        {groups.map((group) => (
+          <div
+            key={group.title}
+            className="mb-4 break-inside-avoid rounded-[10px] border border-line bg-field px-4 py-3.5"
+          >
+            <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+              {group.title}
+            </div>
+            <div>
+              {group.rows.map((row) => (
+                <div key={row.key} className="border-b border-line py-[7px] last:border-0">
                   <div className="text-[11px] text-t3">{row.label}</div>
-                  <div className="tnum mt-0.5 break-words font-mono text-[13px] leading-snug text-t1">
+                  <div className="tnum mt-0.5 break-words font-mono text-[12.5px] leading-snug text-t1">
                     {row.unit ? `${row.value} ${row.unit}` : row.value}
                   </div>
                 </div>
-              </Fragment>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
