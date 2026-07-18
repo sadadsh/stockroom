@@ -70,9 +70,13 @@ def apply_procurement_refresh(record, per_vendor, now_iso: str) -> bool:
         if vendor_changed:
             purchase.fetched_at = now_iso
             changed = True
-    # lifecycle: first vendor that reported one (a Sourced field the candidate mapping drops)
+    # lifecycle: the FIRST vendor that reports one wins (a Sourced field the candidate mapping
+    # drops). Break on the first vendor that HAS a lifecycle - not the first that differs - so a
+    # later vendor can never override the leader just because the leader happened to agree with
+    # what was already stored.
     for _vendor, result in per_vendor:
-        if result.lifecycle is not None and record.specs.get("Lifecycle") != result.lifecycle.value:
-            record.specs["Lifecycle"], changed = result.lifecycle.value, True
+        if result.lifecycle is not None:
+            if record.specs.get("Lifecycle") != result.lifecycle.value:
+                record.specs["Lifecycle"], changed = result.lifecycle.value, True
             break
     return changed
