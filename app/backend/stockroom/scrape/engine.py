@@ -128,12 +128,16 @@ class ScrapeEngine:
         an empty or fully-blocked crawl returns []."""
         import asyncio
         import hashlib
+        from dataclasses import replace
 
-        from stockroom.scrape.crawl.frontier import Frontier
+        from stockroom.scrape.crawl.frontier import Frontier, scope_host
         from stockroom.scrape.model import ScrapeResult
 
+        # Bind the seed's host onto a COPY so the caller's Scope is never mutated, and derive
+        # it with scope_host (bare hostname) so it matches Scope.allows - _host_of returns the
+        # netloc (with port), which is right for scheduler keying but wrong for scope.
         if getattr(scope, "same_host", True) and getattr(scope, "host", None) is None:
-            scope.host = _host_of(seed)
+            scope = replace(scope, host=scope_host(seed))
         frontier = Frontier(scope)
         results: list = []
         pending = 0
