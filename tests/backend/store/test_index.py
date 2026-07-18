@@ -54,7 +54,7 @@ def test_search_category_and_complete_only(tmp_path):
     pd = tmp_path / "parts"
     _write(pd, _complete("a", "Alpha", cat="ICs"))
     inc = _complete("b", "Beta", cat="ICs")
-    inc.model = None  # missing 3D model => incomplete
+    inc.datasheet = None  # missing a required passport field => incomplete (assets no longer gate)
     _write(pd, inc)
     _write(pd, _complete("c", "Gamma", cat="Passives"))
     idx = LibraryIndex.build(pd)
@@ -62,7 +62,7 @@ def test_search_category_and_complete_only(tmp_path):
     assert {r.id for r in idx.search(complete_only=True)} == {"a", "c"}
     assert [r.id for r in idx.incomplete()] == ["b"]
     b = idx.get("b")
-    assert b is not None and not b.is_complete and "3D model" in b.missing
+    assert b is not None and not b.is_complete and "datasheet" in b.missing
 
 
 def test_facets(tmp_path):
