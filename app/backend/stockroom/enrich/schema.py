@@ -31,6 +31,33 @@ def normalize_mpn(mpn: str) -> str:
     return _UNSAFE.sub("-", mpn.strip()).upper()
 
 
+# Distributor lifecycle tokens -> the library's canonical Title-Case status, so a part's
+# manufacturing status reads consistently no matter the source: LCSC says "normal", Mouser's
+# dataLayer says "none", others "eol"/"nrnd". An unknown token is Title-cased if it came in
+# lower-case (cosmetic) and otherwise passed through untouched (never invent a status).
+_LIFECYCLE_MAP = {
+    "none": "Active", "normal": "Active", "active": "Active", "in production": "Active",
+    "new": "New Product", "new product": "New Product", "preorder": "New Product",
+    "eol": "End of Life", "end of life": "End of Life",
+    "obsolete": "Obsolete", "discontinued": "Obsolete", "inactive": "Obsolete",
+    "nrnd": "Not Recommended for New Designs",
+    "not recommended for new designs": "Not Recommended for New Designs",
+}
+
+
+def normalize_lifecycle(raw):
+    """Map a distributor lifecycle token to the canonical library status. A known token maps to
+    its canonical form; an unknown all-lower token is Title-cased (so "normal"-style values are
+    not shown verbatim); anything else is returned unchanged."""
+    if not raw:
+        return raw
+    s = str(raw).strip()
+    mapped = _LIFECYCLE_MAP.get(s.lower())
+    if mapped:
+        return mapped
+    return s.title() if s and s == s.lower() else s
+
+
 @dataclass
 class Sourced:
     value: Any
