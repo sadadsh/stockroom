@@ -173,51 +173,48 @@ export function DetailPanel({
 
   return (
     <div className="max-w-[1240px] pb-12">
-      {/* identity band: the name headline + the MPN as a mono serial stamp, with a
-          single Ready / Missing verdict standing to the right. */}
+      {/* masthead: the derived headline + the MPN serial stamp + the attribute chip rail on
+          the left, the completeness verdict standing to the right. The chips live INSIDE the
+          masthead (not a separate full-width band) so a sparse part reads as one tight header
+          instead of stranding a near-empty card below the title. */}
       <div className="border-b border-line pb-5">
-      <div className="flex items-start justify-between gap-6">
-        <div className="min-w-0 flex-1">
-          <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.04] tracking-[-0.02em] text-t1">
-            {deriveTitle(detail)}
-          </h1>
-          <SerialLine
-            mpn={detail.mpn}
-            manufacturer={detail.manufacturer}
-            category={detail.category}
-          />
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.04] tracking-[-0.02em] text-t1">
+              {deriveTitle(detail)}
+            </h1>
+            <SerialLine
+              mpn={detail.mpn}
+              manufacturer={detail.manufacturer}
+              category={detail.category}
+            />
+            {attributes.length > 0 ? (
+              <div className="mt-3.5 flex flex-wrap gap-1.5">
+                {attributes.map((a) => (
+                  <span
+                    key={a}
+                    className="rounded-control border border-line bg-raise2 px-2.5 py-1 text-xs font-medium text-t2"
+                  >
+                    {a}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {/* the missing fields, named, only when incomplete (the verdict states the count) */}
+            {!isComplete && missing.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">Needs</span>
+                {missing.map((m) => (
+                  <Badge key={m} tone="warn" size="sm">
+                    {m}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <Verdict complete={isComplete} score={score} total={PASSPORT_TOTAL} />
         </div>
-        <Verdict complete={isComplete} score={score} total={PASSPORT_TOTAL} />
       </div>
-
-      {/* the missing fields, named, only when incomplete (the verdict already states the count) */}
-      {!isComplete && missing.length > 0 ? (
-        <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
-          <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">
-            Needs
-          </span>
-          {missing.map((m) => (
-            <Badge key={m} tone="warn" size="sm">
-              {m}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-      </div>
-
-      {/* Attributes: a neutral tag band (no color), full width above the spec sheet. */}
-      {attributes.length > 0 ? (
-        <div className="mt-5 flex flex-wrap gap-2 rounded-card border border-line bg-raise px-4 py-3.5 shadow-card">
-          {attributes.map((a) => (
-            <span
-              key={a}
-              className="rounded-control bg-raise2 px-2.5 py-1 text-xs font-medium text-t2"
-            >
-              {a}
-            </span>
-          ))}
-        </div>
-      ) : null}
 
       {/* Main composition: a laid-out spec sheet, not a scroll. LEFT is the part seen
           three ways (the 3D hero + its symbol + footprint); RIGHT is the record (identity
