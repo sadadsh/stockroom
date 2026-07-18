@@ -73,3 +73,32 @@ def test_appends_a_new_vendor_and_keeps_untouched_ones():
 def test_no_change_returns_false():
     rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X", purchase=[])
     assert apply_procurement_refresh(rec, [("Mouser", EnrichmentResult())], "T") is False
+
+
+def test_identical_data_under_a_later_clock_is_a_no_op_and_keeps_fetched_at():
+    # fetched_at means "when the data last CHANGED" - re-fetching the same values with a fresh
+    # (later) timestamp, as the live endpoint always does, must NOT re-stamp or report a change.
+    rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X",
+                     purchase=[Purchase(vendor="Mouser", stock=42, currency="USD",
+                                        price_breaks=[{"qty": 1, "price": 0.5}],
+                                        fetched_at="t0")])
+    same = _result(stock=42, breaks=[(1, 0.5)])
+    assert apply_procurement_refresh(rec, [("Mouser", same)], "t1-later") is False
+    assert rec.purchase[0].fetched_at == "t0"          # clock advanced, data did not: no re-stamp
+
+
+def test_a_result_with_only_identity_never_creates_an_empty_purchase():
+    # an MPN-only (no price/stock/PN) answer must not spawn a bare vendor row.
+    rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X", purchase=[])
+    r = EnrichmentResult()
+    r.mpn = Sourced("X", "mouser", "high")
+    assert apply_procurement_refresh(rec, [("Mouser", r)], "T") is False
+    assert rec.purchase == []
+
+
+def test_lifecycle_only_result_writes_the_spec_without_a_purchase():
+    rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X", purchase=[])
+    changed = apply_procurement_refresh(rec, [("Mouser", _result(lifecycle="Active"))], "T")
+    assert changed is True
+    assert rec.specs["Lifecycle"] == "Active"
+    assert rec.purchase == []                          # lifecycle alone is not purchase data

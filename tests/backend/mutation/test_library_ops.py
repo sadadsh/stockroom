@@ -459,6 +459,9 @@ def test_refresh_procurement_writes_atomically_and_no_ops_when_unchanged(tmp_pat
     assert any(p.stock == 99 for p in ops.load_record("tps62130rgtr").purchase)  # persisted
 
     head = repo.head()
+    # identical data but a LATER timestamp - as the live endpoint always passes (a fresh
+    # microsecond now_iso every call). fetched_at means "when the data last CHANGED", so an
+    # advancing clock alone must NOT manufacture a commit.
     ops.refresh_procurement(
-        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T00:00:00+00:00")  # identical
+        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T09:59:59+00:00")
     assert repo.head() == head                                                # no empty commit

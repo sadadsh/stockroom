@@ -1,4 +1,26 @@
 import json
+from types import SimpleNamespace
+
+
+def test_build_refresh_adapters_enables_only_the_configured_vendors():
+    import stockroom.api.routers.library as lib_router
+
+    # Mouser key present, DigiKey creds absent -> exactly one enabled, vendor-tagged, adapter.
+    ctx = SimpleNamespace(config=SimpleNamespace(
+        mouser_api_key="mk", digikey_client_id="", digikey_client_secret=""))
+    adapters = lib_router.build_refresh_adapters(ctx)
+    assert [a.vendor for a in adapters] == ["Mouser"]
+    assert adapters[0].enabled is True
+
+    # both vendors configured -> both, in registry order.
+    ctx = SimpleNamespace(config=SimpleNamespace(
+        mouser_api_key="mk", digikey_client_id="ci", digikey_client_secret="cs"))
+    assert [a.vendor for a in lib_router.build_refresh_adapters(ctx)] == ["Mouser", "DigiKey"]
+
+    # no creds -> no adapters (a refresh silently finds nothing rather than erroring).
+    ctx = SimpleNamespace(config=SimpleNamespace(
+        mouser_api_key="", digikey_client_id="", digikey_client_secret=""))
+    assert lib_router.build_refresh_adapters(ctx) == []
 
 
 def _drain_job(client, job_id):
