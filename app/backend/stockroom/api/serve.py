@@ -60,6 +60,13 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
         # surfaces the state honestly rather than crashing the whole bootstrap.
         pass
     ctx.uv_sync = _uv_sync
+    # S5: the real app renders JS distributor pages through the portable, stealthed,
+    # anti-ban-governed headless Chromium engine (retires the HTTP-only default and the
+    # never-shipped WebView2 seam). Lazy: Chromium only launches on the first render, so
+    # boot stays fast and a machine that never enriches never starts a browser.
+    from stockroom.enrich.scrape_adapter import default_rendered_dom_fetcher
+
+    ctx.rendered_dom_fetcher = default_rendered_dom_fetcher(Path(ctx.enrich_cache_dir) / "rendered")
     # Wire KiCad at the active library on every real boot (both entries - the
     # windowed host and standalone serve - build their context here), so the
     # library is visible in KiCad without the manual Doctor click. rewire_kicad
