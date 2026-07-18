@@ -23,6 +23,11 @@ from stockroom.enrich.schema import (
 )
 
 
+def _default_requester(*a, **k):
+    """Temporary stub; Task 3 will replace with the real implementation."""
+    return None
+
+
 def _coerce_price(raw) -> float | None:
     """A price may be a number or a currency string ('$0.12'); pull the first numeric run."""
     if raw is None:
@@ -114,3 +119,38 @@ def _parse_digikey_part(product: dict) -> EnrichmentResult:
     if breaks:
         r.price_breaks = breaks
     return r
+
+
+class DigiKeyAdapter:
+    def __init__(self, client_id: str = "", client_secret: str = "", requester=None):
+        self.client_id = client_id or ""
+        self.client_secret = client_secret or ""
+        self._requester = requester or (
+            _default_requester(self.client_id, self.client_secret) if self.enabled else None
+        )
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.client_id and self.client_secret)
+
+    def lookup(self, mpn: str) -> EnrichmentResult:
+        if not self.enabled or not mpn or self._requester is None:
+            return EnrichmentResult()
+        try:
+            body = self._requester(mpn)
+        except EnrichError:
+            return EnrichmentResult()  # a failed API call must not break enrichment
+        products = (body or {}).get("Products") or []
+        if not products:
+            return EnrichmentResult()
+        target = normalize_mpn(mpn)
+        exact = next(
+            (p for p in products
+             if normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
+            None,
+        )
+        chosen = exact if exact is not None else products[0]
+        result = _parse_digikey_part(chosen)
+        if exact is None and result.mpn is not None:
+            result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
+        return result
