@@ -76,7 +76,8 @@ def _parse_digikey_part(product: dict) -> EnrichmentResult:
     if ds:
         r.datasheet_url = Sourced(ds, "digikey", "high")
     status = _obj_str(product.get("ProductStatus"), "Status")
-    r.lifecycle = Sourced(normalize_lifecycle(status) or "Active", "digikey", "high")
+    if status:
+        r.lifecycle = Sourced(normalize_lifecycle(status), "digikey", "high")
     try:
         stock = int(product.get("QuantityAvailable") or 0)
     except (TypeError, ValueError):
