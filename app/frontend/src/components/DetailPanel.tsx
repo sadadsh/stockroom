@@ -8,8 +8,10 @@
  * Pinout, Sourcing, and History. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
+import { deriveTitle, deriveAttributes } from "../lib/derive";
+import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { Badge, Button, Card } from "./primitives";
 import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
@@ -51,14 +53,9 @@ export function toolLabel(tool: string | undefined): string {
   return t.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
 
-// Spec keys that are NOT parametric specs: the asset references (shown in the Part Canvas)
-// and the pinout (shown as its own table). Everything else in specs is a real spec the panel
-// lists (B1).
-const SPEC_HIDDEN_KEYS = new Set(["Symbol", "Footprint", "3D Model", "product_url", "pinout"]);
-
-// Spec values that mean "the distributor did not fill this" - dropped so an empty-in-disguise
-// spec never takes a row (lowercased for the comparison).
-const EMPTY_SPEC_VALUES = new Set(["not available", "none", "n/a", "-", "unknown", "not applicable"]);
+// Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
+// empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
+// search and extensible: a brand-new spec key still groups sanely with no code change here.
 
 const _KNOWN_VENDORS: Record<string, string> = {
   lcsc: "LCSC",
@@ -148,19 +145,6 @@ export function DetailPanel({
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
   const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
-  // B1: every parametric spec the record holds (Resistance, Tolerance, Voltage Rating, ...) that
-  // the panel used to hide - shown in the datasheet grid. Asset/internal keys and the pinout
-  // (rendered as its own table) are excluded; only scalar spec values are listed.
-  const specRows = Object.entries(detail?.specs ?? {}).filter(
-    ([key, value]) =>
-      !SPEC_HIDDEN_KEYS.has(key) &&
-      value != null &&
-      typeof value !== "object" &&
-      String(value).trim() !== "" &&
-      // A spec the distributor could not fill ("Not available" / "None" / "-") is noise,
-      // not data - never render an empty-in-disguise row.
-      !EMPTY_SPEC_VALUES.has(String(value).trim().toLowerCase()),
-  );
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -176,6 +160,12 @@ export function DetailPanel({
   }
 
   const score = Math.max(0, PASSPORT_TOTAL - missing.length);
+  // The part's tags plus a few chips derived from key specs (package, mounting,
+  // qualifications, salient features), so the attribute band is never empty.
+  const attributes = deriveAttributes(detail);
+  // Grouped, extensible spec sheet (Electrical / Physical / Ratings / Other) from lib/specSchema.
+  const specGroups = groupSpecs(detail.category, detail.specs);
+  const specCount = specGroups.reduce((total, group) => total + group.rows.length, 0);
   // The persisted pinout (M6i) reads from the record's specs, its provenance from
   // the enrichment map. Shown when present, in both read-only and editable modes.
   const pinout = parsePinout(detail.specs);
@@ -188,20 +178,9 @@ export function DetailPanel({
       <div className="border-b border-line pb-5">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
-          {onEditField ? (
-            <EditableText
-              value={detail.display_name}
-              onSave={(v) => onEditField("display_name", v)}
-              label="Name"
-              placeholder="Name this part"
-              disabled={busy}
-              displayClassName="text-[38px] font-semibold leading-[1.05] tracking-[-0.03em]"
-            />
-          ) : (
-            <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.05] tracking-[-0.03em] text-t1">
-              {detail.display_name}
-            </h1>
-          )}
+          <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.04] tracking-[-0.02em] text-t1">
+            {deriveTitle(detail)}
+          </h1>
           <SerialLine
             mpn={detail.mpn}
             manufacturer={detail.manufacturer}
@@ -225,6 +204,20 @@ export function DetailPanel({
         </div>
       ) : null}
       </div>
+
+      {/* Attributes: a neutral tag band (no color), full width above the spec sheet. */}
+      {attributes.length > 0 ? (
+        <div className="mt-5 flex flex-wrap gap-2 rounded-card border border-line bg-raise px-4 py-3.5 shadow-card">
+          {attributes.map((a) => (
+            <span
+              key={a}
+              className="rounded-control bg-raise2 px-2.5 py-1 text-xs font-medium text-t2"
+            >
+              {a}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {/* Main composition: a laid-out spec sheet, not a scroll. LEFT is the part seen
           three ways (the 3D hero + its symbol + footprint); RIGHT is the record (identity
@@ -294,7 +287,9 @@ export function DetailPanel({
           </div>
           </div>
           {/* the datasheet parameter block sits under the canvas in the same column */}
-          {specRows.length > 0 ? <SpecificationsSection rows={specRows} /> : null}
+          {specCount > 0 ? (
+            <SpecificationsSection groups={specGroups} count={specCount} />
+          ) : null}
         </div>
 
         {/* RIGHT: the record - identity fields + sourcing, filling the column */}
@@ -302,6 +297,12 @@ export function DetailPanel({
           <div>
             <SectionLabel>Identity</SectionLabel>
             <div className="rounded-card border border-line bg-raise px-4 py-1 shadow-card">
+              <DataRow
+                label="Name"
+                value={detail.display_name}
+                onSave={onEditField ? (v) => onEditField("display_name", v) : undefined}
+                busy={busy}
+              />
               <DataRow
                 label="Part Number"
                 value={detail.mpn}
@@ -555,7 +556,7 @@ function Verdict({
       <div className="flex flex-none items-center gap-2.5 rounded-control bg-raise px-3.5 py-2 shadow-card">
         <span className="h-2 w-2 flex-none rounded-full bg-ok" aria-hidden="true" />
         <div className="leading-tight">
-          <div className="text-sm font-semibold text-t1">Ready</div>
+          <div className="text-sm font-semibold text-t1">Complete</div>
           <div className="tnum font-mono text-2xs text-t3">{total} of {total} fields</div>
         </div>
       </div>
@@ -936,27 +937,40 @@ function AttachAssetModal({
 // insertion-ordered) ones and let the rest expand, so the section is scannable, not a wall.
 const SPEC_COLLAPSE_AT = 12;
 
-function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
+function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: number }) {
   const [showAll, setShowAll] = useState(false);
-  const collapsible = rows.length > SPEC_COLLAPSE_AT;
-  const shown = showAll || !collapsible ? rows : rows.slice(0, SPEC_COLLAPSE_AT);
+  const collapsible = count > SPEC_COLLAPSE_AT;
+  // Flatten to one ordered list (groups already come in Electrical -> Physical -> Ratings ->
+  // Other order) so the collapse counts rows across groups; each row carries its group title so
+  // the group eyebrow prints once, before that group's first shown row.
+  const flat = groups.flatMap((g) => g.rows.map((r) => ({ ...r, group: g.title })));
+  const shown = showAll || !collapsible ? flat : flat.slice(0, SPEC_COLLAPSE_AT);
   return (
     <>
       <SectionLabel>
-        Specifications <span className="ml-0.5 font-mono text-t3">({rows.length})</span>
+        Specifications <span className="ml-0.5 font-mono text-t3">({count})</span>
       </SectionLabel>
-      {/* a datasheet parameter block: two aligned columns, values in the mono readout
-          face with tabular figures, grouped by whitespace not a border on every row. */}
+      {/* a datasheet parameter block: two aligned columns, values in the mono readout face with
+          tabular figures, sectioned by a full-width group eyebrow (Electrical / Physical / ...). */}
       <div className="grid grid-cols-1 border-t border-line pt-1 sm:grid-cols-2 sm:gap-x-10">
-        {shown.map(([key, value]) => (
-          <div
-            key={key}
-            className="flex items-baseline justify-between gap-4 px-1.5 py-[7px]"
-          >
-            <span className="text-sm text-t3">{key}</span>
-            <span className="tnum font-mono text-sm text-t1 text-right">{String(value)}</span>
-          </div>
-        ))}
+        {shown.map((row, i) => {
+          const firstOfGroup = i === 0 || shown[i - 1].group !== row.group;
+          return (
+            <Fragment key={row.key}>
+              {firstOfGroup ? (
+                <div className="px-1.5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-t3 first:pt-1 sm:col-span-2">
+                  {row.group}
+                </div>
+              ) : null}
+              <div className="flex items-baseline justify-between gap-4 px-1.5 py-[7px]">
+                <span className="text-sm text-t3">{row.label}</span>
+                <span className="tnum font-mono text-sm text-t1 text-right">
+                  {row.unit ? `${row.value} ${row.unit}` : row.value}
+                </span>
+              </div>
+            </Fragment>
+          );
+        })}
       </div>
       {collapsible ? (
         <button
@@ -964,7 +978,7 @@ function SpecificationsSection({ rows }: { rows: [string, unknown][] }) {
           onClick={() => setShowAll((v) => !v)}
           className="mt-2.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
         >
-          {showAll ? "Show Fewer" : `Show All ${rows.length}`}
+          {showAll ? "Show Fewer" : `Show All ${count}`}
         </button>
       ) : null}
     </>

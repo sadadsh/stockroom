@@ -40,9 +40,10 @@ export default {
         "acc-soft": "var(--c-acc-soft)",
       },
       borderRadius: {
-        // design contract: 8/6 radii (the 8px card, the 6px control)
-        card: "8px",
-        control: "6px",
+        // North-star direction (owner decision 2026-07-17): the rounder card + control.
+        // Supersedes the earlier 8/6 lock; see docs/design/design-rules.md.
+        card: "14px",
+        control: "8px",
       },
       fontFamily: {
         // Work Sans (bundled offline via @fontsource-variable) is the interface
