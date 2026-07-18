@@ -80,17 +80,22 @@ class TtlCache:
     def get(self, mpn: str) -> dict | None:
         key = normalize_mpn(mpn)
         now = self._clock()
+        candidates: list[tuple[float, Path]] = []
         for path in self._glob(key):
             try:
                 stamp = float(path.stem.rsplit(_SEP, 1)[1])
             except (IndexError, ValueError):
-                self._remove(path)
+                self._remove(path)  # unparseable stamp: not a real entry, drop it
                 continue
+            candidates.append((stamp, path))
+        # NEWEST first: a lingering un-removable older entry (a persistent Windows lock can defeat
+        # _clear, whose failure is now swallowed) must never shadow the freshest write.
+        for stamp, path in sorted(candidates, key=lambda c: c[0], reverse=True):
             if now - stamp >= self.ttl:
                 self._remove(path)
                 continue
             try:
-                text = _retry_transient(lambda: path.read_text(encoding="utf-8"))
+                return json.loads(_retry_transient(lambda p=path: p.read_text(encoding="utf-8")))
             except FileNotFoundError:
                 continue  # a peer (another read-lane job) removed it between the glob and the read
             except OSError:
@@ -98,11 +103,9 @@ class TtlCache:
                 # of this file. It is a VALID entry being rewritten, not corrupt, so skip it WITHOUT
                 # dropping it - a miss here just re-scrapes, never raises and never poisons.
                 continue
-            try:
-                return json.loads(text)
             except ValueError:
-                # A torn/corrupt body (a legacy pre-atomic-write file): drop it so a fresh scrape
-                # repopulates the key.
+                # A corrupt body: non-UTF-8 bytes (UnicodeDecodeError) or invalid JSON
+                # (JSONDecodeError) - both are ValueError. Drop it so a fresh scrape repopulates.
                 self._remove(path)
                 continue
         return None
@@ -112,24 +115,29 @@ class TtlCache:
         self._clear(key)
         stamp = int(self._clock())
         path = self.root / f"{self.prefix}{_SEP}{key}{_SEP}{stamp}.json"
-        body = json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False)
         # Atomic publish: write to a unique temp file in the same dir (so it never matches the
         # entry glob), then os.replace onto the final name. A reader never sees a half-written
         # file, and two concurrent writers each replace atomically (last wins with a COMPLETE
         # file), never a torn JSON. On Windows the replace can hit a transient sharing violation
-        # when a reader holds the destination open, so it is retried; a persistent failure (an
-        # unwritable dir, or contention past the retries) degrades to no-cache (the next lookup
-        # re-scrapes) rather than raising into the enrich job - the cache is best-effort.
-        fd, tmp_name = tempfile.mkstemp(
-            dir=self.root, prefix=f".{self.prefix}{_SEP}{key}{_SEP}", suffix=".tmp"
-        )
-        tmp = Path(tmp_name)
+        # when a reader holds the destination open, so it is retried. EVERY filesystem step - the
+        # mkstemp create too (an unwritable/full dir), not just the replace - is inside the try, so
+        # a persistent failure degrades to no-cache (the next lookup re-scrapes) rather than raising
+        # into the enrich job; the cache is best-effort. A json.dumps TypeError (a non-serializable
+        # value = a real caller bug) still propagates via the BaseException arm.
+        tmp: Path | None = None
         try:
+            body = json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False)
+            fd, tmp_name = tempfile.mkstemp(
+                dir=self.root, prefix=f".{self.prefix}{_SEP}{key}{_SEP}", suffix=".tmp"
+            )
+            tmp = Path(tmp_name)
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(body)
             _retry_transient(lambda: os.replace(tmp, path))
         except OSError:
-            self._remove(tmp)  # best-effort cache: skip this entry rather than raise
+            if tmp is not None:
+                self._remove(tmp)  # best-effort cache: skip this entry rather than raise
         except BaseException:
-            self._remove(tmp)
+            if tmp is not None:
+                self._remove(tmp)
             raise
