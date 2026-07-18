@@ -142,6 +142,7 @@ def test_supervise_relaunches_on_restart_then_stops(tmp_path):
         spawn=spawn,
         uv_sync=lambda _wd: counts.__setitem__("sync", counts["sync"] + 1),
         ensure=lambda _wd: counts.__setitem__("ensure", counts["ensure"] + 1),
+        ensure_browsers=lambda _wd: None,
     )
     assert code == 0
     assert counts["spawn"] == 3  # ran three times (two self-update restarts + the final)
@@ -151,9 +152,65 @@ def test_supervise_relaunches_on_restart_then_stops(tmp_path):
 
 def test_supervise_returns_the_host_exit_code(tmp_path):
     code = supervise(
-        tmp_path, spawn=lambda _wd: 7, uv_sync=lambda _wd: None, ensure=lambda _wd: None
+        tmp_path, spawn=lambda _wd: 7, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
+        ensure_browsers=lambda _wd: None,
     )
     assert code == 7
+
+
+def test_supervise_provisions_browser_builds_once_after_sync_before_first_spawn(tmp_path):
+    # S7: uv sync installs the camoufox/playwright PACKAGES but not their ~150 MB browser
+    # BUILDS, so a clean install would fail the first distributor render until they are
+    # fetched. supervise must provision them once, after the deps sync and before the host
+    # opens, and NOT re-run the slow fetch on a self-update restart.
+    events: list[str] = []
+    spawns = {"n": 0}
+
+    def spawn(_wd):
+        spawns["n"] += 1
+        events.append("spawn")
+        return EXIT_RESTART if spawns["n"] < 2 else 0  # one self-update restart, then quit
+
+    code = supervise(
+        tmp_path,
+        spawn=spawn,
+        uv_sync=lambda _wd: events.append("sync"),
+        ensure=lambda _wd: None,
+        update=lambda _wd: None,
+        webview2=lambda: None,
+        ensure_browsers=lambda _wd: events.append("browsers"),
+    )
+    assert code == 0
+    assert events.count("browsers") == 1  # provisioned exactly once, not on the restart
+    # after the first sync, before the first spawn
+    assert events.index("browsers") > events.index("sync")
+    assert events.index("browsers") < events.index("spawn")
+
+
+def test_supervise_signals_the_browsers_splash_phase(tmp_path):
+    # The first-run splash must show a "browsers" phase during the slow ~150 MB fetch, so the
+    # window is not a frozen blank while Chromium/Camoufox download.
+    phases: list[str] = []
+    supervise(
+        tmp_path, spawn=lambda _wd: 0, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
+        update=lambda _wd: None, webview2=lambda: None, ensure_browsers=lambda _wd: None,
+        progress=phases.append,
+    )
+    assert "browsers" in phases
+    assert phases.index("browsers") < phases.index("starting")  # before the window opens
+
+
+def test_supervise_survives_a_browser_provision_failure(tmp_path):
+    # The render tier is optional (LCSC resolves over plain HTTP without a browser), so a
+    # failed browser download must degrade honestly, never block the whole app from opening.
+    def boom(_wd):
+        raise RuntimeError("offline: could not fetch Chromium")
+
+    code = supervise(
+        tmp_path, spawn=lambda _wd: 5, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
+        update=lambda _wd: None, webview2=lambda: None, ensure_browsers=boom,
+    )
+    assert code == 5  # the host still launched and its exit code was returned
 
 
 # -- uv resolution (the bundled-uv WinError 2 fix) + git preflight --------------
@@ -278,9 +335,10 @@ def test_supervise_emits_progress_phases_in_order(tmp_path):
     phases = []
     supervise(
         tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
-        uv_sync=lambda _wd: None, spawn=lambda _wd: 0, progress=phases.append,
+        uv_sync=lambda _wd: None, ensure_browsers=lambda _wd: None, spawn=lambda _wd: 0,
+        progress=phases.append,
     )
-    assert phases == ["clone", "update", "webview2", "sync", "starting"]
+    assert phases == ["clone", "update", "webview2", "sync", "browsers", "starting"]
 
 
 def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
@@ -293,10 +351,12 @@ def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
 
     supervise(
         tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
-        uv_sync=lambda _wd: None, spawn=spawn, progress=phases.append,
+        uv_sync=lambda _wd: None, ensure_browsers=lambda _wd: None, spawn=spawn,
+        progress=phases.append,
     )
     assert phases.count("starting") == 1  # only before the FIRST spawn
-    assert phases == ["clone", "update", "webview2", "sync", "starting", "sync"]
+    assert phases.count("browsers") == 1  # provisioned once, not on the self-update restart
+    assert phases == ["clone", "update", "webview2", "sync", "browsers", "starting", "sync"]
 
 
 def test_supervise_updates_on_every_launch_after_clone(tmp_path):
@@ -307,9 +367,10 @@ def test_supervise_updates_on_every_launch_after_clone(tmp_path):
         update=lambda _wd: order.append("update"),
         webview2=lambda: order.append("webview2"),
         uv_sync=lambda _wd: order.append("sync"),
+        ensure_browsers=lambda _wd: order.append("browsers"),
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
     )
-    assert order == ["clone", "update", "webview2", "sync", "spawn"]
+    assert order == ["clone", "update", "webview2", "sync", "browsers", "spawn"]
 
 
 def test_update_to_latest_pulls_when_a_checkout_exists(tmp_path):

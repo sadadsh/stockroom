@@ -25,6 +25,7 @@ _PHASE_TEXT = {
     "update": "Getting the latest updates...",
     "webview2": "Preparing the display runtime...",
     "sync": "Installing components (first run can take a few minutes)...",
+    "browsers": "Downloading the rendering engine (first run only)...",
     "starting": "Starting Stockroom...",
 }
 
