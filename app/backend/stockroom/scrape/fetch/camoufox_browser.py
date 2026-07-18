@@ -23,7 +23,11 @@ from stockroom.scrape.model import FetchError, FetchOutcome, Page
 # captcha-delivery challenge SHELLS are ~2 KB. Settling requires substantial, stable,
 # non-challenge content, so we wait THROUGH the transparent challenge until it resolves.
 _MIN_REAL_BYTES = 20000
-_CHALLENGE_MARKERS = ("captcha-delivery.com", "has been denied", "datadome",
+# Markers of an UNSOLVED challenge SHELL only. Note: NOT the bare word "datadome" — the
+# DataDome client script stays on the CLEARED page, so matching it would make settle think
+# the real page is still a challenge and wait out the whole timeout. The captcha-delivery
+# iframe and the Akamai "access denied" text appear ONLY on the unsolved challenge.
+_CHALLENGE_MARKERS = ("captcha-delivery.com", "access to this page has been denied",
                       "verifying you are human", "checking your browser")
 
 
