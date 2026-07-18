@@ -105,6 +105,16 @@ function resultStream(candidates: StagingCandidate[]): ReadableStream<Uint8Array
   ]);
 }
 
+// Mirrors resultStream but wraps an EnrichmentResult: the enrichPart/enrichFromUrl
+// lookup is a background job now (-> {job_id}), and the sourced result arrives on the
+// job's SSE stream (openJobStream) rather than as the submit call's direct return.
+function enrichStream(r: EnrichmentResult): ReadableStream<Uint8Array> {
+  return streamOf([
+    `event: result\ndata: ${JSON.stringify({ result: r })}\n\n`,
+    "event: done\ndata: {}\n\n",
+  ]);
+}
+
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -124,12 +134,15 @@ beforeEach(() => {
 
 describe("IngestPage — unified Add A Part", () => {
   it("looks up a passive link and adds it with no files", async () => {
-    mockApi.enrichFromUrl.mockResolvedValue({
-      ...EMPTY_RESULT,
-      mpn: sf("560112116151"),
-      specs: { Resistance: sf("118 Ohms") },
-      add_plan: { kind: "resistor", package: "0603", value: "118 Ohms", tolerance: "1%" },
-    });
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(
+      enrichStream({
+        ...EMPTY_RESULT,
+        mpn: sf("560112116151"),
+        specs: { Resistance: sf("118 Ohms") },
+        add_plan: { kind: "resistor", package: "0603", value: "118 Ohms", tolerance: "1%" },
+      }),
+    );
     mockApi.passivePreview.mockResolvedValue({
       status: "ok",
       record: PASSIVE_RECORD,
@@ -163,8 +176,22 @@ describe("IngestPage — unified Add A Part", () => {
   });
 
   it("shows an honest progress indicator while a distributor page is being pulled", async () => {
-    // a lookup that never resolves keeps the fetch in flight, so the progress state is visible.
-    mockApi.enrichFromUrl.mockReturnValue(new Promise<EnrichmentResult>(() => {}));
+    // The submit resolves (a job is started), but the job's SSE stream deliberately
+    // never closes past its first progress frame, so the pipeline's live rendering
+    // stage stays in flight and the progress state (EnrichStages) is observable.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(
+            new TextEncoder().encode(
+              `event: progress\ndata: ${JSON.stringify({ stage: "rendering", message: "settling" })}\n\n`,
+            ),
+          );
+          // no close(): holds the stream (and the progress state) open indefinitely
+        },
+      }),
+    );
     wrap(<IngestPage />);
     const user = userEvent.setup();
     await user.type(
@@ -173,29 +200,43 @@ describe("IngestPage — unified Add A Part", () => {
     );
     await user.click(screen.getByRole("button", { name: "Look Up" }));
     expect(await screen.findByRole("progressbar")).toBeInTheDocument();
-    expect(screen.getByText(/Fetching from Mouser/)).toBeInTheDocument();
+    // The old LookupProgress ("Fetching from Mouser") was replaced by EnrichStages,
+    // which names the real pipeline phase and streams its live message.
+    expect(await screen.findByText(/Rendering/)).toBeInTheDocument();
+    expect(screen.getByText(/settling/)).toBeInTheDocument();
   });
 
   it("routes a bare part number through the MPN lookup, not the URL fetch", async () => {
-    mockApi.enrichPart.mockResolvedValue({ ...EMPTY_RESULT, add_plan: null });
+    mockApi.enrichPart.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
     wrap(<IngestPage />);
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Product link or part number"), "ERJ-P03F1101V");
     await user.click(screen.getByRole("button", { name: "Look Up" }));
-    expect(mockApi.enrichPart).toHaveBeenCalledWith("ERJ-P03F1101V");
+    // useEnrichLookup.runPart calls api.enrichPart(mpn, category, want); with only an
+    // MPN here, category and want are both undefined.
+    expect(mockApi.enrichPart).toHaveBeenCalledWith("ERJ-P03F1101V", undefined, undefined);
     expect(mockApi.enrichFromUrl).not.toHaveBeenCalled();
   });
 
   it("a non-passive link asks for files and merges the pulled data onto the dropped ZIP", async () => {
-    mockApi.enrichFromUrl.mockResolvedValue({
-      ...EMPTY_RESULT,
-      category: "ICs",
-      mpn: sf("STM32F103C8T6"),
-      description: sf("ARM Cortex-M3 MCU"),
-      add_plan: null,
-    });
-    mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
-    mockApi.openJobStream.mockResolvedValue(resultStream([ZIP_CANDIDATE]));
+    // Both the URL lookup and the ZIP inspect stream over openJobStream, each under its
+    // own job id, so the mock must key its response by which job is being opened.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "enrich1" });
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
+    mockApi.openJobStream.mockImplementation((jobId: string) =>
+      Promise.resolve(
+        jobId === "enrich1"
+          ? enrichStream({
+              ...EMPTY_RESULT,
+              category: "ICs",
+              mpn: sf("STM32F103C8T6"),
+              description: sf("ARM Cortex-M3 MCU"),
+              add_plan: null,
+            })
+          : resultStream([ZIP_CANDIDATE]),
+      ),
+    );
     const pick = vi.fn().mockResolvedValue(["C:/dl/STM32.zip"]);
     (window as unknown as { pywebview?: unknown }).pywebview = {
       api: { pick_ingest_files: pick },
@@ -244,7 +285,8 @@ describe("IngestPage — unified Add A Part", () => {
   });
 
   it("is honest when a link yields nothing addable", async () => {
-    mockApi.enrichFromUrl.mockResolvedValue({ ...EMPTY_RESULT, add_plan: null });
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
     wrap(<IngestPage />);
     const user = userEvent.setup();
     await user.type(

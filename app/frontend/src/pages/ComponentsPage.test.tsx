@@ -4,14 +4,16 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
-import type { PartDetail, PartSummary } from "../api/types";
+import type { EnrichmentResult, PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
-// ApiError is preserved (the page branches on it for the error surface).
+// ApiError is preserved (the page branches on it for the error surface). The enrich
+// lookup is a background job now: enrichPart submits it (-> {job_id}) and the sourced
+// result arrives over the job's SSE stream (openJobStream); mock both.
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
   return {
@@ -24,6 +26,7 @@ vi.mock("../api/client", async (importActual) => {
       moveCategory: vi.fn(),
       deletePart: vi.fn(),
       enrichPart: vi.fn(),
+      openJobStream: vi.fn(),
       setSpecs: vi.fn(),
       getDuplicates: vi.fn(),
     },
@@ -31,6 +34,28 @@ vi.mock("../api/client", async (importActual) => {
 });
 
 const mockApi = vi.mocked(api);
+
+function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const s of chunks) c.enqueue(enc.encode(s));
+      c.close();
+    },
+  });
+}
+
+// A successful enrich lookup: the submit returns a job ref, the stream carries the
+// sourced result on the terminal `result` event.
+function mockEnrich(r: EnrichmentResult) {
+  mockApi.enrichPart.mockResolvedValue({ job_id: "e1" });
+  mockApi.openJobStream.mockResolvedValue(
+    streamOf([
+      `event: result\ndata: ${JSON.stringify({ result: r })}\n\n`,
+      "event: done\ndata: {}\n\n",
+    ]),
+  );
+}
 
 // Default: no duplicates. Individual tests override to exercise the badge + filter.
 beforeEach(() => {
@@ -276,7 +301,7 @@ describe("ComponentsPage", () => {
     });
     // The record has no manufacturer, so the sourced value is applyable.
     mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "" });
-    mockApi.enrichPart.mockResolvedValue({
+    mockEnrich({
       category: "ICs",
       mpn: null,
       manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
@@ -319,7 +344,7 @@ describe("ComponentsPage", () => {
       incomplete: 0,
     });
     mockApi.partDetail.mockResolvedValue({ ...DETAIL, manufacturer: "Analog Devices" });
-    mockApi.enrichPart.mockResolvedValue({
+    mockEnrich({
       category: "ICs",
       mpn: null,
       manufacturer: { value: "Analog Devices", source: "jsonld", confidence: "high" },
@@ -360,7 +385,7 @@ describe("ComponentsPage", () => {
       incomplete: 0,
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.enrichPart.mockResolvedValue({
+    mockEnrich({
       category: "ICs",
       mpn: null,
       manufacturer: null,

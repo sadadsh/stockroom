@@ -92,11 +92,20 @@ def enrich_router(require_token) -> APIRouter:
 
     @r.post("/part")
     def enrich_part(request: Request, body: dict) -> dict:
+        """Look a part up by MPN through the pipeline. Runs as a background job (spec
+        section 8): the render tier can take seconds, so the window never blocks. The SSE
+        stream emits the live `fetching -> rendering -> extracting -> validating` stages and
+        ends with the sourced DTO on the `result` event."""
         ctx = request.app.state.ctx
-        pipeline = _make_pipeline(ctx)
-        result = pipeline.enrich(body["mpn"], body.get("category", "Other"),
-                                 want=body.get("want"))
-        return _result_dto(result)
+        mpn = body["mpn"]
+        category = body.get("category", "Other")
+        want = body.get("want")
+
+        def work(progress):
+            pipeline = _make_pipeline(ctx)
+            return _result_dto(pipeline.enrich(mpn, category, want=want, progress=progress))
+
+        return {"job_id": ctx.jobs.submit(work)}
 
     @r.post("/from-url")
     def enrich_from_url(request: Request, body: dict) -> dict:
@@ -104,10 +113,16 @@ def enrich_router(require_token) -> APIRouter:
         browser and return EVERYTHING the page exposes: identity, price breaks, stock, a
         datasheet URL, package, and the full parametric spec set. This is the "paste a
         link and autofill all of it" seam; a blocked/dead page returns empty fields, not
-        an error."""
+        an error. A background job (spec section 8): the live stage sequence streams over
+        SSE and the sourced DTO arrives on the terminal `result` event."""
         ctx = request.app.state.ctx
-        pipeline = _make_pipeline(ctx)
-        return _result_dto(pipeline.extract_from_url(str(body.get("url", ""))))
+        url = str(body.get("url", ""))
+
+        def work(progress):
+            pipeline = _make_pipeline(ctx)
+            return _result_dto(pipeline.extract_from_url(url, progress=progress))
+
+        return {"job_id": ctx.jobs.submit(work)}
 
     @r.post("/bulk")
     def enrich_bulk(request: Request, body: dict) -> dict:

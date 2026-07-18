@@ -16,7 +16,6 @@ import type {
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
-  EnrichmentResult,
   FabExportOptions,
   FabStatus,
   Facets,
@@ -385,18 +384,22 @@ export const api = {
     mpn: string,
     category?: string,
     want?: string[],
-  ): Promise<EnrichmentResult> {
+  ): Promise<JobRef> {
     const body: Record<string, unknown> = { mpn };
     if (category) body.category = category;
     if (want && want.length > 0) body.want = want;
-    return request<EnrichmentResult>("POST", "/api/enrich/part", { body });
+    // A background job (spec section 8): the render tier can take seconds, so this returns a
+    // job ref and the sourced EnrichmentResult arrives on the job's SSE `result` event, with
+    // live fetching/rendering/extracting/validating stages streamed as progress in between.
+    return request<JobRef>("POST", "/api/enrich/part", { body });
   },
 
   // Paste a distributor product URL (a Mouser link) -> fetch it through the real
   // browser and get back EVERY field the page exposes (identity, price, datasheet,
   // package, full spec table). A blocked/dead page returns empty fields, not an error.
-  enrichFromUrl(url: string): Promise<EnrichmentResult> {
-    return request<EnrichmentResult>("POST", "/api/enrich/from-url", { body: { url } });
+  // Returns a job ref; the result + live stages stream over the job's SSE (openJobStream).
+  enrichFromUrl(url: string): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/enrich/from-url", { body: { url } });
   },
 
   // Inspect dropped file paths / LCSC ids into staging candidates. Returns a job
