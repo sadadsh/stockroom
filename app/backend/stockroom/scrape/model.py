@@ -37,6 +37,9 @@ class FetchError:
     reason: str
     kind: str  # "blocked" | "timeout" | "transport" | "http_error"
     status: int = 0
+    # A server Retry-After (seconds), parsed from a 429/503 when present, so the anti-ban
+    # scheduler can honor exactly how long the host asked us to wait. None = not supplied.
+    retry_after: float | None = None
 
     @property
     def ok(self) -> bool:
