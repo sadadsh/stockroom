@@ -43,8 +43,13 @@ def test_parse_tolerates_bare_strings_and_missing_fields():
                              "Description": "a part", "ProductStatus": ""})
     assert r.mpn.value == "X" and r.manufacturer.value == "ACME"
     assert r.description.value == "a part"
-    assert r.lifecycle.value == "Active"      # empty status => Active
+    assert r.lifecycle is None                # empty/absent status => honest None, never fabricated
     assert r.stock is None and r.price_breaks == []
+
+
+def test_parse_maps_a_real_non_active_status():
+    r = _parse_digikey_part({"ProductStatus": {"Status": "Obsolete"}})
+    assert r.lifecycle.value == "Obsolete" and r.lifecycle.source == "digikey"
 
 
 def test_parse_never_raises_on_garbage_shapes():
