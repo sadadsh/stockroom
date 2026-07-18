@@ -13,6 +13,30 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 // Render square at 2x the display box so the icon stays crisp on HiDPI, then display small.
 const SIZE = 96;
 
+// One shared NEUTRAL material every model is rendered in. The GLBs carry wildly different
+// material colours (a tan connector, a near-black resistor, a gray inductor), which at icon
+// size read as an indistinct set of shades; a single neutral surface makes each part read by
+// its SHAPE, lit into form by the studio lights, not by an arbitrary colour. Shared + never
+// disposed (disposeScene skips it), so it is created once for every thumbnail.
+const NEUTRAL_MATERIAL = new THREE.MeshStandardMaterial({
+  color: 0xa8a8ac,
+  roughness: 0.62,
+  metalness: 0.08,
+});
+
+// Replace every mesh's material with the shared neutral one, disposing the GLB's own
+// materials (they are dereferenced and would otherwise leak).
+function neutralize(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const old = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    else old?.dispose();
+    mesh.material = NEUTRAL_MATERIAL;
+  });
+}
+
 let renderer: THREE.WebGLRenderer | null = null;
 let rendererFailed = false;
 let queue: Promise<unknown> = Promise.resolve();
@@ -40,9 +64,8 @@ function disposeScene(scene: THREE.Scene): void {
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
     if (mesh.geometry) mesh.geometry.dispose();
-    const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-    else mat?.dispose();
+    // materials were replaced with the shared NEUTRAL_MATERIAL, which is reused across every
+    // thumbnail and must NOT be disposed here.
   });
 }
 
@@ -78,6 +101,7 @@ function renderOne(glb: ArrayBuffer): Promise<string | null> {
         (gltf) => {
           try {
             scene.add(gltf.scene);
+            neutralize(gltf.scene);
             // Center on the origin, back the camera off the bounding SPHERE (so no clip at
             // the 3/4 angle), place it along the hero's view direction.
             const box = new THREE.Box3().setFromObject(gltf.scene);
