@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow
+from stockroom.store.parametric import ParametricFacets as _ParametricFacets
 from stockroom.store.project_index import ProjectIndexRow
 
 
@@ -48,6 +49,58 @@ class FacetsDTO(BaseModel):
             by_manufacturer=f.by_manufacturer,
             complete=f.complete,
             incomplete=f.incomplete,
+        )
+
+
+class FacetOptionDTO(BaseModel):
+    value: str
+    count: int
+
+
+class ParametricFacetDTO(BaseModel):
+    """One filter dimension GENERATED from the spec bag (never a hardcoded parameter
+    list). `kind` is "options" (top-N distinct values with counts) or "range" (a numeric
+    min/max, with `unit` when the values agree on one). Only the fields the kind uses are
+    populated; the others stay null (an options facet leaves min/max/unit null, a range
+    facet leaves options null)."""
+
+    key: str
+    label: str
+    kind: str
+    count: int
+    options: list[FacetOptionDTO] | None = None
+    min: float | None = None
+    max: float | None = None
+    unit: str | None = None
+
+
+class ParametricFacetsDTO(BaseModel):
+    category: str | None = None
+    facets: list[ParametricFacetDTO]
+    total: int
+
+    @classmethod
+    def from_aggregate(cls, agg: _ParametricFacets) -> "ParametricFacetsDTO":
+        return cls(
+            category=agg.category,
+            facets=[
+                ParametricFacetDTO(
+                    key=f.key,
+                    label=f.label,
+                    kind=f.kind,
+                    count=f.count,
+                    options=(
+                        [FacetOptionDTO(value=o.value, count=o.count) for o in f.options]
+                        if f.options is not None
+                        else None
+                    ),
+                    min=f.min,
+                    max=f.max,
+                    unit=f.unit,
+                )
+                for f in agg.facets
+            ],
+            total=agg.total,
         )
 
 

@@ -29,7 +29,8 @@ def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
 def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx):
     # No fake: drive the REAL IngestPipeline.commit -> LibraryOps.add_part gate through
     # the API. The candidate carries real symbol + footprint SOURCES (so to_staged_part
-    # succeeds) but is missing the datasheet/3D model/purchase passport fields, so the
+    # succeeds) but is missing the datasheet/purchase passport fields (the 3D model is an
+    # attachable asset that no longer gates entry), so the
     # complete-to-add gate must reject it with an honest 422 + per-field missing list,
     # and NOTHING may be written to the primary Main profile (spec section 6). This is
     # the proof that an incomplete part cannot be snuck into a primary profile.
@@ -50,7 +51,7 @@ def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx
     assert r.status_code == 422
     body = r.json()
     assert body["error"] == "IncompleteError"
-    assert set(body["missing"]) >= {"3D model", "datasheet", "purchase link"}
+    assert set(body["missing"]) >= {"datasheet", "purchase link"}
     # the primary profile is untouched: the rejected add left zero trace
     assert client.get("/api/library/parts").json()["count"] == before
 

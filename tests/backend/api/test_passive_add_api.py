@@ -16,8 +16,8 @@ def test_passive_preview_decodes_without_committing(client):
     assert rec["passive"] is True
     assert rec["mpn"] == "ERJ-P03F1101V"
     assert rec["manufacturer"] == "Panasonic"
-    assert rec["symbol"] == {"lib": "Device", "name": "R"}
-    assert rec["footprint"] == {"lib": "Resistor_SMD", "name": "R_0603_1608Metric"}
+    assert rec["symbol"] == {"lib": "Device", "name": "R", "tool": "kicad"}
+    assert rec["footprint"] == {"lib": "Resistor_SMD", "name": "R_0603_1608Metric", "tool": "kicad"}
     assert rec["purchase"][0]["url"] == _OWNER_URL
     assert body["gaps"] == ["datasheet"]
     # preview must not have added anything
@@ -68,7 +68,7 @@ def test_manual_kind_and_package_preview_then_add(client):
     assert preview.status_code == 200, preview.text
     pbody = preview.json()
     assert pbody["status"] == "ok"
-    assert pbody["record"]["footprint"] == {"lib": "Inductor_SMD", "name": "L_1210_3225Metric"}
+    assert pbody["record"]["footprint"] == {"lib": "Inductor_SMD", "name": "L_1210_3225Metric", "tool": "kicad"}
 
     resp = client.post("/api/library/passive", json={
         "input": "560112116151", "kind": "inductor", "package": "1210",

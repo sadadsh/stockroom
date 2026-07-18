@@ -26,6 +26,7 @@ dependencies = [
     # backends, while `uv sync --frozen` on the owner's Windows box provisions it so
     # the launcher's windowed entry can actually open a window (not ModuleNotFoundError).
     "pywebview>=5 ; sys_platform == 'win32'",
+    "selectolax>=0.4.11",
 ]
 
 [dependency-groups]
