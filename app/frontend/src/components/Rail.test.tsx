@@ -10,6 +10,16 @@ const { state, navigate } = vi.hoisted(() => ({
 vi.mock("../lib/router", () => ({
   useRouter: () => ({ route: state.route, navigate }),
 }));
+// The rail now reads theme + live library/sync/update state; stub them so the rail can be
+// tested in isolation (its own render, not the providers).
+vi.mock("../lib/theme", () => ({
+  useTheme: () => ({ theme: "dark", setTheme: vi.fn(), toggle: vi.fn() }),
+}));
+vi.mock("../api/queries", () => ({
+  useFacetsQuery: () => ({ data: { complete: 80, incomplete: 8 } }),
+  useSyncStatus: () => ({ data: { current_branch: "main", ahead: 0, behind: 0 } }),
+  useUpdateCheck: () => ({ data: { update_available: false } }),
+}));
 
 describe("Rail", () => {
   beforeEach(() => {

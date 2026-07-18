@@ -126,10 +126,8 @@ describe("ComponentsPage", () => {
 
     wrap(<ComponentsPage />);
 
-    // The page header carries the title + the live parts count.
-    expect(await screen.findByRole("heading", { name: "Components" })).toBeInTheDocument();
+    // The part appears in the list (the rail carries the library count now, not a header).
     expect(await screen.findByText("LM358")).toBeInTheDocument();
-    expect(await screen.findByText("1 Parts")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
   });

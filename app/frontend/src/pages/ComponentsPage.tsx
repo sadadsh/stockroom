@@ -64,8 +64,6 @@ export function ComponentsPage() {
   const parts = duplicatesOnly
     ? allParts.filter((p) => duplicateIds.has(p.id))
     : allParts;
-  // A live library stat for the header: how many of the listed parts still need a field.
-  const incompleteCount = allParts.filter((p) => !p.is_complete).length;
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
   const detailBusy =
     editField.isPending ||
@@ -175,31 +173,12 @@ export function ComponentsPage() {
 
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
 
+  // north-star .app: rail | list | detail, each column self-heading - no full-width page
+  // header band (the active rail item + the rail's library readout carry that).
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* page header: the title plus a live library readout (parts shown, how many
-          still need a field) in the mono stat face - the header earns its band. */}
-      <header className="flex h-14 flex-none items-center gap-3 border-b border-line px-[18px]">
-        <h1 className="text-lg font-semibold text-t1">Components</h1>
-        {partsQuery.data ? (
-          <div className="flex items-center gap-2 text-2xs">
-            <span className="tnum font-mono text-t3">{partsQuery.data.count} Parts</span>
-            {incompleteCount > 0 ? (
-              <>
-                <span className="text-t3" aria-hidden="true">
-                  ·
-                </span>
-                <span className="tnum font-mono text-warn">
-                  {incompleteCount} Incomplete
-                </span>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-      <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1">
         {/* picker */}
-        <div className="flex w-[348px] flex-none flex-col px-3.5 pt-3.5">
+        <div className="flex w-[320px] flex-none flex-col px-3.5 pt-4">
           <div className="px-2 pt-2">
             <Button
               variant="accent"
@@ -268,7 +247,6 @@ export function ComponentsPage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }
