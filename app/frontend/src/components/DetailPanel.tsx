@@ -36,23 +36,6 @@ import {
 // lands (see the Part Canvas), so they are not part of this score.
 const PASSPORT_TOTAL = 7;
 
-// Known EDA tools mapped to their proper casing; anything else is Title Cased from the raw
-// value. A present asset always targets some tool, so an absent field reads as the backend
-// default "kicad". Data-driven so a future Altium asset surfaces its own label with no code
-// change.
-const _KNOWN_TOOLS: Record<string, string> = {
-  kicad: "KiCad",
-  altium: "Altium",
-};
-
-export function toolLabel(tool: string | undefined): string {
-  const t = (tool || "").trim();
-  if (!t) return _KNOWN_TOOLS.kicad;
-  const known = _KNOWN_TOOLS[t.toLowerCase()];
-  if (known) return known;
-  return t.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-}
-
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
 // empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
 // search and extensible: a brand-new spec key still groups sanely with no code change here.
@@ -231,9 +214,6 @@ export function DetailPanel({
               name="3D Model"
               className="h-[300px]"
               present={hasModel}
-              // A passive owns no model.file but inherits its stock footprint's built-in
-              // model, so the tile's tool falls back to the footprint's tool there.
-              tool={detail.model?.tool ?? detail.footprint?.tool}
               art={<CubeArt />}
               thumb={
                 hasModel ? (
@@ -255,7 +235,6 @@ export function DetailPanel({
                 name="Symbol"
                 className="h-[152px]"
                 present={!!detail.symbol?.name}
-                tool={detail.symbol?.tool}
                 art={<SymbolArt />}
                 thumb={
                   detail.symbol?.name ? (
@@ -270,7 +249,6 @@ export function DetailPanel({
                 name="Footprint"
                 className="h-[152px]"
                 present={!!detail.footprint?.name}
-                tool={detail.footprint?.tool}
                 art={<FootprintArt />}
                 thumb={
                   detail.footprint?.name ? (
@@ -716,7 +694,6 @@ function splitTags(raw: string): string[] {
 function AssetTile({
   name,
   present,
-  tool,
   art,
   thumb,
   onOpen,
@@ -726,10 +703,6 @@ function AssetTile({
 }: {
   name: string;
   present: boolean;
-  // The EDA tool the present asset targets, shown as a small pill (KiCad today,
-  // Altium later). Read straight from the asset's `tool` field; absent reads as the
-  // backend default (KiCad). Only meaningful when the asset is present.
-  tool?: string;
   art: ReactNode;
   // The live render shown when present (falls back to `art` internally on failure);
   // omit it and `art` is shown directly.
@@ -778,11 +751,6 @@ function AssetTile({
   const footer = (
     <div className="flex items-center gap-2 px-3 py-2.5">
       <span className="text-xs font-semibold text-t1">{name}</span>
-      {present ? (
-        <Badge tone="neutral" size="sm">
-          {toolLabel(tool)}
-        </Badge>
-      ) : null}
       <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
         {present ? (
           <>
