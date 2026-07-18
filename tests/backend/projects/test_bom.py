@@ -850,6 +850,25 @@ def test_price_rows_keeps_footprint_package_when_enrich_has_none():
     assert rows[0]["rohs"] == "Yes"  # a rohs already set is not clobbered
 
 
+def test_price_rows_threads_tariff_rate_and_country_of_origin():
+    # library_price_index sets entry["tariff_rate"] / entry["country_of_origin"] from a part's
+    # Mouser specs; _price_rows must copy them onto the row so the per-line import-tariff math
+    # (which reads row["tariff_rate"]) actually uses the part's own rate. A confirmed 0.0 rate
+    # propagates (a US-origin no-tariff part is real data, not a blank).
+    rows = [{"mpn": "X", "qty": 1}, {"mpn": "Y", "qty": 1}]
+
+    def lookup(m):
+        if m == "X":
+            return {"unit_price": 1.0, "tariff_rate": 25.0, "country_of_origin": "China"}
+        return {"unit_price": 1.0, "tariff_rate": 0.0, "country_of_origin": "United States"}
+
+    _price_rows(rows, lookup, "qty")
+    assert rows[0]["tariff_rate"] == 25.0
+    assert rows[0]["country_of_origin"] == "China"
+    assert rows[1]["tariff_rate"] == 0.0  # confirmed no-tariff propagates, not dropped
+    assert rows[1]["country_of_origin"] == "United States"
+
+
 def test_bom_rows_carry_package_from_footprint(tmp_path):
     _write_sch(tmp_path / "b.kicad_sch",
                _sym("R1", "10k", fp="Resistor_SMD:R_0603_1608Metric"))

@@ -17,9 +17,25 @@ def test_mouser_matches_regional_tld_domains():
     assert m.matches("https://www.mouser.co.il/en/ProductDetail/TI/TPS259470LRPWR")
     assert m.matches("https://www.mouser.de/ProductDetail/x")
     assert m.matches("https://www.mouser.com/en/ProductDetail/x")
-    # never a false claim on an unrelated host that merely contains the string "mouser"
+    assert m.matches("https://mouser.co.il/ProductDetail/x")  # no www
+    # scheme-less URL still resolves its host (the fetcher can hand back a bare host)
+    assert m.matches("www.mouser.com/en/ProductDetail/x")
+
+
+def test_mouser_matches_only_the_registrable_mouser_domain():
+    # "mouser" must be the REGISTRABLE domain, not just any DNS label: a foreign eTLD+1 with a
+    # "mouser" subdomain, or a URL whose path/query merely contains mouser.com, is NOT Mouser and
+    # must be refused (extract_product runs EVERY matching adapter, so a false claim contaminates
+    # the result with spurious rows / price breaks).
+    m = MouserWebSite()
+    assert not m.matches("https://mouser.blogspot.com/post")
+    assert not m.matches("https://mouser.evil-reseller.com/fake")
+    assert not m.matches("https://mouser.example.com/")
     assert not m.matches("https://www.notmouser.com/x")
     assert not m.matches("https://www.digikey.com/x")
+    assert not m.matches("https://www.digikey.com/product?ref=www.mouser.com/x")
+    # scheme-less foreign URL whose query contains mouser.com must NOT be claimed
+    assert not m.matches("www.digikey.com/product?ref=www.mouser.com/x")
 
 
 def test_mouser_package_label_without_slash_spaces_is_promoted():

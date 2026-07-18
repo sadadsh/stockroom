@@ -1000,6 +1000,15 @@ def _price_rows(rows, price_lookup, qty_key: str):
         # footprint-derived baseline; rohs/category only fill a value the row does not carry.
         if res.get("package"):
             r["package"] = res["package"]
+        # The part's own effective import tariff drives the per-line tariff math (_annotate_pricing
+        # reads row["tariff_rate"]); without threading it here the enriched specs["US Tariff %"]
+        # never reaches the cost and every line silently falls back to the blanket project rate.
+        # An explicit None/"" guard (not truthiness) so a confirmed 0.0 (US-origin no-tariff) still
+        # propagates rather than being read as "unknown".
+        if res.get("tariff_rate") not in (None, ""):
+            r["tariff_rate"] = res["tariff_rate"]
+        if res.get("country_of_origin") and not r.get("country_of_origin"):
+            r["country_of_origin"] = res["country_of_origin"]
         for k in ("source", "lcsc_pn", "mouser_pn", "digikey_pn", "url", "category", "rohs"):
             v = res.get(k)
             if v and not r.get(k):
