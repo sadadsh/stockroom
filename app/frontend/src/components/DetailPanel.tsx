@@ -956,28 +956,35 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
       </div>
       {/* a datasheet parameter block: two aligned columns, values in the mono readout face with
           tabular figures, sectioned by a full-width group eyebrow (Electrical / Physical / ...). */}
-      <div className="grid grid-cols-2 gap-x-8 md:grid-cols-3 xl:grid-cols-4">
-        {flat.map((row, i) => {
-          const firstOfGroup = i === 0 || flat[i - 1].group !== row.group;
-          return (
-            <Fragment key={row.key}>
-              {firstOfGroup ? (
-                <div className="col-span-full px-0.5 pb-1.5 pt-4 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5">
-                  {row.group}
+      {/* Two clean columns with a hairline down the middle so the split reads clearly (a
+          3-4 column flow with uneven group sizes was hard to parse). Each cell stacks its
+          label over the value so a long value wraps in place instead of running off. */}
+      <div className="relative">
+        <div
+          className="pointer-events-none absolute inset-y-2 left-1/2 hidden w-px -translate-x-1/2 md:block"
+          style={{ background: "var(--c-line)" }}
+          aria-hidden="true"
+        />
+        <div className="grid grid-cols-1 gap-x-10 md:grid-cols-2">
+          {flat.map((row, i) => {
+            const firstOfGroup = i === 0 || flat[i - 1].group !== row.group;
+            return (
+              <Fragment key={row.key}>
+                {firstOfGroup ? (
+                  <div className="col-span-full px-0.5 pb-1.5 pt-5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5">
+                    {row.group}
+                  </div>
+                ) : null}
+                <div className="min-w-0 border-b border-line px-0.5 py-2">
+                  <div className="text-[11px] text-t3">{row.label}</div>
+                  <div className="tnum mt-0.5 break-words font-mono text-[13px] leading-snug text-t1">
+                    {row.unit ? `${row.value} ${row.unit}` : row.value}
+                  </div>
                 </div>
-              ) : null}
-              {/* label over value (stacked): the scraped values run long ("0.45 mm (0.018
-                  in)", "Automotive Grade"), so a side-by-side row pushed them off the card;
-                  stacking gives the value the full column width and it wraps in place. */}
-              <div className="min-w-0 border-b border-line px-0.5 py-2">
-                <div className="text-[11px] text-t3">{row.label}</div>
-                <div className="tnum mt-0.5 break-words font-mono text-[13px] leading-snug text-t1">
-                  {row.unit ? `${row.value} ${row.unit}` : row.value}
-                </div>
-              </div>
-            </Fragment>
-          );
-        })}
+              </Fragment>
+            );
+          })}
+        </div>
       </div>
     </>
   );
