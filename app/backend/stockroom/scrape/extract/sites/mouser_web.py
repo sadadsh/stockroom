@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import re
 from html import unescape
-from urllib.parse import urlparse
 
 from stockroom.enrich.schema import EnrichmentResult, Sourced
+from stockroom.scrape.extract.sites._hostmatch import is_brand_host
 
 # Mouser embeds the real datasheet URL in its analytics dataLayer as
 # `event_datasheet_url`, both raw ("event_datasheet_url":"https://...pdf") and
@@ -247,37 +247,14 @@ def _extract_lead_time(html: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-# Two-level public suffixes Mouser's regional storefronts sit under, so "mouser" is read as the
-# registrable-domain label rather than a bare subdomain (mouser.co.il -> registrable mouser.co.il,
-# not co.il). Single-level TLDs (.com/.de/.fr/...) need no entry. A regional TLD absent here just
-# fails to auto-claim (a safe miss), never a false claim on a foreign host.
-_TWO_LEVEL_SUFFIXES = frozenset({
-    "co.il", "co.uk", "co.jp", "co.kr", "co.in", "co.za", "co.nz", "co.th",
-    "com.cn", "com.mx", "com.tw", "com.br", "com.sg", "com.au", "com.hk", "com.my",
-})
-
-
-def _registrable_domain(host: str) -> str:
-    """The registrable domain (eTLD+1) of a hostname, honoring the two-level ccTLDs Mouser uses,
-    so mouser.co.il -> 'mouser.co.il' while mouser.blogspot.com -> 'blogspot.com'."""
-    parts = host.split(".")
-    if len(parts) >= 3 and ".".join(parts[-2:]) in _TWO_LEVEL_SUFFIXES:
-        return ".".join(parts[-3:])
-    return ".".join(parts[-2:]) if len(parts) >= 2 else host
-
-
 class MouserWebSite:
     def matches(self, url: str) -> bool:
         # Any Mouser storefront TLD (mouser.com, mouser.co.il, mouser.de, ...) serves the SAME
         # product page, so all of them get the full parametric/compliance extractor. Claim ONLY
         # when "mouser" is the REGISTRABLE domain (not merely a DNS label): mouser.blogspot.com /
         # mouser.evil.com are foreign sites and must NOT be claimed (extract_product runs EVERY
-        # matching adapter, so a false claim contaminates the result). A scheme-less string is
-        # normalized so its host is read from the netloc, never from a path/query that happens to
-        # contain "mouser.com".
-        raw = url if "://" in (url or "") else "//" + (url or "")
-        host = (urlparse(raw).hostname or "").lower()
-        return _registrable_domain(host).split(".", 1)[0] == "mouser"
+        # matching adapter, so a false claim contaminates the result).
+        return is_brand_host(url, "mouser")
 
     def extract(self, html: str, url: str) -> EnrichmentResult:
         r = EnrichmentResult()
