@@ -22,6 +22,17 @@ def test_mouser_matches_regional_tld_domains():
     assert not m.matches("https://www.digikey.com/x")
 
 
+def test_mouser_package_label_without_slash_spaces_is_promoted():
+    # The regional .co.il storefront renders the package row label as "Package/Case" (no spaces
+    # around the slash) where .com uses "Package / Case"; both must promote to the package field,
+    # not leave a stray "Package/Case" spec (corpus part tps259470lrpwr package = VQFN-HR-10).
+    html = ('<td class="attr-col"><label>Package/Case:</label></td>'
+            '<td class="attr-value-col">VQFN-HR-10</td>')
+    r = MouserWebSite().extract(html, "https://www.mouser.co.il/x")
+    assert r.package is not None and r.package.value == "VQFN-HR-10"
+    assert "Package/Case" not in r.specs
+
+
 def test_mouser_price_ladder_monotonic():
     html = (
         '<table class="pricing-table">'

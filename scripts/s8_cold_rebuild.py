@@ -171,9 +171,12 @@ def compare(rec: dict, dto: dict) -> dict:
     # Fields compared for COVERAGE only, never correctness, because a mismatch there is not a
     # wrong parametric VALUE: `description` is free-text with divergent sources (corpus terse
     # hand/symbol text vs the Mouser page title); `lifecycle` is a manufacturing STATUS that
-    # legitimately drifts between the months-old corpus snapshot and a live scrape (Active <->
-    # New Product), so the live value is honest, not wrong.
-    coverage_only = {"description", "lifecycle"}
+    # legitimately drifts (Active <-> New Product); `us tariff %` is the effective import tariff
+    # Mouser bakes into its live price ladder, which drifts with tariff POLICY (verified: corpus
+    # 1043 = 0.0, the live ladder now shows DecTariff/DecUnit = 0.449/2.99 = 15.02% - the
+    # extractor is correct, the corpus snapshot is stale). Coverage still requires the field be
+    # present; only the volatile value is exempt from the wrong-check.
+    coverage_only = {"description", "lifecycle", "us tariff %"}
     covered, missed, wrong = [], [], []
     for k, cv in cf.items():
         if k in rf:

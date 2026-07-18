@@ -62,7 +62,17 @@ _TAGS = re.compile(r"<[^>]+>")
 # Labels whose value IS the component package/case. "Mounting Style" is deliberately NOT here:
 # on a real Mouser page it reads "PCB Mount" / "SMD/SMT" (how it mounts, not its size), and letting
 # it win hid the true package (the real ERJ page carries the size only in "Case Code - in": 0603).
-_PACKAGE_LABELS = {"package / case", "package", "case/package"}
+# Stored slash-collapsed and matched slash-collapsed (see _is_package_label) so BOTH spacings of
+# the label survive: the .com storefront renders "Package / Case", the regional .co.il one renders
+# "Package/Case" (no spaces) - without this the co.il package (VQFN-HR-10) was left a stray spec.
+_PACKAGE_LABELS = {"package/case", "package", "case/package"}
+_SLASH_WS = re.compile(r"\s*/\s*")
+
+
+def _is_package_label(label: str) -> bool:
+    return _SLASH_WS.sub("/", label.lower().strip()) in _PACKAGE_LABELS
+
+
 # Fallback package sources, in preference order, used only when no _PACKAGE_LABELS row was found:
 # the imperial case code ("Case Code - in": 0603) is the EIA size the app names packages by.
 # Only EIA case-code labels: they carry a clean package token (0603). "Size / Dimension" is
@@ -267,7 +277,7 @@ class MouserWebSite:
             if not label or not value:
                 continue
             found = True
-            if label.lower() in _PACKAGE_LABELS and r.package is None:
+            if _is_package_label(label) and r.package is None:
                 r.package = Sourced(value, "mouser_web", "medium")
             else:
                 r.specs.setdefault(label, Sourced(value, "mouser_web", "medium"))
@@ -279,7 +289,7 @@ class MouserWebSite:
                 value = unescape(value).strip()
                 if not label or not value:
                     continue
-                if label.lower() in _PACKAGE_LABELS and r.package is None:
+                if _is_package_label(label) and r.package is None:
                     r.package = Sourced(value, "mouser_web", "medium")
                 else:
                     r.specs.setdefault(label, Sourced(value, "mouser_web", "medium"))
