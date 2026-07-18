@@ -94,9 +94,23 @@ def test_run_refreshes_stale_mpn_parts_and_summarizes(tmp_path):
         events.append, force=True, now_fn=_fixed_now)
     assert summary["total"] == 2                          # a, c (b has no MPN)
     assert summary["updated"] == 1 and summary["unchanged"] == 0 and summary["no_data"] == 1
-    assert ops.commits == ["a", "c"]                      # both committed-through; only a moved head
+    assert ops.commits == ["a"]                           # c returned no data -> the write lane is skipped
     assert ctx.rebuilt == 1 and ctx.pushed == 1           # one rebuild + one push, at the end
     assert any(e.get("outcome") == "updated" for e in events)
+
+
+def test_a_part_with_data_but_no_change_is_unchanged_and_does_not_rebuild_or_push(tmp_path):
+    index = _Index([_Row("a", "MPN-A")])
+    ops = _Ops(changed_ids=[])                             # "a" is NOT a changed id -> head never moves
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A")})]  # returns real data
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=[])
+    summary = RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert summary["total"] == 1
+    assert summary["unchanged"] == 1 and summary["updated"] == 0
+    assert ops.commits == ["a"]                            # it had data, so still committed-through
+    # the guarantee: a non-empty worklist that changes nothing must NOT rebuild the index or push
+    assert ctx.rebuilt == 0 and ctx.pushed == 0
 
 
 def test_incremental_skips_fresh_parts(tmp_path):

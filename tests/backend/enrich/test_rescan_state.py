@@ -22,6 +22,18 @@ def test_is_fresh_is_a_lexical_cutoff_compare(tmp_path):
     assert s.is_fresh("x", "2026-07-19T10:00:00+00:00") is False    # checked before cutoff -> stale
 
 
+def test_a_failed_part_is_never_fresh_so_it_is_retried(tmp_path):
+    s = RescanState(tmp_path / "st.json")
+    checked_at = "2026-07-18T10:00:00+00:00"
+    earlier_cutoff = "2026-07-11T10:00:00+00:00"          # checked_at is AFTER this cutoff
+    s.record("failed-part", "failed", checked_at)
+    s.record("updated-part", "updated", checked_at)
+    # failed is never fresh, even though its timestamp is after the cutoff -> retried incrementally
+    assert s.is_fresh("failed-part", earlier_cutoff) is False
+    # same timestamp, "updated" outcome -> IS fresh (proves only "failed" is excluded)
+    assert s.is_fresh("updated-part", earlier_cutoff) is True
+
+
 def test_clear_removes_the_file_and_entries(tmp_path):
     p = tmp_path / "st.json"
     s = RescanState(p)

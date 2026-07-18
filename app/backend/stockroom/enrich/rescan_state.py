@@ -40,10 +40,12 @@ class RescanState:
         return entry.get("outcome", "") if isinstance(entry, dict) else ""
 
     def is_fresh(self, part_id: str, cutoff_iso: str) -> bool:
-        """True iff this part was checked at/after cutoff_iso. Both are UTC ISO-8601, which sorts
-        lexically, so a plain string compare is a valid chronological compare."""
+        """True iff this part was SUCCESSFULLY checked at/after cutoff_iso. A part recorded 'failed'
+        is never fresh, so an incremental re-run retries it (rather than skipping a stale failure for
+        a whole TTL); only force re-fetches successful parts. Timestamps are UTC ISO-8601, which
+        sorts lexically, so the compare is a valid chronological compare."""
         checked = self.last_checked(part_id)
-        return bool(checked) and checked >= cutoff_iso
+        return bool(checked) and self.outcome(part_id) != "failed" and checked >= cutoff_iso
 
     def record(self, part_id: str, outcome: str, checked_at: str) -> None:
         self._entries[part_id] = {"checked_at": checked_at, "outcome": outcome}
