@@ -394,6 +394,64 @@ describe("IngestPage — unified Add A Part", () => {
     delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
 
+  it("tears down the part context after a non-passive commit so a later ZIP is not contaminated", async () => {
+    // Committing a looked-up non-passive part (removeStaged) must reset the whole part context,
+    // like a passive add does. Otherwise the just-added part's lookup stays live and its identity
+    // merges onto an unrelated ZIP browsed afterward, and the completed ZIP job can resurrect
+    // un-merged. Both are the "one part-context teardown after any add" property.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.ingestInspect
+      .mockResolvedValueOnce({ job_id: "zipX" })
+      .mockResolvedValueOnce({ job_id: "zipU" });
+    mockApi.openJobStream.mockImplementation((jobId: string) => {
+      if (jobId === "e1")
+        return Promise.resolve(
+          enrichStream({
+            ...EMPTY_RESULT,
+            category: "ICs",
+            mpn: sf("STM32F103C8T6"),
+            description: sf("ARM Cortex-M3 MCU"),
+            add_plan: null,
+          }),
+        );
+      if (jobId === "zipX") return Promise.resolve(resultStream([ZIP_CANDIDATE]));
+      return Promise.resolve(resultStream([{ ...ZIP_CANDIDATE, entry_name: "UNREL555" }]));
+    });
+    mockApi.ingestCommit.mockResolvedValue({ id: "stm32", display_name: "STM32F103" } as PartDetail);
+    const pick = vi
+      .fn()
+      .mockResolvedValueOnce(["C:/dl/STM32.zip"])
+      .mockResolvedValueOnce(["C:/dl/UNREL.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+
+    // look up non-passive X, drop its ZIP (merged), and commit it
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/stm32",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    await screen.findByText("Needs Files");
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
+    await screen.findByText("Review and Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6"); // merged X
+    await user.click(screen.getByRole("button", { name: "Add to Components" }));
+    await screen.findByText(/Added STM32F103/i);
+
+    // the whole part context tore down: no leftover "Needs Files" card, no resurrected staged card
+    expect(screen.queryByText("Needs Files")).not.toBeInTheDocument();
+    expect(screen.queryByText("Review and Add")).not.toBeInTheDocument();
+
+    // browse an UNRELATED ZIP: it must NOT inherit the committed part's MPN
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
+    await screen.findByText("Review and Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue("");
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
   it("is honest when a link yields nothing addable", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
     mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
