@@ -1,4 +1,4 @@
-from stockroom.enrich.digikey_api import _parse_digikey_part
+from stockroom.enrich.digikey_api import _parse_digikey_part, DigiKeyAdapter
 
 _PRODUCT = {
     "ManufacturerProductNumber": "SN74LVC1G08DBVR",
@@ -57,3 +57,41 @@ def test_parse_never_raises_on_garbage_shapes():
                     {"ProductVariations": [{"StandardPricing": 7}]},
                     {"Classifications": "x"}]:
         assert _parse_digikey_part(product) is not None   # must not raise
+
+
+_BODY = {"Products": [
+    {"ManufacturerProductNumber": "SN74LVC1G08DBVR", "Manufacturer": {"Name": "TI"},
+     "ProductStatus": {"Status": "Active"}},
+    {"ManufacturerProductNumber": "OTHER-PART", "Manufacturer": {"Name": "TI"}},
+]}
+
+
+def test_lookup_picks_the_exact_mpn():
+    a = DigiKeyAdapter("id", "secret", requester=lambda mpn: _BODY)
+    r = a.lookup("sn74lvc1g08dbvr")   # case-insensitive exact match
+    assert r.mpn.value == "SN74LVC1G08DBVR" and r.mpn.source == "digikey"
+    assert r.mpn.confidence == "high"
+
+
+def test_lookup_downgrades_confidence_without_exact_match():
+    body = {"Products": [{"ManufacturerProductNumber": "CLOSE-BUT-NOT-IT",
+                          "Manufacturer": {"Name": "TI"}}]}
+    r = DigiKeyAdapter("id", "secret", requester=lambda mpn: body).lookup("WANTED")
+    assert r.mpn.value == "CLOSE-BUT-NOT-IT" and r.mpn.confidence == "low"
+
+
+def test_lookup_disabled_without_creds_makes_no_call():
+    calls = []
+    a = DigiKeyAdapter("", "", requester=lambda mpn: calls.append(mpn) or {})
+    assert a.enabled is False
+    assert a.lookup("X").mpn is None and calls == []
+
+
+def test_lookup_never_raises_on_requester_failure_or_empty():
+    from stockroom.enrich.errors import EnrichError
+
+    def boom(mpn):
+        raise EnrichError("dead")
+
+    assert DigiKeyAdapter("id", "s", requester=boom).lookup("X").mpn is None
+    assert DigiKeyAdapter("id", "s", requester=lambda m: {"Products": []}).lookup("X").mpn is None
