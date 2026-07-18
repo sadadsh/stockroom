@@ -20,16 +20,6 @@ from stockroom.scrape.stealth.patches import (
     stealth_launch_args,
 )
 
-# Text a bot-manager interstitial (Akamai / Cloudflare) shows while its JS proof
-# of work runs, before it redirects to the real page.
-_CHALLENGE_MARKERS = (
-    "access denied",
-    "verifying you are human",
-    "checking your browser",
-    "enable javascript and cookies",
-    "unusual traffic",
-    "please wait while we verify",
-)
 # A real product page renders thousands of characters; a challenge shell renders
 # almost none. The settle signal is a substantial, STABLE body of text.
 _MIN_REAL_TEXT = 400
@@ -45,8 +35,11 @@ _BLOCK_HOSTS = (
 
 
 def is_challenge_text(probe: str) -> bool:
-    p = (probe or "").lower()
-    return any(marker in p for marker in _CHALLENGE_MARKERS)
+    """Whether a probe carries an anti-bot interstitial marker. Delegates to the shared, vetted
+    marker list (stockroom.scrape.fetch.challenge) so every fetcher detects the same set."""
+    from stockroom.scrape.fetch.challenge import looks_challenge
+
+    return looks_challenge(probe)
 
 
 def looks_settled(

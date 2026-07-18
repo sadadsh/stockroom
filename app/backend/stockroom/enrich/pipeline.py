@@ -83,13 +83,29 @@ def fill_category(result: EnrichmentResult) -> None:
 
 
 def _is_substantive(result: EnrichmentResult) -> bool:
-    """True when a scrape actually pulled part data (identity / package / price / a real spec),
-    so the result is worth caching. A result carrying only the product_url marker, or just an
-    OpenGraph description off a blocked/challenge page, is NOT substantive and is never cached as
-    the answer, so the next lookup re-fetches instead of returning the thin miss forever."""
-    if result.mpn is not None or result.package is not None or result.price_breaks:
+    """True when a scrape pulled REAL part data, not just a lone description, so the result is
+    worth caching AND its description is trustworthy. A blocked/challenge shell yields ONLY an
+    OpenGraph/title description (plus maybe the product_url marker); EVERY other field checked here
+    is set only from STRUCTURED product data (JSON-LD / next_data / microdata / a distributor
+    spec table) that a challenge shell cannot produce, so any one of them marks a genuine page -
+    including a manufacturer landing page that carries brand + name but no MPN yet."""
+    if (result.mpn is not None or result.manufacturer is not None or result.package is not None
+            or result.datasheet_url is not None or result.stock is not None
+            or result.lifecycle is not None or result.lead_time is not None
+            or result.price_breaks or result.dist_pns):
         return True
     return any(key != "product_url" for key in result.specs)
+
+
+def _drop_thin_description(result: EnrichmentResult) -> None:
+    """Honest degradation, vendor-agnostic backstop: a block/challenge/thin page yields ONLY a
+    description - the anti-bot interstitial text ("Just a moment...", "Access to this page has
+    been denied.") or an OpenGraph blurb off a challenge shell - and no real product data.
+    Surfacing that as the part's description fabricates data, so a non-substantive result has its
+    lone description dropped. The marker-level detector (camoufox `_looks_challenge`) is the first
+    line; this catches ANY shell that slips past a specific marker, for any anti-bot vendor."""
+    if result.description is not None and not _is_substantive(result):
+        result.description = None
 
 
 def _default_url_for(mpn: str, category: str) -> str:
@@ -265,6 +281,7 @@ class ScrapeSource:
         parsed = extract_all(page.text, page.final_url or url, self._site_extractors)
         emit(progress, Stage.VALIDATING, "checking values")
         result = validate_product(parsed)
+        _drop_thin_description(result)  # never leak a challenge/thin shell's text as a description
         # record the product URL so the pipeline can build a Purchase link
         if page.final_url or url:
             result.specs.setdefault(
@@ -388,6 +405,7 @@ class EnrichmentPipeline:
         except (EnrichError, OSError):
             return candidate  # a dead purchase link never blocks the fill
         result = validate_product(extract_all(page.text, page.final_url or url, SITE_EXTRACTORS))
+        _drop_thin_description(result)  # never leak a challenge/thin shell's text as a description
 
         for field_name, attr in _CANDIDATE_FIELDS.items():
             sourced = getattr(result, field_name)
@@ -455,6 +473,10 @@ class EnrichmentPipeline:
                 "product_url", Sourced(page.final_url or url, "scrape", "medium")
             )
         fill_category(result)
+        # AFTER fill_category, so a real thin page's category is still derived from its
+        # description before a non-substantive result's lone (challenge/SEO) description is dropped.
+        # product_url is excluded from _is_substantive, so adding it above never masks a thin shell.
+        _drop_thin_description(result)
         # Cache ONLY a substantive pull, so a one-off thin or Akamai-blocked fetch (which yields
         # just a description) never becomes the cached answer and a retry can still get the page.
         if _is_substantive(result):
