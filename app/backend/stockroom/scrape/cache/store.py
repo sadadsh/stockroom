@@ -67,3 +67,33 @@ class ResponseCache:
         self._path(page.url).write_text(
             json.dumps(d, ensure_ascii=False), encoding="utf-8"
         )
+
+    # -- negative cache (anti-ban, spec section 6) ---------------------------------
+    # A freshly-blocked URL is remembered for a SHORT ttl so the engine does not re-hit it
+    # (and re-provoke the WAF) on the very next attempt; the short ttl means a later attempt
+    # still retries clean once the block has likely lifted.
+
+    def _neg_path(self, url: str) -> Path:
+        key = hashlib.sha256(url.encode("utf-8")).hexdigest()
+        return self.root / f"{key}.neg.json"
+
+    def put_negative(self, url: str, ttl: float = 300.0) -> None:
+        self._neg_path(url).write_text(
+            json.dumps({"stamp": self._clock(), "ttl": ttl}), encoding="utf-8"
+        )
+
+    def is_negative(self, url: str) -> bool:
+        path = self._neg_path(url)
+        if not path.exists():
+            return False
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+            stamp = float(d["stamp"])
+            ttl = float(d.get("ttl", 300.0))
+        except (ValueError, KeyError, OSError):
+            path.unlink(missing_ok=True)
+            return False
+        if self._clock() - stamp >= ttl:
+            path.unlink(missing_ok=True)
+            return False
+        return True

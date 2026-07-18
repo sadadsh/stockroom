@@ -26,17 +26,42 @@ def _is_downloadable(url: str) -> bool:
     return path.endswith(_DOWNLOAD_SUFFIXES)
 
 
+def _host_of(url: str) -> str:
+    return (urlsplit(url).netloc or "").lower()
+
+
 class ScrapeEngine:
     def __init__(self, cache: ResponseCache | None = None, http: HttpClient | None = None,
-                 browser=None):
+                 browser=None, scheduler=None):
         self._cache = cache
         self._http = http or HttpClient()
         self._browser = browser
+        # The anti-ban scheduler (S4): paces each host, records blocks/successes, trips a
+        # per-host breaker. Optional; with none the engine is un-governed (S1-S3 behavior).
+        self._scheduler = scheduler
 
     def _cached(self, url: str) -> Page | None:
         if self._cache is None:
             return None
         return self._cache.get(url)
+
+    def _negative(self, url: str) -> bool:
+        return self._cache is not None and self._cache.is_negative(url)
+
+    def _record(self, url: str, host: str, outcome: FetchOutcome) -> None:
+        """Feed the outcome back into the anti-ban subsystem: a block tightens the host,
+        trips its breaker, and is negative-cached so the next attempt does not re-hit it; a
+        success loosens the host."""
+        if isinstance(outcome, FetchError) and outcome.kind == "blocked":
+            if self._scheduler is not None:
+                self._scheduler.record_block(host, getattr(outcome, "retry_after", None))
+            if self._cache is not None:
+                try:
+                    self._cache.put_negative(url)
+                except OSError:
+                    pass
+        elif isinstance(outcome, Page) and outcome.ok and self._scheduler is not None:
+            self._scheduler.record_success(host)
 
     def _store(self, outcome: FetchOutcome) -> None:
         if (
@@ -54,7 +79,17 @@ class ScrapeEngine:
         hit = self._cached(url)
         if hit is not None:
             return hit
-        outcome = await self._http.get(url, referer=referer, timeout=timeout)
+        if self._negative(url):
+            return FetchError(url=url, reason="recently blocked (negative cache)", kind="blocked")
+        host = _host_of(url)
+        if self._scheduler is not None:
+            await self._scheduler.acquire(host)
+        try:
+            outcome = await self._http.get(url, referer=referer, timeout=timeout)
+        finally:
+            if self._scheduler is not None:
+                self._scheduler.release(host)
+        self._record(url, host, outcome)
         self._store(outcome)
         return outcome
 
@@ -64,7 +99,17 @@ class ScrapeEngine:
         hit = self._cached(url)
         if hit is not None:
             return hit
-        outcome = await self._browser.fetch(url, timeout=timeout)
+        if self._negative(url):
+            return FetchError(url=url, reason="recently blocked (negative cache)", kind="blocked")
+        host = _host_of(url)
+        if self._scheduler is not None:
+            await self._scheduler.acquire(host)
+        try:
+            outcome = await self._browser.fetch(url, timeout=timeout)
+        finally:
+            if self._scheduler is not None:
+                self._scheduler.release(host)
+        self._record(url, host, outcome)
         self._store(outcome)
         return outcome
 

@@ -45,9 +45,12 @@ class Scheduler:
         await self._sem.acquire()
         gov = self._governor(host)
         # Loop: the rate/cooldown can move while we wait, so re-check after each sleep.
+        # Read `when` first, then a FRESH `now`: next_available() reads the clock itself, so
+        # `now` must be sampled AFTER it or a ready token (when == its own now) would always
+        # look "in the future" and spin.
         while True:
-            now = self._clock()
             when = gov.next_available()
+            now = self._clock()
             if when <= now:
                 gov.consume()
                 return
