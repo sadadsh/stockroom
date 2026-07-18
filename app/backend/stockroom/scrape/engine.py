@@ -120,6 +120,60 @@ class ScrapeEngine:
             return await self.render(url, timeout=timeout)
         return await self.download(url, referer=referer, timeout=timeout)
 
+    async def crawl(self, seed: str, scope, workers: int = 8, timeout: float = 20.0) -> list:
+        """Concurrently crawl from `seed` within `scope` (spec section 5): workers pull the
+        frontier, scrape each page (auto-governed by the anti-ban scheduler), dedup by
+        canonical URL + content hash, and enqueue in-scope unseen links. Returns the list of
+        ScrapeResults. Never raises: a blocked/dead page is recorded and skipped, not fatal;
+        an empty or fully-blocked crawl returns []."""
+        import asyncio
+        import hashlib
+
+        from stockroom.scrape.crawl.frontier import Frontier
+        from stockroom.scrape.model import ScrapeResult
+
+        if getattr(scope, "same_host", True) and getattr(scope, "host", None) is None:
+            scope.host = _host_of(seed)
+        frontier = Frontier(scope)
+        results: list = []
+        pending = 0
+        done = asyncio.Event()
+
+        if frontier.add(seed, 0):
+            pending = 1
+        else:
+            return results
+
+        async def _process(url: str, depth: int) -> None:
+            nonlocal pending
+            try:
+                outcome = await self.scrape(url, timeout=timeout)
+                if isinstance(outcome, ScrapeResult) and outcome.ok:
+                    digest = hashlib.sha256(outcome.page.content).hexdigest()
+                    if not frontier.seen_content(digest):
+                        results.append(outcome)
+                        for link in outcome.links:
+                            if frontier.add(link, depth + 1):
+                                pending += 1
+            finally:
+                pending -= 1
+                if pending <= 0:
+                    done.set()
+
+        async def _worker() -> None:
+            while True:
+                url, depth = await frontier.get()
+                await _process(url, depth)
+
+        tasks = [asyncio.create_task(_worker()) for _ in range(max(1, workers))]
+        try:
+            await done.wait()
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        return results
+
     async def scrape(self, url: str, referer: str = "", timeout: float = 20.0):
         """Fetch (page -> browser, binary/API -> HTTP) then extract a full ScrapeResult
         (markdown + structured + links + validated product). A fetch failure passes the
