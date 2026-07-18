@@ -13,7 +13,7 @@ import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, deriveAttributes } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
-import { Badge, Button, Card } from "./primitives";
+import { Badge, Button } from "./primitives";
 import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
@@ -991,87 +991,80 @@ function Sourcing({
   const orderable = purchase.filter((p) => p.url);
   if (orderable.length === 0) {
     return (
-      <Card className="flex items-center gap-3.5 px-4 py-3.5">
-        <span className="text-sm text-t2">
-          {hasMpn
-            ? "No purchase link on record yet."
-            : "Not orderable yet, this component has no part number."}
-        </span>
-      </Card>
+      <div className="text-sm text-t2">
+        {hasMpn
+          ? "No purchase link on record yet."
+          : "Not orderable yet, this component has no part number."}
+      </div>
     );
   }
+  // The cheapest unit price across the orderable distributors earns the "Best" tag (only
+  // meaningful with more than one to compare).
+  const units = orderable.map((p) => normalizePriceBreaks(p.price_breaks)[0]?.price ?? null);
+  const cheapest = Math.min(...units.filter((v): v is number => v != null));
   return (
-    <div className="flex flex-col gap-2.5">
-      {orderable.map((p, i) => (
-        <VendorCard key={`${p.vendor}-${i}`} purchase={p} />
-      ))}
-    </div>
-  );
-}
-
-function VendorCard({ purchase }: { purchase: PurchaseRef }) {
-  const stats: Array<[string, string]> = [];
-  if (purchase.stock != null) {
-    stats.push(["In Stock", purchase.stock.toLocaleString()]);
-  }
-  const priceBreaks = normalizePriceBreaks(purchase.price_breaks);
-  const unit = priceBreaks.length > 0 ? priceBreaks[0] : null;
-  if (unit) {
-    stats.push(["Unit Price", formatPrice(unit.price, purchase.currency)]);
-  }
-
-  return (
-    <Card className="px-4 py-3.5">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold text-t1">
-          {vendorLabel(purchase.vendor, purchase.url)}
-        </span>
-        {purchase.part_number ? (
-          <span className="tnum font-mono text-xs text-t3">{purchase.part_number}</span>
-        ) : null}
-        {purchase.fetched_at ? (
-          <span className="text-2xs text-t3">Checked {purchase.fetched_at}</span>
-        ) : null}
-        <a
-          href={purchase.url}
-          target="_blank"
-          rel="noreferrer"
-          className="ml-auto inline-flex items-center gap-1.5 rounded-control bg-raise2 px-3 py-1.5 text-xs font-medium text-t1 hover:brightness-110"
-        >
-          Open Listing
-          <ExternalIcon />
-        </a>
-      </div>
-
-      {stats.length > 0 ? (
-        <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {stats.map(([label, value]) => (
-            <div key={label} className="rounded-card bg-stage px-3 py-2.5">
-              <div className="text-2xs text-t3">{label}</div>
-              <div className="tnum mt-0.5 font-mono text-base font-semibold text-t1">
-                {value}
+    <div className="flex flex-col">
+      {orderable.map((p, i) => {
+        const unit = normalizePriceBreaks(p.price_breaks)[0] ?? null;
+        const isBest = orderable.length > 1 && unit != null && unit.price === cheapest;
+        const name = vendorLabel(p.vendor, p.url);
+        return (
+          <div
+            key={`${p.vendor}-${i}`}
+            className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-line py-[11px] last:border-0"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[12.5px] font-semibold text-t1">{name}</span>
+                {isBest ? (
+                  <span
+                    className="rounded px-1.5 py-0.5 text-[9.5px] font-bold"
+                    style={{
+                      color: "var(--c-ok)",
+                      background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
+                    }}
+                  >
+                    Best
+                  </span>
+                ) : null}
               </div>
+              {p.part_number ? (
+                <div className="tnum mt-0.5 truncate font-mono text-[10.5px] text-t3">
+                  {p.part_number}
+                </div>
+              ) : null}
             </div>
-          ))}
-        </div>
-      ) : null}
-
-      {priceBreaks.length > 1 ? (
-        <div className="mt-3">
-          <div className="mb-2 text-xs font-semibold text-t3">Price Breaks</div>
-          <div className="flex max-w-[480px] flex-col gap-2">
-            {priceBreaks.map((b, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="tnum font-mono w-12 flex-none text-xs text-t3">{b.qty}+</span>
-                <span className="tnum font-mono ml-auto w-16 text-right text-sm font-semibold text-t1">
-                  {formatPrice(b.price, purchase.currency)}
+            <div className="tnum whitespace-nowrap text-right font-mono text-xs text-t2">
+              {p.stock != null ? (
+                <>
+                  <span
+                    className="mr-1.5 inline-block h-[5px] w-[5px] rounded-full align-middle"
+                    style={{ background: "var(--c-ok)" }}
+                  />
+                  {p.stock.toLocaleString()}
+                </>
+              ) : null}
+            </div>
+            <div className="flex items-center justify-end gap-2.5">
+              {unit ? (
+                <span className="tnum font-mono text-[13.5px] font-semibold text-t1">
+                  {formatPrice(unit.price, p.currency)}
                 </span>
-              </div>
-            ))}
+              ) : null}
+              <a
+                href={p.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open on ${name}`}
+                className="text-t3 transition-colors hover:text-t1"
+              >
+                <ExternalIcon />
+              </a>
+            </div>
           </div>
-        </div>
-      ) : null}
-    </Card>
+        );
+      })}
+    </div>
   );
 }
 
