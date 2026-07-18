@@ -103,7 +103,11 @@ class ScrapeEngine:
         self._store(outcome)
         return outcome
 
-    async def render(self, url: str, timeout: float = 20.0) -> FetchOutcome:
+    async def render(self, url: str, timeout: float = 20.0, on_stage=None) -> FetchOutcome:
+        # on_stage(stage_name) surfaces the phases the sync caller cannot observe from
+        # outside this loop: above all the browser settle (the slow 8s render). An instant
+        # cache hit is deliberately silent - it is not a render, and signalling one would
+        # be theater.
         if self._browser is None:
             return FetchError(url=url, reason="no browser render tier configured", kind="transport")
         hit = self._cached(url)
@@ -115,6 +119,8 @@ class ScrapeEngine:
         if self._scheduler is not None:
             await self._scheduler.acquire(host)
         try:
+            if on_stage is not None:
+                on_stage("rendering")
             outcome = await self._browser.fetch(url, timeout=timeout)
         finally:
             if self._scheduler is not None:

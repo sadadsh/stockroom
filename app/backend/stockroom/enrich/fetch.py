@@ -81,7 +81,7 @@ class RenderedDomFetcher(Protocol):
     consumes a RenderedDomFetcher therefore works today; only JS rendering is
     deferred to M5 (spec section 6.1, item 1)."""
 
-    def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult: ...
+    def rendered_html(self, url: str, timeout: float = 20.0, on_stage=None) -> FetchResult: ...
 
 
 class HttpRenderedDomFetcher:
@@ -92,5 +92,8 @@ class HttpRenderedDomFetcher:
     def __init__(self, http: HttpFetcher | None = None):
         self._http = http or HttpFetcher()
 
-    def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
+    def rendered_html(self, url: str, timeout: float = 20.0, on_stage=None) -> FetchResult:
+        # No JS render phase on the HTTP path, so on_stage("rendering") is never raised;
+        # the caller's own "fetching" stage covers the plain GET. The parameter exists only
+        # to satisfy the protocol so the render-tier and HTTP fetchers stay interchangeable.
         return self._http.get(url, timeout=timeout)

@@ -18,6 +18,7 @@ from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
 from stockroom.scrape.validate import validate_product
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
+from stockroom.enrich.progress import Stage, emit, monotonic, stage_callback
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry
 from stockroom.enrich.schema import EnrichmentResult, Sourced
@@ -124,11 +125,13 @@ class LcscSource:
         self._jlc = jlcsearch or JlcSearchClient(http_fetcher)
         self._limiter = limiter
 
-    def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult:
+    def enrich(self, mpn: str, category: str, remaining: set[str],
+               progress=None) -> EnrichmentResult:
         from stockroom.enrich.extract import _looks_like_datasheet_url
         from stockroom.enrich.sites.lcsc import parse_lcsc_product
 
         r = EnrichmentResult(category=category)
+        emit(progress, Stage.FETCHING, "querying LCSC")
         try:
             hit = self._jlc.search(mpn)
         except EnrichError:
@@ -159,6 +162,7 @@ class LcscSource:
         # product-page leg: the full field set from __NEXT_DATA__.
         if self._limiter is not None:
             self._limiter.acquire()
+        emit(progress, Stage.EXTRACTING, "reading the LCSC page")
         try:
             page = self._http.get(product_url)
             product = parse_lcsc_product(page.text)
@@ -234,14 +238,23 @@ class ScrapeSource:
         self._url_for = url_for or _default_url_for
         self._site_extractors = site_extractors
 
-    def enrich(self, mpn: str, category: str, remaining: set[str]) -> EnrichmentResult:
+    def enrich(self, mpn: str, category: str, remaining: set[str],
+               progress=None) -> EnrichmentResult:
         url = self._url_for(mpn, category)
         self._limiter.acquire()
-        page = self._fetcher.rendered_html(url)
+        emit(progress, Stage.FETCHING, "rendering distributor page")
+        # on_stage is only passed when there is a sink, so a fetcher that predates the
+        # progress seam (test stubs, the HTTP default) keeps its original call shape.
+        on_stage = stage_callback(progress)
+        kw = {"on_stage": on_stage} if on_stage is not None else {}
+        page = self._fetcher.rendered_html(url, **kw)
         # No-bad-data gate (spec section 7): drop any malformed field the scrape surfaced
         # (bad MPN charset, negative stock, non-URL datasheet/product link, non-monotonic
         # price ladder) before it ever reaches a record.
-        result = validate_product(extract_all(page.text, page.final_url or url, self._site_extractors))
+        emit(progress, Stage.EXTRACTING, "reading the page")
+        parsed = extract_all(page.text, page.final_url or url, self._site_extractors)
+        emit(progress, Stage.VALIDATING, "checking values")
+        result = validate_product(parsed)
         # record the product URL so the pipeline can build a Purchase link
         if page.final_url or url:
             result.specs.setdefault(
@@ -267,7 +280,8 @@ class DatasheetSource:
         self._cache_dir = Path(cache_dir) if cache_dir is not None else None
 
     def enrich(self, mpn: str, category: str, remaining: set[str],
-               resolved: EnrichmentResult | None = None) -> EnrichmentResult:
+               resolved: EnrichmentResult | None = None,
+               progress=None) -> EnrichmentResult:
         empty = EnrichmentResult(category=category)
         if resolved is None or resolved.datasheet_url is None:
             return empty
@@ -283,10 +297,12 @@ class DatasheetSource:
         from stockroom.enrich.schema import normalize_mpn
 
         dst = base / f"{normalize_mpn(mpn or 'part')}.pdf"
+        emit(progress, Stage.FETCHING, "reading the datasheet")
         try:
             pdf_path = fetch_datasheet(url, dst, fetcher=self._fetcher)
         except EnrichError:
             return empty  # a dead/HTML datasheet link never blocks the walk
+        emit(progress, Stage.EXTRACTING, "extracting datasheet specs")
         try:
             return extract_datasheet_specs(pdf_path, known_mpn=mpn)
         except EnrichError:
@@ -327,11 +343,18 @@ class EnrichmentPipeline:
             sources.append(_MouserSource(mouser, self.mouser_limiter))
         self.registry = SourceRegistry(sources)
 
-    def enrich(self, mpn: str, category: str, want=None) -> EnrichmentResult:
+    def enrich(self, mpn: str, category: str, want=None, progress=None) -> EnrichmentResult:
         cached = self.cache.get(mpn)
         if cached is not None:
+            # An instant cache hit does no network work; the job returns straight to a
+            # `done`, so no fetching/rendering stage is claimed for it.
             return _result_from_cache(cached, category)
-        result = self.registry.enrich(mpn, category, want=set(want) if want else set(DEFAULT_WANT))
+        # One monotonic wrapper for the whole registry walk, so a later source's low local
+        # pct (the datasheet leg after the scrape leg) never rewinds the bar.
+        sink = monotonic(progress)
+        result = self.registry.enrich(mpn, category,
+                                      want=set(want) if want else set(DEFAULT_WANT),
+                                      progress=sink)
         self.cache.put(mpn, _result_to_cache(result))
         return result
 
@@ -385,7 +408,7 @@ class EnrichmentPipeline:
                 self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
 
-    def extract_from_url(self, url: str) -> EnrichmentResult:
+    def extract_from_url(self, url: str, progress=None) -> EnrichmentResult:
         """Fetch a distributor product page and extract EVERYTHING it exposes, from a
         URL alone (no candidate, no file): identity, price breaks, stock, datasheet,
         package, and the full parametric spec table. The fetch goes through the
@@ -400,12 +423,21 @@ class EnrichmentPipeline:
         cached = self.url_cache.get(url)
         if cached is not None:
             return _result_from_cache(cached, cached.get("category", ""))
+        sink = monotonic(progress)
+        emit(sink, Stage.FETCHING, "loading the page")
+        # on_stage raises the render phase (the browser settle) from inside the fetcher;
+        # only passed when there is a sink, so a legacy fetcher keeps its old signature.
+        on_stage = stage_callback(sink)
+        kw = {"on_stage": on_stage} if on_stage is not None else {}
         try:
             self.limiter.acquire()
-            page = self.fetcher.rendered_html(url)
+            page = self.fetcher.rendered_html(url, **kw)
         except (EnrichError, OSError):
             return EnrichmentResult()
-        result = validate_product(extract_all(page.text, page.final_url or url, SITE_EXTRACTORS))
+        emit(sink, Stage.EXTRACTING, "reading fields")
+        parsed = extract_all(page.text, page.final_url or url, SITE_EXTRACTORS)
+        emit(sink, Stage.VALIDATING, "checking values")
+        result = validate_product(parsed)
         if page.final_url or url:
             result.specs.setdefault(
                 "product_url", Sourced(page.final_url or url, "scrape", "medium")

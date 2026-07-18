@@ -47,22 +47,25 @@ class SourceRegistry:
     def __init__(self, sources: list[Source]):
         self.sources = list(sources)
 
-    def enrich(self, mpn: str, category: str, want: set[str] | None = None) -> EnrichmentResult:
+    def enrich(self, mpn: str, category: str, want: set[str] | None = None,
+               progress=None) -> EnrichmentResult:
         remaining = set(want) if want is not None else set(DEFAULT_WANT)
         result = EnrichmentResult(category=category)
         for source in self.sources:
             if not remaining:
                 break
+            # A source opts into optional kwargs by declaring them (or **kwargs), so the
+            # walk stays backward compatible: a source that declares neither keeps its
+            # original three-arg signature. `resolved` hands it the result so far (the
+            # datasheet source needs the URL the scrape surfaced); `progress` hands it the
+            # job's stage sink so a networked source can stream its real fetch/render phases.
+            kwargs: dict = {}
+            if _accepts_kw(source.enrich, "resolved"):
+                kwargs["resolved"] = result
+            if progress is not None and _accepts_kw(source.enrich, "progress"):
+                kwargs["progress"] = progress
             try:
-                # A source that opts in (declares `resolved=`) receives the result so
-                # far, so a later source can act on an earlier one's fields (the
-                # datasheet source fetches the URL the scrape surfaced). This is
-                # per-source and backward compatible: sources that don't declare it
-                # keep the original three-arg signature.
-                if _accepts_kw(source.enrich, "resolved"):
-                    partial = source.enrich(mpn, category, set(remaining), resolved=result)
-                else:
-                    partial = source.enrich(mpn, category, set(remaining))
+                partial = source.enrich(mpn, category, set(remaining), **kwargs)
             except EnrichError:
                 continue  # a dead source never blocks
             result.merge_missing(partial)
