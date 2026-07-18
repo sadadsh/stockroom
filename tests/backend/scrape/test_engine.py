@@ -111,3 +111,28 @@ def test_render_without_browser_is_a_typed_error(tmp_path):
     out = asyncio.run(engine.render("https://x/page"))
     assert isinstance(out, FetchError)
     assert out.kind == "transport"
+
+
+# --- S3: scrape() = fetch then extract a validated ScrapeResult ---
+
+def test_scrape_returns_scrape_result_on_page(tmp_path):
+    from stockroom.scrape.model import ScrapeResult
+    html = ('<html><body><article><h1>LM317</h1><p>' + ('w ' * 80) + '</p></article>'
+            '<script type="application/ld+json">{"@type":"Product","mpn":"LM317"}</script>'
+            '</body></html>')
+    browser = _StubBrowser(Page(url="https://x/page", final_url="https://x/page",
+                                status=200, content=html.encode(), text=html,
+                                content_type="text/html", render_tier="browser"))
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path), browser=browser)
+    out = asyncio.run(engine.scrape("https://x/page"))
+    assert isinstance(out, ScrapeResult)
+    assert out.product.mpn.value == "LM317"
+    assert "# LM317" in out.markdown
+
+
+def test_scrape_passes_through_fetch_error(tmp_path):
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path),
+                          http=_StubHttp(FetchError(url="https://x/p", reason="blocked",
+                                                    kind="blocked", status=403)))
+    out = asyncio.run(engine.scrape("https://x/p.pdf"))
+    assert isinstance(out, FetchError)
