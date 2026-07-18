@@ -95,7 +95,7 @@ class TtlCache:
                 self._remove(path)
                 continue
             try:
-                return json.loads(_retry_transient(lambda p=path: p.read_text(encoding="utf-8")))
+                parsed = json.loads(_retry_transient(lambda p=path: p.read_text(encoding="utf-8")))
             except FileNotFoundError:
                 continue  # a peer (another read-lane job) removed it between the glob and the read
             except OSError:
@@ -108,6 +108,13 @@ class TtlCache:
                 # (JSONDecodeError) - both are ValueError. Drop it so a fresh scrape repopulates.
                 self._remove(path)
                 continue
+            if not isinstance(parsed, dict):
+                # Valid JSON but not a cache record (external tampering / a legacy non-dict). get()'s
+                # contract is a dict or None, so the caller (cached.get(...)) never AttributeErrors:
+                # treat it as corrupt and drop it.
+                self._remove(path)
+                continue
+            return parsed
         return None
 
     def put(self, mpn: str, data: dict) -> None:

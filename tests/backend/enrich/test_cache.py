@@ -150,6 +150,18 @@ def test_put_degrades_to_no_cache_when_the_temp_cannot_be_created(tmp_path, monk
     assert c.get("ABC") is None
 
 
+def test_get_treats_a_non_dict_body_as_a_miss_and_removes_it(tmp_path):
+    # A valid-JSON but non-dict body (external tampering / a legacy record) must be a miss+drop,
+    # not returned: the caller does cached.get(...) and would AttributeError on a list/str. get()'s
+    # contract is "a dict or None", never something that makes the enrich pipeline raise.
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+    key = normalize_mpn("ABC")
+    bad = tmp_path / f"mpn___{key}___1000.json"
+    bad.write_text("[1, 2, 3]", encoding="utf-8")
+    assert c.get("ABC") is None
+    assert not bad.exists()
+
+
 def test_get_returns_the_newest_entry_when_an_old_one_lingers(tmp_path):
     # If _clear cannot remove an old entry (a persistent Windows lock, now swallowed), a newer put
     # still wins: get() must return the NEWEST stamp, never let a stale older file shadow it.
