@@ -161,7 +161,13 @@ export function IngestPage() {
   }, [inspect]);
 
   function removeStaged(id: number) {
-    setStaged((s) => (s ? s.filter((x) => x.id !== id) : s));
+    const remaining = (staged ?? []).filter((x) => x.id !== id);
+    // Committing the LAST staged candidate finishes adding this part, so tear the whole part
+    // context down (like a passive add): otherwise the just-added part's lookup stays live and
+    // its identity merges onto an unrelated ZIP browsed next. While candidates remain, keep the
+    // context - they all belong to this same looked-up part.
+    if (remaining.length === 0) reset();
+    else setStaged(remaining);
   }
 
   function reset() {
@@ -169,10 +175,13 @@ export function IngestPage() {
     setResult(null);
     setLookedUpInput("");
     setStaged(null);
-    // Clear the lookup too, not just its local mirror: the staging effect merges from
-    // enrich.result, so a stale "done" result left here would contaminate an unrelated ZIP
-    // browsed after this reset (e.g. right after a passive add).
+    // Tear down BOTH lifecycles, not just the local mirror. The staging effect merges from
+    // enrich.result and keys off job.status, so a stale "done" lookup would contaminate the next
+    // ZIP, and a still-"done" ZIP job would let flipping enrich.status done->idle re-fire the
+    // effect and resurrect the just-cleared candidate un-merged. Clearing both leaves a true
+    // blank slate.
     enrich.reset();
+    job.reset();
   }
 
   const busy = job.status === "running";
