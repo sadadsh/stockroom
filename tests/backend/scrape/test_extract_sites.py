@@ -9,6 +9,19 @@ def test_site_adapters_registered():
     assert LcscSite().matches("https://www.lcsc.com/product-detail/C1.html")
 
 
+def test_mouser_matches_regional_tld_domains():
+    # A regional Mouser storefront (mouser.co.il, mouser.de, ...) renders the SAME product page
+    # as mouser.com, so the extractor must claim it - otherwise a co.il URL falls to the generic
+    # cascade and loses the whole parametric/compliance depth (corpus part tps259470lrpwr).
+    m = MouserWebSite()
+    assert m.matches("https://www.mouser.co.il/en/ProductDetail/TI/TPS259470LRPWR")
+    assert m.matches("https://www.mouser.de/ProductDetail/x")
+    assert m.matches("https://www.mouser.com/en/ProductDetail/x")
+    # never a false claim on an unrelated host that merely contains the string "mouser"
+    assert not m.matches("https://www.notmouser.com/x")
+    assert not m.matches("https://www.digikey.com/x")
+
+
 def test_mouser_price_ladder_monotonic():
     html = (
         '<table class="pricing-table">'

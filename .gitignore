@@ -53,3 +53,6 @@ docs/research/
 .agents/
 .superdesign/
 /skills-lock.json
+
+# S8 cold-rebuild harness run outputs (local only)
+scripts/out/
