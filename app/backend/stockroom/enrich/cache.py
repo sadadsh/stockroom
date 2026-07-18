@@ -18,6 +18,25 @@ from stockroom.enrich.schema import normalize_mpn
 _SEP = "___"
 
 
+def _retry_transient(op: Callable[[], object], attempts: int = 8, base_delay: float = 0.002):
+    """Run a filesystem op, retrying the TRANSIENT sharing violations that Windows raises when a
+    concurrent read-lane job holds the same cache file open across an os.replace (WinError 5/32,
+    surfaced as PermissionError - an OSError, not FileNotFoundError/ValueError). These clear in
+    microseconds once the peer closes the handle, so a short bounded backoff resolves them; on
+    POSIX the op just succeeds on the first try. FileNotFoundError is definitive (the file is
+    gone), so it is never retried, and the final attempt's error propagates for the caller to
+    decide how to degrade."""
+    for i in range(attempts):
+        try:
+            return op()
+        except FileNotFoundError:
+            raise
+        except OSError:
+            if i == attempts - 1:
+                raise
+            time.sleep(base_delay * (i + 1))
+
+
 class TtlCache:
     """Concurrency-safe under the JobRunner's parallel read lane: two enrich jobs can hit the
     SAME normalized MPN at once (a bulk import overlapping an Add-A-Part lookup). So reads never
@@ -44,10 +63,14 @@ class TtlCache:
 
     @staticmethod
     def _remove(path: Path) -> None:
-        # Best-effort: a peer thread (another read-lane job) may have removed it already.
+        # Best-effort: a peer read-lane job may have removed it already (FileNotFoundError) or may
+        # hold it open on Windows (PermissionError - you cannot unlink an open file there). Either
+        # way there is nothing to do: a file we cannot delete now is stale/being-replaced and gets
+        # pruned on a later pass. Retry the transient Windows sharing violation, then give up
+        # silently - an unlink must never raise into the enrich job (it runs before put()'s try).
         try:
-            path.unlink()
-        except FileNotFoundError:
+            _retry_transient(path.unlink)
+        except OSError:
             pass
 
     def _clear(self, key: str) -> None:
@@ -67,10 +90,19 @@ class TtlCache:
                 self._remove(path)
                 continue
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
-            except (FileNotFoundError, ValueError):
-                # Removed by a peer between the glob and the read, or a torn/corrupt body:
-                # treat as a miss and drop it so a fresh scrape can repopulate the key.
+                text = _retry_transient(lambda: path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                continue  # a peer (another read-lane job) removed it between the glob and the read
+            except OSError:
+                # A Windows sharing violation that outlasted the retries: a peer is mid-os.replace
+                # of this file. It is a VALID entry being rewritten, not corrupt, so skip it WITHOUT
+                # dropping it - a miss here just re-scrapes, never raises and never poisons.
+                continue
+            try:
+                return json.loads(text)
+            except ValueError:
+                # A torn/corrupt body (a legacy pre-atomic-write file): drop it so a fresh scrape
+                # repopulates the key.
                 self._remove(path)
                 continue
         return None
@@ -84,14 +116,20 @@ class TtlCache:
         # Atomic publish: write to a unique temp file in the same dir (so it never matches the
         # entry glob), then os.replace onto the final name. A reader never sees a half-written
         # file, and two concurrent writers each replace atomically (last wins with a COMPLETE
-        # file), never a torn JSON. The temp is cleaned up if the write itself fails.
-        fd, tmp = tempfile.mkstemp(
+        # file), never a torn JSON. On Windows the replace can hit a transient sharing violation
+        # when a reader holds the destination open, so it is retried; a persistent failure (an
+        # unwritable dir, or contention past the retries) degrades to no-cache (the next lookup
+        # re-scrapes) rather than raising into the enrich job - the cache is best-effort.
+        fd, tmp_name = tempfile.mkstemp(
             dir=self.root, prefix=f".{self.prefix}{_SEP}{key}{_SEP}", suffix=".tmp"
         )
+        tmp = Path(tmp_name)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(body)
-            os.replace(tmp, path)
+            _retry_transient(lambda: os.replace(tmp, path))
+        except OSError:
+            self._remove(tmp)  # best-effort cache: skip this entry rather than raise
         except BaseException:
-            self._remove(Path(tmp))
+            self._remove(tmp)
             raise

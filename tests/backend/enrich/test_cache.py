@@ -63,6 +63,65 @@ def test_get_treats_a_torn_body_as_a_miss_and_removes_it(tmp_path):
     assert not torn.exists()
 
 
+def test_get_retries_a_transient_sharing_violation_instead_of_raising(tmp_path, monkeypatch):
+    # On Windows NTFS, reading a cache file a concurrent writer is mid-os.replace-ing raises a
+    # transient PermissionError (an OSError, NOT FileNotFoundError/ValueError). get() must retry
+    # through it and return the value - never raise, and never drop the still-valid entry.
+    import pathlib
+
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+    c.put("ABC", {"v": 1})
+    real_read = pathlib.Path.read_text
+    calls = {"n": 0}
+
+    def flaky_read(self, *a, **k):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise PermissionError(13, "sharing violation")
+        return real_read(self, *a, **k)
+
+    monkeypatch.setattr(pathlib.Path, "read_text", flaky_read)
+    assert c.get("ABC") == {"v": 1}  # retried past the two transient failures
+    assert len(list(tmp_path.glob("*ABC*.json"))) == 1  # the valid entry was NOT dropped
+
+
+def test_put_retries_a_transient_replace_violation_instead_of_raising(tmp_path, monkeypatch):
+    # On Windows, os.replace onto a destination a concurrent reader holds open raises a transient
+    # PermissionError. put() must retry through it so the entry still lands, never raising.
+    import os as _os
+
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+    real_replace = _os.replace
+    calls = {"n": 0}
+
+    def flaky_replace(src, dst, *a, **k):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise PermissionError(5, "access is denied")
+        return real_replace(src, dst, *a, **k)
+
+    monkeypatch.setattr(_os, "replace", flaky_replace)
+    c.put("ABC", {"v": 9})
+    assert c.get("ABC") == {"v": 9}
+    assert list(tmp_path.glob(".mpn*.tmp")) == []  # temp cleaned up, none left behind
+
+
+def test_put_degrades_to_no_cache_when_a_write_persistently_fails(tmp_path, monkeypatch):
+    # A persistently unwritable cache (or contention past the retries) must degrade to no-cache
+    # (the next lookup re-scrapes), never raise into the enrich job.
+    import os as _os
+
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+
+    def always_denied(*a, **k):
+        raise PermissionError(5, "access is denied")
+
+    monkeypatch.setattr(_os, "replace", always_denied)
+    c.put("ABC", {"v": 1})  # must NOT raise
+    assert c.get("ABC") is None  # nothing was cached
+    assert list(tmp_path.glob(".mpn*.tmp")) == []  # temp cleaned up
+
+
 def test_get_and_put_never_raise_or_poison_under_concurrency(tmp_path):
     # The parallel read lane runs two enrich jobs for the SAME normalized MPN at once (a bulk
     # import overlapping an Add-A-Part lookup). Unguarded unlinks and a non-atomic write would
