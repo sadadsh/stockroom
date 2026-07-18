@@ -48,6 +48,27 @@ def to_sse(event: JobEvent) -> dict:
     return {"event": event.kind, "data": json.dumps(event.data)}
 
 
+def _offer(q: "queue.Queue[JobEvent]", event: JobEvent) -> None:
+    """Enqueue without ever blocking the producer. A disconnected SSE consumer stops draining
+    the bounded queue; a plain blocking put() would then wedge the producer forever (and once
+    the S6 render stage emits from the shared scrape-runtime loop thread, a stalled producer
+    would freeze every concurrent render). On a full queue we drop the OLDEST event to make room
+    for the newest. Progress is advisory, so dropping a stale mid-stage event is harmless; the
+    terminal result/error/done are always the LAST puts (no progress follows them), so make-room
+    only ever discards old progress and never a terminal - a consumer that (re)attaches still
+    sees the outcome and the closing 'done', so the stream always terminates cleanly."""
+    while True:
+        try:
+            q.put_nowait(event)
+            return
+        except queue.Full:
+            try:
+                q.get_nowait()  # drop the oldest queued (advisory) event, then retry
+            except queue.Empty:
+                # drained to empty between the Full and here; the retry will now succeed
+                pass
+
+
 class JobRunner:
     def __init__(self, max_workers: int = 1):
         self._jobs: dict[str, Job] = {}
@@ -68,19 +89,19 @@ class JobRunner:
         job.status = JobStatus.RUNNING
 
         def progress(data: dict) -> None:
-            job.queue.put(JobEvent("progress", dict(data)))
+            _offer(job.queue, JobEvent("progress", dict(data)))
 
         try:
             result = fn(progress)
             job.result = result
             job.status = JobStatus.DONE
-            job.queue.put(JobEvent("result", {"result": _jsonable(result)}))
+            _offer(job.queue, JobEvent("result", {"result": _jsonable(result)}))
         except Exception as exc:  # noqa: BLE001 - a job failure is a labeled event
             job.error = str(exc)
             job.status = JobStatus.ERROR
-            job.queue.put(JobEvent("error", {"detail": str(exc), "error": type(exc).__name__}))
+            _offer(job.queue, JobEvent("error", {"detail": str(exc), "error": type(exc).__name__}))
         finally:
-            job.queue.put(_SENTINEL)
+            _offer(job.queue, _SENTINEL)
 
     def run_sync(self, fn) -> Job:
         job = self._new_job()

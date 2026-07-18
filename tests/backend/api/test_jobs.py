@@ -51,3 +51,27 @@ def test_unknown_job_id_raises_keyerror():
         assert False, "expected KeyError"
     except KeyError:
         pass
+
+
+def test_progress_never_blocks_when_the_consumer_stops_draining():
+    # A disconnected SSE consumer stops draining the bounded per-job queue. A blocking put()
+    # would then wedge the producer forever - and once the S6 render stage emits from the
+    # shared scrape-runtime loop thread, that would freeze every concurrent render. So a
+    # producer must never block: excess advisory progress is dropped, but the terminal
+    # result/done still make it in so a (re)attaching consumer terminates cleanly.
+    runner = JobRunner()
+    cap = 1000  # the Job queue maxsize
+
+    def flood(progress):
+        for i in range(cap * 3):  # far more than the queue can hold, and nobody is draining
+            progress({"pct": i})
+        return "finished"
+
+    # run_sync drives it inline on THIS thread; if put() blocked, this call would hang forever.
+    job = runner.run_sync(flood)
+    assert job.status == JobStatus.DONE
+    assert job.result == "finished"
+    kinds = [e.kind for e in runner.drain(job.id)]
+    # the terminal events survived the backpressure (never dropped to make room)
+    assert "result" in kinds
+    assert kinds[-1] == "done"
