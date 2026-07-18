@@ -9,6 +9,7 @@ registry falls through cleanly."""
 from __future__ import annotations
 
 import json
+import time as _time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,9 +24,55 @@ from stockroom.enrich.schema import (
 )
 
 
-def _default_requester(*a, **k):
-    """Temporary stub; Task 3 will replace with the real implementation."""
-    return None
+def _fetch_token(client_id: str, client_secret: str, timeout: float) -> str | None:
+    """OAuth2 client-credentials bearer token, or None (never raises here — the caller treats a
+    missing token as a failed lookup)."""
+    if not (client_id and client_secret):
+        return None
+    body = urllib.parse.urlencode({"client_id": client_id, "client_secret": client_secret,
+                                   "grant_type": "client_credentials"}).encode()
+    req = urllib.request.Request("https://api.digikey.com/v1/oauth2/token", data=body,
+                                 headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read().decode()) or {}).get("access_token") or None
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return None
+
+
+def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
+    """A requester(mpn) -> v4 body dict. One OAuth2 bearer token is cached across every call on
+    this closure (DigiKey tokens live ~30 min; a 25-min TTL leaves margin), so a bulk rescan does
+    not re-auth per part. Raises EnrichError on any auth/transport failure."""
+    tok = {"token": None, "exp": 0.0}
+    TTL = 1500.0
+
+    def _cached_token() -> str | None:
+        now = _time.monotonic()
+        if tok["token"] and now < tok["exp"]:
+            return tok["token"]
+        t = _fetch_token(client_id, client_secret, timeout)
+        if t:  # cache successes only, so a refused token is retried next call
+            tok["token"], tok["exp"] = t, now + TTL
+        return t
+
+    def request(mpn: str) -> dict:
+        token = _cached_token()
+        if not token:
+            raise EnrichError("digikey: no OAuth token (bad creds or throttled)")
+        req = urllib.request.Request(
+            "https://api.digikey.com/products/v4/search/keyword",
+            data=json.dumps({"Keywords": str(mpn).strip(), "Limit": 10, "Offset": 0}).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {token}",
+                     "X-DIGIKEY-Client-Id": client_id})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode())
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            raise EnrichError(f"digikey request failed: {exc}") from exc
+
+    return request
 
 
 def _coerce_price(raw) -> float | None:
