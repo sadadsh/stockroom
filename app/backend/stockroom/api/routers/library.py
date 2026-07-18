@@ -299,6 +299,32 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit(work, write=True)}
 
+    @r.post("/rescan")
+    def rescan_library(request: Request, force: bool = False) -> dict:
+        ctx = request.app.state.ctx
+
+        def work(progress):
+            from stockroom.enrich.rescan import RescanEngine
+
+            # the endpoint builds the adapters (via the patchable build_refresh_adapters) and
+            # INJECTS them, so the engine has no api dependency.
+            return RescanEngine(ctx, adapters=build_refresh_adapters(ctx)).run(progress, force=force)
+
+        # READ lane: the engine is network-I/O-bound and self-serializes its commits via run_write,
+        # so it must NOT occupy the single write worker for the whole run.
+        return {"job_id": ctx.jobs.submit(work, write=False)}
+
+    @r.get("/rescan/state")
+    def rescan_state(request: Request) -> dict:
+        ctx = request.app.state.ctx
+        from stockroom.enrich.rescan_state import RescanState
+
+        parts = RescanState(ctx.enrich_cache_dir / "rescan-state.json").entries()
+        counts: dict[str, int] = {}
+        for entry in parts.values():
+            counts[entry.get("outcome", "")] = counts.get(entry.get("outcome", ""), 0) + 1
+        return {"parts": parts, "counts": counts}
+
     @r.post("/parts/{part_id}/symbol")
     def attach_symbol(request: Request, part_id: str, body: dict) -> dict:
         """Attach (or repoint) a symbol REFERENCE on an existing part, tagged with its EDA

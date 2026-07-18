@@ -60,6 +60,13 @@ class MachineConfig:
     # or chose to continue with the default). Drives the one-time welcome screen (M9b).
     onboarded: bool = False
     window: dict = field(default_factory=dict)
+    # Library-scale rescan (Phase-1b-2): a part is re-checked only when its last check is older
+    # than this many days (incremental), and each provider's calls are paced to <= N/min so a
+    # full-library rescan trickles within quota instead of tripping a 429. Sensible defaults; the
+    # settings UI can tune them later.
+    rescan_ttl_days: int = 7
+    rescan_mouser_per_min: int = 20
+    rescan_digikey_per_min: int = 60
 
     @classmethod
     def _path(cls, path: Path | None) -> Path:
