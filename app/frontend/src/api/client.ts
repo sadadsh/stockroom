@@ -84,7 +84,9 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  params?: Record<string, string>;
+  // A value may be a string, or a string[] for a REPEATED query param (?spec=a&spec=b),
+  // which the parametric spec filter needs.
+  params?: Record<string, string | string[]>;
   body?: unknown;
 }
 
@@ -96,7 +98,13 @@ async function request<T>(
   const url = new URL(apiBase() + path);
   if (opts.params) {
     for (const [k, v] of Object.entries(opts.params)) {
-      if (v !== "" && v != null) url.searchParams.set(k, v);
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item !== "" && item != null) url.searchParams.append(k, item);
+        }
+      } else if (v !== "" && v != null) {
+        url.searchParams.set(k, v);
+      }
     }
   }
   const token = apiToken();

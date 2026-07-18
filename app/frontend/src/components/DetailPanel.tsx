@@ -12,6 +12,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, deriveAttributes } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
+import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { Badge, Button, Card } from "./primitives";
 import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
@@ -30,11 +31,6 @@ import {
   SymbolArt,
   UploadIcon,
 } from "./icons";
-
-// The passport has seven required fields (stockroom.model.part.REQUIRED_FIELDS). Symbol,
-// footprint, and 3D model no longer gate completeness: they are attached AFTER a part
-// lands (see the Part Canvas), so they are not part of this score.
-const PASSPORT_TOTAL = 7;
 
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
 // empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
@@ -142,7 +138,6 @@ export function DetailPanel({
     return <PanelMessage>Select a part to see its details.</PanelMessage>;
   }
 
-  const score = Math.max(0, PASSPORT_TOTAL - missing.length);
   // The part's tags plus a few chips derived from key specs (package, mounting,
   // qualifications, salient features), so the attribute band is never empty.
   const attributes = deriveAttributes(detail);
@@ -156,122 +151,71 @@ export function DetailPanel({
 
   return (
     <div className="max-w-[1240px] pb-12">
-      {/* masthead: the derived headline + the MPN serial stamp + the attribute chip rail on
-          the left, the completeness verdict standing to the right. The chips live INSIDE the
-          masthead (not a separate full-width band) so a sparse part reads as one tight header
-          instead of stranding a near-empty card below the title. */}
-      <div className="border-b border-line pb-5">
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0 flex-1">
-            <h1 className="min-w-0 break-words text-[38px] font-semibold leading-[1.04] tracking-[-0.02em] text-t1">
-              {deriveTitle(detail)}
-            </h1>
-            <SerialLine
-              mpn={detail.mpn}
-              manufacturer={detail.manufacturer}
-              category={detail.category}
-            />
-            {attributes.length > 0 ? (
-              <div className="mt-3.5 flex flex-wrap gap-1.5">
-                {attributes.map((a) => (
-                  <span
-                    key={a}
-                    className="rounded-control border border-line bg-raise2 px-2.5 py-1 text-xs font-medium text-t2"
-                  >
-                    {a}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {/* the missing fields, named, only when incomplete (the verdict states the count) */}
-            {!isComplete && missing.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">Needs</span>
-                {missing.map((m) => (
-                  <Badge key={m} tone="warn" size="sm">
-                    {m}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          <Verdict complete={isComplete} score={score} total={PASSPORT_TOTAL} />
+      {/* masthead (north-star): the derived headline + the MPN serial stamp on the left; the
+          per-tool EDA readiness badges (KiCad / Altium) standing on the right, each opening
+          its own asset checklist on hover. */}
+      <div className="flex items-start justify-between gap-6 border-b border-line pb-5">
+        <div className="min-w-0 flex-1">
+          <h1 className="min-w-0 break-words text-[35px] font-bold leading-[1.02] tracking-[-0.028em] text-t1">
+            {deriveTitle(detail)}
+          </h1>
+          <SerialLine
+            mpn={detail.mpn}
+            manufacturer={detail.manufacturer}
+            category={detail.category}
+          />
+        </div>
+        <div className="flex flex-none items-center gap-2">
+          <EdaBadge label="KiCad" readiness={assetReadiness(detail, "kicad")} />
+          <EdaBadge label="Altium" readiness={assetReadiness(detail, "altium")} />
         </div>
       </div>
 
-      {/* Main composition: a laid-out spec sheet, not a scroll. LEFT is the part seen
-          three ways (the 3D hero + its symbol + footprint); RIGHT is the record (identity
-          + sourcing). The horizontal space carries the grouping so nothing stacks dead. */}
-      <div className="mt-7 grid grid-cols-[1.55fr_1fr] items-start gap-6">
-        {/* LEFT: the Part Canvas, then the full spec sheet, so the column fills to
-            balance the record column instead of stranding space below it. */}
-        <div className="flex flex-col gap-7">
-          <div>
-          <SectionLabel>Part Canvas</SectionLabel>
-          <div className="flex flex-col gap-3">
-            <AssetTile
-              variant="hero"
-              name="3D Model"
-              className="h-[300px]"
-              present={hasModel}
-              art={<CubeArt />}
-              thumb={
-                hasModel ? (
-                  <div className="pointer-events-none h-full w-full">
-                    <Glb3DView
-                      data={modelGlb.data}
-                      isLoading={modelGlb.isLoading}
-                      isError={modelGlb.isError}
-                      error={modelGlb.error}
-                    />
-                  </div>
-                ) : undefined
-              }
-              onOpen={hasModel ? () => setPreview("model") : undefined}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <AssetTile
-                variant="tile"
-                name="Symbol"
-                className="h-[152px]"
-                present={!!detail.symbol?.name}
-                art={<SymbolArt />}
-                thumb={
-                  detail.symbol?.name ? (
-                    <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
-                  ) : undefined
-                }
-                onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
-                onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
-              />
-              <AssetTile
-                variant="tile"
-                name="Footprint"
-                className="h-[152px]"
-                present={!!detail.footprint?.name}
-                art={<FootprintArt />}
-                thumb={
-                  detail.footprint?.name ? (
-                    <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
-                  ) : undefined
-                }
-                onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
-                onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
-              />
-            </div>
+      {/* Attributes (north-star .attrcard): a full-width card of neutral tag chips. */}
+      {attributes.length > 0 ? (
+        <div className="mt-6 rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
+          <div className="mb-3 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+            Attributes
           </div>
+          <div className="flex flex-wrap gap-2">
+            {attributes.map((a) => (
+              <span
+                key={a}
+                className="rounded-full border border-line bg-field px-3 py-[5px] text-xs font-medium text-t2"
+              >
+                {a}
+              </span>
+            ))}
           </div>
-          {/* the datasheet parameter block sits under the canvas in the same column */}
-          {specCount > 0 ? (
-            <SpecificationsSection groups={specGroups} count={specCount} />
-          ) : null}
         </div>
+      ) : null}
 
-        {/* RIGHT: the record - identity fields + sourcing, filling the column */}
-        <div className="flex flex-col gap-6">
-          <div>
-            <SectionLabel>Identity</SectionLabel>
-            <div className="rounded-card border border-line bg-raise px-4 py-1 shadow-card">
+      {!isComplete && missing.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">Needs</span>
+          {missing.map((m) => (
+            <Badge key={m} tone="warn" size="sm">
+              {m}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
+      {/* cols (north-star): the record leads on the LEFT (Specifications, then Overview +
+          Sourcing in one card); the part's three asset views stack uniformly on the RIGHT. */}
+      <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-start gap-6">
+        <div className="flex min-w-0 flex-col gap-[22px]">
+          {specCount > 0 ? (
+            <div className="rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
+              <SpecificationsSection groups={specGroups} count={specCount} />
+            </div>
+          ) : null}
+
+          <div className="overflow-hidden rounded-card border border-line bg-raise shadow-card">
+            <div className="px-[18px] py-[15px]">
+              <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
+                Overview
+              </div>
               <DataRow
                 label="Name"
                 value={detail.display_name}
@@ -303,6 +247,12 @@ export function DetailPanel({
               ) : (
                 <DataRow label="Category" value={detail.category} />
               )}
+              {detail.symbol?.name ? (
+                <DataRow label="Symbol" value={detail.symbol.name} mono />
+              ) : null}
+              {detail.footprint?.name ? (
+                <DataRow label="Footprint" value={detail.footprint.name} mono />
+              ) : null}
               <DataRow
                 label="Description"
                 value={detail.description}
@@ -312,10 +262,8 @@ export function DetailPanel({
               />
               <DataRow
                 label="Datasheet"
-                // A clean "View Datasheet" link, not the raw full-length URL splashed across
-                // the row. The URL rides the href; a file-only datasheet shows its filename.
                 value={
-                  detail.datasheet?.source_url ? "View Datasheet" : detail.datasheet?.file || ""
+                  detail.datasheet?.source_url ? "Datasheet" : detail.datasheet?.file || ""
                 }
                 href={detail.datasheet?.source_url || undefined}
               />
@@ -330,12 +278,65 @@ export function DetailPanel({
                 <DataRow label="Tags" value={detail.tags.join(", ")} />
               ) : null}
             </div>
+            <div className="border-t border-line px-[18px] py-[15px]">
+              <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
+                Sourcing
+              </div>
+              <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+            </div>
           </div>
+        </div>
 
-          <div>
-            <SectionLabel>Sourcing</SectionLabel>
-            <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
-          </div>
+        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. */}
+        <div className="flex flex-col gap-[18px]">
+          <AssetTile
+            variant="tile"
+            name="3D Model"
+            className="h-[184px]"
+            present={hasModel}
+            art={<CubeArt />}
+            thumb={
+              hasModel ? (
+                <div className="pointer-events-none h-full w-full">
+                  <Glb3DView
+                    data={modelGlb.data}
+                    isLoading={modelGlb.isLoading}
+                    isError={modelGlb.isError}
+                    error={modelGlb.error}
+                  />
+                </div>
+              ) : undefined
+            }
+            onOpen={hasModel ? () => setPreview("model") : undefined}
+          />
+          <AssetTile
+            variant="tile"
+            name="Symbol"
+            className="h-[184px]"
+            present={!!detail.symbol?.name}
+            art={<SymbolArt />}
+            thumb={
+              detail.symbol?.name ? (
+                <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
+              ) : undefined
+            }
+            onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
+            onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
+          />
+          <AssetTile
+            variant="tile"
+            name="Footprint"
+            className="h-[184px]"
+            present={!!detail.footprint?.name}
+            art={<FootprintArt />}
+            thumb={
+              detail.footprint?.name ? (
+                <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
+              ) : undefined
+            }
+            onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
+            onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
+          />
         </div>
       </div>
 
@@ -454,6 +455,77 @@ export function DetailPanel({
   );
 }
 
+// A per-tool EDA readiness badge (north-star .eda): the tool name + a green check when the
+// tool's symbol + footprint are both present, else an amber dot; hovering (or focusing)
+// opens the per-asset checklist for that tool. The 3D model is listed but optional, so it
+// never blocks the ready state (mirrors assetReadiness).
+function EdaBadge({ label, readiness }: { label: string; readiness: AssetReadiness }) {
+  const items: Array<{ label: string; ok: boolean }> = [
+    { label: "Symbol", ok: readiness.symbol },
+    { label: "Footprint", ok: readiness.footprint },
+    { label: "3D Model", ok: readiness.model },
+  ];
+  const okCount = items.filter((i) => i.ok).length;
+  const tone = readiness.ready ? "var(--c-ok)" : "var(--c-warn)";
+  return (
+    <div className="group relative inline-flex">
+      <button
+        type="button"
+        className="inline-flex h-[29px] items-center gap-1.5 rounded-control border px-2.5 text-xs font-semibold text-t1"
+        style={{
+          background: `color-mix(in srgb, ${tone} 12%, var(--c-raise))`,
+          borderColor: `color-mix(in srgb, ${tone} ${readiness.ready ? 30 : 42}%, transparent)`,
+        }}
+        aria-label={`${label} assets, ${readiness.ready ? "complete" : `${okCount} of 3`}`}
+      >
+        {label}
+        {readiness.ready ? (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--c-ok)"
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3 w-3"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--c-warn)" }} />
+        )}
+      </button>
+      <div className="pointer-events-none absolute right-0 top-[calc(100%+6px)] z-30 w-[224px] rounded-card border border-line bg-popover p-3.5 opacity-0 shadow-pop transition duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="text-sm font-semibold text-t1">{label}</span>
+          <span
+            className="ml-auto rounded px-2 py-0.5 text-2xs font-bold"
+            style={{ color: tone, background: `color-mix(in srgb, ${tone} 16%, transparent)` }}
+          >
+            {readiness.ready ? "Complete" : `${okCount} of 3`}
+          </span>
+        </div>
+        {items.map((i) => (
+          <div key={i.label} className="flex items-center gap-2 py-[3px] text-xs text-t2">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={i.ok ? "var(--c-ok)" : "var(--c-warn)"}
+              strokeWidth={2.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 flex-none"
+            >
+              {i.ok ? <path d="M20 6 9 17l-5-5" /> : <path d="M18 6 6 18M6 6l12 12" />}
+            </svg>
+            <span>{i.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // A section marker: a short copper tick + the label. The copper tick is the identity
 // throughline that ties every section to the app's material (a trace on the board), and
 // gives the long detail column a scannable rhythm instead of dim floating eyebrows.
@@ -514,39 +586,6 @@ function Middot() {
   );
 }
 
-// The single completeness verdict, replacing the old ring + badge + dots trio. Quiet
-// and confident when the part is Complete (an ok dot is the only color); a warn readout
-// that draws the eye when fields are missing (attention belongs on the gap).
-function Verdict({
-  complete,
-  score,
-  total,
-}: {
-  complete: boolean;
-  score: number;
-  total: number;
-}) {
-  if (complete) {
-    return (
-      <div className="flex flex-none items-center gap-2.5 rounded-control bg-raise px-3.5 py-2 shadow-card">
-        <span className="h-2 w-2 flex-none rounded-full bg-ok" aria-hidden="true" />
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-t1">Complete</div>
-          <div className="tnum font-mono text-2xs text-t3">{total} of {total} fields</div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-none items-center gap-2.5 rounded-control bg-[rgba(224,179,84,0.11)] px-3.5 py-2">
-      <span className="h-2 w-2 flex-none rounded-full bg-warn" aria-hidden="true" />
-      <div className="leading-tight">
-        <div className="text-sm font-semibold text-warn">Incomplete</div>
-        <div className="tnum font-mono text-2xs text-t3">{score} of {total} fields</div>
-      </div>
-    </div>
-  );
-}
 
 function CategoryRow({
   value,
