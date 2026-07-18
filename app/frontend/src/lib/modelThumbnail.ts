@@ -103,8 +103,9 @@ function renderOne(glb: ArrayBuffer): Promise<string | null> {
             scene.add(gltf.scene);
             neutralize(gltf.scene);
             // KiCad/STEP models are authored Z-up; three.js is Y-up, so an unrotated model
-            // renders lying on its side. Rotate it upright before framing.
-            gltf.scene.rotation.x = -Math.PI / 2;
+            // renders lying on its side, and a -90° turn lands it upside down - +90° stands it
+            // right-side up. Rotate before framing.
+            gltf.scene.rotation.x = Math.PI / 2;
             gltf.scene.updateMatrixWorld(true);
             // Center on the origin, back the camera off the bounding SPHERE (so no clip at
             // the 3/4 angle), place it along the hero's view direction.
