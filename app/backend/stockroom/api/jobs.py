@@ -70,9 +70,29 @@ def _offer(q: "queue.Queue[JobEvent]", event: JobEvent) -> None:
 
 
 class JobRunner:
-    def __init__(self, max_workers: int = 1):
+    """Two independent lanes so an interactive lookup never queues behind a long job.
+
+    READ jobs (enrich lookup/bulk, ingest inspect/enrich, project checks/BOM) touch no
+    git working tree, so they run concurrently on a small pool: a bulk enrich or a project
+    prepare in flight never makes an Add-A-Part lookup sit "queued".
+
+    WRITE jobs (project prepare -> an atomic commit on the project's git; doctor wire-kicad
+    -> a rewrite of the shared KiCad config) run on a dedicated single-worker pool, so two
+    git Transactions can never overlap and race on the index lock. A naive `max_workers`
+    bump on ONE pool would have let them - hence the split rather than a shared pool.
+
+    The two lanes are not mutually exclusive: a read may run alongside a write (they touch
+    disjoint state - the enrich cache vs. a project's git). The one narrow overlap left is
+    a `checks`/`bom` READ against a `prepare` WRITE on the SAME project; prepare evicts
+    those caches anyway, so a rare same-instant race only risks a stale advisory cache
+    entry, never a corrupt commit. Revisit only if that ever bites."""
+
+    def __init__(self, max_workers: int = 4):
         self._jobs: dict[str, Job] = {}
-        self._pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._read_pool = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="job-read"
+        )
+        self._write_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="job-write")
         self._lock = threading.Lock()
 
     def get(self, job_id: str) -> Job:
@@ -108,9 +128,12 @@ class JobRunner:
         self._drive(job, fn)
         return job
 
-    def submit(self, fn) -> str:
+    def submit(self, fn, *, write: bool = False) -> str:
+        """Queue a job. `write=True` routes a git/config-mutating job to the serialized
+        write lane; the default read lane runs jobs concurrently."""
         job = self._new_job()
-        self._pool.submit(self._drive, job, fn)
+        pool = self._write_pool if write else self._read_pool
+        pool.submit(self._drive, job, fn)
         return job.id
 
     def events(self, job_id: str) -> Iterator[JobEvent]:

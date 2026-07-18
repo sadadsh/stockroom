@@ -83,6 +83,8 @@ def doctor_router(require_token) -> APIRouter:
                 "restart_needed": report.restart_needed,
             }
 
-        return {"job_id": ctx.jobs.submit(work)}
+        # write=True: wiring rewrites the shared KiCad config (sym/fp-lib-table, SR_LIB), so
+        # it runs on the serialized write lane (two concurrent rewrites would interleave).
+        return {"job_id": ctx.jobs.submit(work, write=True)}
 
     return r

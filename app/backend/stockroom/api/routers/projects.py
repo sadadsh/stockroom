@@ -509,7 +509,9 @@ def projects_router(require_token) -> APIRouter:
                 ctx.bom_cache.pop(project_id, None)
             return result
 
-        return {"job_id": ctx.jobs.submit(work)}
+        # write=True: prepare_apply is one atomic commit on the project's git, so it runs on
+        # the serialized write lane (never two git Transactions at once).
+        return {"job_id": ctx.jobs.submit(work, write=True)}
 
     @r.post("/{project_id}/prepare/fill")
     def manual_fill(request: Request, project_id: str, body: ManualFillBody) -> dict:

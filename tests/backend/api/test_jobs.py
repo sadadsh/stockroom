@@ -1,3 +1,5 @@
+import threading
+
 from stockroom.api.jobs import JobRunner, JobStatus
 
 
@@ -51,6 +53,72 @@ def test_unknown_job_id_raises_keyerror():
         assert False, "expected KeyError"
     except KeyError:
         pass
+
+
+def test_read_jobs_run_concurrently():
+    # An interactive enrich lookup (a READ job) must not sit "queued" behind a long
+    # bulk enrich (another READ job). Two read jobs share a rendezvous barrier that only
+    # releases when BOTH are running at once; if reads were serialized the lone first job
+    # would wait for a partner that never comes, time out, and error.
+    runner = JobRunner()
+    both_running = threading.Barrier(2, timeout=5)
+
+    def read_work(progress):
+        both_running.wait()  # passes only if a second read is running concurrently
+        return "ok"
+
+    id1 = runner.submit(read_work)
+    id2 = runner.submit(read_work)
+    list(runner.events(id1))
+    list(runner.events(id2))
+    assert runner.get(id1).result == "ok"
+    assert runner.get(id2).result == "ok"
+
+
+def test_a_read_runs_while_a_write_is_in_flight():
+    # The core of the finding: a READ (enrich lookup) started while a WRITE (a project
+    # prepare / KiCad wiring commit) is mid-flight must run immediately on the read lane,
+    # never queue behind the mutating job. The barrier proves they overlap.
+    runner = JobRunner()
+    together = threading.Barrier(2, timeout=5)
+
+    def write_work(progress):
+        together.wait()
+        return "write"
+
+    def read_work(progress):
+        together.wait()
+        return "read"
+
+    wid = runner.submit(write_work, write=True)
+    rid = runner.submit(read_work)
+    list(runner.events(wid))
+    list(runner.events(rid))
+    assert runner.get(wid).result == "write"
+    assert runner.get(rid).result == "read"
+
+
+def test_write_jobs_are_serialized():
+    # Guard the unsafe naive fix: git-mutating jobs must NEVER overlap (two concurrent
+    # git Transactions race on the index lock). Two write jobs meet at a barrier that,
+    # if they were parallel, would release and set the overlap flag; serialized, each
+    # waits alone, times out, and the flag stays down.
+    runner = JobRunner()
+    barrier = threading.Barrier(2, timeout=1)
+    overlapped = {"flag": False}
+
+    def write_work(progress):
+        try:
+            barrier.wait()
+            overlapped["flag"] = True  # both reached it -> they overlapped
+        except threading.BrokenBarrierError:
+            pass  # timed out alone -> correctly serialized
+        return "ok"
+
+    ids = [runner.submit(write_work, write=True) for _ in range(2)]
+    for job_id in ids:
+        list(runner.events(job_id))
+    assert overlapped["flag"] is False
 
 
 def test_progress_never_blocks_when_the_consumer_stops_draining():
