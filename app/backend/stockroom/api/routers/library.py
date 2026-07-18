@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from stockroom.api.errors import ApiError
 from stockroom.api.schemas import (
@@ -79,9 +79,24 @@ def library_router(require_token) -> APIRouter:
         q: str = "",
         category: str | None = None,
         complete_only: bool = False,
+        spec: list[str] = Query(default=[]),
     ) -> dict:
+        """The parts list, scoped by text/category/completeness in the derived index, then -
+        for the modular parametric search - narrowed by any ``spec`` constraints
+        (``<key>:<value>`` or ``<key>:<min>~<max>``, repeatable). The spec filter loads each
+        candidate's record (bounded: the parametric rail is category-scoped) and keeps those
+        whose spec bag satisfies every constraint, reusing the SAME normalization the facets
+        are built from so a checkbox never disagrees with the list it produces."""
+        from stockroom.store.parametric import matches_spec_filters, parse_spec_filters
+
         ctx = request.app.state.ctx
         rows = ctx.index.search(query=q, category=category, complete_only=complete_only)
+        constraints = parse_spec_filters(spec)
+        if constraints:
+            rows = [
+                row for row in rows
+                if matches_spec_filters(ctx.ops.load_record(row.id), constraints)
+            ]
         return {"parts": [PartSummary.from_row(row).model_dump() for row in rows],
                 "count": len(rows)}
 
