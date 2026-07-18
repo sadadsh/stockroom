@@ -247,6 +247,17 @@ function hasInlineUnit(value: string): boolean {
   return /[a-zµΩ°%]/i.test(value);
 }
 
+// Spec keys whose value is inherently a ± quantity (a tolerance, a temperature coefficient):
+// the north-star reads "±1%", not "1 %". Keyed normalized so any casing matches.
+const SIGNED_KEYS = new Set(["tolerance", "temperature coefficient"].map(normalizeSpecKey));
+
+// Prefix a ± when the resolved key is a signed quantity and the value does not already carry a
+// sign (a value like "±1%" or "-40" passes through unchanged). Presentation only.
+export function applySign(rawKey: string, value: string): string {
+  if (!SIGNED_KEYS.has(normalizeSpecKey(rawKey))) return value;
+  return /^[±+−-]/.test(value.trim()) ? value : `±${value}`;
+}
+
 // Numeric parse for faceting: the numeric lead (commas stripped) as a finite number,
 // plus its unit, or null when the value is not numeric.
 function parseNumericSpec(raw: string): { num: number; unit: string } | null {
@@ -292,13 +303,21 @@ export function groupSpecs(
     const resolved = resolveSpec(key, category);
     const split = splitValueUnit(coerceValue(value));
     const prettyUnit = split.unit ? prettifyValue(split.unit) : undefined;
+    let dispValue = prettifyValue(split.value);
+    // the value's own inline unit wins; the registry unit is only a fallback for a bare number
+    // that carried none - never appended onto a value that already has a unit.
+    let dispUnit = prettyUnit ?? (hasInlineUnit(split.value) ? undefined : resolved.unit);
+    // a percent reads tight ("±1%", not "1 %"), so fold it into the value with no space
+    if (dispUnit === "%") {
+      dispValue += "%";
+      dispUnit = undefined;
+    }
+    dispValue = applySign(key, dispValue);
     const row: SpecRow = {
       key: resolved.key,
       label: resolved.label,
-      value: prettifyValue(split.value),
-      // the value's own inline unit wins; the registry unit is only a fallback for a bare
-      // number that carried none - never appended onto a value that already has a unit.
-      unit: prettyUnit ?? (hasInlineUnit(split.value) ? undefined : resolved.unit),
+      value: dispValue,
+      unit: dispUnit,
     };
     const list = buckets.get(resolved.group) ?? [];
     list.push({ row, order: resolved.order, seq: seq++ });

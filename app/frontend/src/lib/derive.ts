@@ -12,7 +12,13 @@
  * so every consumer treats the same values as real.
  */
 import type { PartDetail } from "../api/types";
-import { EMPTY_SPEC_VALUES, SPEC_HIDDEN_KEYS, normalizeSpecKey, prettifyValue } from "./specSchema";
+import {
+  EMPTY_SPEC_VALUES,
+  SPEC_HIDDEN_KEYS,
+  applySign,
+  normalizeSpecKey,
+  prettifyValue,
+} from "./specSchema";
 
 // --- shared spec-bag helpers -------------------------------------------------
 
@@ -160,7 +166,7 @@ export function deriveTitle(part: PartDetail): string {
   if (rule) {
     for (const key of rule.specs) {
       const value = specMap.get(normalizeSpecKey(key));
-      if (value) values.push(value);
+      if (value) values.push(applySign(key, value));
     }
   }
   // A registered category with none of its title specs, or any unregistered category,
