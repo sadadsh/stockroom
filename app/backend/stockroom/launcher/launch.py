@@ -267,6 +267,7 @@ def supervise(
     ensure: Callable[[Path], None] | None = None,
     update: Callable[[Path], None] | None = None,
     webview2: Callable[[], None] | None = None,
+    ensure_browsers: Callable[[Path], None] | None = None,
     progress: Callable[[str], None] | None = None,
     remote: str = APP_REPO_REMOTE,
     clone: Callable[[str, Path], None] | None = None,
@@ -274,15 +275,17 @@ def supervise(
     """Run the host, relaunching whenever it exits with EXIT_RESTART (a self-update: the
     in-app updater has already pulled + synced, so the loop just re-runs on the new code).
     Returns the host's final non-restart exit code. The shell-outs are injected for testing;
-    the defaults clone / guarantee WebView2 / `uv sync --frozen` / `uv run python -m
-    stockroom.host.run`. `progress(phase)` (a splash callback: clone / webview2 / sync /
-    starting) lets the first-run splash show what is happening during the slow provision, and
-    is signalled 'starting' right before the FIRST host spawn so the splash can close."""
+    the defaults clone / guarantee WebView2 / `uv sync --frozen` / provision the browser builds
+    / `uv run python -m stockroom.host.run`. `progress(phase)` (a splash callback: clone /
+    webview2 / sync / browsers / starting) lets the first-run splash show what is happening
+    during the slow provision, and is signalled 'starting' right before the FIRST host spawn so
+    the splash can close."""
     workdir = Path(workdir)
     _ensure = ensure or (lambda wd: ensure_clone(wd, remote=remote, clone=clone))
     _update = update or update_to_latest
     _webview2 = webview2 or ensure_webview2
     _uv = uv_sync or _uv_sync
+    _browsers = ensure_browsers or _ensure_browsers
     _spawn = spawn or _spawn_host
     _progress = progress or (lambda _phase: None)
     _progress("clone")
@@ -296,6 +299,17 @@ def supervise(
         _progress("sync")
         _uv(workdir)
         if not started:
+            # Provision the render tier's browser BUILDS once, AFTER the deps sync (uv sync
+            # installs the camoufox/playwright packages but not their ~150 MB browser binaries)
+            # and BEFORE the first host spawn, so a clean install can render distributor pages.
+            # NON-FATAL: unlike WebView2 (without which no window opens), the render tier is
+            # optional (LCSC resolves over plain HTTP), so a failed download degrades the render
+            # path honestly rather than blocking the whole app (source-agnostic completeness).
+            _progress("browsers")
+            try:
+                _browsers(workdir)
+            except Exception:  # noqa: BLE001 - an optional render tier never blocks the launch
+                pass
             _progress("starting")  # provisioning done; the splash closes, the host window appears
             started = True
         code = _spawn(workdir)
@@ -352,6 +366,31 @@ def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
             "could not set up the Stockroom environment: "
             + ((proc.stderr or proc.stdout) or "").strip()
         )
+
+
+def _ensure_browsers(workdir: Path) -> None:  # pragma: no cover - real shell-out
+    """Provision the browser BUILDS the render tier drives: Playwright's Chromium and Camoufox's
+    Firefox build. `uv sync --frozen` installs the python packages but NOT their downloaded
+    browser binaries (~150 MB total), so a clean install would fail the first distributor render
+    until these run. Both commands are IDEMPOTENT (a fast no-op once their build is present), so
+    this is cheap on every launch after the provision, and an updated pin re-fetches the new
+    build. Runs with --frozen --no-sync: supervise already synced, so never re-validate against
+    the network here. A failure is raised for supervise to catch (the render tier is optional, so
+    the launch proceeds without it); the readable message is preserved for a future surface."""
+    for args, what in (
+        (["run", "--frozen", "--no-sync", "python", "-m", "playwright", "install", "chromium"],
+         "Chromium"),
+        (["run", "--frozen", "--no-sync", "python", "-m", "camoufox", "fetch"], "Camoufox"),
+    ):
+        proc = subprocess.run(
+            [_uv_bin(), *args], cwd=str(workdir),
+            capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"could not provision the {what} browser build: "
+                + ((proc.stderr or proc.stdout) or "").strip()
+            )
 
 
 def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
