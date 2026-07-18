@@ -1,4 +1,11 @@
-from stockroom.enrich.digikey_api import _parse_digikey_part, DigiKeyAdapter
+import io
+import json as _json
+import urllib.request
+
+import pytest
+
+from stockroom.enrich.digikey_api import _parse_digikey_part, DigiKeyAdapter, _default_requester
+from stockroom.enrich.errors import EnrichError
 
 _PRODUCT = {
     "ManufacturerProductNumber": "SN74LVC1G08DBVR",
@@ -95,3 +102,42 @@ def test_lookup_never_raises_on_requester_failure_or_empty():
 
     assert DigiKeyAdapter("id", "s", requester=boom).lookup("X").mpn is None
     assert DigiKeyAdapter("id", "s", requester=lambda m: {"Products": []}).lookup("X").mpn is None
+
+
+class _Resp(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _fake_urlopen(token_body, search_body, calls):
+    def _open(req, timeout=8):
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+        calls.append(url)
+        payload = token_body if "oauth2/token" in url else search_body
+        return _Resp(_json.dumps(payload).encode())
+    return _open
+
+
+def test_requester_fetches_token_once_then_searches(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        _fake_urlopen({"access_token": "TOK"},
+                                      {"Products": [{"ManufacturerProductNumber": "X"}]}, calls))
+    req = _default_requester("id", "secret")
+    body = req("X")
+    assert body["Products"][0]["ManufacturerProductNumber"] == "X"
+    # second lookup reuses the cached token: no second oauth call
+    req("Y")
+    assert sum("oauth2/token" in u for u in calls) == 1
+    assert sum("search/keyword" in u for u in calls) == 2
+
+
+def test_requester_raises_enricherror_on_transport_failure(monkeypatch):
+    def _boom(req, timeout=8):
+        raise OSError("network down")
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    with pytest.raises(EnrichError):
+        _default_requester("id", "secret")("X")
