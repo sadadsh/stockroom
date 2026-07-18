@@ -20,10 +20,16 @@ def _make_pipeline(ctx) -> EnrichmentPipeline:
         from stockroom.enrich.mouser import MouserAdapter
 
         mouser = MouserAdapter(api_key=ctx.config.mouser_api_key)
+    digikey = None
+    if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
+        from stockroom.enrich.digikey_api import DigiKeyAdapter
+
+        digikey = DigiKeyAdapter(ctx.config.digikey_client_id, ctx.config.digikey_client_secret)
     return EnrichmentPipeline(
         ctx.enrich_cache_dir,
         fetcher=ctx.rendered_dom_fetcher,  # None -> pipeline's HTTP default
         mouser=mouser,
+        digikey=digikey,
     )
 
 

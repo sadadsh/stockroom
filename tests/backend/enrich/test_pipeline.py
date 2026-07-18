@@ -452,3 +452,21 @@ def test_copy_specs_normalizes_label_no_duplicated_twin():
     _copy_specs(cand, result, {"specs"})
     assert cand.specs["Factory Pack Quantity"] == "999"
     assert twin not in cand.specs
+
+
+def test_pipeline_uses_digikey_adapter_as_a_source(tmp_path):
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    class FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            r = EnrichmentResult()
+            r.lifecycle = Sourced("Active", "digikey", "high")
+            return r
+
+    pipe = EnrichmentPipeline(tmp_path, digikey=FakeDigiKey())
+    # no scrape/LCSC hit for this junk MPN, so the DigiKey source is what fills lifecycle
+    result = pipe.enrich("ZZZ-NO-SUCH-PART", "ICs")
+    assert result.lifecycle is not None and result.lifecycle.value == "Active"
