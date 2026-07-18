@@ -10,7 +10,11 @@ part it already recorded, so it never restarts the whole library."""
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
+
+from stockroom.enrich.cache import _retry_transient
 
 
 class RescanState:
@@ -57,10 +61,29 @@ class RescanState:
         return {k: dict(v) for k, v in self._entries.items()}
 
     def _save(self) -> None:
+        # Concurrency-safe like TtlCache.put: a unique temp file (never a fixed shared name) so
+        # two concurrent writers (two rescan runs, or a GET /rescan/state read racing a write on
+        # Windows) never tear each other's write, plus a retried os.replace for the transient
+        # Windows sharing violation. Every filesystem step - mkdir, mkstemp, write, replace - is
+        # inside this one degrading try, so any failure (including a persistent one) leaves the
+        # prior on-disk file INTACT and just skips this save; this state is advisory (resume-only)
+        # and must never raise into the enrich job.
+        body = json.dumps({"parts": self._entries})
+        tmp: Path | None = None
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"parts": self._entries}), encoding="utf-8")
-            tmp.replace(self._path)
+            fd, tmp_name = tempfile.mkstemp(
+                dir=str(self._path.parent), prefix=self._path.name + ".", suffix=".tmp"
+            )
+            tmp = Path(tmp_name)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(body)
+            _retry_transient(lambda: os.replace(tmp, str(self._path)))
         except OSError:
-            pass  # advisory state: an unwritable dir degrades to no-resume, never raises
+            if tmp is not None:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass  # best-effort cleanup: a peer or the OS may have already removed it
+            # advisory state: an unwritable dir / persistent replace failure degrades to
+            # no-persist, leaving the prior self._path (if any) untouched, never raises
