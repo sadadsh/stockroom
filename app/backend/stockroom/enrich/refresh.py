@@ -11,7 +11,8 @@ from stockroom.model.part import Purchase
 
 
 def _has_data(result: EnrichmentResult) -> bool:
-    return result.mpn is not None or bool(result.price_breaks) or result.stock is not None
+    return (result.mpn is not None or bool(result.price_breaks)
+            or result.stock is not None or result.lifecycle is not None)
 
 
 def refresh_via_adapters(mpn: str, adapters: list) -> list[tuple[str, EnrichmentResult]]:
@@ -36,29 +37,39 @@ def apply_procurement_refresh(record, per_vendor, now_iso: str) -> bool:
     changed = False
     for vendor, result in per_vendor:
         if not _has_data(result):
-            continue  # a data-less result never creates a phantom Purchase (robustness)
+            continue
+        dk_pn = result.dist_pns.get(vendor.lower())
+        # Only ever create/update a Purchase when the vendor returned purchase-shaped data
+        # (price / stock / order P/N); a result carrying only identity or lifecycle never
+        # creates an empty Purchase row (its lifecycle is applied below).
+        has_purchase = bool(result.price_breaks) or result.stock is not None or bool(dk_pn)
         purchase = next((p for p in record.purchase
                          if (p.vendor or "").lower() == vendor.lower()), None)
+        if purchase is None and not has_purchase:
+            continue
+        # Track whether THIS vendor's real data changed, so fetched_at (and thus a commit) only
+        # moves on a genuine data change - not on every re-check. Otherwise a bulk rescan of N
+        # unchanged parts would churn N one-line fetched_at commits per run (the "no empty commit"
+        # constraint). fetched_at means "when this vendor's data last CHANGED".
+        vendor_changed = False
         if purchase is None:
             purchase = Purchase(vendor=vendor)
             record.purchase.append(purchase)
-            changed = True
+            vendor_changed = True
         if result.price_breaks:
             new_breaks = [{"qty": b.qty, "price": b.price} for b in result.price_breaks]
             if new_breaks != purchase.price_breaks:
-                purchase.price_breaks, changed = new_breaks, True
+                purchase.price_breaks, vendor_changed = new_breaks, True
             currency = result.price_breaks[0].currency
             if currency and purchase.currency != currency:
-                purchase.currency, changed = currency, True
+                purchase.currency, vendor_changed = currency, True
         if result.stock is not None and purchase.stock != result.stock.value:
-            purchase.stock, changed = result.stock.value, True
-        dk_pn = result.dist_pns.get(vendor.lower())
+            purchase.stock, vendor_changed = result.stock.value, True
         if dk_pn and purchase.part_number != dk_pn:
-            purchase.part_number, changed = dk_pn, True
-        # re-stamp the freshness marker for this vendor, but only as a real change when it
-        # actually differs, so an identical refresh at the same instant is a true no-op
-        if purchase.fetched_at != now_iso:
-            purchase.fetched_at, changed = now_iso, True
+            purchase.part_number, vendor_changed = dk_pn, True
+        if vendor_changed:
+            purchase.fetched_at = now_iso
+            changed = True
     # lifecycle: first vendor that reported one (a Sourced field the candidate mapping drops)
     for _vendor, result in per_vendor:
         if result.lifecycle is not None and record.specs.get("Lifecycle") != result.lifecycle.value:
