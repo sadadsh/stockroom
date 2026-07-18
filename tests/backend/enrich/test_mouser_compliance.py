@@ -83,3 +83,31 @@ def test_tariff_zero_when_ladder_present_but_every_break_untariffed() -> None:
 def test_tariff_none_when_no_price_ladder_json() -> None:
     # No ladder at all -> unknown, never a fabricated 0.
     assert _extract_tariff_rate("<html><body>no pricing here</body></html>") is None
+
+
+def test_tariff_is_also_a_spec_row() -> None:
+    # The effective US import tariff is the corpus convention as a spec row (a float), and the
+    # BOM cost layer reads specs["US Tariff %"] for its per-line import-tariff math, so mirror
+    # the first-class field onto a spec too (parity with Country of Origin).
+    r = _result()
+    assert "US Tariff %" in r.specs
+    assert r.specs["US Tariff %"].value == 7.98
+    assert r.specs["US Tariff %"].source == "mouser_web"
+
+
+def test_lifecycle_is_also_a_spec_row() -> None:
+    # Lifecycle is a spec row on every corpus part; the detail view lists specs, so the resolved
+    # manufacturing status belongs in the scannable table too (kept first-class as well).
+    r = _result()
+    assert "Lifecycle" in r.specs
+    assert r.specs["Lifecycle"].value == "Active"
+
+
+def test_zero_tariff_is_kept_as_a_confirmed_spec_row() -> None:
+    # A confirmed 0.0 (a non-tariffed origin) is real data the corpus stores (49/88 parts are
+    # 0.0), never a blank, so it must land as a spec row too.
+    html = ('<script>{"DecUnitPrice":0.230,"DecTariffUnitPrice":null},'
+            '{"DecUnitPrice":0.083,"DecTariffUnitPrice":null}</script>')
+    r = MouserWebSite().extract(html, _URL)
+    assert "US Tariff %" in r.specs
+    assert r.specs["US Tariff %"].value == 0.0

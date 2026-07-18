@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from html import unescape
+from urllib.parse import urlparse
 
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 
@@ -238,7 +239,12 @@ def _extract_lead_time(html: str) -> str | None:
 
 class MouserWebSite:
     def matches(self, url: str) -> bool:
-        return "mouser.com" in url.lower()
+        # Any Mouser storefront TLD (mouser.com, mouser.co.il, mouser.de, ...) serves the SAME
+        # product page, so all of them get the full parametric/compliance extractor. Match
+        # "mouser" as a domain LABEL (preceded by start-or-dot) on the hostname alone, so a host
+        # like "notmouser.com" or a "/mouser." path segment never false-claims.
+        host = urlparse(url).hostname or url
+        return bool(re.search(r"(^|\.)mouser\.", host.lower()))
 
     def extract(self, html: str, url: str) -> EnrichmentResult:
         r = EnrichmentResult()
@@ -331,6 +337,11 @@ class MouserWebSite:
         rate = _extract_tariff_rate(html)
         if rate is not None:
             r.tariff_rate = Sourced(rate, "mouser_web", "medium")
+            # Mirror onto a spec row too (parity with Country of Origin): the corpus stores US
+            # Tariff % as a spec (a float; a confirmed 0.0 is kept, never blanked), and the BOM
+            # cost layer reads specs["US Tariff %"] for its per-line import-tariff math - without
+            # this a freshly enriched part silently loses its per-line tariff.
+            r.specs.setdefault("US Tariff %", Sourced(rate, "mouser_web", "medium"))
 
         # Lifecycle from the analytics dataLayer when the spec table carried none ("none" =
         # no special status = Active production), so the field fills honestly instead of blank.
@@ -341,4 +352,10 @@ class MouserWebSite:
                 norm = _LIFECYCLE_MAP.get(raw.lower(), raw.title() if raw else "")
                 if norm:
                     r.lifecycle = Sourced(norm, "mouser_web", "medium")
+
+        # Mirror the resolved lifecycle onto a spec row (the corpus stores Lifecycle as a spec on
+        # every part; the detail view lists specs). setdefault so a real "Lifecycle" attr-row that
+        # the page itself rendered always wins over this promoted copy.
+        if r.lifecycle is not None:
+            r.specs.setdefault("Lifecycle", Sourced(r.lifecycle.value, "mouser_web", "medium"))
         return r
