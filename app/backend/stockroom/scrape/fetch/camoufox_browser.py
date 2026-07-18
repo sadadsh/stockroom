@@ -96,20 +96,19 @@ class CamoufoxFetcher:
                     pass
 
     async def _settle(self, page, timeout: float) -> None:
-        """Wait until the page has rendered substantial, stable, NON-challenge content, so a
+        """Wait until the page has rendered substantial, NON-challenge content, so a
         transparent Akamai/DataDome interstitial (a ~2 KB shell) is waited through until it
-        auto-solves and the real page loads. Bounded by timeout; never raises."""
+        auto-solves and the real page loads. Returns as soon as the real page is present
+        (a short grace lets late hydration finish) rather than requiring exact byte-stability
+        a live page rarely reaches. Bounded by timeout; never raises."""
         deadline = time.monotonic() + timeout
-        last: int | None = None
         while time.monotonic() < deadline:
             try:
                 html = await page.content()
             except Exception:  # noqa: BLE001 - a transient read is not a settle signal
                 await asyncio.sleep(0.4)
                 continue
-            length = len(html or "")
-            if (not _looks_challenge(html) and last is not None
-                    and length == last and length > _MIN_REAL_BYTES):
+            if not _looks_challenge(html) and len(html or "") > _MIN_REAL_BYTES:
+                await asyncio.sleep(1.0)   # brief grace for late-hydrating content
                 return
-            last = length
             await asyncio.sleep(0.5)
