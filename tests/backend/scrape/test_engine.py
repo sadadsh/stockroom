@@ -15,15 +15,32 @@ class _StubHttp:
         return self._outcome
 
 
-def _page(url="https://x/p"):
-    return Page(url=url, final_url=url, status=200, content=b"hi", text="hi",
-                content_type="text/html")
+class _StubBrowser:
+    def __init__(self, outcome):
+        self._outcome = outcome
+        self.calls = 0
 
+    async def fetch(self, url, timeout=20.0):
+        self.calls += 1
+        return self._outcome
+
+
+def _http_page(url="https://x/p"):
+    return Page(url=url, final_url=url, status=200, content=b"H", text="H",
+                content_type="text/html", render_tier="http")
+
+
+def _browser_page(url="https://x/p"):
+    return Page(url=url, final_url=url, status=200, content=b"B", text="B",
+                content_type="text/html", render_tier="browser")
+
+
+# --- S1 behavior (no browser configured): fetch is HTTP-only, cache-first ---
 
 def test_cache_hit_skips_http(tmp_path):
     cache = ResponseCache(tmp_path)
-    cache.put(_page())
-    http = _StubHttp(_page())
+    cache.put(_http_page())
+    http = _StubHttp(_http_page())
     engine = ScrapeEngine(cache=cache, http=http)
     out = asyncio.run(engine.fetch("https://x/p"))
     assert out.from_cache is True
@@ -32,12 +49,11 @@ def test_cache_hit_skips_http(tmp_path):
 
 def test_miss_fetches_and_caches(tmp_path):
     cache = ResponseCache(tmp_path)
-    http = _StubHttp(_page())
+    http = _StubHttp(_http_page())
     engine = ScrapeEngine(cache=cache, http=http)
     out = asyncio.run(engine.fetch("https://x/p"))
     assert isinstance(out, Page)
     assert http.calls == 1
-    # now cached: a second fetch does not hit http again
     out2 = asyncio.run(engine.fetch("https://x/p"))
     assert out2.from_cache is True
     assert http.calls == 1
@@ -49,4 +65,49 @@ def test_error_is_returned_and_not_cached(tmp_path):
     engine = ScrapeEngine(cache=cache, http=http)
     out = asyncio.run(engine.fetch("https://x/p"))
     assert isinstance(out, FetchError)
-    assert cache.get("https://x/p") is None  # errors never cached
+    assert cache.get("https://x/p") is None
+
+
+# --- S2 routing: pages render, binaries/APIs download ---
+
+def test_page_routes_to_browser(tmp_path):
+    cache = ResponseCache(tmp_path)
+    http = _StubHttp(_http_page())
+    browser = _StubBrowser(_browser_page("https://x/page"))
+    engine = ScrapeEngine(cache=cache, http=http, browser=browser)
+    out = asyncio.run(engine.fetch("https://x/page"))
+    assert isinstance(out, Page)
+    assert out.render_tier == "browser"
+    assert browser.calls == 1
+    assert http.calls == 0
+
+
+def test_pdf_routes_to_download(tmp_path):
+    cache = ResponseCache(tmp_path)
+    http = _StubHttp(_http_page("https://x/ds.pdf"))
+    browser = _StubBrowser(_browser_page())
+    engine = ScrapeEngine(cache=cache, http=http, browser=browser)
+    out = asyncio.run(engine.fetch("https://x/ds.pdf"))
+    assert isinstance(out, Page)
+    assert out.render_tier == "http"
+    assert http.calls == 1
+    assert browser.calls == 0
+
+
+def test_render_caches_and_second_call_is_cache_hit(tmp_path):
+    cache = ResponseCache(tmp_path)
+    browser = _StubBrowser(_browser_page("https://x/page"))
+    engine = ScrapeEngine(cache=cache, browser=browser)
+    out = asyncio.run(engine.render("https://x/page"))
+    assert out.render_tier == "browser"
+    assert browser.calls == 1
+    out2 = asyncio.run(engine.render("https://x/page"))
+    assert out2.from_cache is True
+    assert browser.calls == 1
+
+
+def test_render_without_browser_is_a_typed_error(tmp_path):
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path), http=_StubHttp(_http_page()))
+    out = asyncio.run(engine.render("https://x/page"))
+    assert isinstance(out, FetchError)
+    assert out.kind == "transport"
