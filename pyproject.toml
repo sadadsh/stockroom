@@ -6,6 +6,11 @@ requires-python = ">=3.12"
 dependencies = [
     "easyeda2kicad>=1.0.1",
     "curl_cffi>=0.7",
+    # The portable headless-Chromium render tier (stockroom.scrape). Playwright is a
+    # backend library (not a GUI toolkit), driven headless as a subprocess, so it runs
+    # identically on Windows/macOS/Linux/CI and keeps the stockroom.api import gate green.
+    # Chromium is provisioned by `playwright install chromium` (bundled into the exe in S7).
+    "playwright>=1.61",
     "pypdf>=4.0",
     "fastapi>=0.111",
     "uvicorn>=0.30",
@@ -41,4 +46,5 @@ markers = [
     "requires_kicad_cli: test needs the kicad-cli binary; skipped when absent",
     "live_enrich: hits the real network; deselected by default, opt-in only",
     "windows_only: needs a real Windows machine (WebView2, KiCad config surgery); skipped elsewhere",
+    "requires_browser: test launches a real headless Chromium; skipped when Playwright/Chromium cannot launch",
 ]
