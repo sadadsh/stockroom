@@ -1,4 +1,7 @@
+import threading
+
 from stockroom.enrich.cache import TtlCache
+from stockroom.enrich.schema import normalize_mpn
 
 
 class _Clock:
@@ -46,3 +49,42 @@ def test_prefix_keeps_sku_and_mpn_entries_apart(tmp_path):
     sku_cache.put("X", {"kind": "sku"})
     assert mpn_cache.get("X") == {"kind": "mpn"}
     assert sku_cache.get("X") == {"kind": "sku"}
+
+
+def test_get_treats_a_torn_body_as_a_miss_and_removes_it(tmp_path):
+    # A crash mid-write (or, before the atomic-write fix, two concurrent puts) can leave a
+    # half-written JSON body. get() must treat it as a miss and drop the file so a fresh scrape
+    # repopulates the key - never raise (the engine never raises) and never stay poisoned.
+    c = TtlCache(tmp_path, ttl=100.0, clock=_Clock())
+    key = normalize_mpn("STM32F103")
+    torn = tmp_path / f"mpn___{key}___1000.json"
+    torn.write_text('{"mpn": "STM32', encoding="utf-8")  # truncated -> JSONDecodeError
+    assert c.get("STM32F103") is None
+    assert not torn.exists()
+
+
+def test_get_and_put_never_raise_or_poison_under_concurrency(tmp_path):
+    # The parallel read lane runs two enrich jobs for the SAME normalized MPN at once (a bulk
+    # import overlapping an Add-A-Part lookup). Unguarded unlinks and a non-atomic write would
+    # raise (a spurious lookup error) or interleave into a torn JSON that poisons the key for a
+    # full TTL. get()/put() must stay raise-free and never leave the key un-loadable.
+    c = TtlCache(tmp_path, prefix="mpn")  # real wall-clock
+    errors: list[Exception] = []
+
+    def worker(i: int) -> None:
+        try:
+            for _ in range(40):
+                c.put("SAME-MPN", {"n": i, "specs": list(range(30))})
+                c.get("SAME-MPN")
+        except Exception as e:  # noqa: BLE001 - catching a spurious raise is the whole point
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [], f"cache raised under concurrency: {errors[:3]}"
+    # the key is not poisoned: a final read returns a complete dict (or a clean miss), never raises
+    final = c.get("SAME-MPN")
+    assert final is None or isinstance(final, dict)
