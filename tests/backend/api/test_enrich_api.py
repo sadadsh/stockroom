@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json as _json
 
+from stockroom.api.context import build_context
+from stockroom.api.routers.enrich import _make_pipeline
+from stockroom.store.machine_config import MachineConfig
+
 
 def _drain_job(client, job_id):
     """Consume a job's SSE stream and return every progress stage plus the terminal payload.
@@ -162,3 +166,21 @@ def test_bulk_enrich_streams_a_report(client, monkeypatch):
         body = "".join(chunk for chunk in s.iter_text())
     assert "symbol" in body  # the incomplete item's missing field surfaced
     assert "done" in body
+
+
+def test_make_pipeline_wires_digikey_only_when_both_creds_are_set(library_root, tmp_path):
+    # _make_pipeline builds a live DigiKeyAdapter and registers it as a "digikey" source only
+    # when BOTH digikey_client_id and digikey_client_secret are set on the machine config;
+    # this seam had no test coverage (plan Task 4 called for one and it was never added).
+    with_creds = MachineConfig(active_profile="Main", digikey_client_id="id",
+                               digikey_client_secret="secret")
+    ctx = build_context(library_root, kicad_dir=tmp_path / "kicad-with", config=with_creds,
+                        token="testtoken")
+    names = {s.name for s in _make_pipeline(ctx).registry.sources}
+    assert "digikey" in names
+
+    without_creds = MachineConfig(active_profile="Main")
+    ctx2 = build_context(library_root, kicad_dir=tmp_path / "kicad-without", config=without_creds,
+                         token="testtoken")
+    names2 = {s.name for s in _make_pipeline(ctx2).registry.sources}
+    assert "digikey" not in names2
