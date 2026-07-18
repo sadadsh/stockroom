@@ -1,7 +1,7 @@
 /**
  * The part detail panel, designed as an instrument readout (not a CRUD form).
  * Reads the full record from GET /api/library/parts/{id} and lays it out as:
- * an identity band (name headline + the MPN as a mono serial + a single Ready /
+ * an identity band (name headline + the MPN as a mono serial + a single Complete /
  * Missing verdict), the Part Canvas (the 3D physical object as the hero with the
  * schematic symbol + PCB footprint as its embodiments), a borderless datasheet
  * data grid (identity fields + parametric specs in the mono readout face), then
@@ -515,7 +515,7 @@ function Middot() {
 }
 
 // The single completeness verdict, replacing the old ring + badge + dots trio. Quiet
-// and confident when the part is Ready (an ok dot is the only color); a warn readout
+// and confident when the part is Complete (an ok dot is the only color); a warn readout
 // that draws the eye when fields are missing (attention belongs on the gap).
 function Verdict({
   complete,
