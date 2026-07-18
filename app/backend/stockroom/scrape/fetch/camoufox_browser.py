@@ -21,19 +21,10 @@ from stockroom.scrape.model import FetchError, FetchOutcome, Page
 
 # A real product page is hundreds of KB; the Akamai "access denied" and DataDome
 # captcha-delivery challenge SHELLS are ~2 KB. Settling requires substantial, stable,
-# non-challenge content, so we wait THROUGH the transparent challenge until it resolves.
+# non-challenge content, so we wait THROUGH the transparent challenge until it resolves. The
+# interstitial markers live in the shared challenge module so every fetcher uses one vetted list.
 _MIN_REAL_BYTES = 20000
-# Markers of an UNSOLVED challenge SHELL only. Note: NOT the bare word "datadome" — the
-# DataDome client script stays on the CLEARED page, so matching it would make settle think
-# the real page is still a challenge and wait out the whole timeout. The captcha-delivery
-# iframe and the Akamai "access denied" text appear ONLY on the unsolved challenge.
-_CHALLENGE_MARKERS = ("captcha-delivery.com", "access to this page has been denied",
-                      "verifying you are human", "checking your browser")
-
-
-def _looks_challenge(html: str) -> bool:
-    h = (html or "").lower()
-    return any(m in h for m in _CHALLENGE_MARKERS)
+from stockroom.scrape.fetch.challenge import looks_challenge as _looks_challenge  # noqa: E402
 
 
 class CamoufoxFetcher:

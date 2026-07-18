@@ -470,3 +470,44 @@ def test_pipeline_uses_digikey_adapter_as_a_source(tmp_path):
     # no scrape/LCSC hit for this junk MPN, so the DigiKey source is what fills lifecycle
     result = pipe.enrich("ZZZ-NO-SUCH-PART", "ICs")
     assert result.lifecycle is not None and result.lifecycle.value == "Active"
+
+
+def test_extract_from_url_never_leaks_a_challenge_shell_as_description(tmp_path):
+    # A challenge shell (Cloudflare "Just a moment...") whose only extractable field is an
+    # og:description must NOT surface that text as the part description - honest degradation, the
+    # vendor-agnostic backstop below the marker-level detector.
+    from stockroom.enrich.fetch import FetchResult
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+
+    class ChallengeFetcher:
+        def rendered_html(self, url, **kw):
+            html = ('<html><head><meta property="og:description" '
+                    'content="Just a moment..."></head><body></body></html>')
+            return FetchResult(url=url, status=200, text=html, content=b"",
+                               content_type="text/html", final_url=url)
+
+    pipe = EnrichmentPipeline(tmp_path, fetcher=ChallengeFetcher())
+    result = pipe.extract_from_url("https://www.digikey.com/en/products/detail/x/Y/1")
+    assert result.description is None   # the challenge text is not fabricated into a description
+    assert result.mpn is None           # nothing real was pulled
+
+
+def test_extract_from_url_keeps_a_real_description_with_manufacturer_but_no_mpn(tmp_path):
+    # A real manufacturer/landing page whose JSON-LD carries brand + name but no MPN/specs is
+    # substantive - manufacturer is structured-only (a challenge shell can't produce it) - so its
+    # real product description must be KEPT, not dropped as if it were a challenge shell (F1).
+    from stockroom.enrich.fetch import FetchResult
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+
+    class RealPageFetcher:
+        def rendered_html(self, url, **kw):
+            html = ('<script type="application/ld+json">{"@type":"Product",'
+                    '"name":"BQ24074RGTT Battery Charger IC",'
+                    '"brand":{"@type":"Brand","name":"Texas Instruments"}}</script>')
+            return FetchResult(url=url, status=200, text=html, content=b"",
+                               content_type="text/html", final_url=url)
+
+    pipe = EnrichmentPipeline(tmp_path, fetcher=RealPageFetcher())
+    result = pipe.extract_from_url("https://www.ti.com/product/BQ24074")
+    assert result.manufacturer is not None and result.manufacturer.value == "Texas Instruments"
+    assert result.description is not None and "BQ24074RGTT" in result.description.value

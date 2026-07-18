@@ -6,8 +6,34 @@ from __future__ import annotations
 
 import asyncio
 
-from stockroom.scrape.fetch.camoufox_browser import CamoufoxFetcher
+from stockroom.scrape.fetch.camoufox_browser import CamoufoxFetcher, _looks_challenge
 from stockroom.scrape.model import FetchError, Page
+
+
+def test_looks_challenge_catches_every_vendor_interstitial():
+    # The leaked descriptions seen in the wild were Cloudflare's "Just a moment..." and Akamai's
+    # "Access to this page has been denied." Every anti-bot interstitial the distributors use must
+    # be caught so its text is never returned as a page (spec 2.2 honest degradation).
+    shells = [
+        "<title>Just a moment...</title>",                                   # Cloudflare
+        "<html><body>Access to this page has been denied.</body></html>",    # Akamai
+        "<h1>Access Denied</h1>You don't have permission",                   # Akamai short
+        "<p>Enable JavaScript and cookies to continue</p>",                  # Cloudflare
+        "<h1>Attention Required! | Cloudflare</h1>",                         # Cloudflare
+        "<div>Verifying you are human. This may take a few seconds.</div>",  # generic
+        "<div>Verify you are human by completing the action</div>",         # generic
+        "<div>Checking your browser before accessing</div>",                 # generic
+        "<script src='https://ct.captcha-delivery.com/c.js'></script>",     # DataDome
+    ]
+    for shell in shells:
+        assert _looks_challenge(shell) is True, shell
+
+
+def test_looks_challenge_does_not_flag_a_real_product_page():
+    real = ("<title>BQ24074RGTT Texas Instruments | Mouser</title>"
+            "<body>Battery Management charger IC, 4.2 V, VQFN-16, RoHS. In stock.</body>")
+    assert _looks_challenge(real) is False
+    assert _looks_challenge("") is False
 
 
 class _Resp:
