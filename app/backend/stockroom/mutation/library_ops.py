@@ -512,6 +512,22 @@ class LibraryOps:
             txn.commit(f"Set specs on {part_id}: {', '.join(sorted(specs))}")
         return record
 
+    def refresh_procurement(self, part_id: str, per_vendor, now_iso: str) -> PartRecord:
+        """Refresh a part's volatile procurement data (price / stock / lifecycle / distributor
+        P/N / fetched_at) from the per-vendor distributor-API results, atomically. A change-free
+        refresh is a true no-op (no empty commit), mirroring set_specs."""
+        from stockroom.enrich.refresh import apply_procurement_refresh
+
+        record = self.load_record(part_id)
+        if not apply_procurement_refresh(record, per_vendor, now_iso):
+            return record
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Refresh {part_id}: procurement")
+        return record
+
     def _remove_symbol_node(self, sym_lib_path: Path, name: str) -> str:
         """Remove the named symbol node from a lib and return the new file text."""
         sym_lib = SymbolLib.load(sym_lib_path)

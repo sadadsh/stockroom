@@ -55,8 +55,9 @@ def apply_procurement_refresh(record, per_vendor, now_iso: str) -> bool:
         dk_pn = result.dist_pns.get(vendor.lower())
         if dk_pn and purchase.part_number != dk_pn:
             purchase.part_number, changed = dk_pn, True
-        # any real API hit re-stamps the freshness marker for this vendor
-        if _has_data(result):
+        # re-stamp the freshness marker for this vendor, but only as a real change when it
+        # actually differs, so an identical refresh at the same instant is a true no-op
+        if purchase.fetched_at != now_iso:
             purchase.fetched_at, changed = now_iso, True
     # lifecycle: first vendor that reported one (a Sourced field the candidate mapping drops)
     for _vendor, result in per_vendor:

@@ -436,3 +436,29 @@ def test_detect_drift_finds_behind_the_back_edit(tmp_path, fixtures_dir):
     assert item.property == "Manufacturer"
     assert item.json_value == "TI"
     assert item.symbol_value == "WRONG"
+
+
+def test_refresh_procurement_writes_atomically_and_no_ops_when_unchanged(tmp_path, fixtures_dir):
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)  # creates part "tps62130rgtr" with a Mouser purchase
+
+    def result(stock):
+        r = EnrichmentResult()
+        r.stock = Sourced(stock, "mouser", "high")
+        r.price_breaks = [PriceBreak(1, 0.5)]
+        return r
+
+    before = repo.head()
+    rec = ops.refresh_procurement(
+        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T00:00:00+00:00")
+    assert any(p.vendor == "Mouser" and p.stock == 99 for p in rec.purchase)
+    assert repo.head() != before                                              # a commit happened
+    assert any(p.stock == 99 for p in ops.load_record("tps62130rgtr").purchase)  # persisted
+
+    head = repo.head()
+    ops.refresh_procurement(
+        "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T00:00:00+00:00")  # identical
+    assert repo.head() == head                                                # no empty commit
