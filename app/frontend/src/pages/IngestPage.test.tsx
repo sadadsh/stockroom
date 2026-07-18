@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
+import { queuePaths } from "../lib/ingestQueue";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { IngestPage } from "./IngestPage";
@@ -282,6 +283,67 @@ describe("IngestPage — unified Add A Part", () => {
     expect(mockApi.ingestCommit).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(/Added NE555P/i)).toBeInTheDocument();
     delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
+  it("merges the pulled data when a ZIP is dropped mid-lookup (native drag race)", async () => {
+    // The guided flow (look up, THEN drop when prompted) avoids it, but a native drag can drop
+    // a vendor ZIP WHILE the link lookup is still streaming. The ZIP inspect settles first; its
+    // staged candidate must still receive the pulled identity/specs/datasheet once the lookup
+    // lands, never a silently un-merged part. The held enrich stream guarantees the ordering.
+    const enc = new TextEncoder();
+    let enrichController: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const heldEnrich = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(enc.encode(`event: progress\ndata: ${JSON.stringify({ stage: "fetching", pct: 10 })}\n\n`));
+        enrichController = c; // held open: enrich.status stays "running" until the test pushes
+      },
+    });
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "enrich1" });
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
+    mockApi.openJobStream.mockImplementation((jobId: string) =>
+      Promise.resolve(jobId === "enrich1" ? heldEnrich : resultStream([ZIP_CANDIDATE])),
+    );
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/stm32",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    // the lookup is in flight (its stream is held open)
+    await screen.findByRole("button", { name: "Looking Up..." });
+
+    // a native drag drops the ZIP mid-lookup; its inspect settles while enrich is still running
+    await act(async () => {
+      queuePaths(["C:/dl/STM32.zip"]);
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    await waitFor(() => expect(mockApi.openJobStream).toHaveBeenCalledWith("zip1"));
+
+    // now the lookup lands: push its sourced result and close the held stream
+    await act(async () => {
+      enrichController!.enqueue(
+        enc.encode(
+          `event: result\ndata: ${JSON.stringify({
+            result: {
+              ...EMPTY_RESULT,
+              category: "ICs",
+              mpn: sf("STM32F103C8T6"),
+              description: sf("ARM Cortex-M3 MCU"),
+              datasheet_url: sf("https://ds/stm32.pdf"),
+              add_plan: null,
+            },
+          })}\n\n`,
+        ),
+      );
+      enrichController!.enqueue(enc.encode("event: done\ndata: {}\n\n"));
+      enrichController!.close();
+    });
+
+    // the staged candidate carries the ZIP's assets AND the pulled identity (the merge survived)
+    await screen.findByText("Review and Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6");
   });
 
   it("is honest when a link yields nothing addable", async () => {
