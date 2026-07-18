@@ -136,3 +136,34 @@ def test_scrape_passes_through_fetch_error(tmp_path):
                                                     kind="blocked", status=403)))
     out = asyncio.run(engine.scrape("https://x/p.pdf"))
     assert isinstance(out, FetchError)
+
+
+# --- S6: the render tier signals its one unobservable phase (the browser settle) ---
+
+def test_render_signals_the_rendering_stage_before_the_browser_drives(tmp_path):
+    # The pipeline can emit fetching/extracting/validating itself, but the render (the slow
+    # 8s settle) happens inside browser.fetch on the runtime loop; the engine must call
+    # on_stage("rendering") right before it, so the UI shows a real render phase.
+    order: list[str] = []
+
+    class _RecordingBrowser:
+        async def fetch(self, url, timeout=20.0):
+            order.append("fetch")
+            return _browser_page("https://x/page")
+
+    engine = ScrapeEngine(cache=ResponseCache(tmp_path), browser=_RecordingBrowser())
+    out = asyncio.run(engine.render("https://x/page",
+                                    on_stage=lambda s: order.append(f"stage:{s}")))
+    assert out.render_tier == "browser"
+    assert order == ["stage:rendering", "fetch"]
+
+
+def test_render_cache_hit_does_not_signal_rendering(tmp_path):
+    # An instant cache hit is not a render; emitting "rendering" for it would be theater.
+    cache = ResponseCache(tmp_path)
+    cache.put(_browser_page("https://x/page"))
+    seen: list[str] = []
+    engine = ScrapeEngine(cache=cache, browser=_StubBrowser(_browser_page("https://x/page")))
+    out = asyncio.run(engine.render("https://x/page", on_stage=seen.append))
+    assert out.from_cache is True
+    assert seen == []

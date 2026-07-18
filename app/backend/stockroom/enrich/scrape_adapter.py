@@ -66,11 +66,18 @@ class EngineRenderedDomFetcher:
                 self._started = True
             return self._runtime
 
-    def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
+    def rendered_html(self, url: str, timeout: float = 20.0, on_stage=None) -> FetchResult:
         try:
             runtime = self._ensure()
+            # on_stage is invoked on the runtime loop thread (inside engine.render, just
+            # before the browser settle). It only puts onto the job's thread-safe event
+            # queue, and the sync bridge blocks this thread until the render returns, so
+            # the caller's fetching/extracting emits never race the loop's rendering emit.
+            # Only threaded through when a sink is present, so the render call keeps its
+            # original signature on the default (no-progress) path.
+            kw = {"on_stage": on_stage} if on_stage is not None else {}
             outcome = runtime.run(
-                lambda engine: engine.render(url, timeout=timeout),
+                lambda engine: engine.render(url, timeout=timeout, **kw),
                 timeout=timeout + self._run_timeout_buffer,
             )
         except Exception:  # noqa: BLE001 - enrichment never blocks on a render failure
