@@ -13,7 +13,7 @@
        not borders). Four distinct steps on a cool near-black so the nav, the list, and
        the detail cards separate into real layers instead of one flat grey field.
        canvas (deepest) < rail/panel < raise (card) < raise2 (hover/selected). */
-    --c-canvas: #0b0c0f;
+    --c-canvas: #242427;
     --c-rail: rgba(255, 255, 255, 0.032);
     --c-surface: rgba(255, 255, 255, 0.016);
     --c-raise: rgba(255, 255, 255, 0.07);
@@ -21,7 +21,7 @@
     --c-field: rgba(0, 0, 0, 0.28);
     --c-line: rgba(255, 255, 255, 0.07);
     --c-line2: rgba(255, 255, 255, 0.13);
-    --c-popover: #212329;
+    --c-popover: #33333a;
     --c-t1: #f4f4f4;
     --c-t2: rgba(244, 244, 244, 0.66);
     --c-t3: rgba(244, 244, 244, 0.4);
@@ -53,24 +53,14 @@
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     /* page backdrop + chrome that lives outside the token classes: two soft neutral
        highlights over a near-black base so the window reads lit, not flat. */
-    --body-bg: #070808;
-    --root-bg: radial-gradient(
-        1200px 640px at 14% -10%,
-        rgba(255, 255, 255, 0.05),
-        transparent 60%
-      ),
-      radial-gradient(
-        1000px 720px at 112% 4%,
-        rgba(255, 255, 255, 0.028),
-        transparent 58%
-      ),
-      #0b0c0f;
+    --body-bg: #202023;
+    --root-bg: #242427;
     --sb-thumb: rgba(255, 255, 255, 0.13);
     --sb-thumb-hover: rgba(255, 255, 255, 0.22);
     --sb-track: rgba(255, 255, 255, 0.14);
     /* subtle row hover + the sticky category header band + the ring track */
     --c-hover: rgba(255, 255, 255, 0.03);
-    --c-sticky: rgba(15, 15, 16, 0.72);
+    --c-sticky: rgba(36, 36, 39, 0.8);
     --c-ring-track: #26272c;
     /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
        darker inset than the card so the 3D model / symbol / footprint read as lit
@@ -78,18 +68,18 @@
     --c-stage: rgba(0, 0, 0, 0.26);
     /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
        pre-refactor dark value, so the dark app stays byte-identical. */
-    --c-icon-line: #8b9099;
-    --c-icon-fill: #7f858e;
-    --c-icon-cube: #8a8f97;
-    --c-icon-edge: #4b5057;
-    --c-icon-faint: #c7ccd3;
+    --c-icon-line: #8f8f8f;
+    --c-icon-fill: #858585;
+    --c-icon-cube: #8d8d8d;
+    --c-icon-edge: #4f4f4f;
+    --c-icon-faint: #cbcbcb;
   }
 
   :root[data-theme="light"] {
-    --c-canvas: #f3f3f4;
-    --c-rail: rgba(0, 0, 0, 0.024);
+    --c-canvas: #e9eaee;
+    --c-rail: rgba(255, 255, 255, 0.5);
     --c-surface: rgba(255, 255, 255, 0.66);
-    --c-raise: rgba(0, 0, 0, 0.045);
+    --c-raise: #ffffff;
     --c-raise2: rgba(0, 0, 0, 0.08);
     --c-field: rgba(0, 0, 0, 0.05);
     --c-line: rgba(0, 0, 0, 0.1);
@@ -118,30 +108,20 @@
       0 28px 64px rgba(17, 18, 20, 0.2);
     --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    --body-bg: #e9e9eb;
-    --root-bg: radial-gradient(
-        1200px 620px at 14% -10%,
-        rgba(0, 0, 0, 0.03),
-        transparent 60%
-      ),
-      radial-gradient(
-        1000px 700px at 112% 4%,
-        rgba(0, 0, 0, 0.02),
-        transparent 58%
-      ),
-      #f3f3f4;
+    --body-bg: #dfe0e4;
+    --root-bg: #e9eaee;
     --sb-thumb: rgba(0, 0, 0, 0.2);
     --sb-thumb-hover: rgba(0, 0, 0, 0.32);
     --sb-track: rgba(0, 0, 0, 0.16);
     --c-hover: rgba(0, 0, 0, 0.04);
-    --c-sticky: rgba(244, 244, 245, 0.82);
+    --c-sticky: rgba(233, 234, 238, 0.85);
     --c-ring-track: #dfe0e3;
     --c-stage: rgba(17, 18, 20, 0.045);
-    --c-icon-line: #6b7078;
-    --c-icon-fill: #6b7078;
-    --c-icon-cube: #6b7078;
-    --c-icon-edge: #b0b5bd;
-    --c-icon-faint: #6b7078;
+    --c-icon-line: #6f6f6f;
+    --c-icon-fill: #6f6f6f;
+    --c-icon-cube: #6f6f6f;
+    --c-icon-edge: #b3b3b3;
+    --c-icon-faint: #6f6f6f;
   }
 
   html,
