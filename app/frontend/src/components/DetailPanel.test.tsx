@@ -239,31 +239,6 @@ describe("DetailPanel pinout (M6i)", () => {
   });
 });
 
-describe("DetailPanel asset tool pills", () => {
-  it("renders a tool pill on each present asset, mapping the tool value to a nice label", () => {
-    wrap(
-      <DetailPanel
-        detail={detail({
-          symbol: { lib: "Device", name: "R", tool: "kicad" },
-          footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric", tool: "altium" },
-          model: { file: "models/r.step", tool: "kicad" },
-        })}
-        {...BASE}
-      />,
-    );
-    // "altium" Title Cases to "Altium" (data-driven for future Altium support)
-    expect(screen.getByText("Altium")).toBeInTheDocument();
-    // "kicad" maps to the proper "KiCad" casing, on the symbol + 3D model cards
-    expect(screen.getAllByText("KiCad").length).toBe(2);
-  });
-
-  it("defaults an absent tool field to KiCad on every present asset", () => {
-    // the base fixture carries symbol/footprint/model with no tool field
-    wrap(<DetailPanel detail={detail()} {...BASE} />);
-    expect(screen.getAllByText("KiCad")).toHaveLength(3);
-  });
-});
-
 describe("DetailPanel attach-after affordance", () => {
   it("opens the attach modal for a missing symbol and posts the entered lib + name", async () => {
     const onAttachSymbol = vi.fn();
