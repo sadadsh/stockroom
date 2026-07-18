@@ -78,6 +78,14 @@ class CamoufoxFetcher:
             resp = await page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
             await self._settle(page, timeout)
             html = await page.content() or ""
+            if _looks_challenge(html):
+                # The challenge never cleared within the timeout (a hard block): return an honest
+                # "blocked", NOT the ~2 KB challenge SHELL as a status-200 page. Otherwise its
+                # "Access to this page has been denied." text is read downstream as the part's
+                # description (spec 2.2 honest degradation), and the engine's per-host breaker
+                # never learns to back off. _settle only returns via its success path once the
+                # page is already unchallenged, so this fires exactly on the settle-timeout case.
+                return FetchError(url=url, reason="anti-bot challenge did not clear", kind="blocked")
             final_url = page.url or url
             status = int(resp.status) if resp is not None else 200
             return Page(
