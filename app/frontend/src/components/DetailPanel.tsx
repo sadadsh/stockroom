@@ -201,16 +201,10 @@ export function DetailPanel({
         </div>
       ) : null}
 
-      {/* cols (north-star): the record leads on the LEFT (Specifications, then Overview +
-          Sourcing in one card); the part's three asset views stack uniformly on the RIGHT. */}
+      {/* top row: Overview + Sourcing on the LEFT, the part's three asset views on the RIGHT.
+          The wide Specifications sheet sits full-width BELOW this row. */}
       <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-[22px]">
-          {specCount > 0 ? (
-            <div className="rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
-              <SpecificationsSection groups={specGroups} count={specCount} />
-            </div>
-          ) : null}
-
           <div className="overflow-hidden rounded-card border border-line bg-raise shadow-card">
             <div className="px-[18px] py-[15px]">
               <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
@@ -339,6 +333,14 @@ export function DetailPanel({
           />
         </div>
       </div>
+
+      {/* Specifications: full width BELOW the top row, wide so the datasheet parameters
+          spread across the space (3-4 columns) instead of stacking in a narrow column. */}
+      {specCount > 0 ? (
+        <div className="mt-6 rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
+          <SpecificationsSection groups={specGroups} count={specCount} />
+        </div>
+      ) : null}
 
       {/* Attach a missing symbol / footprint reference after the part landed (assets no
           longer gate entry). Mounted only while open so its form state starts fresh each
@@ -954,13 +956,13 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
       </div>
       {/* a datasheet parameter block: two aligned columns, values in the mono readout face with
           tabular figures, sectioned by a full-width group eyebrow (Electrical / Physical / ...). */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-6">
+      <div className="grid grid-cols-2 gap-x-8 md:grid-cols-3 xl:grid-cols-4">
         {flat.map((row, i) => {
           const firstOfGroup = i === 0 || flat[i - 1].group !== row.group;
           return (
             <Fragment key={row.key}>
               {firstOfGroup ? (
-                <div className="px-0.5 pb-1.5 pt-4 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5 sm:col-span-2">
+                <div className="col-span-full px-0.5 pb-1.5 pt-4 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 first:pt-0.5">
                   {row.group}
                 </div>
               ) : null}
