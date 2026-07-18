@@ -70,6 +70,40 @@ describe("deriveTitle", () => {
     expect(deriveTitle(part)).toBe("0.1 µF X7R Capacitor");
   });
 
+  it("does not headline a non-defining junk spec: the 'China Connector' regression", () => {
+    // Specs arrive alphabetically, so a country-of-origin lands first; the fallback must
+    // never turn that into the headline. A connector earns its title from real specs.
+    const part = makePart({
+      category: "Connectors",
+      display_name: "USB4105-GF-A Top-Mount GCT",
+      specs: {
+        "Assembly Country of Origin": "China",
+        Brand: "GCT",
+        Color: "Black",
+        "Contact Material": "Copper Alloy",
+        "Number of Contacts": "16 Contact",
+        Gender: "Receptacle (Female)",
+        "Mounting Style": "Top-Mount",
+      },
+    });
+    const title = deriveTitle(part);
+    expect(title).not.toMatch(/china/i);
+    expect(title).toBe("16 Contact Connector");
+  });
+
+  it("skips country / brand junk in the first-spec fallback for an unregistered category", () => {
+    const part = makePart({
+      category: "Sensors",
+      display_name: "BME280",
+      specs: {
+        "Country of Origin": "China",
+        Brand: "Bosch",
+        "Supply Voltage": "3.3 V",
+      },
+    });
+    expect(deriveTitle(part)).toBe("3.3 V Sensor");
+  });
+
   it("falls back to the raw display_name when there is no usable spec", () => {
     const part = makePart({
       category: "Widgets",
