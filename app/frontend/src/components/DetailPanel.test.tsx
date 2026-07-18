@@ -128,26 +128,25 @@ describe("DetailPanel files previews (M6d)", () => {
         {...BASE}
       />,
     );
-    // the two real specs are listed
+    // the two real specs are listed (units prettified: kOhms -> kΩ for display)
     expect(screen.getByText("Resistance")).toBeInTheDocument();
-    expect(screen.getByText("1.1 kOhms")).toBeInTheDocument();
+    expect(screen.getByText("1.1 kΩ")).toBeInTheDocument();
     expect(screen.getByText("Tolerance")).toBeInTheDocument();
     // the count reflects only the real specs (asset keys + pinout excluded)
-    expect(screen.getByText("(2)")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
     // asset references are shown as Files cards, never listed as specs
     expect(screen.queryByText("Device:R")).not.toBeInTheDocument();
   });
 
-  it("collapses a deep spec list and expands it on Show all (B2)", async () => {
+  it("renders every spec at once (no collapse) (B2)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
     wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
-    // collapsed to the first 10; the deep ones are hidden behind Show all
+    // the north-star datasheet block is never collapsed: shallow AND deep specs both show,
+    // and there is no Show All / Show Fewer control.
     expect(screen.getByText("Spec 0")).toBeInTheDocument();
-    expect(screen.queryByText("Spec 14")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Show All 15" }));
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show Fewer" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show All|Show Fewer/ })).toBeNull();
   });
 
   it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {

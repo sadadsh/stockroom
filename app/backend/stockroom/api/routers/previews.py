@@ -112,7 +112,7 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
 # Bump when the footprint render changes (layers, hidden text, ...): the SVG cache is keyed by
 # the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
 # be served forever without this token. (C1: copper-only render -> "c1".)
-_FP_RENDER_VERSION = "c1"
+_FP_RENDER_VERSION = "c2"
 # Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
 # the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
 # fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
@@ -157,10 +157,13 @@ def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> s
         render_pretty = clean_pretty
     except Exception:  # noqa: BLE001 - unparseable footprint: raw preview, not a 500
         pass
-    # C1: render ONLY the copper (the pads), not the silkscreen + fab body that KiCad's default
-    # export fills the frame with (the "white blob"). A footprint preview is about pad geometry;
-    # pin numbers/names live in the DetailPanel's own Pinout table, not splashed over the pads.
-    svg = cli.fp_export_svg(render_pretty, name, out_dir, black_and_white=bw, layers="F.Cu,B.Cu")
+    # C2: the copper pads PLUS the courtyard boundary (F/B.CrtYd) - a thin dashed outline that
+    # frames the part like the north-star tile, giving the pads context. We still skip the
+    # silkscreen + fab BODY that KiCad's default export fills the frame with (the "white blob");
+    # the courtyard is a boundary line, not a fill, so it reads as an outline, not a smudge.
+    svg = cli.fp_export_svg(
+        render_pretty, name, out_dir, black_and_white=bw, layers="F.Cu,B.Cu,F.CrtYd,B.CrtYd"
+    )
     return Path(svg).read_text(encoding="utf-8")
 
 

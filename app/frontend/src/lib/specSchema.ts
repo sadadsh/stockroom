@@ -224,6 +224,29 @@ export function splitValueUnit(raw: string): { value: string; unit?: string } {
   return unit ? { value: num, unit } : { value: num };
 }
 
+// Presentation-only unit prettifying. The stored specs keep the scraped spelling
+// ("1.1 kOhms", "0.1 uF", "100 PPM"); the north-star shows the real symbols. Only SAFE,
+// unambiguous substitutions (never invents or drops data): Ohm(s) -> Ω, a micro u-prefix on
+// a known unit -> µ, PPM -> ppm. A bare code ("0603") or prose is returned unchanged.
+export function prettifyValue(text: string): string {
+  return text
+    .replace(/ohm(s)?/gi, "Ω")
+    .replace(/([\d\s(])u([FHAVWSs])\b/g, "$1µ$2")
+    .replace(/\bPPM\b/g, "ppm")
+    // a unary +/− with a stray space ("+ 155" -> "+155"); NOT a hyphen (that is a range dash)
+    .replace(/([+−])\s+(?=\d)/g, "$1")
+    .replace(/\/C\b/g, "/°C") // "ppm/C" -> "ppm/°C"
+    // a bare Celsius "C" after "<number> " (a required space avoids mangling a part code like
+    // "0603C" or an MPN's internal "1C1"): "155 C" -> "155 °C"
+    .replace(/(\d)\s+C\b/g, "$1 °C");
+}
+
+// True when a value already carries its own unit / symbol (so the registry unit must NOT be
+// appended on top of it - the source of the "200 mW (1/5 W) W" double-unit).
+function hasInlineUnit(value: string): boolean {
+  return /[a-zµΩ°%]/i.test(value);
+}
+
 // Numeric parse for faceting: the numeric lead (commas stripped) as a finite number,
 // plus its unit, or null when the value is not numeric.
 function parseNumericSpec(raw: string): { num: number; unit: string } | null {
@@ -268,13 +291,14 @@ export function groupSpecs(
     if (!isPresentableValue(value)) continue;
     const resolved = resolveSpec(key, category);
     const split = splitValueUnit(coerceValue(value));
+    const prettyUnit = split.unit ? prettifyValue(split.unit) : undefined;
     const row: SpecRow = {
       key: resolved.key,
       label: resolved.label,
-      value: split.value,
-      // the value's own inline unit wins; the registry unit is only a fallback for a
-      // bare number that carried none.
-      unit: split.unit ?? resolved.unit,
+      value: prettifyValue(split.value),
+      // the value's own inline unit wins; the registry unit is only a fallback for a bare
+      // number that carried none - never appended onto a value that already has a unit.
+      unit: prettyUnit ?? (hasInlineUnit(split.value) ? undefined : resolved.unit),
     };
     const list = buckets.get(resolved.group) ?? [];
     list.push({ row, order: resolved.order, seq: seq++ });
