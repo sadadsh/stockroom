@@ -89,6 +89,29 @@ describe("groupSpecs", () => {
     expect(rows[0]).toMatchObject({ label: "Resistance", value: "10", unit: "kΩ" });
   });
 
+  it("routes common connector/passive specs to their proper category, not Other", () => {
+    const groups = groupSpecs("Connectors", {
+      "Insulation Resistance": "100 MΩ",
+      Gender: "Receptacle",
+      "Mounting Style": "Top-Mount",
+      "Number of Contacts": "16",
+      "Contact Material": "Copper Alloy",
+      "Flammability Rating": "UL 94 V-0",
+      "Maximum Operating Temperature": "85 C",
+      Brand: "GCT", // genuinely commercial -> stays Other
+    });
+    const groupOf = (key: string) =>
+      groups.find((g) => g.rows.some((r) => r.key === key))?.title;
+    expect(groupOf("Insulation Resistance")).toBe("Electrical");
+    expect(groupOf("Gender")).toBe("Physical");
+    expect(groupOf("Mounting Style")).toBe("Physical");
+    expect(groupOf("Number of Contacts")).toBe("Physical");
+    expect(groupOf("Contact Material")).toBe("Physical");
+    expect(groupOf("Flammability Rating")).toBe("Ratings & Compliance");
+    expect(groupOf("Maximum Operating Temperature")).toBe("Ratings & Compliance");
+    expect(groupOf("Brand")).toBe("Other");
+  });
+
   it("orders groups Electrical -> Physical -> Ratings & Compliance -> Other", () => {
     const groups = groupSpecs("ICs", {
       "Operating Temperature": "-40 ~ 85",
