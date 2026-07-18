@@ -74,14 +74,16 @@ class RescanEngine:
             checked_at = now_fn().isoformat()
             try:
                 per_vendor = self._lookup(mpn)
+                if not per_vendor:
+                    outcome = "no_data"
+                else:
+                    def _commit(part_id=part_id, per_vendor=per_vendor, checked_at=checked_at):
+                        before = self._ctx.repo.head()
+                        self._ctx.ops.refresh_procurement(part_id, per_vendor, checked_at)
+                        return self._ctx.repo.head() != before
 
-                def _commit(part_id=part_id, per_vendor=per_vendor, checked_at=checked_at):
-                    before = self._ctx.repo.head()
-                    self._ctx.ops.refresh_procurement(part_id, per_vendor, checked_at)
-                    return self._ctx.repo.head() != before
-
-                changed = self._ctx.jobs.run_write(_commit)
-                outcome = "no_data" if not per_vendor else ("updated" if changed else "unchanged")
+                    changed = self._ctx.jobs.run_write(_commit)
+                    outcome = "updated" if changed else "unchanged"
             except Exception as exc:  # noqa: BLE001 - one part never fails the whole run (graceful)
                 outcome = "failed"
                 progress({"level": "warn", "part_id": part_id, "message": f"{part_id}: {exc}"})

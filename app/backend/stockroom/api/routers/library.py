@@ -5,10 +5,12 @@ at thousands of parts (spec section 2.2); part detail loads the canonical record
 from __future__ import annotations
 
 import json
+import threading
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from stockroom.api.errors import ApiError
+from stockroom.api.jobs import JobStatus
 from stockroom.api.schemas import (
     EditFieldBody,
     FacetsDTO,
@@ -28,6 +30,13 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 # the same cap governs history and the diff rev-validation so the two agree on what
 # is reachable.
 _HISTORY_MAX = 100
+
+# Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
+# AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
+# last-writer-wins), so a second POST while one is QUEUED/RUNNING must return the SAME
+# in-flight job rather than submit a new one. One lock per process is correct here - there
+# is one rescan job slot per app instance (tracked on request.app.state).
+_rescan_lock = threading.Lock()
 
 
 def _part_json_path(ctx, part_id: str):
@@ -310,9 +319,22 @@ def library_router(require_token) -> APIRouter:
             # INJECTS them, so the engine has no api dependency.
             return RescanEngine(ctx, adapters=build_refresh_adapters(ctx)).run(progress, force=force)
 
-        # READ lane: the engine is network-I/O-bound and self-serializes its commits via run_write,
-        # so it must NOT occupy the single write worker for the whole run.
-        return {"job_id": ctx.jobs.submit(work, write=False)}
+        # Single-flight: check-and-submit happens under one lock so two concurrent POSTs can
+        # never both submit a rescan job.
+        with _rescan_lock:
+            existing = getattr(request.app.state, "rescan_job_id", "")
+            if existing:
+                try:
+                    job = ctx.jobs.get(existing)
+                except KeyError:
+                    job = None
+                if job is not None and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                    return {"job_id": existing, "already_running": True}
+            # READ lane: the engine is network-I/O-bound and self-serializes its commits via
+            # run_write, so it must NOT occupy the single write worker for the whole run.
+            job_id = ctx.jobs.submit(work, write=False)
+            request.app.state.rescan_job_id = job_id
+            return {"job_id": job_id}
 
     @r.get("/rescan/state")
     def rescan_state(request: Request) -> dict:
