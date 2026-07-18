@@ -70,6 +70,26 @@ def _footprint_text_at(ctx, rev: str, rec: dict | None) -> str | None:
     return ctx.repo.show_file(rev, fp_file)
 
 
+def build_refresh_adapters(ctx) -> list:
+    """The enabled distributor API adapters, each tagged with its vendor label so a refresh maps
+    each result onto its own Purchase row. Built from the same config as enrich._make_pipeline;
+    a separate module-level function so a rescan can be tested without live API creds."""
+    adapters: list = []
+    if ctx.config.mouser_api_key:
+        from stockroom.enrich.mouser import MouserAdapter
+
+        a = MouserAdapter(api_key=ctx.config.mouser_api_key)
+        a.vendor = "Mouser"
+        adapters.append(a)
+    if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
+        from stockroom.enrich.digikey_api import DigiKeyAdapter
+
+        a = DigiKeyAdapter(ctx.config.digikey_client_id, ctx.config.digikey_client_secret)
+        a.vendor = "DigiKey"
+        adapters.append(a)
+    return adapters
+
+
 def library_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/library", dependencies=[Depends(require_token)])
 
@@ -252,6 +272,32 @@ def library_router(require_token) -> APIRouter:
         ctx.rebuild_index()
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
+
+    @r.post("/parts/{part_id}/refresh")
+    def refresh_part(request: Request, part_id: str) -> dict:
+        """Refresh one part's volatile procurement data (price/stock/lifecycle/lead/dist P/N) from
+        the free distributor APIs (Mouser + DigiKey) - the API lane, no anti-bot. A write-lane
+        background job (spec section 8): the record is committed through a git Transaction, so it
+        runs on the serialized write pool. The terminal `result` event carries the updated record."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+
+        def work(progress):
+            from datetime import datetime, timezone
+
+            from stockroom.enrich.refresh import refresh_via_adapters
+
+            record = ctx.ops.load_record(part_id)
+            progress({"pct": 10, "message": f"querying distributor APIs for {record.mpn}"})
+            per_vendor = refresh_via_adapters(record.mpn, build_refresh_adapters(ctx))
+            now_iso = datetime.now(timezone.utc).isoformat()
+            updated = ctx.ops.refresh_procurement(part_id, per_vendor, now_iso)
+            ctx.rebuild_index()
+            ctx.auto_push()
+            return updated.to_dict()
+
+        return {"job_id": ctx.jobs.submit(work, write=True)}
 
     @r.post("/parts/{part_id}/symbol")
     def attach_symbol(request: Request, part_id: str, body: dict) -> dict:
