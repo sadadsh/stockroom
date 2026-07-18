@@ -41,6 +41,11 @@ class MachineConfig:
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
     libraries_root: str = ""
     mouser_api_key: str = ""
+    # DigiKey Product Information API v4 OAuth2 client-credentials (opt-in, OFF by default —
+    # spec section 6). Both must be set for enrich/routers/enrich.py:_make_pipeline to build a
+    # live DigiKeyAdapter; either blank keeps DigiKey out of the enrichment source registry.
+    digikey_client_id: str = ""
+    digikey_client_secret: str = ""
     # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
     # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
     # collaborator's changes pull. Per-machine, stored in config.json (in the OS config dir, never

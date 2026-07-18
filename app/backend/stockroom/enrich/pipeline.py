@@ -322,7 +322,7 @@ class DatasheetSource:
 class EnrichmentPipeline:
     def __init__(self, cache_dir, fetcher: RenderedDomFetcher | None = None,
                  mouser=None, limiter=None, url_for=None, http_fetcher=None,
-                 mouser_limiter=None, jlcsearch=None):
+                 mouser_limiter=None, jlcsearch=None, digikey=None):
         self.cache = TtlCache(Path(cache_dir))
         # A separate URL-keyed cache for the paste-a-link path (A6 determinism): the same link
         # returns the same result, and only a SUBSTANTIVE result is stored, so a one-off thin or
@@ -351,6 +351,8 @@ class EnrichmentPipeline:
         ]
         if mouser is not None and getattr(mouser, "enabled", False):
             sources.append(_MouserSource(mouser, self.mouser_limiter))
+        if digikey is not None and getattr(digikey, "enabled", False):
+            sources.append(_DigiKeySource(digikey, self.mouser_limiter))
         self.registry = SourceRegistry(sources)
 
     def enrich(self, mpn: str, category: str, want=None, progress=None) -> EnrichmentResult:
@@ -577,6 +579,23 @@ class _MouserSource:
         # in-flight lookup instead of freezing at the prior source's pct (every other networked
         # source emits its stages, so this closes the one remaining silent leg).
         emit(progress, Stage.FETCHING, "querying Mouser")
+        return self._adapter.lookup(mpn)
+
+
+class _DigiKeySource:
+    name = "digikey"
+
+    def __init__(self, adapter, limiter=None):
+        self._adapter = adapter
+        self._limiter = limiter
+
+    def enrich(self, mpn, category, remaining, progress=None):
+        # Shares the Mouser limiter (both are paced distributor APIs guarded against the
+        # same kind of throttling/ban), so a bulk enrich with both live never doubles the
+        # effective request rate against either budget.
+        if self._limiter is not None:
+            self._limiter.acquire()
+        emit(progress, Stage.FETCHING, "querying DigiKey")
         return self._adapter.lookup(mpn)
 
 
