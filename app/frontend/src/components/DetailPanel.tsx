@@ -229,7 +229,7 @@ export function DetailPanel({
             <AssetTile
               variant="hero"
               name="3D Model"
-              className="h-[336px]"
+              className="h-[300px]"
               present={hasModel}
               // A passive owns no model.file but inherits its stock footprint's built-in
               // model, so the tile's tool falls back to the footprint's tool there.
