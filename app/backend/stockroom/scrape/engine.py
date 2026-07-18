@@ -74,3 +74,18 @@ class ScrapeEngine:
         if self._browser is not None and not _is_downloadable(url):
             return await self.render(url, timeout=timeout)
         return await self.download(url, referer=referer, timeout=timeout)
+
+    async def scrape(self, url: str, referer: str = "", timeout: float = 20.0):
+        """Fetch (page -> browser, binary/API -> HTTP) then extract a full ScrapeResult
+        (markdown + structured + links + validated product). A fetch failure passes the
+        typed FetchError straight through. Never raises (spec section 3.1)."""
+        from stockroom.scrape.extract import build_scrape_result
+        from stockroom.scrape.model import ScrapeResult
+
+        outcome = await self.fetch(url, referer=referer, timeout=timeout)
+        if not isinstance(outcome, Page):
+            return outcome
+        try:
+            return build_scrape_result(outcome)
+        except Exception:  # noqa: BLE001 - extraction never sinks a good fetch
+            return ScrapeResult(page=outcome)
