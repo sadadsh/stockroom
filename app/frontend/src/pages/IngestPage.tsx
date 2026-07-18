@@ -131,21 +131,27 @@ export function IngestPage() {
   // pulled identity/specs merge onto each candidate so only the ZIP's assets are new; the
   // pulled datasheet link is carried so the candidate can fetch+store it in one click.
   useEffect(() => {
-    if (job.status === "done" && job.result) {
-      const r = result;
-      const url = r && isUrl(lookedUpInput) ? lookedUpInput : "";
-      setStaged(
-        job.result.map((candidate) => ({
-          id: nextId.current++,
-          candidate: r ? mergeResultIntoCandidate(candidate, r, url) : candidate,
-          datasheetUrl: r ? sv(r.datasheet_url) : "",
-        })),
-      );
-    }
-    // result/lookedUpInput are read at settle time; re-running on their change would
+    if (job.status !== "done" || !job.result) return;
+    // Wait for a still-streaming lookup. A native drag can drop a ZIP mid-lookup, and its
+    // inspect settles FIRST; staging its candidates now (with no result yet) would strand them
+    // un-merged, because this effect keys off the ZIP job and would not re-run when the lookup
+    // lands. Deferring while the lookup runs - enrich.status is a dep - folds the pulled data in
+    // exactly once, when it arrives. enrich.result is read (not the local mirror) so the merge
+    // never depends on the sibling layout effect having written `result` first.
+    if (enrich.status === "running") return;
+    const r = enrich.status === "done" ? enrich.result : null;
+    const url = r && isUrl(lookedUpInput) ? lookedUpInput : "";
+    setStaged(
+      job.result.map((candidate) => ({
+        id: nextId.current++,
+        candidate: r ? mergeResultIntoCandidate(candidate, r, url) : candidate,
+        datasheetUrl: r ? sv(r.datasheet_url) : "",
+      })),
+    );
+    // enrich.result/lookedUpInput are read at settle time; re-running on their change would
     // re-key already-loaded cards and discard edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job.status, job.result]);
+  }, [job.status, job.result, enrich.status]);
 
   // A drop anywhere in the window queues native paths here; inspect them.
   useEffect(() => {
