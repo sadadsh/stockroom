@@ -185,7 +185,7 @@ describe("IngestPage — unified Add A Part", () => {
         start(c) {
           c.enqueue(
             new TextEncoder().encode(
-              `event: progress\ndata: ${JSON.stringify({ stage: "rendering", message: "settling" })}\n\n`,
+              `event: progress\ndata: ${JSON.stringify({ stage: "rendering", pct: 45, message: "settling" })}\n\n`,
             ),
           );
           // no close(): holds the stream (and the progress state) open indefinitely

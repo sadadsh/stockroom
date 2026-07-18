@@ -6,7 +6,7 @@
  * symbol, footprint and 3D model dropped as a vendor ZIP; the pulled identity/specs merge
  * onto it so nothing is re-typed. A vendor ZIP dropped with no link still works on its own.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
@@ -66,7 +66,10 @@ export function IngestPage() {
 
   // Fold the finished lookup into the page: the sourced result feeds the passive section and
   // the ZIP merge; a total miss or an error is surfaced honestly (never a fabricated value).
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): `looking` flips false the moment the job commits done, but
+  // the local `result` is written here; running BEFORE paint keeps the empty "Browse for ZIP"
+  // state from flashing for one frame between the two on every successful lookup.
+  useLayoutEffect(() => {
     if (enrich.status === "done" && enrich.result) {
       const r = enrich.result;
       setResult(r);

@@ -11,10 +11,10 @@ import { motion } from "motion/react";
 import type { JobProgress } from "../lib/useJob";
 
 const STAGES = [
-  { key: "fetching", label: "Fetching" },
-  { key: "rendering", label: "Rendering" },
-  { key: "extracting", label: "Reading" },
-  { key: "validating", label: "Checking" },
+  { key: "fetching", label: "Fetching", pct: 15 },
+  { key: "rendering", label: "Rendering", pct: 45 },
+  { key: "extracting", label: "Reading", pct: 80 },
+  { key: "validating", label: "Checking", pct: 92 },
 ] as const;
 
 // A plain-language fallback line per phase, shown until the pipeline's own message arrives.
@@ -33,12 +33,21 @@ export function EnrichStages({
   progress: JobProgress | null;
   className?: string;
 }) {
-  const stage = progress?.stage ?? "queued";
-  const found = STAGES.findIndex((s) => s.key === stage);
-  // queued / unknown -> the first phase is the one in flight, nothing completed yet.
-  const activeIndex = found === -1 ? 0 : found;
+  // Track the reached phase off the MONOTONIC pct, not the raw stage: the multi-source MPN walk
+  // re-emits earlier stages (LCSC 'extracting' then the scrape source 'fetching'), and the
+  // pipeline already clamps pct so it never rewinds. Keying the rail off pct means a completed
+  // segment never un-fills. The furthest phase whose threshold pct has been reached is active.
+  const pct = progress?.pct ?? 0;
+  let activeIndex = 0;
+  for (let i = 0; i < STAGES.length; i++) {
+    if (pct >= STAGES[i].pct) activeIndex = i;
+  }
   const activeLabel = STAGES[activeIndex]?.label ?? "Working";
-  const message = progress?.message || STAGE_HINT[stage] || "Working";
+  // The live message reflects the current activity (the pipeline's own message when present).
+  // Before any phase is reached (pct 0, the job just queued) show the starting hint; otherwise
+  // fall back to a plain-language hint for the reached phase.
+  const hint = pct < STAGES[0].pct ? STAGE_HINT.queued : STAGE_HINT[STAGES[activeIndex].key];
+  const message = progress?.message || hint || "Working";
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
