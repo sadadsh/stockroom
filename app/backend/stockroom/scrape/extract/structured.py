@@ -126,7 +126,7 @@ def extract_jsonld_product(html: str) -> EnrichmentResult:
     for raw in _SCRIPT_LD.findall(html):
         try:
             blob = json.loads(raw.strip())
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, RecursionError):
             continue
         for obj in _iter_ld_objects(blob):
             types = obj.get("@type")
@@ -216,7 +216,7 @@ def extract_next_data(html: str) -> EnrichmentResult:
         return r
     try:
         blob = json.loads(m.group(1).strip())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, ValueError, RecursionError):
         return r
     for node in _walk_json(blob):
         mpn = _first_str(node.get("manufacturerPartNumber"), node.get("mpn"))
@@ -253,16 +253,29 @@ _MICRODATA_MPN = ("mpn", "productid", "sku", "model")
 
 
 def _itemprop_map(scope) -> dict[str, str]:
-    """Collect itemprop -> value for one microdata scope (a selectolax node). A <meta>
-    uses @content; everything else uses its text. First value per prop wins."""
+    """Collect itemprop -> value for ONE microdata scope (a selectolax node), obeying
+    schema.org ownership: a property belongs to the nearest enclosing itemscope, so a
+    nested item (an Offer/Brand) and everything under it is skipped, never flattened into
+    the outer Product. A <meta> uses @content; else the node text. First value per prop
+    wins. (selectolax `.css` can't express this and bare boolean attributes read as None
+    via `.get`, so this is a manual descent using `"itemscope" in attributes`.)"""
     out: dict[str, str] = {}
-    for node in scope.css("[itemprop]"):
-        prop = (node.attributes.get("itemprop") or "").strip().lower()
-        if not prop or prop in out:
-            continue
-        val = (node.attributes.get("content") or node.text(deep=True) or "").strip()
-        if val:
-            out[prop] = val
+
+    def _walk(node, depth: int) -> None:
+        if depth > 60:
+            return
+        for child in node.iter(include_text=False):
+            has_scope = "itemscope" in child.attributes
+            prop = (child.attributes.get("itemprop") or "").strip().lower()
+            if prop and not has_scope and prop not in out:
+                val = (child.attributes.get("content") or child.text(deep=True) or "").strip()
+                if val:
+                    out[prop] = val
+            if has_scope:
+                continue  # a nested item: don't capture its value, don't descend into it
+            _walk(child, depth + 1)
+
+    _walk(scope, 0)
     return out
 
 
@@ -300,22 +313,34 @@ def extract_microdata(html: str) -> EnrichmentResult:
     return r
 
 
-_SCRIPT_NUXT = re.compile(
-    r"window\.__NUXT__\s*=\s*(\{.*?\})\s*;?\s*</script>",
-    re.IGNORECASE | re.DOTALL,
-)
+def _decode_object_after(html: str, marker: str):
+    """Find `marker` then JSON-decode the object literal that follows, using raw_decode so
+    a trailing statement after the object (window.__NUXT__={...};window.foo=1) does not
+    break it. Only a plain `= {...}` assignment is decoded; an IIFE/function form is
+    skipped (returns None) rather than mis-parsed, so no bad data is invented. Never raises."""
+    idx = html.find(marker)
+    if idx < 0:
+        return None
+    rest = html[idx + len(marker):]
+    brace = rest.find("{")
+    if brace < 0:
+        return None
+    if rest[:brace].strip(" =\t\r\n") != "":
+        return None  # not a plain-object assignment (e.g. an IIFE) -> skip, never guess
+    try:
+        obj, _end = json.JSONDecoder().raw_decode(rest[brace:])
+    except (json.JSONDecodeError, ValueError, RecursionError):
+        return None
+    return obj if isinstance(obj, (dict, list)) else None
 
 
 def extract_nuxt(html: str) -> EnrichmentResult:
     """Nuxt.js SSR state (window.__NUXT__ = {...}): walk it like __NEXT_DATA__ for the
-    same part fields. Medium confidence. A non-JSON or absent blob contributes nothing."""
+    same part fields. Medium confidence. A non-JSON, IIFE, or absent blob contributes
+    nothing (never a wrong value)."""
     r = EnrichmentResult()
-    m = _SCRIPT_NUXT.search(html)
-    if not m:
-        return r
-    try:
-        blob = json.loads(m.group(1))
-    except (json.JSONDecodeError, ValueError):
+    blob = _decode_object_after(html, "window.__NUXT__")
+    if blob is None:
         return r
     for node in _walk_json(blob):
         mpn = _first_str(node.get("manufacturerPartNumber"), node.get("mpn"))
@@ -341,7 +366,7 @@ def structured_blobs(html: str) -> dict:
     for raw in _SCRIPT_LD.findall(html):
         try:
             jsonld.append(json.loads(raw.strip()))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, RecursionError):
             continue
     sweep = _MetaSweep()
     try:
@@ -353,15 +378,9 @@ def structured_blobs(html: str) -> dict:
     if m:
         try:
             next_data = json.loads(m.group(1).strip())
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, RecursionError):
             next_data = None
-    nuxt = None
-    mn = _SCRIPT_NUXT.search(html)
-    if mn:
-        try:
-            nuxt = json.loads(mn.group(1))
-        except (json.JSONDecodeError, ValueError):
-            nuxt = None
+    nuxt = _decode_object_after(html, "window.__NUXT__")
     from stockroom.scrape.extract.html import parse
 
     micro: list = []
