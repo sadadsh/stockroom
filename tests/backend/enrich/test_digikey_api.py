@@ -95,8 +95,6 @@ def test_lookup_disabled_without_creds_makes_no_call():
 
 
 def test_lookup_never_raises_on_requester_failure_or_empty():
-    from stockroom.enrich.errors import EnrichError
-
     def boom(mpn):
         raise EnrichError("dead")
 
@@ -141,3 +139,24 @@ def test_requester_raises_enricherror_on_transport_failure(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", _boom)
     with pytest.raises(EnrichError):
         _default_requester("id", "secret")("X")
+
+
+def test_a_failed_token_is_not_cached_so_the_next_call_retries(monkeypatch):
+    state = {"token_calls": 0}
+
+    def _open(req, timeout=8):
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+        if "oauth2/token" in url:
+            state["token_calls"] += 1
+            if state["token_calls"] == 1:
+                raise OSError("token endpoint down")   # first token fetch fails
+            return _Resp(_json.dumps({"access_token": "TOK"}).encode())
+        return _Resp(_json.dumps({"Products": [{"ManufacturerProductNumber": "X"}]}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", _open)
+    req = _default_requester("id", "secret")
+    with pytest.raises(EnrichError):
+        req("X")                              # first call: token fetch failed -> EnrichError
+    body = req("X")                           # second call: retries token, succeeds
+    assert body["Products"][0]["ManufacturerProductNumber"] == "X"
+    assert state["token_calls"] == 2          # the failed token was NOT memoized

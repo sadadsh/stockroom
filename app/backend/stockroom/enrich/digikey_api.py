@@ -35,7 +35,8 @@ def _fetch_token(client_id: str, client_secret: str, timeout: float) -> str | No
                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return (json.loads(r.read().decode()) or {}).get("access_token") or None
+            parsed = json.loads(r.read().decode())
+        return parsed.get("access_token") if isinstance(parsed, dict) else None
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return None
 
