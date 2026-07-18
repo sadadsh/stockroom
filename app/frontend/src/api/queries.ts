@@ -14,6 +14,7 @@ import {
 import type {
   ConformBody,
   DesignRules,
+  EnrichmentResult,
   FieldEdit,
   ManualFillBody,
   NetClass,
@@ -23,6 +24,7 @@ import type {
   StackupBody,
 } from "./types";
 import { api, type ListPartsArgs } from "./client";
+import { useJob } from "../lib/useJob";
 
 // First-run library onboarding (M9c). Set/complete repoint the running engine at a
 // different library, so EVERY server query is invalidated (parts, projects, facets, ...).
@@ -190,14 +192,20 @@ export function useSetSpecs() {
   });
 }
 
-// Enrichment is a lookup, not a write: it returns sourced candidates without
-// touching the record, so there is nothing to invalidate here. Applying a
-// candidate goes through useEditField, which does the read-after-write invalidation.
-export function useEnrichPart() {
-  return useMutation({
-    mutationFn: (vars: { mpn: string; category?: string; want?: string[] }) =>
-      api.enrichPart(vars.mpn, vars.category, vars.want),
-  });
+// Enrichment is a lookup, not a write: it returns sourced fields without touching the
+// record, so there is nothing to invalidate here. Applying a candidate goes through
+// useEditField, which does the read-after-write invalidation. It runs as a background job
+// (the render tier can take seconds), so this streams the live fetching/rendering/
+// extracting/validating stages and exposes the sourced EnrichmentResult on `result`.
+export function useEnrichLookup() {
+  const job = useJob<EnrichmentResult>();
+  const runPart = useCallback(
+    (mpn: string, category?: string, want?: string[]) =>
+      job.start(() => api.enrichPart(mpn, category, want)),
+    [job],
+  );
+  const runUrl = useCallback((url: string) => job.start(() => api.enrichFromUrl(url)), [job]);
+  return { ...job, runPart, runUrl };
 }
 
 // Committing a staging candidate adds a real part, so it invalidates the list and

@@ -152,25 +152,12 @@ describe("api client", () => {
     });
   });
 
-  it("posts the mpn and category to enrich and returns the sourced result", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({
-        category: "ICs",
-        mpn: { value: "LM358DR", source: "jsonld", confidence: "high" },
-        manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
-        description: null,
-        datasheet_url: null,
-        stock: null,
-        package: null,
-        price_breaks: [],
-        specs: {},
-        schema_version: 1,
-      }),
-    );
+  it("posts the mpn and category to enrich and returns the job ref (the sourced result now streams over SSE)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job456" }));
 
     const res = await api.enrichPart("LM358DR", "ICs");
 
-    expect(res.manufacturer?.value).toBe("Texas Instruments");
+    expect(res).toEqual({ job_id: "job456" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain("/api/enrich/part");
     expect((init as RequestInit).method).toBe("POST");

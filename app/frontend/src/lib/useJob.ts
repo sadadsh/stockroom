@@ -14,6 +14,10 @@ export type JobStatus = "idle" | "running" | "done" | "error";
 export interface JobProgress {
   pct?: number;
   message?: string;
+  // The real pipeline phase (queued/fetching/rendering/extracting/validating), so the UI can
+  // show honest per-stage loading instead of a bare spinner (spec section 8). Absent on jobs
+  // that only report pct/message (e.g. bulk).
+  stage?: string;
 }
 
 interface JobState<T> {
@@ -82,5 +86,28 @@ export function useJob<T = unknown>() {
     );
   }, []);
 
-  return { ...state, run, reset };
+  // Submit a job and stream it as one call, so a POST failure (the submit itself) lands in
+  // the same job state as a stream failure. The submitter returns the job ref; we flip to
+  // running immediately (the spinner shows during the submit too), then hand off to run().
+  const start = useCallback(
+    async (submit: () => Promise<{ job_id: string }>) => {
+      setState({ status: "running", progress: null, result: null, error: null });
+      let ref: { job_id: string };
+      try {
+        ref = await submit();
+      } catch (err) {
+        setState({
+          status: "error",
+          progress: null,
+          result: null,
+          error: err instanceof Error ? err.message : "could not start the job",
+        });
+        return;
+      }
+      await run(ref.job_id);
+    },
+    [run],
+  );
+
+  return { ...state, run, start, reset };
 }

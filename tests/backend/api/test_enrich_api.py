@@ -1,14 +1,37 @@
 from __future__ import annotations
 
+import json as _json
 
-def test_enrich_part_returns_sourced_fields(client, monkeypatch):
+
+def _drain_job(client, job_id):
+    """Consume a job's SSE stream and return every progress stage plus the terminal payload.
+    SSE frames are `event: <kind>` + `data: <json>`; the terminal kinds are result / error."""
+    stages: list[str] = []
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            line = line.strip()
+            if line.startswith("event:"):
+                kind = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data = _json.loads(line[len("data:"):].strip())
+                if kind == "progress" and "stage" in data:
+                    stages.append(data["stage"])
+                elif kind == "result":
+                    return {"status": "done", "result": data["result"], "stages": stages}
+                elif kind == "error":
+                    return {"status": "error", "result": data, "stages": stages}
+    return {"status": "none", "result": None, "stages": stages}
+
+
+def test_enrich_part_streams_sourced_fields(client, monkeypatch):
     from stockroom.enrich.schema import EnrichmentResult, Sourced
 
     class _FakePipeline:
         def __init__(self, *a, **k):
             pass
 
-        def enrich(self, mpn, category, want=None):
+        def enrich(self, mpn, category, want=None, progress=None):
             r = EnrichmentResult(category=category)
             r.manufacturer = Sourced("Texas Instruments", "jsonld", "high")
             r.description = Sourced("buck converter", "jsonld", "high")
@@ -19,17 +42,41 @@ def test_enrich_part_returns_sourced_fields(client, monkeypatch):
 
     r = client.post("/api/enrich/part", json={"mpn": "TPS62130RGTR", "category": "ICs"})
     assert r.status_code == 200
-    body = r.json()
+    out = _drain_job(client, r.json()["job_id"])
+    assert out["status"] == "done"
+    body = out["result"]
     assert body["manufacturer"]["value"] == "Texas Instruments"
     assert body["manufacturer"]["source"] == "jsonld"
     assert body["manufacturer"]["confidence"] == "high"
 
 
-def test_from_url_includes_a_passive_add_plan(client, monkeypatch):
+def test_enrich_part_streams_the_real_stage_sequence(client, monkeypatch):
+    # S6: the background job emits the honest per-stage progress the pipeline produces, so the UI
+    # can show live loading. The fake drives the sink exactly as the real pipeline would.
+    from stockroom.enrich.progress import Stage, emit
     from stockroom.enrich.schema import EnrichmentResult, Sourced
 
     class _FakePipeline:
-        def extract_from_url(self, url):
+        def enrich(self, mpn, category, want=None, progress=None):
+            for st in (Stage.FETCHING, Stage.RENDERING, Stage.EXTRACTING, Stage.VALIDATING):
+                emit(progress, st)
+            r = EnrichmentResult(category=category)
+            r.mpn = Sourced(mpn, "scrape", "medium")
+            return r
+
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _FakePipeline())
+    out = _drain_job(client, client.post(
+        "/api/enrich/part", json={"mpn": "LM317"}).json()["job_id"])
+    assert out["status"] == "done"
+    assert out["stages"] == ["fetching", "rendering", "extracting", "validating"]
+
+
+def test_from_url_streams_a_passive_add_plan(client, monkeypatch):
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    class _FakePipeline:
+        def extract_from_url(self, url, progress=None):
             r = EnrichmentResult(category="")
             r.mpn = Sourced("560112116151", "mouser", "high")
             r.package = Sourced("0603 (1608 Metric)", "mouser", "high")
@@ -44,18 +91,18 @@ def test_from_url_includes_a_passive_add_plan(client, monkeypatch):
                         lambda ctx: _FakePipeline())
     r = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"})
     assert r.status_code == 200
-    plan = r.json()["add_plan"]
+    plan = _drain_job(client, r.json()["job_id"])["result"]["add_plan"]
     assert plan == {"kind": "resistor", "package": "0603", "value": "118 Ohms", "tolerance": "1%"}
 
 
-def test_from_url_serializes_procurement_fields(client, monkeypatch):
+def test_from_url_streams_procurement_fields(client, monkeypatch):
     # A2: the DTO must carry the FULL pulled depth, not just identity + specs. lifecycle /
     # lead_time / product_url / dist_pns / stock live on the schema but were dropped by the
     # DTO, so the owner's UI could never show them even when a Mouser page yielded them.
     from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 
     class _FakePipeline:
-        def extract_from_url(self, url):
+        def extract_from_url(self, url, progress=None):
             r = EnrichmentResult(category="Resistors")
             r.mpn = Sourced("ERJ-P03F1101V", "mouser_web", "medium")
             r.stock = Sourced(5616, "mouser_web", "medium")
@@ -68,7 +115,8 @@ def test_from_url_serializes_procurement_fields(client, monkeypatch):
 
     monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
                         lambda ctx: _FakePipeline())
-    body = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"}).json()
+    body = _drain_job(client, client.post(
+        "/api/enrich/from-url", json={"url": "https://www.mouser.com/x"}).json()["job_id"])["result"]
     assert body["stock"]["value"] == 5616
     assert body["lifecycle"]["value"] == "Active"
     assert body["lead_time"]["value"] == "15 Weeks"
@@ -81,7 +129,7 @@ def test_from_url_add_plan_null_for_non_passive(client, monkeypatch):
     from stockroom.enrich.schema import EnrichmentResult, Sourced
 
     class _FakePipeline:
-        def extract_from_url(self, url):
+        def extract_from_url(self, url, progress=None):
             r = EnrichmentResult(category="Transistors")
             r.mpn = Sourced("IRLML6344TRPBF", "mouser", "high")
             r.description = Sourced("MOSFET N-Ch 30V 5A SOT-23", "mouser", "high")
@@ -92,7 +140,7 @@ def test_from_url_add_plan_null_for_non_passive(client, monkeypatch):
                         lambda ctx: _FakePipeline())
     r = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"})
     assert r.status_code == 200
-    assert r.json()["add_plan"] is None
+    assert _drain_job(client, r.json()["job_id"])["result"]["add_plan"] is None
 
 
 def test_bulk_enrich_streams_a_report(client, monkeypatch):

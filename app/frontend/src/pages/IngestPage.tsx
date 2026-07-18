@@ -10,13 +10,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
+import { useEnrichLookup } from "../api/queries";
 import { useToast } from "../lib/toast";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { motion } from "motion/react";
-import { mergeResultIntoCandidate, vendorFromUrl } from "../lib/candidateFromResult";
+import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
+import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
 import { PulledDepth } from "../components/PulledDepth";
 import { UploadIcon } from "../components/icons";
@@ -35,7 +36,6 @@ const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 export function IngestPage() {
   const [input, setInput] = useState("");
-  const [looking, setLooking] = useState(false);
   const [result, setResult] = useState<EnrichmentResult | null>(null);
   // The exact input that produced `result`, so the passive section and the ZIP merge
   // use the right link even after the input box is edited.
@@ -44,20 +44,32 @@ export function IngestPage() {
   const [staged, setStaged] = useState<Staged[] | null>(null);
   const nextId = useRef(0);
   const job = useJob<StagingCandidate[]>();
+  // The lookup is a background job now (the render tier can take seconds): it streams the live
+  // fetching/rendering/extracting/validating stages, and the sourced result lands on `enrich.result`.
+  const enrich = useEnrichLookup();
+  const looking = enrich.status === "running";
   const { toast } = useToast();
 
-  const lookUp = useCallback(async () => {
+  const lookUp = useCallback(() => {
     const v = input.trim();
     if (!v || looking) return;
-    setLooking(true);
     setResult(null);
     setStaged(null);
+    setLookedUpInput(v);
     // Drop any in-flight ZIP inspect so its result never merges onto this new lookup.
     job.reset();
-    try {
-      const r = isUrl(v) ? await api.enrichFromUrl(v) : await api.enrichPart(v);
+    // Fire-and-forget: the hook drives status/progress/result; the settle effect below folds
+    // the sourced fields in once the stream ends (a submit/stream failure lands as enrich.error).
+    if (isUrl(v)) enrich.runUrl(v);
+    else enrich.runPart(v);
+  }, [input, looking, job, enrich]);
+
+  // Fold the finished lookup into the page: the sourced result feeds the passive section and
+  // the ZIP merge; a total miss or an error is surfaced honestly (never a fabricated value).
+  useEffect(() => {
+    if (enrich.status === "done" && enrich.result) {
+      const r = enrich.result;
       setResult(r);
-      setLookedUpInput(v);
       const gotAnything =
         r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
       if (!gotAnything) {
@@ -66,12 +78,12 @@ export function IngestPage() {
           "neutral",
         );
       }
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Look up failed.", "err");
-    } finally {
-      setLooking(false);
+    } else if (enrich.status === "error") {
+      toast(enrich.error ?? "Look up failed.", "err");
     }
-  }, [input, looking, toast, job]);
+    // toast is stable; re-running only on the lookup settling is intended.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrich.status, enrich.result]);
 
   const inspect = useCallback(
     async (paths: string[], lcscIds: string[]) => {
@@ -194,7 +206,7 @@ export function IngestPage() {
           </Button>
         </div>
         {looking ? (
-          <LookupProgress input={input} />
+          <EnrichStages progress={enrich.progress} className="mt-3.5" />
         ) : !result ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
@@ -283,32 +295,6 @@ export function IngestPage() {
           No parts found in what was dropped.
         </div>
       ) : null}
-    </div>
-  );
-}
-
-// Honest progress while a distributor page is fetched and parsed. The fetch is one opaque,
-// multi-second call (WebView2 past Akamai), so this is an INDETERMINATE bar with a phase-
-// describing, vendor-aware message, never a faked percentage over a single fetch.
-function LookupProgress({ input }: { input: string }) {
-  const trimmed = input.trim();
-  const lead = /^https?:\/\//i.test(trimmed)
-    ? `Fetching from ${vendorFromUrl(trimmed)}`
-    : `Looking up ${trimmed}`;
-  return (
-    <div className="mt-3 flex flex-col gap-2">
-      <div
-        role="progressbar"
-        aria-label="Looking up the part"
-        className="h-1.5 w-full overflow-hidden rounded-full bg-raise2"
-      >
-        <motion.div
-          className="h-full w-1/3 rounded-full bg-acc"
-          animate={{ x: ["-100%", "300%"] }}
-          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
-      <span className="text-xs text-t3">{lead} and reading specs, pricing and stock...</span>
     </div>
   );
 }
