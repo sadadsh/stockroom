@@ -31,20 +31,23 @@ export function Rail() {
       {/* header zone: same height + hairline as the content header bar, so the top of
           the app reads as one band; the wordmark's mark left-aligns with the nav icons. */}
       <div className="flex h-14 flex-none items-center gap-2.5 border-b border-line px-[14px]">
-        {/* a small stacked-bins mark: the stockroom, in miniature */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 18 18"
-          fill="none"
-          aria-hidden="true"
-          className="flex-none text-t1"
-        >
-          <rect x="2.5" y="2.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="2.5" y="10.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
-          <circle cx="5.6" cy="5" r="0.9" fill="currentColor" />
-          <circle cx="5.6" cy="13" r="0.9" fill="currentColor" />
-        </svg>
+        {/* the wordmark reads as the brand anchor: the stacked-bins mark sits in an
+            accent-soft logo tile (the same pop the active nav item carries), so the top of
+            the rail is the one place the accent lives at rest. */}
+        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-control bg-acc-soft text-acc-strong">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 18 18"
+            fill="none"
+            aria-hidden="true"
+          >
+            <rect x="2.5" y="2.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
+            <rect x="2.5" y="10.5" width="13" height="5" rx="1.4" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="5.6" cy="5" r="0.9" fill="currentColor" />
+            <circle cx="5.6" cy="13" r="0.9" fill="currentColor" />
+          </svg>
+        </span>
         <span className="text-[15px] font-semibold tracking-[-0.02em] text-t1">
           Stockroom
         </span>
