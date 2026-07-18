@@ -47,3 +47,32 @@ def test_structured_blobs_collects_every_source():
     assert isinstance(blobs["jsonld"], list) and blobs["jsonld"]
     assert blobs["opengraph"].get("og:title") == "T"
     assert "microdata" in blobs and "next_data" in blobs and "nuxt" in blobs
+
+
+def test_extract_product_cascade_merges_sources_and_prefers_high_conf():
+    from stockroom.scrape.extract import extract_product
+    html = (
+        '<script type="application/ld+json">{"@type":"Product","mpn":"LM317T",'
+        '"brand":{"name":"TI"}}</script>'
+        '<meta property="og:description" content="Adjustable regulator">'
+    )
+    r = extract_product(html, "https://x/p")
+    assert r.mpn.value == "LM317T"                        # JSON-LD high wins
+    assert r.description.value == "Adjustable regulator"  # OG fills the gap
+
+
+def test_build_scrape_result_populates_all_facets():
+    from stockroom.scrape.extract import build_scrape_result
+    from stockroom.scrape.model import Page
+    html = ('<html><body><article><h1>LM317T</h1><p>' + ('word ' * 60) + '</p>'
+            '<a href="/d">d</a></article>'
+            '<script type="application/ld+json">{"@type":"Product","mpn":"LM317T"}</script>'
+            '</body></html>')
+    page = Page(url="https://x/p", final_url="https://x/p", status=200,
+                content=html.encode(), text=html, content_type="text/html",
+                render_tier="browser")
+    sr = build_scrape_result(page)
+    assert sr.product is not None and sr.product.mpn.value == "LM317T"
+    assert "# LM317T" in sr.markdown
+    assert "https://x/d" in sr.links
+    assert sr.structured["jsonld"]
