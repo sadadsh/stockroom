@@ -169,6 +169,10 @@ export function IngestPage() {
     setResult(null);
     setLookedUpInput("");
     setStaged(null);
+    // Clear the lookup too, not just its local mirror: the staging effect merges from
+    // enrich.result, so a stale "done" result left here would contaminate an unrelated ZIP
+    // browsed after this reset (e.g. right after a passive add).
+    enrich.reset();
   }
 
   const busy = job.status === "running";
