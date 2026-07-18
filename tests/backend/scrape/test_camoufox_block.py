@@ -81,3 +81,49 @@ def test_real_page_still_returns_a_page():
     assert isinstance(out, Page)
     assert out.status == 200
     assert "denied" not in out.text.lower()
+
+
+def _fake_asynccamoufox(monkeypatch, captured, fail_first=False):
+    import camoufox.async_api
+
+    class FakeCF:
+        def __init__(self, **kw):
+            captured.append(kw)
+            if fail_first and len(captured) == 1:
+                raise RuntimeError("profile locked")
+
+        async def __aenter__(self):
+            return "CTX"
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(camoufox.async_api, "AsyncCamoufox", FakeCF)
+
+
+def test_a_profile_dir_launches_a_persistent_trust_context(monkeypatch, tmp_path):
+    # Given a user_data_dir, the fetcher launches camoufox in persistent-context mode so the anti-bot
+    # clearance cookie persists across renders/restarts (the trust profile).
+    captured: list = []
+    _fake_asynccamoufox(monkeypatch, captured)
+    asyncio.run(CamoufoxFetcher(user_data_dir=tmp_path / "profile").start())
+    assert captured[0].get("persistent_context") is True
+    assert captured[0].get("user_data_dir") == str(tmp_path / "profile")
+
+
+def test_no_profile_dir_stays_ephemeral(monkeypatch):
+    captured: list = []
+    _fake_asynccamoufox(monkeypatch, captured)
+    asyncio.run(CamoufoxFetcher().start())
+    assert "persistent_context" not in captured[0]
+
+
+def test_a_locked_profile_degrades_to_ephemeral_instead_of_wedging(monkeypatch, tmp_path):
+    # A persistent launch that fails (a concurrent app holds the Firefox profile lock) must fall
+    # back to an ephemeral browser, not break scraping.
+    captured: list = []
+    _fake_asynccamoufox(monkeypatch, captured, fail_first=True)
+    asyncio.run(CamoufoxFetcher(user_data_dir=tmp_path / "profile").start())
+    assert len(captured) == 2                                   # persistent tried, then retried
+    assert captured[0].get("persistent_context") is True        # first attempt was persistent
+    assert "persistent_context" not in captured[1]              # fallback is ephemeral

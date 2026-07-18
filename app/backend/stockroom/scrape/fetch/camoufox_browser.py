@@ -28,9 +28,16 @@ from stockroom.scrape.fetch.challenge import looks_challenge as _looks_challenge
 
 
 class CamoufoxFetcher:
-    def __init__(self, headless: bool = True, os_profile: str = "windows"):
+    def __init__(self, headless: bool = True, os_profile: str = "windows",
+                 user_data_dir=None):
         self._headless = headless
         self._os = os_profile
+        # A PERSISTENT profile dir turns the fetcher into a trust-accumulating browser: the anti-bot
+        # clearance cookie (DataDome/Cloudflare) a solved challenge sets is stored here and REUSED on
+        # every later render and every restart, instead of throwing away a fresh context per page and
+        # re-solving the challenge from zero each time (the cause of the re-challenge/throttle spiral).
+        # None keeps the old ephemeral-per-render behavior (tests, callers that opt out).
+        self._user_data_dir = user_data_dir
         self._cf = None      # the AsyncCamoufox async-context-manager instance
         self._browser = None
 
@@ -39,15 +46,27 @@ class CamoufoxFetcher:
         from camoufox.async_api import AsyncCamoufox
 
         # Genuine Windows fingerprint, humanized cursor, GeoIP-consistent locale/timezone,
-        # and uBlock DISABLED so anti-bot challenge scripts can run (see module docstring).
-        self._cf = AsyncCamoufox(
-            headless=self._headless,
-            os=self._os,
-            humanize=True,
-            geoip=True,
-            exclude_addons=[DefaultAddons.UBO],
-        )
-        self._browser = await self._cf.__aenter__()
+        # and uBlock DISABLED so anti-bot challenge scripts can run (see module docstring). Camoufox
+        # applies the fingerprint at LAUNCH level, so a persistent context carries the SAME
+        # fingerprint AND persists cookies/storage - the trust profile (see __init__).
+        opts = dict(headless=self._headless, os=self._os, humanize=True, geoip=True,
+                    exclude_addons=[DefaultAddons.UBO])
+        if self._user_data_dir is not None:
+            import os as _os_mod
+
+            _os_mod.makedirs(str(self._user_data_dir), exist_ok=True)
+            opts.update(persistent_context=True, user_data_dir=str(self._user_data_dir))
+        try:
+            self._cf = AsyncCamoufox(**opts)
+            self._browser = await self._cf.__aenter__()
+        except Exception:  # noqa: BLE001 - a locked/unusable profile must never wedge the fetcher
+            # A persistent-profile launch can fail (a concurrent app holds the Firefox profile lock,
+            # or the dir is unwritable). Degrade to the ephemeral browser rather than break scraping.
+            if self._user_data_dir is None:
+                raise
+            self._cf = AsyncCamoufox(headless=self._headless, os=self._os, humanize=True,
+                                     geoip=True, exclude_addons=[DefaultAddons.UBO])
+            self._browser = await self._cf.__aenter__()
         return self
 
     async def aclose(self) -> None:
