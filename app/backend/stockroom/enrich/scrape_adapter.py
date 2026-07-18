@@ -37,11 +37,15 @@ def _default_engine_factory(cache_dir: Path):
 
 
 class EngineRenderedDomFetcher:
-    def __init__(self, cache_dir: Path | str | None = None, runtime: ScrapeRuntime | None = None):
+    def __init__(self, cache_dir: Path | str | None = None, runtime: ScrapeRuntime | None = None,
+                 run_timeout_buffer: float = 10.0):
         # An injected runtime (tests, or a shared app runtime) is used as-is; otherwise a
         # default browser-backed runtime is built lazily on first use.
         self._runtime = runtime
         self._cache_dir = Path(cache_dir) if cache_dir is not None else Path(".scrape-cache")
+        # A wall-clock ceiling on run() = render timeout + this buffer, so an anti-ban cooldown
+        # (up to BREAKER_CAP) in engine.render can never pin the calling thread indefinitely.
+        self._run_timeout_buffer = run_timeout_buffer
         self._started = False
         # The app shares one fetcher across CONCURRENT enrich requests (FastAPI threadpool),
         # so the lazy start must be serialized or two threads could double-start the runtime.
@@ -61,7 +65,10 @@ class EngineRenderedDomFetcher:
     def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
         try:
             runtime = self._ensure()
-            outcome = runtime.run(lambda engine: engine.render(url, timeout=timeout))
+            outcome = runtime.run(
+                lambda engine: engine.render(url, timeout=timeout),
+                timeout=timeout + self._run_timeout_buffer,
+            )
         except Exception:  # noqa: BLE001 - enrichment never blocks on a render failure
             return FetchResult(url=url, status=0, text="", content=b"",
                                content_type="", final_url=url)

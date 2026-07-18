@@ -64,9 +64,16 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
     # anti-ban-governed headless Chromium engine (retires the HTTP-only default and the
     # never-shipped WebView2 seam). Lazy: Chromium only launches on the first render, so
     # boot stays fast and a machine that never enriches never starts a browser.
+    import atexit
+
     from stockroom.enrich.scrape_adapter import default_rendered_dom_fetcher
 
-    ctx.rendered_dom_fetcher = default_rendered_dom_fetcher(Path(ctx.enrich_cache_dir) / "rendered")
+    _fetcher = default_rendered_dom_fetcher(Path(ctx.enrich_cache_dir) / "rendered")
+    ctx.rendered_dom_fetcher = _fetcher
+    # Best-effort: close the render runtime (browser + node driver) on a normal quit or a
+    # self-update restart, so a headless Chromium is not orphaned. The runtime is a daemon
+    # thread, so this is a courtesy, not required for a hard kill.
+    atexit.register(_fetcher.close)
     # Wire KiCad at the active library on every real boot (both entries - the
     # windowed host and standalone serve - build their context here), so the
     # library is visible in KiCad without the manual Doctor click. rewire_kicad
