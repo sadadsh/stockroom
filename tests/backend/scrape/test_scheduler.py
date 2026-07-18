@@ -77,7 +77,7 @@ def test_global_concurrency_cap_blocks_the_third():
     asyncio.run(run())
 
 
-def test_record_success_clears_a_tripped_breaker():
+def test_record_success_clears_an_expired_breaker():
     clk = _Clock()
     slp = _Sleep(clk)
     s = Scheduler(max_concurrency=4, clock=clk, sleep=slp)
@@ -86,8 +86,10 @@ def test_record_success_clears_a_tripped_breaker():
         host = "ex.com"
         for _ in range(BREAKER_THRESHOLD):
             s.record_block(host)
+        gov = s._governor(host)
+        clk.t = gov.cooldown_until + 1.0       # the cooldown has elapsed
         s.record_success(host)
-        await s.acquire(host)                  # breaker cleared -> no cooldown sleep
+        await s.acquire(host)                  # expired breaker cleared -> no cooldown sleep
         assert slp.calls == [] or all(d == 0 for d in slp.calls)
         s.release(host)
 

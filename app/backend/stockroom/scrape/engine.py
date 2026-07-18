@@ -154,11 +154,19 @@ class ScrapeEngine:
                 outcome = await self.scrape(url, timeout=timeout)
                 if isinstance(outcome, ScrapeResult) and outcome.ok:
                     digest = hashlib.sha256(outcome.page.content).hexdigest()
-                    if not frontier.seen_content(digest):
+                    if frontier.seen_content(digest):
+                        frontier.release_slot()   # a duplicate body frees its page-budget slot
+                    else:
                         results.append(outcome)
                         for link in outcome.links:
-                            if frontier.add(link, depth + 1):
+                            try:
+                                added = frontier.add(link, depth + 1)
+                            except Exception:  # noqa: BLE001 - a malformed link is dropped, never fatal
+                                added = False
+                            if added:
                                 pending += 1
+            except Exception:  # noqa: BLE001 - a per-URL failure is skipped; the worker survives
+                pass
             finally:
                 pending -= 1
                 if pending <= 0:

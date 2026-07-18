@@ -7,6 +7,7 @@ crawl never re-fetches the same page under a cosmetically different URL."""
 from __future__ import annotations
 
 import asyncio
+import posixpath
 from dataclasses import dataclass, field
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -16,14 +17,44 @@ _TRACKING_PREFIXES = ("utm_", "mc_")
 _TRACKING_EXACT = frozenset({"gclid", "fbclid", "_ga", "ref", "ref_src", "igshid"})
 
 
+def _normalize_path(path: str) -> str:
+    """Resolve dot-segments and collapse duplicate slashes so cosmetically-different paths
+    for the same resource dedup together, preserving a trailing slash if the original had
+    one (posixpath.normpath strips it)."""
+    if not path:
+        return "/"
+    trailing = path.endswith("/") and len(path) > 1
+    normalized = posixpath.normpath(path)
+    if normalized == ".":
+        normalized = "/"
+    if trailing and not normalized.endswith("/"):
+        normalized += "/"
+    return normalized
+
+
+def _idna_host(host: str) -> str:
+    """Unify a Unicode/IDN host with its ASCII (punycode) form so both canonicalize the
+    same. A host the idna codec rejects (underscores, over-long labels) is left as-is."""
+    if not host or host.isascii():
+        return host
+    try:
+        return host.encode("idna").decode("ascii")
+    except (UnicodeError, ValueError):
+        return host
+
+
 def canonical_url(url: str) -> str:
-    """A stable canonical form: lowercase scheme+host, drop the fragment, drop a default
-    port, strip tracking params, and sort the remaining query. Path case is preserved
-    (paths can be case-sensitive)."""
+    """A stable canonical form: lowercase scheme+host (IDN -> punycode), drop the fragment,
+    drop a default port, strip tracking params, sort the remaining query, and normalize the
+    path (dot-segments + duplicate slashes). Path case is preserved (paths can be
+    case-sensitive). A malformed/out-of-range port is treated as no port, never a crash."""
     parts = urlsplit((url or "").strip())
     scheme = (parts.scheme or "https").lower()
-    host = (parts.hostname or "").lower()
-    port = parts.port
+    host = _idna_host((parts.hostname or "").lower())
+    try:
+        port = parts.port
+    except ValueError:
+        port = None   # a garbage port from an untrusted link must not crash canonicalization
     default = (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
     netloc = f"{host}:{port}" if port and not default else host
     query_pairs = [
@@ -32,7 +63,7 @@ def canonical_url(url: str) -> str:
     ]
     query_pairs.sort()
     query = urlencode(query_pairs)
-    path = parts.path or "/"
+    path = _normalize_path(parts.path or "/")
     return urlunsplit((scheme, netloc, path, query, ""))
 
 
@@ -58,8 +89,13 @@ class Scope:
         parts = urlsplit(url)
         if self.same_host and self.host and scope_host(url) != self.host.lower():
             return False
-        if self.path_prefix and not (parts.path or "/").startswith(self.path_prefix):
-            return False
+        if self.path_prefix:
+            path = parts.path or "/"
+            prefix = self.path_prefix.rstrip("/")
+            # A real subtree boundary: exact match or prefix followed by '/', so a sibling
+            # like /docs-evil never counts as being under /docs.
+            if not (path == prefix or path.startswith(prefix + "/")):
+                return False
         return True
 
 
@@ -93,6 +129,13 @@ class Frontier:
             return True
         self._content.add(content_hash)
         return False
+
+    def release_slot(self) -> None:
+        """Give a page-budget slot back (called when a fetched page turns out to be a
+        content duplicate), so max_pages bounds UNIQUE crawled pages rather than merely
+        enqueued URLs."""
+        if self._added > 0:
+            self._added -= 1
 
     async def get(self) -> tuple[str, int]:
         return await self._queue.get()
