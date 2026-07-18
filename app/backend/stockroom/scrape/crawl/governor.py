@@ -62,7 +62,10 @@ class HostGovernor:
     def on_success(self) -> None:
         self.rate = min(MAX_RATE, self.rate + LOOSEN)
         self.consec_blocks = 0
-        self.cooldown_until = 0.0
+        # Only clear a cooldown that has already expired: a stale / out-of-order success must
+        # NOT cancel a live breaker (spec section 6 self-preservation).
+        if self._clock() >= self.cooldown_until:
+            self.cooldown_until = 0.0
 
     def on_block(self, retry_after: float | None = None) -> None:
         now = self._clock()
@@ -70,9 +73,16 @@ class HostGovernor:
         self.consec_blocks += 1
         cooldown = 0.0
         if self.consec_blocks >= BREAKER_THRESHOLD:
-            over = self.consec_blocks - BREAKER_THRESHOLD
+            # Clamp the exponent so 2.0**over never OverflowErrors (the min(BREAKER_CAP, ...)
+            # already bounds the value; 2**40 vastly exceeds the cap, so nothing is lost).
+            over = min(self.consec_blocks - BREAKER_THRESHOLD, 40)
             cooldown = min(BREAKER_CAP, BREAKER_BASE * (2.0 ** over))
         if retry_after is not None and retry_after > 0:
             cooldown = max(cooldown, retry_after)
         if cooldown > 0:
             self.cooldown_until = now + cooldown
+            # Resume at a TRICKLE after the cooldown, not a full-bucket burst (the thundering
+            # herd the cooldown exists to prevent): clamp the bucket and anchor the refill
+            # clock at cooldown end so no tokens accrue while the host is cooling.
+            self.tokens = min(self.tokens, 1.0)
+            self._last_refill = self.cooldown_until

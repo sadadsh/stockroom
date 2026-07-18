@@ -17,6 +17,30 @@ from stockroom.scrape.stealth.fingerprint import FingerprintRotator
 _BLOCK_STATUSES = frozenset({403, 429, 503})
 
 
+def _parse_retry_after(headers) -> float | None:
+    """The server's Retry-After (seconds), from a 429/503, so the anti-ban governor can
+    honor exactly how long the host asked us to wait. Accepts an integer-seconds form or an
+    HTTP-date; anything unparseable yields None (never a fabricated wait)."""
+    raw = ""
+    for key, value in dict(headers or {}).items():
+        if str(key).lower() == "retry-after":
+            raw = str(value).strip()
+            break
+    if not raw:
+        return None
+    try:
+        return float(int(raw))
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+
+        dt = parsedate_to_datetime(raw)
+        return max(0.0, dt.timestamp() - time.time())
+    except Exception:  # noqa: BLE001 - a malformed date is simply "unknown", not a crash
+        return None
+
+
 def _default_session_factory() -> Any:
     from curl_cffi.requests import AsyncSession
 
@@ -55,8 +79,10 @@ class HttpClient:
                 continue
             status = int(getattr(resp, "status_code", 0))
             if status in _BLOCK_STATUSES:
+                retry_after = _parse_retry_after(getattr(resp, "headers", {}) or {})
                 last = FetchError(
-                    url=url, reason=f"blocked (HTTP {status})", kind="blocked", status=status
+                    url=url, reason=f"blocked (HTTP {status})", kind="blocked",
+                    status=status, retry_after=retry_after,
                 )
                 fp = self._rotator.rotate()
                 continue

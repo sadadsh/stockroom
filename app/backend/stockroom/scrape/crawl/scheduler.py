@@ -39,12 +39,32 @@ class Scheduler:
         return gov
 
     async def acquire(self, host: str) -> None:
-        """Take a global slot, then wait until this host's governor allows a request and
-        consume its token. Waiting is done via the injected sleep, so a cooling-down host
-        (tripped breaker) blocks here rather than hammering the WAF."""
-        await self._sem.acquire()
+        """Wait until this host's governor allows a request, then take a global slot and
+        consume a token. The per-host wait (incl. a tripped-breaker cooldown of up to
+        BREAKER_CAP) happens WITHOUT holding a global slot, so a single cooling-down host
+        cannot tie up all slots and starve healthy hosts (no head-of-line blocking). The
+        slot, once taken, is released here on any exception/cancellation so it is never
+        leaked; the caller releases it after the fetch on the success path."""
         gov = self._governor(host)
-        # Loop: the rate/cooldown can move while we wait, so re-check after each sleep.
+        while True:
+            # 1. Wait for host readiness with NO global slot held.
+            await self._wait_ready(gov)
+            # 2. Take a global slot.
+            await self._sem.acquire()
+            # 3. Still ready? consume + return (caller releases). Else drop the slot and
+            #    re-wait, so the slot is never held across a cooldown. Leak-proof on abort.
+            try:
+                when = gov.next_available()
+                now = self._clock()
+                if when <= now:
+                    gov.consume()
+                    return
+            except BaseException:
+                self._sem.release()
+                raise
+            self._sem.release()
+
+    async def _wait_ready(self, gov: HostGovernor) -> None:
         # Read `when` first, then a FRESH `now`: next_available() reads the clock itself, so
         # `now` must be sampled AFTER it or a ready token (when == its own now) would always
         # look "in the future" and spin.
@@ -52,7 +72,6 @@ class Scheduler:
             when = gov.next_available()
             now = self._clock()
             if when <= now:
-                gov.consume()
                 return
             await self._sleep(when - now)
 
