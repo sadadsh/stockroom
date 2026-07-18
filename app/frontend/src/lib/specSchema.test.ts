@@ -5,6 +5,7 @@ import {
   normalizeSpecKey,
   splitValueUnit,
   prettifyValue,
+  applySign,
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
 } from "./specSchema";
@@ -36,6 +37,19 @@ describe("prettifyValue", () => {
     expect(prettifyValue("0603C")).toBe("0603C"); // no space before C -> not a temperature
     expect(prettifyValue("Automotive Grade")).toBe("Automotive Grade");
     expect(prettifyValue("ERJ-P03F1101V")).toBe("ERJ-P03F1101V");
+  });
+});
+
+describe("applySign", () => {
+  it("prefixes ± on a signed quantity (tolerance, temp coefficient) without one", () => {
+    expect(applySign("Tolerance", "1%")).toBe("±1%");
+    expect(applySign("Temperature Coefficient", "100 ppm/°C")).toBe("±100 ppm/°C");
+  });
+  it("leaves a value that already carries a sign, and never touches an unsigned key", () => {
+    expect(applySign("Tolerance", "±1%")).toBe("±1%");
+    expect(applySign("Tolerance", "-40")).toBe("-40");
+    expect(applySign("Resistance", "1.1 kΩ")).toBe("1.1 kΩ");
+    expect(applySign("Package", "0603")).toBe("0603");
   });
 });
 
