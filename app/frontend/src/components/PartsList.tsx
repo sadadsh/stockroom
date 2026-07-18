@@ -3,10 +3,90 @@
  * the part number, with an incomplete warning triangle on the right. Parts are
  * grouped by category with sticky group headers, matching library-v2.html.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PartSummary } from "../api/types";
+import { usePreviewGlb } from "../api/queries";
 import { WarnIcon } from "./icons";
 import { Badge } from "./primitives";
+
+// Rendered GLB thumbnails, cached by part id for this session so scrolling never re-renders a
+// model (each render is a real GPU pass through the shared offscreen renderer).
+const thumbCache = new Map<string, string>();
+
+// The part's 3D model, rendered flat + frozen, as the row icon. Fetches the GLB only once the
+// row is in view (lazy), renders it to a PNG through the shared offscreen renderer, and caches
+// the result. Returns null while loading / when the part has no renderable model, so the row
+// keeps its category glyph as an honest fallback. A passive resolves its built-in library
+// model through the SAME endpoint the detail hero uses.
+function useModelThumbnail(id: string, inView: boolean): string | null {
+  const cached = thumbCache.get(id) ?? null;
+  const [url, setUrl] = useState<string | null>(cached);
+  const glb = usePreviewGlb(id, inView && !cached);
+
+  useEffect(() => {
+    if (cached) {
+      setUrl(cached);
+      return;
+    }
+    if (!glb.data) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { renderGlbThumbnail } = await import("../lib/modelThumbnail");
+        const dataUrl = await renderGlbThumbnail(glb.data as ArrayBuffer);
+        if (cancelled) return;
+        if (dataUrl) thumbCache.set(id, dataUrl);
+        setUrl(dataUrl);
+      } catch {
+        /* no WebGL / render failed: keep the glyph fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, glb.data, cached]);
+
+  return url;
+}
+
+// The row icon shell: a 30px tile that observes its own visibility (so a long list only
+// renders the models the user can actually see), showing the frozen 3D render when ready and
+// the category glyph until then / when the part has none.
+function RowThumbnail({ id, category }: { id: string; category: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [inView, setInView] = useState(() => typeof IntersectionObserver === "undefined");
+
+  useEffect(() => {
+    if (inView || typeof IntersectionObserver === "undefined") return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "300px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [inView]);
+
+  const thumb = useModelThumbnail(id, inView);
+  return (
+    <span
+      ref={ref}
+      className="flex h-[30px] w-[30px] flex-none items-center justify-center overflow-hidden rounded-[7px] border border-line bg-field"
+    >
+      {thumb ? (
+        <img src={thumb} alt="" className="h-full w-full object-contain" />
+      ) : (
+        <CategoryGlyph category={category} />
+      )}
+    </span>
+  );
+}
 
 // A small monochrome category glyph for the row thumbnail (north-star .rthumb): the part seen
 // as its kind at a glance. Neutral stroke art, so it inherits the row's text color and never
@@ -114,9 +194,7 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
                   (selected ? "bg-raise2" : "hover:bg-[var(--c-hover)]")
                 }
               >
-                <span className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[7px] border border-line bg-field">
-                  <CategoryGlyph category={p.category} />
-                </span>
+                <RowThumbnail id={p.id} category={p.category} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span
