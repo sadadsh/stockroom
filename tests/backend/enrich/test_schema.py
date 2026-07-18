@@ -4,8 +4,22 @@ from stockroom.enrich.schema import (
     EnrichmentResult,
     PriceBreak,
     Sourced,
+    normalize_lifecycle,
     normalize_mpn,
 )
+
+
+def test_normalize_lifecycle_canonicalizes_distributor_tokens():
+    # LCSC's "normal" and Mouser's "none" both mean a part in normal production = Active.
+    assert normalize_lifecycle("normal") == "Active"
+    assert normalize_lifecycle("none") == "Active"
+    assert normalize_lifecycle("NRND") == "Not Recommended for New Designs"
+    assert normalize_lifecycle("eol") == "End of Life"
+    assert normalize_lifecycle("Active") == "Active"  # already canonical, unchanged
+    # an unknown lower-case token is Title-cased (never shown verbatim), a cased one is kept
+    assert normalize_lifecycle("preproduction") == "Preproduction"
+    assert normalize_lifecycle("Some Vendor Status") == "Some Vendor Status"
+    assert normalize_lifecycle("") == "" and normalize_lifecycle(None) is None
 
 
 def test_normalize_mpn_is_filesystem_safe():

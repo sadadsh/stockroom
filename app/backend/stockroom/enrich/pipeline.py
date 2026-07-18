@@ -187,7 +187,13 @@ class LcscSource:
             r.datasheet_url = Sourced(product.datasheet_url, "lcsc", "medium")
         lifecycle = product.specs.get("Lifecycle")
         if lifecycle:
-            r.lifecycle = Sourced(lifecycle, "lcsc", "medium")
+            from stockroom.enrich.schema import normalize_lifecycle
+
+            norm = normalize_lifecycle(lifecycle)
+            r.lifecycle = Sourced(norm, "lcsc", "medium")
+            # normalize the spec-bag copy too (LCSC's raw "normal" -> "Active"), so the detail
+            # view + BOM see the canonical status, and setdefault below never re-adds the raw one
+            r.specs["Lifecycle"] = Sourced(norm, "lcsc", "medium")
         for label, value in product.specs.items():
             r.specs.setdefault(label, Sourced(value, "lcsc", "medium"))
         return r

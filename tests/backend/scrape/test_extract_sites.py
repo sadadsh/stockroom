@@ -1,6 +1,25 @@
+import json
+
+from stockroom.scrape.extract import extract_product
 from stockroom.scrape.extract.sites import SITE_ADAPTERS
 from stockroom.scrape.extract.sites.lcsc import LcscSite, parse_lcsc_product
 from stockroom.scrape.extract.sites.mouser_web import MouserWebSite, _extract_price_breaks
+
+
+def test_site_adapter_datasheet_supersedes_the_generic_json_walk():
+    # F8: DigiKey's CURATED datasheet (productOverview.datasheetUrl, redirect unwrapped) must win
+    # over whatever link the generic next_data walk surfaces from the same blob, so a redirect
+    # datasheet is not left as the un-followable raw one.
+    nd = {"props": {"pageProps": {"envelope": {"data": {"productOverview": {
+        "manufacturerProductNumber": "SN74X",
+        "datasheetUrl": ("https://www.ti.com/general/docs/suppproductinfo.tsp?gotoUrl="
+                         "https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74x"),
+    }}}}}}
+    html = ('<script id="__NEXT_DATA__" type="application/json">' + json.dumps(nd) + "</script>")
+    r = extract_product(html, "https://www.digikey.com/en/products/detail/ti/SN74X/1")
+    assert r.datasheet_url is not None
+    assert r.datasheet_url.value == "https://www.ti.com/lit/gpn/sn74x"
+    assert r.datasheet_url.source == "digikey_web"
 
 
 def test_site_adapters_registered():

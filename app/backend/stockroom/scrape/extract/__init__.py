@@ -49,6 +49,12 @@ def extract_product(html: str, url: str, site_extractors=SITE_ADAPTERS) -> Enric
             # generic single-offer price could raise the threshold and block a real table.
             if len(site.price_breaks) > len(result.price_breaks):
                 result.price_breaks = list(site.price_breaks)
+            # A site adapter's datasheet is the distributor's CURATED field (Mouser's dataLayer,
+            # DigiKey's productOverview.datasheetUrl with its redirect unwrapped), so it supersedes
+            # whatever link the generic JSON-walk happened to surface from the same blob - the same
+            # authority the price ladder gets. Only a real site datasheet overrides.
+            if site.datasheet_url is not None:
+                result.datasheet_url = site.datasheet_url
             result.merge_missing(site)
     # nuxt + microdata are generic fallbacks below the site adapters: they gap-fill only
     # what a matching adapter did not, so the site-adapter precedence is preserved exactly.
