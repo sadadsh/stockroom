@@ -80,10 +80,40 @@ def _footprint_text_at(ctx, rev: str, rec: dict | None) -> str | None:
     return ctx.repo.show_file(rev, fp_file)
 
 
+def _mouser_link_resolver(ctx):
+    """A lazy MPN -> stored-Mouser-product-link resolver for the keyless scrape adapter (owner
+    directive: the user provides the distributor link, so we scrape the part's OWN Mouser
+    `Purchase.url`, never a guessed search). The map is built from the library records on first
+    use and cached, so callers that never scrape Mouser (e.g. the cad-source route) never pay the
+    record scan. MPNs are unique per library, so keying by normalized MPN is unambiguous."""
+    from stockroom.enrich.schema import normalize_mpn
+
+    cache: dict[str, str] = {}
+    state = {"built": False}
+
+    def resolve(mpn: str) -> str | None:
+        if not state["built"]:
+            for row in ctx.index.search(""):
+                try:
+                    rec = ctx.ops.load_record(row.id)
+                except Exception:  # noqa: BLE001 - a bad record must not break the whole resolver
+                    continue
+                for p in rec.purchase:
+                    if (p.vendor or "").lower() == "mouser" and p.url:
+                        cache[normalize_mpn(rec.mpn)] = p.url
+                        break
+            state["built"] = True
+        return cache.get(normalize_mpn(mpn))
+
+    return resolve
+
+
 def build_refresh_adapters(ctx) -> list:
-    """The enabled distributor API adapters, each tagged with its vendor label so a refresh maps
-    each result onto its own Purchase row. Built from the same config as enrich._make_pipeline;
-    a separate module-level function so a rescan can be tested without live API creds."""
+    """The enabled distributor adapters, each tagged with its vendor label so a refresh maps each
+    result onto its own Purchase row, in the owner's sourcing order: MOUSER PRIMARY, DIGIKEY
+    FALLBACK. Mouser is the API adapter when a key is configured, otherwise the keyless scrape
+    adapter that renders each part's stored Mouser link (owner directive 2026-07-19). DigiKey is
+    its API. A separate module-level function so a rescan can be tested without live creds."""
     adapters: list = []
     if ctx.config.mouser_api_key:
         from stockroom.enrich.mouser import MouserAdapter
@@ -91,6 +121,15 @@ def build_refresh_adapters(ctx) -> list:
         a = MouserAdapter(api_key=ctx.config.mouser_api_key)
         a.vendor = "Mouser"
         adapters.append(a)
+    else:
+        from stockroom.enrich.mouser_scrape import MouserScrapeAdapter
+
+        a = MouserScrapeAdapter(
+            getattr(ctx, "rendered_dom_fetcher", None), url_for=_mouser_link_resolver(ctx)
+        )
+        a.vendor = "Mouser"
+        if a.enabled:  # only when a rendered-DOM fetcher is wired + Camoufox is available
+            adapters.append(a)
     if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
         from stockroom.enrich.digikey_api import DigiKeyAdapter
 
