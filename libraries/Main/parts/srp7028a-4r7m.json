@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/40/1/srp7028a.pdf"
   },
   "description": "Inductor",
-  "display_name": "4.7u 20% Bourns SRP7028A-4R7M",
+  "display_name": "4.7µH 20% 5.5A Power Inductor",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:31.265739+00:00",
       "part_number": "652-SRP7028A-4R7M",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 1.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.902,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.787,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.742,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.687,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.648,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.61,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.563,
           "qty": 2000
         }
       ],
-      "stock": 16159,
+      "stock": 16135,
       "url": "https://www.mouser.com/en/ProductDetail/Bourns/SRP7028A-4R7M?qs=7z%252BmIopC6%2FJgdLFz63lL4Q%3D%3D",
       "vendor": "Mouser"
     },
