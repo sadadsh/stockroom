@@ -63,8 +63,8 @@ export function Finder({
           className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
         {onOpenSearch ? (
-          <kbd className="mr-0.5 flex-none rounded border border-line2 px-1.5 py-0.5 font-mono text-[10px] text-t3">
-            ⌘K
+          <kbd className="mr-0.5 flex-none rounded border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-[10px] font-medium text-t2">
+            Ctrl K
           </kbd>
         ) : null}
         <button
