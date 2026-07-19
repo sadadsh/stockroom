@@ -32,34 +32,48 @@
       "part_number": "710-74438357010",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.68,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.6,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 1.54,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.4,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 700,
+          "currency": "USD",
           "price": 1.22,
-          "currency": "USD"
+          "qty": 700
         }
       ],
       "stock": 11702,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010?qs=AQlKX63v8RstGPuQmrueWg%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:58.113036+00:00",
+      "part_number": "732-11197-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.159,
+          "qty": 700
+        }
+      ],
+      "stock": 16066,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -96,12 +110,11 @@
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 kHz",
-    "Tolerance": "20 %",
+    "Tolerance": "20%",
     "Type": "Power Inductor",
     "US Tariff %": 0.0,
     "Unit Weight": "0.011993 oz",
-    "Width": "4.1 mm",
-    "Factory Pack Quantity: Factory Pack Quantity": "700"
+    "Width": "4.1 mm"
   },
   "symbol": {
     "lib": "Device",
