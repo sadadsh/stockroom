@@ -6,7 +6,7 @@
     "source_url": "PTS645SM43SMTR92LFS"
   },
   "description": "PTS645",
-  "display_name": "PTS645 C&K PTS645SK43SMTR92-LFS",
+  "display_name": "SPST Tactile Switch PTS645SK43SMTR92-LFS",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:16.731287+00:00",
       "part_number": "611-PTS645SK43SMTR92",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.36,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.313,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.293,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.262,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.243,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.229,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.187,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.176,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.171,
           "qty": 5000
         }
       ],
-      "stock": 87087,
+      "stock": 86890,
       "url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK43SMTR92-LFS?qs=Imq1NPwxi76wjUe7hzmA%252BA%3D%3D&mgh=1",
       "vendor": "Mouser"
     },
