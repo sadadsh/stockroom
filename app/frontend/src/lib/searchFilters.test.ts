@@ -11,6 +11,7 @@ import {
   hasAnyFilter,
   parseMagnitude,
   isOptionOn,
+  orderFacetsForRail,
   removeOption,
   setRange,
   toSpecParams,
@@ -38,6 +39,10 @@ describe("formatMagnitude", () => {
     expect(formatMagnitude(5, "%")).toBe("5%");
     expect(formatMagnitude(0.1, "%")).toBe("0.1%");
     expect(formatMagnitude(155, "°C")).toBe("155 °C");
+  });
+  it("canonicalizes a spelled-out Ohm so it prefixes like Ω", () => {
+    expect(formatMagnitude(1000000, "Ohms")).toBe("1 MΩ");
+    expect(formatMagnitude(1000, "Ohm")).toBe("1 kΩ");
   });
 });
 
@@ -141,6 +146,21 @@ describe("deriveColumns", () => {
       "Resistance",
       "Tolerance",
     ]);
+  });
+});
+
+describe("orderFacetsForRail", () => {
+  it("floats electrical parameters to the top and sinks provenance/commercial to the bottom", () => {
+    const mixed: ParametricFacet[] = [
+      { key: "Assembly Country of Origin", label: "Assembly Country of Origin", kind: "options", count: 88, options: [{ value: "China", count: 40 }, { value: "Taiwan", count: 48 }] },
+      { key: "Application", label: "Application", kind: "options", count: 40, options: [{ value: "General Purpose", count: 30 }, { value: "Automotive", count: 10 }] },
+      { key: "Resistance", label: "Resistance", kind: "range", count: 34, min: 100, max: 100000, unit: "Ω" },
+      { key: "US Tariff %", label: "US Tariff %", kind: "range", count: 80, min: 0, max: 8 },
+    ];
+    const order = orderFacetsForRail(mixed, "Resistors").map((f) => f.key);
+    expect(order[0]).toBe("Resistance"); // the electrical range leads
+    expect(order[order.length - 1]).toBe("US Tariff %"); // commercial sinks last
+    expect(order.indexOf("Application")).toBeLessThan(order.indexOf("Assembly Country of Origin"));
   });
 });
 

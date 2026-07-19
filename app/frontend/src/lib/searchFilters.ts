@@ -50,8 +50,15 @@ function _sig(n: number): string {
   return String(parseFloat(s));
 }
 
-export function formatMagnitude(mag: number, unit: string | null | undefined): string {
+/** Canonicalize a facet unit for display: a spelled-out "Ohm(s)" becomes the Ω symbol so it
+ * prefixes and reads like the rest of the app; everything else passes through. */
+export function normalizeUnit(unit: string | null | undefined): string {
   const u = (unit ?? "").trim();
+  return /^ohms?$/i.test(u) ? "Ω" : u;
+}
+
+export function formatMagnitude(mag: number, unit: string | null | undefined): string {
+  const u = normalizeUnit(unit);
   if (!Number.isFinite(mag)) return "";
   if (mag !== 0 && _PREFIXABLE.has(u)) {
     const abs = Math.abs(mag);
@@ -281,6 +288,37 @@ export function deriveColumns(
       unit: f.unit ?? r.unit ?? null,
     };
   });
+}
+
+// Where a facet sits in the rail: the same parameter-importance signal the columns use, but
+// kept finite for every facet so the whole rail just reorders - electrical ranges at the top,
+// commercial / provenance dimensions sunk to the bottom, never hidden.
+function _railScore(facet: ParametricFacet, category: string): number {
+  if (_COMMERCIAL.test(normalizeSpecKey(facet.key))) return -1;
+  const groupRank: Record<SpecGroupName, number> = {
+    Electrical: 4,
+    Physical: 3,
+    "Ratings & Compliance": 2,
+    Other: 1,
+  };
+  const r = resolveSpec(facet.key, category);
+  const kindBoost = facet.kind === "range" ? 0.5 : 0; // a quantitative dimension is a prime filter
+  // order is only a FINE within-group tiebreak (the fallback order is huge, so keep it << 1)
+  return groupRank[r.group] + kindBoost - (r.order ?? 100) / 1e6;
+}
+
+/** The facets in rail order: the meaningful parameters first (electrical ranges lead), provenance
+ * last. Every facet is kept - a parametric search rail is comprehensive - only reordered, so the
+ * first thing the eye lands on is Resistance, not Country of Origin. Stable within a tier. */
+export function orderFacetsForRail(
+  facets: ParametricFacet[],
+  category: string | null,
+): ParametricFacet[] {
+  const cat = category ?? "";
+  return facets
+    .map((f, i) => ({ f, i, s: _railScore(f, cat) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.f);
 }
 
 /** A row's display value for a spec column: the part's own value, prettified (Ohms -> Ω, unit

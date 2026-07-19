@@ -18,6 +18,8 @@ import {
   formatMagnitude,
   hasAnyFilter,
   isOptionOn,
+  normalizeUnit,
+  orderFacetsForRail,
   parseMagnitude,
   setRange,
   toSpecParams,
@@ -83,7 +85,8 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const searchResults = useSearchQuery({ q, category, spec });
 
   const facets = paramFacets.data?.facets ?? [];
-  const columns = useMemo(() => deriveColumns(facets, category), [facets, category]);
+  const railFacets = useMemo(() => orderFacetsForRail(facets, category), [facets, category]);
+  const columns = useMemo(() => deriveColumns(facets, category, 4), [facets, category]);
   const chips = useMemo(() => activeChips(filters, facets), [filters, facets]);
 
   const rows = useMemo(() => {
@@ -127,7 +130,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-canvas">
       {/* top: the query field + a close affordance */}
-      <div className="flex-none px-8 pt-6">
+      <div className="flex-none px-6 pt-6">
         <div className="flex items-center gap-4">
           <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-[13px] border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
             <SearchIcon className="h-5 w-5 flex-none text-t3" />
@@ -203,14 +206,14 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
       </div>
 
       {/* main: the schema-driven facet rail + the results table */}
-      <div className="grid min-h-0 flex-1 grid-cols-[272px_1fr] gap-6 px-8 pb-6">
+      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr] gap-5 px-6 pb-6">
         <FacetRail
           categories={categories}
           category={category}
           onCategory={(name) =>
             setFilters((f) => ({ ...emptyFilters(), inStock: f.inStock, category: name }))
           }
-          facets={facets}
+          facets={railFacets}
           filters={filters}
           setFilters={setFilters}
         />
@@ -600,11 +603,12 @@ function RangeFacet({
   const fmax = facet.max ?? 1;
   const lo = sel?.min ?? fmin;
   const hi = sel?.max ?? fmax;
+  const unit = normalizeUnit(facet.unit);
   return (
-    <FacetGroup title={facet.label} unit={facet.unit}>
+    <FacetGroup title={facet.label} unit={unit}>
       <div className="mb-2 flex justify-between font-mono text-xs text-t2">
-        <span>{formatMagnitude(lo, facet.unit)}</span>
-        <span>{formatMagnitude(hi, facet.unit)}</span>
+        <span>{formatMagnitude(lo, unit)}</span>
+        <span>{formatMagnitude(hi, unit)}</span>
       </div>
       <RangeSlider
         fmin={fmin}
@@ -731,13 +735,13 @@ function ResultsTable({
       </div>
     );
   }
-  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3.5 py-3 text-left text-[10px] font-bold uppercase tracking-[0.06em] text-t3";
-  const td = "whitespace-nowrap px-3.5 py-2.5 text-sm";
+  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-[10px] font-bold uppercase tracking-[0.06em] text-t3";
+  const td = "whitespace-nowrap px-3 py-2.5 text-sm";
   return (
     <table className="w-full border-collapse">
       <thead>
         <tr>
-          <th className={th}>Part</th>
+          <th className={th + " w-[204px]"}>Part</th>
           {columns.map((c) => (
             <th key={c.key} className={th + (c.numeric ? " text-right" : "")}>
               {c.label}
@@ -766,7 +770,7 @@ function ResultsTable({
             <td className={td}>
               <div className="flex items-center gap-2.5">
                 <RowThumbnail id={row.id} category={row.category} />
-                <div className="min-w-0">
+                <div className="min-w-0 max-w-[152px]">
                   <div className="truncate font-semibold text-t1">{row.display_name}</div>
                   <div className="tnum truncate font-mono text-[11px] text-t2">{row.mpn}</div>
                 </div>
