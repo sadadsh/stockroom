@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps2121"
   },
   "description": "Power Switch ICs - Power Distribution",
-  "display_name": "TPS2121RUXR VQFN-12 TI",
+  "display_name": "Power MUX TPS2121RUXR VQFN-12",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,36 +28,31 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:47.400656+00:00",
       "part_number": "595-TPS2121RUXR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.44,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 1.82,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 1.66,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 1.49,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 1.49,
           "qty": 3000
         }
       ],
-      "stock": 14155,
+      "stock": 30779,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR?qs=qSfuJ%252Bfl%2Fd7dCYiVnUfngQ%3D%3D",
       "vendor": "Mouser"
     },
