@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "4.12k 1% 0402 Vishay CRCW04024K12FKED",
+  "display_name": "4.12kΩ 1% 100mW 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:22.912178+00:00",
       "part_number": "71-CRCW0402-4.12K-E3",
       "price_breaks": [
         {
-          "currency": "USD",
-          "price": 0.15,
+          "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
-          "price": 0.089,
+          "price": 0.02,
           "qty": 10
         },
         {
-          "currency": "USD",
-          "price": 0.038,
+          "price": 0.016,
           "qty": 100
         },
         {
-          "currency": "USD",
-          "price": 0.03,
+          "price": 0.013,
           "qty": 250
         },
         {
-          "currency": "USD",
-          "price": 0.027,
+          "price": 0.011,
           "qty": 500
         },
         {
-          "currency": "USD",
-          "price": 0.025,
+          "price": 0.009,
           "qty": 1000
         },
         {
-          "currency": "USD",
-          "price": 0.018,
+          "price": 0.007,
           "qty": 5000
         },
         {
-          "currency": "USD",
-          "price": 0.017,
+          "price": 0.005,
           "qty": 10000
         },
         {
-          "currency": "USD",
-          "price": 0.016,
+          "price": 0.004,
           "qty": 20000
         }
       ],
-      "stock": 10238,
+      "stock": 10228,
       "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED?qs=hAuyw6LW%252BLh45zlhMS0oKQ%3D%3D",
       "vendor": "Mouser"
     },
