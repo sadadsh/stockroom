@@ -11,12 +11,14 @@ import type { ParametricFacet, SearchRow } from "../api/types";
 import { useFacetsQuery, useParametricFacets, useSearchQuery } from "../api/queries";
 import {
   activeChips,
+  applyClientFilters,
   cellValue,
   clearAll,
   deriveColumns,
   emptyFilters,
   formatMagnitude,
   hasAnyFilter,
+  PRICE_KEY,
   isOptionOn,
   makeScale,
   normalizeUnit,
@@ -31,6 +33,7 @@ import {
   type SearchFilters,
   type SpecColumn,
 } from "../lib/searchFilters";
+import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
 import { RowThumbnail } from "./PartsList";
 
@@ -88,15 +91,22 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const searchResults = useSearchQuery({ q, category, spec });
 
   const facets = paramFacets.data?.facets ?? [];
-  const sections = useMemo(() => sectionedRail(facets, category), [facets, category]);
+  const serverRows = searchResults.data?.parts ?? [];
+  // the sourcing-derived Unit Price facet (not a spec) is synthesized from the rows and filtered
+  // client-side; it rides the rail alongside the spec facets but never a column.
+  const priceFacet = useMemo(() => makePriceFacet(serverRows), [serverRows]);
+  const railFacets = useMemo(
+    () => (priceFacet ? [...facets, priceFacet] : facets),
+    [facets, priceFacet],
+  );
+  const sections = useMemo(() => sectionedRail(railFacets, category), [railFacets, category]);
   const columns = useMemo(() => deriveColumns(facets, category, 4), [facets, category]);
-  const chips = useMemo(() => activeChips(filters, facets), [filters, facets]);
+  const chips = useMemo(() => activeChips(filters, railFacets), [filters, railFacets]);
 
-  const rows = useMemo(() => {
-    let out = searchResults.data?.parts ?? [];
-    if (filters.inStock) out = out.filter((r) => (r.stock ?? 0) > 0);
-    return sortRows(out, sort, columns);
-  }, [searchResults.data, filters.inStock, sort, columns]);
+  const rows = useMemo(
+    () => sortRows(applyClientFilters(serverRows, filters), sort, columns),
+    [serverRows, filters, sort, columns],
+  );
 
   // Focus the field on open; keep the keyboard selection in range as the row set changes.
   useEffect(() => inputRef.current?.focus(), []);
@@ -127,7 +137,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const categories = categoryFacets.data
     ? Object.entries(categoryFacets.data.by_category).sort((a, b) => a[0].localeCompare(b[0]))
     : [];
-  const total = searchResults.data?.count ?? 0;
+  const total = serverRows.length;
   const shown = rows.length;
 
   return (
@@ -171,9 +181,9 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         {/* sub-bar: result count, the active-filter chips, and the sort control */}
         <div className="flex items-center gap-3 py-4">
           <span className="flex-none text-sm font-bold text-t1">
-            {searchResults.isLoading ? "…" : total}
+            {searchResults.isLoading ? "…" : shown}
             <span className="ml-1.5 text-xs font-medium text-t3">
-              {total === 1 ? "result" : "results"}
+              {shown === 1 ? "result" : "results"}
             </span>
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -260,6 +270,27 @@ function KbdHint({ keys, label }: { keys: string[]; label: string }) {
       {label}
     </span>
   );
+}
+
+// The Unit Price facet, synthesized from the rows' sourcing (it is not a spec, so the backend
+// facets can never produce it). Null when too few rows carry a price to make a meaningful range.
+function makePriceFacet(rows: SearchRow[]): ParametricFacet | null {
+  const prices = rows
+    .map((r) => r.unit_price)
+    .filter((p): p is number => p != null && p > 0);
+  if (prices.length < 2) return null;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  if (min === max) return null;
+  return {
+    key: PRICE_KEY,
+    label: "Unit Price",
+    kind: "range",
+    count: prices.length,
+    min,
+    max,
+    unit: "$",
+  };
 }
 
 // --- sort ------------------------------------------------------------------
@@ -583,7 +614,7 @@ function OptionFacet({
       {shown.map((o) => (
         <OptionRow
           key={o.value}
-          label={o.value}
+          label={prettifyValue(o.value)}
           count={o.count}
           on={isOptionOn(filters, facet.key, o.value)}
           onToggle={() => setFilters((f) => toggleOption(f, facet.key, o.value))}

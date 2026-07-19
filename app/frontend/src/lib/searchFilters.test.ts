@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { ParametricFacet } from "../api/types";
 import {
   activeChips,
+  applyClientFilters,
+  PRICE_KEY,
   cellValue,
   clearAll,
   clearRange,
@@ -163,6 +165,26 @@ describe("orderFacetsForRail", () => {
     expect(order[0]).toBe("Resistance"); // the electrical range leads
     expect(order[order.length - 1]).toBe("US Tariff %"); // commercial sinks last
     expect(order.indexOf("Application")).toBeLessThan(order.indexOf("Assembly Country of Origin"));
+  });
+});
+
+describe("applyClientFilters", () => {
+  const rows = [
+    { stock: 5000, unit_price: 0.31 },
+    { stock: 0, unit_price: 0.02 },
+    { stock: 100, unit_price: null },
+    { stock: 8, unit_price: 1.5 },
+  ];
+  it("applies the In Stock toggle over the rows' stock", () => {
+    const filters = { ...emptyFilters(), inStock: true };
+    expect(applyClientFilters(rows, filters)).toEqual([rows[0], rows[2], rows[3]]);
+  });
+  it("applies the reserved Unit Price range and drops price-less rows", () => {
+    const filters = setRange(emptyFilters(), PRICE_KEY, { min: 0.1, max: 1 });
+    expect(applyClientFilters(rows, filters)).toEqual([rows[0]]);
+  });
+  it("the Unit Price range never leaves as a spec token (it is client-side)", () => {
+    expect(toSpecParams(setRange(emptyFilters(), PRICE_KEY, { min: 0.1, max: 1 }))).toEqual([]);
   });
 });
 
