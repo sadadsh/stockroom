@@ -32,54 +32,88 @@
       "part_number": "71-CRCW0402-4.12K-E3",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.15,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.089,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.038,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.027,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.025,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.018,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.017,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 20000,
+          "currency": "USD",
           "price": 0.016,
-          "currency": "USD"
+          "qty": 20000
         }
       ],
       "stock": 10238,
       "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED?qs=hAuyw6LW%252BLh45zlhMS0oKQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:17.111897+00:00",
+      "part_number": "541-4.12KLTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00551,
+          "qty": 10000
+        },
+        {
+          "price": 0.00499,
+          "qty": 20000
+        },
+        {
+          "price": 0.00473,
+          "qty": 30000
+        },
+        {
+          "price": 0.00445,
+          "qty": 50000
+        },
+        {
+          "price": 0.00429,
+          "qty": 70000
+        },
+        {
+          "price": 0.00414,
+          "qty": 100000
+        }
+      ],
+      "stock": 38718,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -111,14 +145,13 @@
     "Series": "D/CRCW e3",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 10.0,
     "Unit Weight": "0.000023 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.5 mm (0.02 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000"
+    "Width": "0.5 mm (0.02 in)"
   },
   "symbol": {
     "lib": "Device",
