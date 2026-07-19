@@ -28,7 +28,7 @@ export function Card({
   );
 }
 
-type ButtonVariant = "default" | "accent" | "danger";
+type ButtonVariant = "default" | "accent" | "danger" | "soft";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -61,6 +61,10 @@ export function Button({
       "border-transparent bg-acc text-acc-on shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
     danger:
       "border-transparent bg-err text-white shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
+    // A raised-but-neutral action (north-star .addbtn): a subtle lifted tile, not a heavy
+    // solid accent bar. Reads clean on both themes (a light overlay on the panel).
+    soft:
+      "border-line2 bg-raise2 text-t1 font-semibold shadow-card hover:brightness-110 hover:-translate-y-px hover:shadow-raise",
   };
   return (
     <button

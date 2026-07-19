@@ -181,10 +181,10 @@ export function ComponentsPage() {
         <div className="flex w-[320px] flex-none flex-col px-3.5 pt-4">
           <div className="px-2 pt-2">
             <Button
-              variant="accent"
+              variant="soft"
               icon={<AddPartIcon />}
               onClick={openAddPart}
-              className="mb-2.5 w-full justify-center"
+              className="mb-2.5 h-9 w-full justify-center"
             >
               Add Parts
             </Button>
