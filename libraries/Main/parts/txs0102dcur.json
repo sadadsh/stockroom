@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/gpn/txs0102"
   },
   "description": "2-Bit Bidirectional Voltage-Level Shifter for Open-Drain and Push-Pull Application, VSSOP-8",
-  "display_name": "TXS0102DCUR VSSOP-8 TI",
+  "display_name": "Translation TXS0102DCUR VSSOP-8",
   "enrichment": {},
   "footprint": {
     "lib": "Package_SO",
