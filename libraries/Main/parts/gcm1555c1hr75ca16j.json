@@ -32,49 +32,63 @@
       "part_number": "81-GCM1555C1HR75CA6J",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.15,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.053,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.029,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.019,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.014,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.009,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.008,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 50000,
+          "currency": "USD",
           "price": 0.008,
-          "currency": "USD"
+          "qty": 50000
         }
       ],
       "stock": 35585,
       "url": "https://www.mouser.com/en/ProductDetail/Murata-Electronics/GCM1555C1HR75CA16J?qs=QzBtWTOodeXZZhEWV%2FO7LA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:34.890620+00:00",
+      "part_number": "490-GCM1555C1HR75CA16JTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00568,
+          "qty": 50000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -101,6 +115,7 @@
     "Product": "Automotive MLCCs",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
     "Product Type": "Ceramic Capacitors",
+    "Qualification": "AEC-Q200",
     "RoHS": "Details",
     "Series": "GCM",
     "Shipping Restrictions": "Mouser does not presently sell this product in your region.",
@@ -109,12 +124,10 @@
     "Termination Style": "SMD/SMT",
     "Tolerance": "0.25 pF",
     "Type": "Chip Multilayer Ceramic Capacitors for Automotive",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000056 oz",
     "Voltage Rating DC": "50 VDC",
-    "Width": "0.5 mm (0.02 in)",
-    "Qualification": "AEC-Q200",
-    "Factory Pack Quantity: Factory Pack Quantity": "50000",
-    "US Tariff %": 0.0
+    "Width": "0.5 mm (0.02 in)"
   },
   "symbol": {
     "lib": "Device",
