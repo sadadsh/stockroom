@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/74439346068.pdf"
   },
   "description": "Power Inductors - SMD",
-  "display_name": "6.8u 20% 6060 Wurth 74439346068",
+  "display_name": "6.8µH 20% 6.5A Power Inductor",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -28,31 +28,27 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:00.856619+00:00",
       "part_number": "710-74439346068",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 4.05,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 3.68,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 2.73,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 2.49,
           "qty": 700
         }
       ],
-      "stock": 6579,
+      "stock": 7341,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068?qs=NSAOzM2zc%2FVj5BeHYKNgfQ%3D%3D",
       "vendor": "Mouser"
     },
