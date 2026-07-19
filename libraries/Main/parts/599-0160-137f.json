@@ -6,7 +6,7 @@
     "source_url": "https://s3.us-west-2.amazonaws.com/catsy.557/Dialight_datasheet_599_Single-Color_0805_2_Taiwan.pdf"
   },
   "description": "Light emitting diode",
-  "display_name": "Green 0805 Dialight 599-0160-137F",
+  "display_name": "Single Color LED 2.2V 0805",
   "enrichment": {},
   "footprint": {
     "lib": "LED_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:58.827240+00:00",
       "part_number": "645-599-0160-137F",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.29,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.195,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.137,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.111,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.102,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.095,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.08,
           "qty": 4000
         },
         {
-          "currency": "USD",
           "price": 0.073,
           "qty": 24000
         }
       ],
-      "stock": 11820,
+      "stock": 11808,
       "url": "https://www.mouser.com/en/ProductDetail/Dialight/599-0160-137F?qs=4dK74SdgGtw70mfJFAB4aw%3D%3D",
       "vendor": "Mouser"
     },
@@ -123,7 +115,7 @@
     "If - Forward Current": "20 mA",
     "Length": "2 mm",
     "Lens Color": "Water Clear",
-    "Lifecycle": "Active",
+    "Lifecycle": "New Product",
     "Luminous Intensity": "80 cd",
     "Manufacturer": "Dialight",
     "Maximum Operating Temperature": "+ 85 C",
