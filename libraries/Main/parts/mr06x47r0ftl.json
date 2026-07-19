@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/317/1/ASC_MR.pdf"
   },
   "description": "Resistor",
-  "display_name": "47Ω 1% 0603 Walsin MR06X47R0FTL",
+  "display_name": "47Ω 1% 125mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:50.862546+00:00",
       "part_number": "791-MR06X47R0FTL",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.13,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.033,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.016,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.012,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.01,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.009,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.005,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.003,
           "qty": 10000
         }
       ],
-      "stock": 49137,
+      "stock": 49125,
       "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X47R0FTL?qs=GedFDFLaBXGoJo8MM4e47Q%3D%3D",
       "vendor": "Mouser"
     },
