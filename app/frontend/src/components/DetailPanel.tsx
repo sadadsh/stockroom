@@ -293,7 +293,13 @@ export function DetailPanel({
 
         {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. */}
         <div className="flex flex-col gap-[18px]">
-          <CadDownloadCard partId={detail.id} assetsMissing={noCadAssetsYet} />
+          {/* Keyed by part id so a part switch (even to a cached part that never
+              unmounts DetailPanel) remounts the card fresh: without this, the SAME
+              instance (and its useCadDownload state + armed one-shot download
+              handler) survives navigation, so a card for the NEW part could show a
+              stale "waiting"/"done" state left over from a download started on the
+              PREVIOUS part. Matches PinoutViewer/EnrichPanel/PartTimeline below. */}
+          <CadDownloadCard key={detail.id} partId={detail.id} assetsMissing={noCadAssetsYet} />
           <AssetTile
             variant="tile"
             name="3D Model"

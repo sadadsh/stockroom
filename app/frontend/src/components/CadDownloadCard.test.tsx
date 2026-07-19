@@ -163,6 +163,54 @@ describe("CadDownloadCard", () => {
     expect(await screen.findByRole("button", { name: /Try Again/ })).toBeInTheDocument();
   });
 
+  it("resets to idle instead of leaking state when remounted for a different part (key change simulates DetailPanel navigation)", async () => {
+    const openCadDownload = vi.fn();
+    (
+      window as unknown as { pywebview: { api: { open_cad_download: typeof openCadDownload } } }
+    ).pywebview = { api: { open_cad_download: openCadDownload } };
+    vi.spyOn(api, "partCadSource").mockResolvedValue({
+      url: "https://www.digikey.com/en/products/detail/x/BQ24074/123",
+      mpn: "BQ24074",
+      vendor: "DigiKey",
+    });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <CadDownloadCard key="partA" partId="partA" assetsMissing={true} />
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+
+    // Drive part A's card into "waiting" (button clicked, host bridge opened, one-shot
+    // handler armed) - this is the state a click on part A leaves behind.
+    await user.click(await screen.findByRole("button", { name: /Get CAD Files From DigiKey/ }));
+    expect(await screen.findByTestId("cad-download-message")).toHaveTextContent(
+      "Waiting for the download",
+    );
+    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeInstanceOf(Function);
+
+    // Simulate navigating to a different (possibly cached) part: DetailPanel mounts
+    // CadDownloadCard with a new key={detail.id}, so React unmounts the part-A instance
+    // (tearing down its armed handler via the hook's unmount cleanup) and mounts a
+    // fresh part-B instance - it must NOT inherit part A's "waiting" state.
+    rerender(
+      <QueryClientProvider client={qc}>
+        <CadDownloadCard key="partB" partId="partB" assetsMissing={true} />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Get CAD Files From DigiKey/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("cad-download-message")).not.toHaveTextContent(
+      "Waiting for the download",
+    );
+    // Part A's one-shot handler must be gone, not silently pointed at part B's card.
+    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeUndefined();
+  });
+
   it("surfaces an inspect/commit error inline instead of crashing", async () => {
     const openCadDownload = vi.fn();
     (
