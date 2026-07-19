@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "249k 1% 0603 Vishay CRCW0603249KFKEC",
+  "display_name": "249kΩ 1% 125mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:52.787429+00:00",
       "part_number": "71-CRCW0603249KFKEC",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.25,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.063,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.031,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.022,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.019,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.017,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.01,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.008,
           "qty": 10000
         },
         {
-          "currency": "USD",
           "price": 0.008,
           "qty": 20000
         }
       ],
-      "stock": 53712,
+      "stock": 53700,
       "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW0603249KFKEC?qs=fV9RsfLZb3Nd4oImm8Ob9w%3D%3D",
       "vendor": "Mouser"
     },
