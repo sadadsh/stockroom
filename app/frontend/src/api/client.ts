@@ -247,14 +247,16 @@ export const api = {
     return apiGet<Facets>("/api/library/facets");
   },
 
-  // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by
-  // the same text/category/completeness as the list so a facet count never disagrees with it.
-  parametricFacets({ q, category, completeOnly }: ListPartsArgs): Promise<ParametricFacets> {
-    const params: Record<string, string> = {};
+  // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by the
+  // same text/category/completeness AND the live rail `spec` selections so the counts narrow as the
+  // user picks (each facet excludes its own key server-side, so it still offers its other values).
+  parametricFacets({ q, category, completeOnly, spec }: SearchArgs): Promise<ParametricFacets> {
+    const params: Record<string, string | string[]> = {};
     if (q) params.q = q;
     if (category) params.category = category;
     if (completeOnly) params.complete_only = "true";
-    return apiGet<ParametricFacets>("/api/library/facets/parametric", params);
+    if (spec && spec.length) params.spec = spec;
+    return request<ParametricFacets>("GET", "/api/library/facets/parametric", { params });
   },
 
   // The rich results rows for the search table: same scope + `spec` filter as the lean list, but

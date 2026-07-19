@@ -226,18 +226,31 @@ def matches_spec_filters(record, constraints: list[SpecConstraint]) -> bool:
     return _specs_match(record.specs or {}, constraints)
 
 
-def aggregate_parametric(records, category: str | None = None) -> ParametricFacets:
-    """Aggregate the spec bags of ``records`` (already scoped by the caller) into one
-    facet per spec key. ``category`` is echoed back on the result; it does not filter
-    (the caller scopes the records). Insertion order of keys as first seen is preserved
-    so a stable, data-driven ordering reaches the UI."""
-    buckets: dict[str, list] = {}
-    total = 0
-    for rec in records:
-        total += 1
+def aggregate_parametric(
+    records, category: str | None = None, constraints: list[SpecConstraint] | None = None
+) -> ParametricFacets:
+    """Aggregate the spec bags of ``records`` (already scoped by the caller) into one facet per
+    spec key. When ``constraints`` are given (the live rail selections), each facet is counted over
+    the records that satisfy every constraint EXCEPT its OWN key - so the rail narrows as the user
+    selects, yet a facet being filtered still shows its other selectable values (multi-select keeps
+    working) rather than collapsing to the one chosen value. ``total`` is the count satisfying ALL
+    constraints. First-seen key order is preserved for a stable, data-driven ordering."""
+    constraints = constraints or []
+    recs = list(records)
+    key_order: dict[str, None] = {}
+    for rec in recs:
         for raw_key, value in (rec.specs or {}).items():
-            if not _is_scalar(value):
-                continue
-            buckets.setdefault(raw_key, []).append(value)
-    facets = [_build_facet(key, values) for key, values in buckets.items()]
+            if _is_scalar(value):
+                key_order.setdefault(raw_key, None)
+    facets: list[ParametricFacet] = []
+    for key in key_order:
+        others = [c for c in constraints if c.key != key]
+        values = [
+            (rec.specs or {})[key]
+            for rec in recs
+            if _is_scalar((rec.specs or {}).get(key)) and _specs_match(rec.specs or {}, others)
+        ]
+        if values:  # a facet with nothing left under the other filters just drops out
+            facets.append(_build_facet(key, values))
+    total = sum(1 for rec in recs if _specs_match(rec.specs or {}, constraints))
     return ParametricFacets(category=category, facets=facets, total=total)

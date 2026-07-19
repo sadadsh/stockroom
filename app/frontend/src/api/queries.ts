@@ -70,9 +70,15 @@ export function useFacetsQuery() {
 // The modular search rail's filter dimensions, generated from the parts' specs and scoped by
 // the current query/category so the counts track what the list shows. Its own key (not
 // ["facets"]) so a normal facet invalidation and this can refetch independently.
-export function useParametricFacets(args: ListPartsArgs, enabled = true) {
+export function useParametricFacets(args: SearchArgs, enabled = true) {
   return useQuery({
-    queryKey: ["parametric-facets", args.q ?? "", args.category ?? "", !!args.completeOnly],
+    queryKey: [
+      "parametric-facets",
+      args.q ?? "",
+      args.category ?? "",
+      !!args.completeOnly,
+      [...(args.spec ?? [])].sort().join("|"),
+    ],
     queryFn: () => api.parametricFacets(args),
     enabled,
     placeholderData: keepPreviousData,
