@@ -32,54 +32,88 @@
       "part_number": "611-PTS645SK43SMTR92",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.36,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.313,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.293,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.262,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.243,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.229,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.187,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.176,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.171,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 87087,
       "url": "https://www.mouser.com/en/ProductDetail/CK/PTS645SK43SMTR92-LFS?qs=Imq1NPwxi76wjUe7hzmA%252BA%3D%3D&mgh=1",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:48.111798+00:00",
+      "part_number": "CKN9084TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.21605,
+          "qty": 1000
+        },
+        {
+          "price": 0.20433,
+          "qty": 2000
+        },
+        {
+          "price": 0.19796,
+          "qty": 3000
+        },
+        {
+          "price": 0.19045,
+          "qty": 5000
+        },
+        {
+          "price": 0.18583,
+          "qty": 7000
+        },
+        {
+          "price": 0.1812,
+          "qty": 10000
+        }
+      ],
+      "stock": 103472,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -119,11 +153,10 @@
     "Termination Style": "Gull Wing Lead",
     "Tradename": "PTS",
     "Type": "Tactile",
+    "US Tariff %": 8.06,
     "Unit Weight": "0.580821 oz",
     "Voltage Rating DC": "12 VDC",
-    "Width": "6 mm",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000",
-    "US Tariff %": 8.06
+    "Width": "6 mm"
   },
   "symbol": null,
   "tags": []
