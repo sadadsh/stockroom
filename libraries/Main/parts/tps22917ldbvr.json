@@ -5,7 +5,7 @@
     "file": "",
     "source_url": "http://www.ti.com/lit/ds/symlink/tps22917.pdf"
   },
-  "description": "1V to 5.5V, 2A, 80m\u03a9 Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
+  "description": "1V to 5.5V, 2A, 80mΩ Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
   "display_name": "TPS22917LDBVR SOT23-6 TI",
   "enrichment": {},
   "footprint": {
@@ -32,54 +32,88 @@
       "part_number": "595-TPS22917LDBVR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.52,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.367,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.328,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.285,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.264,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.252,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.242,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.229,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.223,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 171,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR?qs=doiCPypUmgGbWD5ZXr9T%2FQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:56.905568+00:00",
+      "part_number": "296-TPS22917LDBVRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.22945,
+          "qty": 3000
+        },
+        {
+          "price": 0.22331,
+          "qty": 6000
+        },
+        {
+          "price": 0.22023,
+          "qty": 9000
+        },
+        {
+          "price": 0.21682,
+          "qty": 15000
+        },
+        {
+          "price": 0.21483,
+          "qty": 21000
+        },
+        {
+          "price": 0.21292,
+          "qty": 30000
+        }
+      ],
+      "stock": 2984,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,8 +146,7 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1 V",
     "Type": "Load Switch",
-    "US Tariff %": 0.0,
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "US Tariff %": 0.0
   },
   "symbol": null,
   "tags": []
