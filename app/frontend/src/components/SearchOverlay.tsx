@@ -87,7 +87,8 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const category = filters.category;
   const spec = useMemo(() => toSpecParams(filters), [filters]);
   const categoryFacets = useFacetsQuery();
-  const paramFacets = useParametricFacets({ q, category });
+  // pass the live spec selections so the rail's counts narrow as you pick (faceted search)
+  const paramFacets = useParametricFacets({ q, category, spec });
   const searchResults = useSearchQuery({ q, category, spec });
 
   const facets = paramFacets.data?.facets ?? [];
@@ -151,7 +152,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               ref={inputRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search components by name, MPN, value, or spec…"
+              placeholder="Search components using a name, MPN, value, or specification..."
               aria-label="Search components"
               className="min-w-0 flex-1 bg-transparent text-[17px] font-medium text-t1 outline-none placeholder:font-normal placeholder:text-t3"
             />
@@ -172,7 +173,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             className="flex h-[52px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-4 text-sm font-semibold text-t2 shadow-card hover:border-line2 hover:text-t1"
           >
             Close
-            <kbd className="rounded-[5px] border border-line px-1.5 py-0.5 font-mono text-[11px] text-t3">
+            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2">
               Esc
             </kbd>
           </button>
@@ -262,7 +263,7 @@ function KbdHint({ keys, label }: { keys: string[]; label: string }) {
       {keys.map((k) => (
         <kbd
           key={k}
-          className="min-w-[18px] rounded border border-line px-1.5 text-center font-mono text-[10.5px] text-t2"
+          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2"
         >
           {k}
         </kbd>
@@ -519,11 +520,11 @@ function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean 
       {label}
       {fromSpecs ? (
         <span
-          className="inline-flex items-center gap-1 rounded-full bg-acc-soft px-1.5 py-0.5 text-[9px] font-semibold normal-case tracking-normal text-t2"
+          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-acc-soft px-1.5 py-0.5 text-[9px] font-semibold normal-case tracking-normal text-t2"
           title="These filters are generated from the category's part specs"
         >
           <Spark className="h-2.5 w-2.5" />
-          from specs
+          From Specifications
         </span>
       ) : null}
       <span className="h-px flex-1 bg-line" />
@@ -604,31 +605,22 @@ function OptionFacet({
   filters: SearchFilters;
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const opts = facet.options ?? [];
-  const LIMIT = 5;
-  const shown = expanded ? opts : opts.slice(0, LIMIT);
-  const more = opts.length - shown.length;
   return (
     <FacetGroup title={facet.label} first={first}>
-      {shown.map((o) => (
-        <OptionRow
-          key={o.value}
-          label={prettifyValue(o.value)}
-          count={o.count}
-          on={isOptionOn(filters, facet.key, o.value)}
-          onToggle={() => setFilters((f) => toggleOption(f, facet.key, o.value))}
-        />
-      ))}
-      {more > 0 ? (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="py-1 text-xs font-semibold text-t2 hover:text-t1"
-        >
-          + {more} More
-        </button>
-      ) : null}
+      {/* every value is shown - no "show more" gate; a long list just scrolls in place so the
+          rail narrows live as selections are made rather than hiding options up front */}
+      <div className={opts.length > 8 ? "max-h-[184px] overflow-y-auto pr-1" : ""}>
+        {opts.map((o) => (
+          <OptionRow
+            key={o.value}
+            label={prettifyValue(o.value)}
+            count={o.count}
+            on={isOptionOn(filters, facet.key, o.value)}
+            onToggle={() => setFilters((f) => toggleOption(f, facet.key, o.value))}
+          />
+        ))}
+      </div>
     </FacetGroup>
   );
 }
@@ -797,7 +789,7 @@ function ResultsTable({
   const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-[10px] font-bold uppercase tracking-[0.06em] text-t3";
   const td = "whitespace-nowrap px-3 py-2.5 text-sm";
   return (
-    <table className="w-full border-collapse">
+    <table className="w-max min-w-full border-collapse">
       <thead>
         <tr>
           <th className={th + " w-[204px]"}>Part</th>
