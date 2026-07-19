@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/150060RS75000.pdf"
   },
   "description": "Light emitting diode",
-  "display_name": "Red 0603 Wurth 150060RS75000",
+  "display_name": "Red LED 2V 0603",
   "enrichment": {},
   "footprint": {
     "lib": "LED_SMD",
@@ -28,41 +28,35 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:29.046259+00:00",
       "part_number": "710-150060RS75000",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.16,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.151,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.142,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 0.122,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.116,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.116,
           "qty": 4000
         }
       ],
-      "stock": 368302,
+      "stock": 367078,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060RS75000?qs=LlUlMxKIyB3QnmZ3fw%2FVCA%3D%3D",
       "vendor": "Mouser"
     },
