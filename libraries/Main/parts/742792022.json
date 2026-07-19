@@ -32,54 +32,68 @@
       "part_number": "710-742792022",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.154,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.15,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.141,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.14,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.136,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.127,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.108,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.108,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 145687,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:02.143194+00:00",
+      "part_number": "732-1614-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.1444,
+          "qty": 4000
+        }
+      ],
+      "stock": 129237,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -109,12 +123,11 @@
     "Subcategory": "Ferrites",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 MHz",
-    "Tolerance": "25 %",
+    "Tolerance": "25%",
     "Type": "SMD EMI Suppression Ferrite Bead WE-CBF",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000194 oz",
-    "Width": "1.2 mm",
-    "Factory Pack Quantity: Factory Pack Quantity": "4000"
+    "Width": "1.2 mm"
   },
   "symbol": {
     "lib": "Device",
