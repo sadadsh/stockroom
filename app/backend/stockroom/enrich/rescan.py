@@ -59,6 +59,10 @@ class RescanEngine:
                      "DigiKey": float(getattr(ctx.config, "rescan_digikey_per_min", 60) or 0)}
             pacer = Pacer(rates)
         self._pacer = pacer
+        # circuit breaker (Phase-1b-2b, reactive): a provider that comes back rate-limited or
+        # auth-failed is paused for the REST of this run - no more pacing, no more calls to it -
+        # so a throttled/misconfigured provider never gets hammered for the whole rescan.
+        self._tripped: set[str] = set()
 
     def run(self, progress, *, ttl_days: int | None = None, force: bool = False, now_fn=None) -> dict:
         now_fn = now_fn or (lambda: datetime.now(timezone.utc))
@@ -95,21 +99,33 @@ class RescanEngine:
         if summary["updated"]:
             self._ctx.jobs.run_write(self._ctx.rebuild_index)
             self._ctx.jobs.run_write(self._ctx.auto_push)
+        paused = sorted(self._tripped)
+        summary["paused_providers"] = paused
         summary["message"] = (f"Refreshed {summary['updated']} of {total} "
                               f"({summary['unchanged']} unchanged, {summary['no_data']} no data, "
                               f"{summary['failed']} failed)")
+        if paused:
+            summary["message"] += f" (paused: {', '.join(paused)})"
         return summary
 
     def _lookup(self, mpn: str) -> list:
         """Paced per-provider lookups (runs on the READ lane). Returns [(vendor, EnrichmentResult)]
-        for each enabled provider that returned real data."""
+        for each enabled provider that returned real data. A provider already tripped by the
+        circuit breaker (see _tripped) is skipped entirely for the rest of the run - no pace,
+        no call - and any provider whose lookup just came back rate-limited/auth-failed trips
+        here so every later part skips it too."""
         out = []
         for adapter in self._adapters:
             if not getattr(adapter, "enabled", False):
                 continue
             vendor = getattr(adapter, "vendor", "distributor")
+            if vendor in self._tripped:
+                continue
             self._pacer.wait(vendor)
             result = adapter.lookup(mpn)
+            last_status = getattr(adapter, "last_status", "")
+            if last_status in ("rate_limited", "auth_error"):
+                self._tripped.add(vendor)
             if _has_data(result):
                 out.append((vendor, result))
         return out

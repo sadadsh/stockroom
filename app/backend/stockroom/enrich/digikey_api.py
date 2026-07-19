@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from stockroom.enrich.errors import EnrichError
+from stockroom.enrich.errors import EnrichError, status_from_error
 from stockroom.enrich.schema import (
     EnrichmentResult,
     PriceBreak,
@@ -70,6 +70,9 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
+        except urllib.error.HTTPError as exc:
+            # a 429/401/403 carries .code: the rescan breaker reads it via status_code
+            raise EnrichError(f"digikey request failed: {exc}", status_code=exc.code) from exc
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
             raise EnrichError(f"digikey request failed: {exc}") from exc
 
@@ -176,6 +179,9 @@ class DigiKeyAdapter:
         self._requester = requester or (
             _default_requester(self.client_id, self.client_secret) if self.enabled else None
         )
+        # out-of-band signal for the rescan circuit breaker (Phase-1b-2b); never affects the
+        # returned EnrichmentResult, which stays exactly what it is today on every path.
+        self.last_status: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -186,10 +192,12 @@ class DigiKeyAdapter:
             return EnrichmentResult()
         try:
             body = self._requester(mpn)
-        except EnrichError:
+        except EnrichError as exc:
+            self.last_status = status_from_error(exc)
             return EnrichmentResult()  # a failed API call must not break enrichment
         products = (body or {}).get("Products") or []
         if not products:
+            self.last_status = "not_found"
             return EnrichmentResult()
         target = normalize_mpn(mpn)
         exact = next(
@@ -202,4 +210,5 @@ class DigiKeyAdapter:
         result = _parse_digikey_part(chosen)
         if exact is None and result.mpn is not None:
             result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
+        self.last_status = "ok"
         return result

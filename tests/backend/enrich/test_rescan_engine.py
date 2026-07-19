@@ -20,12 +20,15 @@ class _Index:
 
 
 class _Adapter:
-    def __init__(self, vendor, results):
+    def __init__(self, vendor, results, statuses=None):
         self.vendor, self.enabled, self._results = vendor, True, results
         self.calls = []
+        self._statuses = statuses or {}
+        self.last_status = ""
 
     def lookup(self, mpn):
         self.calls.append(mpn)
+        self.last_status = self._statuses.get(mpn, "ok")
         return self._results.get(mpn, EnrichmentResult())
 
 
@@ -143,3 +146,41 @@ def test_a_failing_part_is_recorded_and_never_fails_the_run(tmp_path):
         lambda e: None, force=True, now_fn=_fixed_now)
     assert summary["failed"] == 1 and summary["updated"] == 1     # a failed, c updated - run finished
     assert RescanState(tmp_path / "rescan-state.json").outcome("a") == "failed"
+
+
+def test_a_rate_limited_provider_is_paused_for_the_rest_of_the_run(tmp_path):
+    # the FIRST part trips the breaker (rate_limited); every later part must skip that
+    # provider entirely - no pace, no call - and the run still finishes without raising.
+    index = _Index([_Row("a", "MPN-A"), _Row("b", "MPN-B"), _Row("c", "MPN-C")])
+    ops = _Ops(changed_ids=[])
+    adapters = [_Adapter("DigiKey", {}, statuses={"MPN-A": "rate_limited"})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=[])
+    summary = RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert summary["total"] == 3
+    assert adapters[0].calls == ["MPN-A"]                 # b, c never call the paused provider
+    assert summary["paused_providers"] == ["DigiKey"]
+    assert "paused: DigiKey" in summary["message"]
+    assert summary["failed"] == 0                         # never fails the run
+
+
+def test_an_auth_error_also_trips_the_breaker(tmp_path):
+    index = _Index([_Row("a", "MPN-A"), _Row("b", "MPN-B")])
+    ops = _Ops(changed_ids=[])
+    adapters = [_Adapter("Mouser", {}, statuses={"MPN-A": "auth_error"})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=[])
+    summary = RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert adapters[0].calls == ["MPN-A"]
+    assert summary["paused_providers"] == ["Mouser"]
+
+
+def test_no_paused_providers_when_nothing_trips_the_breaker(tmp_path):
+    index = _Index([_Row("a", "MPN-A")])
+    ops = _Ops(changed_ids=["a"])
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A")})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=["a"])
+    summary = RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert summary["paused_providers"] == []
+    assert "paused" not in summary["message"]
