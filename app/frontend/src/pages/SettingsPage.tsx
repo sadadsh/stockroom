@@ -76,7 +76,7 @@ export function SettingsPage() {
         <h1 className="text-lg font-semibold text-t1">Settings</h1>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
-        <div className="max-w-[720px] pb-12">
+        <div className="mx-auto max-w-[860px] pb-12">
           <AppearanceSection />
           <ProfilesSection />
           <SyncSection />

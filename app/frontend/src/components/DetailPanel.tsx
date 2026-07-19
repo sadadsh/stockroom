@@ -147,6 +147,7 @@ export function DetailPanel({
   // no Complete Part affordance, only the honest "Not linked" state on the tiles).
   const canComplete = !!(onEditField || onAttachSymbol || onAttachFootprint);
 
+  const title = deriveTitle(detail);
   // The part's tags plus a few chips derived from key specs (package, mounting,
   // qualifications, salient features), so the attribute band is never empty.
   const attributes = deriveAttributes(detail);
@@ -166,10 +167,13 @@ export function DetailPanel({
       <div className="flex items-start justify-between gap-6 border-b border-line pb-5">
         <div className="min-w-0 flex-1">
           <h1 className="min-w-0 break-words text-[35px] font-bold leading-[1.02] tracking-[-0.028em] text-t1">
-            {deriveTitle(detail)}
+            {title}
           </h1>
           <SerialLine
             mpn={detail.mpn}
+            // when the MPN IS the headline (a spec-less IC / diode titles by its MPN), the serial
+            // line drops it so the same part number never reads twice.
+            mpnIsHeadline={title === detail.mpn.trim()}
             manufacturer={detail.manufacturer}
             category={detail.category}
           />
@@ -669,22 +673,26 @@ function SectionLabel({
 // each piece dropping out honestly when the record does not carry it.
 function SerialLine({
   mpn,
+  mpnIsHeadline,
   manufacturer,
   category,
 }: {
   mpn: string;
+  mpnIsHeadline?: boolean;
   manufacturer: string;
   category: string;
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
       <span className="h-1.5 w-1.5 flex-none rounded-full bg-t3" aria-hidden="true" />
-      <span className="tnum font-mono text-sm text-t1">
-        {mpn || <span className="font-sans italic text-t3">No Part Number</span>}
-      </span>
+      {mpnIsHeadline ? null : (
+        <span className="tnum font-mono text-sm text-t1">
+          {mpn || <span className="font-sans italic text-t3">No Part Number</span>}
+        </span>
+      )}
       {manufacturer ? (
         <>
-          <Middot />
+          {mpnIsHeadline ? null : <Middot />}
           <span className="text-sm text-t2">{manufacturer}</span>
         </>
       ) : null}

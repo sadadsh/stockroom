@@ -53,6 +53,25 @@ describe("deriveTitle", () => {
     expect(deriveTitle(part)).toBe("10 kΩ Thermistor");
   });
 
+  it("titles a spec-less IC by its MPN, not a junk spec fragment", () => {
+    const part = makePart({
+      category: "ICs",
+      mpn: "SN74LVC138AQPWREP",
+      specs: { "Base Product Number": "LVC138", Function: "Decoder" },
+    });
+    // was "LVC IC" (first spec + noun); the MPN is the recognizable identifier instead
+    expect(deriveTitle(part)).toBe("SN74LVC138AQPWREP");
+  });
+
+  it("titles a diode lacking rating specs by its MPN, not 'Single Diode'", () => {
+    const part = makePart({
+      category: "Diodes",
+      mpn: "599-0160-137F",
+      specs: { Configuration: "Single" },
+    });
+    expect(deriveTitle(part)).toBe("599-0160-137F");
+  });
+
   it("keeps the category noun when a known category is missing its title specs", () => {
     const part = makePart({
       category: "Resistors",

@@ -171,15 +171,22 @@ export function deriveTitle(part: PartDetail): string {
       if (value) values.push(applySign(key, value));
     }
   }
-  // A registered category with none of its title specs, or any unregistered category,
-  // still earns a sane headline from the first meaningful spec + the noun.
-  if (values.length === 0) {
-    const first = firstDefiningValue(part.specs);
-    if (first) values.push(first);
-  }
-
   if (values.length > 0) {
     const lead = prettifyValue(values.join(" "));
+    return noun ? `${lead} ${noun}` : lead;
+  }
+
+  // No registered title spec resolved (an IC, a diode with no rating specs, ...). The MPN is a
+  // recognizable identifier and far better here than the first raw spec, which tends to grab a
+  // junk fragment ("LVC" -> "LVC IC", "Single" -> "Single Diode"). Prefer it before that fallback.
+  const mpn = part.mpn?.trim();
+  if (mpn) return mpn;
+
+  // A registered category with none of its title specs, or any unregistered one, still earns a
+  // sane headline from the first meaningful (non-commerce) spec + the noun.
+  const first = firstDefiningValue(part.specs);
+  if (first) {
+    const lead = prettifyValue(first);
     return noun ? `${lead} ${noun}` : lead;
   }
   // Nothing usable in the specs: the raw name is the honest last resort, then the category,

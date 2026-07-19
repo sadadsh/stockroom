@@ -137,14 +137,19 @@ export function ProjectsPage() {
 
   const projects = projectsQuery.data ?? [];
 
-  // Keep the selection valid: when the list settles, drop a selection that fell out
-  // of it (a delete, or the first load). Do not auto-select the first project; the
-  // audit is a deliberate click, not something to fire on every list refresh.
+  // Auto-select the first project once the list settles (mirrors the Components picker) so the
+  // detail pane is never a large empty void on load. Landing on the Overview tab is cheap - the
+  // Health audit only runs on its own tab, so this never fires an expensive check unbidden. Act
+  // only on SETTLED data so a refetch never re-picks a just-deleted project.
   const projectsFetching = projectsQuery.isFetching;
   useEffect(() => {
     if (projectsFetching) return;
-    if (selectedId && !projects.some((p) => p.id === selectedId)) {
-      setSelectedId(null);
+    if (projects.length === 0) {
+      if (selectedId !== null) setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !projects.some((p) => p.id === selectedId)) {
+      setSelectedId(projects[0].id);
     }
   }, [projects, selectedId, projectsFetching]);
 
