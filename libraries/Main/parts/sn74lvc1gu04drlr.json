@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/ds/symlink/sn74lvc1gu04.pdf"
   },
   "description": "Single Inverter Gate, SOT-553",
-  "display_name": "74LVC1GU04DRLR SOT-5X3-5 TI SN74LVC1GU04DRLR",
+  "display_name": "Inverter SN74LVC1GU04DRLR SOT-5X3-5",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:26.589337+00:00",
       "part_number": "595-SN74LVC1GU04DRLR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.36,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.246,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.219,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.189,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.175,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.166,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.159,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.157,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.148,
           "qty": 4000
         }
       ],
-      "stock": 6693,
+      "stock": 6663,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR?qs=dT9u2OTAaVWQWKRtkB6JZw%3D%3D",
       "vendor": "Mouser"
     },
