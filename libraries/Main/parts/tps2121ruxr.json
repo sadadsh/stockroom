@@ -32,34 +32,52 @@
       "part_number": "595-TPS2121RUXR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.44,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.82,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.66,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.49,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 1.49,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 14155,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS2121RUXR?qs=qSfuJ%252Bfl%2Fd7dCYiVnUfngQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:55.921147+00:00",
+      "part_number": "296-53410-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.25826,
+          "qty": 3000
+        },
+        {
+          "price": 1.23349,
+          "qty": 6000
+        }
+      ],
+      "stock": 4903,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -90,8 +108,7 @@
     "Supply Voltage - Min": "2.8 V",
     "Type": "Power MUX",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.000988 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Unit Weight": "0.000988 oz"
   },
   "symbol": null,
   "tags": []
