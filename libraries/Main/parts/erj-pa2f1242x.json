@@ -32,54 +32,68 @@
       "part_number": "667-ERJ-PA2F1242X",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.28,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.129,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.072,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.059,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.054,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.049,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.033,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 20000,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 20000
         }
       ],
       "stock": 28035,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-PA2F1242X?qs=V%252BBODeGd91LZ4cJzK1GGng%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:51.935655+00:00",
+      "part_number": "ERJ-PA2F1242X-ND",
+      "price_breaks": [
+        {
+          "price": 0.03015,
+          "qty": 10000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -110,14 +124,13 @@
     "Series": "ERJ-P",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000023 oz",
     "Voltage Rating": "50 V",
-    "Width": "0.5 mm (0.02 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000"
+    "Width": "0.5 mm (0.02 in)"
   },
   "symbol": {
     "lib": "Device",
