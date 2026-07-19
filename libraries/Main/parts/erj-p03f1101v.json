@@ -32,54 +32,68 @@
       "part_number": "667-ERJ-P03F1101V",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.31,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.163,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.097,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.076,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.069,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.063,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.051,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.045,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 25000,
+          "currency": "USD",
           "price": 0.043,
-          "currency": "USD"
+          "qty": 25000
         }
       ],
       "stock": 5616,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V?qs=sGAEpiMZZMtG0KNrPCHnjYpPrk%252BOMd4bdFNd%2Ftqgjvc%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:01:52.077087+00:00",
+      "part_number": "ERJ-P03F1101V-ND",
+      "price_breaks": [
+        {
+          "price": 0.04767,
+          "qty": 5000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,14 +126,13 @@
     "Series": "ERJ-P",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "200 PPM / C",
+    "Temperature Coefficient": "200 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "150 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
