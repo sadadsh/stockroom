@@ -32,44 +32,78 @@
       "part_number": "534-1043",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.99,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.49,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 2.48,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 2.44,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.92,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 1.61,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 1.6,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 9743,
       "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:45.763617+00:00",
+      "part_number": "1276-1043-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00306,
+          "qty": 10000
+        },
+        {
+          "price": 0.00274,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00229,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 9177129,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -93,8 +127,7 @@
     "Subcategory": "Battery",
     "Type": "Tray",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.509684 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "100"
+    "Unit Weight": "0.509684 oz"
   },
   "symbol": null,
   "tags": []
