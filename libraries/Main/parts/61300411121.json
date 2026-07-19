@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/61300411121.pdf"
   },
   "description": "Generic connector, single row, 01x04, script generated",
-  "display_name": "Conn_01x04_Pin Wurth 61300411121",
+  "display_name": "Pin Header 1x04 2.54mm",
   "enrichment": {},
   "footprint": {
     "lib": "Connector_PinHeader_2.54mm",
@@ -28,41 +28,35 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:41.625340+00:00",
       "part_number": "710-61300411121",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.19,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.163,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.135,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.113,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 0.102,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.094,
           "qty": 1000
         }
       ],
-      "stock": 51814,
+      "stock": 50969,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300411121?qs=PhR8RmCirEYQcLLqXD8rAA%3D%3D",
       "vendor": "Mouser"
     },
