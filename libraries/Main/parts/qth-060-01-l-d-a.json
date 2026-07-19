@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/85/1/qth.pdf"
   },
   "description": "Board to Board & Mezzanine Connectors",
-  "display_name": "QTH-060-01-X-D-A Samtec QTH-060-01-L-D-A",
+  "display_name": "Connector 2x60 0.5mm",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,26 +28,23 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:25.203204+00:00",
       "part_number": "200-QTH06001LDA",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 5.75,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 5.15,
           "qty": 96
         },
         {
-          "currency": "USD",
           "price": 4.74,
           "qty": 288
         }
       ],
-      "stock": 4882,
+      "stock": 4831,
       "url": "https://www.mouser.com/en/ProductDetail/Samtec/QTH-060-01-L-D-A?qs=4hHQsd36k317SgTiURd9mA%3D%3D",
       "vendor": "Mouser"
     },
