@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/184/1/abm8.pdf"
   },
   "description": "Four pin crystal, GND on pins 2 and 4",
-  "display_name": "Crystal_GND24 50PPM 3.2 mm x 2.5 mm Abracon ABM8-25.000MHZ-B2-T",
+  "display_name": "25MHz Crystal 18pF 3.2x2.5mm",
   "enrichment": {},
   "footprint": {
     "lib": "Crystal",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:48.191007+00:00",
       "part_number": "815-ABM8-25-B2-T",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.5,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.434,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.394,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.378,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.357,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.343,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.328,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.306,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.297,
           "qty": 5000
         }
       ],
-      "stock": 14291,
+      "stock": 14287,
       "url": "https://www.mouser.com/en/ProductDetail/ABRACON/ABM8-25.000MHZ-B2-T?qs=D0XpjEo%2FJ5CyDikUKoGKpw%3D%3D",
       "vendor": "Mouser"
     },
