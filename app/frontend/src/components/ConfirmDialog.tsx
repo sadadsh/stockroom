@@ -46,7 +46,7 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-[380px] rounded-card border border-line bg-raise p-5 shadow-pop"
+        className="w-full max-w-[380px] rounded-card border border-line bg-popover p-5 shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label={title}
