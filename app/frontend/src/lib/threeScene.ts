@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { orientUpright } from "./modelOrient";
 
 export function mountModelScene(
   container: HTMLElement,
@@ -72,15 +73,9 @@ export function mountModelScene(
         else old?.dispose();
         mesh.material = neutral;
       });
-      // Sit the part on its largest face: rotate so the SHORTEST bounding-box axis points up
-      // (Y). A flat part (resistor, chip) then lies flat instead of standing on its face -
-      // robust to the GLBs' inconsistent authored up-axes - and the auto-spin turns it about
-      // that vertical axis.
-      {
-        const d = new THREE.Box3().setFromObject(gltf.scene).getSize(new THREE.Vector3());
-        if (d.z <= d.x && d.z <= d.y) gltf.scene.rotation.x = -Math.PI / 2;
-        else if (d.x <= d.y && d.x <= d.z) gltf.scene.rotation.z = Math.PI / 2;
-      }
+      // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
+      // and the body points up, and the auto-spin turns it about that vertical axis.
+      orientUpright(gltf.scene);
       gltf.scene.updateMatrixWorld(true);
       // frame the model: center it on the origin and back the camera off to fit. Use the
       // bounding-SPHERE radius (half the box diagonal) so the model never clips at any
