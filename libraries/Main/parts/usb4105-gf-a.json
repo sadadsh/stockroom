@@ -1,5 +1,5 @@
 {
-  "category": "Crystals & Oscillators",
+  "category": "Connectors",
   "datasheet": {
     "fetched_at": "",
     "file": "",
@@ -9,7 +9,7 @@
   "display_name": "USB4105-GF-A Top-Mount GCT",
   "enrichment": {},
   "footprint": {
-    "lib": "SR-Crystals_Oscillators",
+    "lib": "SR-Connectors",
     "name": "USB4105-GF-A-120",
     "tool": "kicad"
   },
@@ -159,7 +159,7 @@
     "Voltage Rating": "48 VDC"
   },
   "symbol": {
-    "lib": "SR-Crystals_Oscillators",
+    "lib": "SR-Connectors",
     "name": "USB4105-GF-A-120",
     "tool": "kicad"
   },
