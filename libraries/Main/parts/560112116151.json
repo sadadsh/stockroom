@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/560112116151.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "1.13k 1% 0603 Wurth 560112116151",
+  "display_name": "1.13kΩ 1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,41 +28,35 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:12:19.400746+00:00",
       "part_number": "710-560112116151",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.11,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.102,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.058,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 0.039,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.03,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.03,
           "qty": 5000
         }
       ],
-      "stock": 9795,
+      "stock": 9785,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116151?qs=sGAEpiMZZMtG0KNrPCHnjRpfexHZHoPIOe63Hq9ISdAfX3qbuXrk3g%3D%3D",
       "vendor": "Mouser"
     },
