@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps22918-q1"
   },
   "description": "Power Switch ICs - Power Distribution",
-  "display_name": "TPS22918DBVR SOT-23-6 TI TPS22918TDBVRQ1",
+  "display_name": "Load Switch TPS22918TDBVRQ1 SOT-23-6",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:54.929895+00:00",
       "part_number": "595-TPS22918TDBVRQ1",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.76,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.54,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.484,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.423,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.393,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.376,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.361,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.346,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.337,
           "qty": 6000
         }
       ],
-      "stock": 10139,
+      "stock": 12247,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22918TDBVRQ1?qs=sGAEpiMZZMv0DJfhVcWlK1Yz3z1OExkkjE2ZiqKPcyuhsbfKfPdS3Q%3D%3D",
       "vendor": "Mouser"
     },
