@@ -32,39 +32,73 @@
       "part_number": "603-AC0603FR-07255KL",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.017,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.009,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.008,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.004,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 25000,
+          "currency": "USD",
           "price": 0.003,
-          "currency": "USD"
+          "qty": 25000
         }
       ],
       "stock": 27471,
       "url": "https://www.mouser.com/en/ProductDetail/YAGEO/AC0603FR-07255KL?qs=ygRr%2FtkhteuHHB%2Fp4hR9tQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:08.317461+00:00",
+      "part_number": "13-AC0603FR-07255KLTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00497,
+          "qty": 5000
+        },
+        {
+          "price": 0.0044,
+          "qty": 10000
+        },
+        {
+          "price": 0.00413,
+          "qty": 15000
+        },
+        {
+          "price": 0.00383,
+          "qty": 25000
+        },
+        {
+          "price": 0.00366,
+          "qty": 35000
+        },
+        {
+          "price": 0.0035,
+          "qty": 50000
+        }
+      ],
+      "stock": 5382,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -95,14 +129,13 @@
     "Series": "AC",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 30.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
