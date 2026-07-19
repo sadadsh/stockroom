@@ -32,49 +32,83 @@
       "part_number": "645-599-0160-137F",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.29,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.195,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.137,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.111,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.102,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.095,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.08,
-          "currency": "USD"
+          "qty": 4000
         },
         {
-          "qty": 24000,
+          "currency": "USD",
           "price": 0.073,
-          "currency": "USD"
+          "qty": 24000
         }
       ],
       "stock": 11820,
       "url": "https://www.mouser.com/en/ProductDetail/Dialight/599-0160-137F?qs=4dK74SdgGtw70mfJFAB4aw%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:07:51.375841+00:00",
+      "part_number": "350-5990160137FTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.08623,
+          "qty": 4000
+        },
+        {
+          "price": 0.08093,
+          "qty": 8000
+        },
+        {
+          "price": 0.07822,
+          "qty": 12000
+        },
+        {
+          "price": 0.07515,
+          "qty": 20000
+        },
+        {
+          "price": 0.07332,
+          "qty": 28000
+        },
+        {
+          "price": 0.07153,
+          "qty": 40000
+        }
+      ],
+      "stock": 8000,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -89,7 +123,7 @@
     "If - Forward Current": "20 mA",
     "Length": "2 mm",
     "Lens Color": "Water Clear",
-    "Lifecycle": "New Product",
+    "Lifecycle": "Active",
     "Luminous Intensity": "80 cd",
     "Manufacturer": "Dialight",
     "Maximum Operating Temperature": "+ 85 C",
@@ -109,8 +143,7 @@
     "Vf - Forward Voltage": "2.2 V",
     "Viewing Angle": "140 deg",
     "Wavelength/Color Temperature": "572 nm",
-    "Width": "1.25 mm",
-    "Factory Pack Quantity: Factory Pack Quantity": "4000"
+    "Width": "1.25 mm"
   },
   "symbol": null,
   "tags": []
