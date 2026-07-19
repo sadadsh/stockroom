@@ -32,39 +32,53 @@
       "part_number": "710-560112116151",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.11,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.102,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.058,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.039,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 9795,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/560112116151?qs=sGAEpiMZZMtG0KNrPCHnjRpfexHZHoPIOe63Hq9ISdAfX3qbuXrk3g%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:38.687097+00:00",
+      "part_number": "732-560112116151TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.02422,
+          "qty": 5000
+        }
+      ],
+      "stock": 9850,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -96,13 +110,12 @@
     "Series": "WRIS-RSKS",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
-    "Tolerance": "1 %",
+    "Temperature Coefficient": "100 PPM/C",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000317 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
