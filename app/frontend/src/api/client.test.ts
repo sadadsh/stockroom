@@ -65,6 +65,34 @@ describe("api client", () => {
     expect(url).toContain("complete_only=true");
   });
 
+  it("searchParts serializes each spec constraint as a repeated query param", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ parts: [], count: 0 }));
+
+    await api.searchParts({
+      category: "Resistors",
+      spec: ["Resistance:1000~10000", "Tolerance:1%"],
+    });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toContain("/api/library/search");
+    expect(url.searchParams.get("category")).toBe("Resistors");
+    expect(url.searchParams.getAll("spec")).toEqual([
+      "Resistance:1000~10000",
+      "Tolerance:1%",
+    ]);
+  });
+
+  it("parametricFacets scopes by category and query", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ category: "Resistors", facets: [], total: 0 }));
+
+    await api.parametricFacets({ category: "Resistors", q: "0603" });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toContain("/api/library/facets/parametric");
+    expect(url.searchParams.get("category")).toBe("Resistors");
+    expect(url.searchParams.get("q")).toBe("0603");
+  });
+
   it("surfaces the backend error message and status on a non-ok response", async () => {
     fetchMock.mockResolvedValueOnce(errJson(404, { error: "not found" }));
 
