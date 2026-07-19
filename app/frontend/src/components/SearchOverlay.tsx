@@ -623,20 +623,31 @@ function RangeFacet({
         }
       />
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <RangeInput value={lo} onCommit={(v) => onChange({ min: v <= fmin ? null : v, max: sel?.max ?? null })} />
-        <RangeInput value={hi} onCommit={(v) => onChange({ min: sel?.min ?? null, max: v >= fmax ? null : v })} />
+        <RangeInput value={lo} unit={unit} onCommit={(v) => onChange({ min: v <= fmin ? null : v, max: sel?.max ?? null })} />
+        <RangeInput value={hi} unit={unit} onCommit={(v) => onChange({ min: sel?.min ?? null, max: v >= fmax ? null : v })} />
       </div>
     </FacetGroup>
   );
 }
 
-function RangeInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
-  const [text, setText] = useState(String(round(value)));
-  useEffect(() => setText(String(round(value))), [value]);
+function RangeInput({
+  value,
+  unit,
+  onCommit,
+}: {
+  value: number;
+  unit: string;
+  onCommit: (v: number) => void;
+}) {
+  // Show an engineering value ("22 µF", "1 MΩ") that round-trips through parseMagnitude, so the
+  // field never reads "0.000022"; a bare number the user types (no unit) is taken verbatim.
+  const [text, setText] = useState(() => formatMagnitude(value, unit));
+  useEffect(() => setText(formatMagnitude(value, unit)), [value, unit]);
   const commit = () => {
-    const v = parseFloat(text);
-    if (Number.isFinite(v)) onCommit(v);
-    else setText(String(round(value)));
+    const v = parseMagnitude(text);
+    const n = v ?? parseFloat(text);
+    if (Number.isFinite(n)) onCommit(n);
+    else setText(formatMagnitude(value, unit));
   };
   return (
     <input
@@ -820,12 +831,6 @@ function Lifecycle({ specs }: { specs: Record<string, string | number | boolean>
       {isActive ? "Active" : raw}
     </span>
   );
-}
-
-function round(v: number): number {
-  if (Math.abs(v) >= 100) return Math.round(v);
-  if (Math.abs(v) >= 1) return Math.round(v * 100) / 100;
-  return Math.round(v * 1e6) / 1e6;
 }
 
 function formatUnit(price: number, currency: string): string {

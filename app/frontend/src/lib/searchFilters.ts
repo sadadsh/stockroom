@@ -63,7 +63,8 @@ export function formatMagnitude(mag: number, unit: string | null | undefined): s
   if (mag !== 0 && _PREFIXABLE.has(u)) {
     const abs = Math.abs(mag);
     for (const [scale, prefix] of _PREFIXES) {
-      if (abs >= scale) return `${_sig(mag / scale)} ${prefix}${u}`.trim();
+      // pico is the floor: a value below it still reads as fractional "pF", never as 7.5e-13
+      if (abs >= scale || scale === 1e-12) return `${_sig(mag / scale)} ${prefix}${u}`.trim();
     }
   }
   return u ? `${_sig(mag)} ${u}`.replace(/\s+%/, "%") : _sig(mag);
