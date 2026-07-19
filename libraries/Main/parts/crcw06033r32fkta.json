@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20008/dcrcw.pdf"
   },
   "description": "Resistor",
-  "display_name": "3.3Ω 1% 0603 Vishay CRCW06033R32FKTA",
+  "display_name": "3.32Ω 1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,52 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:10.673945+00:00",
       "part_number": "71-CRCW0603-3.32",
       "price_breaks": [
         {
-          "currency": "USD",
-          "price": 0.29,
+          "price": 0.16,
           "qty": 1
         },
         {
-          "currency": "USD",
-          "price": 0.155,
+          "price": 0.053,
           "qty": 10
         },
         {
-          "currency": "USD",
-          "price": 0.092,
+          "price": 0.045,
           "qty": 100
         },
         {
-          "currency": "USD",
-          "price": 0.072,
+          "price": 0.037,
           "qty": 250
         },
         {
-          "currency": "USD",
-          "price": 0.065,
+          "price": 0.033,
           "qty": 500
         },
         {
-          "currency": "USD",
-          "price": 0.059,
+          "price": 0.029,
           "qty": 1000
         },
         {
-          "currency": "USD",
-          "price": 0.047,
+          "price": 0.021,
           "qty": 5000
         },
         {
-          "currency": "USD",
-          "price": 0.043,
+          "price": 0.019,
           "qty": 10000
         },
         {
-          "currency": "USD",
-          "price": 0.041,
+          "price": 0.018,
           "qty": 25000
         }
       ],
