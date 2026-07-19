@@ -24,6 +24,7 @@ import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
 import { usePreviewGlb } from "../api/queries";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
+import { CadDownloadCard } from "./CadDownloadCard";
 import {
   CubeArt,
   ExternalIcon,
@@ -120,6 +121,10 @@ export function DetailPanel({
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
+  // Get CAD Files From DigiKey (Phase-2 asset download): offered only for a part that
+  // landed with NO CAD assets at all yet (identity-only) - a part that already has any
+  // of the three should attach/replace the rest through the normal Attach flow instead.
+  const noCadAssetsYet = !!detail && !detail.symbol?.name && !detail.footprint?.name && !hasModel;
   // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
@@ -288,6 +293,7 @@ export function DetailPanel({
 
         {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. */}
         <div className="flex flex-col gap-[18px]">
+          <CadDownloadCard partId={detail.id} assetsMissing={noCadAssetsYet} />
           <AssetTile
             variant="tile"
             name="3D Model"

@@ -12,6 +12,7 @@ import type {
   BomDiffResult,
   BomExportKind,
   BomResult,
+  CadSourceResponse,
   ChecksResult,
   DiffResponse,
   DoctorScan,
@@ -452,6 +453,37 @@ export const api = {
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {
     return request<PartDetail>("POST", "/api/ingest/commit", { body: candidate });
+  },
+
+  // Resolve an existing part's DigiKey CAD-download source from its MPN (Phase-2 asset
+  // download, spec section 5). A resolvable 200 either way; `url` is null when the part
+  // has no MPN, DigiKey is disabled, or nothing resolved - never an error.
+  partCadSource(id: string): Promise<CadSourceResponse> {
+    return apiGet<CadSourceResponse>(
+      `/api/library/parts/${encodeURIComponent(id)}/cad-source`,
+    );
+  },
+
+  // Unpack a downloaded CAD ZIP for an EXISTING part into staging candidates. Same
+  // read-lane job + candidate DTO shape as ingestInspect; the result arrives on the
+  // job's SSE result event (openJobStream).
+  assetsInspect(partId: string, paths: string[]): Promise<JobRef> {
+    return request<JobRef>(
+      "POST",
+      `/api/parts/${encodeURIComponent(partId)}/assets/inspect`,
+      { body: { paths } },
+    );
+  },
+
+  // Attach a reviewed candidate's symbol/footprint/3D onto the existing part,
+  // synchronously (one atomic Transaction). Only the assets the candidate actually
+  // carries are touched; an already-present asset is left alone.
+  assetsCommit(partId: string, candidate: StagingCandidate): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/parts/${encodeURIComponent(partId)}/assets/commit`,
+      { body: candidate },
+    );
   },
 
   // Open a job's Server-Sent Events stream. Native EventSource cannot send the
