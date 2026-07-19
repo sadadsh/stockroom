@@ -32,44 +32,58 @@
       "part_number": "603-RT0603BRD0794K2L",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.06,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.056,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.052,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.046,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.038,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 8529,
       "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L?qs=bQfrgN9vNvwe21O8BIcT9A%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:35.788150+00:00",
+      "part_number": "2266-RT0603BRD0794K2LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.032,
+          "qty": 5000
+        }
+      ],
+      "stock": 7000,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -99,15 +113,14 @@
     "Series": "RT",
     "Subcategory": "Resistors",
     "Technology": "Thin Film",
-    "Temperature Coefficient": "25 PPM / C",
+    "Temperature Coefficient": "25 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "0.1 %",
+    "Tolerance": "0.1%",
     "Type": "High Stability Chip Resistors",
     "US Tariff %": 8.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
