@@ -32,54 +32,100 @@
       "part_number": "612-EG1218",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.71,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.617,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.548,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.506,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.475,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.442,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.42,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.39,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.376,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 12328,
       "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218?qs=xDsBkp9LkocT0c8K%252B5e%2FgA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:41.183166+00:00",
+      "part_number": "EG1903-ND",
+      "price_breaks": [
+        {
+          "price": 0.72,
+          "qty": 1
+        },
+        {
+          "price": 0.617,
+          "qty": 10
+        },
+        {
+          "price": 0.5748,
+          "qty": 25
+        },
+        {
+          "price": 0.5128,
+          "qty": 100
+        },
+        {
+          "price": 0.475,
+          "qty": 250
+        },
+        {
+          "price": 0.44854,
+          "qty": 500
+        },
+        {
+          "price": 0.42418,
+          "qty": 1000
+        },
+        {
+          "price": 0.39005,
+          "qty": 3000
+        },
+        {
+          "price": 0.37607,
+          "qty": 5000
+        }
+      ],
+      "stock": 29828,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,8 +158,7 @@
     "Type": "Slide Switch",
     "US Tariff %": 30.0,
     "Unit Weight": "0.011323 oz",
-    "Voltage Rating DC": "30 VDC",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000"
+    "Voltage Rating DC": "30 VDC"
   },
   "symbol": null,
   "tags": []
