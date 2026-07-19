@@ -1,12 +1,12 @@
 {
   "category": "Resistors",
   "datasheet": {
+    "fetched_at": "",
     "file": "",
-    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/RDO0000C334.pdf",
-    "fetched_at": ""
+    "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/RDO0000C334.pdf"
   },
   "description": "Resistor",
-  "display_name": "220\u03a9 5% 0603 Panasonic ERJ-3GEYJ221V",
+  "display_name": "220Ω 5% 0603 Panasonic ERJ-3GEYJ221V",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -20,66 +20,100 @@
   "mpn": "ERJ-3GEYJ221V",
   "passive": true,
   "provenance": {
-    "source": "finale-sauce-equiv",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
+    "ingested_at": "",
     "original_zip_sha256": "",
-    "ingested_at": ""
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D"
   },
   "purchase": [
     {
-      "vendor": "Mouser",
-      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
+      "currency": "USD",
+      "fetched_at": "",
       "part_number": "667-ERJ-3GEYJ221V",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.023,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.019,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.015,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.013,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.011,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.007,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.006,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 25000,
+          "currency": "USD",
           "price": 0.005,
-          "currency": "USD"
+          "qty": 25000
         }
       ],
       "stock": 41255,
+      "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
+      "vendor": "Mouser"
+    },
+    {
       "currency": "USD",
-      "fetched_at": ""
+      "fetched_at": "2026-07-19T16:04:03.215460+00:00",
+      "part_number": "P220GTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00751,
+          "qty": 5000
+        },
+        {
+          "price": 0.00674,
+          "qty": 10000
+        },
+        {
+          "price": 0.00637,
+          "qty": 15000
+        },
+        {
+          "price": 0.00597,
+          "qty": 25000
+        },
+        {
+          "price": 0.00574,
+          "qty": 35000
+        },
+        {
+          "price": 0.00553,
+          "qty": 50000
+        }
+      ],
+      "stock": 316805,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -105,20 +139,19 @@
     "Product": "Thick Film Resistors SMD",
     "Product Category": "Thick Film Resistors - SMD",
     "Product Type": "Thick Film Resistors",
+    "Qualification": "AEC-Q200",
     "Resistance": "220 Ohms",
     "RoHS": "Details",
     "Series": "ERJ-xGE",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "200 PPM / C",
+    "Temperature Coefficient": "200 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "5 %",
+    "Tolerance": "5%",
     "US Tariff %": 8.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 VDC",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000",
-    "Qualification": "AEC-Q200"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
