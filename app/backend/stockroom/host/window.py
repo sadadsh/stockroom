@@ -7,15 +7,30 @@ exposes a native file picker to Ingest via js_api (window.pywebview.api.pick_ing
 so a vendor zip skips an HTTP upload), and stops uvicorn on close (the host supervisor that started
 the server thread does the stop after run_window returns). pywebview is imported
 lazily inside run_window, so this module imports on Linux without it; the pure
-helpers (inject_script, dropped_paths_to_inspect_body, active_window) are Linux-tested."""
+helpers (inject_script, dropped_paths_to_inspect_body, active_window) are Linux-tested.
+
+Also opens a distributor's CAD-download page (DigiKey product page etc.) in a dedicated,
+VISIBLE second window and captures the ZIP it downloads (plan
+docs/superpowers/plans/2026-07-18-digikey-asset-download.md, Task 3) - see the "CAD-source
+download capture" section below and _HostApi.open_cad_download. That wiring is Windows-only
+and owner-verified; the module still imports cleanly on Linux (pywebview-specific calls stay
+inside functions/guards, same discipline as the rest of this file)."""
 
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+import threading
+import time
+from pathlib import Path
 from urllib.parse import urlsplit
 
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
+_CAD_WINDOW = None
+_CAD_DOWNLOADS_WATCH = None
+_CAD_CAPTURE_LOCK = threading.Lock()
 
 
 def active_window():
@@ -127,6 +142,168 @@ def inject_script(base_url: str, token: str) -> str:
     )
 
 
+# -- CAD-source download capture (plan docs/superpowers/plans/2026-07-18-digikey-asset-
+# download.md, Task 3): opening a distributor's CAD page (e.g. a DigiKey product page) in
+# a dedicated window and getting the ZIP it downloads back to the SPA without a manual
+# drag/drop. Two tiers, because pywebview exposes NO public download-intercept API
+# (verified against pywebview's vendored WebView2 backend, 2026-07: ALLOW_DOWNLOADS only
+# ever triggers pywebview's OWN native Save-As dialog via edgechromium.py::
+# on_download_starting; there is no download-related entry in its public event set):
+#
+#   tier 1 (best-effort, Windows only): _install_cad_download_intercept reaches into
+#   pywebview's internals and redirects THIS ONE window's download save-path, degrading
+#   silently (never raising) on any shape mismatch.
+#
+#   tier 2 (always available): a DownloadsWatch (download_capture.py - pure, Linux-tested)
+#   polled on a background thread, the backstop for whatever tier 1 cannot reach.
+#
+# Whichever tier finds the file first forwards it to the SPA via
+# window.__STOCKROOM_CAD_DOWNLOAD__(path) - the SAME convergence point regardless of which
+# tier fired, so the frontend (Task 4) never has to know which one won. Tier 3 is the
+# existing manual pick_ingest_files() picker, unchanged.
+
+
+def cad_window():
+    return _CAD_WINDOW
+
+
+def cad_downloads_watch():
+    return _CAD_DOWNLOADS_WATCH
+
+
+def cad_forward_js(path: str) -> str:
+    """The renderer call that hands a captured CAD-download ZIP path to the SPA, exactly
+    mirroring drop_forward_js. Guarded so a renderer that has not registered the hook is a
+    no-op, and JSON-encoded so a quote/backslash in a path cannot break out of the script."""
+    encoded = json.dumps(str(path))
+    return (
+        "window.__STOCKROOM_CAD_DOWNLOAD__ && "
+        f"window.__STOCKROOM_CAD_DOWNLOAD__({encoded});"
+    )
+
+
+def _forward_cad_capture(path) -> None:
+    """Hand a captured path to the SPA on the MAIN window - never on the remote cad
+    window, which never loads the SPA and so never has the forwarding hook registered."""
+    spa = active_window()
+    if spa is not None:
+        spa.evaluate_js(cad_forward_js(str(path)))
+
+
+def _fire_cad_capture_once(path, state: dict) -> bool:
+    """Thread-safe single-fire gate shared by both tiers for one open_cad_download() call:
+    tier 1 (a WebView2 COM callback thread) and tier 2 (the poll thread below) race to
+    report a captured path, and only the FIRST one to arrive wins - the loser's later find
+    is real but redundant (the same completed download, or a stray leftover zip) once the
+    SPA already has a path to inspect."""
+    with _CAD_CAPTURE_LOCK:
+        if state["fired"]:
+            return False
+        state["fired"] = True
+        state["stop"] = True
+    return True
+
+
+def _poll_downloads_watch(
+    watch,
+    state: dict,
+    *,
+    interval: float = 1.5,
+    timeout: float = 300.0,
+    sleep=time.sleep,
+    now=time.time,
+) -> None:
+    """TIER 2 background loop: poll `watch` (download_capture.DownloadsWatch) until it
+    finds a zip, a tier-1 capture flags state["stop"], or `timeout` elapses with nothing
+    found. Runs on a daemon thread started by open_cad_download. This function has zero
+    pywebview dependency (importable and callable on Linux), but only ever actually finds
+    a real file on a Windows machine watching a real Downloads folder."""
+    deadline = now() + timeout
+    while now() < deadline and not state["stop"]:
+        found = watch.poll()
+        if found is not None:
+            if _fire_cad_capture_once(found, state):
+                _forward_cad_capture(found)
+            return
+        sleep(interval)
+
+
+def _install_cad_download_intercept(window, target_dir: Path, on_captured, state: dict) -> bool:
+    """TIER 1 (best-effort, Windows only): reach past pywebview's public API - which
+    exposes NO download hook, only the ALLOW_DOWNLOADS setting that triggers pywebview's
+    own native Save-As dialog - into its vendored WebView2 backend, and redirect THIS ONE
+    window's next download save-path into `target_dir`, notifying `on_captured(path)` once
+    WebView2 reports the download Completed.
+
+    Why a per-INSTANCE monkeypatch, not a per-CLASS one: pywebview's Windows browser
+    (webview.platforms.winforms.BrowserView -> webview.platforms.edgechromium.EdgeChrome)
+    wires `sender.CoreWebView2.DownloadStarting += self.on_download_starting` exactly once
+    per window, inside EdgeChrome.on_webview_ready, when THAT window's CoreWebView2 finishes
+    its async init (verified against pywebview's vendored source, 2026-07). That `+=`
+    resolves `self.on_download_starting` at THAT moment; patching the CLASS method would
+    hijack EVERY window's downloads, including the main SPA window's BOM CSV / fab zip /
+    audit-markdown Blob exports, which must keep their normal Save-As flow (see
+    run_window's ALLOW_DOWNLOADS comment). Patching the INSTANCE attribute on just THIS
+    window's EdgeChrome object - installed immediately after webview.create_window()
+    returns, synchronously before on_webview_ready has had any chance to run - scopes the
+    redirect to this one distributor window only.
+
+    Returns True once the monkeypatch itself is installed (BrowserView and its browser
+    instance were found); False if pywebview's internals do not match this shape (a
+    different pywebview version, a non-EdgeChrome renderer) - the caller still has tier 2
+    armed regardless. Never raises: this reaches into library internals pywebview gives no
+    compatibility guarantee on, so ANY shape mismatch must degrade, never crash the running
+    app. If the per-download handler cannot subscribe to the WebView2 download's completion
+    signal, it deliberately does NOT redirect the save path either, so the file falls
+    through to WebView2's own default save location (the OS Downloads folder) - exactly
+    where tier 2 is already watching, rather than landing, uncaptured, in a temp dir tier 2
+    never looks at."""
+    if os.name != "nt":
+        return False
+    try:
+        from webview.platforms.winforms import BrowserView  # pywebview's Windows backend
+    except Exception:  # noqa: BLE001 - not the expected Windows backend; tier 2 still covers it
+        return False
+
+    browser_form = BrowserView.instances.get(getattr(window, "uid", None))
+    edge = getattr(browser_form, "browser", None)
+    if edge is None:
+        return False
+
+    def _on_download_starting(sender, args) -> None:
+        try:
+            operation = args.DownloadOperation
+        except Exception:  # noqa: BLE001 - can't observe completion; let it save to the
+            return  # default location (OS Downloads) where tier 2 is watching
+
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            name = os.path.basename(str(args.ResultFilePath)) or "cad-download.zip"
+            dest = target_dir / name
+
+            def _on_state_changed(op_sender, op_args) -> None:
+                try:
+                    from Microsoft.Web.WebView2.Core import CoreWebView2DownloadState
+
+                    done = operation.State == CoreWebView2DownloadState.Completed
+                except Exception:  # noqa: BLE001 - best-effort: treat an unreadable state as done
+                    done = True
+                if done and _fire_cad_capture_once(dest, state):
+                    on_captured(dest)
+
+            operation.StateChanged += _on_state_changed
+            args.ResultFilePath = str(dest)
+            args.Handled = True  # skip pywebview's native Save-As dialog for this window
+        except Exception:  # noqa: BLE001 - best-effort; fall through to the default save flow
+            return
+
+    try:
+        edge.on_download_starting = _on_download_starting
+    except Exception:  # noqa: BLE001 - could not patch this instance; tier 2 still covers it
+        return False
+    return True
+
+
 class _HostApi:
     """The js_api pywebview exposes to the renderer as `window.pywebview.api`. It gives Ingest a
     NATIVE file picker for vendor ZIPs, so adding a part never depends on pywebview's drag-drop
@@ -161,6 +338,59 @@ class _HostApi:
             file_types=("Datasheet PDF (*.pdf)", "All files (*.*)"),
         )
         return list(result) if result else []
+
+    def open_cad_download(self, url: str) -> None:
+        """Open a distributor's CAD-download page (e.g. a DigiKey product page) in a
+        SECOND, VISIBLE window dedicated to this one flow - the fetch_window() precedent,
+        but visible instead of hidden, since the owner clicks the vendor's own Download
+        button on it. This window gets NO `loaded` handler at all - not merely relying on
+        should_inject's origin guard, there is simply no wiring through which the
+        per-launch token could ever reach this remote page - and NO js_api bridge either,
+        so nothing this app exposes is reachable from remote content.
+
+        Arms BOTH capture tiers on every call: tier 1 best-effort redirects this window's
+        next WebView2 download into a fresh app temp dir
+        (_install_cad_download_intercept, Windows only, degrades silently); tier 2 arms a
+        DownloadsWatch over the OS Downloads folder as of right now and polls it on a
+        daemon thread, the always-available backstop for whatever tier 1 cannot reach (an
+        unexpected pywebview version, a non-EdgeChrome renderer, a WebView2 quirk).
+        Whichever tier finds the ZIP first forwards it to the SPA via
+        window.__STOCKROOM_CAD_DOWNLOAD__(path); the other tier's late or redundant find
+        is dropped by the shared single-fire gate (_fire_cad_capture_once).
+
+        Replaces any cad window left over from a previous call (closing it first) rather
+        than piling up extra windows across repeated clicks."""
+        global _CAD_WINDOW, _CAD_DOWNLOADS_WATCH
+        import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
+
+        from stockroom.host.download_capture import DownloadsWatch, default_downloads_dir
+
+        if _CAD_WINDOW is not None:
+            try:
+                _CAD_WINDOW.destroy()
+            except Exception:  # noqa: BLE001 - already closed/invalid; we're replacing it anyway
+                pass
+            _CAD_WINDOW = None
+
+        win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
+        _CAD_WINDOW = win
+
+        def _on_cad_closed() -> None:
+            global _CAD_WINDOW
+            if _CAD_WINDOW is win:
+                _CAD_WINDOW = None
+
+        win.events.closed += _on_cad_closed
+
+        capture_state = {"fired": False, "stop": False}
+        target_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
+        _install_cad_download_intercept(win, target_dir, _forward_cad_capture, capture_state)
+
+        watch = DownloadsWatch.start(default_downloads_dir())
+        _CAD_DOWNLOADS_WATCH = watch
+        threading.Thread(
+            target=_poll_downloads_watch, args=(watch, capture_state), daemon=True
+        ).start()
 
 
 def run_window(base_url: str, token: str) -> None:
