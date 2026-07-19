@@ -32,44 +32,78 @@
       "part_number": "71-CRCW0603-133K",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.05,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.042,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.035,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.031,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.025,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.018,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 7217,
       "url": "http://mouser.com/en/ProductDetail/Vishay/CRCW0603133KFKTA?qs=IKjLF%2FNaaZUWED%2FihlRVOQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:53.949829+00:00",
+      "part_number": "541-CRCW0603133KFKTATR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0224,
+          "qty": 5000
+        },
+        {
+          "price": 0.02081,
+          "qty": 10000
+        },
+        {
+          "price": 0.02004,
+          "qty": 15000
+        },
+        {
+          "price": 0.0192,
+          "qty": 25000
+        },
+        {
+          "price": 0.01872,
+          "qty": 35000
+        },
+        {
+          "price": 0.01827,
+          "qty": 50000
+        }
+      ],
+      "stock": 838,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -97,18 +131,17 @@
     "Product Type": "Thick Film Resistors",
     "Qualification": "AEC-Q200",
     "Resistance": "133 kOhms",
-    "RoHS": "No\u00a0-\u00a0RoHS Version Available",
+    "RoHS": "No - RoHS Version Available",
     "Series": "D/CRCW",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.85 mm (0.033 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.85 mm (0.033 in)"
   },
   "symbol": {
     "lib": "Device",
