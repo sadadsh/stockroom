@@ -321,6 +321,16 @@ export interface JobRef {
   job_id: string;
 }
 
+// GET /api/library/parts/{id}/cad-source (Phase-2 DigiKey asset download, spec section
+// 5). `url` is the DigiKey product-detail page hosting the Ultra Librarian / SnapEDA CAD
+// download for the part's MPN, or null when the part has no MPN, DigiKey enrichment is
+// disabled, or nothing resolved - a resolvable 200 either way, never an error.
+export interface CadSourceResponse {
+  url: string | null;
+  mpn: string;
+  vendor: string;
+}
+
 // Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
 // reports whether enrichment could resolve the part's identity and, if not, exactly what is
 // still missing to complete it (or the error that stopped it). It does NOT add parts.
