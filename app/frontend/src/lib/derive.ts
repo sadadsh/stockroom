@@ -312,6 +312,15 @@ const _COMMERCIAL_ATTR =
 // electrical parameters rather than sinking with the rest of the physical form.
 const _PRIME_PHYSICAL = new Set(["package", "case", "case code"].map(normalizeSpecKey));
 
+// Raw physical dimensions read as noise in a summary chip ("0.8 mm", "2 mm") - the package code
+// already conveys the footprint - so they sink below every other attribute and surface only when
+// a part has nothing better to say.
+const _DIMENSION_KEYS = new Set(
+  ["height", "length", "width", "thickness", "depth", "diameter", "size", "lead spacing", "lead pitch"].map(
+    normalizeSpecKey,
+  ),
+);
+
 /**
  * The "Attributes" chips: the FEW parameters that actually matter when choosing this part -
  * derived purely from its specs and ranked by importance (electrical first, then form, then
@@ -343,6 +352,7 @@ export function deriveAttributes(part: PartDetail): string[] {
     // the package/case leads the physical form.
     if (rule) score = Math.max(score, 150);
     if (_PRIME_PHYSICAL.has(nk)) score += 130;
+    if (_DIMENSION_KEYS.has(nk)) score = -100; // a bare dimension is a last-resort chip
     scored.push({ label, score, order: seq });
   }
   // Rank first, THEN dedup by label - so when two keys yield the same chip ("Package" and a

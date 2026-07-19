@@ -192,18 +192,15 @@ export function ProjectsPage() {
 
   return (
     <>
-      <div className="flex h-14 flex-none items-center gap-3 border-b border-line px-[18px]">
-        <h1 className="text-lg font-semibold text-t1">Projects</h1>
-        {projectsQuery.data ? (
-          <span className="tnum font-mono text-2xs text-t3">
-            {projects.length} {projects.length === 1 ? "Project" : "Projects"}
-          </span>
-        ) : null}
-      </div>
-
       <div className="flex min-h-0 flex-1">
-        {/* picker */}
-        <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-1.5">
+      {/* picker: self-heads like the Components picker (no full-width page header band) */}
+      <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-4">
+          <div className="flex items-baseline gap-2 px-2 pb-2.5">
+            <h1 className="text-lg font-semibold text-t1">Projects</h1>
+            {projectsQuery.data ? (
+              <span className="tnum font-mono text-2xs text-t3">{projects.length}</span>
+            ) : null}
+          </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1">
             <ProjectPicker
               isLoading={projectsQuery.isLoading}
@@ -337,29 +334,48 @@ function ProjectRow({
       data-testid={`project-row-${project.id}`}
       onClick={onSelect}
       className={
-        "flex w-full flex-col gap-1 rounded-control border px-3 py-2.5 text-left transition-colors " +
+        "flex w-full items-start gap-3 rounded-card border px-3 py-3 text-left transition " +
         (selected
-          ? "border-acc bg-raise2"
-          : "border-line bg-raise hover:bg-raise2 hover:border-line2")
+          ? "border-acc bg-raise2 shadow-card"
+          : "border-line bg-raise hover:-translate-y-px hover:border-line2 hover:bg-raise2 hover:shadow-card")
       }
     >
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-t1">
-          {project.name}
-        </span>
-        {project.has_git ? (
-          <Badge tone="neutral" title="Under version control">
-            Git
-          </Badge>
-        ) : null}
+      <span
+        aria-hidden
+        className="mt-0.5 grid h-9 w-9 flex-none place-items-center rounded-control border border-line2 bg-field text-t2"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M9 3v18M15 3v18M3 9h18M3 15h18" opacity="0.55" />
+        </svg>
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-t1">
+            {project.name}
+          </span>
+          <span
+            className={
+              "inline-flex flex-none items-center gap-1 text-2xs font-medium " +
+              (project.has_git ? "text-ok" : "text-t3")
+            }
+            title={project.has_git ? "Under version control" : "Not under version control"}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: project.has_git ? "var(--c-ok)" : "var(--c-t3)" }}
+            />
+            {project.has_git ? "Git" : "No Git"}
+          </span>
+        </div>
+        <div className="mt-0.5 truncate font-mono text-2xs text-t3" title={project.root}>
+          {project.root}
+        </div>
+        <div className="tnum mt-1 font-mono text-2xs text-t3">
+          {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
+          {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
+        </div>
       </div>
-      <span className="truncate font-mono text-2xs text-t3" title={project.root}>
-        {project.root}
-      </span>
-      <span className="tnum font-mono text-2xs text-t3">
-        {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
-        {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
-      </span>
     </button>
   );
 }
