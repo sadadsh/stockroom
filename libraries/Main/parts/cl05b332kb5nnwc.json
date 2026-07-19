@@ -6,7 +6,7 @@
     "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL05B332KB5NNN"
   },
   "description": "capacitor, small US symbol",
-  "display_name": "3.3n 10% X7R 0402 Samsung CL05B332KB5NNWC",
+  "display_name": "3300pF X7R 50V 10% 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:04.250092+00:00",
       "part_number": "187-CL05B332KB5NNWC",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.013,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.011,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.008,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.007,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.005,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.003,
           "qty": 10000
         }
       ],
-      "stock": 80721,
+      "stock": 80701,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B332KB5NNWC?qs=xZ%2FP%252Ba9zWqZqGlb3MDMYXQ%3D%3D",
       "vendor": "Mouser"
     },
