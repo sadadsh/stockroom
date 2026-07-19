@@ -32,29 +32,43 @@
       "part_number": "945-IC51-0644-807",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 126.53,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 96.45,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 96.44,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 96.0,
-          "currency": "USD"
+          "qty": 100
         }
       ],
       "stock": 9,
       "url": "https://www.mouser.com/en/ProductDetail/Yamaichi-Electronics/IC51-0644-807?qs=nO3wRANIIvmhhPuENfC7rw%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:44.316913+00:00",
+      "part_number": "2408-IC51-0644-807-ND",
+      "price_breaks": [
+        {
+          "price": 124.04,
+          "qty": 1
+        }
+      ],
+      "stock": 10,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -80,8 +94,7 @@
     "Termination Style": "SMD/SMT",
     "Type": "Chip Carrier",
     "US Tariff %": 8.0,
-    "Unit Weight": "1.890908 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "25"
+    "Unit Weight": "1.890908 oz"
   },
   "symbol": null,
   "tags": []
