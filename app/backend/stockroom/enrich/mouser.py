@@ -17,7 +17,7 @@ import json
 import urllib.error
 import urllib.request
 
-from stockroom.enrich.errors import EnrichError
+from stockroom.enrich.errors import EnrichError, status_from_error
 from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced, normalize_mpn
 
 
@@ -101,6 +101,9 @@ def _default_requester(api_key: str, timeout: int = 8):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            # a 429/401/403 carries .code: the rescan breaker reads it via status_code
+            raise EnrichError(f"mouser request failed: {exc}", status_code=exc.code) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise EnrichError(f"mouser request failed: {exc}") from exc
 
@@ -113,6 +116,9 @@ class MouserAdapter:
         self._requester = requester or (
             _default_requester(self.api_key) if self.api_key else None
         )
+        # out-of-band signal for the rescan circuit breaker (Phase-1b-2b); never affects the
+        # returned EnrichmentResult, which stays exactly what it is today on every path.
+        self.last_status: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -123,10 +129,12 @@ class MouserAdapter:
             return EnrichmentResult()
         try:
             body = self._requester(mpn)
-        except EnrichError:
+        except EnrichError as exc:
+            self.last_status = status_from_error(exc)
             return EnrichmentResult()  # a failed API call must not break enrichment
         parts = ((body or {}).get("SearchResults") or {}).get("Parts") or []
         if not parts:
+            self.last_status = "not_found"
             return EnrichmentResult()
         target = normalize_mpn(mpn)
         exact = next(
@@ -138,4 +146,5 @@ class MouserAdapter:
         if exact is None and result.mpn is not None:
             # no exact match: downgrade confidence so a manual review flags it
             result.mpn = Sourced(result.mpn.value, "mouser", "low")
+        self.last_status = "ok"
         return result

@@ -1,5 +1,6 @@
 import io
 import json as _json
+import urllib.error
 import urllib.request
 
 import pytest
@@ -102,6 +103,65 @@ def test_lookup_never_raises_on_requester_failure_or_empty():
     assert DigiKeyAdapter("id", "s", requester=lambda m: {"Products": []}).lookup("X").mpn is None
 
 
+# --- Phase-1b-2b: last_status circuit-breaker signal ------------------------------
+
+
+def test_last_status_is_rate_limited_on_a_429():
+    def boom(mpn):
+        raise EnrichError("throttled", status_code=429)
+
+    a = DigiKeyAdapter("id", "secret", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "rate_limited"
+    assert r.mpn is None  # a failed lookup still returns an empty result
+
+
+def test_last_status_is_auth_error_on_a_401():
+    def boom(mpn):
+        raise EnrichError("unauthorized", status_code=401)
+
+    a = DigiKeyAdapter("id", "secret", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "auth_error"
+    assert r.mpn is None
+
+
+def test_last_status_is_auth_error_on_a_403():
+    def boom(mpn):
+        raise EnrichError("forbidden", status_code=403)
+
+    a = DigiKeyAdapter("id", "secret", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "auth_error"
+    assert r.mpn is None
+
+
+def test_last_status_is_error_on_a_generic_failure():
+    def boom(mpn):
+        raise EnrichError("dead")  # no status_code: not HTTP-coded
+
+    a = DigiKeyAdapter("id", "secret", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "error"
+    assert r.mpn is None
+
+
+def test_last_status_is_ok_on_a_matching_part():
+    a = DigiKeyAdapter("id", "secret", requester=lambda mpn: _BODY)
+    a.lookup("SN74LVC1G08DBVR")
+    assert a.last_status == "ok"
+
+
+def test_last_status_is_not_found_on_no_products():
+    a = DigiKeyAdapter("id", "secret", requester=lambda mpn: {"Products": []})
+    a.lookup("NOPE")
+    assert a.last_status == "not_found"
+
+
+def test_last_status_defaults_to_empty_before_any_lookup():
+    assert DigiKeyAdapter("id", "secret").last_status == ""
+
+
 def test_lookup_never_raises_on_a_non_dict_products_entry():
     # a garbled API response with non-dict Products entries must not raise (never-raises constraint)
     body = {"Products": ["error", None, {"ManufacturerProductNumber": "X"}]}
@@ -146,8 +206,22 @@ def test_requester_raises_enricherror_on_transport_failure(monkeypatch):
     def _boom(req, timeout=8):
         raise OSError("network down")
     monkeypatch.setattr(urllib.request, "urlopen", _boom)
-    with pytest.raises(EnrichError):
+    with pytest.raises(EnrichError) as exc_info:
         _default_requester("id", "secret")("X")
+    assert exc_info.value.status_code is None
+
+
+def test_requester_raises_enricherror_with_status_code_on_http_error(monkeypatch):
+    def _open(req, timeout=8):
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+        if "oauth2/token" in url:
+            return _Resp(_json.dumps({"access_token": "TOK"}).encode())
+        raise urllib.error.HTTPError(url, 429, "Too Many Requests", None, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _open)
+    with pytest.raises(EnrichError) as exc_info:
+        _default_requester("id", "secret")("X")
+    assert exc_info.value.status_code == 429
 
 
 def test_a_failed_token_is_not_cached_so_the_next_call_retries(monkeypatch):
