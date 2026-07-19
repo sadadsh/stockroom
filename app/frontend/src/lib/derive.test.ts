@@ -164,7 +164,7 @@ describe("deriveAttributes", () => {
     expect(attrs).toContain("Surface Mount");
   });
 
-  it("keeps the card small: no more than six chips", () => {
+  it("caps the ranked set and leads with the electrical parameters", () => {
     const part = makePart({
       category: "Resistors",
       specs: {
@@ -179,7 +179,9 @@ describe("deriveAttributes", () => {
         Qualification: "AEC-Q200",
       },
     });
-    expect(deriveAttributes(part).length).toBeLessThanOrEqual(6);
+    const attrs = deriveAttributes(part);
+    expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the card shows a few + Show All
+    expect(attrs[0]).toBe("±1%"); // the electrical parameter leads
   });
 
   it("maps a through-hole code and keeps a value that is already a label", () => {

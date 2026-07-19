@@ -280,10 +280,11 @@ export function DetailPanel({
               />
               <DataRow
                 label="Datasheet"
-                value={
-                  detail.datasheet?.source_url ? "Datasheet" : detail.datasheet?.file || ""
-                }
+                value={detail.datasheet?.source_url || detail.datasheet?.file || ""}
                 href={detail.datasheet?.source_url || undefined}
+                mono
+                onSave={onEditField ? (v) => onEditField("datasheet", v) : undefined}
+                busy={busy}
               />
             </div>
             <div className="mt-auto border-t border-line px-[18px] py-[15px]">
@@ -486,14 +487,25 @@ function AttributesCard({
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const derivedLower = new Set(derived.map((a) => a.toLowerCase()));
   const manualChips = manual.filter(
     (t) => t.trim() !== "" && !derivedLower.has(t.trim().toLowerCase()),
   );
+  // the most important first (derived is already importance-ranked), then the user's manual pins
+  const chips = [
+    ...derived.map((label) => ({ label, manual: false })),
+    ...manualChips.map((label) => ({ label, manual: true })),
+  ];
+  const COLLAPSED = 7;
+  const hasMore = chips.length > COLLAPSED;
+  // collapsed keeps to ONE non-wrapping row (a glance); expanded wraps to show everything + edit.
+  const open = expanded || !hasMore;
+  const shown = open ? chips : chips.slice(0, COLLAPSED);
 
   const chipCls =
-    "inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-medium";
+    "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-medium";
 
   function commitAdd() {
     const value = draft.trim();
@@ -512,34 +524,46 @@ function AttributesCard({
 
   return (
     <div className="mt-6 rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
-      <div className="mb-3 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-        Attributes
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Attributes
+        </span>
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-2xs font-semibold text-t2 hover:text-t1"
+          >
+            {expanded ? "Show Less" : `Show All ${chips.length}`}
+          </button>
+        ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {derived.map((a) => (
-          <span key={`d-${a}`} className={chipCls + " border-line bg-field text-t2"}>
-            {a}
-          </span>
-        ))}
-        {manualChips.map((t) => (
-          <span key={`m-${t}`} className={chipCls + " border-line2 bg-raise2 text-t1"}>
-            {t}
-            {onEditTags ? (
-              <button
-                type="button"
-                onClick={() => removeManual(t)}
-                disabled={busy}
-                aria-label={`Remove ${t}`}
-                className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            ) : null}
-          </span>
-        ))}
-        {onEditTags ? (
+      <div className={open ? "flex flex-wrap items-center gap-2" : "flex gap-2 overflow-hidden"}>
+        {shown.map((c) =>
+          c.manual ? (
+            <span key={`m-${c.label}`} className={chipCls + " border-line2 bg-raise2 text-t1"}>
+              {c.label}
+              {onEditTags && open ? (
+                <button
+                  type="button"
+                  onClick={() => removeManual(c.label)}
+                  disabled={busy}
+                  aria-label={`Remove ${c.label}`}
+                  className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              ) : null}
+            </span>
+          ) : (
+            <span key={`d-${c.label}`} className={chipCls + " border-line bg-field text-t2"}>
+              {c.label}
+            </span>
+          ),
+        )}
+        {onEditTags && open ? (
           adding ? (
             <input
               autoFocus
@@ -555,14 +579,14 @@ function AttributesCard({
               }}
               placeholder="Add attribute"
               aria-label="Add attribute"
-              className="h-[29px] w-36 rounded-full border border-line2 bg-field px-3 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
+              className="h-[29px] w-36 flex-none rounded-full border border-line2 bg-field px-3 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
             />
           ) : (
             <button
               type="button"
               onClick={() => setAdding(true)}
               disabled={busy}
-              className="inline-flex items-center gap-1 rounded-full border border-dashed border-line2 px-3 py-[5px] text-xs font-medium text-t3 hover:border-acc hover:text-t1 disabled:opacity-50"
+              className="inline-flex flex-none items-center gap-1 rounded-full border border-dashed border-line2 px-3 py-[5px] text-xs font-medium text-t3 hover:border-acc hover:text-t1 disabled:opacity-50"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3 w-3">
                 <path d="M12 5v14M5 12h14" />
@@ -571,7 +595,7 @@ function AttributesCard({
             </button>
           )
         ) : null}
-        {derived.length === 0 && manualChips.length === 0 && !onEditTags ? (
+        {chips.length === 0 && !onEditTags ? (
           <span className="text-xs text-t3">No attributes.</span>
         ) : null}
       </div>
@@ -766,15 +790,28 @@ function DataRow({
         }
       >
         {onSave ? (
-          <EditableText
-            value={value}
-            onSave={onSave}
-            label={label}
-            placeholder="Missing"
-            mono={mono}
-            multiline={multiline}
-            disabled={busy}
-          />
+          <>
+            <EditableText
+              value={value}
+              onSave={onSave}
+              label={label}
+              placeholder="Missing"
+              mono={mono}
+              multiline={multiline}
+              disabled={busy}
+            />
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${label}`}
+                className="flex-none text-t3 transition-colors hover:text-t1"
+              >
+                <ExternalIcon />
+              </a>
+            ) : null}
+          </>
         ) : empty ? (
           "Missing"
         ) : href ? (
@@ -939,11 +976,13 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
         </span>
         <span className="tnum font-mono text-xs text-t3">{count}</span>
       </div>
-      <div className="columns-1 gap-4 md:columns-2">
+      {/* a stretched grid (not a masonry) so the two cards in a row share the taller one's height
+          and line up at the bottom, rather than one falling short */}
+      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {groups.map((group) => (
           <div
             key={group.title}
-            className="mb-4 break-inside-avoid rounded-[10px] border border-line bg-field px-4 py-3.5"
+            className="flex h-full flex-col rounded-[10px] border border-line bg-field px-4 py-3.5"
           >
             <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
               {group.title}
@@ -1048,15 +1087,17 @@ function Sourcing({
             {breaks.length > 1 ? (
               <div className="mt-3">
                 <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-t3">
-                  Price Breaks
+                  Volume Pricing
                 </div>
+                {/* the qty-1 unit price is already shown next to the stock above, so the ladder
+                    starts at the FIRST bulk tier (10+, 100+, ...) - no redundant "1+" row */}
                 <div
                   className="grid grid-flow-col gap-x-10"
                   style={{
-                    gridTemplateRows: `repeat(${Math.ceil(breaks.length / 2)}, auto)`,
+                    gridTemplateRows: `repeat(${Math.ceil((breaks.length - 1) / 2)}, auto)`,
                   }}
                 >
-                  {breaks.map((b) => (
+                  {breaks.slice(1).map((b) => (
                     <div
                       key={b.qty}
                       className="tnum flex items-baseline justify-between py-[3.5px] font-mono text-xs"
