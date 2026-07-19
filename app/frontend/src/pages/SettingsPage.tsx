@@ -71,13 +71,10 @@ function StatusRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function SettingsPage() {
   return (
-    <>
-      <div className="flex h-14 flex-none items-center gap-3 border-b border-line px-[18px]">
-        <h1 className="text-lg font-semibold text-t1">Settings</h1>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
-        <div className="mx-auto max-w-[860px] pb-12">
-          <AppearanceSection />
+    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+      <div className="mx-auto max-w-[860px] pb-12">
+        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1">Settings</h1>
+        <AppearanceSection />
           <ProfilesSection />
           <SyncSection />
           <GitHubSection />
@@ -86,9 +83,8 @@ export function SettingsPage() {
           <RescanSection />
           <DistributorSection />
           <UpdateSection />
-        </div>
       </div>
-    </>
+    </div>
   );
 }
 

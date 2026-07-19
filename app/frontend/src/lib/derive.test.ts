@@ -208,6 +208,24 @@ describe("deriveAttributes", () => {
     expect(deriveAttributes(part)).toEqual([]);
   });
 
+  it("sinks bare dimensions below real attributes (no 0.8 mm noise)", () => {
+    const part = makePart({
+      category: "Diodes",
+      specs: {
+        Height: "0.8 mm",
+        Length: "2 mm",
+        Width: "1.25 mm",
+        Package: "0805",
+        "Mounting Type": "SMD",
+        RoHS: "Yes",
+      },
+    });
+    const attrs = deriveAttributes(part);
+    // the meaningful attributes lead; a bare dimension only shows as a last resort, never above them
+    expect(attrs.slice(0, 3)).toEqual(["0805", "Surface Mount", "RoHS Compliant"]);
+    expect(attrs.indexOf("2 mm")).toBeGreaterThan(2);
+  });
+
   it("skips commercial / provenance specs (tariff, country, packaging)", () => {
     const part = makePart({
       category: "Resistors",
