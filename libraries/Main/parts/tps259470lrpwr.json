@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tps25947"
   },
   "description": "Hot Swap Voltage Controllers",
-  "display_name": "TPS259470L VQFN-HR-10 TI TPS259470LRPWR",
+  "display_name": "Hot Swap Voltage Controller TPS259470LRPWR VQFN-HR-10",
   "enrichment": {},
   "footprint": {
     "lib": "Package_DFN_QFN",
