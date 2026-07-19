@@ -32,39 +32,73 @@
       "part_number": "710-61300411121",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.19,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.163,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.135,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.113,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.102,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.094,
-          "currency": "USD"
+          "qty": 1000
         }
       ],
       "stock": 51814,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300411121?qs=PhR8RmCirEYQcLLqXD8rAA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:37.813603+00:00",
+      "part_number": "732-5317-ND",
+      "price_breaks": [
+        {
+          "price": 0.19,
+          "qty": 1
+        },
+        {
+          "price": 0.163,
+          "qty": 10
+        },
+        {
+          "price": 0.1352,
+          "qty": 25
+        },
+        {
+          "price": 0.113,
+          "qty": 50
+        },
+        {
+          "price": 0.102,
+          "qty": 100
+        },
+        {
+          "price": 0.0986,
+          "qty": 1000
+        }
+      ],
+      "stock": 83944,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -105,8 +139,7 @@
     "Type": "Pin Strip",
     "US Tariff %": 0.0,
     "Unit Weight": "0.007408 oz",
-    "Voltage Rating": "250 V",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000"
+    "Voltage Rating": "250 V"
   },
   "symbol": null,
   "tags": []
