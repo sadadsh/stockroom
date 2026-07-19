@@ -88,6 +88,66 @@ export function parseMagnitude(value: string): number | null {
   return mag;
 }
 
+// --- slider scale (log for decade-spanning ranges) --------------------------
+//
+// A resistance facet runs 100 Ω .. 1 MΩ - four decades. On a LINEAR track the whole lower half
+// is crushed into a few pixels, so a range that spans >= two decades (and starts above zero) maps
+// LOGARITHMICALLY; everything else stays linear. Both expose the same value<->percent pair plus a
+// handful of "nice" tick values to print under the track.
+
+export interface Scale {
+  toPct: (value: number) => number;
+  fromPct: (pct: number) => number;
+  ticks: number[];
+  log: boolean;
+}
+
+function _clampPct(p: number): number {
+  return Math.max(0, Math.min(100, p));
+}
+
+// Round "nice" tick values (…, 1, 2, 5, 10, …) spanning [min, max] - so a linear track prints
+// 200 / 400 / 600, never 1.325 / 2.55 / 3.775.
+function _niceTicks(min: number, max: number): number[] {
+  const span = max - min || 1;
+  const raw = span / 4;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const ticks: number[] = [];
+  for (let t = Math.ceil(min / step) * step; t <= max + step * 1e-9; t += step) {
+    ticks.push(Math.round(t / step) * step);
+  }
+  return ticks;
+}
+
+export function makeScale(fmin: number, fmax: number): Scale {
+  const span = fmax - fmin;
+  const useLog = fmin > 0 && fmax > 0 && fmax / fmin >= 100;
+  if (useLog) {
+    const lo = Math.log10(fmin);
+    const hi = Math.log10(fmax);
+    const denom = hi - lo || 1;
+    // the decade boundaries (10^n) within the range - the readout above the track already prints
+    // the exact min/max, so a non-round endpoint (3.32 Ω) is left off the ticks, not crammed in
+    const ticks: number[] = [];
+    for (let e = Math.ceil(lo - 1e-9); e <= Math.floor(hi + 1e-9); e++) ticks.push(10 ** e);
+    return {
+      log: true,
+      ticks,
+      toPct: (v) => _clampPct(((Math.log10(Math.max(v, fmin)) - lo) / denom) * 100),
+      fromPct: (p) => 10 ** (lo + (_clampPct(p) / 100) * denom),
+    };
+  }
+  const denom = span || 1;
+  return {
+    log: false,
+    ticks: _niceTicks(fmin, fmax),
+    toPct: (v) => _clampPct(((v - fmin) / denom) * 100),
+    fromPct: (p) => fmin + (_clampPct(p) / 100) * denom,
+  };
+}
+
 // --- spec-token encoding ----------------------------------------------------
 
 function _rangeToken(key: string, sel: RangeSel): string | null {
@@ -320,6 +380,45 @@ export function orderFacetsForRail(
     .map((f, i) => ({ f, i, s: _railScore(f, cat) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.f);
+}
+
+export interface RailSection {
+  title: string;
+  fromSpecs: boolean; // stamp the "from specs" badge (the generated parameter block)
+  facets: ParametricFacet[];
+}
+
+/** Group the rail's facets into the north-star sections - Parameters (the electrical, generated
+ * block), Package & Form, Sourcing & Compliance, then a More Filters catch-all for provenance -
+ * ordered within each section by importance. The sectioning is registry-driven (a facet's spec
+ * group decides its home), so it stays modular: a new electrical spec joins Parameters on its own,
+ * a new commercial one lands in More Filters. Empty sections are dropped. */
+export function sectionedRail(
+  facets: ParametricFacet[],
+  category: string | null,
+): RailSection[] {
+  const cat = category ?? "";
+  const buckets: Record<SpecGroupName, ParametricFacet[]> = {
+    Electrical: [],
+    Physical: [],
+    "Ratings & Compliance": [],
+    Other: [],
+  };
+  for (const f of orderFacetsForRail(facets, cat)) {
+    const group = _COMMERCIAL.test(normalizeSpecKey(f.key))
+      ? "Other"
+      : resolveSpec(f.key, cat).group;
+    buckets[group].push(f);
+  }
+  const sections: RailSection[] = [];
+  const add = (title: string, fromSpecs: boolean, list: ParametricFacet[]) => {
+    if (list.length) sections.push({ title, fromSpecs, facets: list });
+  };
+  add(cat ? `${cat} Parameters` : "Parameters", true, buckets.Electrical);
+  add("Package & Form", false, buckets.Physical);
+  add("Sourcing & Compliance", false, buckets["Ratings & Compliance"]);
+  add("More Filters", false, buckets.Other);
+  return sections;
 }
 
 /** A row's display value for a spec column: the part's own value, prettified (Ohms -> Ω, unit
