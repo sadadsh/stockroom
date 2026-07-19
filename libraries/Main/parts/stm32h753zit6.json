@@ -6,7 +6,7 @@
     "source_url": "https://www.st.com/resource/en/datasheet/stm32h753zi.pdf"
   },
   "description": "STMicroelectronics Arm Cortex-M7 MCU, 2048KB flash, 1024KB RAM, 480 MHz, 1.62-3.6V, 114 GPIO, LQFP144",
-  "display_name": "STM32H753ZIT6 LQFP-144 ST",
+  "display_name": "ARM Microcontroller STM32H753ZIT6 LQFP-144",
   "enrichment": {},
   "footprint": {
     "lib": "Package_QFP",
@@ -28,36 +28,30 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:40.257717+00:00",
       "part_number": "511-STM32H753ZIT6",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 17.13,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 14.15,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 13.42,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 12.01,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 11.45,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 10.94,
           "qty": 360
         }
