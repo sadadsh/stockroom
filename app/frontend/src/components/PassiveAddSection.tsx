@@ -11,6 +11,7 @@ import { ApiError, api } from "../api/client";
 import { useFacetsQuery, usePassiveAdd } from "../api/queries";
 import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
+import { applySign, prettifyValue } from "../lib/specSchema";
 import { Badge, Button } from "./primitives";
 import { PulledDepth } from "./PulledDepth";
 import { StockAssetPreview } from "./StockAssetPreview";
@@ -213,7 +214,7 @@ export function PassiveAddSection({
             <div className="flex flex-wrap gap-2">
               {specEntries.map(([k, v]) => (
                 <Badge key={k} tone="neutral">
-                  {k}: {String(v)}
+                  {k}: {prettifyValue(applySign(k, String(v)))}
                 </Badge>
               ))}
             </div>
