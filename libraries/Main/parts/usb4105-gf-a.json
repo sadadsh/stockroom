@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/catalog/specsheets/Global_Connector_Technology_usb4105.pdf"
   },
   "description": "USB4105-GF-A GCT USB Connectors USB Type C,2.0, Rec,SMT, 0.95mmTH Shell Stakes,G/F,RA,Top Mnt,T&R datasheet, inventory, & pricing.",
-  "display_name": "USB4105-GF-A Top-Mount GCT",
+  "display_name": "Connector Top-Mount",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
