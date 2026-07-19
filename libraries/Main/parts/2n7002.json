@@ -32,34 +32,68 @@
       "part_number": "512-2N7002",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.09,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.761,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.482,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.298,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.298,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 525994,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002?qs=0dwsXDNhqlz66WJJhrTFjQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:09.145219+00:00",
+      "part_number": "4878-2N7002TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.03203,
+          "qty": 3000
+        },
+        {
+          "price": 0.02847,
+          "qty": 6000
+        },
+        {
+          "price": 0.02665,
+          "qty": 9000
+        },
+        {
+          "price": 0.0246,
+          "qty": 15000
+        },
+        {
+          "price": 0.02339,
+          "qty": 21000
+        },
+        {
+          "price": 0.02221,
+          "qty": 30000
+        }
+      ],
+      "stock": 58933,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -96,8 +130,7 @@
     "Unit Weight": "0.000282 oz",
     "Vds - Drain-Source Breakdown Voltage": "60 V",
     "Vgs - Gate-Source Voltage": "- 20 V, 20 V",
-    "Vgs th - Gate-Source Threshold Voltage": "2.5 V",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Vgs th - Gate-Source Threshold Voltage": "2.5 V"
   },
   "symbol": null,
   "tags": []
