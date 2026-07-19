@@ -32,54 +32,80 @@
       "part_number": "815-ABM8-25-B2-T",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.5,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.434,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.394,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.378,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.357,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.343,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.328,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.306,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.297,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 14291,
       "url": "https://www.mouser.com/en/ProductDetail/ABRACON/ABM8-25.000MHZ-B2-T?qs=D0XpjEo%2FJ5CyDikUKoGKpw%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:40.017443+00:00",
+      "part_number": "2266-ABM8-25.000MHZ-B2-T-535-ND",
+      "price_breaks": [
+        {
+          "price": 0.37,
+          "qty": 1000
+        },
+        {
+          "price": 0.3,
+          "qty": 5000
+        },
+        {
+          "price": 0.268,
+          "qty": 10000
+        },
+        {
+          "price": 0.254,
+          "qty": 25000
+        }
+      ],
+      "stock": 101000,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -114,8 +140,7 @@
     "Type": "Ceramic Crystal",
     "US Tariff %": 30.0,
     "Unit Weight": "0.000564 oz",
-    "Width": "2.5 mm",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000"
+    "Width": "2.5 mm"
   },
   "symbol": null,
   "tags": []
