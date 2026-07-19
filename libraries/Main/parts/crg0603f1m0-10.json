@@ -6,7 +6,7 @@
     "source_url": "https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=1622877&DocType=Customer+Drawing&DocLang=English&PartCntxt=1622877-2"
   },
   "description": "Resistor, small symbol",
-  "display_name": "1M 1% 0603 TE CRG0603F1M0-10",
+  "display_name": "1MΩ 1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:15.904034+00:00",
       "part_number": "279-CRG0603F1M0/10",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.24,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.06,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.03,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.021,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.019,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.017,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.01,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.007,
           "qty": 10000
         },
         {
-          "currency": "USD",
           "price": 0.005,
           "qty": 20000
         }
       ],
-      "stock": 18188,
+      "stock": 18162,
       "url": "https://www.mouser.com/en/ProductDetail/TE-Connectivity-Holsworthy/CRG0603F1M0-10?qs=s1WWODT2SXVmMRw54xD%2FMg%3D%3D",
       "vendor": "Mouser"
     },
