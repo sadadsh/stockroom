@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/ds/symlink/tps22917.pdf"
   },
   "description": "1V to 5.5V, 2A, 80mΩ Ultra-Low Leakage Load Switch, Active Low, SOT23-6",
-  "display_name": "TPS22917LDBVR SOT23-6 TI",
+  "display_name": "Load Switch TPS22917LDBVR SOT23-6",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:51.437854+00:00",
       "part_number": "595-TPS22917LDBVR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.52,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.367,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.328,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.285,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.264,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.252,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.242,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.229,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.223,
           "qty": 6000
         }
       ],
-      "stock": 171,
+      "stock": 154,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS22917LDBVR?qs=doiCPypUmgGbWD5ZXr9T%2FQ%3D%3D",
       "vendor": "Mouser"
     },
