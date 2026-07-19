@@ -32,24 +32,54 @@
       "part_number": "200-QSH06001HDA",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 22.49,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 192,
+          "currency": "USD",
           "price": 22.45,
-          "currency": "USD"
+          "qty": 192
         },
         {
-          "qty": 448,
+          "currency": "USD",
           "price": 17.26,
-          "currency": "USD"
+          "qty": 448
         }
       ],
       "stock": 202,
       "url": "https://www.mouser.com/en/ProductDetail/Samtec/QSH-060-01-H-D-A?qs=rU5fayqh%252BE34oibMPSfe5w%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:48.774971+00:00",
+      "part_number": "3937-QSH-060-01-H-D-A-ND",
+      "price_breaks": [
+        {
+          "price": 71.75,
+          "qty": 1
+        },
+        {
+          "price": 70.3195,
+          "qty": 100
+        },
+        {
+          "price": 68.91308,
+          "qty": 500
+        },
+        {
+          "price": 67.53481,
+          "qty": 1000
+        },
+        {
+          "price": 66.18412,
+          "qty": 5000
+        }
+      ],
+      "stock": 181,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -85,8 +115,7 @@
     "Tradename": "Q Strip",
     "US Tariff %": 6.98,
     "Unit Weight": "0.024424 oz",
-    "Voltage Rating": "175 VAC",
-    "Factory Pack Quantity: Factory Pack Quantity": "64"
+    "Voltage Rating": "175 VAC"
   },
   "symbol": null,
   "tags": []
