@@ -32,54 +32,68 @@
       "part_number": "279-CRG0603F1M0/10",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.24,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.06,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.03,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.021,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.019,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.017,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.01,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.007,
-          "currency": "USD"
+          "qty": 10000
         },
         {
-          "qty": 20000,
+          "currency": "USD",
           "price": 0.005,
-          "currency": "USD"
+          "qty": 20000
         }
       ],
       "stock": 18188,
       "url": "https://www.mouser.com/en/ProductDetail/TE-Connectivity-Holsworthy/CRG0603F1M0-10?qs=s1WWODT2SXVmMRw54xD%2FMg%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:56.392967+00:00",
+      "part_number": "1111-CRG0603F1M0/10TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00585,
+          "qty": 20000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,14 +126,13 @@
     "Series": "CRG",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "50 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
