@@ -6,7 +6,7 @@
     "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL05B222KB5NNN"
   },
   "description": "capacitor, small US symbol",
-  "display_name": "2.2n 10% X7R 0402 Samsung CL05B222KB5NNNC",
+  "display_name": "2200pF X7R 50V 10% 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:23.378052+00:00",
       "part_number": "187-CL05B222KB5NNNC",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.016,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.013,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.009,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.008,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.007,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.004,
           "qty": 10000
         }
       ],
-      "stock": 12169,
+      "stock": 11649,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B222KB5NNNC?qs=349EhDEZ59rr3rosBHU74A%3D%3D",
       "vendor": "Mouser"
     },
