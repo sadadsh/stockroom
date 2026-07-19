@@ -17,6 +17,7 @@ from stockroom.api.schemas import (
     MoveBody,
     ParametricFacetsDTO,
     PartSummary,
+    SearchRow,
     SetSpecsBody,
 )
 from stockroom.ingest.passive_add import (
@@ -128,6 +129,33 @@ def library_router(require_token) -> APIRouter:
             ]
         return {"parts": [PartSummary.from_row(row).model_dump() for row in rows],
                 "count": len(rows)}
+
+    @r.get("/search")
+    def search(
+        request: Request,
+        q: str = "",
+        category: str | None = None,
+        complete_only: bool = False,
+        spec: list[str] = Query(default=[]),
+    ) -> dict:
+        """RICH search rows for the modular results table: the same index scope + spec filter as
+        /parts, but each surviving row is joined to its loaded record so the row carries the part's
+        spec bag and a flattened sourcing summary (stock, unit price). The table picks its columns
+        from those specs on the frontend, so the endpoint never hardcodes a per-category column
+        set. Bounded like the facets endpoint (the parametric rail is category-scoped), so loading a
+        record per result row is affordable."""
+        from stockroom.store.parametric import matches_spec_filters, parse_spec_filters
+
+        ctx = request.app.state.ctx
+        rows = ctx.index.search(query=q, category=category, complete_only=complete_only)
+        constraints = parse_spec_filters(spec)
+        out = []
+        for row in rows:
+            record = ctx.ops.load_record(row.id)
+            if constraints and not matches_spec_filters(record, constraints):
+                continue
+            out.append(SearchRow.from_row_and_record(row, record).model_dump())
+        return {"parts": out, "count": len(out)}
 
     @r.get("/facets")
     def facets(request: Request) -> dict:

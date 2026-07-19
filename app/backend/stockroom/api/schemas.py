@@ -36,6 +36,79 @@ class PartSummary(BaseModel):
         )
 
 
+def _scalar_specs(specs: dict) -> dict:
+    """The scalar spec values only (str / number / bool, non-empty) - the structured entries
+    in the bag (the pinout list, per-key provenance) are not table columns, so they are dropped
+    from the search row. Mirrors the parametric aggregator's notion of a facetable value, so a
+    column and its facet always agree on what counts as a spec."""
+    out: dict = {}
+    for key, value in (specs or {}).items():
+        if isinstance(value, str):
+            if value.strip():
+                out[key] = value
+        elif isinstance(value, (int, float, bool)):
+            out[key] = value
+    return out
+
+
+def _row_sourcing(record) -> tuple[int | None, float | None, str]:
+    """A flat ``(stock, unit_price, currency)`` from a record's stored purchase list for the
+    Stock / Unit columns: the qty-1 (lowest tier) price off the purchase that carries breaks,
+    else the first purchase's stock. Null-safe - a part with no purchase reports ``(None, None,
+    "")`` rather than raising. Mirrors ``library_price_index``'s best-purchase choice."""
+    purchases = list(getattr(record, "purchase", None) or [])
+    best = next((p for p in purchases if getattr(p, "price_breaks", None)), None)
+    if best is None:
+        best = purchases[0] if purchases else None
+    if best is None:
+        return None, None, ""
+    breaks = []
+    for b in (getattr(best, "price_breaks", None) or []):
+        try:
+            breaks.append((int(b["qty"]), float(b["price"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    breaks.sort(key=lambda qp: qp[0])
+    unit_price = breaks[0][1] if breaks else None
+    return getattr(best, "stock", None), unit_price, getattr(best, "currency", "") or ""
+
+
+class SearchRow(BaseModel):
+    """A RICH results row for the modular search table: the lean identity plus the part's own
+    spec bag and a flattened sourcing summary. The table picks its columns from ``specs`` on the
+    frontend, so a new spec becomes a column with zero backend change - the endpoint hands over
+    the data, never a hardcoded per-category column list."""
+
+    id: str
+    display_name: str
+    category: str
+    mpn: str
+    manufacturer: str
+    is_complete: bool
+    missing: list[str] = []
+    specs: dict[str, Any] = {}
+    stock: int | None = None
+    unit_price: float | None = None
+    currency: str = ""
+
+    @classmethod
+    def from_row_and_record(cls, row: IndexRow, record) -> "SearchRow":
+        stock, unit_price, currency = _row_sourcing(record)
+        return cls(
+            id=row.id,
+            display_name=row.display_name,
+            category=row.category,
+            mpn=row.mpn,
+            manufacturer=row.manufacturer,
+            is_complete=row.is_complete,
+            missing=list(row.missing),
+            specs=_scalar_specs(getattr(record, "specs", None) or {}),
+            stock=stock,
+            unit_price=unit_price,
+            currency=currency,
+        )
+
+
 class FacetsDTO(BaseModel):
     by_category: dict[str, int]
     by_manufacturer: dict[str, int]
