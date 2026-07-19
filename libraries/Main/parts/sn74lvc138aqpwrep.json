@@ -6,7 +6,7 @@
     "source_url": "https://toshiba.semicon-storage.com/info/docget.jsp?did=15392&prodName=74LCX138FT"
   },
   "description": "Encoders, Decoders, Multiplexers & Demultiplexers",
-  "display_name": "74LCV138 TSSOP-16 TI SN74LVC138AQPWREP",
+  "display_name": "Encoder SN74LVC138AQPWREP TSSOP-16",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:23.086724+00:00",
       "part_number": "595-N74LVC138AQPWREP",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.73,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 2.04,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 1.86,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 1.67,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 1.6,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 1.55,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 1.44,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 1.41,
           "qty": 4000
         }
       ],
-      "stock": 1995,
+      "stock": 1991,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D",
       "vendor": "Mouser"
     },
