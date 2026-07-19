@@ -6,7 +6,7 @@
     "source_url": "https://assets.nexperia.com/documents/data-sheet/PTVS5V0Z1USK.pdf"
   },
   "description": "5V, 1200W TVS unidirectional diode, DSN1608-2",
-  "display_name": "ESD9X5.0ST5G SOD-923-2 onsemi",
+  "display_name": "Diode SOD-923-2",
   "enrichment": {},
   "footprint": {
     "lib": "Diode_SMD",
@@ -28,51 +28,39 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:55.358609+00:00",
       "part_number": "863-ESD9X5.0ST5G",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.16,
           "qty": 1
         },
         {
-          "currency": "USD",
-          "price": 0.101,
+          "price": 0.102,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.054,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.045,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.031,
           "qty": 1000
         },
         {
-          "currency": "USD",
-          "price": 0.027,
-          "qty": 2500
-        },
-        {
-          "currency": "USD",
-          "price": 0.025,
+          "price": 0.029,
           "qty": 5000
         },
         {
-          "currency": "USD",
-          "price": 0.021,
+          "price": 0.026,
           "qty": 8000
         }
       ],
-      "stock": 64322,
+      "stock": 145905,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G?qs=OSf9jACorvbLo4%2Fn72DVLA%3D%3D",
       "vendor": "Mouser"
     },
