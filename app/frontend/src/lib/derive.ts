@@ -18,6 +18,8 @@ import {
   applySign,
   normalizeSpecKey,
   prettifyValue,
+  resolveSpec,
+  type SpecGroupName,
 } from "./specSchema";
 
 // --- shared spec-bag helpers -------------------------------------------------
@@ -194,18 +196,9 @@ interface AttributeRule {
   format: (value: string) => string | null;
 }
 
-// The most a chip rail should carry before it stops reading as a summary.
-const MAX_ATTRIBUTES = 12;
-
-// A value that is a numeric measurement ("75 V", "200 mW", "1.6 mm", "16 Contact" is NOT one -
-// its unit token is a word) belongs in Specifications, not a summary chip.
-// A value that leads with a number is a measurement or a count (1.1 kOhms, 100 nF, -40 °C,
-// 0603, 8) — that belongs in the Specifications sheet, never as a categorical attribute chip.
-// Curated numeric attributes we DO want (package size, bit width) come through the registry
-// above, which is not gated by this; only the open-ended fallback below uses it.
-function isMeasurement(value: string): boolean {
-  return /^[+\-±]?\s*[\d.,]/.test(value.trim());
-}
+// The few chips the summary card should carry - the things that actually matter when choosing
+// the part. More than this and it stops reading as a glance.
+const MAX_ATTRIBUTES = 6;
 
 // Mounting codes normalized to a spoken label; a value that is already a label passes
 // through formatMounting unchanged.
@@ -289,54 +282,72 @@ const _ATTR_INDEX: Map<string, AttributeRule> = (() => {
   return index;
 })();
 
+// How a spec's group weighs into "is this what people care about": the electrical parameters
+// first, then the physical form, then compliance. Mirrors the search columns' ranking so the
+// glance-chips and the parametric columns agree on what matters. "Other" is admitted, but last.
+const _ATTR_GROUP_SCORE: Record<SpecGroupName, number> = {
+  Electrical: 400,
+  Physical: 250,
+  "Ratings & Compliance": 120,
+  Other: 0,
+};
+
+// The part's HEADLINE value already leads the title (deriveTitle), so it is redundant as a chip.
+const _PRIMARY_VALUE_KEYS = new Set(
+  ["resistance", "capacitance", "inductance"].map(normalizeSpecKey),
+);
+
+// Provenance / logistics keys are never "what people care about" when choosing a part.
+const _COMMERCIAL_ATTR =
+  /tariff|packaging|pack quantity|standard pack|country of origin|lead time|weight|base product|catalog|reach|export|eccn|\bhts\b|series|subcategory|moisture|number of parts|^product$/;
+
+// The package/case is a headline physical attribute (footprint choice), so it rides near the
+// electrical parameters rather than sinking with the rest of the physical form.
+const _PRIME_PHYSICAL = new Set(["package", "case", "case code"].map(normalizeSpecKey));
+
 /**
- * The full-width "Attributes" chips the detail masthead shows. The curated part.tags come
- * first, verbatim, then a few chips derived from key specs (package/case, mounting,
- * qualification, compliance, salient features) so a sparse card is never empty. Chips are
- * deduped case-insensitively with a tag winning over a derived duplicate, order preserved
- * (tags first, then derived), empty-in-disguise values skipped, and the whole capped at
- * MAX_ATTRIBUTES. A new attribute-worthy spec is one ATTRIBUTE_REGISTRY line.
+ * The "Attributes" chips: the FEW parameters that actually matter when choosing this part -
+ * derived purely from its specs and ranked by importance (electrical first, then form, then
+ * compliance), capped small so the card reads as a summary, not a data dump. The headline value
+ * (in the title) and commercial/provenance keys are skipped; a registry formatter gives a
+ * spoken label where one exists ("SMD" -> "Surface Mount", "RoHS" -> "RoHS Compliant"), else the
+ * value is prettified and signed (±1%, 200 mW, ±100 ppm/°C, 0603). Curated tags are NO LONGER
+ * folded in - a user's manual attributes live in `tags` and are shown/edited separately.
  */
 export function deriveAttributes(part: PartDetail): string[] {
-  const chips: string[] = [];
-  const seen = new Set<string>();
-  const push = (raw: string | null | undefined): void => {
-    if (raw == null) return;
-    const text = raw.trim();
-    if (text === "") return;
-    if (EMPTY_SPEC_VALUES.has(text.toLowerCase())) return;
-    const norm = text.toLowerCase();
-    if (seen.has(norm)) return; // case-insensitive dedup; the first seen (a tag) wins
-    seen.add(norm);
-    chips.push(text);
-  };
-
-  // Curated tags first, verbatim.
-  for (const tag of part.tags) push(tag);
-
-  // Then the curated derived chips, in the record's own spec order.
+  const scored: { label: string; score: number; order: number }[] = [];
+  let seq = 0;
   for (const [key, value] of Object.entries(part.specs)) {
-    if (chips.length >= MAX_ATTRIBUTES) break;
-    if (SPEC_HIDDEN_KEYS.has(key)) continue;
-    if (!isPresentable(value)) continue;
-    const rule = _ATTR_INDEX.get(normalizeSpecKey(key));
-    if (!rule) continue;
-    push(rule.format(String(value).trim()));
-  }
-
-  // Then fill any remaining slots from the part's OTHER short categorical specs (the Mouser
-  // parametric attributes not already curated), so the card reflects the real component: skip
-  // numeric measurements (those live in Specifications) and commercial / provenance keys.
-  for (const [key, value] of Object.entries(part.specs)) {
-    if (chips.length >= MAX_ATTRIBUTES) break;
+    seq += 1;
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
     if (!isPresentable(value)) continue;
     const nk = normalizeSpecKey(key);
-    if (_ATTR_INDEX.has(nk) || TITLE_SKIP_KEYS.has(nk)) continue;
+    if (_PRIMARY_VALUE_KEYS.has(nk) || _COMMERCIAL_ATTR.test(nk)) continue;
     const text = String(value).trim();
-    if (text.length > 24 || isMeasurement(text)) continue;
-    push(prettifyValue(text));
+    if (isNegative(text)) continue;
+    const rule = _ATTR_INDEX.get(nk);
+    const label = rule ? rule.format(text) : prettifyValue(applySign(key, text));
+    if (!label) continue;
+    if (label.length > 22 || EMPTY_SPEC_VALUES.has(label.toLowerCase())) continue;
+    const r = resolveSpec(key, part.category);
+    let score = _ATTR_GROUP_SCORE[r.group] - (r.order ?? 100) / 100;
+    // a spec curated as attribute-worthy (a registry rule) is at least mid-tier, so a key
+    // characteristic the spec schema doesn't rank (composition, dielectric) still surfaces;
+    // the package/case leads the physical form.
+    if (rule) score = Math.max(score, 150);
+    if (_PRIME_PHYSICAL.has(nk)) score += 130;
+    scored.push({ label, score, order: seq });
   }
-
-  return chips.slice(0, MAX_ATTRIBUTES);
+  // Rank first, THEN dedup by label - so when two keys yield the same chip ("Package" and a
+  // "Case Code" both -> "0603"), the higher-scored occurrence is the one that survives.
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const c of scored.sort((a, b) => b.score - a.score || a.order - b.order)) {
+    const norm = c.label.toLowerCase();
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(c.label);
+    if (out.length >= MAX_ATTRIBUTES) break;
+  }
+  return out;
 }
