@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/ds/symlink/tps62933.pdf"
   },
   "description": "3.8-30V, 3A Synchronous Buck Converters with pulse frequency modulation (PFM) and power good, SOT583-8",
-  "display_name": "TPS62933P SOT-583-8 TI TPS62933PDRLR",
+  "display_name": "Switching Voltage Regulator TPS62933PDRLR SOT-583-8",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
