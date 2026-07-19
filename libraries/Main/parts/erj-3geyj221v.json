@@ -6,7 +6,7 @@
     "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/RDO0000C334.pdf"
   },
   "description": "Resistor",
-  "display_name": "220Ω 5% 0603 Panasonic ERJ-3GEYJ221V",
+  "display_name": "220Ω 5% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:39.372590+00:00",
       "part_number": "667-ERJ-3GEYJ221V",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.023,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.019,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.015,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.013,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.011,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.007,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 10000
         },
         {
-          "currency": "USD",
           "price": 0.005,
           "qty": 25000
         }
       ],
-      "stock": 41255,
+      "stock": 40235,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-3GEYJ221V?qs=4WZYzuGhm5qHCFSN9go8VQ%3D%3D",
       "vendor": "Mouser"
     },
