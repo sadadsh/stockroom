@@ -1015,15 +1015,28 @@ function Sourcing({
             </div>
             </div>
             {breaks.length > 1 ? (
-              <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
-                {breaks.map((b) => (
-                  <div key={b.qty} className="flex items-baseline gap-1.5">
-                    <span className="tnum font-mono text-[11px] text-t3">{b.qty}+</span>
-                    <span className="tnum font-mono text-[11px] font-semibold text-t1">
-                      {formatPrice(b.price, p.currency)}
-                    </span>
-                  </div>
-                ))}
+              <div className="mt-3">
+                <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-t3">
+                  Price Breaks
+                </div>
+                <div
+                  className="grid grid-flow-col gap-x-10"
+                  style={{
+                    gridTemplateRows: `repeat(${Math.ceil(breaks.length / 2)}, auto)`,
+                  }}
+                >
+                  {breaks.map((b) => (
+                    <div
+                      key={b.qty}
+                      className="tnum flex items-baseline justify-between py-[3.5px] font-mono text-xs"
+                    >
+                      <span className="text-t3">{b.qty}+</span>
+                      <span className="font-semibold text-t1">
+                        {formatPrice(b.price, p.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>
