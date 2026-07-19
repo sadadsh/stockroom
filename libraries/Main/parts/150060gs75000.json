@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/150060GS75000.pdf"
   },
   "description": "Light emitting diode",
-  "display_name": "LED 0603 Wurth 150060GS75000",
+  "display_name": "Green LED 3.2V 0603",
   "enrichment": {},
   "footprint": {
     "lib": "LED_SMD",
@@ -28,41 +28,35 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:08.861384+00:00",
       "part_number": "710-150060GS75000",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.16,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.151,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.142,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 0.122,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.116,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.116,
           "qty": 4000
         }
       ],
-      "stock": 146444,
+      "stock": 132078,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/150060GS75000?qs=LlUlMxKIyB0UYkq5lDO8nA%3D%3D",
       "vendor": "Mouser"
     },
