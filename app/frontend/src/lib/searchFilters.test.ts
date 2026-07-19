@@ -201,7 +201,7 @@ describe("sectionedRail", () => {
     expect(sections.map((s) => s.title)).toEqual([
       "Resistors Parameters",
       "Package & Form",
-      "Sourcing & Compliance",
+      "Ratings & Compliance",
       "More Filters",
     ]);
     // the generated parameter block carries the "from specs" badge; the rest do not
@@ -210,6 +210,17 @@ describe("sectionedRail", () => {
     // electrical params live under Parameters; provenance sinks to More Filters
     expect(sections[0].facets.map((f) => f.key)).toContain("Resistance");
     expect(sections[3].facets.map((f) => f.key)).toEqual(["Assembly Country of Origin"]);
+  });
+
+  it("routes manufacturer + Unit Price into a Sourcing section", () => {
+    const facets: ParametricFacet[] = [
+      { key: "Resistance", label: "Resistance", kind: "range", count: 34, min: 100, max: 100000, unit: "Ω" },
+      { key: "Manufacturer", label: "Manufacturer", kind: "options", count: 34, options: [{ value: "Panasonic", count: 20 }, { value: "Yageo", count: 14 }] },
+      { key: "__unit_price__", label: "Unit Price", kind: "range", count: 34, min: 0.1, max: 0.31, unit: "$" },
+    ];
+    const sections = sectionedRail(facets, "Resistors");
+    const sourcing = sections.find((s) => s.title === "Sourcing");
+    expect(sourcing?.facets.map((f) => f.key).sort()).toEqual(["Manufacturer", "__unit_price__"]);
   });
 });
 

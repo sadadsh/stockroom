@@ -97,6 +97,11 @@ def _parse_numeric(value) -> tuple[float, str] | None:
     m = _NUM_RE.match(value.strip())
     if not m:
         return None
+    # A leading zero followed by another digit is a CODE, not a magnitude: real numbers never
+    # carry a leading zero, so "0402"/"0603" (package/case sizes) are discrete options, not a
+    # numeric range. This keeps the parametric facet data-driven - no per-key package list.
+    if re.match(r"[+-]?0\d", m.group(1)):
+        return None
     magnitude = float(m.group(1))
     mult, base = _split_prefix(m.group(2).strip())
     return magnitude * mult, base
