@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/catalog/specsheets/Yamaichi%20Electronics_08162018_IC51-0644-807_H.pdf"
   },
   "description": "IC & Component Sockets",
-  "display_name": "IC51-0644-807 Yamaichi",
+  "display_name": "IC IC51-0644-807",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,31 +28,27 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:02.026995+00:00",
       "part_number": "945-IC51-0644-807",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 126.53,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 96.45,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 96.44,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 96.0,
           "qty": 100
         }
       ],
-      "stock": 9,
+      "stock": 8,
       "url": "https://www.mouser.com/en/ProductDetail/Yamaichi-Electronics/IC51-0644-807?qs=nO3wRANIIvmhhPuENfC7rw%3D%3D",
       "vendor": "Mouser"
     },
