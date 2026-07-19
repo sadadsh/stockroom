@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/508/1/upy-gphc_x5r_4v-to-50v.pdf"
   },
   "description": "capacitor, small US symbol",
-  "display_name": "4.7uF 10% X5R 0805 YAGEO CC0805KFX5R8BB475",
+  "display_name": "4.7µF X5R 25V 10% 0805",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:34.566961+00:00",
       "part_number": "603-CC0805KFX5R8BB47",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.39,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.17,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.152,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.12,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.111,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.098,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.092,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.077,
           "qty": 10000
         }
       ],
-      "stock": 19998,
+      "stock": 19978,
       "url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC0805KFX5R8BB475?qs=mzRxyRlhVdvf7w1%2FCVNeQQ%3D%3D",
       "vendor": "Mouser"
     },
