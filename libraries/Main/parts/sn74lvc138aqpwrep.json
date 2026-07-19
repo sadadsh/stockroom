@@ -32,49 +32,71 @@
       "part_number": "595-N74LVC138AQPWREP",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.73,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.04,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.86,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.67,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 1.6,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.55,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 1.44,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 1.41,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 1995,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:33.195848+00:00",
+      "part_number": "296-20727-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.44117,
+          "qty": 2000
+        },
+        {
+          "price": 1.41064,
+          "qty": 4000
+        },
+        {
+          "price": 1.39535,
+          "qty": 6000
+        }
+      ],
+      "stock": 1769,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -107,8 +129,7 @@
     "Supply Voltage - Max": "3.6 V",
     "Supply Voltage - Min": "2 V",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.002183 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "2000"
+    "Unit Weight": "0.002183 oz"
   },
   "symbol": null,
   "tags": []
