@@ -28,16 +28,35 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "517-358",
+      "fetched_at": "2026-07-19T16:04:15.486950+00:00",
+      "part_number": "P5.10KLTR-ND",
       "price_breaks": [
         {
-          "qty": 1,
-          "price": 19.95,
-          "currency": "USD"
+          "price": 0.00542,
+          "qty": 10000
+        },
+        {
+          "price": 0.0049,
+          "qty": 20000
+        },
+        {
+          "price": 0.00464,
+          "qty": 30000
+        },
+        {
+          "price": 0.00437,
+          "qty": 50000
+        },
+        {
+          "price": 0.00421,
+          "qty": 70000
+        },
+        {
+          "price": 0.00406,
+          "qty": 100000
         }
       ],
-      "stock": null,
+      "stock": 519937,
       "url": "https://www.digikey.com/en/products/detail/adafruit-industries-llc/358/5801368",
       "vendor": "DigiKey"
     }
@@ -55,12 +74,12 @@
     "Product": "Tapes",
     "Product Category": "Labels & Industrial Warning Signs",
     "Product Type": "Labels",
+    "Quantity": "Unit Price",
     "RoHS": "Details",
     "Subcategory": "Supplies",
     "Type": "Barricade Tape",
     "Unit Weight": "1.102 lbs",
-    "Width": "3 in",
-    "Quantity": "Unit Price"
+    "Width": "3 in"
   },
   "symbol": null,
   "tags": []
