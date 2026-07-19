@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/bq24075"
   },
   "description": "Battery Management",
-  "display_name": "BQ24074 VQFN-16 TI BQ24074RGTT",
+  "display_name": "Battery Management BQ24074RGTT VQFN-16",
   "enrichment": {},
   "footprint": {
     "lib": "Package_DFN_QFN",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:37.469019+00:00",
       "part_number": "595-BQ24074RGTT",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 3.19,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 2.39,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 2.19,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 1.97,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 1.86,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 1.76,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 1.71,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 1.69,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 1.67,
           "qty": 5000
         }
       ],
-      "stock": 1351,
+      "stock": 1347,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT?qs=ZV%2Fxhq4oszp0gb4MsbpFYw%3D%3D",
       "vendor": "Mouser"
     },
