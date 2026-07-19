@@ -9,10 +9,12 @@ import {
   emptyFilters,
   formatMagnitude,
   hasAnyFilter,
+  makeScale,
   parseMagnitude,
   isOptionOn,
   orderFacetsForRail,
   removeOption,
+  sectionedRail,
   setRange,
   toSpecParams,
   toggleOption,
@@ -161,6 +163,51 @@ describe("orderFacetsForRail", () => {
     expect(order[0]).toBe("Resistance"); // the electrical range leads
     expect(order[order.length - 1]).toBe("US Tariff %"); // commercial sinks last
     expect(order.indexOf("Application")).toBeLessThan(order.indexOf("Assembly Country of Origin"));
+  });
+});
+
+describe("sectionedRail", () => {
+  it("buckets facets into the north-star sections, provenance last", () => {
+    const facets: ParametricFacet[] = [
+      { key: "Resistance", label: "Resistance", kind: "range", count: 34, min: 100, max: 100000, unit: "Ω" },
+      { key: "Tolerance", label: "Tolerance", kind: "range", count: 34, min: 0.1, max: 5, unit: "%" },
+      { key: "Package", label: "Package", kind: "options", count: 34, options: [{ value: "0603", count: 20 }, { value: "0402", count: 14 }] },
+      { key: "RoHS", label: "RoHS", kind: "options", count: 34, options: [{ value: "Yes", count: 34 }] },
+      { key: "Assembly Country of Origin", label: "Assembly Country of Origin", kind: "options", count: 34, options: [{ value: "China", count: 34 }] },
+    ];
+    const sections = sectionedRail(facets, "Resistors");
+    expect(sections.map((s) => s.title)).toEqual([
+      "Resistors Parameters",
+      "Package & Form",
+      "Sourcing & Compliance",
+      "More Filters",
+    ]);
+    // the generated parameter block carries the "from specs" badge; the rest do not
+    expect(sections[0].fromSpecs).toBe(true);
+    expect(sections.slice(1).every((s) => !s.fromSpecs)).toBe(true);
+    // electrical params live under Parameters; provenance sinks to More Filters
+    expect(sections[0].facets.map((f) => f.key)).toContain("Resistance");
+    expect(sections[3].facets.map((f) => f.key)).toEqual(["Assembly Country of Origin"]);
+  });
+});
+
+describe("makeScale", () => {
+  it("uses a log scale for a range spanning >= 2 decades, decade ticks", () => {
+    const s = makeScale(100, 100000); // 100 Ω .. 100 kΩ
+    expect(s.log).toBe(true);
+    // the midpoint by percent is the geometric mean, not the arithmetic one
+    expect(s.fromPct(50)).toBeCloseTo(Math.sqrt(100 * 100000), 0);
+    expect(s.toPct(1000)).toBeCloseTo(33.33, 0);
+    expect(s.ticks).toEqual([100, 1000, 10000, 100000]); // clean decades incl. round endpoints
+  });
+  it("drops a non-round endpoint from the log ticks (leaves the decades)", () => {
+    expect(makeScale(3.32, 1_000_000).ticks).toEqual([10, 100, 1000, 10000, 100000, 1000000]);
+  });
+  it("stays linear with nice round ticks for a narrow range", () => {
+    const s = makeScale(50, 750); // 50 V .. 750 V
+    expect(s.log).toBe(false);
+    expect(s.fromPct(50)).toBe(400);
+    expect(s.ticks).toEqual([200, 400, 600]);
   });
 });
 

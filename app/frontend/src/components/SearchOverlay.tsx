@@ -18,10 +18,13 @@ import {
   formatMagnitude,
   hasAnyFilter,
   isOptionOn,
+  makeScale,
   normalizeUnit,
-  orderFacetsForRail,
   parseMagnitude,
+  sectionedRail,
   setRange,
+  type RailSection as RailSectionData,
+  type Scale,
   toSpecParams,
   toggleOption,
   type RangeSel,
@@ -85,7 +88,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const searchResults = useSearchQuery({ q, category, spec });
 
   const facets = paramFacets.data?.facets ?? [];
-  const railFacets = useMemo(() => orderFacetsForRail(facets, category), [facets, category]);
+  const sections = useMemo(() => sectionedRail(facets, category), [facets, category]);
   const columns = useMemo(() => deriveColumns(facets, category, 4), [facets, category]);
   const chips = useMemo(() => activeChips(filters, facets), [filters, facets]);
 
@@ -213,7 +216,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
           onCategory={(name) =>
             setFilters((f) => ({ ...emptyFilters(), inStock: f.inStock, category: name }))
           }
-          facets={railFacets}
+          sections={sections}
           filters={filters}
           setFilters={setFilters}
         />
@@ -380,14 +383,14 @@ function FacetRail({
   categories,
   category,
   onCategory,
-  facets,
+  sections,
   filters,
   setFilters,
 }: {
   categories: [string, number][];
   category: string | null;
   onCategory: (name: string | null) => void;
-  facets: ParametricFacet[];
+  sections: RailSectionData[];
   filters: SearchFilters;
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
 }) {
@@ -410,29 +413,38 @@ function FacetRail({
           ) : null}
         </FacetGroup>
 
-        <RailSection label={category ? `${category} Parameters` : "Parameters"} fromSpecs />
-        {facets.length === 0 ? (
-          <div className="px-0.5 py-3 text-xs text-t3">
-            No parametric specs to filter on yet.
-          </div>
+        {sections.length === 0 ? (
+          <>
+            <RailSection label={category ? `${category} Parameters` : "Parameters"} fromSpecs />
+            <div className="px-0.5 py-3 text-xs text-t3">
+              No parametric specs to filter on yet.
+            </div>
+          </>
         ) : (
-          facets.map((facet) =>
-            facet.kind === "range" ? (
-              <RangeFacet
-                key={facet.key}
-                facet={facet}
-                sel={filters.ranges[facet.key] ?? null}
-                onChange={(sel) => setFilters((f) => setRange(f, facet.key, sel))}
-              />
-            ) : (
-              <OptionFacet
-                key={facet.key}
-                facet={facet}
-                filters={filters}
-                setFilters={setFilters}
-              />
-            ),
-          )
+          sections.map((sec) => (
+            <div key={sec.title}>
+              <RailSection label={sec.title} fromSpecs={sec.fromSpecs} />
+              {sec.facets.map((facet, idx) =>
+                facet.kind === "range" ? (
+                  <RangeFacet
+                    key={facet.key}
+                    facet={facet}
+                    first={idx === 0}
+                    sel={filters.ranges[facet.key] ?? null}
+                    onChange={(sel) => setFilters((f) => setRange(f, facet.key, sel))}
+                  />
+                ) : (
+                  <OptionFacet
+                    key={facet.key}
+                    facet={facet}
+                    first={idx === 0}
+                    filters={filters}
+                    setFilters={setFilters}
+                  />
+                ),
+              )}
+            </div>
+          ))
         )}
 
         <div className="mt-3.5 flex gap-2 border-t border-line pt-3 text-[10.5px] leading-relaxed text-t3">
@@ -552,10 +564,12 @@ function OptionRow({
 
 function OptionFacet({
   facet,
+  first,
   filters,
   setFilters,
 }: {
   facet: ParametricFacet;
+  first?: boolean;
   filters: SearchFilters;
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
 }) {
@@ -565,7 +579,7 @@ function OptionFacet({
   const shown = expanded ? opts : opts.slice(0, LIMIT);
   const more = opts.length - shown.length;
   return (
-    <FacetGroup title={facet.label}>
+    <FacetGroup title={facet.label} first={first}>
       {shown.map((o) => (
         <OptionRow
           key={o.value}
@@ -592,10 +606,12 @@ function OptionFacet({
 
 function RangeFacet({
   facet,
+  first,
   sel,
   onChange,
 }: {
   facet: ParametricFacet;
+  first?: boolean;
   sel: RangeSel | null;
   onChange: (sel: RangeSel) => void;
 }) {
@@ -604,15 +620,15 @@ function RangeFacet({
   const lo = sel?.min ?? fmin;
   const hi = sel?.max ?? fmax;
   const unit = normalizeUnit(facet.unit);
+  const scale = useMemo(() => makeScale(fmin, fmax), [fmin, fmax]);
   return (
-    <FacetGroup title={facet.label} unit={unit}>
+    <FacetGroup title={facet.label} unit={unit} first={first}>
       <div className="mb-2 flex justify-between font-mono text-xs text-t2">
         <span>{formatMagnitude(lo, unit)}</span>
         <span>{formatMagnitude(hi, unit)}</span>
       </div>
       <RangeSlider
-        fmin={fmin}
-        fmax={fmax}
+        scale={scale}
         lo={lo}
         hi={hi}
         onChange={(nlo, nhi) =>
@@ -622,7 +638,12 @@ function RangeFacet({
           })
         }
       />
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 flex justify-between px-1.5 font-mono text-[9.5px] text-t3">
+        {scale.ticks.map((t, i) => (
+          <span key={i}>{formatMagnitude(t, unit)}</span>
+        ))}
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
         <RangeInput value={lo} unit={unit} onCommit={(v) => onChange({ min: v <= fmin ? null : v, max: sel?.max ?? null })} />
         <RangeInput value={hi} unit={unit} onCommit={(v) => onChange({ min: sel?.min ?? null, max: v >= fmax ? null : v })} />
       </div>
@@ -661,23 +682,19 @@ function RangeInput({
 }
 
 function RangeSlider({
-  fmin,
-  fmax,
+  scale,
   lo,
   hi,
   onChange,
 }: {
-  fmin: number;
-  fmax: number;
+  scale: Scale;
   lo: number;
   hi: number;
   onChange: (lo: number, hi: number) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const span = fmax - fmin || 1;
-  const pct = (v: number) => Math.max(0, Math.min(100, ((v - fmin) / span) * 100));
-  const loPct = pct(lo);
-  const hiPct = pct(hi);
+  const loPct = scale.toPct(lo);
+  const hiPct = scale.toPct(hi);
 
   const drag = (which: "lo" | "hi") => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -685,8 +702,8 @@ function RangeSlider({
     const move = (clientX: number) => {
       const rect = trackRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const v = fmin + p * span;
+      const p = ((clientX - rect.left) / rect.width) * 100;
+      const v = scale.fromPct(p);
       if (which === "lo") onChange(Math.min(v, hi), hi);
       else onChange(lo, Math.max(v, lo));
     };
