@@ -102,9 +102,12 @@ function renderOne(glb: ArrayBuffer): Promise<string | null> {
           try {
             scene.add(gltf.scene);
             neutralize(gltf.scene);
-            // KiCad/STEP models are authored Z-up; three.js is Y-up, so -90° about X stands
-            // them upright. Applied before framing.
-            gltf.scene.rotation.x = -Math.PI / 2;
+            // Sit the part on its largest face: rotate so the SHORTEST bounding-box axis
+            // points up (Y). A flat part (resistor, chip) then lies flat instead of standing
+            // on its face - robust to the GLBs' inconsistent authored up-axes.
+            const d = new THREE.Box3().setFromObject(gltf.scene).getSize(new THREE.Vector3());
+            if (d.z <= d.x && d.z <= d.y) gltf.scene.rotation.x = -Math.PI / 2;
+            else if (d.x <= d.y && d.x <= d.z) gltf.scene.rotation.z = Math.PI / 2;
             gltf.scene.updateMatrixWorld(true);
             // Center on the origin, back the camera off the bounding SPHERE (so no clip at
             // the 3/4 angle), place it along the hero's view direction.
