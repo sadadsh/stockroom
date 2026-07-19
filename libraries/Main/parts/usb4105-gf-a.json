@@ -35,54 +35,88 @@
       "part_number": "640-USB4105-GF-A",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.93,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.81,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.741,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.668,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.61,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 800,
+          "currency": "USD",
           "price": 0.505,
-          "currency": "USD"
+          "qty": 800
         },
         {
-          "qty": 2400,
+          "currency": "USD",
           "price": 0.474,
-          "currency": "USD"
+          "qty": 2400
         },
         {
-          "qty": 4800,
+          "currency": "USD",
           "price": 0.451,
-          "currency": "USD"
+          "qty": 4800
         },
         {
-          "qty": 9600,
+          "currency": "USD",
           "price": 0.43,
-          "currency": "USD"
+          "qty": 9600
         }
       ],
       "stock": 481266,
       "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:05:05.141587+00:00",
+      "part_number": "2073-USB4105-GF-ATR-ND",
+      "price_breaks": [
+        {
+          "price": 0.49603,
+          "qty": 800
+        },
+        {
+          "price": 0.47234,
+          "qty": 1600
+        },
+        {
+          "price": 0.45903,
+          "qty": 2400
+        },
+        {
+          "price": 0.44278,
+          "qty": 4000
+        },
+        {
+          "price": 0.43239,
+          "qty": 5600
+        },
+        {
+          "price": 0.42165,
+          "qty": 8000
+        }
+      ],
+      "stock": 113633,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -122,8 +156,7 @@
     "Type": "PCB Top Mount",
     "US Tariff %": 30.0,
     "Unit Weight": "0.027090 oz",
-    "Voltage Rating": "48 VDC",
-    "Factory Pack Quantity: Factory Pack Quantity": "800"
+    "Voltage Rating": "48 VDC"
   },
   "symbol": {
     "lib": "SR-Connectors",
