@@ -32,44 +32,78 @@
       "part_number": "595-TXS0102DCUR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.63,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.445,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.399,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.348,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.324,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.31,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.31,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 111475,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR?qs=dB0LedT%252BmmBcQ3I%2Fs9XEDA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:05:04.079283+00:00",
+      "part_number": "296-21931-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.28249,
+          "qty": 3000
+        },
+        {
+          "price": 0.27524,
+          "qty": 6000
+        },
+        {
+          "price": 0.27161,
+          "qty": 9000
+        },
+        {
+          "price": 0.26759,
+          "qty": 15000
+        },
+        {
+          "price": 0.26524,
+          "qty": 21000
+        },
+        {
+          "price": 0.26298,
+          "qty": 30000
+        }
+      ],
+      "stock": 33104,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -94,8 +128,7 @@
     "Supply Voltage - Min": "1.65 V, 2.3 V",
     "Type": "2-bit Bidirectional Voltage-Level Translator",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.000339 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Unit Weight": "0.000339 oz"
   },
   "symbol": null,
   "tags": []
