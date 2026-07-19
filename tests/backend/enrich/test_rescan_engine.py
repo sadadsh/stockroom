@@ -87,6 +87,19 @@ def _fixed_now():
     return datetime(2026, 7, 18, tzinfo=timezone.utc)
 
 
+class _RecordingPacer(Pacer):
+    """A Pacer that records every provider it was asked to wait on, so a test can assert the
+    engine paces exactly once per enabled provider per processed part - no more, no less."""
+
+    def __init__(self):
+        super().__init__({})
+        self.calls: list[str] = []
+
+    def wait(self, provider):
+        self.calls.append(provider)
+        super().wait(provider)
+
+
 def test_run_refreshes_stale_mpn_parts_and_summarizes(tmp_path):
     index = _Index([_Row("a", "MPN-A"), _Row("b", ""), _Row("c", "MPN-C")])
     ops = _Ops(changed_ids=["a"])                         # only part a actually changes
@@ -175,6 +188,25 @@ def test_an_auth_error_also_trips_the_breaker(tmp_path):
     assert summary["paused_providers"] == ["Mouser"]
 
 
+def test_a_raising_progress_callback_never_aborts_the_run(tmp_path):
+    # a subscriber's progress callback throwing (a broken SSE consumer, a bug in the UI
+    # handler) must not abort the run itself - "one part never fails the run" also has to
+    # hold when the failure is in the progress plumbing, not the lookup/commit.
+    index = _Index([_Row("a", "MPN-A"), _Row("b", "MPN-B")])
+    ops = _Ops(changed_ids=["a", "b"])
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A"), "MPN-B": _priced("MPN-B")})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=["a", "b"])
+
+    def _boom_progress(data):
+        raise RuntimeError("progress callback exploded")
+
+    summary = RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        _boom_progress, force=True, now_fn=_fixed_now)
+    assert summary["total"] == 2
+    assert summary["updated"] == 2
+    assert ops.commits == ["a", "b"]
+
+
 def test_no_paused_providers_when_nothing_trips_the_breaker(tmp_path):
     index = _Index([_Row("a", "MPN-A")])
     ops = _Ops(changed_ids=["a"])
@@ -184,3 +216,51 @@ def test_no_paused_providers_when_nothing_trips_the_breaker(tmp_path):
         lambda e: None, force=True, now_fn=_fixed_now)
     assert summary["paused_providers"] == []
     assert "paused" not in summary["message"]
+
+
+def test_pacer_wait_is_called_once_per_enabled_provider_per_processed_part(tmp_path):
+    index = _Index([_Row("a", "MPN-A"), _Row("b", "MPN-B")])
+    ops = _Ops(changed_ids=[])
+    adapters = [_Adapter("Mouser", {}), _Adapter("DigiKey", {})]
+    pacer = _RecordingPacer()
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=[])
+    RescanEngine(ctx, pacer=pacer, adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    # 2 parts x 2 enabled providers, in adapter order, every single time - not skipped,
+    # not batched, not deduped.
+    assert pacer.calls == ["Mouser", "DigiKey", "Mouser", "DigiKey"]
+
+
+def test_a_disabled_adapter_is_skipped_and_never_looked_up(tmp_path):
+    index = _Index([_Row("a", "MPN-A")])
+    ops = _Ops(changed_ids=[])
+    adapter = _Adapter("Mouser", {"MPN-A": _priced("MPN-A")})
+    adapter.enabled = False
+    ctx = _Ctx(tmp_path, index, ops, [adapter], changed_ids=[])
+    pacer = _RecordingPacer()
+    summary = RescanEngine(ctx, pacer=pacer, adapters=[adapter]).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert adapter.calls == []          # lookup is never called on a disabled adapter
+    assert pacer.calls == []            # and it is never even paced
+    assert summary["no_data"] == 1      # so the part just comes back with nothing
+
+
+def test_a_failed_part_fires_a_warn_progress_event_with_the_part_id(tmp_path):
+    index = _Index([_Row("a", "MPN-A"), _Row("c", "MPN-C")])
+
+    class _Boom(_Ops):
+        def refresh_procurement(self, part_id, per_vendor, now_iso):
+            if part_id == "a":
+                raise RuntimeError("write blew up")
+            return super().refresh_procurement(part_id, per_vendor, now_iso)
+
+    ops = _Boom(changed_ids=["c"])
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A"), "MPN-C": _priced("MPN-C")})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=["c"])
+    events = []
+    RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        events.append, force=True, now_fn=_fixed_now)
+    warns = [e for e in events if e.get("level") == "warn"]
+    assert len(warns) == 1
+    assert warns[0]["part_id"] == "a"
+    assert "write blew up" in warns[0]["message"]

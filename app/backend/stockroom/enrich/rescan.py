@@ -3,6 +3,7 @@ checkpoint. See the plan header for the lane model and the uncommitted-staleness
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from stockroom.enrich.refresh import _has_data
@@ -29,7 +30,9 @@ class Pacer:
     blocks (via the injected sleep) only as long as needed since that provider's last call.
     Deterministic under an injected clock/sleep."""
 
-    def __init__(self, per_minute: dict[str, float], *, now=None, sleep=None):
+    def __init__(self, per_minute: dict[str, float], *,
+                 now: Callable[[], float] | None = None,
+                 sleep: Callable[[float], None] | None = None):
         self._min_interval = {k: (60.0 / v) for k, v in per_minute.items() if v and v > 0}
         self._last: dict[str, float] = {}
         self._now = now or time.monotonic
@@ -64,6 +67,15 @@ class RescanEngine:
         # so a throttled/misconfigured provider never gets hammered for the whole rescan.
         self._tripped: set[str] = set()
 
+    def _emit(self, progress, data: dict) -> None:
+        """Fire one progress event; a raising subscriber callback (a broken SSE consumer, a
+        buggy UI handler) must never abort the run - "one part never fails the run" holds for
+        the progress plumbing too, not just the lookup/commit."""
+        try:
+            progress(data)
+        except Exception:  # noqa: BLE001 - swallow, never let a callback abort the run
+            pass
+
     def run(self, progress, *, ttl_days: int | None = None, force: bool = False, now_fn=None) -> dict:
         now_fn = now_fn or (lambda: datetime.now(timezone.utc))
         if ttl_days is None:
@@ -73,7 +85,8 @@ class RescanEngine:
         worklist = plan_rescan(self._ctx.index, state, cutoff_iso, force)
         total = len(worklist)
         summary = {"total": total, "updated": 0, "unchanged": 0, "no_data": 0, "failed": 0}
-        progress({"pct": 0, "done": 0, "total": total, "message": f"{total} parts to refresh"})
+        self._emit(progress, {"pct": 0, "done": 0, "total": total,
+                              "message": f"{total} parts to refresh"})
         for i, (part_id, mpn) in enumerate(worklist):
             checked_at = now_fn().isoformat()
             try:
@@ -90,12 +103,13 @@ class RescanEngine:
                     outcome = "updated" if changed else "unchanged"
             except Exception as exc:  # noqa: BLE001 - one part never fails the whole run (graceful)
                 outcome = "failed"
-                progress({"level": "warn", "part_id": part_id, "message": f"{part_id}: {exc}"})
+                self._emit(progress, {"level": "warn", "part_id": part_id,
+                                      "message": f"{part_id}: {exc}"})
             summary[outcome] += 1
             state.record(part_id, outcome, checked_at)
             done = i + 1
-            progress({"pct": round(done * 100 / total) if total else 100, "done": done,
-                      "total": total, "part_id": part_id, "outcome": outcome})
+            self._emit(progress, {"pct": round(done * 100 / total) if total else 100, "done": done,
+                                  "total": total, "part_id": part_id, "outcome": outcome})
         if summary["updated"]:
             self._ctx.jobs.run_write(self._ctx.rebuild_index)
             self._ctx.jobs.run_write(self._ctx.auto_push)

@@ -25,8 +25,12 @@ from stockroom.enrich.schema import (
 
 
 def _fetch_token(client_id: str, client_secret: str, timeout: float) -> str | None:
-    """OAuth2 client-credentials bearer token, or None (never raises here — the caller treats a
-    missing token as a failed lookup)."""
+    """OAuth2 client-credentials bearer token, or None on a non-HTTP transport failure (the
+    caller treats a missing token as a failed lookup). An HTTP error status at the token
+    endpoint (401/403 bad credential, 429 throttled) instead raises EnrichError carrying that
+    status_code, so a bad/expired DigiKey credential surfaces to DigiKeyAdapter.lookup as
+    auth_error/rate_limited (via status_from_error) - the same breaker signal a failed product
+    search gives - rather than degrading to a generic, breaker-invisible failure."""
     if not (client_id and client_secret):
         return None
     body = urllib.parse.urlencode({"client_id": client_id, "client_secret": client_secret,
@@ -37,6 +41,8 @@ def _fetch_token(client_id: str, client_secret: str, timeout: float) -> str | No
         with urllib.request.urlopen(req, timeout=timeout) as r:
             parsed = json.loads(r.read().decode())
         return parsed.get("access_token") if isinstance(parsed, dict) else None
+    except urllib.error.HTTPError as exc:
+        raise EnrichError(f"digikey token request failed: {exc}", status_code=exc.code) from exc
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
         return None
 

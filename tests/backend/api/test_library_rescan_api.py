@@ -1,19 +1,4 @@
-import json
-
-
-def _drain_job(client, job_id):
-    kind = None
-    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
-        for line in s.iter_lines():
-            if line.startswith("event:"):
-                kind = line.split(":", 1)[1].strip()
-            elif line.startswith("data:"):
-                data = json.loads(line.split(":", 1)[1].strip() or "{}")
-                if kind == "result":
-                    return data["result"]
-                if kind == "error":
-                    raise AssertionError(data)
-    raise AssertionError("no terminal event")
+from tests.backend.api.conftest import _drain_job
 
 
 def test_rescan_endpoint_refreshes_the_library_via_the_adapters(client, app_ctx, monkeypatch):
@@ -35,7 +20,9 @@ def test_rescan_endpoint_refreshes_the_library_via_the_adapters(client, app_ctx,
 
     r = client.post("/api/library/rescan?force=true")
     assert r.status_code == 200
-    summary = _drain_job(client, r.json()["job_id"])
+    out = _drain_job(client, r.json()["job_id"])
+    assert out["status"] == "done", out
+    summary = out["result"]
     assert summary["total"] >= 1 and summary["updated"] >= 1
     # the state surface reflects the run
     st = client.get("/api/library/rescan/state")
@@ -87,5 +74,7 @@ def test_rescan_is_single_flight_while_one_is_running(client, app_ctx, monkeypat
     assert len(app_ctx.jobs._jobs) == 1  # only job A was ever created
 
     event.set()  # release the blocked lookup so job A can complete
-    summary = _drain_job(client, job_a)
+    out = _drain_job(client, job_a)
+    assert out["status"] == "done", out
+    summary = out["result"]
     assert summary["total"] >= 1 and summary["updated"] >= 1

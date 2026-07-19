@@ -55,6 +55,15 @@ def test_load_ignores_unknown_keys(tmp_path):
     assert cfg.active_profile == "X"
 
 
+def test_rescan_config_defaults():
+    # Library-scale rescan (Phase-1b-2): a fresh install must trickle within each API's
+    # published quota out of the box, without the settings UI having to be touched first.
+    cfg = MachineConfig()
+    assert cfg.rescan_ttl_days == 7
+    assert cfg.rescan_mouser_per_min == 20
+    assert cfg.rescan_digikey_per_min == 60
+
+
 def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     # M9a: the per-machine library location. Blank on a fresh install (first-run onboarding);
     # persisted once the user picks/creates/clones a library.
