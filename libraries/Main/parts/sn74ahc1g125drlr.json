@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/sg/scyt129e/scyt129e.pdf"
   },
   "description": "Single Buffer Gate Tri-State, Low-Voltage CMOS",
-  "display_name": "74AHC1G125 SOT-5X3-5 TI SN74AHC1G125DRLR",
+  "display_name": "Buffer SN74AHC1G125DRLR SOT-5X3-5",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:14.802255+00:00",
       "part_number": "595-SN74AHC1G125DRLR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.22,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.148,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.131,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.112,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.103,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.098,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.093,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.092,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.091,
           "qty": 4000
         }
       ],
-      "stock": 6492,
+      "stock": 6252,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74AHC1G125DRLR?qs=NvrC5vRk3q5L7MSRMAsCMg%3D%3D",
       "vendor": "Mouser"
     },
