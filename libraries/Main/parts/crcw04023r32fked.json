@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "3.3Ω 1% 0402 Vishay CRCW04023R32FKED",
+  "display_name": "3.32Ω 1% 100mW 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:14:07.174926+00:00",
       "part_number": "71-CRCW0402-3.32-E3",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.025,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.021,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.017,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.014,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.012,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.009,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 10000
         }
       ],
-      "stock": 91174,
+      "stock": 91162,
       "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED?qs=%2FGvPWUwWV9YPS%252BJP%2FiUvGA%3D%3D",
       "vendor": "Mouser"
     },
