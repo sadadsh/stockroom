@@ -32,49 +32,83 @@
       "part_number": "621-74AHC1G32QSE-7",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.14,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.092,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.081,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.069,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.063,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.059,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.056,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.056,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 7036,
       "url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7?qs=bAKSY%2FctAC6EE%252BFwJC1d6Q%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:32.138228+00:00",
+      "part_number": "31-74AHC1G32QSE-7TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05195,
+          "qty": 3000
+        },
+        {
+          "price": 0.05016,
+          "qty": 6000
+        },
+        {
+          "price": 0.04926,
+          "qty": 9000
+        },
+        {
+          "price": 0.04827,
+          "qty": 15000
+        },
+        {
+          "price": 0.04769,
+          "qty": 21000
+        },
+        {
+          "price": 0.04713,
+          "qty": 30000
+        }
+      ],
+      "stock": 2389,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -106,8 +140,7 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "2 V",
-    "US Tariff %": 37.86,
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "US Tariff %": 37.86
   },
   "symbol": null,
   "tags": []
