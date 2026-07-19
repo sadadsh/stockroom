@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/74438357010.pdf"
   },
   "description": "Wurth 74438357010",
-  "display_name": "1uH 20% 4030 Wurth 74438357010",
+  "display_name": "1µH 20% 10.25A Power Inductor",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -28,36 +28,31 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:19.442113+00:00",
       "part_number": "710-74438357010",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 1.68,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 1.6,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 1.54,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 1.4,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 1.22,
           "qty": 700
         }
       ],
-      "stock": 11702,
+      "stock": 15017,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010?qs=AQlKX63v8RstGPuQmrueWg%3D%3D",
       "vendor": "Mouser"
     },
