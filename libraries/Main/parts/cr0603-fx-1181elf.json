@@ -32,44 +32,78 @@
       "part_number": "652-CR0603FX-1181ELF",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.016,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.01,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.007,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.006,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.004,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.003,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 51357,
       "url": "https://www.mouser.com/en/ProductDetail/Bourns/CR0603-FX-1181ELF?qs=e7cxVwPieur3A68XPb9FHg%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:39.878862+00:00",
+      "part_number": "118-CR0603-FX-1181ELFTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00508,
+          "qty": 5000
+        },
+        {
+          "price": 0.0045,
+          "qty": 10000
+        },
+        {
+          "price": 0.00421,
+          "qty": 15000
+        },
+        {
+          "price": 0.00391,
+          "qty": 25000
+        },
+        {
+          "price": 0.00373,
+          "qty": 35000
+        },
+        {
+          "price": 0.00357,
+          "qty": 50000
+        }
+      ],
+      "stock": 8120,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -100,14 +134,13 @@
     "Series": "CR0603",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
-    "Width": "0.8 mm (0.031 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000"
+    "Width": "0.8 mm (0.031 in)"
   },
   "symbol": {
     "lib": "Device",
