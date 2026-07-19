@@ -36,8 +36,14 @@ class _Ops:
     def __init__(self, changed_ids):
         self._changed = set(changed_ids)
         self.commits = []
+        self.rebuilds = []
 
     def refresh_procurement(self, part_id, per_vendor, now_iso):
+        self.commits.append(part_id)
+        return part_id  # stand-in record
+
+    def rebuild_part(self, part_id, per_vendor, now_iso):
+        self.rebuilds.append(part_id)
         self.commits.append(part_id)
         return part_id  # stand-in record
 
@@ -264,3 +270,27 @@ def test_a_failed_part_fires_a_warn_progress_event_with_the_part_id(tmp_path):
     assert len(warns) == 1
     assert warns[0]["part_id"] == "a"
     assert "write blew up" in warns[0]["message"]
+
+
+def test_rename_true_routes_each_commit_through_rebuild_part(tmp_path):
+    """A full rebuild (rename=True) refreshes data AND re-derives the name in the SAME per-part
+    commit, so the engine must route through ops.rebuild_part, not the data-only refresh_procurement."""
+    index = _Index([_Row("a", "MPN-A")])
+    ops = _Ops(changed_ids=["a"])
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A")})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=["a"])
+    RescanEngine(ctx, pacer=Pacer({}), adapters=adapters, rename=True).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert ops.rebuilds == ["a"]   # rebuild path used
+    assert ops.commits == ["a"]    # exactly once
+
+
+def test_rename_default_false_uses_data_only_refresh(tmp_path):
+    index = _Index([_Row("a", "MPN-A")])
+    ops = _Ops(changed_ids=["a"])
+    adapters = [_Adapter("Mouser", {"MPN-A": _priced("MPN-A")})]
+    ctx = _Ctx(tmp_path, index, ops, adapters, changed_ids=["a"])
+    RescanEngine(ctx, pacer=Pacer({}), adapters=adapters).run(
+        lambda e: None, force=True, now_fn=_fixed_now)
+    assert ops.rebuilds == []      # plain rescan never renames
+    assert ops.commits == ["a"]
