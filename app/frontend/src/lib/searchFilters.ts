@@ -57,9 +57,14 @@ export function normalizeUnit(unit: string | null | undefined): string {
   return /^ohms?$/i.test(u) ? "Ω" : u;
 }
 
+// The reserved facet key for the sourcing-derived Unit Price range: it filters client-side over
+// the rows' unit_price (not a spec), so it never becomes a `spec` token or a results column.
+export const PRICE_KEY = "__unit_price__";
+
 export function formatMagnitude(mag: number, unit: string | null | undefined): string {
   const u = normalizeUnit(unit);
   if (!Number.isFinite(mag)) return "";
+  if (u === "$") return `$${mag < 1 ? mag.toFixed(mag < 0.1 ? 3 : 2) : mag.toFixed(2)}`;
   if (mag !== 0 && _PREFIXABLE.has(u)) {
     const abs = Math.abs(mag);
     for (const [scale, prefix] of _PREFIXES) {
@@ -160,13 +165,33 @@ function _rangeToken(key: string, sel: RangeSel): string | null {
 export function toSpecParams(filters: SearchFilters): string[] {
   const tokens: string[] = [];
   for (const [key, values] of Object.entries(filters.options)) {
+    if (key.startsWith("__")) continue; // reserved client-side facet (Unit Price)
     for (const value of values) tokens.push(`${key}:${value}`);
   }
   for (const [key, sel] of Object.entries(filters.ranges)) {
+    if (key.startsWith("__")) continue;
     const t = _rangeToken(key, sel);
     if (t) tokens.push(t);
   }
   return tokens;
+}
+
+/** Apply the filters the backend does NOT do - the In Stock toggle and the Unit Price range -
+ * client-side over the rows the server returned, so the facet counts stay stable as they toggle. */
+export function applyClientFilters<
+  T extends { stock: number | null; unit_price: number | null },
+>(rows: T[], filters: SearchFilters): T[] {
+  const price = filters.ranges[PRICE_KEY];
+  return rows.filter((r) => {
+    if (filters.inStock && !(r.stock != null && r.stock > 0)) return false;
+    if (price) {
+      const p = r.unit_price;
+      if (p == null) return false;
+      if (price.min != null && p < price.min) return false;
+      if (price.max != null && p > price.max) return false;
+    }
+    return true;
+  });
 }
 
 // --- active-filter chips ----------------------------------------------------
@@ -217,8 +242,8 @@ export function activeChips(
     if (sel.min == null && sel.max == null) continue;
     chips.push({
       id: `range:${key}`,
-      keyLabel: key,
-      value: _rangeLabel(sel, unitOf(key)),
+      keyLabel: key === PRICE_KEY ? "Unit Price" : key,
+      value: _rangeLabel(sel, key === PRICE_KEY ? "$" : unitOf(key)),
       remove: clearRange(filters, key),
     });
   }
@@ -405,9 +430,12 @@ export function sectionedRail(
     Other: [],
   };
   for (const f of orderFacetsForRail(facets, cat)) {
-    const group = _COMMERCIAL.test(normalizeSpecKey(f.key))
-      ? "Other"
-      : resolveSpec(f.key, cat).group;
+    const group =
+      f.key === PRICE_KEY
+        ? "Ratings & Compliance" // Unit Price belongs to Sourcing & Compliance
+        : _COMMERCIAL.test(normalizeSpecKey(f.key))
+          ? "Other"
+          : resolveSpec(f.key, cat).group;
     buckets[group].push(f);
   }
   const sections: RailSection[] = [];
