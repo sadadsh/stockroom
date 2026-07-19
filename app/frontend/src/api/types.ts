@@ -512,6 +512,38 @@ export interface RepairResult {
   manual: RepairFinding[];
 }
 
+// POST /api/library/rescan -> a background job (Phase-1b-3: library-scale procurement
+// rescan). already_running is set (instead of a fresh job_id) when a rescan was already in
+// flight; the caller attaches to that job rather than starting a second one.
+export interface RescanStartResponse extends JobRef {
+  already_running?: boolean;
+}
+
+// The terminal `result` event of a rescan job: one part-count per outcome, the providers
+// (if any) that hit a quota/auth issue partway through and were skipped for the rest of the
+// run, and the engine's own honest summary line.
+export interface RescanSummary {
+  total: number;
+  updated: number;
+  unchanged: number;
+  no_data: number;
+  failed: number;
+  paused_providers: string[];
+  message: string;
+}
+
+// GET /api/library/rescan/state -> the last-known rescan outcome per part (uncommitted,
+// per-machine; empty before any rescan has ever run on this machine).
+export interface RescanStateEntry {
+  checked_at: string;
+  outcome: string;
+}
+
+export interface RescanStateResponse {
+  parts: Record<string, RescanStateEntry>;
+  counts: Record<string, number>;
+}
+
 // POST /api/doctor/wire-kicad (a job) -> the KiCad wiring outcome. restart_needed is
 // true when KiCad was running while the library tables changed under it.
 export interface WiringReport {

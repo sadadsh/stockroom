@@ -53,6 +53,8 @@ import type {
   ProjectSummary,
   BoardSettings,
   RepairResult,
+  RescanStartResponse,
+  RescanStateResponse,
   RevisionsResult,
   SetBoardSettingsBody,
   SetBoardSettingsResult,
@@ -235,6 +237,22 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Refresh every part's procurement data (price/stock/lifecycle) from the free distributor
+  // APIs, in one incremental background job (Phase-1b-3). force=true re-checks every part,
+  // ignoring the freshness window; already_running (instead of a new job_id) means a rescan
+  // was already in flight, so the caller attaches to that job rather than starting a second.
+  rescanLibrary(force = false): Promise<RescanStartResponse> {
+    return request<RescanStartResponse>("POST", "/api/library/rescan", {
+      params: force ? { force: "true" } : undefined,
+    });
+  },
+
+  // The last-known rescan outcome per part (empty before any rescan has run on this
+  // machine), for an honest "last refreshed" summary before the next run starts.
+  getRescanState(): Promise<RescanStateResponse> {
+    return apiGet<RescanStateResponse>("/api/library/rescan/state");
   },
 
   // Preview a file-less passive add (decode + resolve stock assets) without
