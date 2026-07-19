@@ -32,49 +32,83 @@
       "part_number": "187-CL05B222KB5NNNC",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.1,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.016,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.013,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.009,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.008,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.007,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.006,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 10000,
+          "currency": "USD",
           "price": 0.004,
-          "currency": "USD"
+          "qty": 10000
         }
       ],
       "stock": 12169,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL05B222KB5NNNC?qs=349EhDEZ59rr3rosBHU74A%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:03:59.125351+00:00",
+      "part_number": "1276-1054-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00523,
+          "qty": 10000
+        },
+        {
+          "price": 0.00473,
+          "qty": 20000
+        },
+        {
+          "price": 0.00447,
+          "qty": 30000
+        },
+        {
+          "price": 0.0042,
+          "qty": 50000
+        },
+        {
+          "price": 0.00403,
+          "qty": 70000
+        },
+        {
+          "price": 0.00388,
+          "qty": 100000
+        }
+      ],
+      "stock": 289809,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -106,13 +140,12 @@
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "10 %",
+    "Tolerance": "10%",
     "Type": "Multilayer Ceramic Capacitor",
     "US Tariff %": 8.0,
     "Unit Weight": "0.000053 oz",
     "Voltage Rating DC": "50 VDC",
-    "Width": "0.5 mm (0.02 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000"
+    "Width": "0.5 mm (0.02 in)"
   },
   "symbol": {
     "lib": "Device",
