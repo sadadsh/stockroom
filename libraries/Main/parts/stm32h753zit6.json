@@ -32,39 +32,73 @@
       "part_number": "511-STM32H753ZIT6",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 17.13,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 14.15,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 13.42,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 12.01,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 11.45,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 360,
+          "currency": "USD",
           "price": 10.94,
-          "currency": "USD"
+          "qty": 360
         }
       ],
       "stock": 14,
       "url": "https://www.mouser.com/en/ProductDetail/STMicroelectronics/STM32H753ZIT6?qs=u4fy%2FsgLU9PzR9vtNNw%2FMw%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:54.093213+00:00",
+      "part_number": "497-18568-ND",
+      "price_breaks": [
+        {
+          "price": 16.95,
+          "qty": 1
+        },
+        {
+          "price": 13.438,
+          "qty": 10
+        },
+        {
+          "price": 12.5608,
+          "qty": 25
+        },
+        {
+          "price": 11.49533,
+          "qty": 120
+        },
+        {
+          "price": 10.98442,
+          "qty": 360
+        },
+        {
+          "price": 10.79557,
+          "qty": 600
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -105,8 +139,7 @@
     "Tradename": "STM32",
     "US Tariff %": 0.0,
     "Unit Weight": "0.046385 oz",
-    "Watchdog Timers": "Watchdog Timer, Windowed",
-    "Factory Pack Quantity: Factory Pack Quantity": "360"
+    "Watchdog Timers": "Watchdog Timer, Windowed"
   },
   "symbol": null,
   "tags": []
