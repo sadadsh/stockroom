@@ -6,7 +6,7 @@
     "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDP0000/AOA0000C334.pdf"
   },
   "description": "Resistor",
-  "display_name": "10k 1% 0603 Panasonic ERJ-S03F1002V",
+  "display_name": "10kΩ 1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:12:49.384150+00:00",
       "part_number": "667-ERJ-S03F1002V",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.23,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.083,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.072,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.061,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.054,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.049,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.037,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.035,
           "qty": 10000
         }
       ],
-      "stock": 58274,
+      "stock": 57982,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-S03F1002V?qs=Zyl8A9hlmJoZiGA1sKtMzw%3D%3D",
       "vendor": "Mouser"
     },
