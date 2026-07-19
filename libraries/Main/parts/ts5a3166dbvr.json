@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/ds/symlink/ts5a3166.pdf"
   },
   "description": "Single SPST Analog Switch, 5-V/3.3-V, normally OFF, 0.9Ohm Ron, SOT-23-5",
-  "display_name": "TS5A3166DBVR SOT-23-5 TI",
+  "display_name": "Analog Switch IC TS5A3166DBVR SOT-23-5",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
