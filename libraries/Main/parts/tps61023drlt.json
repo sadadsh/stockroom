@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=http%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Ftps61023"
   },
   "description": "Switching Voltage Regulators 3-A boost converter with 0.5-V ultra-low input voltage 6-SOT-5X3 -40 to 125",
-  "display_name": "TPS61023 SOT-563-6 TI TPS61023DRLT",
+  "display_name": "Switching Voltage Regulator TPS61023DRLT SOT-563-6",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
