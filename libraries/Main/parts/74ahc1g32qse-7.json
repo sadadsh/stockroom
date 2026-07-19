@@ -6,7 +6,7 @@
     "source_url": "http://www.ti.com/lit/sg/scyt129e/scyt129e.pdf"
   },
   "description": "Single OR Gate, Low-Voltage CMOS",
-  "display_name": "74AHC1G32QSE-7 SOT-353-5 Diodes",
+  "display_name": "Logic Gate 74AHC1G32QSE-7 SOT-353-5",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -28,51 +28,43 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:19.725013+00:00",
       "part_number": "621-74AHC1G32QSE-7",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.14,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.092,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.081,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.069,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.063,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.059,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.056,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.056,
           "qty": 3000
         }
       ],
-      "stock": 7036,
+      "stock": 7134,
       "url": "https://www.mouser.com/en/ProductDetail/Diodes-Incorporated/74AHC1G32QSE-7?qs=bAKSY%2FctAC6EE%252BFwJC1d6Q%3D%3D",
       "vendor": "Mouser"
     },
