@@ -32,54 +32,88 @@
       "part_number": "595-SN74LVC1G74DCUR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.6,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.422,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.379,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.33,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.307,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.293,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.287,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.267,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.26,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 52594,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR?qs=DS7Z8uEdLNyRBKrHxqRXjA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:53.064922+00:00",
+      "part_number": "296-25554-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.26724,
+          "qty": 3000
+        },
+        {
+          "price": 0.26032,
+          "qty": 6000
+        },
+        {
+          "price": 0.25685,
+          "qty": 9000
+        },
+        {
+          "price": 0.25301,
+          "qty": 15000
+        },
+        {
+          "price": 0.25076,
+          "qty": 21000
+        },
+        {
+          "price": 0.2486,
+          "qty": 30000
+        }
+      ],
+      "stock": 24912,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,8 +146,7 @@
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V",
     "US Tariff %": 8.0,
-    "Unit Weight": "0.001058 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Unit Weight": "0.001058 oz"
   },
   "symbol": null,
   "tags": []
