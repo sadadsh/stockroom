@@ -165,9 +165,42 @@ export function DetailPanel({
             category={detail.category}
           />
         </div>
-        <div className="flex flex-none items-center gap-2">
-          <EdaBadge label="KiCad" readiness={assetReadiness(detail, "kicad")} />
-          <EdaBadge label="Altium" readiness={assetReadiness(detail, "altium")} />
+        <div className="flex flex-none flex-col items-end gap-3">
+          <div className="flex items-center gap-2">
+            <EdaBadge label="KiCad" readiness={assetReadiness(detail, "kicad")} />
+            <EdaBadge label="Altium" readiness={assetReadiness(detail, "altium")} />
+          </div>
+          {/* Moving a part between category libraries lives HERE in the masthead, not among
+              the Overview data rows where a select read out of place. */}
+          {onMoveCategory && categories && categories.length > 0 ? (
+            <span className="relative inline-block">
+              <select
+                aria-label="Category"
+                value={detail.category}
+                disabled={busy}
+                onChange={(e) => {
+                  if (e.target.value !== detail.category) onMoveCategory(e.target.value);
+                }}
+                className="appearance-none rounded-control border border-line2 bg-field py-1.5 pl-3 pr-8 text-xs font-medium text-t1 outline-none focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-t3"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+              >
+                <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -203,9 +236,9 @@ export function DetailPanel({
 
       {/* top row: Overview + Sourcing on the LEFT, the part's three asset views on the RIGHT.
           The wide Specifications sheet sits full-width BELOW this row. */}
-      <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-start gap-6">
+      <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-stretch gap-6">
         <div className="flex min-w-0 flex-col gap-[22px]">
-          <div className="overflow-hidden rounded-card border border-line bg-raise shadow-card">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-card border border-line bg-raise shadow-card">
             <div className="px-[18px] py-[15px]">
               <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
                 Overview
@@ -229,24 +262,6 @@ export function DetailPanel({
                 onSave={onEditField ? (v) => onEditField("manufacturer", v) : undefined}
                 busy={busy}
               />
-              {/* Category moves the symbol + footprint between libraries, so it is a
-                  select over known categories, not an inline field edit. */}
-              {onMoveCategory && categories && categories.length > 0 ? (
-                <CategoryRow
-                  value={detail.category}
-                  categories={categories}
-                  onMove={onMoveCategory}
-                  busy={busy}
-                />
-              ) : (
-                <DataRow label="Category" value={detail.category} />
-              )}
-              {detail.symbol?.name ? (
-                <DataRow label="Symbol" value={detail.symbol.name} mono />
-              ) : null}
-              {detail.footprint?.name ? (
-                <DataRow label="Footprint" value={detail.footprint.name} mono />
-              ) : null}
               <DataRow
                 label="Description"
                 value={detail.description}
@@ -261,18 +276,8 @@ export function DetailPanel({
                 }
                 href={detail.datasheet?.source_url || undefined}
               />
-              {onEditField ? (
-                <DataRow
-                  label="Tags"
-                  value={detail.tags.join(", ")}
-                  onSave={(v) => onEditField("tags", splitTags(v))}
-                  busy={busy}
-                />
-              ) : detail.tags.length > 0 ? (
-                <DataRow label="Tags" value={detail.tags.join(", ")} />
-              ) : null}
             </div>
-            <div className="border-t border-line px-[18px] py-[15px]">
+            <div className="mt-auto border-t border-line px-[18px] py-[15px]">
               <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
                 Sourcing
               </div>
@@ -589,54 +594,6 @@ function Middot() {
 }
 
 
-function CategoryRow({
-  value,
-  categories,
-  onMove,
-  busy,
-}: {
-  value: string;
-  categories: string[];
-  onMove: (category: string) => void;
-  busy?: boolean;
-}) {
-  // Always include the current category, even if the facets have not caught up.
-  const options = categories.includes(value) ? categories : [value, ...categories];
-  return (
-    <div className="flex gap-4 py-2">
-      <span className="w-[96px] flex-none pt-1.5 text-sm text-t3">Category</span>
-      <span className="flex min-w-0 flex-1 items-center">
-        <span className="relative inline-block w-full max-w-[240px]">
-          <select
-            aria-label="Category"
-            value={value}
-            disabled={busy}
-            onChange={(e) => {
-              if (e.target.value !== value) onMove(e.target.value);
-            }}
-            className="w-full appearance-none rounded-control border border-line2 bg-field px-2.5 py-1.5 pr-8 text-sm text-t1 outline-none focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {options.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <svg
-            className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-t3"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            aria-hidden="true"
-          >
-            <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </span>
-    </div>
-  );
-}
 
 function PanelMessage({
   children,
@@ -717,14 +674,6 @@ function DataRow({
       </span>
     </div>
   );
-}
-
-// Tags edit as a comma-separated string; store them as a clean array.
-function splitTags(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
 }
 
 // One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
@@ -1003,14 +952,13 @@ function Sourcing({
   return (
     <div className="flex flex-col">
       {orderable.map((p, i) => {
-        const unit = normalizePriceBreaks(p.price_breaks)[0] ?? null;
+        const breaks = normalizePriceBreaks(p.price_breaks);
+        const unit = breaks[0] ?? null;
         const isBest = orderable.length > 1 && unit != null && unit.price === cheapest;
         const name = vendorLabel(p.vendor, p.url);
         return (
-          <div
-            key={`${p.vendor}-${i}`}
-            className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-line py-[11px] last:border-0"
-          >
+          <div key={`${p.vendor}-${i}`} className="border-b border-line py-[11px] last:border-0">
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[12.5px] font-semibold text-t1">{name}</span>
@@ -1059,6 +1007,19 @@ function Sourcing({
                 <ExternalIcon />
               </a>
             </div>
+            </div>
+            {breaks.length > 1 ? (
+              <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
+                {breaks.map((b) => (
+                  <div key={b.qty} className="flex items-baseline gap-1.5">
+                    <span className="tnum font-mono text-[11px] text-t3">{b.qty}+</span>
+                    <span className="tnum font-mono text-[11px] font-semibold text-t1">
+                      {formatPrice(b.price, p.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
       })}

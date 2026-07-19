@@ -179,7 +179,7 @@ describe("deriveAttributes", () => {
   it("caps the chip count and keeps tags-first ordering", () => {
     const part = makePart({
       category: "Resistors",
-      tags: ["T1", "T2", "T3", "T4", "T5", "T6"],
+      tags: ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"],
       specs: {
         Package: "0603",
         "Mounting Type": "SMD",
@@ -188,9 +188,11 @@ describe("deriveAttributes", () => {
       },
     });
     const attrs = deriveAttributes(part);
-    expect(attrs.length).toBe(8);
-    expect(attrs.slice(0, 6)).toEqual(["T1", "T2", "T3", "T4", "T5", "T6"]);
-    expect(attrs[6]).toBe("0603");
-    expect(attrs[7]).toBe("Surface Mount");
+    expect(attrs.length).toBe(12);
+    expect(attrs.slice(0, 10)).toEqual([
+      "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10",
+    ]);
+    expect(attrs[10]).toBe("0603");
+    expect(attrs[11]).toBe("Surface Mount");
   });
 });

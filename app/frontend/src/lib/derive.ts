@@ -195,7 +195,17 @@ interface AttributeRule {
 }
 
 // The most a chip rail should carry before it stops reading as a summary.
-const MAX_ATTRIBUTES = 8;
+const MAX_ATTRIBUTES = 12;
+
+// A value that is a numeric measurement ("75 V", "200 mW", "1.6 mm", "16 Contact" is NOT one -
+// its unit token is a word) belongs in Specifications, not a summary chip.
+// A value that leads with a number is a measurement or a count (1.1 kOhms, 100 nF, -40 °C,
+// 0603, 8) — that belongs in the Specifications sheet, never as a categorical attribute chip.
+// Curated numeric attributes we DO want (package size, bit width) come through the registry
+// above, which is not gated by this; only the open-ended fallback below uses it.
+function isMeasurement(value: string): boolean {
+  return /^[+\-±]?\s*[\d.,]/.test(value.trim());
+}
 
 // Mounting codes normalized to a spoken label; a value that is already a label passes
 // through formatMounting unchanged.
@@ -252,6 +262,23 @@ const ATTRIBUTE_REGISTRY: AttributeRule[] = [
   { match: "anti surge", format: (v) => (isNegative(v) ? null : "Anti-Surge") },
   { match: "sulfur resistant", format: (v) => (isNegative(v) ? null : "Sulfur Resistant") },
   { match: "sulphur resistant", format: (v) => (isNegative(v) ? null : "Sulfur Resistant") },
+  // more parametric categoricals (Mouser-style): dielectric, connector gender / termination,
+  // element / contact material + plating, orientation, mounting style, feature flags.
+  { match: "dielectric", format: (v) => v },
+  { match: "gender", format: (v) => v },
+  { match: "termination", format: (v) => v },
+  { match: "termination style", format: (v) => v },
+  { match: "termination type", format: (v) => v },
+  { match: "orientation", format: (v) => v },
+  { match: "mounting style", format: (v) => v },
+  { match: "mounting angle", format: (v) => v },
+  { match: "contact material", format: (v) => v },
+  { match: "contact plating", format: (v) => v },
+  { match: "shielding", format: (v) => (isNegative(v) ? null : v) },
+  { match: "lifecycle", format: (v) => (/active/i.test(v) ? "Active" : null) },
+  { match: "part status", format: (v) => (/active/i.test(v) ? "Active" : null) },
+  { match: "features", format: (v) => (v.length <= 24 ? v : null) },
+  { match: "automotive", format: (v) => (isNegative(v) ? null : "Automotive") },
 ];
 
 const _ATTR_INDEX: Map<string, AttributeRule> = (() => {
@@ -287,7 +314,7 @@ export function deriveAttributes(part: PartDetail): string[] {
   // Curated tags first, verbatim.
   for (const tag of part.tags) push(tag);
 
-  // Then derived chips, in the record's own spec order, until the cap is reached.
+  // Then the curated derived chips, in the record's own spec order.
   for (const [key, value] of Object.entries(part.specs)) {
     if (chips.length >= MAX_ATTRIBUTES) break;
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
@@ -295,6 +322,20 @@ export function deriveAttributes(part: PartDetail): string[] {
     const rule = _ATTR_INDEX.get(normalizeSpecKey(key));
     if (!rule) continue;
     push(rule.format(String(value).trim()));
+  }
+
+  // Then fill any remaining slots from the part's OTHER short categorical specs (the Mouser
+  // parametric attributes not already curated), so the card reflects the real component: skip
+  // numeric measurements (those live in Specifications) and commercial / provenance keys.
+  for (const [key, value] of Object.entries(part.specs)) {
+    if (chips.length >= MAX_ATTRIBUTES) break;
+    if (SPEC_HIDDEN_KEYS.has(key)) continue;
+    if (!isPresentable(value)) continue;
+    const nk = normalizeSpecKey(key);
+    if (_ATTR_INDEX.has(nk) || TITLE_SKIP_KEYS.has(nk)) continue;
+    const text = String(value).trim();
+    if (text.length > 24 || isMeasurement(text)) continue;
+    push(prettifyValue(text));
   }
 
   return chips.slice(0, MAX_ATTRIBUTES);

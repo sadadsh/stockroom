@@ -272,7 +272,10 @@ export function prettifyValue(text: string): string {
     .replace(/ohm(s)?/gi, "Ω")
     .replace(/([\d\s(])u([FHAVWSs])\b/g, "$1µ$2")
     .replace(/\bPPM\b/g, "ppm")
-    // a unary +/− with a stray space ("+ 155" -> "+155"); NOT a hyphen (that is a range dash)
+    // a LEADING unary sign is always negative/positive, never a range dash: tighten the stray
+    // space and normalize an ASCII hyphen to a true minus ("- 55" -> "−55", "+ 155" -> "+155")
+    .replace(/^([+\-−])\s*(?=[\d.,])/, (_m, s) => (s === "+" ? "+" : "−"))
+    // an interior unary +/− with a stray space ("~ + 85" -> "~ +85"); NOT a hyphen (a range dash)
     .replace(/([+−])\s+(?=\d)/g, "$1")
     .replace(/\/C\b/g, "/°C") // "ppm/C" -> "ppm/°C"
     // a bare Celsius "C" after "<number> " (a required space avoids mangling a part code like
