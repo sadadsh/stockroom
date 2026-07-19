@@ -1,14 +1,15 @@
 /**
  * The left navigation rail (north-star .nav): a wordmark card at the top, the primary
- * destinations, and a footer that carries the one Update Available action, the theme
- * (Appearance) toggle, and a live Library / Synced readout - all wired to real state.
- * Icons are the artifact's own set, inline, so the rail matches the north-star 1:1.
+ * destinations, and a footer pinned to the bottom that carries Settings and a single
+ * utility row - the Update action (when one is available) sitting beside the light/dark
+ * theme toggle. Icons are the artifact's own set, inline, so the rail matches the
+ * north-star 1:1.
  */
 import type { ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
-import { useFacetsQuery, useSyncStatus, useUpdateCheck } from "../api/queries";
+import { useUpdateCheck } from "../api/queries";
 
 const svgProps = {
   viewBox: "0 0 24 24",
@@ -55,29 +56,16 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   ),
 };
 
-function syncReadout(
-  data: { current_branch: string; ahead: number; behind: number } | undefined,
-): string {
-  if (!data) return "…";
-  const drift =
-    data.ahead === 0 && data.behind === 0
-      ? "clean"
-      : [data.ahead ? `${data.ahead} ahead` : "", data.behind ? `${data.behind} behind` : ""]
-          .filter(Boolean)
-          .join(", ");
-  return `${data.current_branch} · ${drift}`;
-}
-
 export function Rail() {
   const { route, navigate } = useRouter();
   const { toggle } = useTheme();
   const items = railNav();
+  const primary = items.filter((item) => item.group === "primary");
+  const footItems = items.filter((item) => item.group === "foot");
   const active = railRouteFor(route);
 
-  const facets = useFacetsQuery();
-  const sync = useSyncStatus();
   const update = useUpdateCheck();
-  const total = facets.data ? facets.data.complete + facets.data.incomplete : null;
+  const hasUpdate = !!update.data?.update_available;
 
   return (
     <nav
@@ -96,7 +84,7 @@ export function Rail() {
       </div>
 
       <div className="flex flex-col gap-0.5">
-        {items.map((item) => (
+        {primary.map((item) => (
           <RailItem
             key={item.route}
             item={item}
@@ -106,52 +94,54 @@ export function Rail() {
         ))}
       </div>
 
-      {/* footer (north-star .navfoot): the one Update action, the Appearance toggle, and a
-          live library / sync readout. */}
-      <div className="mt-auto border-t border-line pt-2">
-        {update.data?.update_available ? (
+      {/* footer (north-star .navfoot), pinned to the bottom: Settings, then a utility row -
+          the Update action (when one is available) beside the light/dark theme toggle. */}
+      <div className="mt-auto flex flex-col gap-0.5 border-t border-line pt-2">
+        {footItems.map((item) => (
+          <RailItem
+            key={item.route}
+            item={item}
+            selected={active === item.route}
+            onSelect={() => navigate(item.route)}
+          />
+        ))}
+        <div className="mt-1.5 flex items-center gap-1.5">
+          {hasUpdate ? (
+            <button
+              type="button"
+              title="A new version is available"
+              className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line2 bg-raise2 px-2.5 text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
+            >
+              <svg {...svgProps} className="h-4 w-4 flex-none">
+                <path d="M12 17V3" />
+                <path d="m6 11 6 6 6-6" />
+                <path d="M19 21H5" />
+              </svg>
+              Update
+            </button>
+          ) : null}
           <button
             type="button"
-            className="mb-2 flex h-[35px] w-full items-center gap-2.5 rounded-control border border-line2 bg-raise2 px-[11px] text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
+            onClick={toggle}
+            aria-label="Toggle light or dark theme"
+            title="Toggle light or dark theme"
+            className={
+              "flex h-[34px] flex-none items-center justify-center rounded-control border border-line2 bg-raise2 text-t2 shadow-card transition hover:brightness-110 hover:text-t1 " +
+              (hasUpdate ? "w-[34px]" : "w-full")
+            }
           >
             <svg {...svgProps} className="h-4 w-4 flex-none">
-              <path d="M12 17V3" />
-              <path d="m6 11 6 6 6-6" />
-              <path d="M19 21H5" />
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" />
             </svg>
-            Update Available
           </button>
-        ) : null}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label="Appearance"
-          className="mb-1.5 flex h-[34px] w-full items-center gap-2.5 rounded-control px-2.5 text-[13px] font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
-        >
-          <svg {...svgProps} className="h-4 w-4 flex-none">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2" />
-            <path d="M12 20v2" />
-            <path d="m4.93 4.93 1.41 1.41" />
-            <path d="m17.66 17.66 1.41 1.41" />
-            <path d="M2 12h2" />
-            <path d="M20 12h2" />
-            <path d="m6.34 17.66-1.41 1.41" />
-            <path d="m19.07 4.93-1.41 1.41" />
-          </svg>
-          Appearance
-        </button>
-        <div className="px-2.5 pb-0.5 pt-1">
-          <div className="flex justify-between py-[3px] text-[11px] text-t3">
-            <span>Library</span>
-            <span className="tnum font-mono text-t2">
-              {total == null ? "—" : `${total} parts`}
-            </span>
-          </div>
-          <div className="flex justify-between py-[3px] text-[11px] text-t3">
-            <span>Synced</span>
-            <span className="tnum font-mono text-t2">{syncReadout(sync.data)}</span>
-          </div>
         </div>
       </div>
     </nav>
