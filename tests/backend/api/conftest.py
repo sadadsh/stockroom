@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -9,6 +10,25 @@ from stockroom.api.app import create_app
 from stockroom.api.context import build_context
 from stockroom.store.machine_config import MachineConfig
 from stockroom.vcs.repo import GitRepo
+
+
+def _drain_job(client, job_id):
+    """Consume a job's SSE stream and return the terminal payload (event: <kind> + data: <json>)
+    as {"status": "done"|"error"|"none", "result": ...}. Shared by every test that submits a
+    job and waits for it to finish, so both the rescan and refresh API tests drain the same
+    way instead of carrying their own copy of this loop."""
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            if line.startswith("event:"):
+                kind = line.split(":", 1)[1].strip()
+            elif line.startswith("data:"):
+                data = json.loads(line.split(":", 1)[1].strip() or "{}")
+                if kind == "result":
+                    return {"status": "done", "result": data["result"]}
+                if kind == "error":
+                    return {"status": "error", "result": data}
+    return {"status": "none", "result": None}
 
 
 @pytest.fixture(autouse=True)

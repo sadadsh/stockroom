@@ -224,6 +224,33 @@ def test_requester_raises_enricherror_with_status_code_on_http_error(monkeypatch
     assert exc_info.value.status_code == 429
 
 
+def test_a_401_at_the_token_endpoint_trips_the_breaker_via_lookup(monkeypatch):
+    # the token fetch itself fails auth (bad/expired DigiKey credential) - that must surface
+    # through DigiKeyAdapter.lookup as auth_error, same as a 401 on the product search call.
+    def _open(req, timeout=8):
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+        assert "oauth2/token" in url  # the search endpoint must never be reached without a token
+        raise urllib.error.HTTPError(url, 401, "Unauthorized", None, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _open)
+    a = DigiKeyAdapter("id", "secret")
+    r = a.lookup("X")
+    assert a.last_status == "auth_error"
+    assert r.mpn is None  # a failed lookup still returns an empty result, never raises
+
+
+def test_a_429_at_the_token_endpoint_trips_the_breaker_via_lookup(monkeypatch):
+    def _open(req, timeout=8):
+        url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+        raise urllib.error.HTTPError(url, 429, "Too Many Requests", None, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _open)
+    a = DigiKeyAdapter("id", "secret")
+    r = a.lookup("X")
+    assert a.last_status == "rate_limited"
+    assert r.mpn is None
+
+
 def test_a_failed_token_is_not_cached_so_the_next_call_retries(monkeypatch):
     state = {"token_calls": 0}
 

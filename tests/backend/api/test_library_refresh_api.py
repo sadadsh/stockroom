@@ -1,5 +1,6 @@
-import json
 from types import SimpleNamespace
+
+from tests.backend.api.conftest import _drain_job
 
 
 def test_build_refresh_adapters_enables_only_the_configured_vendors():
@@ -21,22 +22,6 @@ def test_build_refresh_adapters_enables_only_the_configured_vendors():
     ctx = SimpleNamespace(config=SimpleNamespace(
         mouser_api_key="", digikey_client_id="", digikey_client_secret=""))
     assert lib_router.build_refresh_adapters(ctx) == []
-
-
-def _drain_job(client, job_id):
-    """Consume a job's SSE stream and return the terminal payload (event: <kind> + data: <json>)."""
-    kind = None
-    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
-        for line in s.iter_lines():
-            if line.startswith("event:"):
-                kind = line.split(":", 1)[1].strip()
-            elif line.startswith("data:"):
-                data = json.loads(line.split(":", 1)[1].strip() or "{}")
-                if kind == "result":
-                    return {"status": "done", "result": data["result"]}
-                if kind == "error":
-                    return {"status": "error", "result": data}
-    return {"status": "none", "result": None}
 
 
 def test_refresh_endpoint_updates_a_part_via_the_api_adapters(client, app_ctx, monkeypatch):
