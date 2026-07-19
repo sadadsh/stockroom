@@ -109,6 +109,23 @@ def test_discrete_spec_becomes_options_with_counts(spec_client):
         assert power["options"][0] == {"value": "0.25 W", "count": 2}
 
 
+def test_package_codes_are_options_not_a_numeric_range(spec_client, tmp_path):
+    # "0402"/"0603" parse as 402/603 but are CODES, not magnitudes (leading zero) - so a Package
+    # spec must aggregate as discrete options, never a nonsensical 402..603 range slider.
+    import json
+
+    parts = tmp_path / "libraries" / "Main" / "parts"
+    for pid, case in (("r1", "0603"), ("r2", "0402")):
+        rec = json.loads((parts / f"{pid}.json").read_text(encoding="utf-8"))
+        rec["specs"]["Package"] = case
+        (parts / f"{pid}.json").write_text(json.dumps(rec), encoding="utf-8")
+
+    facets = _facets_by_key(spec_client.get("/api/library/facets/parametric").json())
+    pkg = facets["Package"]
+    assert pkg["kind"] == "options"
+    assert {o["value"] for o in pkg["options"]} == {"0603", "0402"}
+
+
 def test_category_filter_scopes_the_aggregation(spec_client):
     r = spec_client.get("/api/library/facets/parametric", params={"category": "Resistors"})
     assert r.status_code == 200

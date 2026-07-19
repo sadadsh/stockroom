@@ -413,39 +413,56 @@ export interface RailSection {
   facets: ParametricFacet[];
 }
 
-/** Group the rail's facets into the north-star sections - Parameters (the electrical, generated
- * block), Package & Form, Sourcing & Compliance, then a More Filters catch-all for provenance -
- * ordered within each section by importance. The sectioning is registry-driven (a facet's spec
- * group decides its home), so it stays modular: a new electrical spec joins Parameters on its own,
- * a new commercial one lands in More Filters. Empty sections are dropped. */
+// Manufacturer / brand / supplier are sourcing dimensions, not parameters - they join Unit Price
+// in the Sourcing section rather than sinking into More Filters with the rest of the "Other" group.
+const _SOURCING_KEY = /^(manufacturer|brand|supplier|vendor|distributor)$/;
+
+// Which rail section a facet lands in. Sourcing (price + who-sells-it) and the commercial catch-all
+// are decided by key; everything else follows its registry spec group, so the sectioning stays
+// modular - a new electrical spec joins Parameters on its own, a new provenance one lands in More.
+function _sectionKey(facet: ParametricFacet, cat: string): string {
+  if (facet.key === PRICE_KEY) return "Sourcing";
+  const nk = normalizeSpecKey(facet.key);
+  if (_SOURCING_KEY.test(nk)) return "Sourcing";
+  if (_COMMERCIAL.test(nk)) return "More";
+  const group = resolveSpec(facet.key, cat).group;
+  return group === "Electrical"
+    ? "Parameters"
+    : group === "Physical"
+      ? "Package"
+      : group === "Ratings & Compliance"
+        ? "Ratings"
+        : "More";
+}
+
+/** Group the rail's facets into the north-star sections in a fixed order - Parameters (the
+ * electrical, generated block), Package & Form, Ratings & Compliance, Sourcing (who sells it +
+ * Unit Price), then a More Filters catch-all for provenance - ordered within each by importance.
+ * Empty sections are dropped. */
 export function sectionedRail(
   facets: ParametricFacet[],
   category: string | null,
 ): RailSection[] {
   const cat = category ?? "";
-  const buckets: Record<SpecGroupName, ParametricFacet[]> = {
-    Electrical: [],
-    Physical: [],
-    "Ratings & Compliance": [],
-    Other: [],
+  const buckets: Record<string, ParametricFacet[]> = {
+    Parameters: [],
+    Package: [],
+    Ratings: [],
+    Sourcing: [],
+    More: [],
   };
-  for (const f of orderFacetsForRail(facets, cat)) {
-    const group =
-      f.key === PRICE_KEY
-        ? "Ratings & Compliance" // Unit Price belongs to Sourcing & Compliance
-        : _COMMERCIAL.test(normalizeSpecKey(f.key))
-          ? "Other"
-          : resolveSpec(f.key, cat).group;
-    buckets[group].push(f);
-  }
+  for (const f of orderFacetsForRail(facets, cat)) buckets[_sectionKey(f, cat)].push(f);
+  const defs: [string, string, boolean][] = [
+    ["Parameters", cat ? `${cat} Parameters` : "Parameters", true],
+    ["Package", "Package & Form", false],
+    ["Ratings", "Ratings & Compliance", false],
+    ["Sourcing", "Sourcing", false],
+    ["More", "More Filters", false],
+  ];
   const sections: RailSection[] = [];
-  const add = (title: string, fromSpecs: boolean, list: ParametricFacet[]) => {
-    if (list.length) sections.push({ title, fromSpecs, facets: list });
-  };
-  add(cat ? `${cat} Parameters` : "Parameters", true, buckets.Electrical);
-  add("Package & Form", false, buckets.Physical);
-  add("Sourcing & Compliance", false, buckets["Ratings & Compliance"]);
-  add("More Filters", false, buckets.Other);
+  for (const [key, title, fromSpecs] of defs) {
+    if (buckets[key].length) sections.push({ title, fromSpecs, facets: buckets[key] });
+  }
   return sections;
 }
 
