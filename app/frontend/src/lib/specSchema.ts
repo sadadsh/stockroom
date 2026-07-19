@@ -227,7 +227,7 @@ const _REGISTRY_INDEX: Map<string, SpecRegistryEntry> = (() => {
 
 // Resolve where a raw key lands: a category-scoped entry wins, then a global entry, then
 // the fallback (Other, at the fallback order) so an unknown key is placed, never dropped.
-function resolveSpec(rawKey: string, category: string): ResolvedSpec {
+export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
   const norm = normalizeSpecKey(rawKey);
   const scoped = category
     ? _REGISTRY_INDEX.get(`${category}::${norm}`)

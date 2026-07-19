@@ -27,6 +27,7 @@ import { useAddPart } from "../lib/addPart";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
+import { SearchOverlay } from "../components/SearchOverlay";
 import { AddPartIcon } from "../components/icons";
 import { Button } from "../components/primitives";
 
@@ -36,6 +37,7 @@ export function ComponentsPage() {
   const [completeOnly, setCompleteOnly] = useState(false);
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
@@ -171,6 +173,37 @@ export function ComponentsPage() {
     }
   }, [parts, selectedId, partsFetching]);
 
+  // Ctrl/Cmd+K (and "/" when not already typing) opens the full-screen parametric search.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (
+        e.key === "/" &&
+        !searchOpen &&
+        !(e.target instanceof HTMLElement &&
+          /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))
+      ) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [searchOpen]);
+
+  // Open a part chosen in the search overlay: scope the picker to its category and clear the
+  // narrowing filters so the row is present in the list, select it, and close the overlay.
+  function openFromSearch(id: string, cat: string) {
+    setCategory(cat);
+    setCompleteOnly(false);
+    setDuplicatesOnly(false);
+    setSearch("");
+    setSelectedId(id);
+    setSearchOpen(false);
+  }
+
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
 
   // north-star .app: rail | list | detail, each column self-heading - no full-width page
@@ -199,6 +232,7 @@ export function ComponentsPage() {
               duplicatesOnly={duplicatesOnly}
               onDuplicatesOnly={setDuplicatesOnly}
               duplicateCount={duplicateIds.size}
+              onOpenSearch={() => setSearchOpen(true)}
             />
           </div>
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -247,6 +281,10 @@ export function ComponentsPage() {
             </div>
           )}
         </div>
+
+        {searchOpen ? (
+          <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
+        ) : null}
     </div>
   );
 }
