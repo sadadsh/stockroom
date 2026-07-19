@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/sn74lvc1g74"
   },
   "description": "Flip Flops",
-  "display_name": "SN74LVC1G74DCUR VSSOP-8 TI",
+  "display_name": "Flip Flop SN74LVC1G74DCUR VSSOP-8",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:36.341655+00:00",
       "part_number": "595-SN74LVC1G74DCUR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.6,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.422,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.379,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.33,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.307,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.293,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.287,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.267,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.26,
           "qty": 6000
         }
       ],
-      "stock": 52594,
+      "stock": 52505,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1G74DCUR?qs=DS7Z8uEdLNyRBKrHxqRXjA%3D%3D",
       "vendor": "Mouser"
     },
