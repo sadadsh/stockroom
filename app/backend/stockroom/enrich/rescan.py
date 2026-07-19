@@ -52,11 +52,16 @@ class Pacer:
 
 
 class RescanEngine:
-    def __init__(self, ctx, *, pacer: "Pacer | None" = None, adapters: list | None = None):
+    def __init__(self, ctx, *, pacer: "Pacer | None" = None, adapters: list | None = None,
+                 rename: bool = False):
         # adapters are INJECTED (the endpoint builds them via build_refresh_adapters and passes them
         # in) so the enrich layer never imports the api layer - no backwards dependency, no cycle.
         self._ctx = ctx
         self._adapters = list(adapters) if adapters is not None else []
+        # A full rebuild (rename=True) also re-derives each part's spec-aware display name in the
+        # SAME per-part commit as the data refresh, so "rebuild the library" lands fresh data + a
+        # proper name atomically; a plain rescan (default) only refreshes procurement data.
+        self._rename = rename
         if pacer is None:
             rates = {"Mouser": float(getattr(ctx.config, "rescan_mouser_per_min", 20) or 0),
                      "DigiKey": float(getattr(ctx.config, "rescan_digikey_per_min", 60) or 0)}
@@ -96,7 +101,8 @@ class RescanEngine:
                 else:
                     def _commit(part_id=part_id, per_vendor=per_vendor, checked_at=checked_at):
                         before = self._ctx.repo.head()
-                        self._ctx.ops.refresh_procurement(part_id, per_vendor, checked_at)
+                        op = self._ctx.ops.rebuild_part if self._rename else self._ctx.ops.refresh_procurement
+                        op(part_id, per_vendor, checked_at)
                         return self._ctx.repo.head() != before
 
                     changed = self._ctx.jobs.run_write(_commit)

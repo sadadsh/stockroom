@@ -533,6 +533,28 @@ class LibraryOps:
             txn.commit(f"Refresh {part_id}: procurement")
         return record
 
+    def rebuild_part(self, part_id: str, per_vendor, now_iso: str) -> PartRecord:
+        """Rebuild a part in ONE atomic commit: refresh its procurement data AND re-derive its
+        spec-aware display name (what it IS), so a whole-library rebuild lands fresh data + a proper
+        name per part in a single commit. A change-free rebuild is a true no-op (no empty commit)."""
+        from stockroom.enrich.refresh import apply_procurement_refresh
+        from stockroom.ingest.component_naming import propose_component_name_from_record
+
+        record = self.load_record(part_id)
+        changed = apply_procurement_refresh(record, per_vendor, now_iso)
+        new_name = propose_component_name_from_record(record)
+        if new_name and new_name != record.display_name:
+            record.display_name = new_name
+            changed = True
+        if not changed:
+            return record
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Rebuild {part_id}: data + name")
+        return record
+
     def _remove_symbol_node(self, sym_lib_path: Path, name: str) -> str:
         """Remove the named symbol node from a lib and return the new file text."""
         sym_lib = SymbolLib.load(sym_lib_path)

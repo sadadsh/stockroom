@@ -482,3 +482,26 @@ def test_refresh_procurement_writes_atomically_and_no_ops_when_unchanged(tmp_pat
     ops.refresh_procurement(
         "tps62130rgtr", [("Mouser", result(99))], "2026-07-18T09:59:59+00:00")
     assert repo.head() == head                                                # no empty commit
+
+
+def test_rebuild_part_renames_to_the_spec_aware_name_atomically(tmp_path, fixtures_dir):
+    """A full rebuild re-derives the spec-aware display name and commits it atomically; a second
+    identical rebuild is a true no-op (no empty commit), mirroring refresh_procurement/set_specs."""
+    from datetime import datetime, timezone
+
+    from stockroom.ingest.component_naming import propose_component_name_from_record
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec0 = ops.load_record("tps62130rgtr")
+    expected = propose_component_name_from_record(rec0)
+    before = repo.head()
+    rec = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert rec.display_name == expected
+    if expected != rec0.display_name:
+        assert repo.head() != before  # renamed -> one atomic commit
+        assert ops.load_record("tps62130rgtr").display_name == expected
+    mid = repo.head()
+    ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert repo.head() == mid  # no-op second pass
