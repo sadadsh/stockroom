@@ -959,7 +959,7 @@ function AttachAssetModal({
       onClick={onCancel}
     >
       <form
-        className="w-full max-w-[420px] rounded-card border border-line bg-raise p-5 shadow-pop"
+        className="w-full max-w-[420px] rounded-card border border-line bg-popover p-5 shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label={`Attach ${kindLabel}`}
