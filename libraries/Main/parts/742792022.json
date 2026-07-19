@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/742792022.pdf"
   },
   "description": "Ferrite bead, small symbol",
-  "display_name": "220 25% 0805 Wurth 742792022",
+  "display_name": "Ferrite Bead 220Ω@100MHz 2A 0805",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:35.701124+00:00",
       "part_number": "710-742792022",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.16,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.154,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.15,
           "qty": 50
         },
         {
-          "currency": "USD",
           "price": 0.141,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.14,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.136,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.127,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.108,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.108,
           "qty": 4000
         }
       ],
-      "stock": 145687,
+      "stock": 145081,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D",
       "vendor": "Mouser"
     },
