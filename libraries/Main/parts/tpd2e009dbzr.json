@@ -32,54 +32,88 @@
       "part_number": "595-TPD2E009DBZR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.79,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.486,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.313,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.239,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.215,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.184,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.168,
-          "currency": "USD"
+          "qty": 6000
         },
         {
-          "qty": 9000,
+          "currency": "USD",
           "price": 0.158,
-          "currency": "USD"
+          "qty": 9000
         },
         {
-          "qty": 24000,
+          "currency": "USD",
           "price": 0.148,
-          "currency": "USD"
+          "qty": 24000
         }
       ],
       "stock": 4367,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD2E009DBZR?qs=XGzIaZb%2FFYIsL3UFh35JpQ%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:55.081015+00:00",
+      "part_number": "296-24657-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.19245,
+          "qty": 3000
+        },
+        {
+          "price": 0.17637,
+          "qty": 6000
+        },
+        {
+          "price": 0.16817,
+          "qty": 9000
+        },
+        {
+          "price": 0.15896,
+          "qty": 15000
+        },
+        {
+          "price": 0.1535,
+          "qty": 21000
+        },
+        {
+          "price": 0.1482,
+          "qty": 30000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -113,8 +147,7 @@
     "Vesd - Voltage ESD Air Gap": "8 kV",
     "Vesd - Voltage ESD Contact": "8 kV",
     "Vf - Forward Voltage": "800 mV",
-    "Working Voltage": "5.5 V",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Working Voltage": "5.5 V"
   },
   "symbol": null,
   "tags": []
