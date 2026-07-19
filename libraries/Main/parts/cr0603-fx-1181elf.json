@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/40/1/cr.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "1.18k 1% 0603 Bourns CR0603-FX-1181ELF",
+  "display_name": "1.18kΩ 1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,46 +28,39 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:12:23.003324+00:00",
       "part_number": "652-CR0603FX-1181ELF",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.016,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.01,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.007,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.004,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.003,
-          "qty": 10000
+          "qty": 25000
         }
       ],
-      "stock": 51357,
+      "stock": 51345,
       "url": "https://www.mouser.com/en/ProductDetail/Bourns/CR0603-FX-1181ELF?qs=e7cxVwPieur3A68XPb9FHg%3D%3D",
       "vendor": "Mouser"
     },
