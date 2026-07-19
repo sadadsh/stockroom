@@ -410,6 +410,13 @@ export function useRepairLibrary() {
   });
 }
 
+// The last-known library-wide rescan state (Phase-1b-3), for the idle "last refreshed"
+// summary. Read-only; the rescan job itself invalidates this (in useRescan) once its
+// terminal result lands, so the summary is fresh the next time this is read.
+export function useRescanState() {
+  return useQuery({ queryKey: ["rescan-state"], queryFn: () => api.getRescanState() });
+}
+
 // --- Projects page server state (M7a) ---
 
 // The registered-project list, served warm from the derived project index. Register

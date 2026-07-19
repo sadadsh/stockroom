@@ -11,6 +11,7 @@ import { ApiError, api } from "../api/client";
 import type { WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
+import { RescanSection } from "../components/RescanSection";
 import {
   useActivateProfile,
   useApplyUpdate,
@@ -82,6 +83,7 @@ export function SettingsPage() {
           <GitHubSection />
           <KiCadSection />
           <LibraryHealthSection />
+          <RescanSection />
           <DistributorSection />
           <UpdateSection />
         </div>
