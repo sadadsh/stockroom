@@ -1,9 +1,9 @@
 {
   "category": "Capacitors",
   "datasheet": {
+    "fetched_at": "",
     "file": "",
-    "source_url": "https://www.mouser.com/datasheet/3/508/1/upy-gphc_x5r_4v-to-50v.pdf",
-    "fetched_at": ""
+    "source_url": "https://www.mouser.com/datasheet/3/508/1/upy-gphc_x5r_4v-to-50v.pdf"
   },
   "description": "capacitor, small US symbol",
   "display_name": "10u 20% X5R 1206 YAGEO CC1206MKX5R9BB106",
@@ -20,56 +20,70 @@
   "mpn": "CC1206MKX5R9BB106",
   "passive": true,
   "provenance": {
-    "source": "finale-sauce-equiv",
-    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D",
+    "ingested_at": "",
     "original_zip_sha256": "",
-    "ingested_at": ""
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D"
   },
   "purchase": [
     {
-      "vendor": "Mouser",
-      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D",
+      "currency": "USD",
+      "fetched_at": "",
       "part_number": "603-CC1206MKX5R9BB10",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.46,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.306,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.191,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.154,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.141,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.131,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.117,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 2431,
+      "url": "https://www.mouser.com/en/ProductDetail/YAGEO/CC1206MKX5R9BB106?qs=W0yvOO0ixfEGA7Mg821gyg%3D%3D",
+      "vendor": "Mouser"
+    },
+    {
       "currency": "USD",
-      "fetched_at": ""
+      "fetched_at": "2026-07-19T16:03:50.938805+00:00",
+      "part_number": "13-CC1206MKX5R9BB106TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.11636,
+          "qty": 2000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -101,13 +115,12 @@
     "Subcategory": "Capacitors",
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "20 %",
+    "Tolerance": "20%",
     "Type": "MLCC Surface Mount Ceramic Capacitor",
     "US Tariff %": 8.04,
     "Unit Weight": "0.000952 oz",
     "Voltage Rating DC": "50 VDC",
-    "Width": "1.6 mm (0.063 in)",
-    "Factory Pack Quantity: Factory Pack Quantity": "2000"
+    "Width": "1.6 mm (0.063 in)"
   },
   "symbol": {
     "lib": "Device",
