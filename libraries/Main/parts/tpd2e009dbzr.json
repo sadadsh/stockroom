@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/tpd2e009"
   },
   "description": "ESD Protection Diodes / TVS Diodes",
-  "display_name": "TPD2E009DRTR SC-59-3 TI TPD2E009DBZR",
+  "display_name": "Diode 800mV SC-59-3",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:44.187026+00:00",
       "part_number": "595-TPD2E009DBZR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.79,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.486,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.313,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.239,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.215,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.184,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.168,
           "qty": 6000
         },
         {
-          "currency": "USD",
           "price": 0.158,
           "qty": 9000
         },
         {
-          "currency": "USD",
           "price": 0.148,
           "qty": 24000
         }
       ],
-      "stock": 4367,
+      "stock": 10251,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD2E009DBZR?qs=XGzIaZb%2FFYIsL3UFh35JpQ%3D%3D",
       "vendor": "Mouser"
     },
