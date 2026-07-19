@@ -394,6 +394,11 @@ class LibraryOps:
         record = self.load_record(part_id)
         if not hasattr(record, field):
             raise ValueError(f"unknown field: {field}")
+        # The datasheet is a structured ref, but the UI edits it as a bare URL (the Complete-Part
+        # window): coerce a plain string into a Datasheet so the record stays well-formed. A blank
+        # string clears it.
+        if field == "datasheet" and isinstance(value, str):
+            value = Datasheet(source_url=value.strip()) if value.strip() else None
         setattr(record, field, value)
         json_path = self.lib.parts_dir / f"{part_id}.json"
         sym_lib_path = self.lib.symbol_lib_path(record.category)

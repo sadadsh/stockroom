@@ -239,7 +239,7 @@ describe("DetailPanel pinout (M6i)", () => {
 });
 
 describe("DetailPanel attach-after affordance", () => {
-  it("opens the attach modal for a missing symbol and posts the entered lib + name", async () => {
+  it("adds a missing symbol by lib + name through the one Complete Part window", async () => {
     const onAttachSymbol = vi.fn();
     wrap(
       <DetailPanel
@@ -249,18 +249,18 @@ describe("DetailPanel attach-after affordance", () => {
         onAttachFootprint={vi.fn()}
       />,
     );
-    // the missing symbol card is now an Attach button (only one such button exists yet)
-    await userEvent.click(screen.getByRole("button", { name: "Attach Symbol" }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Attach Symbol" });
-    await userEvent.type(within(dialog).getByLabelText("Library"), "Device");
+    // the scattered per-tile attach buttons are gone; one Complete Part action opens the window
+    await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
+    const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add Symbol" }));
+    // Library is pre-filled "Device" for a symbol; enter the device name and attach
     await userEvent.type(within(dialog).getByLabelText("Name"), "R");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Attach Symbol" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Attach" }));
 
     expect(onAttachSymbol).toHaveBeenCalledWith("Device", "R");
   });
 
-  it("disables Attach until a name is entered (the backend gate requires it)", async () => {
+  it("disables the attach action until a footprint lib + name are entered", async () => {
     wrap(
       <DetailPanel
         detail={detail({ footprint: null })}
@@ -269,20 +269,22 @@ describe("DetailPanel attach-after affordance", () => {
         onAttachFootprint={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Attach Footprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "Attach Footprint" });
-    // name empty -> submit disabled
-    expect(within(dialog).getByRole("button", { name: "Attach Footprint" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
+    const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add Footprint" }));
+    // both fields empty -> Attach disabled
+    expect(within(dialog).getByRole("button", { name: "Attach" })).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText("Library"), "Resistor_SMD");
     await userEvent.type(within(dialog).getByLabelText("Name"), "R_0603_1608Metric");
-    expect(within(dialog).getByRole("button", { name: "Attach Footprint" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Attach" })).toBeEnabled();
   });
 
-  it("offers no Attach affordance in a read-only panel (no handler given)", () => {
+  it("offers no Complete Part affordance in a read-only panel (no handlers)", () => {
     wrap(<DetailPanel detail={detail({ symbol: null })} {...BASE} />);
     expect(
-      screen.queryByRole("button", { name: "Attach Symbol" }),
+      screen.queryByRole("button", { name: /Complete Part/ }),
     ).not.toBeInTheDocument();
-    // it degrades to the honest Not Linked state
+    // it degrades to the honest Not Linked state on the tile
     expect(screen.getByText("Not Linked")).toBeInTheDocument();
   });
 });

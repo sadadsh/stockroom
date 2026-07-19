@@ -8,13 +8,11 @@
  * Pinout, Sourcing, and History. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, deriveAttributes } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
-import { Badge, Button } from "./primitives";
-import { TextField } from "./formFields";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
@@ -24,13 +22,14 @@ import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
 import { usePreviewGlb } from "../api/queries";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
-import { CadDownloadCard } from "./CadDownloadCard";
+import { CompletePartModal } from "./CompletePartModal";
 import {
   CubeArt,
   ExternalIcon,
   FootprintArt,
   SymbolArt,
   UploadIcon,
+  WarnIcon,
 } from "./icons";
 
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
@@ -99,7 +98,6 @@ export function DetailPanel({
   isLoading,
   error,
   missing,
-  isComplete,
   onEditField,
   onMoveCategory,
   categories,
@@ -113,18 +111,13 @@ export function DetailPanel({
   // Which preview is expanded in the in-window modal (null = closed). The modal has
   // tabs, so this is only the tab it opens on.
   const [preview, setPreview] = useState<PreviewKind | null>(null);
-  // Which missing asset's Attach modal is open (null = closed). Only symbol / footprint
-  // have an attach endpoint, so the 3D model tile carries no Attach affordance.
-  const [attachKind, setAttachKind] = useState<"symbol" | "footprint" | null>(null);
+  // The one Complete-Part window (adds every missing file + data field in one place) - open flag.
+  const [completeOpen, setCompleteOpen] = useState(false);
   // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
   // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
-  // Get CAD Files From DigiKey (Phase-2 asset download): offered only for a part that
-  // landed with NO CAD assets at all yet (identity-only) - a part that already has any
-  // of the three should attach/replace the rest through the normal Attach flow instead.
-  const noCadAssetsYet = !!detail && !detail.symbol?.name && !detail.footprint?.name && !hasModel;
   // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
@@ -142,6 +135,17 @@ export function DetailPanel({
   if (!detail) {
     return <PanelMessage>Select a part to see its details.</PanelMessage>;
   }
+
+  // What the part still needs, files + data, for the one Complete-Part window and its trigger.
+  const missingAssets = [
+    !detail.symbol?.name ? "symbol" : null,
+    !detail.footprint?.name ? "footprint" : null,
+    !hasModel ? "3D model" : null,
+  ].filter((x): x is string => x !== null);
+  const needsList = [...missing, ...missingAssets];
+  // The panel is completable when it can edit a field OR attach an asset (a read-only panel gets
+  // no Complete Part affordance, only the honest "Not linked" state on the tiles).
+  const canComplete = !!(onEditField || onAttachSymbol || onAttachFootprint);
 
   // The part's tags plus a few chips derived from key specs (package, mounting,
   // qualifications, salient features), so the attribute band is never empty.
@@ -218,15 +222,21 @@ export function DetailPanel({
         busy={busy}
       />
 
-      {!isComplete && missing.length > 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="mr-0.5 text-2xs uppercase tracking-wide text-t3">Needs</span>
-          {missing.map((m) => (
-            <Badge key={m} tone="warn" size="sm">
-              {m}
-            </Badge>
-          ))}
-        </div>
+      {canComplete && needsList.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setCompleteOpen(true)}
+          className="mt-3 flex w-full items-center gap-3 rounded-card border border-warn/40 bg-warn/10 px-4 py-3 text-left transition hover:border-warn/70"
+        >
+          <WarnIcon className="h-4 w-4 flex-none text-warn" />
+          <span className="flex-none text-sm font-semibold text-t1">Complete Part</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-t3">
+            Needs {needsList.join(", ")}
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 flex-none text-t3">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
       ) : null}
 
       {/* top row: Overview + Sourcing on the LEFT, the part's three asset views on the RIGHT.
@@ -281,15 +291,10 @@ export function DetailPanel({
           </div>
         </div>
 
-        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. */}
+        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. They are
+            read-only previews now - a missing asset reads "Not linked", and the one Complete
+            Part window (above) is where every file + data field is added. */}
         <div className="flex flex-col gap-[18px]">
-          {/* Keyed by part id so a part switch (even to a cached part that never
-              unmounts DetailPanel) remounts the card fresh: without this, the SAME
-              instance (and its useCadDownload state + armed one-shot download
-              handler) survives navigation, so a card for the NEW part could show a
-              stale "waiting"/"done" state left over from a download started on the
-              PREVIOUS part. Matches PinoutViewer/EnrichPanel/PartTimeline below. */}
-          <CadDownloadCard key={detail.id} partId={detail.id} assetsMissing={noCadAssetsYet} />
           <AssetTile
             variant="tile"
             name="3D Model"
@@ -322,7 +327,6 @@ export function DetailPanel({
               ) : undefined
             }
             onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
-            onAttach={onAttachSymbol ? () => setAttachKind("symbol") : undefined}
           />
           <AssetTile
             variant="tile"
@@ -336,7 +340,6 @@ export function DetailPanel({
               ) : undefined
             }
             onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
-            onAttach={onAttachFootprint ? () => setAttachKind("footprint") : undefined}
           />
         </div>
       </div>
@@ -349,20 +352,18 @@ export function DetailPanel({
         </div>
       ) : null}
 
-      {/* Attach a missing symbol / footprint reference after the part landed (assets no
-          longer gate entry). Mounted only while open so its form state starts fresh each
-          time; the submit routes to the matching handler and defaults the tool to KiCad. */}
-      {attachKind ? (
-        <AttachAssetModal
-          kind={attachKind}
-          partName={detail.display_name}
+      {/* The one Complete-Part window: every missing file (symbol / footprint / 3D model) and
+          data field (datasheet, MPN, ...) is added here, replacing the per-tile attach buttons
+          and the standalone DigiKey card. Mounted only while open so its inputs start fresh. */}
+      {completeOpen ? (
+        <CompletePartModal
+          detail={detail}
+          hasModel={hasModel}
           busy={busy}
-          onCancel={() => setAttachKind(null)}
-          onSubmit={(lib, name) => {
-            if (attachKind === "symbol") onAttachSymbol?.(lib, name);
-            else onAttachFootprint?.(lib, name);
-            setAttachKind(null);
-          }}
+          onClose={() => setCompleteOpen(false)}
+          onAttachSymbol={onAttachSymbol}
+          onAttachFootprint={onAttachFootprint}
+          onEditField={onEditField}
         />
       ) : null}
 
@@ -912,90 +913,6 @@ function AssetTile({
     <div className={base}>
       {stage}
       {footer}
-    </div>
-  );
-}
-
-// The Attach-a-reference modal: a lib + name form that POSTs a symbol / footprint
-// reference onto an existing part (assets are attached after the part lands). Same
-// scrim-and-card idiom as ConfirmDialog; the tool defaults to KiCad on the wire, so
-// there is no tool picker here yet (a future Altium flow can add one). Escape or a
-// scrim click cancels; Attach is disabled until a name is entered (the backend gate
-// requires it).
-function AttachAssetModal({
-  kind,
-  partName,
-  busy,
-  onSubmit,
-  onCancel,
-}: {
-  kind: "symbol" | "footprint";
-  partName: string;
-  busy: boolean;
-  onSubmit: (lib: string, name: string) => void;
-  onCancel: () => void;
-}) {
-  const [lib, setLib] = useState("");
-  const [name, setName] = useState("");
-  const kindLabel = kind === "symbol" ? "Symbol" : "Footprint";
-  // Examples steer the two halves of a KiCad lib_id (library nickname + entry name).
-  const libExample = kind === "symbol" ? "Device" : "Resistor_SMD";
-  const nameExample = kind === "symbol" ? "R" : "R_0603_1608Metric";
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
-  const canSubmit = !!name.trim() && !busy;
-
-  return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-      onClick={onCancel}
-    >
-      <form
-        className="w-full max-w-[420px] rounded-card border border-line bg-popover p-5 shadow-pop"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Attach ${kindLabel}`}
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (canSubmit) onSubmit(lib.trim(), name.trim());
-        }}
-      >
-        <div className="text-base font-semibold text-t1">Attach {kindLabel}</div>
-        <div className="mt-2 text-sm text-t2">
-          Reference a KiCad {kind} by its library and name for {partName}.
-        </div>
-        <div className="mt-4 flex flex-col gap-3">
-          <TextField
-            label="Library"
-            value={lib}
-            onChange={setLib}
-            placeholder={libExample}
-          />
-          <TextField
-            label="Name"
-            value={name}
-            onChange={setName}
-            placeholder={nameExample}
-          />
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button small type="button" onClick={onCancel} disabled={busy}>
-            Cancel
-          </Button>
-          <Button small variant="accent" type="submit" disabled={!canSubmit}>
-            Attach {kindLabel}
-          </Button>
-        </div>
-      </form>
     </div>
   );
 }
