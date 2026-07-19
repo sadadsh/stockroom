@@ -32,39 +32,69 @@
       "part_number": "710-61300811121",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.39,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.336,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.28,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 50,
+          "currency": "USD",
           "price": 0.234,
-          "currency": "USD"
+          "qty": 50
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.212,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.193,
-          "currency": "USD"
+          "qty": 1000
         }
       ],
       "stock": 21500,
       "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/61300811121?qs=PhR8RmCirEZRdx%252BVlEmRRA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:39.234707+00:00",
+      "part_number": "732-5321-ND",
+      "price_breaks": [
+        {
+          "price": 0.38,
+          "qty": 1
+        },
+        {
+          "price": 0.319,
+          "qty": 10
+        },
+        {
+          "price": 0.266,
+          "qty": 25
+        },
+        {
+          "price": 0.2224,
+          "qty": 50
+        },
+        {
+          "price": 0.2016,
+          "qty": 100
+        }
+      ],
+      "stock": 40846,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -104,8 +134,7 @@
     "Termination Style": "Solder Pin",
     "Type": "Pin Strip",
     "US Tariff %": 0.0,
-    "Unit Weight": "0.016932 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000"
+    "Unit Weight": "0.016932 oz"
   },
   "symbol": null,
   "tags": []
