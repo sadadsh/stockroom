@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/85/1/qsh.pdf"
   },
   "description": "Board to Board & Mezzanine Connectors",
-  "display_name": "QSH-060-01-X-D-A Samtec QSH-060-01-H-D-A",
+  "display_name": "Connector 2x60 0.5mm",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,26 +28,23 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:20.946539+00:00",
       "part_number": "200-QSH06001HDA",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 22.49,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 22.45,
           "qty": 192
         },
         {
-          "currency": "USD",
           "price": 17.26,
           "qty": 448
         }
       ],
-      "stock": 202,
+      "stock": 199,
       "url": "https://www.mouser.com/en/ProductDetail/Samtec/QSH-060-01-H-D-A?qs=rU5fayqh%252BE34oibMPSfe5w%3D%3D",
       "vendor": "Mouser"
     },
