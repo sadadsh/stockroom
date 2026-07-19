@@ -32,49 +32,63 @@
       "part_number": "863-ESD9X5.0ST5G",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.16,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.101,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.054,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.045,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.031,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 0.027,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 0.025,
-          "currency": "USD"
+          "qty": 5000
         },
         {
-          "qty": 8000,
+          "currency": "USD",
           "price": 0.021,
-          "currency": "USD"
+          "qty": 8000
         }
       ],
       "stock": 64322,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/ESD9X5.0ST5G?qs=OSf9jACorvbLo4%2Fn72DVLA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:42.214886+00:00",
+      "part_number": "6557-ESD9X5.0ST5GTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0193,
+          "qty": 8000
+        }
+      ],
+      "stock": 10000,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -108,8 +122,7 @@
     "Unit Weight": "0.001552 oz",
     "Vesd - Voltage ESD Air Gap": "30 kV",
     "Vesd - Voltage ESD Contact": "30 kV",
-    "Working Voltage": "5 V",
-    "Factory Pack Quantity: Factory Pack Quantity": "8000"
+    "Working Voltage": "5 V"
   },
   "symbol": null,
   "tags": []
