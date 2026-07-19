@@ -32,54 +32,76 @@
       "part_number": "595-TPS62933PDRLR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 1.38,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 1.01,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.912,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.808,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.758,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.729,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.708,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2000,
+          "currency": "USD",
           "price": 0.697,
-          "currency": "USD"
+          "qty": 2000
         },
         {
-          "qty": 4000,
+          "currency": "USD",
           "price": 0.664,
-          "currency": "USD"
+          "qty": 4000
         }
       ],
       "stock": 10754,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR?qs=vvQtp7zwQdPCuPvhGs%2FYxA%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:05:01.904980+00:00",
+      "part_number": "296-TPS62933PDRLRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.68477,
+          "qty": 4000
+        },
+        {
+          "price": 0.67076,
+          "qty": 8000
+        },
+        {
+          "price": 0.66374,
+          "qty": 12000
+        }
+      ],
+      "stock": 8954,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -113,8 +135,7 @@
     "Switching Frequency": "200 kHz to 2.2 MHz",
     "Topology": "Buck",
     "Type": "Synchronous Buck Converter",
-    "US Tariff %": 0.0,
-    "Factory Pack Quantity: Factory Pack Quantity": "4000"
+    "US Tariff %": 0.0
   },
   "symbol": null,
   "tags": []
