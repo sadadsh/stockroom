@@ -6,7 +6,7 @@
     "source_url": "https://www.onsemi.com/pub/Collateral/NDS7002A-D.PDF"
   },
   "description": "MOSFETs",
-  "display_name": "2N7002 SOT-23-3 onsemi",
+  "display_name": "N-Channel MOSFET 60V 2N7002 SOT-23-3",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -28,36 +28,31 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:59.404423+00:00",
       "part_number": "512-2N7002",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 1.09,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.761,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.482,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.298,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.298,
           "qty": 3000
         }
       ],
-      "stock": 525994,
+      "stock": 495934,
       "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002?qs=0dwsXDNhqlz66WJJhrTFjQ%3D%3D",
       "vendor": "Mouser"
     },
