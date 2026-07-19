@@ -6,7 +6,7 @@
     "source_url": "https://weblib.samsungsem.com/mlcc/mlcc-ec-data-sheet.do?partNumber=CL10A225KO8NNN"
   },
   "description": "capacitor, small US symbol",
-  "display_name": "2.2uF 10% X5R 0603 Samsung CL10A225KO8NNNC",
+  "display_name": "2.2µF X5R 16V 10% 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Capacitor_SMD",
@@ -28,51 +28,39 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:28.990465+00:00",
       "part_number": "187-CL10A225KO8NNNC",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.033,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.029,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.021,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.018,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.016,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.013,
           "qty": 4000
-        },
-        {
-          "currency": "USD",
-          "price": 0.01,
-          "qty": 8000
         }
       ],
-      "stock": 220172,
+      "stock": 212157,
       "url": "https://www.mouser.com/en/ProductDetail/Samsung-Electro-Mechanics/CL10A225KO8NNNC?qs=hqM3L16%252BxlecoJxUp5hKOw%3D%3D",
       "vendor": "Mouser"
     },
