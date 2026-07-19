@@ -12,7 +12,7 @@
  * not a spec token.
  */
 import type { ParametricFacet } from "../api/types";
-import { prettifyValue } from "./specSchema";
+import { normalizeSpecKey, prettifyValue, resolveSpec, type SpecGroupName } from "./specSchema";
 
 export interface RangeSel {
   min: number | null;
@@ -60,6 +60,24 @@ export function formatMagnitude(mag: number, unit: string | null | undefined): s
     }
   }
   return u ? `${_sig(mag)} ${u}`.replace(/\s+%/, "%") : _sig(mag);
+}
+
+const _SI_PARSE: Record<string, number> = {
+  p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, "μ": 1e-6,
+  m: 1e-3, k: 1e3, K: 1e3, M: 1e6, G: 1e9, T: 1e12,
+};
+
+/** The SI-normalized magnitude of a spec value ("10 kΩ" -> 10000, "220 Ω" -> 220, "5%" -> 5),
+ * or null when it is not a leading number. Mirrors the backend `_parse_numeric` so the frontend
+ * sorts a numeric column exactly the way the range facet bounded it. */
+export function parseMagnitude(value: string): number | null {
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+))\s*(\S*)$/.exec(value.trim());
+  if (!m) return null;
+  let mag = parseFloat(m[1]);
+  if (!Number.isFinite(mag)) return null;
+  const unit = m[2];
+  if (unit.length >= 2 && unit[0] in _SI_PARSE) mag *= _SI_PARSE[unit[0]];
+  return mag;
 }
 
 // --- spec-token encoding ----------------------------------------------------
@@ -209,28 +227,60 @@ export interface SpecColumn {
   unit: string | null;
 }
 
-/** Choose the table's spec columns from the facets the data produced: the most-populated,
- * genuinely-varying parameters first (a range, or an option with more than one distinct value -
- * a spec that is the same for every part is a poor column). Ranges lead (the quantitative
- * columns), then multi-valued options. Capped so the table stays legible; the rest live in the
- * facet rail and the part detail. */
+// A parameter's worth as a table column comes from its spec GROUP, so the columns are the
+// meaningful electrical/physical parameters (Resistance, Tolerance, Power, Package) - never the
+// commercial/logistics noise (pack quantity, tariff, weight) that a raw count would surface. The
+// grouping is itself registry-driven, so a genuinely new *parameter* still ranks; provenance
+// junk stays out.
+const _GROUP_SCORE: Record<SpecGroupName, number> = {
+  Electrical: 400,
+  Physical: 250,
+  "Ratings & Compliance": 120,
+  Other: -1,
+};
+
+// Provenance / logistics / commercial keys that are never useful table columns even when the
+// data carries them for many parts. Matched as substrings of the normalized key so label
+// variants ("US Tariff %", "Factory Pack Quantity", "Unit Weight") are all caught.
+const _COMMERCIAL = /tariff|packaging|pack quantity|standard pack|country of origin|lead time|unit weight|gross weight|base product|catalog|reach|export control|eccn|\bhts\b|number of parts/;
+
+function _columnScore(facet: ParametricFacet, category: string): number {
+  if (_COMMERCIAL.test(normalizeSpecKey(facet.key))) return -Infinity;
+  const r = resolveSpec(facet.key, category);
+  const base = _GROUP_SCORE[r.group];
+  if (base < 0) {
+    // unregistered / "Other": a genuinely new parameter can still fill a tail slot (a numeric
+    // one leads a categorical one), but always below every registered electrical/physical param.
+    return facet.kind === "range" ? 10 : 3;
+  }
+  return base - (r.order ?? 100) / 100;
+}
+
+/** Choose the results table's spec columns from the facets the data produced, ranked by how much
+ * of a real PARAMETER each is (its spec group) so the table reads like a datasheet, not a
+ * shipping manifest. A single-valued option (the same for every part) is dropped - a useless
+ * column. Ties break on how many parts carry the parameter. Capped so the table stays legible;
+ * everything else lives in the facet rail and the part detail. */
 export function deriveColumns(
   facets: ParametricFacet[],
+  category: string | null,
   maxCols = 5,
 ): SpecColumn[] {
-  const useful = facets.filter(
-    (f) => f.kind === "range" || (f.options?.length ?? 0) > 1,
-  );
-  const ranked = [...useful].sort((a, b) => {
-    if ((a.kind === "range") !== (b.kind === "range")) return a.kind === "range" ? -1 : 1;
-    return b.count - a.count;
+  const cat = category ?? "";
+  const scored = facets
+    .filter((f) => f.kind === "range" || (f.options?.length ?? 0) > 1)
+    .map((f) => ({ f, score: _columnScore(f, cat) }))
+    .filter((s) => s.score > -Infinity)
+    .sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
+  return scored.slice(0, maxCols).map(({ f }) => {
+    const r = resolveSpec(f.key, cat);
+    return {
+      key: f.key,
+      label: r.label,
+      numeric: f.kind === "range",
+      unit: f.unit ?? r.unit ?? null,
+    };
   });
-  return ranked.slice(0, maxCols).map((f) => ({
-    key: f.key,
-    label: f.label,
-    numeric: f.kind === "range",
-    unit: f.unit ?? null,
-  }));
 }
 
 /** A row's display value for a spec column: the part's own value, prettified (Ohms -> Ω, unit

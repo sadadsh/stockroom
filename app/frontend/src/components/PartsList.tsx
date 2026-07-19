@@ -52,7 +52,7 @@ function useModelThumbnail(id: string, inView: boolean): string | null {
 // The row icon shell: a 30px tile that observes its own visibility (so a long list only
 // renders the models the user can actually see), showing the frozen 3D render when ready and
 // the category glyph until then / when the part has none.
-function RowThumbnail({ id, category }: { id: string; category: string }) {
+export function RowThumbnail({ id, category }: { id: string; category: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [inView, setInView] = useState(() => typeof IntersectionObserver === "undefined");
 

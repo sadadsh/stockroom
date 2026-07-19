@@ -9,6 +9,7 @@ import {
   emptyFilters,
   formatMagnitude,
   hasAnyFilter,
+  parseMagnitude,
   isOptionOn,
   removeOption,
   setRange,
@@ -119,9 +120,16 @@ describe("hasAnyFilter / clearAll", () => {
 });
 
 describe("deriveColumns", () => {
-  it("picks varying parameters, ranges first, and drops a single-valued option", () => {
-    const cols = deriveColumns(FACETS, 5);
+  it("ranks by parameter group (electrical params first), drops single-valued + commercial", () => {
+    const withNoise: ParametricFacet[] = [
+      ...FACETS,
+      { key: "Factory Pack Quantity", label: "Factory Pack Quantity", kind: "range", count: 88, min: 100, max: 10000 },
+      { key: "US Tariff %", label: "US Tariff %", kind: "range", count: 80, min: 0, max: 8 },
+    ];
+    const cols = deriveColumns(withNoise, "Resistors", 5);
+    // electrical parameters win; the commercial ranges never appear despite high counts
     expect(cols.map((c) => c.key)).toEqual(["Resistance", "Tolerance", "Power", "Package"]);
+    expect(cols.some((c) => /tariff|pack quantity/i.test(c.key))).toBe(false);
     // RoHS (every part "Yes") is a useless column and is excluded
     expect(cols.some((c) => c.key === "RoHS")).toBe(false);
     // a range column is numeric (right-aligned mono) and carries its unit
@@ -129,7 +137,20 @@ describe("deriveColumns", () => {
     expect(cols[3]).toMatchObject({ key: "Package", numeric: false });
   });
   it("honours the column cap", () => {
-    expect(deriveColumns(FACETS, 2).map((c) => c.key)).toEqual(["Resistance", "Tolerance"]);
+    expect(deriveColumns(FACETS, "Resistors", 2).map((c) => c.key)).toEqual([
+      "Resistance",
+      "Tolerance",
+    ]);
+  });
+});
+
+describe("parseMagnitude", () => {
+  it("normalizes SI-prefixed spec values, null when non-numeric", () => {
+    expect(parseMagnitude("10 kΩ")).toBe(10000);
+    expect(parseMagnitude("220 Ω")).toBe(220);
+    expect(parseMagnitude("5%")).toBe(5);
+    expect(parseMagnitude("100 nF")).toBeCloseTo(1e-7);
+    expect(parseMagnitude("Surface Mount")).toBeNull();
   });
 });
 

@@ -19,6 +19,9 @@ interface Props {
   duplicatesOnly: boolean;
   onDuplicatesOnly: (value: boolean) => void;
   duplicateCount: number;
+  // When set, the search field is a trigger for the full-screen parametric search (the
+  // north-star search): focusing/clicking it opens the overlay rather than editing inline.
+  onOpenSearch?: () => void;
 }
 
 export function Finder({
@@ -32,6 +35,7 @@ export function Finder({
   duplicatesOnly,
   onDuplicatesOnly,
   duplicateCount,
+  onOpenSearch,
 }: Props) {
   const [open, setOpen] = useState(false);
   const activeFilters =
@@ -47,10 +51,22 @@ export function Finder({
         <input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
+          onFocus={onOpenSearch ? (e) => { e.target.blur(); onOpenSearch(); } : undefined}
+          onMouseDown={
+            onOpenSearch
+              ? (e) => { e.preventDefault(); onOpenSearch(); }
+              : undefined
+          }
+          readOnly={!!onOpenSearch}
           placeholder="Search Parts"
           aria-label="Search Parts"
-          className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
+          className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
+        {onOpenSearch ? (
+          <kbd className="mr-0.5 flex-none rounded border border-line2 px-1.5 py-0.5 font-mono text-[10px] text-t3">
+            ⌘K
+          </kbd>
+        ) : null}
         <button
           type="button"
           aria-label="Filters"
