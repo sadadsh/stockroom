@@ -32,54 +32,88 @@
       "part_number": "595-BQ24074RGTT",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 3.19,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.39,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 2.19,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 1.97,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 1.86,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 1.76,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 1.71,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 2500,
+          "currency": "USD",
           "price": 1.69,
-          "currency": "USD"
+          "qty": 2500
         },
         {
-          "qty": 5000,
+          "currency": "USD",
           "price": 1.67,
-          "currency": "USD"
+          "qty": 5000
         }
       ],
       "stock": 1351,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT?qs=ZV%2Fxhq4oszp0gb4MsbpFYw%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:04:36.819247+00:00",
+      "part_number": "296-23798-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.86356,
+          "qty": 250
+        },
+        {
+          "price": 1.80036,
+          "qty": 500
+        },
+        {
+          "price": 1.76872,
+          "qty": 750
+        },
+        {
+          "price": 1.73365,
+          "qty": 1250
+        },
+        {
+          "price": 1.71315,
+          "qty": 1750
+        },
+        {
+          "price": 1.69346,
+          "qty": 2500
+        }
+      ],
+      "stock": 8875,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -109,8 +143,7 @@
     "Series": "BQ24074",
     "Subcategory": "PMIC - Power Management ICs",
     "US Tariff %": 37.93,
-    "Unit Weight": "0.000808 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "250"
+    "Unit Weight": "0.000808 oz"
   },
   "symbol": null,
   "tags": []
