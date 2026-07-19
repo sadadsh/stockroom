@@ -6,7 +6,7 @@
     "source_url": "https://ckswitches.com/media/1422/js.pdf"
   },
   "description": "Slide Switches",
-  "display_name": "JS102011SAQN C&K",
+  "display_name": "SPDT Slide Switch JS102011SAQN",
   "enrichment": {},
   "footprint": {
     "lib": "Button_Switch_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:16:05.787244+00:00",
       "part_number": "611-JS102011SAQN",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.84,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.727,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.677,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.604,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.559,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.528,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.468,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.446,
           "qty": 2000
         },
         {
-          "currency": "USD",
           "price": 0.431,
           "qty": 4000
         }
       ],
-      "stock": 6938,
+      "stock": 6875,
       "url": "https://www.mouser.com/en/ProductDetail/CK/JS102011SAQN?qs=LgMIjt8LuD%252B69bNM9a%2FozQ%3D%3D",
       "vendor": "Mouser"
     },
