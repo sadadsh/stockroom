@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/72/1/PYU_RT_1_TO_0_01_ROHS_L.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "94.2k 0.1% 0603 YAGEO RT0603BRD0794K2L",
+  "display_name": "94.2kΩ 0.1% 100mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,46 +28,39 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:15:34.086880+00:00",
       "part_number": "603-RT0603BRD0794K2L",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.06,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.056,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.052,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.05,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.046,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.038,
           "qty": 10000
         }
       ],
-      "stock": 8529,
+      "stock": 8469,
       "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RT0603BRD0794K2L?qs=bQfrgN9vNvwe21O8BIcT9A%3D%3D",
       "vendor": "Mouser"
     },
