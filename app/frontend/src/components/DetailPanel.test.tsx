@@ -142,11 +142,11 @@ describe("DetailPanel files previews (M6d)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
     wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
-    // the north-star datasheet block is never collapsed: shallow AND deep specs both show,
-    // and there is no Show All / Show Fewer control.
+    // the north-star datasheet block is never collapsed: every spec shows at once, shallow AND
+    // deep (the attributes card has its own Show All, but the spec sheet does not collapse).
     expect(screen.getByText("Spec 0")).toBeInTheDocument();
+    expect(screen.getByText("Spec 7")).toBeInTheDocument();
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Show All|Show Fewer/ })).toBeNull();
   });
 
   it("shows a passive's 3D model as present via its footprint, not Not Linked (A8)", () => {

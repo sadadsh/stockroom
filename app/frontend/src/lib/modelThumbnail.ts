@@ -20,9 +20,9 @@ const SIZE = 96;
 // its SHAPE, lit into form by the studio lights, not by an arbitrary colour. Shared + never
 // disposed (disposeScene skips it), so it is created once for every thumbnail.
 const NEUTRAL_MATERIAL = new THREE.MeshStandardMaterial({
-  color: 0xa8a8ac,
-  roughness: 0.62,
-  metalness: 0.08,
+  color: 0xb2b2b8,
+  roughness: 0.5,
+  metalness: 0.22,
 });
 
 // Replace every mesh's material with the shared neutral one, disposing the GLB's own
@@ -79,14 +79,18 @@ function renderOne(glb: ArrayBuffer): Promise<string | null> {
     }
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
-    // The same even, shadow-free studio lighting as the detail hero.
-    scene.add(new THREE.AmbientLight(0xffffff, 0.95));
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
-    key.position.set(1, 1.4, 1);
+    // The same three-point lighting as the detail hero: low ambient + a strong key + fill + rim,
+    // so even a tiny thumbnail shows tonal variation across faces instead of a flat gray shape.
+    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+    const key = new THREE.DirectionalLight(0xffffff, 1.55);
+    key.position.set(1.2, 1.6, 1.1);
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-    fill.position.set(-1, -0.6, -1);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+    fill.position.set(-1.2, -0.4, -0.8);
     scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.7);
+    rim.position.set(-0.6, 0.8, -1.4);
+    scene.add(rim);
 
     let settled = false;
     const done = (url: string | null) => {

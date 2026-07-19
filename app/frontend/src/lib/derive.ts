@@ -203,9 +203,9 @@ interface AttributeRule {
   format: (value: string) => string | null;
 }
 
-// The few chips the summary card should carry - the things that actually matter when choosing
-// the part. More than this and it stops reading as a glance.
-const MAX_ATTRIBUTES = 6;
+// The full ranked set the attributes card may hold; it shows only the first several as a glance
+// and reveals the rest behind "Show All", so this is the ceiling, not what is shown at rest.
+const MAX_ATTRIBUTES = 14;
 
 // Mounting codes normalized to a spoken label; a value that is already a label passes
 // through formatMounting unchanged.
