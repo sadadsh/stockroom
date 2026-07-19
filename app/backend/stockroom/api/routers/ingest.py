@@ -254,6 +254,45 @@ def ingest_router(require_token) -> APIRouter:
         ctx.auto_push()  # adding a part auto-pushes it to git so collaborators get it on next launch
         return record.to_dict()
 
+    @r.post("/parts/{part_id}/assets/inspect")
+    def inspect_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
+        """Unpack a downloaded CAD ZIP for an EXISTING part (the owner's DigiKey-CAD
+        flow, spec section 5). Same read-lane job + candidate DTO as /ingest/inspect;
+        the only difference is the caller already knows the target part_id, so this
+        checks it exists up front instead of discovering it only at commit time.
+        Deliberately does NOT call pipeline.cleanup() here (same as /ingest/inspect):
+        a candidate's symbol/footprint/model paths point INTO the pipeline's owned
+        tempdir and a fresh pipeline instance handles the follow-up commit call, so
+        cleaning up here would delete the very files that commit still needs."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        paths = [Path(p) for p in (body.get("paths") or [])]
+
+        def work(progress):
+            progress({"pct": 5, "message": "unpacking"})
+            pipeline = _make_pipeline(ctx)
+            cands = pipeline.inspect(inputs=paths)
+            progress({"pct": 90, "message": "staged"})
+            return [candidate_to_dto(c) for c in cands]
+
+        return {"job_id": ctx.jobs.submit(work)}  # read lane (no git)
+
+    @r.post("/parts/{part_id}/assets/commit")
+    def commit_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
+        """Attach the reviewed candidate's symbol/footprint/3D onto the existing part,
+        synchronously (one atomic Transaction whose added-or-rejected result the caller
+        needs immediately, same reasoning as /ingest/commit)."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        pipeline = _make_pipeline(ctx)
+        candidate = dto_to_candidate(body)
+        record = pipeline.attach_assets(part_id, candidate)
+        ctx.rebuild_index()
+        ctx.auto_push()  # attaching assets changes the part, so push it like any other mutation
+        return record.to_dict()
+
     @r.get("/jobs/{job_id}/events")
     def job_events(request: Request, job_id: str) -> EventSourceResponse:
         ctx = request.app.state.ctx
