@@ -32,54 +32,88 @@
       "part_number": "595-TS5A3166DBVR",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 0.43,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 0.302,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 0.27,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 100,
+          "currency": "USD",
           "price": 0.233,
-          "currency": "USD"
+          "qty": 100
         },
         {
-          "qty": 250,
+          "currency": "USD",
           "price": 0.216,
-          "currency": "USD"
+          "qty": 250
         },
         {
-          "qty": 500,
+          "currency": "USD",
           "price": 0.206,
-          "currency": "USD"
+          "qty": 500
         },
         {
-          "qty": 1000,
+          "currency": "USD",
           "price": 0.197,
-          "currency": "USD"
+          "qty": 1000
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 0.186,
-          "currency": "USD"
+          "qty": 3000
         },
         {
-          "qty": 6000,
+          "currency": "USD",
           "price": 0.181,
-          "currency": "USD"
+          "qty": 6000
         }
       ],
       "stock": 6188,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TS5A3166DBVR?qs=0O%2FZFlpUpJWfi7hoK1hGig%3D%3D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-19T16:08:11.449584+00:00",
+      "part_number": "296-17740-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.18628,
+          "qty": 3000
+        },
+        {
+          "price": 0.18111,
+          "qty": 6000
+        },
+        {
+          "price": 0.17852,
+          "qty": 9000
+        },
+        {
+          "price": 0.17565,
+          "qty": 15000
+        },
+        {
+          "price": 0.17397,
+          "qty": 21000
+        },
+        {
+          "price": 0.17236,
+          "qty": 30000
+        }
+      ],
+      "stock": 25896,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "specs": {
@@ -112,8 +146,7 @@
     "Supply Voltage - Min": "1.65 V",
     "Switch Continuous Current": "100 mA",
     "US Tariff %": 7.91,
-    "Unit Weight": "0.000222 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000"
+    "Unit Weight": "0.000222 oz"
   },
   "symbol": null,
   "tags": []
