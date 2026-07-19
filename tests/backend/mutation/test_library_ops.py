@@ -224,6 +224,23 @@ def test_add_reference_part_still_gates_on_purchase(tmp_path, fixtures_dir):
     assert repo.is_clean()
 
 
+def test_edit_datasheet_coerces_a_url_string_into_a_datasheet_ref(tmp_path, fixtures_dir):
+    # the Complete-Part window edits the datasheet as a bare URL; edit_field must wrap it in a
+    # Datasheet so the record stays well-formed, and a blank clears it.
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_reference_part(_refless_record())
+    edited = ops.edit_field("stm32h753zit6", "datasheet", "https://example.com/ds.pdf")
+    assert edited.datasheet is not None
+    assert edited.datasheet.source_url == "https://example.com/ds.pdf"
+    # round-trips through disk as a real Datasheet, not a bare string
+    saved = PartRecord.loads(
+        (profile.library.parts_dir / "stm32h753zit6.json").read_text(encoding="utf-8")
+    )
+    assert saved.datasheet.source_url == "https://example.com/ds.pdf"
+    assert ops.edit_field("stm32h753zit6", "datasheet", "  ").datasheet is None
+
+
 def test_attach_symbol_and_footprint_tag_the_tool_and_commit(tmp_path, fixtures_dir):
     repo, profile, _ = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
