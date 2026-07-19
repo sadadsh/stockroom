@@ -20,6 +20,8 @@ import type {
   FabExportOptions,
   FabStatus,
   Facets,
+  ParametricFacets,
+  SearchResponse,
   HistoryResponse,
   JobRef,
   PartDetail,
@@ -227,6 +229,11 @@ export interface ListPartsArgs {
   completeOnly?: boolean;
 }
 
+export interface SearchArgs extends ListPartsArgs {
+  // repeated spec constraints: "<key>:<value>" (an option) or "<key>:<min>~<max>" (a range)
+  spec?: string[];
+}
+
 export const api = {
   listParts({ q, category, completeOnly }: ListPartsArgs): Promise<PartsResponse> {
     const params: Record<string, string> = {};
@@ -238,6 +245,28 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by
+  // the same text/category/completeness as the list so a facet count never disagrees with it.
+  parametricFacets({ q, category, completeOnly }: ListPartsArgs): Promise<ParametricFacets> {
+    const params: Record<string, string> = {};
+    if (q) params.q = q;
+    if (category) params.category = category;
+    if (completeOnly) params.complete_only = "true";
+    return apiGet<ParametricFacets>("/api/library/facets/parametric", params);
+  },
+
+  // The rich results rows for the search table: same scope + `spec` filter as the lean list, but
+  // each row carries its spec bag + a sourcing summary. `spec` is a repeated `<key>:<value>` /
+  // `<key>:<min>~<max>` param (request() serializes the array to ?spec=a&spec=b).
+  searchParts({ q, category, completeOnly, spec }: SearchArgs): Promise<SearchResponse> {
+    const params: Record<string, string | string[]> = {};
+    if (q) params.q = q;
+    if (category) params.category = category;
+    if (completeOnly) params.complete_only = "true";
+    if (spec && spec.length) params.spec = spec;
+    return request<SearchResponse>("GET", "/api/library/search", { params });
   },
 
   // Refresh every part's procurement data (price/stock/lifecycle) from the free distributor

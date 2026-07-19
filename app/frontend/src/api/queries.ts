@@ -23,7 +23,7 @@ import type {
   SettingsPatch,
   StackupBody,
 } from "./types";
-import { api, type ListPartsArgs } from "./client";
+import { api, type ListPartsArgs, type SearchArgs } from "./client";
 import { useJob } from "../lib/useJob";
 
 // First-run library onboarding (M9c). Set/complete repoint the running engine at a
@@ -64,6 +64,36 @@ export function useFacetsQuery() {
   return useQuery({
     queryKey: ["facets"],
     queryFn: () => api.facets(),
+  });
+}
+
+// The modular search rail's filter dimensions, generated from the parts' specs and scoped by
+// the current query/category so the counts track what the list shows. Its own key (not
+// ["facets"]) so a normal facet invalidation and this can refetch independently.
+export function useParametricFacets(args: ListPartsArgs, enabled = true) {
+  return useQuery({
+    queryKey: ["parametric-facets", args.q ?? "", args.category ?? "", !!args.completeOnly],
+    queryFn: () => api.parametricFacets(args),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// The rich search results (specs + sourcing per row) for the results table. `spec` is part of
+// the key so toggling any facet refetches; disabled while the overlay is closed so it costs
+// nothing until opened.
+export function useSearchQuery(args: SearchArgs, enabled = true) {
+  return useQuery({
+    queryKey: [
+      "search",
+      args.q ?? "",
+      args.category ?? "",
+      !!args.completeOnly,
+      [...(args.spec ?? [])].sort().join("|"),
+    ],
+    queryFn: () => api.searchParts(args),
+    enabled,
+    placeholderData: keepPreviousData,
   });
 }
 

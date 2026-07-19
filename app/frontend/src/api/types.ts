@@ -42,6 +42,54 @@ export interface Facets {
   incomplete: number;
 }
 
+// GET /api/library/facets/parametric — filter dimensions GENERATED from the parts' own spec
+// bags (never a hardcoded per-category list). A numeric key becomes a `range`; any other key
+// becomes `options` (the top distinct values with counts). A new spec key surfaces on its own.
+export interface FacetOption {
+  value: string;
+  count: number;
+}
+
+export interface ParametricFacet {
+  key: string;
+  label: string;
+  kind: "options" | "range";
+  count: number;
+  options?: FacetOption[] | null;
+  // range facets carry SI-normalized magnitude bounds + the shared base unit
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
+}
+
+export interface ParametricFacets {
+  category: string | null;
+  facets: ParametricFacet[];
+  total: number;
+}
+
+// GET /api/library/search — a rich results row: the lean identity plus the part's own scalar
+// spec bag and a flattened sourcing summary. The results table picks its columns from `specs`,
+// so a new spec becomes a column with no code change.
+export interface SearchRow {
+  id: string;
+  display_name: string;
+  category: string;
+  mpn: string;
+  manufacturer: string;
+  is_complete: boolean;
+  missing: string[];
+  specs: Record<string, string | number | boolean>;
+  stock: number | null;
+  unit_price: number | null;
+  currency: string;
+}
+
+export interface SearchResponse {
+  parts: SearchRow[];
+  count: number;
+}
+
 // Nested records inside the full part detail (stockroom.model.part).
 export interface DatasheetRef {
   file: string;
