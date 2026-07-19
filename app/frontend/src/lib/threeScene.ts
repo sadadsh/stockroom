@@ -30,15 +30,20 @@ export function mountModelScene(
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
 
-  // Even, shadow-free studio lighting so a bare mechanical model reads clearly from
-  // any angle without a floor or a hard key light.
-  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-  const key = new THREE.DirectionalLight(0xffffff, 1.1);
-  key.position.set(1, 1.4, 1);
+  // Three-point studio lighting: a strong key from above-right for the form's primary gradient, a
+  // softer fill to keep the shadow side readable, and a back/rim light that grazes the silhouette
+  // so edges catch light. Low ambient so faces actually vary in tone (a flat, evenly-lit monochrome
+  // blob is what made a real model look like an empty placeholder).
+  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+  const key = new THREE.DirectionalLight(0xffffff, 1.55);
+  key.position.set(1.2, 1.6, 1.1);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-  fill.position.set(-1, -0.6, -1);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+  fill.position.set(-1.2, -0.4, -0.8);
   scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.7);
+  rim.position.set(-0.6, 0.8, -1.4);
+  scene.add(rim);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -61,10 +66,14 @@ export function mountModelScene(
       // per-material colour), so a model reads by its lit form, not by the GLB's arbitrary
       // colour. Disposed with the scene below (all meshes share this one material).
       const neutral = new THREE.MeshStandardMaterial({
-        color: 0xa8a8ac,
-        roughness: 0.62,
-        metalness: 0.08,
+        color: 0xb2b2b8,
+        roughness: 0.5,
+        metalness: 0.22,
       });
+      // A crisp dark outline on the geometry's sharp edges (>~30° dihedral): a monochrome fill
+      // alone hides where one face ends and the next begins, so the outline is what makes the
+      // form legible - it reads like a shaded CAD drawing rather than a gray silhouette.
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0x33333a, transparent: true, opacity: 0.55 });
       gltf.scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -72,6 +81,9 @@ export function mountModelScene(
         if (Array.isArray(old)) old.forEach((m) => m.dispose());
         else old?.dispose();
         mesh.material = neutral;
+        if (mesh.geometry) {
+          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 30), edgeMat));
+        }
       });
       // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
       // and the body points up, and the auto-spin turns it about that vertical axis.
