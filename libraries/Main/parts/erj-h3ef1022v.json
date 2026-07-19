@@ -6,7 +6,7 @@
     "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/RDO0000C334.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "10.2k 1% 0603 Panasonic ERJ-H3EF1022V",
+  "display_name": "10.2kΩ 1% 125mW 0603",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:12:26.226129+00:00",
       "part_number": "667-ERJ-H3EF1022V",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.28,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.131,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.074,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.06,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.055,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.051,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.044,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.03,
           "qty": 10000
         },
         {
-          "currency": "USD",
           "price": 0.029,
           "qty": 25000
         }
       ],
-      "stock": 9828,
+      "stock": 9824,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-H3EF1022V?qs=eP2BKZSCXI7QGPTo2Wu7Tg%3D%3D",
       "vendor": "Mouser"
     },
