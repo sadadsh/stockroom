@@ -6,7 +6,7 @@
     "source_url": "https://industrial.panasonic.com/cdbs/www-data/pdf/RDO0000/AOA0000C331.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "12.5k 1% 0402 Panasonic ERJ-PA2F1242X",
+  "display_name": "12.4kΩ 1% 250mW 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:13:02.941366+00:00",
       "part_number": "667-ERJ-PA2F1242X",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.28,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.129,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.072,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.059,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.054,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.05,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.049,
           "qty": 5000
         },
         {
-          "currency": "USD",
           "price": 0.033,
           "qty": 10000
         },
         {
-          "currency": "USD",
           "price": 0.03,
           "qty": 20000
         }
       ],
-      "stock": 28035,
+      "stock": 28031,
       "url": "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-PA2F1242X?qs=V%252BBODeGd91LZ4cJzK1GGng%3D%3D",
       "vendor": "Mouser"
     },
