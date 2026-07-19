@@ -209,24 +209,14 @@ export function DetailPanel({
         </div>
       </div>
 
-      {/* Attributes (north-star .attrcard): a full-width card of neutral tag chips. */}
-      {attributes.length > 0 ? (
-        <div className="mt-6 rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
-          <div className="mb-3 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-            Attributes
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {attributes.map((a) => (
-              <span
-                key={a}
-                className="rounded-full border border-line bg-field px-3 py-[5px] text-xs font-medium text-t2"
-              >
-                {a}
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      {/* Attributes (north-star .attrcard): the few parameters that matter for THIS part, derived
+          from its specs, plus any the user pins by hand (stored in the record's tags). */}
+      <AttributesCard
+        derived={attributes}
+        manual={detail.tags}
+        onEditTags={onEditField ? (next) => onEditField("tags", next) : undefined}
+        busy={busy}
+      />
 
       {!isComplete && missing.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -470,6 +460,116 @@ export function DetailPanel({
           onCancel={() => setConfirmDelete(false)}
         />
       ) : null}
+    </div>
+  );
+}
+
+// The Attributes card: the FEW derived, parameter-ranked chips (deriveAttributes) plus any the
+// user pins by hand. Manual attributes persist in the record's `tags` field (the retired "tags"
+// concept is now this), so each shows a remove control and there is an inline add. Derived chips
+// are read-only (they mirror the specs); a manual chip that duplicates a derived one is hidden.
+function AttributesCard({
+  derived,
+  manual,
+  onEditTags,
+  busy,
+}: {
+  derived: string[];
+  manual: string[];
+  onEditTags?: (next: string[]) => void;
+  busy?: boolean;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const derivedLower = new Set(derived.map((a) => a.toLowerCase()));
+  const manualChips = manual.filter(
+    (t) => t.trim() !== "" && !derivedLower.has(t.trim().toLowerCase()),
+  );
+
+  const chipCls =
+    "inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-medium";
+
+  function commitAdd() {
+    const value = draft.trim();
+    setDraft("");
+    setAdding(false);
+    if (!value || !onEditTags) return;
+    const exists =
+      derivedLower.has(value.toLowerCase()) ||
+      manual.some((t) => t.toLowerCase() === value.toLowerCase());
+    if (!exists) onEditTags([...manual, value]);
+  }
+
+  function removeManual(tag: string) {
+    onEditTags?.(manual.filter((t) => t !== tag));
+  }
+
+  return (
+    <div className="mt-6 rounded-card border border-line bg-raise px-[18px] py-[15px] shadow-card">
+      <div className="mb-3 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+        Attributes
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {derived.map((a) => (
+          <span key={`d-${a}`} className={chipCls + " border-line bg-field text-t2"}>
+            {a}
+          </span>
+        ))}
+        {manualChips.map((t) => (
+          <span key={`m-${t}`} className={chipCls + " border-line2 bg-raise2 text-t1"}>
+            {t}
+            {onEditTags ? (
+              <button
+                type="button"
+                onClick={() => removeManual(t)}
+                disabled={busy}
+                aria-label={`Remove ${t}`}
+                className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
+          </span>
+        ))}
+        {onEditTags ? (
+          adding ? (
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitAdd}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitAdd();
+                else if (e.key === "Escape") {
+                  setDraft("");
+                  setAdding(false);
+                }
+              }}
+              placeholder="Add attribute"
+              aria-label="Add attribute"
+              className="h-[29px] w-36 rounded-full border border-line2 bg-field px-3 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-line2 px-3 py-[5px] text-xs font-medium text-t3 hover:border-acc hover:text-t1 disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3 w-3">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add
+            </button>
+          )
+        ) : null}
+        {derived.length === 0 && manualChips.length === 0 && !onEditTags ? (
+          <span className="text-xs text-t3">No attributes.</span>
+        ) : null}
+      </div>
     </div>
   );
 }

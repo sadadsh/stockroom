@@ -120,34 +120,47 @@ describe("deriveTitle", () => {
 });
 
 describe("deriveAttributes", () => {
-  it("lists tags first, then derived chips (package + mounting + compliance + feature)", () => {
+  it("derives the key parameters from specs, ranked electrical-first, and IGNORES tags", () => {
     const part = makePart({
       category: "Resistors",
-      tags: ["Thin Film", "General Purpose"],
+      tags: ["Thin Film", "General Purpose"], // manual tags are NOT folded into derived attributes
       specs: {
+        Resistance: "1.1 kΩ", // the headline value is in the title, so never a chip
+        Tolerance: "1%",
+        "Power Rating": "0.2 W",
         Package: "0603",
+        Composition: "Thick Film",
         "Mounting Type": "SMD",
         RoHS: "Yes",
-        Composition: "Thick Film",
-        Qualification: "AEC-Q200",
       },
     });
     const attrs = deriveAttributes(part);
-    expect(attrs.slice(0, 2)).toEqual(["Thin Film", "General Purpose"]);
+    // tags are gone, the headline resistance is gone
+    expect(attrs).not.toContain("Thin Film");
+    expect(attrs).not.toContain("General Purpose");
+    expect(attrs.some((a) => /kΩ/.test(a))).toBe(false);
+    // the signed tolerance leads (Electrical), physical form + compliance follow
+    expect(attrs[0]).toBe("±1%");
     expect(attrs).toContain("0603");
     expect(attrs).toContain("Surface Mount");
-    expect(attrs).toContain("RoHS Compliant");
-    expect(attrs).toContain("Thick Film");
-    expect(attrs).toContain("AEC-Q200");
   });
 
-  it("dedups a derived chip against a curated tag, case-insensitively (the tag wins)", () => {
+  it("keeps the card small: no more than six chips", () => {
     const part = makePart({
       category: "Resistors",
-      tags: ["0603", "surface mount"],
-      specs: { Package: "0603", "Mounting Type": "SMD" },
+      specs: {
+        Tolerance: "1%",
+        "Power Rating": "0.2 W",
+        "Voltage Rating": "75 V",
+        "Temperature Coefficient": "100 ppm/°C",
+        Package: "0603",
+        Composition: "Thick Film",
+        "Mounting Type": "SMD",
+        RoHS: "Yes",
+        Qualification: "AEC-Q200",
+      },
     });
-    expect(deriveAttributes(part)).toEqual(["0603", "surface mount"]);
+    expect(deriveAttributes(part).length).toBeLessThanOrEqual(6);
   });
 
   it("maps a through-hole code and keeps a value that is already a label", () => {
@@ -176,23 +189,16 @@ describe("deriveAttributes", () => {
     expect(deriveAttributes(part)).toEqual([]);
   });
 
-  it("caps the chip count and keeps tags-first ordering", () => {
+  it("skips commercial / provenance specs (tariff, country, packaging)", () => {
     const part = makePart({
       category: "Resistors",
-      tags: ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"],
       specs: {
+        "US Tariff %": "8",
+        "Assembly Country of Origin": "China",
+        Packaging: "Tape & Reel",
         Package: "0603",
-        "Mounting Type": "SMD",
-        RoHS: "Yes",
-        Qualification: "AEC-Q200",
       },
     });
-    const attrs = deriveAttributes(part);
-    expect(attrs.length).toBe(12);
-    expect(attrs.slice(0, 10)).toEqual([
-      "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10",
-    ]);
-    expect(attrs[10]).toBe("0603");
-    expect(attrs[11]).toBe("Surface Mount");
+    expect(deriveAttributes(part)).toEqual(["0603"]);
   });
 });
