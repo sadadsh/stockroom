@@ -308,6 +308,19 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit(work, write=True)}
 
+    @r.get("/parts/{part_id}/cad-source")
+    def part_cad_source(request: Request, part_id: str) -> dict:
+        ctx = request.app.state.ctx
+        row = ctx.index.get(part_id)
+        if row is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        from stockroom.enrich.cad_source import resolve_digikey_cad_source
+
+        digikey = next((a for a in build_refresh_adapters(ctx)
+                        if getattr(a, "vendor", "") == "DigiKey"), None)
+        url = resolve_digikey_cad_source(row.mpn, digikey) if digikey is not None else None
+        return {"url": url, "mpn": row.mpn, "vendor": "DigiKey"}
+
     @r.post("/rescan")
     def rescan_library(request: Request, force: bool = False) -> dict:
         ctx = request.app.state.ctx
