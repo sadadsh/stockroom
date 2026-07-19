@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/catalog/specsheets/YAGEO_PYu_RC_Group_51_RoHS_L_12.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "10k 1% 0402 YAGEO RC0402FR-0710KL",
+  "display_name": "10kΩ 1% 62.5mW 0402",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -28,36 +28,31 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-19T23:12:46.183267+00:00",
       "part_number": "603-RC0402FR-0710KL",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.1,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.009,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.006,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.004,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.002,
           "qty": 10000
         }
       ],
-      "stock": 6731048,
+      "stock": 7071258,
       "url": "https://www.mouser.com/en/ProductDetail/YAGEO/RC0402FR-0710KL?qs=I1mnnYJTTsxUoNwrUsQExA%3D%3D",
       "vendor": "Mouser"
     },
