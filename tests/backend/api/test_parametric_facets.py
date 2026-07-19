@@ -197,6 +197,25 @@ def test_a_malformed_spec_token_is_ignored_not_500(spec_client):
     assert r.json()["count"] == 3
 
 
+def test_facets_narrow_by_selection_but_exclude_their_own_key(spec_client):
+    # constrain to a tight tolerance (only r1, 1%). The rail must narrow the OTHER facets to r1,
+    # but the Tolerance facet itself excludes its own constraint so it still shows BOTH 1% and 5%
+    # (multi-select keeps working); total reflects the fully-constrained count.
+    r = spec_client.get(
+        "/api/library/facets/parametric",
+        params={"category": "Resistors", "spec": "Tolerance:0~2"},
+    )
+    body = r.json()
+    assert body["total"] == 1  # only r1 satisfies the tolerance band
+    facets = _facets_by_key(body)
+    # Resistance narrowed to r1 only (10 kΩ)
+    assert facets["Resistance"]["min"] == 10000.0
+    assert facets["Resistance"]["max"] == 10000.0
+    # Tolerance excludes its OWN constraint -> still spans both parts (1..5)
+    assert facets["Tolerance"]["min"] == 1.0
+    assert facets["Tolerance"]["max"] == 5.0
+
+
 def test_parametric_facets_require_a_token(tmp_path):
     from fastapi.testclient import TestClient
 

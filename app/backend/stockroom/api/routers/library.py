@@ -207,19 +207,22 @@ def library_router(require_token) -> APIRouter:
         category: str | None = None,
         q: str = "",
         complete_only: bool = False,
+        spec: list[str] = Query(default=[]),
     ) -> dict:
         """Facets GENERATED from the parts' free-form spec bags (never a hardcoded
         parameter list) for the modular Mouser-style search. Each spec key present across
         the (optionally category/query/complete-scoped) parts becomes one facet: a
         mostly-numeric key -> a range (min/max, unit), any other -> the top-N distinct
-        values with counts. A category that grows a brand-new spec key surfaces it with
-        zero code change. Scoping reuses the derived index; specs load from the records."""
-        from stockroom.store.parametric import aggregate_parametric
+        values with counts. The live rail selections (``spec``, same tokens as /parts) are
+        applied so the counts narrow as the user picks - each facet excludes its OWN key so it
+        still offers its other values. A category that grows a brand-new spec key surfaces it
+        with zero code change. Scoping reuses the derived index; specs load from the records."""
+        from stockroom.store.parametric import aggregate_parametric, parse_spec_filters
 
         ctx = request.app.state.ctx
         rows = ctx.index.search(query=q, category=category, complete_only=complete_only)
         records = (ctx.ops.load_record(row.id) for row in rows)
-        agg = aggregate_parametric(records, category=category)
+        agg = aggregate_parametric(records, category=category, constraints=parse_spec_filters(spec))
         return ParametricFacetsDTO.from_aggregate(agg).model_dump()
 
     @r.post("/bom-match")
