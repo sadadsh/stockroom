@@ -28,26 +28,22 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-20T02:20:59.137809+00:00",
       "part_number": "595-TPS3700DDCR2G4",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.75,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 2.05,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 1.88,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 1.88,
           "qty": 3000
         }
@@ -68,7 +64,7 @@
     "Development Kit": "ISO5852SDWEVM-017, TPS3700EVM-114, TPS3700EVM-202, UCC21732QDWEVM-025, UCC21750QDWEVM-025",
     "ECCN": "EAR99",
     "Factory Pack Quantity": "3000",
-    "Lifecycle": "Active",
+    "Lifecycle": "New Product",
     "Manual Reset": "No Manual Reset",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
