@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { orientUpright } from "./modelOrient";
 
 export function mountModelScene(
@@ -25,25 +26,37 @@ export function mountModelScene(
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height);
+  // Filmic tone mapping so the bright metal highlights + deep shadow sides don't clip: this is
+  // what turns a flat gray blob into a form with readable light-to-dark gradients.
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
 
-  // Three-point studio lighting: a strong key from above-right for the form's primary gradient, a
-  // softer fill to keep the shadow side readable, and a back/rim light that grazes the silhouette
-  // so edges catch light. Low ambient so faces actually vary in tone (a flat, evenly-lit monochrome
-  // blob is what made a real model look like an empty placeholder).
-  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
-  const key = new THREE.DirectionalLight(0xffffff, 1.55);
-  key.position.set(1.2, 1.6, 1.1);
+  // IMAGE-BASED LIGHTING: a neutral studio room supplies realistic reflections + soft occlusion,
+  // so the monochrome surface actually reads as a lit 3D object (the single biggest legibility win
+  // over flat directional light on a matte gray). PMREM prefilters it for the standard material.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envRT = pmrem.fromScene(new RoomEnvironment(), 0.03);
+  scene.environment = envRT.texture;
+
+  // A strong shadow-casting key defines the primary highlight + drops a contact shadow that grounds
+  // the part; a soft fill keeps the far side from going black. The environment handles the rest.
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(1.4, 2.2, 1.3);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.bias = -0.0005;
+  const kd = key.shadow.camera as THREE.OrthographicCamera;
+  kd.left = kd.bottom = -2; kd.right = kd.top = 2; kd.near = 0.1; kd.far = 20;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.55);
-  fill.position.set(-1.2, -0.4, -0.8);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+  fill.position.set(-1.2, -0.2, -0.9);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffffff, 0.7);
-  rim.position.set(-0.6, 0.8, -1.4);
-  scene.add(rim);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -65,15 +78,18 @@ export function mountModelScene(
       // Render every part in ONE neutral surface (the app's 3D renders are monochrome - no
       // per-material colour), so a model reads by its lit form, not by the GLB's arbitrary
       // colour. Disposed with the scene below (all meshes share this one material).
+      // A brushed-metal surface: reflective enough that the studio environment paints bright
+      // highlights + dark shadow zones across it (high internal contrast = readable form on ANY
+      // tile background), yet still monochrome so the part reads by shape, not by GLB colour.
       const neutral = new THREE.MeshStandardMaterial({
-        color: 0xb2b2b8,
-        roughness: 0.5,
-        metalness: 0.22,
+        color: 0xbdbdc4,
+        roughness: 0.34,
+        metalness: 0.55,
+        envMapIntensity: 1.35,
       });
-      // A crisp dark outline on the geometry's sharp edges (>~30° dihedral): a monochrome fill
-      // alone hides where one face ends and the next begins, so the outline is what makes the
-      // form legible - it reads like a shaded CAD drawing rather than a gray silhouette.
-      const edgeMat = new THREE.LineBasicMaterial({ color: 0x33333a, transparent: true, opacity: 0.55 });
+      // A near-black outline on every sharp edge (>~24° dihedral) at full strength, so the
+      // silhouette AND internal creases are always visible even where the fill matches the tile.
+      const edgeMat = new THREE.LineBasicMaterial({ color: 0x141418, transparent: true, opacity: 0.9 });
       gltf.scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -81,8 +97,10 @@ export function mountModelScene(
         if (Array.isArray(old)) old.forEach((m) => m.dispose());
         else old?.dispose();
         mesh.material = neutral;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         if (mesh.geometry) {
-          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 30), edgeMat));
+          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 24), edgeMat));
         }
       });
       // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
@@ -99,6 +117,28 @@ export function mountModelScene(
       const center = box.getCenter(new THREE.Vector3());
       gltf.scene.position.sub(center);
       const radius = Math.max(size.length() * 0.5, 0.001);
+
+      // A soft CONTACT SHADOW under the part: a shadow-only plane at the model's base catches the
+      // key light, grounding the object and adding depth (a floating monochrome shape reads as flat;
+      // a grounded one reads as solid). Sized + placed relative to the model so it works at any scale.
+      const bottomY = -size.y / 2;
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(radius * 8, radius * 8),
+        new THREE.ShadowMaterial({ opacity: 0.28 }),
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = bottomY - radius * 0.02;
+      ground.receiveShadow = true;
+      scene.add(ground);
+      // aim the key + scale its shadow frustum to the model so the shadow is crisp, not clipped
+      key.position.set(radius * 1.6, radius * 2.6, radius * 1.5);
+      kd.left = kd.bottom = -radius * 2.2;
+      kd.right = kd.top = radius * 2.2;
+      kd.near = radius * 0.05;
+      kd.far = radius * 8;
+      kd.updateProjectionMatrix();
+      fill.position.set(-radius * 1.4, -radius * 0.3, -radius);
+
       // The frame is usually wider than tall; fit the sphere to the SHORTER (vertical)
       // extent so the model reads large, and account for aspect so a portrait frame still
       // fits horizontally.
@@ -153,6 +193,8 @@ export function mountModelScene(
       if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
       else mat?.dispose();
     });
+    envRT.texture.dispose();
+    pmrem.dispose();
     renderer.dispose();
     // dispose() frees GPU caches but leaves the WebGL context alive until GC; browsers
     // cap live contexts (~16), so without this every 3D-preview open would leak one and
