@@ -427,10 +427,19 @@ export function useDoSync() {
   });
 }
 
+// The rail mounts this on boot, so the check must keep running on its own - otherwise a
+// release pushed AFTER the app opened never surfaces until something else remounts the query
+// (the reported bug: the Update pill only appeared after opening Settings, whose own observer
+// forced a refetch). Each check does a real `git fetch` + ahead/behind, so re-run it on a modest
+// interval and whenever the window regains focus; a stale window then discovers a new release
+// within a couple minutes without any navigation. staleTime dedupes the boot + Settings observers.
 export function useUpdateCheck() {
   return useQuery({
     queryKey: ["update-check"],
     queryFn: () => api.checkUpdate(),
+    refetchInterval: 2 * 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 60_000,
   });
 }
 
