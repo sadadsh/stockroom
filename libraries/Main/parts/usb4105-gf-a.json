@@ -9,8 +9,8 @@
   "display_name": "Connector Top-Mount",
   "enrichment": {},
   "footprint": {
-    "lib": "MyFootprints",
-    "name": "GCT_USB4105-GF-A",
+    "lib": "SR-Connectors",
+    "name": "USB4105-GF-A-120",
     "tool": "kicad"
   },
   "hashes": null,
