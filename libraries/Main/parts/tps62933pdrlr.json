@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-20T02:20:59.137809+00:00",
       "part_number": "595-TPS62933PDRLR",
       "price_breaks": [
         {
-          "currency": "USD",
-          "price": 1.38,
+          "price": 1.45,
           "qty": 1
         },
         {
-          "currency": "USD",
-          "price": 1.01,
+          "price": 1.05,
           "qty": 10
         },
         {
-          "currency": "USD",
-          "price": 0.912,
+          "price": 0.948,
           "qty": 25
         },
         {
-          "currency": "USD",
-          "price": 0.808,
+          "price": 0.838,
           "qty": 100
         },
         {
-          "currency": "USD",
-          "price": 0.758,
+          "price": 0.785,
           "qty": 250
         },
         {
-          "currency": "USD",
-          "price": 0.729,
+          "price": 0.754,
           "qty": 500
         },
         {
-          "currency": "USD",
-          "price": 0.708,
+          "price": 0.72,
           "qty": 1000
         },
         {
-          "currency": "USD",
-          "price": 0.697,
+          "price": 0.7,
           "qty": 2000
         },
         {
-          "currency": "USD",
-          "price": 0.664,
+          "price": 0.682,
           "qty": 4000
         }
       ],
-      "stock": 10754,
+      "stock": 8142,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62933PDRLR?qs=vvQtp7zwQdPCuPvhGs%2FYxA%3D%3D",
       "vendor": "Mouser"
     },
