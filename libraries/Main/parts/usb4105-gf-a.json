@@ -30,57 +30,48 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-20T02:20:59.137809+00:00",
       "part_number": "640-USB4105-GF-A",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.93,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.81,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.741,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.668,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.61,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.505,
           "qty": 800
         },
         {
-          "currency": "USD",
           "price": 0.474,
           "qty": 2400
         },
         {
-          "currency": "USD",
           "price": 0.451,
           "qty": 4800
         },
         {
-          "currency": "USD",
           "price": 0.43,
           "qty": 9600
         }
       ],
-      "stock": 481266,
+      "stock": 481077,
       "url": "https://www.mouser.com/en/ProductDetail/GCT/USB4105-GF-A?qs=KUoIvG%2F9IlY%2FMLlBMpStpA%3D%3D",
       "vendor": "Mouser"
     },
