@@ -1,12 +1,12 @@
 {
   "category": "ICs",
   "datasheet": {
+    "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/tps3700",
-    "fetched_at": ""
+    "source_url": "https://www.ti.com/lit/gpn/tps3700"
   },
   "description": "Analog Comparators",
-  "display_name": "TPS3700DDCR SOT-23-6 TI TPS3700DDCR2G4",
+  "display_name": "Supervisory Circuit TPS3700DDCR2G4 SOT-23-6",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -20,46 +20,48 @@
   "mpn": "TPS3700DDCR2G4",
   "passive": false,
   "provenance": {
-    "source": "finale-sauce-equiv",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR2G4?qs=7%2F6SraaimPQ2iIfCXLqUgg%3D%3D",
+    "ingested_at": "",
     "original_zip_sha256": "",
-    "ingested_at": ""
+    "source": "finale-sauce-equiv",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR2G4?qs=7%2F6SraaimPQ2iIfCXLqUgg%3D%3D"
   },
   "purchase": [
     {
-      "vendor": "Mouser",
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR2G4?qs=7%2F6SraaimPQ2iIfCXLqUgg%3D%3D",
+      "currency": "USD",
+      "fetched_at": "",
       "part_number": "595-TPS3700DDCR2G4",
       "price_breaks": [
         {
-          "qty": 1,
+          "currency": "USD",
           "price": 2.75,
-          "currency": "USD"
+          "qty": 1
         },
         {
-          "qty": 10,
+          "currency": "USD",
           "price": 2.05,
-          "currency": "USD"
+          "qty": 10
         },
         {
-          "qty": 25,
+          "currency": "USD",
           "price": 1.88,
-          "currency": "USD"
+          "qty": 25
         },
         {
-          "qty": 3000,
+          "currency": "USD",
           "price": 1.88,
-          "currency": "USD"
+          "qty": 3000
         }
       ],
       "stock": 2919,
-      "currency": "USD",
-      "fetched_at": ""
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS3700DDCR2G4?qs=7%2F6SraaimPQ2iIfCXLqUgg%3D%3D",
+      "vendor": "Mouser"
     }
   ],
   "specs": {
     "Assembly Country of Origin": "Not available",
+    "Battery Backup Switching": "Backup",
     "Brand": "Texas Instruments",
+    "Chip Enable Signals": "No Chip Enable",
     "Comparator Type": "Window",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Thailand",
@@ -67,21 +69,25 @@
     "ECCN": "EAR99",
     "Factory Pack Quantity": "3000",
     "Lifecycle": "Active",
+    "Manual Reset": "No Manual Reset",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 40 C",
     "Moisture Sensitive": "Yes",
     "Mounting Style": "SMD/SMT",
     "Number of Channels": "1 Channel",
+    "Number of Inputs Monitored": "2 Input",
     "Operating Supply Current": "7 uA",
     "Output Current per Channel": "40 mA",
     "Output Type": "Active Low, Open Drain",
     "Package": "SOT-23-6",
     "Packaging": "Reel",
+    "Power Fail Detection": "No",
     "Product": "Analog Comparators",
     "Product Category": "Supervisory Circuits",
     "Product Type": "Supervisory Circuits",
     "Propagation Delay Time": "29 us",
+    "Quiescent Current": "5.5 uA",
     "Response Time": "29 us",
     "RoHS": "Details",
     "Series": "TPS3700DDCR2G4",
@@ -89,17 +95,10 @@
     "Subcategory": "PMIC - Power Management ICs",
     "Supply Voltage - Max": "18 V",
     "Supply Voltage - Min": "1.8 V",
+    "Threshold Voltage": "400 mV",
     "US Tariff %": 0.0,
     "Unit Weight": "0.000229 oz",
-    "Factory Pack Quantity: Factory Pack Quantity": "3000",
-    "Threshold Voltage": "400 mV",
-    "Number of Inputs Monitored": "2 Input",
-    "Manual Reset": "No Manual Reset",
-    "Watchdog Timers": "Watchdog",
-    "Battery Backup Switching": "Backup",
-    "Chip Enable Signals": "No Chip Enable",
-    "Power Fail Detection": "No",
-    "Quiescent Current": "5.5 uA"
+    "Watchdog Timers": "Watchdog"
   },
   "symbol": null,
   "tags": []
