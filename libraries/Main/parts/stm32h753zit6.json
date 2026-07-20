@@ -9,14 +9,17 @@
   "display_name": "ARM Microcontroller STM32H753ZIT6 LQFP-144",
   "enrichment": {},
   "footprint": {
-    "lib": "Package_QFP",
-    "name": "LQFP-144_20x20mm_P0.5mm",
+    "lib": "SR-ICs",
+    "name": "STM32H753ZIT6",
     "tool": "kicad"
   },
   "hashes": null,
   "id": "stm32h753zit6",
   "manufacturer": "STMicroelectronics",
-  "model": null,
+  "model": {
+    "file": "models/STM32H753ZIT6.step",
+    "tool": "kicad"
+  },
   "mpn": "STM32H753ZIT6",
   "passive": false,
   "provenance": {
@@ -135,6 +138,10 @@
     "Unit Weight": "0.046385 oz",
     "Watchdog Timers": "Watchdog Timer, Windowed"
   },
-  "symbol": null,
+  "symbol": {
+    "lib": "SR-ICs",
+    "name": "STM32H753ZIT6",
+    "tool": "kicad"
+  },
   "tags": []
 }
