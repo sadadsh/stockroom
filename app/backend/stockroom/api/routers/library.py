@@ -110,26 +110,26 @@ def _mouser_link_resolver(ctx):
 
 def build_refresh_adapters(ctx) -> list:
     """The enabled distributor adapters, each tagged with its vendor label so a refresh maps each
-    result onto its own Purchase row, in the owner's sourcing order: MOUSER PRIMARY, DIGIKEY
-    FALLBACK. Mouser is the API adapter when a key is configured, otherwise the keyless scrape
-    adapter that renders each part's stored Mouser link (owner directive 2026-07-19). DigiKey is
-    its API. A separate module-level function so a rescan can be tested without live creds."""
+    result onto its own Purchase row, in the owner's sourcing order: MOUSER PRIMARY (the keyless
+    crawler over a part's stored Mouser link), the MOUSER API as a FALLBACK when the crawler
+    errors/blocks, then the DIGIKEY API (owner directive 2026-07-19). One Mouser adapter drives
+    both tiers; with no rendered-DOM fetcher it degrades to API-only. A separate module-level
+    function so a rescan can be tested without live creds."""
+    from stockroom.enrich.mouser import MouserAdapter
+    from stockroom.enrich.mouser_scrape import MouserScrapeAdapter
+
     adapters: list = []
-    if ctx.config.mouser_api_key:
-        from stockroom.enrich.mouser import MouserAdapter
-
-        a = MouserAdapter(api_key=ctx.config.mouser_api_key)
-        a.vendor = "Mouser"
-        adapters.append(a)
-    else:
-        from stockroom.enrich.mouser_scrape import MouserScrapeAdapter
-
-        a = MouserScrapeAdapter(
-            getattr(ctx, "rendered_dom_fetcher", None), url_for=_mouser_link_resolver(ctx)
-        )
-        a.vendor = "Mouser"
-        if a.enabled:  # only when a rendered-DOM fetcher is wired + Camoufox is available
-            adapters.append(a)
+    api_fallback = MouserAdapter(api_key=ctx.config.mouser_api_key) if ctx.config.mouser_api_key else None
+    if api_fallback is not None:
+        api_fallback.vendor = "Mouser"
+    mouser = MouserScrapeAdapter(
+        getattr(ctx, "rendered_dom_fetcher", None),
+        url_for=_mouser_link_resolver(ctx),
+        api_fallback=api_fallback,
+    )
+    mouser.vendor = "Mouser"
+    if mouser.enabled:  # the crawler (fetcher + Camoufox) OR the API fallback is available
+        adapters.append(mouser)
     if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
         from stockroom.enrich.digikey_api import DigiKeyAdapter
 

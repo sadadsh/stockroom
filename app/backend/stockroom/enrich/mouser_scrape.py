@@ -1,18 +1,14 @@
-"""Keyless Mouser data source for the bulk rescan (owner directive 2026-07-19: Mouser is the
-PRIMARY procurement-data source via the crawler, DigiKey the API fallback; the user provides the
-distributor link, so there is NO MPN->URL guessing).
+"""Mouser data source for the bulk rescan: the keyless crawler PRIMARY, the Mouser API as the
+FALLBACK when the crawler hits an error/block (owner directive 2026-07-19). Mouser is the primary
+procurement source; the user provides the distributor link, so the crawler renders the part's
+OWN stored Mouser `Purchase.url` (no MPN->URL guessing). When Mouser's WAF (DataDome) blocks the
+crawler, the official Mouser Search API rescues that part by MPN — and once the crawler is clearly
+blocked for the run, we stop wasting crawl attempts and go API-only for the rest.
 
-`MouserScrapeAdapter` mirrors the rescan adapter shape of `enrich.mouser.MouserAdapter`
-(`.enabled` / `.lookup(mpn) -> EnrichmentResult` / `.last_status` / `.vendor`), but instead of the
-Mouser Search API it renders the part's ALREADY-STORED Mouser product link through the stealthed
-rendered-DOM fetcher (Camoufox, which clears Mouser's DataDome) and runs the Mouser web extractor.
-
-The link comes from the caller via `url_for(mpn)` (built from each part's Mouser `Purchase.url`),
-never from a search: an exact stored product link is reliable, whereas a `/c/?q=` search redirect
-is not (an ambiguous MPN lands on a search-results page the extractor cannot parse). A block or a
-dead render collapses to empty text at the fetch boundary (FetchResult carries no block flag), so
-an empty render is reported as `rate_limited` to trip the rescan circuit breaker; a missing link or
-a thin page is an honest `not_found` that does not trip it."""
+`MouserScrapeAdapter` keeps the rescan adapter shape (`.enabled` / `.lookup(mpn) -> EnrichmentResult`
+/ `.last_status` / `.vendor`). last_status carries the effective verdict: "ok" when either source
+returned data, "rate_limited" only when BOTH the crawler is blocked AND the API failed (so the
+rescan circuit breaker trips only when Mouser is truly exhausted), "not_found" on a clean miss."""
 
 from __future__ import annotations
 
@@ -27,7 +23,7 @@ from stockroom.scrape.validate import validate_product
 
 
 class MouserScrapeAdapter:
-    """A rescan procurement adapter that scrapes a part's stored Mouser link (no API key)."""
+    """A rescan procurement adapter: Mouser crawler (a part's stored link) primary, Mouser API fallback."""
 
     vendor = "Mouser"
 
@@ -37,46 +33,69 @@ class MouserScrapeAdapter:
         url_for: Callable[[str], str | None],
         limiter=None,
         timeout: float = 20.0,
+        api_fallback=None,
     ):
-        # `fetcher` is a RenderedDomFetcher (rendered_html(url) -> FetchResult); shared with the
-        # enrichment path so the rescan never spins up a second browser. `url_for` maps an MPN to
-        # that part's stored Mouser product URL (or None when the part has no Mouser link yet).
+        # `fetcher` is a RenderedDomFetcher (rendered_html(url) -> FetchResult); `url_for` maps an
+        # MPN to that part's stored Mouser product URL. `api_fallback` is a MouserAdapter (the
+        # official API) used when the crawler errors/blocks, or None.
         self._fetcher = fetcher
         self._url_for = url_for
         self._limiter = limiter
         self._timeout = timeout
+        self._api = api_fallback
+        # Once the crawler is clearly WAF-blocked this run, skip it and go API-only for the rest -
+        # a block is persistent, so re-attempting the (slow) render on every later part is wasted.
+        self._scrape_blocked = False
         # out-of-band signal for the rescan circuit breaker; never affects the returned result.
         self.last_status: str = ""
 
-    @property
-    def enabled(self) -> bool:
-        # Usable only when a rendered-DOM fetcher is wired AND the Camoufox package is importable
-        # (its patched-Firefox binary is provisioned out of band); otherwise the rescan skips it.
+    def _scrape_available(self) -> bool:
         return self._fetcher is not None and importlib.util.find_spec("camoufox") is not None
 
-    def lookup(self, mpn: str) -> EnrichmentResult:
-        self.last_status = ""
-        if not self.enabled or not mpn:
-            return EnrichmentResult()
+    @property
+    def enabled(self) -> bool:
+        # Usable when EITHER the crawler (fetcher + Camoufox) OR the API fallback is available.
+        return self._scrape_available() or (
+            self._api is not None and getattr(self._api, "enabled", False)
+        )
+
+    def _scrape_lookup(self, mpn: str) -> EnrichmentResult:
+        """Render the part's stored Mouser link and extract it; sets last_status to
+        ok / rate_limited (blocked) / not_found (no link or thin page)."""
         url = self._url_for(mpn) if self._url_for is not None else None
         if not url:
-            # No stored link for this part: an honest miss, not a breaker-tripping failure.
             self.last_status = "not_found"
             return EnrichmentResult()
         if self._limiter is not None:
             self._limiter.acquire()
         page = self._fetcher.rendered_html(url, timeout=self._timeout)
         if not getattr(page, "text", ""):
-            # A WAF block or dead render collapses to empty text (FetchResult has no block flag);
-            # report it as rate_limited so RescanEngine._lookup pauses Mouser for the rest of the run.
-            self.last_status = "rate_limited"
+            self.last_status = "rate_limited"  # a WAF block/dead render collapses to empty text
             return EnrichmentResult()
         final = getattr(page, "final_url", "") or url
         result = validate_product(extract_all(page.text, final, SITE_EXTRACTORS))
         if not _has_data(result):
-            # A served-but-thin page (challenge shell, wrong page) carried no procurement data.
             self.last_status = "not_found"
             return EnrichmentResult()
         result.specs.setdefault("product_url", Sourced(final, "scrape", "medium"))
         self.last_status = "ok"
         return result
+
+    def lookup(self, mpn: str) -> EnrichmentResult:
+        self.last_status = ""
+        if not mpn:
+            return EnrichmentResult()
+        # 1. Crawler PRIMARY (skipped once it is proven blocked for this run).
+        if self._scrape_available() and not self._scrape_blocked:
+            result = self._scrape_lookup(mpn)
+            if self.last_status == "ok":
+                return result
+            if self.last_status == "rate_limited":
+                self._scrape_blocked = True  # persistent WAF block -> API-only for the rest of the run
+        # 2. Mouser API FALLBACK: rescues a blocked/errored crawler AND missing-link/thin cases.
+        if self._api is not None and getattr(self._api, "enabled", False):
+            result = self._api.lookup(mpn)
+            self.last_status = getattr(self._api, "last_status", "") or self.last_status
+            return result
+        # Nothing rescued: last_status carries the crawler's verdict (rate_limited trips the breaker).
+        return EnrichmentResult()
