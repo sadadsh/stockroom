@@ -87,3 +87,72 @@ def test_disabled_when_no_fetcher_is_wired():
     a = MouserScrapeAdapter(None, url_for=lambda m: "https://www.mouser.com/x")
     assert a.enabled is False
     assert not _has_data(a.lookup("m"))
+
+
+# --- API fallback (owner 2026-07-19: crawler primary, Mouser API rescues blocks/errors) ---
+from stockroom.enrich.schema import EnrichmentResult, Sourced  # noqa: E402
+
+
+class _FakeApi:
+    def __init__(self, result, status="ok"):
+        self._result, self._status = result, status
+        self.enabled = True
+        self.last_status = ""
+        self.calls: list[str] = []
+
+    def lookup(self, mpn):
+        self.calls.append(mpn)
+        self.last_status = self._status
+        return self._result
+
+
+def _api_result():
+    r = EnrichmentResult()
+    r.stock = Sourced(42, "mouser", "high")
+    return r
+
+
+def test_api_fallback_rescues_a_blocked_crawler():
+    blocked = FakeFetcher(_fr("", status=0))  # crawler WAF-blocked -> empty render
+    api = _FakeApi(_api_result())
+    a = MouserScrapeAdapter(blocked, url_for=lambda m: "https://www.mouser.com/x", api_fallback=api)
+    r = a.lookup("MPN")
+    assert api.calls == ["MPN"]       # the API was consulted
+    assert a.last_status == "ok"      # rescued -> breaker does NOT trip
+    assert r.stock is not None and r.stock.value == 42
+
+
+def test_crawler_success_does_not_call_the_api():
+    html = FIXTURE.read_text(encoding="utf-8")
+    ok = FakeFetcher(_fr(html, final_url="https://www.mouser.com/p"))
+    api = _FakeApi(_api_result())
+    a = MouserScrapeAdapter(ok, url_for=lambda m: "https://www.mouser.com/p", api_fallback=api)
+    a.lookup("erj-p03f1101v")
+    assert a.last_status == "ok"
+    assert api.calls == []            # crawler served it; the API quota is untouched
+
+
+def test_blocked_crawler_goes_api_only_for_the_rest_of_the_run():
+    blocked = FakeFetcher(_fr("", status=0))
+    api = _FakeApi(_api_result())
+    a = MouserScrapeAdapter(blocked, url_for=lambda m: "https://www.mouser.com/x", api_fallback=api)
+    a.lookup("A")
+    a.lookup("B")
+    assert blocked.calls == ["https://www.mouser.com/x"]  # crawler tried ONCE, then skipped
+    assert api.calls == ["A", "B"]                        # both served by the API
+
+
+def test_api_only_when_no_crawler_fetcher():
+    api = _FakeApi(_api_result())
+    a = MouserScrapeAdapter(None, url_for=lambda m: "x", api_fallback=api)
+    assert a.enabled is True          # the API alone enables it
+    r = a.lookup("MPN")
+    assert api.calls == ["MPN"] and r.stock.value == 42
+
+
+def test_both_exhausted_reports_rate_limited_to_trip_the_breaker():
+    blocked = FakeFetcher(_fr("", status=0))
+    api = _FakeApi(EnrichmentResult(), status="rate_limited")  # API also rate-limited
+    a = MouserScrapeAdapter(blocked, url_for=lambda m: "https://www.mouser.com/x", api_fallback=api)
+    a.lookup("MPN")
+    assert a.last_status == "rate_limited"  # both exhausted -> breaker trips
