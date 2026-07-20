@@ -28,46 +28,39 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-20T02:20:59.137809+00:00",
       "part_number": "595-TXS0102DCUR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.63,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.445,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.399,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.348,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.324,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.31,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.31,
           "qty": 3000
         }
       ],
-      "stock": 111475,
+      "stock": 126415,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TXS0102DCUR?qs=dB0LedT%252BmmBcQ3I%2Fs9XEDA%3D%3D",
       "vendor": "Mouser"
     },
