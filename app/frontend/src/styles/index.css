@@ -129,6 +129,10 @@
   #root {
     height: 100%;
     margin: 0;
+    /* the app owns all scrolling INSIDE its panes; the window itself never scrolls, so you can
+       never drag the whole app off-screen or rubber-band past it (WebView2 on Windows). */
+    overflow: hidden;
+    overscroll-behavior: none;
   }
   body {
     background: var(--body-bg);
