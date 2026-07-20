@@ -296,15 +296,18 @@ export function DetailPanel({
           </div>
         </div>
 
-        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), same size. They are
-            read-only previews now - a missing asset reads "Not linked", and the one Complete
-            Part window (above) is where every file + data field is added. */}
-        <div className="flex flex-col gap-[18px]">
+        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint) in a 3-row grid. `grid-rows-3`
+            is repeat(3, minmax(0,1fr)) - the min-0 track means each tile takes exactly a third of the
+            column height WITHOUT the preview images leaking their natural height into it (a plain flex
+            stack balloons because an <img>/canvas child pushes the intrinsic size). The outer grid
+            (items-stretch) stretches this column to the row height, which is driven by the LEFT
+            Overview+Sourcing card, so the Footprint tile's bottom ALWAYS lines up with the Overview
+            card's bottom, whatever the sourcing content. min-h keeps a sane floor (3x184 + 2 gaps)
+            when the left card is short. Read-only previews; the Complete Part window adds a missing one. */}
+        <div className="grid grid-rows-3 gap-[18px] min-h-[588px]">
           <AssetTile
             variant="tile"
-            name="3D Model"
-            className="h-[184px]"
-            present={hasModel}
+            name="3D Model"            present={hasModel}
             art={<CubeArt />}
             thumb={
               hasModel ? (
@@ -322,9 +325,7 @@ export function DetailPanel({
           />
           <AssetTile
             variant="tile"
-            name="Symbol"
-            className="h-[184px]"
-            present={!!detail.symbol?.name}
+            name="Symbol"            present={!!detail.symbol?.name}
             art={<SymbolArt />}
             thumb={
               detail.symbol?.name ? (
@@ -335,9 +336,7 @@ export function DetailPanel({
           />
           <AssetTile
             variant="tile"
-            name="Footprint"
-            className="h-[184px]"
-            present={!!detail.footprint?.name}
+            name="Footprint"            present={!!detail.footprint?.name}
             art={<FootprintArt />}
             thumb={
               detail.footprint?.name ? (
@@ -884,7 +883,11 @@ function AssetTile({
           }}
         />
       ) : null}
-      <div className="relative flex h-full w-full items-center justify-center">
+      {/* absolute so the preview image / 3D canvas is taken OUT of the intrinsic-height flow:
+          otherwise a large SVG/GLB render leaks its natural height into the flex/grid column and
+          balloons the whole row. The stage (relative, min-h-0) then collapses to nothing on its
+          own and simply fills whatever height the grid cell gives it. */}
+      <div className="absolute inset-0 flex items-center justify-center">
         {present ? (
           thumb ?? art
         ) : (
