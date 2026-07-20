@@ -28,56 +28,47 @@
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
+      "fetched_at": "2026-07-20T02:20:59.137809+00:00",
       "part_number": "595-TPS61023DRLT",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 1.43,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 1.04,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.942,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.836,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.784,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.738,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.711,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.701,
           "qty": 2500
         },
         {
-          "currency": "USD",
           "price": 0.688,
           "qty": 5000
         }
       ],
-      "stock": 47090,
+      "stock": 47086,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS61023DRLT?qs=BJlw7L4Cy78Zr3IJIU3gNw%3D%3D",
       "vendor": "Mouser"
     },
