@@ -9,24 +9,27 @@
  */
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { orientUpright } from "./modelOrient";
 
 // Render square at 2x the display box so the icon stays crisp on HiDPI, then display small.
 const SIZE = 96;
 
-// One shared NEUTRAL material every model is rendered in. The GLBs carry wildly different
-// material colours (a tan connector, a near-black resistor, a gray inductor), which at icon
-// size read as an indistinct set of shades; a single neutral surface makes each part read by
-// its SHAPE, lit into form by the studio lights, not by an arbitrary colour. Shared + never
-// disposed (disposeScene skips it), so it is created once for every thumbnail.
+// One shared NEUTRAL brushed-metal material every model is rendered in (matches the detail hero):
+// the studio environment paints highlights + shadows across it so each part reads by its SHAPE,
+// lit into form, not by the GLB's arbitrary colour. Metallic surfaces need image-based lighting to
+// look right (env below); without it they would render black. Shared + never disposed.
 const NEUTRAL_MATERIAL = new THREE.MeshStandardMaterial({
-  color: 0xb2b2b8,
-  roughness: 0.5,
-  metalness: 0.22,
+  color: 0xbdbdc4,
+  roughness: 0.34,
+  metalness: 0.55,
+  envMapIntensity: 1.35,
 });
+// A near-black outline on sharp edges, shared like the material; makes a tiny icon's form legible.
+const EDGE_MATERIAL = new THREE.LineBasicMaterial({ color: 0x141418, transparent: true, opacity: 0.85 });
 
-// Replace every mesh's material with the shared neutral one, disposing the GLB's own
-// materials (they are dereferenced and would otherwise leak).
+// Replace every mesh's material with the shared neutral one (disposing the GLB's own) and add a
+// crisp edge outline so the shape reads even at icon size.
 function neutralize(root: THREE.Object3D): void {
   root.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
@@ -35,7 +38,22 @@ function neutralize(root: THREE.Object3D): void {
     if (Array.isArray(old)) old.forEach((m) => m.dispose());
     else old?.dispose();
     mesh.material = NEUTRAL_MATERIAL;
+    if (mesh.geometry) {
+      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 24), EDGE_MATERIAL));
+    }
   });
+}
+
+// The prefiltered studio environment, built once from the shared renderer and reused for every
+// thumbnail (a PMREM per render would be far too costly).
+let envTexture: THREE.Texture | null = null;
+function getEnv(r: THREE.WebGLRenderer): THREE.Texture {
+  if (!envTexture) {
+    const pmrem = new THREE.PMREMGenerator(r);
+    envTexture = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+    pmrem.dispose();
+  }
+  return envTexture;
 }
 
 let renderer: THREE.WebGLRenderer | null = null;
@@ -53,6 +71,8 @@ function getRenderer(): THREE.WebGLRenderer | null {
     });
     r.setPixelRatio(1);
     r.setSize(SIZE, SIZE);
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 1.15;
     renderer = r;
     return r;
   } catch {
@@ -79,18 +99,16 @@ function renderOne(glb: ArrayBuffer): Promise<string | null> {
     }
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
-    // The same three-point lighting as the detail hero: low ambient + a strong key + fill + rim,
-    // so even a tiny thumbnail shows tonal variation across faces instead of a flat gray shape.
-    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-    const key = new THREE.DirectionalLight(0xffffff, 1.55);
-    key.position.set(1.2, 1.6, 1.1);
+    // Same image-based lighting as the detail hero (a prefiltered studio room) plus a key + fill,
+    // so the icon reads as a shaded 3D form, not a flat shape. ACES tone mapping keeps it from
+    // blowing out to white.
+    scene.environment = getEnv(r);
+    const key = new THREE.DirectionalLight(0xffffff, 1.7);
+    key.position.set(1.4, 2.2, 1.3);
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
-    fill.position.set(-1.2, -0.4, -0.8);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+    fill.position.set(-1.2, -0.2, -0.9);
     scene.add(fill);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.7);
-    rim.position.set(-0.6, 0.8, -1.4);
-    scene.add(rim);
 
     let settled = false;
     const done = (url: string | null) => {
