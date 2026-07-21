@@ -218,9 +218,8 @@ export function IngestPage() {
       {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
       <div>
         <p className="mb-2.5 text-xs text-t3">
-          Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls
-          it all. A passive is complete with no files; a non-passive needs its symbol,
-          footprint and 3D model.
+          Paste a product link and Stockroom pulls all the fields.
+          A passive component is complete with no additional files; a non-passive component does to be complete.
         </p>
         <div className="flex items-center gap-2.5">
           <input
