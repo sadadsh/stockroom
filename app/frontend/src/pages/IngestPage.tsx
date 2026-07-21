@@ -223,13 +223,13 @@ export function IngestPage() {
         </p>
         <div className="flex items-center gap-2.5">
           <input
-            aria-label="Product link or part number"
+            aria-label="Product Link"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") lookUp();
             }}
-            placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
+            placeholder="https://www.mouser.com/en/ProductDetail/..."
             disabled={looking}
             className="h-11 min-w-0 flex-1 rounded-control border border-line2 bg-field px-3.5 text-base text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
           />
@@ -247,10 +247,10 @@ export function IngestPage() {
         ) : !result ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-              Browse for ZIP
+              Browse for ZIP Files
             </Button>
             <span className="text-xs text-t3">
-              Or add a part straight from a vendor ZIP (SnapEDA, Ultra Librarian).
+              Or add a part straight from a vendor ZIP.
             </span>
           </div>
         ) : null}
