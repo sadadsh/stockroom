@@ -45,7 +45,7 @@ def ensure_ff_pull(repo_root: Path, backend: str | None = None) -> bool:
     if backend == "git":
         before = _head(repo_root)
         subprocess.run(
-            ["git", "-C", str(repo_root), "pull", "--ff-only"],
+            ["git", "-C", str(repo_root), "pull"],
             check=True, capture_output=True, text=True,
         )
         return _head(repo_root) != before
