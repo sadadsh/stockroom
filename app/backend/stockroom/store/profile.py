@@ -120,12 +120,23 @@ class ProfileStore:
         if self.exists(name):
             raise ValueError(f"profile already exists: {name}")
         profile = Profile(name, self.libraries_root / name)
-        tracked = list(profile.library.ensure_layout())
-        if archive:
-            marker = profile.root / ".archive"
-            marker.write_text("")
-            tracked.append(marker)
-        self.repo.commit(f"Create {'archive ' if archive else ''}profile {name}", tracked)
+        # ensure_layout writes the scaffold to disk BEFORE the commit, so a commit failure would
+        # otherwise leave a phantom: a folder the app lists as a real profile that never entered
+        # git (on disk, 0 ahead/0 behind, "synced", but never on the remote). So force-commit the
+        # scaffold past any library .gitignore, and roll the folder back on ANY failure so a
+        # profile is either fully committed or leaves no trace.
+        try:
+            tracked = list(profile.library.ensure_layout())
+            if archive:
+                marker = profile.root / ".archive"
+                marker.write_text("")
+                tracked.append(marker)
+            self.repo.commit(
+                f"Create {'archive ' if archive else ''}profile {name}", tracked, force=True
+            )
+        except Exception:
+            shutil.rmtree(profile.root, ignore_errors=True)
+            raise
         return profile
 
     def delete(self, name: str) -> None:

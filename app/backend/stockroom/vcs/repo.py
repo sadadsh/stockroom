@@ -147,7 +147,7 @@ class GitRepo:
             args += [str(p) for p in paths]
         return not [line for line in self._run(*args).stdout.splitlines() if line.strip()]
 
-    def commit(self, message: str, paths: list[Path]) -> str:
+    def commit(self, message: str, paths: list[Path], force: bool = False) -> str:
         if not message.strip():
             raise GitError("commit message must not be empty")
         # Guarantee a commit identity for EVERY commit, not only after init()/clone_from(): the
@@ -164,7 +164,12 @@ class GitRepo:
         # --only below still carries it into the commit.
         addable = [p for p in paths if Path(p).exists() or self._is_tracked(p)]
         if addable:
-            self._run("add", "-A", "--", *[str(p) for p in addable])
+            # force=True (-f) commits paths a .gitignore would skip. Used for engine bookkeeping
+            # that MUST be tracked regardless of a user/library ignore rule (a profile's structural
+            # .gitkeep scaffold): without it `git add` errors on the ignored keepfiles and the
+            # profile lands on disk but never in git (the phantom-profile bug).
+            add_args = ["add", "-A"] + (["-f"] if force else []) + ["--"]
+            self._run(*add_args, *[str(p) for p in addable])
         # nothing staged among these paths => no-op, return current head.
         if self._run("diff", "--cached", "--quiet", check=False).returncode == 0:
             return self.head()
