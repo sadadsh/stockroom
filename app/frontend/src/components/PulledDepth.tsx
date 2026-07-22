@@ -46,7 +46,13 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
       ? breaks.reduce((a, b) => (b.price < a.price ? b : a))
       : null;
 
-  const distPns = Object.entries(result.dist_pns ?? {}).filter(([, v]) => v);
+  // The union of every distributor we captured a link OR an order number for, so BOTH the Mouser
+  // and DigiKey buy links show when both APIs answered (the owner's "store + display both links").
+  const distUrls = result.dist_urls ?? {};
+  const distPns = result.dist_pns ?? {};
+  const distKeys = Array.from(new Set([...Object.keys(distPns), ...Object.keys(distUrls)])).filter(
+    (k) => distPns[k] || distUrls[k],
+  );
 
   const stats: [string, string][] = [];
   if (stockNum != null) stats.push(["Stock", `${stockNum.toLocaleString()} in stock`]);
@@ -54,19 +60,37 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   if (lifecycle) stats.push(["Lifecycle", lifecycle]);
   if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
 
-  if (stats.length === 0 && breaks.length === 0 && distPns.length === 0) return null;
+  if (stats.length === 0 && breaks.length === 0 && distKeys.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <Eyebrow>Sourcing</Eyebrow>
-        {/* the distributor source flag + its own order number, together as the source identity */}
-        {distPns.map(([key, pn]) => (
-          <span key={key} className="inline-flex items-center gap-1.5">
-            <Badge tone="neutral">{distributorLabel(key)}</Badge>
-            <span className="text-xs text-t2">{pn}</span>
-          </span>
-        ))}
+        {/* each distributor as a clickable buy link (when we have its url) + its own order number,
+            together as the source identity; both Mouser and DigiKey show when both APIs answered */}
+        {distKeys.map((key) => {
+          const pn = distPns[key] ?? "";
+          const href = distUrls[key] ?? "";
+          const label = distributorLabel(key);
+          return (
+            <span key={key} className="inline-flex items-center gap-1.5">
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-control outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-acc"
+                  title={`Open on ${label}`}
+                >
+                  <Badge tone="ok">{label}</Badge>
+                </a>
+              ) : (
+                <Badge tone="neutral">{label}</Badge>
+              )}
+              {pn ? <span className="text-xs text-t2">{pn}</span> : null}
+            </span>
+          );
+        })}
       </div>
       {stats.length > 0 ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
