@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
 from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.model.part import (
+    AltiumRef,
     Datasheet,
     EnrichmentField,
     LibRef,
@@ -416,6 +418,50 @@ class LibraryOps:
             txn.track(dblib_path)
             txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")
         return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "xlsx": xlsx_path}
+
+    def attach_altium_assets(self, part_id: str, *sources) -> PartRecord:
+        """Store a part's Altium assets verbatim under <profile>/altium/ and set
+        altium_symbol/altium_footprint. `*sources` is EITHER a loose .SchLib + .PcbLib pair OR
+        a single compiled .IntLib (auto-extracted in pure Python, no Altium). Only the loose
+        .SchLib/.PcbLib are stored; the .IntLib is not. One atomic commit; on any error every
+        touched path is restored (zero trace). Fails loud if the source cannot be normalized or
+        an entry name cannot be read (part left untouched)."""
+        from stockroom.altium.extract import normalize_altium_source
+        from stockroom.altium.oleread import read_footprint_names, read_symbol_names
+
+        record = self.load_record(part_id)
+        altium_dir = self.lib.parts_dir.parent / "altium"
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+
+        with tempfile.TemporaryDirectory() as td:
+            # normalize to a loose (schlib, pcblib) pair (extracting an IntLib into the tempdir)
+            sch_src, pcb_src = normalize_altium_source(*sources, out_dir=td)
+            sym_names = read_symbol_names(sch_src)
+            fp_names = read_footprint_names(pcb_src)
+            if not sym_names:
+                raise ValueError(f"no symbol entry found in {Path(sch_src).name}")
+            if not fp_names:
+                raise ValueError(f"no footprint entry found in {Path(pcb_src).name}")
+            sym_name = record.mpn if record.mpn in sym_names else sym_names[0]
+            fp_name = fp_names[0]
+
+            # mkdir AFTER validation so a normalize/read failure leaves zero trace
+            fresh = [] if altium_dir.exists() else [altium_dir]
+            altium_dir.mkdir(parents=True, exist_ok=True)
+            sch_dst = altium_dir / f"{part_id}.SchLib"
+            pcb_dst = altium_dir / f"{part_id}.PcbLib"
+            with Transaction(self.repo) as txn:
+                txn.track_dir(*fresh)
+                shutil.copyfile(sch_src, sch_dst)
+                shutil.copyfile(pcb_src, pcb_dst)
+                txn.track(sch_dst)
+                txn.track(pcb_dst)
+                record.altium_symbol = AltiumRef(lib=sch_dst.name, name=sym_name)
+                record.altium_footprint = AltiumRef(lib=pcb_dst.name, name=fp_name)
+                json_path.write_text(record.dumps(), encoding="utf-8")
+                txn.track(json_path)
+                txn.commit(f"Attach Altium assets to {part_id}: {sym_name} + {fp_name}")
+        return record
 
     def load_record(self, part_id: str) -> PartRecord:
         path = self.lib.parts_dir / f"{part_id}.json"
