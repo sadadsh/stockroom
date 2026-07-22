@@ -232,7 +232,9 @@ describe("DetailPanel pinout (M6i)", () => {
     const view = (d: PartDetail) => (
       <QueryClientProvider client={qc}>
         <ThemeProvider>
-          <DetailPanel detail={d} {...BASE} />
+          <CaptureProvider>
+            <DetailPanel detail={d} {...BASE} />
+          </CaptureProvider>
         </ThemeProvider>
       </QueryClientProvider>
     );

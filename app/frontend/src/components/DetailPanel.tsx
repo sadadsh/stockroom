@@ -8,9 +8,10 @@
  * Pinout, Sourcing, and History. Everything degrades honestly when a field is
  * absent, and no data is fabricated.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, deriveAttributes } from "../lib/derive";
+import { useCapture } from "../lib/capture";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { EditableText } from "./EditableText";
@@ -113,6 +114,15 @@ export function DetailPanel({
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   // The one Complete-Part window (adds every missing file + data field in one place) - open flag.
   const [completeOpen, setCompleteOpen] = useState(false);
+  // Finish the background-pill reopen handoff: when the pill asked to reopen THIS part (the page
+  // already selected it), open the Complete-Part window and clear the intent.
+  const { reopenPartId, clearReopen } = useCapture();
+  useEffect(() => {
+    if (reopenPartId && detail?.id === reopenPartId) {
+      setCompleteOpen(true);
+      clearReopen();
+    }
+  }, [reopenPartId, detail?.id, clearReopen]);
   // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
   // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
