@@ -74,8 +74,10 @@ function SegmentMeter({
 const KICAD_ROWS = [
   { req: "kicad_symbol", label: "Symbol" },
   { req: "kicad_footprint", label: "Footprint" },
-  { req: "kicad_model", label: "3D Model" },
 ] as const;
+// The 3D model is a .step - one file, referenced by BOTH the KiCad and the Altium footprint - so
+// it is captured once and lives in its own Shared group, not doubled under each tool.
+const SHARED_ROWS = [{ req: "kicad_model", label: "3D Model" }] as const;
 const ALTIUM_ROWS = [
   { req: "altium_symbol", label: "Symbol" },
   { req: "altium_footprint", label: "Footprint" },
@@ -89,16 +91,19 @@ function CaptureGroup({
   tool,
   rows,
   received,
+  note,
 }: {
   tool: string;
   rows: readonly { req: Requirement; label: string }[];
   received: Partial<Record<Requirement, boolean>>;
+  note?: string;
 }) {
   const done = rows.filter((r) => received[r.req]).length;
   return (
     <div data-track={tool}>
       <div className="mb-1 flex items-center gap-2">
         <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-t3">{tool}</span>
+        {note ? <span className="text-2xs text-t3">{note}</span> : null}
         <span className="h-px flex-1 bg-line" />
         <span className="tnum font-mono text-2xs text-t3">
           {done}/{rows.length}
@@ -242,6 +247,7 @@ export function CompletePartModal({
   }
 
   const kicadRows = KICAD_ROWS.filter((r) => needs.includes(r.req));
+  const sharedRows = SHARED_ROWS.filter((r) => needs.includes(r.req));
   const altiumRows = ALTIUM_ROWS.filter((r) => needs.includes(r.req));
 
   const requirements = useMemo(
@@ -342,7 +348,7 @@ export function CompletePartModal({
                         {isDone
                           ? "Every format this part needed is attached."
                           : needsSubline(
-                              kicadRows.length > 0,
+                              kicadRows.length > 0 || sharedRows.length > 0,
                               altiumRows.length > 0,
                               cadSource.data?.vendor ?? "the vendor",
                             )}
@@ -355,6 +361,14 @@ export function CompletePartModal({
                 <div className="mt-3.5 flex flex-col gap-3">
                   {kicadRows.length > 0 ? (
                     <CaptureGroup tool="KiCad" rows={kicadRows} received={download.received} />
+                  ) : null}
+                  {sharedRows.length > 0 ? (
+                    <CaptureGroup
+                      tool="Shared"
+                      rows={sharedRows}
+                      received={download.received}
+                      note="Used by KiCad and Altium"
+                    />
                   ) : null}
                   {altiumRows.length > 0 ? (
                     <CaptureGroup tool="Altium" rows={altiumRows} received={download.received} />
