@@ -141,13 +141,12 @@ export function usePartDiff(id: string | null, a: string, b: string | null) {
   });
 }
 
-// Whether a DigiKey CAD source resolves for a part (Phase-2 asset download, spec
-// section 5). `enabled` gates this on the caller's own "does this part need it"
-// check (missing assets), so a fully-asset-complete part never fires the request.
-// Kept separate from useCadDownload's OWN cad-source GET (fired again right before
-// opening the remote page): this one only decides whether the Get CAD Files control
-// renders at all, so a stale cached answer here can never open a dead page - the
-// hook always re-resolves fresh at click time.
+// The CAD source + capture needs for a part (guided capture, spec section 5). Feeds
+// the both-format checklist its `needs` and the Get CAD Files control its target URL.
+// Kept separate from useGuidedCapture's OWN cad-source GET (fired again right before
+// opening the remote page): this one only decides what the checklist shows, so a stale
+// cached answer here can never open a dead page - the hook always re-resolves fresh at
+// click time.
 export function useCadSourceQuery(id: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["cad-source", id],
