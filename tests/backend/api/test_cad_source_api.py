@@ -32,5 +32,21 @@ def test_cad_source_falls_back_to_digikey_when_primary_unresolvable(client, app_
     assert body["url"].startswith("https://www.digikey.com/detail/")
 
 
+def test_cad_source_prefers_snapeda_when_only_snapeda_login_is_set(client, app_ctx):
+    # A SnapEDA user (saved SnapEDA login, no Ultra Librarian login) gets SnapEDA as the source.
+    app_ctx.config.snapeda_username = "me@x.com"
+    app_ctx.config.ul_username = ""
+    app_ctx.config.ul_password = ""
+    body = client.get("/api/library/parts/tps62130/cad-source").json()
+    assert body["vendor"] == "SnapEDA"
+    assert "snapeda.com" in body["url"]
+
+
+def test_cad_source_stays_ultralibrarian_when_both_logins_set(client, app_ctx):
+    app_ctx.config.snapeda_username = "s"
+    app_ctx.config.ul_username = "u"
+    assert client.get("/api/library/parts/tps62130/cad-source").json()["vendor"] == "UltraLibrarian"
+
+
 def test_cad_source_unknown_part_404(client):
     assert client.get("/api/library/parts/nope/cad-source").status_code == 404
