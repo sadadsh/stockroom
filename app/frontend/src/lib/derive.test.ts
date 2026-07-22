@@ -180,7 +180,7 @@ describe("deriveAttributes", () => {
       },
     });
     const attrs = deriveAttributes(part);
-    expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the card shows a few + Show All
+    expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the detail band shows a capped highlight glance
     expect(attrs[0]).toBe("±1%"); // the electrical parameter leads
   });
 

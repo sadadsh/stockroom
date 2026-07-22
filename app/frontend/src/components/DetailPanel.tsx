@@ -724,6 +724,7 @@ function RailReference({
               label="Description"
               placeholder="Add a note"
               multiline
+              clampLines={2}
               disabled={busy}
               displayClassName="text-xs"
             />
@@ -809,22 +810,20 @@ function AttributesCard({
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-  const [expanded, setExpanded] = useState(false);
 
   const derivedLower = new Set(derived.map((a) => a.toLowerCase()));
   const manualChips = manual.filter(
     (t) => t.trim() !== "" && !derivedLower.has(t.trim().toLowerCase()),
   );
-  // the most important first (derived is already importance-ranked), then the user's manual pins
+  // A tight highlight glance, not an exhaustive dump: the top few derived chips (deriveAttributes
+  // ranks them, so the low-value tail - bare dimensions, near-duplicate case codes - falls off the
+  // end) plus every manual pin the user added. The full spec sheet sits right below and carries
+  // the rest, so the band stays a glance and every chip wraps whole (no single-row clip).
+  const HIGHLIGHT_CAP = 7;
   const chips = [
-    ...derived.map((label) => ({ label, manual: false })),
+    ...derived.slice(0, HIGHLIGHT_CAP).map((label) => ({ label, manual: false })),
     ...manualChips.map((label) => ({ label, manual: true })),
   ];
-  const COLLAPSED = 8;
-  const hasMore = chips.length > COLLAPSED;
-  // collapsed keeps to ONE non-wrapping row (a glance); expanded wraps to show everything + edit.
-  const open = expanded || !hasMore;
-  const shown = open ? chips : chips.slice(0, COLLAPSED);
 
   const chipCls =
     "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-medium";
@@ -848,26 +847,15 @@ function AttributesCard({
 
   return (
     <div className="mb-5">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Attributes
-        </span>
-        {hasMore ? (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-2xs font-semibold text-t2 hover:text-t1"
-          >
-            {expanded ? "Show Less" : `Show All ${chips.length}`}
-          </button>
-        ) : null}
+      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+        Attributes
       </div>
-      <div className={open ? "flex flex-wrap items-center gap-2" : "flex gap-2 overflow-hidden"}>
-        {shown.map((c) =>
+      <div className="flex flex-wrap items-center gap-2">
+        {chips.map((c) =>
           c.manual ? (
             <span key={`m-${c.label}`} className={chipCls + " border-line2 bg-raise2 text-t1"}>
               {c.label}
-              {onEditTags && open ? (
+              {onEditTags ? (
                 <button
                   type="button"
                   onClick={() => removeManual(c.label)}
@@ -887,7 +875,7 @@ function AttributesCard({
             </span>
           ),
         )}
-        {onEditTags && open ? (
+        {onEditTags ? (
           adding ? (
             <input
               autoFocus
@@ -1073,10 +1061,11 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
         </span>
         <span className="tnum font-mono text-2xs text-t3">{count}</span>
       </div>
-      {/* One column (the owner's call): a plain label -> value definition list per group, so
-          nothing truncates and no spec ever sits in a cramped side column. The tab owns the
-          scroll, so however many rows a part carries, they never grow the page. */}
-      <div className="flex max-w-[560px] flex-col gap-5">
+      {/* One column (the owner's call): label on the left, value aligned to the right of a
+          capped block, so the value column lines up and no hairline trails off into empty
+          space. At single-column width both label and value have room, so nothing truncates.
+          The tab owns the scroll, so however many rows a part carries never grow the page. */}
+      <div className="flex max-w-[460px] flex-col gap-5">
         {groups.map((group) => (
           <section key={group.title}>
             <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.05em] text-t2">
@@ -1086,15 +1075,15 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
               {group.rows.map((row) => (
                 <div
                   key={row.key}
-                  className="grid grid-cols-[minmax(0,190px)_1fr] gap-x-6 border-b border-line/60 py-1.5 last:border-0"
+                  className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1.5 last:border-0"
                 >
                   <dt
-                    className="break-words text-xs text-t3"
+                    className="min-w-0 flex-1 break-words text-xs text-t3"
                     title={typeof row.label === "string" ? row.label : undefined}
                   >
                     {row.label}
                   </dt>
-                  <dd className="tnum min-w-0 break-words font-mono text-sm text-t1">
+                  <dd className="tnum max-w-[56%] flex-none break-words text-right font-mono text-sm text-t1">
                     {row.unit ? `${row.value} ${row.unit}` : row.value}
                   </dd>
                 </div>
