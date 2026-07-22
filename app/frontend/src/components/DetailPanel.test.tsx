@@ -153,8 +153,8 @@ describe("DetailPanel files previews (M6d)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
     wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
-    // the north-star datasheet block is never collapsed: every spec shows at once, shallow AND
-    // deep (the attributes card has its own Show All, but the spec sheet does not collapse).
+    // the spec sheet is never collapsed: every spec shows at once, shallow AND deep (the
+    // attributes band shows a capped highlight glance, but the spec sheet does not collapse).
     expect(screen.getByText("Spec 0")).toBeInTheDocument();
     expect(screen.getByText("Spec 7")).toBeInTheDocument();
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
