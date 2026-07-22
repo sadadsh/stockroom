@@ -404,6 +404,14 @@ export interface SettingsInfo {
   mouser_api_key_hint: string;
   github_token_set: boolean;
   github_token_hint: string;
+  // Saved vendor logins for the guided capture window. Usernames are echoed raw
+  // (not secrets); passwords cross the wire only as presence + a last-4 hint.
+  ul_username: string;
+  ul_password_set: boolean;
+  ul_password_hint: string;
+  snapeda_username: string;
+  snapeda_password_set: boolean;
+  snapeda_password_hint: string;
   // KiCad wiring: the per-machine overrides (plain paths, not secrets), the
   // effective locations they resolve to, and whether SR_LIB currently points at
   // the active profile's library.
@@ -419,6 +427,10 @@ export interface SettingsInfo {
 export interface SettingsPatch {
   mouser_api_key?: string;
   github_token?: string;
+  ul_username?: string;
+  ul_password?: string;
+  snapeda_username?: string;
+  snapeda_password?: string;
   kicad_config_override?: string;
   kicad_cli_override?: string;
 }
