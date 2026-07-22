@@ -482,7 +482,7 @@ def _vendor_from_url(url: str) -> tuple[str, str]:
     if "snapeda" in u:
         return ("snapeda", "SnapEDA")
     if "digikey" in u:
-        return ("", "DigiKey")
+        return ("digikey", "DigiKey")
     return ("", "the vendor")
 
 

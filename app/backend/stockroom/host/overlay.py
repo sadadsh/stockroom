@@ -42,7 +42,7 @@ def build_overlay_js(needs: list[str], vendor: str) -> str:
         f'<ul style="margin:0 0 8px;padding-left:16px;">{rows}</ul>'
         '<div id="__stockroom_overlay_status__" '
         'style="padding-top:8px;border-top:1px solid #22303c;opacity:.85;">'
-        "Follow the highlighted steps and click Download.</div>"
+        "Download the files this part needs; they attach automatically.</div>"
     )
     j = json.dumps
     return (

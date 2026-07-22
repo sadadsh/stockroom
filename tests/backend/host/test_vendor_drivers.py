@@ -17,6 +17,23 @@ def test_snapeda_driver_is_built_for_snapeda():
     assert "__STOCKROOM_OVERLAY__" in js
 
 
+def test_digikey_driver_guides_to_the_cad_models_section():
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "scrollIntoView" in js  # brings DigiKey's CAD / EDA models section into view
+    assert "__STOCKROOM_OVERLAY__" in js  # reports guidance into the overlay
+    assert js.count("try") >= 1 and js.count("catch") >= 1  # guarded, never throws
+    stripped = js.strip()
+    assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")  # a self-contained IIFE
+    assert "cad" in js.lower()  # targets the CAD download section, not fragile format toggles
+
+
+def test_digikey_driver_is_resilient_via_a_heading_text_fallback():
+    # DigiKey's markup changes, so the driver also finds the section by a CAD/symbol/EDA heading -
+    # it does not depend only on brittle id selectors (the owner did not want to tune selectors).
+    js = build_driver_js("digikey", ["kicad"])
+    assert "textContent" in js or "innerText" in js
+
+
 def test_unknown_vendor_is_a_guidance_only_noop():
     js = build_driver_js("mouser", ["kicad"])
     # a benign script: no auto-click attempts, but still reports guidance to the overlay
