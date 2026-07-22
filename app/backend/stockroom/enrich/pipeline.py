@@ -471,6 +471,10 @@ class EnrichmentPipeline:
                 partial = adapter.lookup(token)
             except Exception:  # noqa: BLE001 - an adapter must never break the paste path
                 continue
+            # Keep THIS vendor's own buy link, so both survive even though the merged result keeps
+            # a single primary product_url. The pasted vendor's link is set to the pasted url below.
+            if partial.product_url is not None:
+                result.dist_urls.setdefault(name, str(partial.product_url.value))
             result.merge_missing(partial)
         return result
 
@@ -504,6 +508,9 @@ class EnrichmentPipeline:
                 # the API's own ProductDetailUrl (a Mouser paste stays that Mouser link).
                 api.product_url = Sourced(url, vendor, "high")
                 api.specs["product_url"] = Sourced(url, vendor, "high")
+                # the pasted vendor's buy link is the EXACT link the user pasted (its qs token and
+                # all), not the API's canonical rewrite; the other vendor keeps its API link.
+                api.dist_urls[vendor] = url
                 fill_category(api)
                 self.url_cache.put(url, _result_to_cache(api))
                 return api
@@ -687,6 +694,7 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         # sourcing risk + lead the first fresh lookup found).
         "lifecycle": s(r.lifecycle), "lead_time": s(r.lead_time), "product_url": s(r.product_url),
         "dist_pns": dict(r.dist_pns),
+        "dist_urls": dict(r.dist_urls),
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
     }
@@ -702,6 +710,7 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.datasheet_url, r.stock, r.package = s(d.get("datasheet_url")), s(d.get("stock")), s(d.get("package"))
     r.lifecycle, r.lead_time, r.product_url = s(d.get("lifecycle")), s(d.get("lead_time")), s(d.get("product_url"))
     r.dist_pns = dict(d.get("dist_pns", {}))
+    r.dist_urls = dict(d.get("dist_urls", {}))
     r.price_breaks = [PriceBreak(**b) for b in d.get("price_breaks", [])]
     r.specs = {k: Sourced(v["value"], v["source"], v["confidence"]) for k, v in d.get("specs", {}).items()}
     return r

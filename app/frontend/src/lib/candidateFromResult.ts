@@ -6,7 +6,7 @@
  * then drops a SnapEDA ZIP into carries everything the page gave without re-typing it.
  */
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
-import { sv } from "./sourced";
+import { distributorLabel, sv } from "./sourced";
 
 export function vendorFromUrl(url: string): string {
   let host = "";
@@ -46,22 +46,38 @@ export function mergeResultIntoCandidate(
       : null;
   // The distributor's own order number for THIS vendor (a Mouser link -> dist_pns.mouser), so the
   // committed purchase carries the P/N an order export needs, not just the manufacturer MPN.
-  const partNumber = result.dist_pns?.[vendorFromUrl(url).toLowerCase()] ?? "";
-  const purchase = url
-    ? [
-        {
-          vendor: vendorFromUrl(url),
-          url,
-          part_number: partNumber,
-          price_breaks: result.price_breaks.map((b) => ({
-            qty: b.qty,
-            price: b.price,
-            currency: b.currency,
-          })),
-          stock: stockNum,
-        },
-      ]
-    : candidate.purchase;
+  const primaryKey = vendorFromUrl(url).toLowerCase();
+  const partNumber = result.dist_pns?.[primaryKey] ?? "";
+  const priceBreaks = result.price_breaks.map((b) => ({
+    qty: b.qty,
+    price: b.price,
+    currency: b.currency,
+  }));
+  // Store a purchase per distributor link we captured: when both APIs answered we keep BOTH the
+  // Mouser and DigiKey buy links (the owner's ask), not only the pasted one. The pasted vendor is
+  // PRIMARY and carries the pulled price ladder + stock; a second vendor stores its link + order
+  // number. Fall back to the single pasted link (a render/LCSC pull with no dist_urls), then to the
+  // candidate's own purchase when nothing was pulled.
+  const linkEntries = Object.entries(result.dist_urls ?? {}).filter(([, u]) => u);
+  let purchase: StagingCandidate["purchase"];
+  if (linkEntries.length > 0) {
+    purchase = linkEntries.map(([key, u]) => {
+      const isPrimary = key === primaryKey;
+      return {
+        vendor: distributorLabel(key),
+        url: u,
+        part_number: result.dist_pns?.[key] ?? "",
+        price_breaks: isPrimary ? priceBreaks : [],
+        stock: isPrimary ? stockNum : null,
+      };
+    });
+  } else if (url) {
+    purchase = [
+      { vendor: vendorFromUrl(url), url, part_number: partNumber, price_breaks: priceBreaks, stock: stockNum },
+    ];
+  } else {
+    purchase = candidate.purchase;
+  }
 
   return {
     ...candidate,

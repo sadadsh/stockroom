@@ -620,6 +620,47 @@ def test_paste_digikey_link_resolves_via_api_using_the_path_mpn(tmp_path):
     assert seen == ["TPD6E05U06RVZR"]  # parsed from the middle path segment
 
 
+def test_paste_link_captures_both_distributor_buy_links(tmp_path):
+    # The owner's ask: since we call BOTH APIs, store BOTH the Mouser and DigiKey buy links (and
+    # each vendor's own order number) on the part, not only the pasted link.
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    m = _mouser_full()
+    m.product_url = Sourced("https://www.mouser.com/ProductDetail/x", "mouser", "high")
+    m.dist_pns["mouser"] = "595-TPD6E05U06RVZR"
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            r = EnrichmentResult()
+            r.product_url = Sourced(
+                "https://www.digikey.com/en/products/detail/ti/TPD6E05U06RVZR/1", "digikey", "high"
+            )
+            r.dist_pns["digikey"] = "296-39349-2-ND"
+            return r
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=_FakeMouser(m), digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+    assert r.dist_urls["mouser"].startswith("https://www.mouser.com/")
+    assert r.dist_urls["digikey"].startswith("https://www.digikey.com/")
+    assert set(r.dist_pns) == {"mouser", "digikey"}
+
+
+def test_dist_urls_round_trip_through_the_cache():
+    # both buy links must survive caching, so a re-looked-up link keeps both distributors.
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult
+
+    r = EnrichmentResult()
+    r.dist_urls = {"mouser": "https://m/x", "digikey": "https://d/y"}
+    back = _result_from_cache(_result_to_cache(r), "")
+    assert back.dist_urls == {"mouser": "https://m/x", "digikey": "https://d/y"}
+
+
 def test_paste_link_falls_back_to_render_when_the_api_misses(tmp_path):
     # If the official API has no data (a miss, or the part is not carried), the paste path still
     # falls back to rendering the page - no regression for a link the API cannot resolve.
