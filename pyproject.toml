@@ -37,6 +37,10 @@ dependencies = [
     # MPN-keyed .xlsx an Altium .DbLib reads through the ACE engine. Pure-Python, no engine
     # at emit time; the .xlsx is a derived, gitignored artifact regenerated from the records.
     "openpyxl>=3.1",
+    # Read Altium .SchLib/.PcbLib/.IntLib (OLE2/CFB) entry names + extract .IntLib embedded
+    # sources (stockroom.altium.oleread / .extract). olefile is BSD, read-only, pure-Python;
+    # combined with zlib it replicates KiCad's DecodeIntLibStream. We never write Altium binary.
+    "olefile>=0.47",
 ]
 
 [dependency-groups]
