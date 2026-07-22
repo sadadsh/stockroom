@@ -201,40 +201,22 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         return
     time.sleep(1.5)
     W._HostApi().open_cad_download(url, ["kicad_symbol", "altium_symbol", "altium_footprint"])
-    time.sleep(6.0)  # initial load
+    # The DigiKey driver polls + scrolls asynchronously in the page for ~11s to catch the
+    # lazy-loaded CAD section; just wait it out, then read the result (single cheap queries).
+    time.sleep(16.0)
     cad = W.cad_window()
-    # DigiKey lazy-loads below-the-fold sections; scroll the page to force them into the DOM.
-    try:
-        for frac in (0.4, 0.75, 1.0):
-            cad.evaluate_js(f"window.scrollTo(0, document.body.scrollHeight*{frac})")
-            time.sleep(1.5)
-    except Exception:  # noqa: BLE001
-        pass
-    time.sleep(1.5)
     try:
         result["overlay_present"] = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
         result["page_title"] = cad.evaluate_js("document.title||''") or ""
         result["status_text"] = (
             cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
         )
-        result["all_headings"] = (
-            cad.evaluate_js(
-                "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4,h5'))"
-                ".map(function(h){return (h.textContent||'').trim().slice(0,45)}).filter(Boolean).slice(0,35))"
-            )
-            or "[]"
-        )
-        result["iframes"] = cad.evaluate_js("document.querySelectorAll('iframe').length")
-        # the SnapEDA-powered CAD widget on DigiKey is usually an iframe; capture its src host
-        result["iframe_srcs"] = (
-            cad.evaluate_js(
-                "JSON.stringify(Array.from(document.querySelectorAll('iframe'))"
-                ".map(function(f){return (f.src||'').slice(0,60)}).filter(Boolean).slice(0,8))"
-            )
-            or "[]"
-        )
     except Exception as e:  # noqa: BLE001
         result["error"] = repr(e)
+    # PASS = the page loaded, the overlay rendered, and the driver located + guided to the CAD
+    # section (status flips to the found-it message).
+    result["found_cad"] = "CAD Models section" in str(result.get("status_text", ""))
+    result["ok"] = bool(result.get("overlay_present")) and result["found_cad"]
     try:
         from PIL import ImageGrab
 
