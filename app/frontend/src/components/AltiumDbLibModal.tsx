@@ -4,10 +4,11 @@
  * an Attach action that opens the host file picker for its .SchLib/.PcbLib (or .IntLib), attaches
  * them, and regenerates so it lands in the library immediately.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { useAltiumAttach, useAltiumRegenerate, useAltiumStatus } from "../api/queries";
 import type { AltiumStatusRow } from "../api/types";
+import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Dot, SegmentedControl } from "./primitives";
 import { CloseIcon, UploadIcon } from "./icons";
@@ -28,26 +29,18 @@ function pickAltiumFiles(): Promise<string[]> | null {
   return hostApi?.pick_altium_files ? hostApi.pick_altium_files() : null;
 }
 
-export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
+export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const status = useAltiumStatus();
   const attach = useAltiumAttach();
   const regenerate = useAltiumRegenerate();
   const { toast } = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [attachingId, setAttachingId] = useState<string | null>(null);
-  const restoreFocus = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    restoreFocus.current = document.activeElement as HTMLElement | null;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      restoreFocus.current?.focus?.();
-    };
-  }, [onClose]);
+  // Escape + Tab focus-trap + focus-restore (the shared modal idiom); attach the ref to the dialog.
+  const dialogRef = useModalDismiss(open, onClose);
+  // Any in-flight write serializes the surface: a second attach or a regenerate can collide with the
+  // backend's single git repo, so no Attach is offered while one is running (the backend also locks).
+  const busy = attach.isPending || regenerate.isPending;
 
   const rows = status.data?.rows ?? [];
   const readyCount = useMemo(() => rows.filter((r) => r.ready).length, [rows]);
@@ -72,15 +65,31 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
     if (!paths.length) return; // cancelled
     setAttachingId(row.id);
     try {
-      await attach.mutateAsync({ id: row.id, paths });
-      await regenerate.mutateAsync();
-      toast(`Attached ${row.display_name} and added it to the DbLib.`, "ok");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not attach the files.", "err");
+      // Attach and regenerate are distinct steps: if the attach itself fails, the part is
+      // untouched; if only the follow-on regenerate fails, the part IS attached (now Ready) and
+      // just needs a Regenerate, so the two must report differently (never "could not attach"
+      // for a part that actually attached).
+      try {
+        await attach.mutateAsync({ id: row.id, paths });
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Could not attach the files.", "err");
+        return;
+      }
+      try {
+        await regenerate.mutateAsync();
+        toast(`Attached ${row.display_name} and added it to the DbLib.`, "ok");
+      } catch {
+        toast(
+          `Attached ${row.display_name}, but the DbLib did not regenerate. Click Regenerate DbLib to finish.`,
+          "neutral",
+        );
+      }
     } finally {
       setAttachingId(null);
     }
   }
+
+  if (!open) return null;
 
   return (
     <div
@@ -90,13 +99,15 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
       }}
     >
       <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
         initial={{ opacity: 0, y: 8, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 420, damping: 32 }}
         role="dialog"
         aria-modal="true"
         aria-label="Altium Database Library"
-        className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise"
+        className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
           <div className="flex items-baseline gap-2.5">
@@ -139,11 +150,11 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-center justify-center gap-2.5 py-10">
               <Dot tone="neutral" />
               <span className="text-sm text-t3">
-                {filter === "ready"
-                  ? "No parts are ready to place yet. Attach a part's Altium assets to get started."
-                  : filter === "needs"
-                    ? "Every part has its Altium assets."
-                    : "This profile has no parts yet."}
+                {rows.length === 0
+                  ? "This profile has no parts yet."
+                  : filter === "ready"
+                    ? "No parts are ready to place yet. Attach a part's Altium assets to get started."
+                    : "Every part has its Altium assets."}
               </span>
             </div>
           ) : (
@@ -192,7 +203,7 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
                         <Button
                           small
                           onClick={() => onAttach(row)}
-                          disabled={attachingId === row.id}
+                          disabled={busy}
                           icon={<UploadIcon className="h-3.5 w-3.5" />}
                         >
                           {attachingId === row.id ? "Attaching..." : "Attach Files"}

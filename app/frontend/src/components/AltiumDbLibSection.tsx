@@ -117,7 +117,8 @@ export function AltiumDbLibSection() {
         </div>
       </Card>
 
-      {open && data ? <AltiumDbLibModal onClose={() => setOpen(false)} /> : null}
+      <AltiumDbLibModal open={open} onClose={() => setOpen(false)} />
+
     </section>
   );
 }
