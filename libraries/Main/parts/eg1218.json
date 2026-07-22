@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.mouser.com/datasheet/3/315/1/EG1218.pdf"
+    "source_url": "EG1218"
   },
   "description": "Slide Switches",
-  "display_name": "EG1218",
+  "display_name": "EG1218 1218 E-Switch",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218?qs=xDsBkp9LkocT0c8K%252B5e%2FgA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:10:50.547992+00:00",
+      "part_number": "612-EG1218",
       "price_breaks": [
         {
           "price": 0.71,
@@ -68,19 +68,24 @@
           "qty": 5000
         }
       ],
-      "stock": 12328,
-      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218",
+      "stock": 12219,
+      "url": "https://www.mouser.com/en/ProductDetail/E-Switch/EG1218?qs=xDsBkp9LkocT0c8K%252B5e%2FgA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "E-Switch",
     "Contact Form": "SPDT",
     "Contact Material": "Copper Alloy",
     "Contact Plating": "Silver",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
     "Current Rating": "200 mA",
-    "Factory Pack Quantity: Factory Pack Quantity": "1000",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "1000",
     "Illuminated": "Non-Illuminated",
+    "Lifecycle": "Active",
     "Manufacturer": "E-Switch",
     "Maximum Operating Temperature": "+ 70 C",
     "Minimum Operating Temperature": "- 20 C",
@@ -96,6 +101,7 @@
     "Termination Style": "PC Pin",
     "Travel": "2.5 mm",
     "Type": "Slide Switch",
+    "US Tariff %": 30.0,
     "Unit Weight": "0.011323 oz",
     "Voltage Rating DC": "30 VDC"
   },
