@@ -386,6 +386,37 @@ class LibraryOps:
             txn.commit(f"Attach {tool} {field} {lib}:{name} to {part_id}")
         return record
 
+    def regenerate_altium_dblib(self) -> dict:
+        """Regenerate the Altium data source (.xlsx, gitignored) for every place-ready part
+        and the .DbLib (committed) in one atomic commit. Parts missing Altium assets or the
+        required data fields are excluded and reported (never half-placed)."""
+        from stockroom.altium.datasource import emit_xlsx
+        from stockroom.altium.dblib import emit_dblib
+        from stockroom.model.part import altium_assets_ready
+
+        altium_dir = self.lib.parts_dir.parent / "altium"
+        altium_dir.mkdir(parents=True, exist_ok=True)
+        xlsx_path = altium_dir / "stockroom-parts.xlsx"
+        dblib_path = altium_dir / "Stockroom.DbLib"
+
+        ready, skipped = [], []
+        for json_path in sorted(self.lib.parts_dir.glob("*.json")):
+            record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
+            required = bool(
+                record.mpn and record.manufacturer and record.description and record.value
+            )
+            if altium_assets_ready(record) and required:
+                ready.append(record)
+            else:
+                skipped.append(record.id)
+
+        emit_xlsx(ready, xlsx_path)  # derived + gitignored: written, NOT tracked
+        with Transaction(self.repo) as txn:
+            emit_dblib("Parts$", xlsx_path.name, dblib_path)
+            txn.track(dblib_path)
+            txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")
+        return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "xlsx": xlsx_path}
+
     def load_record(self, part_id: str) -> PartRecord:
         path = self.lib.parts_dir / f"{part_id}.json"
         return PartRecord.loads(path.read_text(encoding="utf-8"))
