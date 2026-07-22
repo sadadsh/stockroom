@@ -530,6 +530,69 @@ def test_stop_active_capture_stops_prior_session_joins_thread_and_cleans_temp(tm
     assert W._CAD_SESSION is None and W._CAD_POLL_THREAD is None
 
 
+# -- login auto-fill + loaded-injection order (Phase 3 A3) --
+
+
+def test_login_autofill_blank_creds_is_empty():
+    from stockroom.host.window import build_login_autofill_js
+
+    assert build_login_autofill_js("ultralibrarian", "", "") == ""
+
+
+def test_login_autofill_json_encodes_creds_and_is_guarded():
+    from stockroom.host.window import build_login_autofill_js
+
+    js = build_login_autofill_js("ultralibrarian", "me@x.com", "s3cr3t")
+    assert js.strip().startswith("(") and "try" in js and "catch" in js
+    # creds are JSON-encoded, never string-concatenated into the script
+    assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
+    assert "password" in js  # fills a password field
+
+
+def test_formats_for_needs_maps_kicad_and_altium():
+    from stockroom.host.window import _formats_for_needs
+
+    assert _formats_for_needs(["kicad_symbol", "kicad_model"]) == ["kicad"]
+    assert _formats_for_needs(["kicad_symbol", "altium_footprint"]) == ["kicad", "altium"]
+    assert _formats_for_needs(["altium_symbol"]) == ["altium"]
+    assert _formats_for_needs([]) == []
+
+
+def test_vendor_from_url_maps_key_and_label():
+    from stockroom.host.window import _vendor_from_url
+
+    assert _vendor_from_url("https://app.ultralibrarian.com/search?q=x") == (
+        "ultralibrarian",
+        "Ultra Librarian",
+    )
+    assert _vendor_from_url("https://www.snapeda.com/parts/x") == ("snapeda", "SnapEDA")
+    assert _vendor_from_url("https://www.digikey.com/x")[1] == "DigiKey"
+    assert _vendor_from_url("")[0] == ""
+
+
+def test_cad_loaded_scripts_order_and_omission():
+    from stockroom.host.window import cad_loaded_scripts
+
+    with_creds = cad_loaded_scripts(
+        ["kicad_symbol", "altium_symbol"],
+        "ultralibrarian",
+        "Ultra Librarian",
+        ["kicad", "altium"],
+        {"username": "u", "password": "p"},
+    )
+    assert len(with_creds) == 3  # overlay, autofill, driver in order
+    assert "__STOCKROOM_OVERLAY__" in with_creds[0]  # overlay first
+    assert "password" in with_creds[1]  # autofill second
+    assert "KiCad" in with_creds[2] and "Altium" in with_creds[2]  # driver last
+
+    no_creds = cad_loaded_scripts(
+        ["kicad_symbol"], "ultralibrarian", "Ultra Librarian", ["kicad"], {}
+    )
+    assert len(no_creds) == 2  # overlay, driver (autofill omitted when no creds)
+    assert "__STOCKROOM_OVERLAY__" in no_creds[0]
+    assert "KiCad" in no_creds[1]
+
+
 # -- persistent vendor WebView2 profile (B5): the storage kwargs for webview.start --
 
 
