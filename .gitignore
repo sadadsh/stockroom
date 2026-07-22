@@ -58,3 +58,19 @@ libraries/*/altium/*.xlsx
 
 # S8 cold-rebuild harness run outputs (local only)
 scripts/out/
+
+# Untracked, kept local (out of the repo, still on disk). library-v2.html stays tracked.
+docs/mockups/accent-direction.html
+docs/mockups/layout-direction.html
+docs/mockups/library-app.html
+docs/mockups/library-combined.html
+docs/mockups/projects.html
+docs/mockups/render-library-parts.html
+docs/Stockroom-Knowledge-Transfer.md
+docs/FINALE_SAUCE_BOM.md
+docs/FINALE_SAUCE_BOM.xlsx
+docs/FINALE_SAUCE_SOURCE.md
+# Superseded root launcher; the shipped one is stockroom.launcher (see packaging/).
+/launcher/
+tests/backend/api/test_launcher.py
+tests/backend/api/test_gitshim.py
