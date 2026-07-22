@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/sn74lvc138a-ep"
+    "source_url": "https://toshiba.semicon-storage.com/info/docget.jsp?did=15392&prodName=74LCX138FT"
   },
   "description": "Encoders, Decoders, Multiplexers & Demultiplexers",
-  "display_name": "74LCV138",
+  "display_name": "74LCV138 TSSOP-16 TI SN74LVC138AQPWREP",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:10:16.077597+00:00",
+      "part_number": "595-N74LVC138AQPWREP",
       "price_breaks": [
         {
           "price": 2.73,
@@ -52,6 +52,10 @@
           "qty": 250
         },
         {
+          "price": 1.59,
+          "qty": 500
+        },
+        {
           "price": 1.55,
           "qty": 1000
         },
@@ -64,14 +68,19 @@
           "qty": 4000
         }
       ],
-      "stock": 1995,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP",
+      "stock": 1991,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC138AQPWREP?qs=7reVrgTiN3aXLinzUDCIoQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Texas Instruments",
-    "Factory Pack Quantity: Factory Pack Quantity": "2000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Malaysia",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "2000",
+    "Lifecycle": "Active",
     "Logic Family": "LVC",
     "Logic Type": "Decoders/Demultiplexers",
     "Manufacturer": "Texas Instruments",
@@ -81,6 +90,7 @@
     "Number of Circuits": "1 Circuit",
     "Number of Input Lines": "3 Input",
     "Number of Output Lines": "8 Output",
+    "Package": "TSSOP-16",
     "Packaging": "Reel",
     "Part # Aliases": "V62/04657-01YE",
     "Product": "Decoders / Demultiplexers",
@@ -92,6 +102,7 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "3.6 V",
     "Supply Voltage - Min": "2 V",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.002183 oz"
   },
   "symbol": null,
