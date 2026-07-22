@@ -70,6 +70,17 @@ def missing_assets_from_presence(present: dict[str, bool]) -> list[str]:
     return [label for key, label in ATTACHABLE_ASSETS if not present.get(key)]
 
 
+def altium_assets_ready(record) -> bool:
+    """True when a part carries both an Altium symbol and footprint with resolved entry
+    names. Advisory: gates only what the DbLib emitter writes, not the complete-to-add gate.
+    (Whether the footprint embeds a STEP body is not checkable here; that is the owner's
+    manual step.)"""
+    return (
+        record.altium_symbol is not None and bool(record.altium_symbol.name)
+        and record.altium_footprint is not None and bool(record.altium_footprint.name)
+    )
+
+
 @dataclass
 class Datasheet:
     file: str = ""
@@ -106,6 +117,17 @@ class ModelRef:
     # A 3D model (STEP/WRL) is largely tool-neutral, but tag it too so a future Altium
     # import can carry its own model without ambiguity.
     tool: str = "kicad"
+
+
+@dataclass
+class AltiumRef:
+    """An Altium symbol/footprint reference: the .SchLib/.PcbLib filename (relative to
+    <profile>/altium/) + the exact entry name inside that OLE compound file (the value
+    Altium's [Library Ref]/[Footprint Ref] resolves). Vendor files are stored verbatim;
+    Stockroom only reads their names, never edits them."""
+    lib: str = ""
+    name: str = ""
+    tool: str = "altium"
 
 
 @dataclass
@@ -152,6 +174,10 @@ class PartRecord:
     symbol: LibRef | None = None
     footprint: LibRef | None = None
     model: ModelRef | None = None
+    # The Altium half of the cross-EDA asset pair (parallel to symbol/footprint above). The
+    # shared 3D `model` above is EDA-neutral and serves both. None until acquired.
+    altium_symbol: AltiumRef | None = None
+    altium_footprint: AltiumRef | None = None
     provenance: Provenance | None = None
     hashes: Hashes | None = None
     enrichment: dict[str, EnrichmentField] = field(default_factory=dict)
@@ -185,6 +211,8 @@ class PartRecord:
             "symbol": asdict(self.symbol) if self.symbol else None,
             "footprint": asdict(self.footprint) if self.footprint else None,
             "model": asdict(self.model) if self.model else None,
+            "altium_symbol": asdict(self.altium_symbol) if self.altium_symbol else None,
+            "altium_footprint": asdict(self.altium_footprint) if self.altium_footprint else None,
             "provenance": asdict(self.provenance) if self.provenance else None,
             "hashes": asdict(self.hashes) if self.hashes else None,
             "enrichment": {k: asdict(v) for k, v in self.enrichment.items()},
@@ -208,6 +236,8 @@ class PartRecord:
             symbol=LibRef(**d["symbol"]) if d.get("symbol") else None,
             footprint=LibRef(**d["footprint"]) if d.get("footprint") else None,
             model=ModelRef(**d["model"]) if d.get("model") else None,
+            altium_symbol=AltiumRef(**d["altium_symbol"]) if d.get("altium_symbol") else None,
+            altium_footprint=AltiumRef(**d["altium_footprint"]) if d.get("altium_footprint") else None,
             provenance=Provenance(**d["provenance"]) if d.get("provenance") else None,
             hashes=Hashes(**d["hashes"]) if d.get("hashes") else None,
             enrichment={
