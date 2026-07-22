@@ -597,6 +597,26 @@ class _HostApi:
         return session.token
 
 
+def _webview_start_kwargs(start_fn, profile_dir) -> dict:
+    """The private_mode/storage_path kwargs that make the guided-capture (vendor) window's
+    login persist across parts and app launches (B5). pywebview's storage is set once at
+    webview.start(), not per window, so a persistent, non-private profile on the shared
+    WebView2 environment is what carries the vendor's login cookies from one capture to the
+    next. Included only when this pywebview version accepts them (older versions ignore the
+    profile and the login simply will not persist). The main SPA is loopback with a
+    per-launch token injected on every load and its service workers unregistered, so a
+    persistent profile changes nothing for it."""
+    import inspect
+
+    params = inspect.signature(start_fn).parameters
+    kwargs: dict = {}
+    if "private_mode" in params:
+        kwargs["private_mode"] = False
+    if "storage_path" in params:
+        kwargs["storage_path"] = str(profile_dir)
+    return kwargs
+
+
 def run_window(base_url: str, token: str) -> None:
     """Open the WebView2 window onto the FastAPI-served frontend and block until it
     closes. Injects the base+token on every load (so an SPA reload after self-update
@@ -604,6 +624,8 @@ def run_window(base_url: str, token: str) -> None:
     that called run_window (stockroom.host.run), which shuts it down once this returns."""
     global _ACTIVE_WINDOW
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
+
+    from stockroom.store.machine_config import config_dir
 
     # pywebview blocks ALL downloads by default, which silently kills every export
     # in the app (the BOM CSV, the fab zip, the audit markdown are Blob+anchor
@@ -667,7 +689,16 @@ def run_window(base_url: str, token: str) -> None:
     # Adding a vendor ZIP also works through the native file picker exposed as
     # window.pywebview.api.pick_ingest_files (js_api above), the fallback path that
     # never depends on the drag-drop DOM registration above.
+    #
+    # A persistent, non-private WebView2 profile so a vendor login in the guided-capture
+    # window survives across parts and launches (B5). pywebview sets storage once here at
+    # start(), for every window in this session including the later cad window.
+    profile_dir = config_dir() / "webview-profile"
     try:
-        webview.start()  # blocks until the window closes
+        profile_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:  # a read-only/odd config dir must never block launch; login just won't persist
+        pass
+    try:
+        webview.start(**_webview_start_kwargs(webview.start, profile_dir))  # blocks until close
     finally:
         _ACTIVE_WINDOW = None
