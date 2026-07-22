@@ -515,3 +515,28 @@ def test_stop_active_capture_stops_prior_session_joins_thread_and_cleans_temp(tm
     assert finished.wait(2.0)  # the prior poll thread actually exited
     assert not tmp.exists()  # its temp dir was cleaned (B8)
     assert W._CAD_SESSION is None and W._CAD_POLL_THREAD is None
+
+
+# -- persistent vendor WebView2 profile (B5): the storage kwargs for webview.start --
+
+
+def test_webview_start_kwargs_persist_the_profile_when_supported(tmp_path):
+    from stockroom.host.window import _webview_start_kwargs
+
+    def start(func=None, private_mode=True, storage_path=None):
+        ...
+
+    prof = tmp_path / "webview-profile"
+    assert _webview_start_kwargs(start, prof) == {
+        "private_mode": False,
+        "storage_path": str(prof),
+    }
+
+
+def test_webview_start_kwargs_empty_on_an_older_pywebview(tmp_path):
+    from stockroom.host.window import _webview_start_kwargs
+
+    def start(func=None):  # a pywebview without private_mode/storage_path
+        ...
+
+    assert _webview_start_kwargs(start, tmp_path / "p") == {}
