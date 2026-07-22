@@ -17,6 +17,24 @@ from pathlib import Path
 NowFn = Callable[[], float]
 ListDirFn = Callable[[Path], Iterable[Path]]
 
+# The download shapes a guided capture must surface: a vendor bundle (*.zip) AND the loose
+# KiCad + Altium asset files a vendor (Ultra Librarian / SnapEDA) can hand over one at a time.
+# Kept consistent with capture/classify.py's suffix set (the classifier that turns each of
+# these into the capture Requirements it satisfies). Matched case-insensitively.
+_WATCHED_SUFFIXES = frozenset(
+    {
+        ".zip",
+        ".schlib",
+        ".pcblib",
+        ".intlib",
+        ".kicad_sym",
+        ".kicad_mod",
+        ".step",
+        ".stp",
+        ".wrl",
+    }
+)
+
 
 def _os_name() -> str:
     return os.name
@@ -43,19 +61,20 @@ def _default_listdir(directory: Path) -> Iterable[Path]:
 
 
 class DownloadsWatch:
-    """Watches a Downloads directory for a NEW *.zip that appears after the watch
-    armed, so a distributor download saved through the browser's normal Save-As flow
-    (or an unattended auto-save) can still be surfaced when pywebview's tier-1 intercept
-    is unavailable or captures nothing.
+    """Watches a Downloads directory for a NEW watched asset file (a *.zip bundle OR a
+    loose KiCad/Altium asset - see _WATCHED_SUFFIXES) that appears after the watch armed,
+    so a vendor download saved through the browser's normal Save-As flow (or an
+    unattended auto-save) can still be surfaced when pywebview's tier-1 intercept is
+    unavailable or captures nothing.
 
     Pure filesystem logic: `now` and `listdir` are injected so poll() is deterministic
     and testable without a real clock or a real Downloads folder. poll() returns the
-    newest qualifying *.zip file (case-insensitive suffix, regular files only - a
+    newest qualifying file (a watched suffix, case-insensitive; regular files only - a
     directory that happens to be named "foo.zip" is never mistaken for a download),
     skipping:
       - anything whose mtime predates `started_at` (it was already there, not a new
         download this watch should claim),
-      - anything not a *.zip,
+      - anything whose suffix is not one of _WATCHED_SUFFIXES,
       - anything already returned by an earlier poll() on this same instance (so a
         caller can poll in a loop without ever being handed the same file twice),
       - anything whose mtime somehow reads AFTER the current `now()` (clock skew on a
@@ -100,7 +119,7 @@ class DownloadsWatch:
         candidates: list[tuple[float, Path]] = []
         for entry in entries:
             path = Path(entry)
-            if path.suffix.lower() != ".zip":
+            if path.suffix.lower() not in _WATCHED_SUFFIXES:
                 continue
             if path in self._seen:
                 continue
