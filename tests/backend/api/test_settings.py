@@ -177,3 +177,31 @@ def test_patch_strips_windows_copy_as_path_quotes(client, app_ctx, tmp_path):
     client.patch("/api/settings", json={"kicad_config_override": f'"{target}"'})
     assert app_ctx.config.kicad_config_override == str(target)
     assert app_ctx.kicad_dir == target
+
+
+def test_patch_sets_vendor_logins(client, app_ctx):
+    client.patch("/api/settings", json={
+        "ul_username": "me@x.com", "ul_password": "secret",
+        "snapeda_username": "s", "snapeda_password": "q",
+    })
+    assert app_ctx.config.ul_username == "me@x.com"
+    assert app_ctx.config.ul_password == "secret"
+    assert app_ctx.config.snapeda_username == "s"
+    assert app_ctx.config.snapeda_password == "q"
+
+
+def test_get_settings_masks_vendor_passwords(client, app_ctx):
+    app_ctx.config.ul_username = "me@x.com"
+    app_ctx.config.ul_password = "secret"
+    body = client.get("/api/settings").json()
+    assert body["ul_username"] == "me@x.com"
+    assert body["ul_password_set"] is True
+    assert body["ul_password_hint"] == "cret"
+    assert "ul_password" not in body
+
+
+def test_vendor_login_raw_password_never_leaks(client, app_ctx):
+    import json as _json
+    app_ctx.config.snapeda_password = "topsecretpw"
+    body = client.get("/api/settings").json()
+    assert "topsecretpw" not in _json.dumps(body)
