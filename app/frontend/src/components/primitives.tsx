@@ -390,3 +390,100 @@ export function TabPanel({
     </div>
   );
 }
+
+// The consistent heading atop a Panel or a content block: Title Case, quiet weight.
+// (The uppercase micro-label is Eyebrow, for dense sub-headings inside a Panel.)
+export function SectionHeading({
+  className,
+  children,
+  ...rest
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cx("text-sm font-semibold text-t1", className)} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+// The one content surface for the whole app. Depth reads from a single background step
+// plus a hairline, never a background AND a border AND a drop shadow at once (the design
+// contract: elevation through background, not stacked outlines). Pass `title` for a
+// headed card; `actions` sits opposite the title; `inset` uses the recessed field well
+// (a value that sits IN the surface, like a spec box). Build a card by composing this,
+// not by re-deriving the class string.
+export function Panel({
+  title,
+  actions,
+  inset = false,
+  className,
+  bodyClassName,
+  children,
+  ...rest
+}: {
+  title?: ReactNode;
+  actions?: ReactNode;
+  inset?: boolean;
+  bodyClassName?: string;
+} & HTMLAttributes<HTMLElement>) {
+  const hasHeader = title != null || actions != null;
+  return (
+    <section
+      className={cx(
+        "rounded-card border border-line",
+        inset ? "bg-field" : "bg-surface",
+        className,
+      )}
+      {...rest}
+    >
+      {hasHeader ? (
+        <header className="flex items-center justify-between gap-3 px-4 pb-2.5 pt-3.5">
+          {title != null ? <SectionHeading>{title}</SectionHeading> : <span />}
+          {actions}
+        </header>
+      ) : null}
+      <div className={cx(hasHeader ? "px-4 pb-3.5" : "p-4", bodyClassName)}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// A labelled value: one row of a data card's definition list. Default lays label and
+// value on a line (label left, value right); `stacked` puts the label above the value
+// for the dense spec readout; `mono` sets the value in the machine-data face so numbers
+// align. Pass `value` for a plain value or `children` for rich content.
+export function Field({
+  label,
+  value,
+  children,
+  stacked = false,
+  mono = false,
+  className,
+}: {
+  label: ReactNode;
+  value?: ReactNode;
+  children?: ReactNode;
+  stacked?: boolean;
+  mono?: boolean;
+  className?: string;
+}) {
+  const content = children ?? value;
+  if (stacked) {
+    return (
+      <div className={cx("py-1.5", className)}>
+        <div className="text-2xs text-t3">{label}</div>
+        <div className={cx("mt-0.5 break-words text-sm text-t1", mono && "font-mono tnum")}>
+          {content}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={cx("flex items-baseline justify-between gap-4 py-1.5", className)}>
+      <span className="flex-none text-sm text-t3">{label}</span>
+      <span className={cx("min-w-0 text-right text-sm text-t1", mono && "font-mono tnum")}>
+        {content}
+      </span>
+    </div>
+  );
+}

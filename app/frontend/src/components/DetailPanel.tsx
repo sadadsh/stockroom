@@ -31,6 +31,7 @@ import {
   UploadIcon,
   WarnIcon,
 } from "./icons";
+import { Field, Panel } from "./primitives";
 
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
 // empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
@@ -993,24 +994,17 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
           and line up at the bottom, rather than one falling short */}
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {groups.map((group) => (
-          <div
-            key={group.title}
-            className="flex h-full flex-col rounded-card border border-line bg-field px-4 py-3.5"
-          >
-            <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-              {group.title}
-            </div>
-            <div>
-              {group.rows.map((row) => (
-                <div key={row.key} className="border-b border-line py-[7px] last:border-0">
-                  <div className="text-xs text-t3">{row.label}</div>
-                  <div className="tnum mt-0.5 break-words font-mono text-sm leading-snug text-t1">
-                    {row.unit ? `${row.value} ${row.unit}` : row.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Panel inset key={group.title} title={group.title} className="flex h-full flex-col">
+            {group.rows.map((row) => (
+              <Field
+                key={row.key}
+                stacked
+                mono
+                label={row.label}
+                value={row.unit ? `${row.value} ${row.unit}` : row.value}
+              />
+            ))}
+          </Panel>
         ))}
       </div>
     </>
