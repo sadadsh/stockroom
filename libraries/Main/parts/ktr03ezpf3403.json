@@ -6,7 +6,7 @@
     "source_url": "https://www.rohm.com/datasheet?p=KTR03EZPF"
   },
   "description": "Resistor, small symbol",
-  "display_name": "732k",
+  "display_name": "732k 1% 0603 ROHM KTR03EZPF3403",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403?qs=17ckDYBRdekVwQV2ubwDJA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:10:04.683320+00:00",
+      "part_number": "755-KTR03EZPF3403",
       "price_breaks": [
         {
           "price": 0.19,
@@ -68,23 +68,29 @@
           "qty": 25000
         }
       ],
-      "stock": 13778,
-      "url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403",
+      "stock": 13768,
+      "url": "https://www.mouser.com/en/ProductDetail/ROHM-Semiconductor/KTR03EZPF3403?qs=17ckDYBRdekVwQV2ubwDJA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Automotive Grade, Industrial Grade",
+    "Assembly Country of Origin": "Not available",
     "Brand": "ROHM Semiconductor",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Philippines",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "ROHM Semiconductor",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product": "Thick Film Resistors SMD",
@@ -95,9 +101,10 @@
     "Series": "SDR",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
+    "US Tariff %": 0.0,
     "Voltage Rating": "350 V",
     "Width": "0.8 mm (0.031 in)"
   },
