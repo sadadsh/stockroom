@@ -109,7 +109,7 @@ export function RescanSection() {
           <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t2">
             <span
               className={
-                "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px] text-[11px] " +
+                "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-[11px] " +
                 (force ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
               }
             >

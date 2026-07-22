@@ -129,7 +129,7 @@ export function ProjectViewer({ projectId, files }: { projectId: string; files: 
                 onClick={() => setActive(f.path)}
                 data-testid={`viewer-tab-${f.path}`}
                 className={
-                  "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-colors " +
+                  "rounded-control px-2.5 py-1 text-xs font-medium transition-colors " +
                   (on ? "bg-raise2 text-t1" : "text-t2 hover:text-t1")
                 }
               >
