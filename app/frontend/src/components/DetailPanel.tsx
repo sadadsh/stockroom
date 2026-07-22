@@ -990,11 +990,11 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
         </span>
         <span className="tnum font-mono text-xs text-t3">{count}</span>
       </div>
-      {/* a stretched grid (not a masonry) so the two cards in a row share the taller one's height
-          and line up at the bottom, rather than one falling short */}
-      <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
+      {/* a masonry (CSS columns) so any number of group cards packs tight at its natural height:
+          an odd last card fills its column instead of being stranded or stretched to match */}
+      <div className="columns-1 gap-4 md:columns-2">
         {groups.map((group) => (
-          <Panel inset key={group.title} title={group.title} className="flex h-full flex-col">
+          <Panel inset key={group.title} title={group.title} className="mb-4 break-inside-avoid">
             <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1">
               {group.rows.map((row) => (
                 <div key={row.key} className="col-span-2 grid grid-cols-subgrid items-baseline">
