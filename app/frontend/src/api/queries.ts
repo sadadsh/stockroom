@@ -391,6 +391,9 @@ export function useActivateProfile() {
       qc.invalidateQueries({ queryKey: ["system"] });
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["facets"] });
+      // the Altium DbLib status is per-profile (path, counts, profile name), so a switch must
+      // refetch it or the section shows the previous profile's data
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
     },
   });
 }
@@ -422,6 +425,7 @@ export function useDoSync() {
       if (result.pulled) {
         qc.invalidateQueries({ queryKey: ["parts"] });
         qc.invalidateQueries({ queryKey: ["facets"] });
+        qc.invalidateQueries({ queryKey: ["altium-status"] });
       }
     },
   });
