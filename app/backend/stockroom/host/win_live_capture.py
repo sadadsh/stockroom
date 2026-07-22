@@ -212,11 +212,10 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
             cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
         )
         # light diagnostics (small node sets, no '*' scan) so we can see the real CAD markup
-        result["cad_headings"] = (
+        result["all_headings"] = (
             cad.evaluate_js(
-                "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4,h5'))"
-                ".map(function(h){return (h.textContent||'').trim().slice(0,45)})"
-                ".filter(function(t){return /cad|symbol|footprint|eda|3d/i.test(t)}).slice(0,8))"
+                "JSON.stringify(Array.from(document.querySelectorAll('h2,h3,h4'))"
+                ".map(function(h){return (h.textContent||'').trim().slice(0,40)}).filter(Boolean).slice(0,30))"
             )
             or "[]"
         )
