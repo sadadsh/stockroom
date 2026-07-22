@@ -141,13 +141,12 @@ export function usePartDiff(id: string | null, a: string, b: string | null) {
   });
 }
 
-// Whether a DigiKey CAD source resolves for a part (Phase-2 asset download, spec
-// section 5). `enabled` gates this on the caller's own "does this part need it"
-// check (missing assets), so a fully-asset-complete part never fires the request.
-// Kept separate from useCadDownload's OWN cad-source GET (fired again right before
-// opening the remote page): this one only decides whether the Get CAD Files control
-// renders at all, so a stale cached answer here can never open a dead page - the
-// hook always re-resolves fresh at click time.
+// The CAD source + capture needs for a part (guided capture, spec section 5). Feeds
+// the both-format checklist its `needs` and the Get CAD Files control its target URL.
+// Kept separate from useGuidedCapture's OWN cad-source GET (fired again right before
+// opening the remote page): this one only decides what the checklist shows, so a stale
+// cached answer here can never open a dead page - the hook always re-resolves fresh at
+// click time.
 export function useCadSourceQuery(id: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["cad-source", id],
@@ -391,6 +390,9 @@ export function useActivateProfile() {
       qc.invalidateQueries({ queryKey: ["system"] });
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["facets"] });
+      // the Altium DbLib status is per-profile (path, counts, profile name), so a switch must
+      // refetch it or the section shows the previous profile's data
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
     },
   });
 }
@@ -422,6 +424,7 @@ export function useDoSync() {
       if (result.pulled) {
         qc.invalidateQueries({ queryKey: ["parts"] });
         qc.invalidateQueries({ queryKey: ["facets"] });
+        qc.invalidateQueries({ queryKey: ["altium-status"] });
       }
     },
   });
@@ -887,5 +890,34 @@ export function useRestore() {
   return useMutation({
     mutationFn: (id: string) => api.restore(id),
     onSuccess: (_data, id) => invalidate(id),
+  });
+}
+
+// The Altium Database Library status for the active profile (place-ready count + per-part rows).
+export function useAltiumStatus() {
+  return useQuery({ queryKey: ["altium-status"], queryFn: () => api.altiumStatus() });
+}
+
+// Regenerate the DbLib over every place-ready part. A write (commits + may push), so it refreshes
+// the status the count is read from.
+export function useAltiumRegenerate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.altiumRegenerate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["altium-status"] }),
+  });
+}
+
+// Attach a part's Altium assets by native paths, then the part becomes place-ready. Invalidates
+// the Altium status plus the part list/detail (the record gained altium refs).
+export function useAltiumAttach() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; paths: string[] }) => api.altiumAttach(vars.id, vars.paths),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["part", vars.id] });
+    },
   });
 }

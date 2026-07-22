@@ -73,6 +73,9 @@ def _result_dto(r: EnrichmentResult) -> dict:
         "lead_time": _sourced_dto(r.lead_time),
         "product_url": _sourced_dto(r.product_url),
         "dist_pns": dict(r.dist_pns),
+        # both distributor buy links (mouser + digikey) when both APIs answered, so the committed
+        # part carries every place it can be ordered, not only the pasted link.
+        "dist_urls": dict(r.dist_urls),
         "price_breaks": [
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],

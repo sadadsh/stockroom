@@ -84,4 +84,27 @@ describe("mergeResultIntoCandidate", () => {
     expect(vendorFromUrl("https://octopart.com/a")).toBe("octopart.com");
     expect(vendorFromUrl("not a url")).toBe("manual");
   });
+
+  it("stores BOTH distributor buy links when both APIs answered", () => {
+    // dist_urls carries the Mouser + DigiKey links; the committed part gets a purchase for each.
+    const both: EnrichmentResult = {
+      ...RESULT,
+      dist_pns: { mouser: "581-STM32F103C8T6", digikey: "497-STM32-ND" },
+      dist_urls: {
+        mouser: "https://www.mouser.com/x",
+        digikey: "https://www.digikey.com/en/products/detail/st/STM32F103C8T6/1",
+      },
+    };
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, both, "https://www.mouser.com/x");
+    const byVendor = Object.fromEntries(merged.purchase.map((p) => [p.vendor, p]));
+    expect(Object.keys(byVendor).sort()).toEqual(["DigiKey", "Mouser"]);
+    expect(byVendor.Mouser.url).toBe("https://www.mouser.com/x");
+    expect(byVendor.DigiKey.url).toContain("digikey.com");
+    expect(byVendor.Mouser.part_number).toBe("581-STM32F103C8T6");
+    expect(byVendor.DigiKey.part_number).toBe("497-STM32-ND");
+    // the pasted (primary) vendor carries the pulled price ladder + stock; the other keeps the link
+    expect(byVendor.Mouser.price_breaks).toEqual([{ qty: 1, price: 2.5, currency: "USD" }]);
+    expect(byVendor.DigiKey.price_breaks).toEqual([]);
+    expect(byVendor.Mouser.stock).toBe(1500);
+  });
 });

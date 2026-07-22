@@ -10,6 +10,7 @@ from stockroom.model.category import (
 )
 from stockroom.model.part import (
     KICAD_MIRROR_FIELDS,
+    AltiumRef,
     Datasheet,
     EnrichmentField,
     Hashes,
@@ -18,6 +19,7 @@ from stockroom.model.part import (
     PartRecord,
     Provenance,
     Purchase,
+    altium_assets_ready,
     new_part_id,
 )
 
@@ -29,6 +31,7 @@ __all__ = [
     "is_valid_category",
     "slugify",
     "KICAD_MIRROR_FIELDS",
+    "AltiumRef",
     "Datasheet",
     "EnrichmentField",
     "Hashes",
@@ -37,5 +40,6 @@ __all__ = [
     "PartRecord",
     "Provenance",
     "Purchase",
+    "altium_assets_ready",
     "new_part_id",
 ]

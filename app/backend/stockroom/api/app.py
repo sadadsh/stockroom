@@ -39,6 +39,9 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import library as library_router_mod
     app.include_router(library_router_mod.library_router(require_token))
 
+    from stockroom.api.routers import altium as altium_router_mod
+    app.include_router(altium_router_mod.altium_router(require_token))
+
     from stockroom.api.routers import previews as previews_router_mod
     app.include_router(previews_router_mod.previews_router(require_token))
 

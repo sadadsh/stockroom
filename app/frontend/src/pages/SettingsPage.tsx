@@ -6,10 +6,11 @@
  * and a missing kicad-cli are surfaced verbatim, never faked green, and the Mouser
  * key is only ever shown as a last-4 hint.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import type { WiringReport } from "../api/types";
+import type { SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
+import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { RescanSection } from "../components/RescanSection";
 import {
@@ -81,7 +82,9 @@ export function SettingsPage() {
           <KiCadSection />
           <LibraryHealthSection />
           <RescanSection />
+          <AltiumDbLibSection />
           <DistributorSection />
+          <VendorLoginsSection />
           <UpdateSection />
       </div>
     </div>
@@ -602,6 +605,126 @@ function DistributorSection() {
           </Button>
         ) : null}
       </div>
+    </Section>
+  );
+}
+
+// One vendor's saved login: a username (echoed, not secret) plus a masked password.
+// The guided capture window uses these to auto-fill the first login and then keeps
+// the session, so the user signs in once.
+function VendorLogin({
+  label,
+  savedUsername,
+  passwordSet,
+  passwordHint,
+  pending,
+  onSave,
+}: {
+  label: string;
+  savedUsername: string;
+  passwordSet: boolean;
+  passwordHint: string;
+  pending: boolean;
+  onSave: (username: string, password: string) => void;
+}) {
+  const [username, setUsername] = useState(savedUsername);
+  const [password, setPassword] = useState("");
+  const [edited, setEdited] = useState(false);
+  // Prefill the saved username once it arrives, unless the user has started editing.
+  useEffect(() => {
+    if (!edited) setUsername(savedUsername);
+  }, [savedUsername, edited]);
+  const slug = label.toLowerCase().replace(/\s+/g, "-");
+  return (
+    <div className="border-b border-line py-3 last:border-b-0">
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <span className="text-sm font-medium text-t1">{label}</span>
+        <span className="flex-none text-xs text-t3">
+          {passwordSet ? `Password set (ending ${passwordHint})` : "No password saved"}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label htmlFor={`${slug}-user`} className="sr-only">
+          {label} Username
+        </label>
+        <input
+          id={`${slug}-user`}
+          type="text"
+          autoComplete="off"
+          value={username}
+          onChange={(e) => {
+            setEdited(true);
+            setUsername(e.target.value);
+          }}
+          placeholder="Username or email"
+          className={INPUT_CLS}
+        />
+        <label htmlFor={`${slug}-pass`} className="sr-only">
+          {label} Password
+        </label>
+        <input
+          id={`${slug}-pass`}
+          type="password"
+          autoComplete="off"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={passwordSet ? "Paste a new password to replace it" : "Password"}
+          className={INPUT_CLS}
+        />
+        <Button
+          className="min-w-[176px] justify-center"
+          onClick={() => onSave(username.trim(), password)}
+          disabled={pending || (!username.trim() && !password)}
+        >
+          Save {label} Login
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function VendorLoginsSection() {
+  const settings = useSettings();
+  const save = useUpdateSettings();
+  const { toast } = useToast();
+  const d = settings.data;
+
+  function saveLogin(patch: SettingsPatch, name: string) {
+    save.mutate(patch, {
+      onSuccess: () => toast(`${name} login saved.`, "ok"),
+      onError: (e) => toast(errMsg(e), "err"),
+    });
+  }
+
+  return (
+    <Section
+      title="Vendor Logins"
+      hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window sign you in and stay logged in across parts. They are stored per machine and the password is never shown again."
+    >
+      <VendorLogin
+        label="Ultra Librarian"
+        savedUsername={d?.ul_username ?? ""}
+        passwordSet={d?.ul_password_set ?? false}
+        passwordHint={d?.ul_password_hint ?? ""}
+        pending={save.isPending}
+        onSave={(username, password) => {
+          const patch: SettingsPatch = { ul_username: username };
+          if (password) patch.ul_password = password;
+          saveLogin(patch, "Ultra Librarian");
+        }}
+      />
+      <VendorLogin
+        label="SnapEDA"
+        savedUsername={d?.snapeda_username ?? ""}
+        passwordSet={d?.snapeda_password_set ?? false}
+        passwordHint={d?.snapeda_password_hint ?? ""}
+        pending={save.isPending}
+        onSave={(username, password) => {
+          const patch: SettingsPatch = { snapeda_username: username };
+          if (password) patch.snapeda_password = password;
+          saveLogin(patch, "SnapEDA");
+        }}
+      />
     </Section>
   );
 }

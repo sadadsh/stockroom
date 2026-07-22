@@ -301,6 +301,10 @@ export interface EnrichmentResult {
   lead_time?: SourcedField | null;
   product_url?: SourcedField | null;
   dist_pns?: Record<string, string>;
+  // Each distributor's own buy link ("mouser"->..., "digikey"->...): when both APIs answer a
+  // lookup we keep BOTH, so the part carries every place it can be ordered, not only the pasted
+  // link. Optional so older payloads without it still type-check.
+  dist_urls?: Record<string, string>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
   // The backend always emits this; optional so fixtures/older payloads without it
@@ -373,10 +377,21 @@ export interface JobRef {
 // 5). `url` is the DigiKey product-detail page hosting the Ultra Librarian / SnapEDA CAD
 // download for the part's MPN, or null when the part has no MPN, DigiKey enrichment is
 // disabled, or nothing resolved - a resolvable 200 either way, never an error.
+// The KiCad + Altium asset types a part can still need. Mirrors the backend
+// stockroom.capture.requirements.Requirement enum values exactly (the wire contract).
+export type Requirement =
+  | "kicad_symbol"
+  | "kicad_footprint"
+  | "kicad_model"
+  | "altium_symbol"
+  | "altium_footprint";
+
 export interface CadSourceResponse {
   url: string | null;
   mpn: string;
   vendor: string;
+  // The requirements this part is missing, so the guided checklist knows what to fill.
+  needs: Requirement[];
 }
 
 // Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
@@ -400,6 +415,14 @@ export interface SettingsInfo {
   mouser_api_key_hint: string;
   github_token_set: boolean;
   github_token_hint: string;
+  // Saved vendor logins for the guided capture window. Usernames are echoed raw
+  // (not secrets); passwords cross the wire only as presence + a last-4 hint.
+  ul_username: string;
+  ul_password_set: boolean;
+  ul_password_hint: string;
+  snapeda_username: string;
+  snapeda_password_set: boolean;
+  snapeda_password_hint: string;
   // KiCad wiring: the per-machine overrides (plain paths, not secrets), the
   // effective locations they resolve to, and whether SR_LIB currently points at
   // the active profile's library.
@@ -415,6 +438,10 @@ export interface SettingsInfo {
 export interface SettingsPatch {
   mouser_api_key?: string;
   github_token?: string;
+  ul_username?: string;
+  ul_password?: string;
+  snapeda_username?: string;
+  snapeda_password?: string;
   kicad_config_override?: string;
   kicad_cli_override?: string;
 }
@@ -1371,4 +1398,33 @@ export interface SystemInfo {
   kicad_running: boolean;
   kicad_cli_available: boolean;
   kicad_cli_path: string;
+}
+
+// One part's Altium DbLib status: its identity, the Value the emitter writes, its resolved
+// Altium symbol/footprint entry names (empty until attached), and whether it is place-ready.
+export interface AltiumStatusRow {
+  id: string;
+  display_name: string;
+  category: string;
+  mpn: string;
+  value: string;
+  symbol: string;
+  footprint: string;
+  ready: boolean;
+}
+
+// The Altium Database Library status for the ACTIVE profile.
+export interface AltiumStatus {
+  profile: string;
+  dblib: string;
+  dblib_dir: string;
+  ready: number;
+  total: number;
+  rows: AltiumStatusRow[];
+}
+
+export interface AltiumRegenerateResult {
+  emitted: number;
+  skipped: string[];
+  dblib: string;
 }
