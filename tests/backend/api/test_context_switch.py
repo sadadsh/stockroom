@@ -43,7 +43,7 @@ def test_switch_library_repoints_and_preserves_token_and_clears_caches(tmp_path)
 
 def test_switch_library_preserves_host_wired_hooks(tmp_path):
     a, b = _library(tmp_path / "A"), _library(tmp_path / "B")
-    ctx = build_context(a, kicad_dir=tmp_path / "k", config=MachineConfig(), token="T")
+    ctx = build_context(a, kicad_dir=tmp_path / "k", config=MachineConfig(active_profile="Main"), token="T")
     sentinel = object()
 
     def restart():
