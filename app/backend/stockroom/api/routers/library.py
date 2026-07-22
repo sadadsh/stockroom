@@ -34,14 +34,19 @@ _HISTORY_MAX = 100
 
 
 def _preferred_cad_vendor(config) -> str:
-    """Which CAD-source vendor the guided window opens, from the saved logins: SnapEDA when the
-    user has a SnapEDA login and no Ultra Librarian one, Ultra Librarian otherwise. Both offer
-    KiCad + Altium behind a control the guided window can drive; picking by the saved login means
-    a SnapEDA user is signed in and a UL user is signed in, with UL the zero-config default (its
-    page is reachable even without a login)."""
+    """Which CAD-source vendor the guided window opens, from the saved logins: Ultra Librarian or
+    SnapEDA when the user has that login (so the guided window is signed in and can drive the
+    provider's own download control), and DigiKey otherwise. DigiKey is the login-free default: a
+    part's DigiKey page gathers the SnapEDA / Ultra Librarian / SamacSys CAD downloads in ONE
+    place, so a user with no vendor login still sees every option to pick from without signing in
+    to anything."""
     has_ul = bool(getattr(config, "ul_username", "") or getattr(config, "ul_password", ""))
     has_snap = bool(getattr(config, "snapeda_username", "") or getattr(config, "snapeda_password", ""))
-    return "snapeda" if (has_snap and not has_ul) else "ultralibrarian"
+    if has_ul:
+        return "ultralibrarian"
+    if has_snap:
+        return "snapeda"
+    return "digikey"
 
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
 # AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
