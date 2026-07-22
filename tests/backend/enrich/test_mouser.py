@@ -6,9 +6,66 @@ from pathlib import Path
 import pytest
 
 from stockroom.enrich.errors import EnrichError
-from stockroom.enrich.mouser import MouserAdapter, _default_requester
+from stockroom.enrich.mouser import MouserAdapter, _default_requester, _parse_mouser_part
 
 FIX = Path(__file__).parent / "fixtures"
+
+
+# A real-shaped Mouser part carrying the full field set the API returns (parametric attributes,
+# category, compliance, trade origin, image, order quantities) that the parser used to drop.
+_FULL_PART = {
+    "ManufacturerPartNumber": "TPD6E05U06RVZR",
+    "Manufacturer": "Texas Instruments",
+    "Description": "ESD Protection Diodes / TVS Diodes 6-CH",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "ImagePath": "https://www.mouser.com/images/ti/tpd6e05.jpg",
+    "ROHSStatus": "RoHS Compliant",
+    "Min": "1",
+    "Mult": "1",
+    "SalesMaximumOrderQty": "240",
+    "AvailabilityInStock": "12317",
+    "ProductDetailUrl": "https://www.mouser.com/x",
+    "MouserPartNumber": "595-TPD6E05U06RVZR",
+    "UnitWeightKg": {"UnitWeight": 4.2e-05},
+    "ProductAttributes": [
+        {"AttributeName": "Packaging", "AttributeValue": "Reel"},
+        {"AttributeName": "Packaging", "AttributeValue": "Cut Tape"},
+        {"AttributeName": "Standard Pack Qty", "AttributeValue": "3000"},
+    ],
+    "ProductCompliance": [
+        {"ComplianceName": "USHTS", "ComplianceValue": "8541100080"},
+        {"ComplianceName": "ECCN", "ComplianceValue": "EAR99"},
+    ],
+    "TradeCompliance": [
+        {"ComplianceName": "Country of Origin", "ComplianceValue": "China"},
+    ],
+    "PriceBreaks": [{"Quantity": 1, "Price": "$0.50"}],
+}
+
+
+def test_parse_captures_parametrics_category_and_compliance():
+    r = _parse_mouser_part(_FULL_PART)
+    # packaging/parametric attributes flow into specs, grouped by name (distinct values joined)
+    assert "Reel" in r.specs["Packaging"].value and "Cut Tape" in r.specs["Packaging"].value
+    assert r.specs["Standard Pack Qty"].value == "3000"
+    # the distributor category is kept as a spec (also drives the fill_category classifier)
+    assert r.specs["Product Category"].value == "ESD Protection Diodes / TVS Diodes"
+    assert r.specs["RoHS"].value == "RoHS Compliant"
+    assert r.specs["ECCN"].value == "EAR99"
+    assert r.specs["HTS Code (US)"].value == "8541100080"
+    assert r.specs["Image"].value.startswith("http")
+    # country of origin becomes the canonical field AND a spec
+    assert r.country_of_origin.value == "China"
+    # order quantities
+    assert r.specs["Minimum Order Quantity"].value == "1"
+    assert r.specs["Maximum Order Quantity"].value == "240"
+
+
+def test_parse_never_raises_on_missing_rich_blocks():
+    # a lean part (no attributes/compliance/category) must still parse cleanly, never raise
+    r = _parse_mouser_part({"ManufacturerPartNumber": "X"})
+    assert r.mpn.value == "X"
+    assert r.country_of_origin is None and "Product Category" not in r.specs
 
 
 def test_adapter_is_off_by_default_with_no_key():
