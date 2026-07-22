@@ -35,7 +35,7 @@ def config_dir() -> Path:
 
 @dataclass
 class MachineConfig:
-    active_profile: str = "Main"
+    active_profile: str = "Stockroom"
     # Where the library repo lives on this machine (M9a). Blank on a fresh install, so the
     # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.

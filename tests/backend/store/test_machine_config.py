@@ -26,7 +26,7 @@ def test_config_dir_uses_xdg_on_posix(monkeypatch, tmp_path):
 
 def test_missing_file_returns_defaults(tmp_path):
     cfg = MachineConfig.load(tmp_path / "nope.json")
-    assert cfg.active_profile == "Main"
+    assert cfg.active_profile == "Stockroom"
     assert cfg.mouser_api_key == ""
     assert cfg.sync_enabled is True
 
