@@ -237,6 +237,11 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (tokenRef.current && p.token && p.token !== tokenRef.current) return; // B4 guard
+      // Scope this forward to the part that was active when it arrived: if the user replaces the
+      // capture (starts another part) while this one's attach is in flight, bail rather than mark
+      // the new part's checklist. (The attach itself is already safe - attachKicad/attachAltium
+      // capture the part id at call time - so this only guards the received-map UI.)
+      const pid = partIdRef.current;
       clearWatchdog();
       setState((s) => ({ ...s, status: "attaching", message: "Attaching the files to the part..." }));
       const reqs = p.requirements ?? [];
@@ -246,12 +251,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       try {
         if (wantKicad && p.path) {
           await attachKicad([p.path]);
+          if (partIdRef.current !== pid) return;
           markReceived(kicadReqs.length ? kicadReqs : KICAD_REQS);
         }
         if (altiumReqs.length > 0) {
           await attachAltium(p.altiumPaths ?? (p.path ? [p.path] : []));
+          if (partIdRef.current !== pid) return;
           markReceived(altiumReqs);
         }
+        if (partIdRef.current !== pid) return;
         invalidate();
         if (allReceived()) {
           clearHandler();
@@ -265,6 +273,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           }));
         }
       } catch (err) {
+        if (partIdRef.current !== pid) return; // replaced mid-attach; leave the new capture alone
         clearHandler();
         setState((s) => ({
           ...s,
@@ -356,6 +365,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, status: "attaching", message: "Attaching the files to the part..." }));
       try {
         await attachKicad(paths);
+        if (partIdRef.current !== partId) return; // replaced mid-attach; leave the new capture alone
         markReceived(KICAD_REQS);
         invalidate();
         if (allReceived()) {
@@ -370,6 +380,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           }));
         }
       } catch (err) {
+        if (partIdRef.current !== partId) return;
         setState((s) => ({
           ...s,
           status: "error",
