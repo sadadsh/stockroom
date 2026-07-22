@@ -6,7 +6,7 @@
     "source_url": "https://www.ti.com/lit/gpn/bq24075"
   },
   "description": "Battery Management",
-  "display_name": "BQ24074",
+  "display_name": "BQ24074 VQFN-16 TI BQ24074RGTT",
   "enrichment": {},
   "footprint": {
     "lib": "Package_DFN_QFN",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT?qs=ZV%2Fxhq4oszp0gb4MsbpFYw%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:10:32.769681+00:00",
+      "part_number": "595-BQ24074RGTT",
       "price_breaks": [
         {
           "price": 3.19,
@@ -68,16 +68,21 @@
           "qty": 5000
         }
       ],
-      "stock": 1351,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT",
+      "stock": 1347,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/BQ24074RGTT?qs=ZV%2Fxhq4oszp0gb4MsbpFYw%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Battery Type": "Lithium-ion",
     "Brand": "Texas Instruments",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
     "Development Kit": "BQ24074EVM",
-    "Factory Pack Quantity: Factory Pack Quantity": "250",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "250",
+    "Lifecycle": "Active",
     "Manufacturer": "Texas Instruments",
     "Maximum Operating Temperature": "+ 85 C",
     "Minimum Operating Temperature": "- 40 C",
@@ -86,6 +91,7 @@
     "Operating Supply Voltage": "4.3 V to 10.2 V",
     "Output Current": "1.5 A",
     "Output Voltage": "4.2 V",
+    "Package": "VQFN-16",
     "Packaging": "Reel",
     "Product": "Charge Management",
     "Product Category": "Battery Management",
@@ -93,6 +99,7 @@
     "RoHS": "Details",
     "Series": "BQ24074",
     "Subcategory": "PMIC - Power Management ICs",
+    "US Tariff %": 37.93,
     "Unit Weight": "0.000808 oz"
   },
   "symbol": null,
