@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/317/1/ASC_MR.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "470k",
+  "display_name": "470k 1% 0603 Walsin MR06X4703FTL",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X4703FTL"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X4703FTL?qs=GedFDFLaBXHpTipOCmV8gQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:09:34.050641+00:00",
+      "part_number": "791-MR06X4703FTL",
       "price_breaks": [
         {
           "price": 0.13,
@@ -60,22 +60,28 @@
           "qty": 5000
         }
       ],
-      "stock": 70598,
-      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X4703FTL",
+      "stock": 70586,
+      "url": "https://www.mouser.com/en/ProductDetail/Walsin/MR06X4703FTL?qs=GedFDFLaBXHpTipOCmV8gQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Walsin",
     "Case Code - in": "0603",
     "Case Code - mm": "1608",
-    "Factory Pack Quantity: Factory Pack Quantity": "5000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "5000",
     "Height": "0.45 mm (0.018 in)",
     "Length": "1.6 mm (0.063 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Walsin",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0603",
     "Packaging": "Reel",
     "Power Rating": "125 mW (1/8 W)",
     "Product Category": "Thick Film Resistors - SMD",
@@ -86,9 +92,10 @@
     "Series": "MR",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000071 oz",
     "Voltage Rating": "75 V",
     "Width": "0.8 mm (0.031 in)"
