@@ -144,7 +144,7 @@ export function Eyebrow({
   return (
     <div
       className={cx(
-        "text-[11px] font-semibold text-t3",
+        "text-xs font-semibold text-t3",
         className,
       )}
       {...rest}

@@ -81,7 +81,7 @@ export function Rail() {
           <polyline points="3.29 7 12 12 20.71 7" />
           <path d="m7.5 4.27 9 5.15" />
         </svg>
-        <span className="text-[15px] font-semibold tracking-[-0.02em] text-t1">Stockroom</span>
+        <span className="text-lg font-semibold tracking-[-0.02em] text-t1">Stockroom</span>
       </div>
 
       <div className="flex flex-col gap-0.5">
@@ -109,7 +109,7 @@ export function Rail() {
         <button
           type="button"
           onClick={() => setAboutOpen(true)}
-          className="flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-[13.5px] font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
+          className="flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
         >
           <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
             <svg {...svgProps}>
@@ -242,7 +242,7 @@ function RailItem({
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={
-        "flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-[13.5px] transition " +
+        "flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base transition " +
         (selected
           ? "bg-raise2 font-semibold text-t1 shadow-card"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
