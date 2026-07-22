@@ -207,7 +207,10 @@ def main() -> int:
 
     print("LIVE_RESULT " + json.dumps(result, default=str))
     if result["ok"]:
-        what = "overlay + driver + capture" if fixture else f"download via {result.get('tier')}"
+        what = {
+            "digikey": "DigiKey CAD-section guide (overlay + driver)",
+            "fixture": "overlay + driver + capture",
+        }.get(mode, f"download via {result.get('tier')}")
         print(f"PASS: real WebView2 {what} verified")
         return 0
     print("FAIL: real WebView2 validation did not pass (see LIVE_RESULT)")
