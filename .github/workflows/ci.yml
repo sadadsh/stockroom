@@ -7,9 +7,18 @@ on:
 jobs:
   backend:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # A hard cap so a hung test (a browser launch that blocks on a headless Windows runner, a git
+    # op waiting on a credential prompt) fails the job in minutes instead of running for hours.
+    timeout-minutes: 30
+    env:
+      # Git must never block waiting for interactive credentials in CI (on Windows the credential
+      # manager can hang a push/pull); fail fast instead so a bad remote surfaces as an error.
+      GIT_TERMINAL_PROMPT: "0"
+      GCM_INTERACTIVE: "never"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
