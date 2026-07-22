@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/74439346068.pdf"
   },
   "description": "Power Inductors - SMD",
-  "display_name": "6.8u WE-XHMI_6060",
+  "display_name": "6.8u 20% 6060 Wurth 74439346068",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068?qs=NSAOzM2zc%2FVj5BeHYKNgfQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:09:53.232717+00:00",
+      "part_number": "710-74439346068",
       "price_breaks": [
         {
           "price": 4.05,
@@ -44,24 +44,29 @@
           "qty": 250
         },
         {
-          "price": 2.49,
+          "price": 2.52,
           "qty": 700
         }
       ],
-      "stock": 6579,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068",
+      "stock": 7341,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74439346068?qs=NSAOzM2zc%2FVj5BeHYKNgfQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Power",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Wurth Elektronik",
     "Core Material": "Metal Composite",
     "Core Type": "Wirewound",
-    "Factory Pack Quantity: Factory Pack Quantity": "700",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "700",
     "Height": "5.8 mm",
     "Inductance": "6.8 uH",
     "Length": "6.65 mm",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum DC Current": "6.5 A",
     "Maximum DC Resistance": "17.6 mOhms",
@@ -82,8 +87,9 @@
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 kHz",
-    "Tolerance": "20 %",
+    "Tolerance": "20%",
     "Type": "Power Inductor",
+    "US Tariff %": 35.06,
     "Unit Weight": "0.023951 oz",
     "Width": "6.45 mm"
   },
