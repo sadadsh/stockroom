@@ -31,6 +31,8 @@ from urllib.parse import urlsplit
 
 from stockroom.capture.classify import classify_asset
 from stockroom.capture.requirements import Requirement
+from stockroom.host.overlay import build_overlay_js
+from stockroom.host.vendor_drivers.drivers import build_driver_js
 
 _log = logging.getLogger("stockroom.host.cad")
 
@@ -437,6 +439,84 @@ def _install_cad_download_intercept(
     return True
 
 
+def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
+    """A best-effort login auto-fill for the vendor window, from the per-machine saved creds
+    (Settings). Pure string builder. Empty when there is nothing to fill (so nothing is
+    injected). Creds are JSON-encoded (never string-concatenated) and every field fill is
+    guarded, so a page without a matching field is a silent no-op. Injected ONLY into the
+    remote cad window on its `loaded` event - never the SPA. `vendor` is accepted for future
+    per-vendor login DOMs; the current fill is generic (email/username + password)."""
+    if not (username or password):
+        return ""
+    j = json.dumps
+    return (
+        "(function(){try{"
+        f"var u={j(username)},p={j(password)};"
+        "function set(sel,val){if(!val)return false;var el=document.querySelector(sel);"
+        "if(el){el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));"
+        "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;}"
+        "set(\"input[type='email'],input[name='username'],input[name='email'],input[name*='user']\",u);"
+        "set(\"input[type='password']\",p);"
+        "}catch(e){}})();"
+    )
+
+
+def _formats_for_needs(needs) -> list[str]:
+    """The vendor download formats (`kicad`/`altium`) a set of Requirement values implies,
+    KiCad before Altium."""
+    values = {str(n) for n in (needs or [])}
+    formats: list[str] = []
+    if any(v.startswith("kicad_") for v in values):
+        formats.append("kicad")
+    if any(v.startswith("altium_") for v in values):
+        formats.append("altium")
+    return formats
+
+
+def _vendor_from_url(url: str) -> tuple[str, str]:
+    """(driver_key, display_label) for a resolved CAD-source URL. The key drives which vendor
+    driver runs (empty = no automation, guidance only); the label is what the overlay shows."""
+    u = (url or "").lower()
+    if "ultralibrarian" in u:
+        return ("ultralibrarian", "Ultra Librarian")
+    if "snapeda" in u:
+        return ("snapeda", "SnapEDA")
+    if "digikey" in u:
+        return ("", "DigiKey")
+    return ("", "the vendor")
+
+
+def cad_loaded_scripts(needs, vendor_key: str, vendor_label: str, formats, creds) -> list[str]:
+    """The scripts to inject into the cad window on each `loaded`, in order: the overlay (so
+    the panel + `window.__STOCKROOM_OVERLAY__` bridge exist first), then a best-effort login
+    auto-fill (omitted when there are no creds), then the vendor driver (which reports into the
+    overlay)."""
+    scripts = [build_overlay_js(list(needs), vendor_label)]
+    autofill = build_login_autofill_js(
+        vendor_key, (creds or {}).get("username", ""), (creds or {}).get("password", "")
+    )
+    if autofill:
+        scripts.append(autofill)
+    scripts.append(build_driver_js(vendor_key, list(formats)))
+    return scripts
+
+
+def _load_vendor_creds(vendor_key: str) -> dict:
+    """The saved login for a vendor from the per-machine config, or {} (best-effort - a missing
+    or unreadable config never blocks the capture)."""
+    if vendor_key not in ("ultralibrarian", "snapeda"):
+        return {}
+    try:
+        from stockroom.store.machine_config import MachineConfig
+
+        cfg = MachineConfig.load()
+    except Exception:  # noqa: BLE001 - no config / unreadable: just skip the auto-fill
+        return {}
+    if vendor_key == "ultralibrarian":
+        return {"username": cfg.ul_username, "password": cfg.ul_password}
+    return {"username": cfg.snapeda_username, "password": cfg.snapeda_password}
+
+
 def _parse_needs(needs) -> frozenset:
     """The frontend hands the capture's needs as Requirement `.value` strings; map them back
     to the Requirement enum, dropping anything unrecognized (never trust remote input)."""
@@ -564,12 +644,32 @@ class _HostApi:
                 pass
             _CAD_WINDOW = None
 
-        session = CaptureSession.start("", _parse_needs(needs), now=time.time())
+        needs_set = _parse_needs(needs)
+        session = CaptureSession.start("", needs_set, now=time.time())
         session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
         _CAD_SESSION = session
 
         win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
         _CAD_WINDOW = win
+
+        # Guide the capture INSIDE the vendor window: on each load, inject the overlay (the
+        # checklist + the __STOCKROOM_OVERLAY__ bridge), then a best-effort login auto-fill from
+        # the saved creds, then the vendor driver (auto-click, reporting into the overlay). All
+        # best-effort and guarded; injected ONLY on this remote window, never the SPA.
+        needs_values = [r.value for r in needs_set]
+        vendor_key, vendor_label = _vendor_from_url(url)
+        formats = _formats_for_needs(needs_values)
+        creds = _load_vendor_creds(vendor_key)
+        loaded_scripts = cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds)
+
+        def _on_cad_loaded() -> None:
+            for script in loaded_scripts:
+                try:
+                    win.evaluate_js(script)
+                except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
+                    _log.warning("cad guided-overlay/driver injection failed on load")
+
+        win.events.loaded += _on_cad_loaded
 
         thread_box: dict = {"t": None}
 
