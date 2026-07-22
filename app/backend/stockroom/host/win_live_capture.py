@@ -1,16 +1,22 @@
-"""LIVE Windows validation of the real WebView2 download capture (plan Task 2.5 companion).
+"""LIVE Windows validation of the real WebView2 guided capture (plan Task 2.5 + Phase 3 A4).
 
-Where win_run_capture.py proves the pure pipeline with SIMULATED file drops, this opens the
-REAL host guided-capture window against a local HTTP server that serves a KiCad test zip AS AN
-ATTACHMENT, and asserts the actual WebView2 download is captured, classified, and forwarded
-with the right requirements + the live session token - closing the one Phase 2 gate that a
-simulated drop cannot: the tier-1 CoreWebView2 DownloadStarting intercept (or, if that pywebview
-version does not match, the tier-2 Downloads watch) firing on a genuine download through a real
-window. Reports which tier fired.
+Two modes, both against a REAL WebView2 window on real Windows:
 
-Windows-only (needs pywebview + WebView2); run from the winverify clone:
+  (default)   the download path: open the cad window at a local endpoint that serves a KiCad zip
+              AS AN ATTACHMENT, and assert the actual WebView2 download is intercepted +
+              classified + forwarded with the right requirements + session token. Closes the gate
+              a simulated drop cannot: the tier-1 CoreWebView2 DownloadStarting intercept.
+
+  --fixture   the overlay + driver path: open the cad window at a local page whose URL contains
+              "ultralibrarian" (so open_cad_download injects the REAL Ultra Librarian overlay +
+              driver on load) and whose DOM mimics the UL controls, then assert the overlay
+              rendered, the driver auto-clicked consent + both format buttons + Download, and the
+              resulting download was captured. This validates A1/A2/A3 injection end to end
+              against a fixture; the LIVE UL/SnapEDA selectors are owner-validated (Phase C).
+
+Run from the winverify clone (a window briefly opens, then closes itself):
     uv run python -m stockroom.host.win_live_capture
-It briefly opens a window on the desktop, drives one download, then closes itself.
+    uv run python -m stockroom.host.win_live_capture --fixture
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ import http.server
 import io
 import json
 import socketserver
+import sys
 import tempfile
 import threading
 import time
@@ -39,68 +46,113 @@ def _kicad_zip_bytes() -> bytes:
 
 _ZIP = _kicad_zip_bytes()
 
+# A fixture page that mimics the Ultra Librarian controls the driver targets, and records every
+# click the driver makes into window.__clicks so the harness can assert the driver ran.
+_FIXTURE_HTML = b"""<!doctype html><html><head><meta charset="utf-8"><title>UL fixture</title></head>
+<body style="font:14px system-ui;padding:24px">
+<h1>Ultra Librarian (fixture)</h1>
+<button id="onetrust-accept-btn-handler">Accept cookies</button>
+<button data-ecad="KiCad">KiCad</button>
+<button data-ecad="Altium">Altium</button>
+<a download href="/stockroom-live-part.zip" data-testid="download">Download</a>
+<script>
+window.__clicks=[];
+function rec(x){window.__clicks.push(x);}
+document.getElementById('onetrust-accept-btn-handler').addEventListener('click',function(){rec('consent');});
+document.querySelector("[data-ecad='KiCad']").addEventListener('click',function(){rec('kicad');});
+document.querySelector("[data-ecad='Altium']").addEventListener('click',function(){rec('altium');});
+document.querySelector("[data-testid='download']").addEventListener('click',function(){rec('download');});
+</script>
+</body></html>"""
+
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.rstrip("/").endswith(".zip"):
-            self.send_response(200)
-            self.send_header("Content-Type", "application/octet-stream")
-            self.send_header("Content-Disposition", 'attachment; filename="stockroom-live-part.zip"')
-            self.send_header("Content-Length", str(len(_ZIP)))
-            self.end_headers()
-            self.wfile.write(_ZIP)
+            self._send(_ZIP, "application/octet-stream", attachment="stockroom-live-part.zip")
+        elif "ultralibrarian" in self.path.lower():
+            self._send(_FIXTURE_HTML, "text/html")
         else:
-            body = b"<!doctype html><meta charset=utf-8><title>dl</title><body>download</body>"
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send(b"<!doctype html><meta charset=utf-8><body>download</body>", "text/html")
+
+    def _send(self, body: bytes, ctype: str, attachment: str | None = None) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        if attachment:
+            self.send_header("Content-Disposition", f'attachment; filename="{attachment}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, *args):  # silence the request log
         pass
 
 
+def _serve() -> str:
+    srv = socketserver.TCPServer(("127.0.0.1", 0), _Handler)
+    srv.allow_reuse_address = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{srv.server_address[1]}"
+
+
+def _drive_download(webview, base: str, captured: list, result: dict) -> None:
+    time.sleep(1.5)
+    needs = ["kicad_symbol", "kicad_footprint", "kicad_model"]
+    token = W._HostApi().open_cad_download(f"{base}/stockroom-live-part.zip", needs)
+    deadline = time.time() + 25.0
+    while time.time() < deadline and not captured:
+        time.sleep(0.25)
+    result["captured"] = list(captured)
+    if captured:
+        p = captured[0]
+        temp = str(getattr(W._CAD_SESSION, "temp_dir", "") or "")
+        result["tier"] = "tier1-intercept" if temp and str(p.get("path", "")).startswith(temp) else "tier2-watch"
+        result["token_ok"] = p.get("token") == token
+        result["ok"] = result["token_ok"] and "kicad_symbol" in (p.get("requirements") or [])
+
+
+def _drive_fixture(webview, base: str, captured: list, result: dict) -> None:
+    time.sleep(1.5)
+    needs = ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"]
+    # URL contains 'ultralibrarian' -> open_cad_download injects the real UL overlay + driver on load
+    W._HostApi().open_cad_download(f"{base}/ultralibrarian", needs)
+    deadline = time.time() + 25.0
+    while time.time() < deadline and not captured:
+        time.sleep(0.25)
+    time.sleep(1.0)  # let the overlay + click recorder settle
+    cad = W.cad_window()
+    overlay_present, clicks = False, []
+    try:
+        overlay_present = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
+        clicks = json.loads(cad.evaluate_js("JSON.stringify(window.__clicks||[])") or "[]")
+    except Exception as e:  # noqa: BLE001
+        result["error"] = repr(e)
+    result["overlay_present"] = overlay_present
+    result["clicks"] = clicks
+    result["captured"] = list(captured)
+    needed_clicks = {"consent", "kicad", "altium", "download"}
+    result["ok"] = overlay_present and needed_clicks.issubset(set(clicks)) and bool(captured)
+
+
 def main() -> int:
     import webview
 
-    # Capture the forward without a real SPA: the emit->evaluate_js hop is trivial and already
-    # Linux-tested; what we are validating here is the real download -> classify -> payload.
+    fixture = "--fixture" in sys.argv
     captured: list[dict] = []
     W._emit_to_spa = lambda payload: captured.append(payload)
-
-    srv = socketserver.TCPServer(("127.0.0.1", 0), _Handler)
-    srv.allow_reuse_address = True
-    port = srv.server_address[1]
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{port}/stockroom-live-part.zip"
-
-    result: dict = {"ok": False, "captured": None, "tier": None, "token_ok": None, "error": None}
+    base = _serve()
+    result: dict = {"mode": "fixture" if fixture else "download", "ok": False, "error": None}
 
     main_win = webview.create_window("stockroom-live", html="<html><body>host</body></html>", hidden=True)
     W._ACTIVE_WINDOW = main_win
     try:
-        webview.settings["ALLOW_DOWNLOADS"] = True  # same as run_window; WebView2 blocks downloads otherwise
+        webview.settings["ALLOW_DOWNLOADS"] = True
     except Exception:  # noqa: BLE001
         pass
 
     def driver() -> None:
         try:
-            time.sleep(1.5)  # let the GUI + WebView2 environment settle
-            needs = ["kicad_symbol", "kicad_footprint", "kicad_model"]
-            token = W._HostApi().open_cad_download(url, needs)
-            deadline = time.time() + 25.0
-            while time.time() < deadline and not captured:
-                time.sleep(0.25)
-            result["captured"] = list(captured)
-            if captured:
-                p = captured[0]
-                temp = str(getattr(W._CAD_SESSION, "temp_dir", "") or "")
-                result["tier"] = (
-                    "tier1-intercept" if temp and str(p.get("path", "")).startswith(temp) else "tier2-watch"
-                )
-                result["token_ok"] = p.get("token") == token
-                result["ok"] = result["token_ok"] and "kicad_symbol" in (p.get("requirements") or [])
+            (_drive_fixture if fixture else _drive_download)(webview, base, captured, result)
         except Exception as e:  # noqa: BLE001
             result["error"] = repr(e)
         finally:
@@ -113,16 +165,13 @@ def main() -> int:
     profile = Path(tempfile.gettempdir()) / "stockroom-live-profile"
     profile.mkdir(parents=True, exist_ok=True)
     webview.start(driver, **W._webview_start_kwargs(webview.start, profile))
-    try:
-        srv.shutdown()
-    except Exception:  # noqa: BLE001
-        pass
 
     print("LIVE_RESULT " + json.dumps(result, default=str))
     if result["ok"]:
-        print(f"PASS: real WebView2 download captured via {result['tier']} and forwarded with the session token")
+        what = "overlay + driver + capture" if fixture else f"download via {result.get('tier')}"
+        print(f"PASS: real WebView2 {what} verified")
         return 0
-    print("FAIL: real WebView2 capture did not verify (see LIVE_RESULT)")
+    print("FAIL: real WebView2 validation did not pass (see LIVE_RESULT)")
     return 1
 
 
