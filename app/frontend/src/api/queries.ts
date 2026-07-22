@@ -889,3 +889,32 @@ export function useRestore() {
     onSuccess: (_data, id) => invalidate(id),
   });
 }
+
+// The Altium Database Library status for the active profile (place-ready count + per-part rows).
+export function useAltiumStatus() {
+  return useQuery({ queryKey: ["altium-status"], queryFn: () => api.altiumStatus() });
+}
+
+// Regenerate the DbLib over every place-ready part. A write (commits + may push), so it refreshes
+// the status the count is read from.
+export function useAltiumRegenerate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.altiumRegenerate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["altium-status"] }),
+  });
+}
+
+// Attach a part's Altium assets by native paths, then the part becomes place-ready. Invalidates
+// the Altium status plus the part list/detail (the record gained altium refs).
+export function useAltiumAttach() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; paths: string[] }) => api.altiumAttach(vars.id, vars.paths),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["part", vars.id] });
+    },
+  });
+}

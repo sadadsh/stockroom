@@ -324,6 +324,22 @@ class _HostApi:
         )
         return list(result) if result else []
 
+    def pick_altium_files(self) -> list[str]:
+        """A native picker for a part's Altium assets: a .SchLib + .PcbLib pair, or a single
+        compiled .IntLib. Returns real filesystem paths straight to the frontend, which posts
+        them to /api/altium/parts/{id}/attach (the same host-captured-path path as ingest)."""
+        import webview
+
+        win = active_window()
+        if win is None:
+            return []
+        result = win.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=True,
+            file_types=("Altium libraries (*.IntLib;*.SchLib;*.PcbLib)", "All files (*.*)"),
+        )
+        return list(result) if result else []
+
     def pick_datasheet_file(self) -> list[str]:
         """A native picker for the part's datasheet PDF, so Autofill can attach a
         file already on disk (the frontend sends its path as datasheet_file)."""

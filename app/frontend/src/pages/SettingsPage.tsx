@@ -10,6 +10,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
+import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { RescanSection } from "../components/RescanSection";
 import {
@@ -81,6 +82,7 @@ export function SettingsPage() {
           <KiCadSection />
           <LibraryHealthSection />
           <RescanSection />
+          <AltiumDbLibSection />
           <DistributorSection />
           <UpdateSection />
       </div>

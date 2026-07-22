@@ -1372,3 +1372,32 @@ export interface SystemInfo {
   kicad_cli_available: boolean;
   kicad_cli_path: string;
 }
+
+// One part's Altium DbLib status: its identity, the Value the emitter writes, its resolved
+// Altium symbol/footprint entry names (empty until attached), and whether it is place-ready.
+export interface AltiumStatusRow {
+  id: string;
+  display_name: string;
+  category: string;
+  mpn: string;
+  value: string;
+  symbol: string;
+  footprint: string;
+  ready: boolean;
+}
+
+// The Altium Database Library status for the ACTIVE profile.
+export interface AltiumStatus {
+  profile: string;
+  dblib: string;
+  dblib_dir: string;
+  ready: number;
+  total: number;
+  rows: AltiumStatusRow[];
+}
+
+export interface AltiumRegenerateResult {
+  emitted: number;
+  skipped: string[];
+  dblib: string;
+}

@@ -27,6 +27,9 @@ vi.mock("../api/client", async (importActual) => {
       repairLibrary: vi.fn(),
       wireKicad: vi.fn(),
       openJobStream: vi.fn(),
+      altiumStatus: vi.fn(),
+      altiumRegenerate: vi.fn(),
+      altiumAttach: vi.fn(),
     },
   };
 });
