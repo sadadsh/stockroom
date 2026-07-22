@@ -35,6 +35,10 @@ class CaptureSession:
     ttl: float = _DEFAULT_TTL
     received: dict[Requirement, Path] = field(default_factory=dict)
     stop_flag: dict = field(default_factory=lambda: {"stop": False})
+    # The host's scratch dir for this capture (loose Altium libraries extracted from a
+    # captured zip land here). Set by the host after start(); cleaned when the session is
+    # stopped/replaced or its window closes. Pure data - the capture package never touches it.
+    temp_dir: Path | None = None
 
     @classmethod
     def start(cls, part_id, needs, *, now, token=None, ttl=_DEFAULT_TTL):
