@@ -205,3 +205,12 @@ def test_vendor_login_raw_password_never_leaks(client, app_ctx):
     app_ctx.config.snapeda_password = "topsecretpw"
     body = client.get("/api/settings").json()
     assert "topsecretpw" not in _json.dumps(body)
+
+
+def test_get_settings_tolerates_a_null_secret_field(client, app_ctx):
+    # a hand-edited config.json can carry a JSON null; the hint must not 500
+    app_ctx.config.ul_password = None
+    resp = client.get("/api/settings")
+    assert resp.status_code == 200
+    assert resp.json()["ul_password_set"] is False
+    assert resp.json()["ul_password_hint"] == ""

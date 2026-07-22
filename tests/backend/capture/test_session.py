@@ -56,3 +56,11 @@ def test_stop_sets_flag():
     assert s.stop_flag["stop"] is False
     s.stop()
     assert s.stop_flag["stop"] is True
+
+
+def test_kicad_incomplete_until_all_its_needs_land():
+    s = _session([R.KICAD_SYMBOL, R.KICAD_FOOTPRINT])
+    s.record([R.KICAD_SYMBOL], Path("/a"))
+    assert not s.kicad_complete()  # footprint still missing
+    s.record([R.KICAD_FOOTPRINT], Path("/b"))
+    assert s.kicad_complete()

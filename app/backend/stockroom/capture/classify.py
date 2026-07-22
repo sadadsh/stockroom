@@ -65,6 +65,9 @@ def _tool_for_reqs(reqs: set[Requirement]) -> str:
     if not reqs:
         return "unknown"
     tools = {_TOOL_FOR_REQ[r] for r in reqs}
+    # A lone 3D model is "shared" whether loose or zipped (consistency with the loose path).
+    if tools == {"shared"}:
+        return "shared"
     if tools <= {"kicad", "shared"}:
         return "kicad"
     if tools == {"altium"}:

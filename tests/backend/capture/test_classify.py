@@ -69,3 +69,26 @@ def test_bad_zip_is_unknown(tmp_path):
     z.write_bytes(b"not a zip")
     c = classify_asset(z)
     assert c.tool == "unknown" and c.kind == "zip" and c.requirements == frozenset()
+
+
+def test_model_only_zip_is_shared_like_loose(tmp_path):
+    z = tmp_path / "m.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("a.step", "x")
+    # a lone 3D model classifies the same whether loose or zipped
+    assert classify_asset(z).tool == "shared"
+    assert classify_asset(Path("a.step")).tool == "shared"
+
+
+def test_valid_zip_all_unknown_is_unknown(tmp_path):
+    z = tmp_path / "u.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("README.txt", "hi")
+    c = classify_asset(z)
+    assert c.tool == "unknown" and c.kind == "zip" and c.requirements == frozenset()
+
+
+def test_loose_legacy_lib_symbol_and_wrl_model():
+    assert classify_asset(Path("x.lib")).tool == "kicad"
+    assert classify_asset(Path("x.lib")).requirements == frozenset({Requirement.KICAD_SYMBOL})
+    assert classify_asset(Path("x.wrl")).requirements == frozenset({Requirement.KICAD_MODEL})
