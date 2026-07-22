@@ -6,7 +6,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/201/1/1043.pdf"
   },
   "description": "Cylindrical Battery Contacts, Clips, Holders & Springs",
-  "display_name": "1043 Holder for 18650",
+  "display_name": "1043 Keystone",
   "enrichment": {},
   "footprint": {
     "lib": "MyFootprints",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:07:01.101438+00:00",
+      "part_number": "534-1043",
       "price_breaks": [
         {
           "price": 2.99,
@@ -60,16 +60,21 @@
           "qty": 5000
         }
       ],
-      "stock": 9773,
-      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043",
+      "stock": 9254,
+      "url": "https://www.mouser.com/en/ProductDetail/Keystone-Electronics/1043?qs=%2F7TOpeL5Mz6j%2FnxeOA1rsg%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Battery Cell Size": "18650",
     "Brand": "Keystone Electronics",
     "Contact Plating": "Gold",
-    "Factory Pack Quantity: Factory Pack Quantity": "100",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "United States",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "100",
+    "Lifecycle": "Active",
     "Manufacturer": "Keystone Electronics",
     "Mounting Style": "Snap In",
     "Number of Batteries": "1 Battery",
@@ -80,6 +85,7 @@
     "RoHS": "Details",
     "Subcategory": "Battery",
     "Type": "Tray",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.509684 oz"
   },
   "symbol": null,
