@@ -259,7 +259,7 @@ export function DetailPanel({
         <div className="flex min-w-0 flex-col gap-[22px]">
           <div className="flex flex-1 flex-col overflow-hidden rounded-card border border-line bg-raise shadow-card">
             <div className="px-[18px] py-[15px]">
-              <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
+              <div className="mb-3 text-lg font-semibold tracking-[-0.014em] text-t1">
                 Overview
               </div>
               <DataRow
@@ -298,7 +298,7 @@ export function DetailPanel({
               />
             </div>
             <div className="mt-auto border-t border-line px-[18px] py-[15px]">
-              <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
+              <div className="mb-3 text-lg font-semibold tracking-[-0.014em] text-t1">
                 Sourcing
               </div>
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
@@ -696,7 +696,7 @@ function SectionLabel({
   return (
     <div className={"mb-3 flex items-center gap-2.5 " + (className ?? "")}>
       <span className="h-3.5 w-[3px] flex-none rounded-full bg-acc" aria-hidden="true" />
-      <span className="text-[12.5px] font-semibold tracking-tight text-t2">{children}</span>
+      <span className="text-sm font-semibold tracking-tight text-t2">{children}</span>
     </div>
   );
 }
@@ -984,7 +984,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
   return (
     <>
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-[15px] font-semibold tracking-[-0.014em] text-t1">
+        <span className="text-lg font-semibold tracking-[-0.014em] text-t1">
           Specifications
         </span>
         <span className="tnum font-mono text-xs text-t3">{count}</span>
@@ -1003,8 +1003,8 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
             <div>
               {group.rows.map((row) => (
                 <div key={row.key} className="border-b border-line py-[7px] last:border-0">
-                  <div className="text-[11px] text-t3">{row.label}</div>
-                  <div className="tnum mt-0.5 break-words font-mono text-[12.5px] leading-snug text-t1">
+                  <div className="text-xs text-t3">{row.label}</div>
+                  <div className="tnum mt-0.5 break-words font-mono text-sm leading-snug text-t1">
                     {row.unit ? `${row.value} ${row.unit}` : row.value}
                   </div>
                 </div>
@@ -1050,10 +1050,10 @@ function Sourcing({
             <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[12.5px] font-semibold text-t1">{name}</span>
+                <span className="text-sm font-semibold text-t1">{name}</span>
                 {isBest ? (
                   <span
-                    className="rounded-control px-1.5 py-0.5 text-[9.5px] font-bold"
+                    className="rounded-control px-1.5 py-0.5 text-2xs font-bold"
                     style={{
                       color: "var(--c-ok)",
                       background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
@@ -1064,7 +1064,7 @@ function Sourcing({
                 ) : null}
               </div>
               {p.part_number ? (
-                <div className="tnum mt-0.5 truncate font-mono text-[10.5px] text-t3">
+                <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
                   {p.part_number}
                 </div>
               ) : null}
@@ -1082,7 +1082,7 @@ function Sourcing({
             </div>
             <div className="flex items-center justify-end gap-2.5">
               {unit ? (
-                <span className="tnum font-mono text-[13.5px] font-semibold text-t1">
+                <span className="tnum font-mono text-base font-semibold text-t1">
                   {formatPrice(unit.price, p.currency)}
                 </span>
               ) : null}
@@ -1099,7 +1099,7 @@ function Sourcing({
             </div>
             {breaks.length > 1 ? (
               <div className="mt-3">
-                <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-t3">
+                <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.05em] text-t3">
                   Volume Pricing
                 </div>
                 {/* the qty-1 unit price is already shown next to the stock above, so the ladder

@@ -63,7 +63,7 @@ export function Finder({
           className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
         {onOpenSearch ? (
-          <kbd className="mr-0.5 flex-none rounded-control border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-[10px] font-medium text-t2">
+          <kbd className="mr-0.5 flex-none rounded-control border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-2xs font-medium text-t2">
             Ctrl K
           </kbd>
         ) : null}
@@ -84,7 +84,7 @@ export function Finder({
             <path d="M3 5h18M6 12h12M10 19h4" strokeLinecap="round" />
           </svg>
           {activeFilters > 0 ? (
-            <span className="rounded-full bg-acc px-1.5 text-[9px] font-bold leading-[14px] text-acc-on">
+            <span className="rounded-full bg-acc px-1.5 text-2xs font-bold leading-[14px] text-acc-on">
               {activeFilters}
             </span>
           ) : null}
@@ -98,7 +98,7 @@ export function Finder({
             <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
               <span
                 className={
-                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-[11px] " +
+                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
                   (completeOnly
                     ? "border-acc bg-acc text-acc-on"
                     : "border-line2 text-transparent")
@@ -121,7 +121,7 @@ export function Finder({
               <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
                 <span
                   className={
-                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-[11px] " +
+                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
                     (duplicatesOnly
                       ? "border-acc bg-acc text-acc-on"
                       : "border-line2 text-transparent")
