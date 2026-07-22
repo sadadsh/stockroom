@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { api } from "../api/client";
 import type { PartDetail } from "../api/types";
 import { ThemeProvider } from "../lib/theme";
+import { ToastProvider } from "../lib/toast";
 import { DetailPanel } from "./DetailPanel";
 
 // The Files cards fetch live SVG thumbnails; mock the previews so nothing hits network.
@@ -62,7 +63,9 @@ function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <ThemeProvider>{ui}</ThemeProvider>
+      <ThemeProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }

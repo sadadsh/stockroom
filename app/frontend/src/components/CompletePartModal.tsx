@@ -7,10 +7,12 @@
  * at once. Applying a row routes to the same seams the detail already uses (attach / edit-field /
  * CAD download), so the record stays the single source of truth and the rows refresh as it does.
  */
-import { useMemo, useState } from "react";
-import type { PartDetail } from "../api/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
+import type { PartDetail, Requirement } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
-import { useCadDownload, type CadDownloadStatus } from "../lib/useCadDownload";
+import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
+import { useToast } from "../lib/toast";
 import { Button } from "./primitives";
 import { DownloadIcon } from "./icons";
 
@@ -30,21 +32,123 @@ const CheckMark = () => (
   </svg>
 );
 
-function cadLabel(status: CadDownloadStatus): string {
+// A soft progress meter that fills as received/needs grows (the "feel-good" fill).
+function CaptureMeter({ received, total }: { received: number; total: number }) {
+  const pct = total ? Math.round((received / total) * 100) : 0;
+  return (
+    <div
+      className="flex flex-none items-center gap-2 pt-0.5"
+      role="progressbar"
+      aria-valuenow={received}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuetext={`${received} of ${total} files received`}
+    >
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-raise2">
+        <motion.div
+          className="h-full rounded-full bg-ok"
+          initial={false}
+          animate={{ width: `${pct}%` }}
+          transition={{ type: "spring", stiffness: 220, damping: 28 }}
+        />
+      </div>
+      <span className="tnum whitespace-nowrap font-mono text-2xs text-t3">
+        {received}/{total}
+      </span>
+    </div>
+  );
+}
+
+// The both-format checklist: KiCad and Altium groups, only the needed rows, each
+// flipping waiting -> received with a confirming settle.
+function CaptureChecklist({
+  needs,
+  received,
+}: {
+  needs: Requirement[];
+  received: Partial<Record<Requirement, boolean>>;
+}) {
+  const groups = [
+    { name: "KiCad", rows: KICAD_ROWS.filter((r) => needs.includes(r.req)) },
+    { name: "Altium", rows: ALTIUM_ROWS.filter((r) => needs.includes(r.req)) },
+  ].filter((g) => g.rows.length > 0);
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((g) => (
+        <div key={g.name}>
+          <div className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-t3">
+            {g.name}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {g.rows.map((r) => (
+              <CaptureRow key={r.req} label={r.label} done={!!received[r.req]} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CaptureRow({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5" data-received={done}>
+      <motion.span
+        className={
+          "grid h-4 w-4 flex-none place-items-center rounded-full " +
+          (done ? "bg-ok text-white" : "border-[1.5px] border-line2 text-transparent")
+        }
+        initial={false}
+        animate={done ? { scale: [1, 1.28, 1] } : { scale: 1 }}
+        transition={{ duration: 0.34, ease: "easeOut" }}
+      >
+        <CheckMark />
+      </motion.span>
+      <span className={"flex-1 text-sm " + (done ? "text-t2" : "text-t1")}>{label}</span>
+      <span className={"text-xs " + (done ? "font-medium text-ok" : "text-t3")}>
+        {done ? "Received" : "Waiting"}
+      </span>
+    </div>
+  );
+}
+
+function cadLabel(status: GuidedStatus): string {
   switch (status) {
-    case "waiting":
-      return "Waiting for the Download...";
-    case "inspecting":
-      return "Inspecting...";
-    case "committing":
+    case "resolving":
+      return "Looking Up...";
+    case "window-open":
+    case "receiving":
+      return "Waiting For Files...";
+    case "attaching":
       return "Attaching...";
+    case "timed-out":
     case "unavailable":
     case "error":
       return "Try Again";
     default:
-      return "Get Files From DigiKey";
+      return "Get CAD Files (KiCad + Altium)";
   }
 }
+
+// Checklist row layout, per tool. Only the rows a part actually needs render.
+const KICAD_ROWS = [
+  { req: "kicad_symbol", label: "Symbol" },
+  { req: "kicad_footprint", label: "Footprint" },
+  { req: "kicad_model", label: "3D Model" },
+] as const;
+const ALTIUM_ROWS = [
+  { req: "altium_symbol", label: "Symbol" },
+  { req: "altium_footprint", label: "Footprint" },
+] as const;
+
+// Sentence-case toast copy fired as each requirement lands (body prose, not a label).
+const REQ_TOAST: Record<Requirement, string> = {
+  kicad_symbol: "KiCad symbol received",
+  kicad_footprint: "KiCad footprint received",
+  kicad_model: "KiCad 3D model received",
+  altium_symbol: "Altium symbol received",
+  altium_footprint: "Altium footprint received",
+};
 
 function pickIngestFiles(): Promise<string[]> | null {
   const hostApi = (
@@ -67,14 +171,31 @@ export function CompletePartModal({
   const hasSymbol = !!detail.symbol?.name;
   const hasFootprint = !!detail.footprint?.name;
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
-  const anyCadMissing = !hasSymbol || !hasFootprint || !hasModel;
 
-  const cadSource = useCadSourceQuery(detail.id, anyCadMissing);
-  const download = useCadDownload(detail.id);
+  // The guided capture flow: resolve the part's needs (KiCad + Altium), open the
+  // guided window, and fill the checklist as each file lands. The needs come from
+  // the cad-source query up front so the checklist renders before start().
+  const cadSource = useCadSourceQuery(detail.id, true);
+  const download = useGuidedCapture(detail.id);
+  const { toast } = useToast();
+  const needs: Requirement[] = download.needs.length ? download.needs : cadSource.data?.needs ?? [];
+  const receivedCount = needs.filter((n) => download.received[n]).length;
+  const showCad = needs.length > 0;
   const cadBusy =
-    download.status === "waiting" ||
-    download.status === "inspecting" ||
-    download.status === "committing";
+    download.status === "resolving" ||
+    download.status === "window-open" ||
+    download.status === "receiving" ||
+    download.status === "attaching";
+
+  // Feel-good validation: toast each requirement the moment it flips to received.
+  const prevReceived = useRef<Partial<Record<Requirement, boolean>>>({});
+  useEffect(() => {
+    const rec = download.received;
+    (Object.keys(rec) as Requirement[]).forEach((req) => {
+      if (rec[req] && !prevReceived.current[req]) toast(REQ_TOAST[req], "ok");
+    });
+    prevReceived.current = { ...rec };
+  }, [download.received, toast]);
 
   async function browse() {
     const picked = pickIngestFiles();
@@ -136,31 +257,48 @@ export function CompletePartModal({
         </div>
 
         <div className="max-h-[68vh] overflow-y-auto px-5 py-4">
-          {/* CAD files (symbol / footprint / 3D model) in one step: pull all three from DigiKey
-              when a source resolves for the MPN, and always allow dropping a vendor ZIP. Shown
-              whenever any CAD asset is still missing. */}
-          {anyCadMissing ? (
-            <div className="mb-4 rounded-control border border-line2 bg-field p-3.5">
-              <div className="text-sm font-semibold text-t1">Add CAD files</div>
-              <p className={"mt-1 text-xs " + (download.status === "error" ? "text-err" : "text-t3")}>
-                {download.message ??
-                  "Pull the symbol, footprint, and 3D model from DigiKey, or drop a vendor ZIP (SnapEDA, Ultra Librarian)."}
-              </p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {cadSource.data?.url ? (
-                  <Button
-                    variant="accent"
-                    small
-                    icon={<DownloadIcon className="h-3.5 w-3.5" />}
-                    disabled={cadBusy}
-                    onClick={() => void download.start()}
+          {/* Guided capture: get BOTH the KiCad and the Altium assets in one pass. The
+              checklist fills live as each file lands, with a progress meter and per-row
+              validation. Shown whenever the part is missing any CAD or Altium asset. */}
+          {showCad ? (
+            <div className="mb-4 overflow-hidden rounded-control border border-line2 bg-field">
+              <div className="flex items-start justify-between gap-3 border-b border-line px-3.5 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-t1">CAD Files</div>
+                  <p
+                    className={
+                      "mt-0.5 text-xs " +
+                      (download.status === "error"
+                        ? "text-err"
+                        : download.status === "timed-out"
+                          ? "text-warn"
+                          : "text-t3")
+                    }
                   >
-                    {cadLabel(download.status)}
+                    {download.message ??
+                      `Get both the KiCad and Altium assets from ${cadSource.data?.vendor ?? "the vendor"} in one pass.`}
+                  </p>
+                </div>
+                <CaptureMeter received={receivedCount} total={needs.length} />
+              </div>
+              <div className="px-3.5 py-3">
+                <CaptureChecklist needs={needs} received={download.received} />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {cadSource.data?.url ? (
+                    <Button
+                      variant="accent"
+                      small
+                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
+                      disabled={cadBusy}
+                      onClick={() => void download.start()}
+                    >
+                      {cadLabel(download.status)}
+                    </Button>
+                  ) : null}
+                  <Button small disabled={cadBusy} onClick={() => void browse()}>
+                    Browse For Files
                   </Button>
-                ) : null}
-                <Button small disabled={cadBusy} onClick={() => void browse()}>
-                  Browse for ZIP
-                </Button>
+                </div>
               </div>
             </div>
           ) : null}
@@ -246,7 +384,7 @@ function Requirement({
         {req.present ? (
           <span className="text-xs text-t3">Added</span>
         ) : req.kind === "cad-only" ? (
-          <span className="text-xs text-t3">From DigiKey or a ZIP</span>
+          <span className="text-xs text-t3">From the CAD files above</span>
         ) : editable ? (
           <button
             type="button"

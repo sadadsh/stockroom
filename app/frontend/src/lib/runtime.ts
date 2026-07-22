@@ -15,11 +15,13 @@ declare global {
     // The WebView2 host forwards native drag-drop file paths through this hook
     // (registered by AppShell); a plain browser drop cannot see filesystem paths.
     __STOCKROOM_NATIVE_DROP__?: (paths: string[]) => void;
-    // The host's CAD-download capture (Phase-2 asset download, spec section 5) hands
-    // the captured ZIP's local path through this one-shot hook (registered by
-    // useCadDownload for the duration of one start() call); a plain browser never
-    // calls it, so the caller falls back to the manual ZIP picker.
-    __STOCKROOM_CAD_DOWNLOAD__?: (path: string) => void;
+    // The host's guided capture forwards a captured asset (or a timeout signal)
+    // through this hook (registered by useGuidedCapture while a capture is live).
+    // Legacy: a bare path string; new: a CaptureForward object carrying the session
+    // token + the requirements the file satisfies. A plain browser never calls it.
+    __STOCKROOM_CAD_DOWNLOAD__?: (
+      payload: import("./useGuidedCapture").CaptureForward | string,
+    ) => void;
   }
 }
 

@@ -377,10 +377,21 @@ export interface JobRef {
 // 5). `url` is the DigiKey product-detail page hosting the Ultra Librarian / SnapEDA CAD
 // download for the part's MPN, or null when the part has no MPN, DigiKey enrichment is
 // disabled, or nothing resolved - a resolvable 200 either way, never an error.
+// The KiCad + Altium asset types a part can still need. Mirrors the backend
+// stockroom.capture.requirements.Requirement enum values exactly (the wire contract).
+export type Requirement =
+  | "kicad_symbol"
+  | "kicad_footprint"
+  | "kicad_model"
+  | "altium_symbol"
+  | "altium_footprint";
+
 export interface CadSourceResponse {
   url: string | null;
   mpn: string;
   vendor: string;
+  // The requirements this part is missing, so the guided checklist knows what to fill.
+  needs: Requirement[];
 }
 
 // Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
