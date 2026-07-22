@@ -19,6 +19,7 @@ from stockroom.model.spec_hygiene import normalize_specs
 # part even without Stockroom (spec section 3). Maps record-derived value ->
 # KiCad property name; the actual value extraction lives in mutation/placement.
 KICAD_MIRROR_FIELDS: tuple[str, ...] = (
+    "Value",
     "MPN",
     "Manufacturer",
     "Datasheet",
@@ -137,6 +138,10 @@ class PartRecord:
     tags: list[str] = field(default_factory=list)
     mpn: str = ""
     manufacturer: str = ""
+    # The component Value shown on a schematic + in a BOM (e.g. "10k", "1µF" for a
+    # passive; the MPN for an active). Mirrored to the symbol's Value property so a
+    # placed part is self-describing. Derived on rebuild (ingest/component_naming).
+    value: str = ""
     # A passive (R/C/L) references KiCad STOCK symbol/footprint/3D by lib_id rather
     # than owning copied asset files (the generic package is already in KiCad). The
     # completion gate is relaxed accordingly: a passive needs no owned 3D model, and
@@ -173,6 +178,7 @@ class PartRecord:
             "tags": list(self.tags),
             "mpn": self.mpn,
             "manufacturer": self.manufacturer,
+            "value": self.value,
             "passive": self.passive,
             "datasheet": asdict(self.datasheet) if self.datasheet else None,
             "purchase": [asdict(p) for p in self.purchase],
@@ -195,6 +201,7 @@ class PartRecord:
             tags=list(d.get("tags", [])),
             mpn=d.get("mpn", ""),
             manufacturer=d.get("manufacturer", ""),
+            value=d.get("value", ""),
             passive=bool(d.get("passive", False)),
             datasheet=Datasheet(**d["datasheet"]) if d.get("datasheet") else None,
             purchase=[Purchase(**p) for p in d.get("purchase", [])],
