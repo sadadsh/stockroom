@@ -174,13 +174,16 @@ def _resolve_digikey_url(mpn: str):
     """Resolve a real DigiKey product-detail URL for an MPN via the app's DigiKey resolver +
     configured creds, so the live check opens the same page the guided window would."""
     try:
-        from stockroom.api.context import build_context
-        from stockroom.api.routers.library import build_refresh_adapters
         from stockroom.enrich.cad_source import resolve_digikey_cad_source
+        from stockroom.enrich.digikey_api import DigiKeyAdapter
+        from stockroom.store.machine_config import MachineConfig
 
-        ctx = build_context()
-        dk = next((a for a in build_refresh_adapters(ctx) if getattr(a, "vendor", "") == "DigiKey"), None)
-        return resolve_digikey_cad_source(mpn, dk) if dk is not None else None
+        cfg = MachineConfig.load()
+        if not (cfg.digikey_client_id and cfg.digikey_client_secret):
+            print("RESOLVE: no DigiKey API creds in config")
+            return None
+        dk = DigiKeyAdapter(cfg.digikey_client_id, cfg.digikey_client_secret)
+        return resolve_digikey_cad_source(mpn, dk)
     except Exception as e:  # noqa: BLE001
         print("RESOLVE_ERROR", repr(e))
         return None
