@@ -7,6 +7,8 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
+from stockroom.ingest.component_naming import derive_value
+
 ALTIUM_COLUMNS: list[str] = [
     "MPN", "Library Ref", "Library Path", "Footprint Ref", "Footprint Path",
     "Value", "Manufacturer", "Description",
@@ -53,7 +55,10 @@ def row_for(record) -> dict[str, str]:
         "Library Path": (sym.lib if sym else "") or "",
         "Footprint Ref": (fp.name if fp else "") or "",
         "Footprint Path": (fp.lib if fp else "") or "",
-        "Value": record.value or "",
+        # A persisted record.value wins; otherwise derive it (a passive's parametric value, an
+        # active's MPN). Nothing in the real pipeline persists value yet, so deriving here is what
+        # makes the Value column populate + keeps the emitter independent of that field.
+        "Value": record.value or derive_value(record),
         "Manufacturer": record.manufacturer or "",
         "Description": record.description or "",
         "ComponentLink1Description": "Datasheet" if _datasheet_url(record) else "",
