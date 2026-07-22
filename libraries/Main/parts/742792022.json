@@ -5,8 +5,8 @@
     "file": "",
     "source_url": "https://www.we-online.com/components/products/datasheet/742792022.pdf"
   },
-  "description": "Ferrite Beads",
-  "display_name": "220",
+  "description": "Ferrite bead, small symbol",
+  "display_name": "220 25% 0805 Wurth 742792022",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:08:17.755937+00:00",
+      "part_number": "710-742792022",
       "price_breaks": [
         {
           "price": 0.16,
@@ -68,22 +68,28 @@
           "qty": 4000
         }
       ],
-      "stock": 145767,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022",
+      "stock": 145081,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/742792022?qs=5twSNpOB8IBksnQcn3fDWA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Not available",
     "Brand": "Wurth Elektronik",
-    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "4000",
     "Height": "0.9 mm",
     "Impedance": "220 Ohms",
     "Length": "2 mm",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum DC Current": "2 A",
     "Maximum DC Resistance": "50 mOhms",
     "Maximum Operating Temperature": "+ 125 C",
     "Minimum Operating Temperature": "- 55 C",
+    "Package": "0805 (2012 metric)",
     "Packaging": "Reel",
     "Product": "Ferrite Chip Beads",
     "Product Category": "Ferrite Beads",
@@ -94,8 +100,9 @@
     "Subcategory": "Ferrites",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 MHz",
-    "Tolerance": "25 %",
+    "Tolerance": "25%",
     "Type": "SMD EMI Suppression Ferrite Bead WE-CBF",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000194 oz",
     "Width": "1.2 mm"
   },
