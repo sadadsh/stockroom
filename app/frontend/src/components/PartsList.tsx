@@ -77,7 +77,7 @@ export function RowThumbnail({ id, category }: { id: string; category: string })
   return (
     <span
       ref={ref}
-      className="flex h-[30px] w-[30px] flex-none items-center justify-center overflow-hidden rounded-[7px] border border-line bg-field"
+      className="flex h-[30px] w-[30px] flex-none items-center justify-center overflow-hidden rounded-control border border-line bg-field"
     >
       {thumb ? (
         <img src={thumb} alt="" className="h-full w-full object-contain" />

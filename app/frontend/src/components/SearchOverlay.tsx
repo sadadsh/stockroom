@@ -146,7 +146,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
       {/* top: the query field + a close affordance */}
       <div className="flex-none px-6 pt-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-[13px] border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
+          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-control border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
             <SearchIcon className="h-5 w-5 flex-none text-t3" />
             <input
               ref={inputRef}
@@ -173,7 +173,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             className="flex h-[52px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-4 text-sm font-semibold text-t2 shadow-card hover:border-line2 hover:text-t1"
           >
             Close
-            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2">
+            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2">
               Esc
             </kbd>
           </button>
@@ -263,7 +263,7 @@ function KbdHint({ keys, label }: { keys: string[]; label: string }) {
       {keys.map((k) => (
         <kbd
           key={k}
-          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2"
+          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2"
         >
           {k}
         </kbd>
@@ -387,7 +387,7 @@ function SortControl({
                     setOpen(false);
                   }}
                   className={
-                    "flex w-full items-center justify-between rounded-[6px] px-2.5 py-1.5 text-left text-sm " +
+                    "flex w-full items-center justify-between rounded-control px-2.5 py-1.5 text-left text-sm " +
                     (on ? "bg-raise2 font-semibold text-t1" : "text-t2 hover:bg-raise2 hover:text-t1")
                   }
                 >
@@ -582,7 +582,7 @@ function OptionRow({
     >
       <span
         className={
-          "grid h-4 w-4 flex-none place-items-center rounded-[5px] border-[1.5px] " +
+          "grid h-4 w-4 flex-none place-items-center rounded-control border-[1.5px] " +
           (on ? "border-acc bg-acc text-acc-on" : "border-line2 bg-field text-transparent")
         }
       >
@@ -861,7 +861,7 @@ function Lifecycle({ specs }: { specs: Record<string, string | number | boolean>
   const isActive = /active/i.test(raw);
   return (
     <span
-      className="inline-flex rounded-[6px] px-2 py-0.5 text-[11px] font-semibold"
+      className="inline-flex rounded-control px-2 py-0.5 text-[11px] font-semibold"
       style={
         isActive
           ? { color: "var(--c-ok)", background: "color-mix(in srgb, var(--c-ok) 16%, transparent)" }

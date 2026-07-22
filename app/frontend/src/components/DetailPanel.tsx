@@ -656,7 +656,7 @@ function EdaBadge({ label, readiness }: { label: string; readiness: AssetReadine
         <div className="mb-2.5 flex items-center gap-2">
           <span className="text-sm font-semibold text-t1">{label}</span>
           <span
-            className="ml-auto rounded px-2 py-0.5 text-2xs font-bold"
+            className="ml-auto rounded-control px-2 py-0.5 text-2xs font-bold"
             style={{ color: tone, background: `color-mix(in srgb, ${tone} 16%, transparent)` }}
           >
             {readiness.ready ? "Complete" : `${okCount} of 3`}
@@ -995,7 +995,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
         {groups.map((group) => (
           <div
             key={group.title}
-            className="flex h-full flex-col rounded-[10px] border border-line bg-field px-4 py-3.5"
+            className="flex h-full flex-col rounded-card border border-line bg-field px-4 py-3.5"
           >
             <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
               {group.title}
@@ -1053,7 +1053,7 @@ function Sourcing({
                 <span className="text-[12.5px] font-semibold text-t1">{name}</span>
                 {isBest ? (
                   <span
-                    className="rounded px-1.5 py-0.5 text-[9.5px] font-bold"
+                    className="rounded-control px-1.5 py-0.5 text-[9.5px] font-bold"
                     style={{
                       color: "var(--c-ok)",
                       background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",

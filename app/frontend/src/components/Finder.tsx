@@ -63,7 +63,7 @@ export function Finder({
           className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
         {onOpenSearch ? (
-          <kbd className="mr-0.5 flex-none rounded border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-[10px] font-medium text-t2">
+          <kbd className="mr-0.5 flex-none rounded-control border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-[10px] font-medium text-t2">
             Ctrl K
           </kbd>
         ) : null}
@@ -71,7 +71,7 @@ export function Finder({
           type="button"
           aria-label="Filters"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-[5px] p-1.5 text-t3 hover:bg-raise2 hover:text-t1"
+          className="inline-flex items-center gap-1.5 rounded-control p-1.5 text-t3 hover:bg-raise2 hover:text-t1"
         >
           <svg
             width="15"
@@ -98,7 +98,7 @@ export function Finder({
             <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
               <span
                 className={
-                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px] text-[11px] " +
+                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-[11px] " +
                   (completeOnly
                     ? "border-acc bg-acc text-acc-on"
                     : "border-line2 text-transparent")
@@ -121,7 +121,7 @@ export function Finder({
               <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
                 <span
                   className={
-                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-[5px] border-[1.5px] text-[11px] " +
+                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-[11px] " +
                     (duplicatesOnly
                       ? "border-acc bg-acc text-acc-on"
                       : "border-line2 text-transparent")
@@ -187,7 +187,7 @@ function FacetRow({
       type="button"
       onClick={onClick}
       className={
-        "flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left text-sm " +
+        "flex w-full items-center gap-2.5 rounded-control px-1.5 py-1.5 text-left text-sm " +
         (active ? "bg-raise text-t1" : "text-t2 hover:bg-raise")
       }
     >
