@@ -29,3 +29,19 @@ def test_regenerate_emits_only_place_ready(library_ops):
     ws = load_workbook(result["xlsx"])["Parts"]
     mpns = [row[0].value for row in ws.iter_rows(min_row=2)]
     assert mpns == ["AAA"]
+
+
+def test_regenerate_is_idempotent(library_ops):
+    """Regenerate runs on every data refresh; an unchanged .DbLib must not crash on an
+    empty commit or spawn a noisy empty commit (GitRepo.commit no-ops on an empty diff)."""
+    ops = library_ops
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
+
+    first = ops.regenerate_altium_dblib()
+    head_after_first = ops.repo.head()
+    second = ops.regenerate_altium_dblib()  # identical content
+
+    assert second["emitted"] == 1
+    assert ops.repo.head() == head_after_first  # no new (empty) commit
+    assert second["dblib"].exists()
