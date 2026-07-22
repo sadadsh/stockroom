@@ -672,6 +672,7 @@ function VendorLogin({
           className={INPUT_CLS}
         />
         <Button
+          className="min-w-[176px] justify-center"
           onClick={() => onSave(username.trim(), password)}
           disabled={pending || (!username.trim() && !password)}
         >
