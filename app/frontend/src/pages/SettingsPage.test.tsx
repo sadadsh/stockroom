@@ -41,6 +41,12 @@ const BASE_SETTINGS: SettingsInfo = {
   mouser_api_key_hint: "",
   github_token_set: false,
   github_token_hint: "",
+  ul_username: "",
+  ul_password_set: false,
+  ul_password_hint: "",
+  snapeda_username: "",
+  snapeda_password_set: false,
+  snapeda_password_hint: "",
   kicad_config_override: "",
   kicad_cli_override: "",
   kicad_config_dir: "/home/x/.config/kicad/10.0",
@@ -399,5 +405,31 @@ describe("SettingsPage — KiCad wiring", () => {
     await waitFor(() => expect(mockApi.wireKicad).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Registered 2 categories/)).toBeInTheDocument();
     expect(screen.getByText(/Restart KiCad to load the updated tables\./)).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPage - vendor logins", () => {
+  it("saves the Ultra Librarian username and password", async () => {
+    const user = userEvent.setup();
+    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
+    renderPage();
+    await screen.findByText("Vendor Logins");
+    await user.type(screen.getByLabelText("Ultra Librarian Username"), "me@x.com");
+    await user.type(screen.getByLabelText("Ultra Librarian Password"), "secret");
+    await user.click(
+      screen.getByRole("button", { name: "Save Ultra Librarian Login" }),
+    );
+    expect(mockApi.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ ul_username: "me@x.com", ul_password: "secret" }),
+    );
+  });
+
+  it("renders the password input as type password", async () => {
+    renderPage();
+    await screen.findByText("Vendor Logins");
+    expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute(
+      "type",
+      "password",
+    );
   });
 });
