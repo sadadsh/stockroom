@@ -8,6 +8,25 @@ from stockroom.vcs.repo import GitRepo
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
 
+def _rmtree_force(path):
+    """rmtree that tolerates Windows read-only .git object files: git marks packed/loose objects
+    read-only, so a plain rmtree raises WinError 5 (Access is denied) on Windows. Make every entry
+    writable first, then remove. A no-op difference on POSIX."""
+    import os
+    import stat
+
+    for root, dirs, files in os.walk(path):
+        for name in dirs + files:
+            p = os.path.join(root, name)
+            try:
+                # ADD write (never replace the mode): a bare S_IWRITE on a directory drops its
+                # read/execute bits and makes it non-traversable, so deletion then fails.
+                os.chmod(p, os.stat(p).st_mode | stat.S_IWRITE)
+            except OSError:
+                pass
+    shutil.rmtree(path)
+
+
 def _origin_and_clone(tmp_path):
     origin = tmp_path / "origin"
     origin.mkdir()
@@ -104,10 +123,8 @@ def test_check_fetches_so_a_fresh_remote_commit_is_seen(tmp_path):
 
 
 def test_check_reports_an_unreachable_remote_honestly(tmp_path):
-    import shutil as _shutil
-
     o, origin, c, clone = _origin_and_clone(tmp_path)
-    _shutil.rmtree(origin)  # the remote cannot be fetched anymore
+    _rmtree_force(origin)  # the remote cannot be fetched anymore (Windows-safe: git objects are RO)
     info = AppUpdater(c, uv_runner=lambda: None, restart=lambda: None).check()
     assert info["update_available"] is False
     assert info["state"] == UpdateState.OFFLINE

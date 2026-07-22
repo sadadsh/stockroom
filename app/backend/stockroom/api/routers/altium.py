@@ -60,8 +60,10 @@ def altium_router(require_token) -> APIRouter:
         altium_dir = parts_dir.parent / "altium"
         return {
             "profile": ctx.profile.name,
-            "dblib": str(altium_dir / "Stockroom.DbLib"),
-            "dblib_dir": str(altium_dir),
+            # .as_posix() (never str(Path)) so the path reads the same on Windows and Linux
+            # (backslashes would break a "/altium/..." consumer and the test); repo display rule.
+            "dblib": (altium_dir / "Stockroom.DbLib").as_posix(),
+            "dblib_dir": altium_dir.as_posix(),
             "ready": sum(1 for x in rows if x["ready"]),
             "total": len(rows),
             # not-ready first (the ones needing attention), then by name
@@ -77,7 +79,7 @@ def altium_router(require_token) -> APIRouter:
         return {
             "emitted": result["emitted"],
             "skipped": result["skipped"],
-            "dblib": str(result["dblib"]),
+            "dblib": Path(result["dblib"]).as_posix(),
         }
 
     @r.post("/parts/{part_id}/attach")
