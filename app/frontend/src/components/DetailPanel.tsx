@@ -31,7 +31,7 @@ import {
   UploadIcon,
   WarnIcon,
 } from "./icons";
-import { Field, Panel } from "./primitives";
+import { Panel } from "./primitives";
 
 // Spec presentation (grouping into Electrical / Physical / Ratings / Other, hidden-key and
 // empty-value filtering, value+unit split) lives in lib/specSchema, shared with the parametric
@@ -995,15 +995,18 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
       <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
         {groups.map((group) => (
           <Panel inset key={group.title} title={group.title} className="flex h-full flex-col">
-            {group.rows.map((row) => (
-              <Field
-                key={row.key}
-                stacked
-                mono
-                label={row.label}
-                value={row.unit ? `${row.value} ${row.unit}` : row.value}
-              />
-            ))}
+            <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1">
+              {group.rows.map((row) => (
+                <div key={row.key} className="col-span-2 grid grid-cols-subgrid items-baseline">
+                  <dt className="truncate text-xs text-t3" title={typeof row.label === "string" ? row.label : undefined}>
+                    {row.label}
+                  </dt>
+                  <dd className="tnum text-right font-mono text-sm text-t1">
+                    {row.unit ? `${row.value} ${row.unit}` : row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </Panel>
         ))}
       </div>
