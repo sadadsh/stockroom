@@ -17,6 +17,9 @@ interface Props {
   mono?: boolean;
   disabled?: boolean;
   displayClassName?: string;
+  // Clamp the resting display to a single line with an ellipsis (for a long value like a
+  // datasheet URL that must not wrap the row); editing still opens the full field.
+  truncate?: boolean;
 }
 
 export function EditableText({
@@ -28,6 +31,7 @@ export function EditableText({
   mono = false,
   disabled = false,
   displayClassName,
+  truncate = false,
 }: Props) {
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
@@ -88,7 +92,9 @@ export function EditableText({
         (displayClassName ?? "text-base")
       }
     >
-      <span className="min-w-0 break-words">{empty ? placeholder : value}</span>
+      <span className={"min-w-0 " + (truncate ? "truncate" : "break-words")}>
+        {empty ? placeholder : value}
+      </span>
     </button>
   );
 }

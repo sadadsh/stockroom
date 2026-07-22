@@ -78,9 +78,13 @@ describe("App shell", () => {
     expect(screen.getByText("Stockroom")).toBeInTheDocument();
     expect(await screen.findByText("LM358")).toBeInTheDocument();
     expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
-    // the default route renders the Components flagship (just the Parts view now,
-    // no tab strip since BOM Coverage / Duplicates / Doctor all moved out)
-    expect(screen.queryByRole("tab")).toBeNull();
+    // the default route renders the Components flagship: no page-level tab strip
+    // (BOM Coverage / Duplicates / Doctor all moved out). The only tabs now are the
+    // selected part's workbench (Specs / Sourcing / History / ...).
+    expect(
+      screen.queryByRole("tab", { name: /BOM Coverage|Duplicates|Doctor/ }),
+    ).toBeNull();
+    expect(screen.getByRole("tab", { name: "Specs" })).toBeInTheDocument();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {

@@ -86,6 +86,52 @@ const TITLE_SKIP_KEYS: Set<string> = new Set(
   ].map(normalizeSpecKey),
 );
 
+// Spec keys that are commerce / provenance / logistics, not what the part physically IS:
+// the manufacturer, brand, series, base product number, country of origin, packaging, and
+// pack-quantity rows a distributor page carries. They are dropped from the detail spec sheet
+// so the real parametric specs are not buried under a wall of catalog metadata (the record
+// already carries the manufacturer and category as first-class fields). Normalized so any
+// casing / punctuation matches; a denylist, so a real spec the list does not name still shows.
+// This intentionally does NOT reuse TITLE_SKIP_KEYS: that set also holds real physical specs
+// (Color, Contact Material, Plating) that must never headline but DO belong in the spec sheet.
+const REFERENCE_ONLY_SPEC_KEYS: Set<string> = new Set(
+  [
+    "Manufacturer",
+    "Brand",
+    "Vendor",
+    "Supplier",
+    "Series",
+    "Base Product Number",
+    "Base Product",
+    "Country of Origin",
+    "Assembly Country of Origin",
+    "Country of Diffusion",
+    "Product",
+    "Product Type",
+    "Product Category",
+    "Subcategory",
+    "Category",
+    "ECCN",
+    "HTS Code",
+    "HTSUS",
+    "Number of Parts",
+  ].map(normalizeSpecKey),
+);
+
+// A couple of families that vary too much to enumerate (Factory Pack Quantity, Standard Pack
+// Quantity, Quantity per Reel; Base Product Number; catalog numbers) are matched by substring.
+const _REFERENCE_ONLY_RE = /pack quantity|country of origin|base product|\bcatalog\b|packaging|tariff|\bweight\b/;
+
+/**
+ * True when a spec key is catalog metadata (commerce / provenance / logistics) rather than a
+ * physical parameter, so the detail spec sheet can drop it. Exported so the one place that
+ * decides "is this a real spec to show" stays shared.
+ */
+export function isReferenceOnlySpecKey(rawKey: string): boolean {
+  const nk = normalizeSpecKey(rawKey);
+  return REFERENCE_ONLY_SPEC_KEYS.has(nk) || _REFERENCE_ONLY_RE.test(nk);
+}
+
 // The first presentable, non-hidden, DEFINING spec value in insertion order (commerce /
 // provenance / compliance keys in TITLE_SKIP_KEYS are skipped so a country or brand can
 // never headline), or null when the bag holds nothing usable. The generic title fallback
