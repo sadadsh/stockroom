@@ -99,6 +99,55 @@ def test_a_future_dated_mtime_is_treated_as_untrustworthy_and_skipped(tmp_path):
     assert watch.poll() is None
 
 
+# -- widened suffix matching: loose KiCad + Altium asset files, not just *.zip --
+
+
+def test_loose_altium_schlib_after_start_is_returned(tmp_path):
+    started_at = 1_000.0
+    schlib = tmp_path / "BQ24074.SchLib"
+    _touch(schlib, started_at + 3)
+    watch = DownloadsWatch(tmp_path, started_at, now=lambda: started_at + 10)
+    assert watch.poll() == schlib
+
+
+def test_loose_altium_pcblib_and_intlib_after_start_are_returned(tmp_path):
+    started_at = 1_000.0
+    pcblib = tmp_path / "SOIC8.PcbLib"
+    _touch(pcblib, started_at + 2)
+    watch = DownloadsWatch(tmp_path, started_at, now=lambda: started_at + 10)
+    assert watch.poll() == pcblib
+
+    intlib = tmp_path / "part.IntLib"
+    _touch(intlib, started_at + 4)
+    assert watch.poll() == intlib
+
+
+def test_loose_kicad_sym_footprint_and_model_after_start_are_returned(tmp_path):
+    started_at = 1_000.0
+    for i, name in enumerate(("a.kicad_sym", "a.kicad_mod", "a.step", "a.STP", "a.wrl"), start=1):
+        f = tmp_path / name
+        _touch(f, started_at + i)
+        watch = DownloadsWatch(tmp_path, started_at, now=lambda: started_at + 20)
+        # each poll on a fresh watch returns the newest qualifying asset so far
+        assert watch.poll() == f
+
+
+def test_a_non_asset_file_is_still_ignored(tmp_path):
+    started_at = 1_000.0
+    for name in ("notes.txt", "readme.md", "part.pdf", "image.png"):
+        _touch(tmp_path / name, started_at + 1)
+    watch = DownloadsWatch(tmp_path, started_at, now=lambda: started_at + 10)
+    assert watch.poll() is None
+
+
+def test_widened_suffix_match_is_case_insensitive(tmp_path):
+    started_at = 1_000.0
+    schlib = tmp_path / "PART.SCHLIB"
+    _touch(schlib, started_at + 1)
+    watch = DownloadsWatch(tmp_path, started_at, now=lambda: started_at + 10)
+    assert watch.poll() == schlib
+
+
 # -- DownloadsWatch.start() --
 
 
