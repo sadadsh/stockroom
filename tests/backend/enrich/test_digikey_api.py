@@ -44,6 +44,37 @@ def test_parse_maps_every_field():
     assert [(b.qty, b.price) for b in r.price_breaks] == [(1, 0.12), (10, 0.099), (100, 0.077)]
 
 
+def test_parse_captures_parameters_photo_category_and_classifications():
+    # "use literally everything the token gives us": the 14 electrical parametrics, the image,
+    # the leaf category, and the full compliance block (not just RoHS) all flow into specs.
+    product = dict(_PRODUCT)
+    product["PhotoUrl"] = "https://dk/photo.jpg"
+    product["Category"] = {"Name": "Circuit Protection"}
+    product["Series"] = {"Name": "-"}
+    product["Parameters"] = [
+        {"ParameterText": "Type", "ValueText": "Steering (Rail to Rail)"},
+        {"ParameterText": "Unidirectional Channels", "ValueText": "6"},
+        {"ParameterText": "Capacitance @ Frequency", "ValueText": "-"},  # placeholder -> skipped
+    ]
+    product["Classifications"] = {
+        "RohsStatus": "ROHS3 Compliant", "ReachStatus": "REACH Unaffected",
+        "MoistureSensitivityLevel": "1 (Unlimited)", "ExportControlClassNumber": "EAR99",
+        "HtsusCode": "8541.10.0080",
+    }
+    r = _parse_digikey_part(product)
+    assert r.specs["Type"].value == "Steering (Rail to Rail)"
+    assert r.specs["Unidirectional Channels"].value == "6"
+    assert "Capacitance @ Frequency" not in r.specs  # the "-" placeholder is not captured
+    assert r.specs["Image"].value == "https://dk/photo.jpg"
+    assert r.specs["Product Category"].value == "Circuit Protection"
+    assert "Series" not in r.specs  # a "-" series is skipped
+    assert r.specs["RoHS"].value == "ROHS3 Compliant"  # still present (existing behavior)
+    assert r.specs["REACH"].value == "REACH Unaffected"
+    assert r.specs["ECCN"].value == "EAR99"
+    assert r.specs["Moisture Sensitivity Level"].value == "1 (Unlimited)"
+    assert r.specs["HTS Code (US)"].value == "8541.10.0080"
+
+
 def test_parse_tolerates_bare_strings_and_missing_fields():
     # v4 sometimes returns Manufacturer/Description/ProductStatus as plain strings, and a part
     # may omit fields entirely; the parser must never raise and must skip absent fields.

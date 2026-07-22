@@ -34,6 +34,70 @@ def _coerce_price(raw) -> float | None:
         return None
 
 
+_COMPLIANCE_LABELS = {
+    "USHTS": "HTS Code (US)", "CNHTS": "HTS Code (CN)", "CAHTS": "HTS Code (CA)",
+    "JPHTS": "HTS Code (JP)", "MXHTS": "HTS Code (MX)", "TARIC": "HTS Code (EU TARIC)",
+    "ECCN": "ECCN",
+}
+
+
+def _capture_everything(p: dict, r: EnrichmentResult) -> None:
+    """Fold the full field set the search API returns (parametric attributes, the distributor
+    category, compliance + trade origin, the product image, order quantities) into the spec bag.
+    Previously dropped; the owner's "use literally everything the token gives us". Each row is
+    setdefault so a real value already on the result (e.g. a datasheet leg's) is never clobbered."""
+    cat = (p.get("Category") or "").strip()
+    if cat:
+        r.specs.setdefault("Product Category", Sourced(cat, "mouser", "high"))
+    # ProductAttributes repeat a name once per option (Packaging: Reel / Cut Tape / MouseReel),
+    # so group by name and join the distinct values into one spec row.
+    attrs: dict[str, list[str]] = {}
+    for a in p.get("ProductAttributes") or []:
+        if not isinstance(a, dict):
+            continue
+        name = (a.get("AttributeName") or "").strip()
+        val = (a.get("AttributeValue") or "").strip()
+        if name and val and val not in attrs.setdefault(name, []):
+            attrs[name].append(val)
+    for name, vals in attrs.items():
+        r.specs.setdefault(name, Sourced(", ".join(vals), "mouser", "high"))
+    rohs = (p.get("ROHSStatus") or "").strip()
+    if rohs:
+        r.specs.setdefault("RoHS", Sourced(rohs, "mouser", "high"))
+    image = (p.get("ImagePath") or "").strip()
+    if image:
+        r.specs.setdefault("Image", Sourced(image, "mouser", "medium"))
+    for src_key, label in (("Min", "Minimum Order Quantity"), ("Mult", "Order Multiple"),
+                           ("SalesMaximumOrderQty", "Maximum Order Quantity")):
+        raw = p.get(src_key)
+        val = str(raw).strip() if raw not in (None, "") else ""
+        if val:
+            r.specs.setdefault(label, Sourced(val, "mouser", "medium"))
+    weight = p.get("UnitWeightKg")
+    unit_weight = weight.get("UnitWeight") if isinstance(weight, dict) else None
+    if isinstance(unit_weight, (int, float)) and unit_weight > 0:
+        r.specs.setdefault("Unit Weight (kg)", Sourced(str(unit_weight), "mouser", "medium"))
+    # Export/trade compliance: HTS codes + ECCN under readable labels.
+    for c in p.get("ProductCompliance") or []:
+        if not isinstance(c, dict):
+            continue
+        name = (c.get("ComplianceName") or "").strip()
+        val = (c.get("ComplianceValue") or "").strip()
+        if name and val:
+            r.specs.setdefault(_COMPLIANCE_LABELS.get(name, name), Sourced(val, "mouser", "high"))
+    # Trade origin: kept as specs, and the manufacturing origin promoted to the canonical field.
+    for c in p.get("TradeCompliance") or []:
+        if not isinstance(c, dict):
+            continue
+        name = (c.get("ComplianceName") or "").strip()
+        val = (c.get("ComplianceValue") or "").strip()
+        if not (name and val):
+            continue
+        r.specs.setdefault(name, Sourced(val, "mouser", "high"))
+        if name == "Country of Origin" and r.country_of_origin is None:
+            r.country_of_origin = Sourced(val, "mouser", "high")
+
+
 def _parse_mouser_part(p: dict) -> EnrichmentResult:
     """One Mouser API part -> the canonical schema (legacy _parse_mouser_part,
     remapped onto EnrichmentResult; a distributor API is high confidence)."""
@@ -83,6 +147,7 @@ def _parse_mouser_part(p: dict) -> EnrichmentResult:
     breaks.sort(key=lambda x: x.qty)
     if breaks:
         r.price_breaks = breaks
+    _capture_everything(p, r)
     return r
 
 
