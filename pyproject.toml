@@ -33,6 +33,10 @@ dependencies = [
     # fork with genuine fingerprints that defeats Akamai AND DataDome (Mouser) where patched
     # Chromium is hard-blocked. Its browser build is provisioned by `camoufox fetch`.
     "camoufox[geoip]>=0.5.4",
+    # The Altium DbLib data source (stockroom.altium.datasource): openpyxl writes the
+    # MPN-keyed .xlsx an Altium .DbLib reads through the ACE engine. Pure-Python, no engine
+    # at emit time; the .xlsx is a derived, gitignored artifact regenerated from the records.
+    "openpyxl>=3.1",
 ]
 
 [dependency-groups]
