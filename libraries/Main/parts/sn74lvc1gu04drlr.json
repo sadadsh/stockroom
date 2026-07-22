@@ -3,10 +3,10 @@
   "datasheet": {
     "fetched_at": "",
     "file": "",
-    "source_url": "https://www.ti.com/lit/gpn/sn74lvc1gu04"
+    "source_url": "http://www.ti.com/lit/ds/symlink/sn74lvc1gu04.pdf"
   },
   "description": "Single Inverter Gate, SOT-553",
-  "display_name": "74LVC1GU04DRLR",
+  "display_name": "74LVC1GU04DRLR SOT-5X3-5 TI SN74LVC1GU04DRLR",
   "enrichment": {},
   "footprint": {
     "lib": "Package_TO_SOT_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR?qs=dT9u2OTAaVWQWKRtkB6JZw%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:10:19.986928+00:00",
+      "part_number": "595-SN74LVC1GU04DRLR",
       "price_breaks": [
         {
           "price": 0.36,
@@ -68,16 +68,21 @@
           "qty": 4000
         }
       ],
-      "stock": 6693,
-      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR",
+      "stock": 6614,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/SN74LVC1GU04DRLR?qs=dT9u2OTAaVWQWKRtkB6JZw%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
+    "Assembly Country of Origin": "Thailand",
     "Brand": "Texas Instruments",
-    "Factory Pack Quantity: Factory Pack Quantity": "4000",
+    "Country of Diffusion": "Germany",
+    "Country of Origin": "Thailand",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "4000",
     "High Level Output Current": "- 32 mA",
     "Input Type": "CMOS, TTL",
+    "Lifecycle": "Active",
     "Logic Family": "LVC",
     "Logic Type": "Inverting",
     "Low Level Output Current": "32 mA",
@@ -86,6 +91,7 @@
     "Minimum Operating Temperature": "- 40 C",
     "Mounting Style": "SMD/SMT",
     "Number of Circuits": "1 Circuit",
+    "Package": "SOT-5X3-5",
     "Packaging": "Reel",
     "Product Category": "Inverters",
     "Product Type": "Inverters",
@@ -94,6 +100,7 @@
     "Subcategory": "Logic ICs",
     "Supply Voltage - Max": "5.5 V",
     "Supply Voltage - Min": "1.65 V",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.000099 oz"
   },
   "symbol": null,
