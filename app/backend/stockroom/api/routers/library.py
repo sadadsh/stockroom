@@ -32,6 +32,17 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 # is reachable.
 _HISTORY_MAX = 100
 
+
+def _preferred_cad_vendor(config) -> str:
+    """Which CAD-source vendor the guided window opens, from the saved logins: SnapEDA when the
+    user has a SnapEDA login and no Ultra Librarian one, Ultra Librarian otherwise. Both offer
+    KiCad + Altium behind a control the guided window can drive; picking by the saved login means
+    a SnapEDA user is signed in and a UL user is signed in, with UL the zero-config default (its
+    page is reachable even without a login)."""
+    has_ul = bool(getattr(config, "ul_username", "") or getattr(config, "ul_password", ""))
+    has_snap = bool(getattr(config, "snapeda_username", "") or getattr(config, "snapeda_password", ""))
+    return "snapeda" if (has_snap and not has_ul) else "ultralibrarian"
+
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
 # AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
 # last-writer-wins), so a second POST while one is QUEUED/RUNNING must return the SAME
@@ -389,10 +400,11 @@ def library_router(require_token) -> APIRouter:
         record = ctx.ops.load_record(part_id)
         needs = [req.value for req in capture_needs(record)]
         # Primary source: an Ultra Librarian / SnapEDA page (both KiCad + Altium
-        # downloads behind a real control the guided window can click).
+        # downloads behind a real control the guided window can click). Which one is picked from
+        # the user's saved vendor login (SnapEDA if that is the only one set, else Ultra Librarian).
         from stockroom.enrich.asset_source import resolve_asset_page
 
-        page = resolve_asset_page(record.mpn)
+        page = resolve_asset_page(record.mpn, vendor=_preferred_cad_vendor(ctx.config))
         if page is not None:
             return {"url": page.url, "mpn": record.mpn, "vendor": page.vendor, "needs": needs}
         # Fallback: open the DigiKey product page.
