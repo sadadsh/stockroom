@@ -72,3 +72,25 @@ def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     cfg = MachineConfig(libraries_root=str(tmp_path / "lib"))
     cfg.save(path)
     assert MachineConfig.load(path).libraries_root == str(tmp_path / "lib")
+
+
+def test_vendor_login_fields_round_trip(tmp_path):
+    path = tmp_path / "config.json"
+    cfg = MachineConfig(
+        ul_username="me@x.com",
+        ul_password="pw",
+        snapeda_username="s",
+        snapeda_password="q",
+    )
+    cfg.save(path)
+    loaded = MachineConfig.load(path)
+    assert loaded.ul_username == "me@x.com"
+    assert loaded.ul_password == "pw"
+    assert loaded.snapeda_username == "s"
+    assert loaded.snapeda_password == "q"
+
+
+def test_vendor_login_defaults_empty():
+    cfg = MachineConfig()
+    assert cfg.ul_username == "" and cfg.ul_password == ""
+    assert cfg.snapeda_username == "" and cfg.snapeda_password == ""

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.backend.conftest import requires_kicad_cli
+
 
 def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
     # candidate_to_dto must emit a `purchase` key (even empty) so the frontend
@@ -56,6 +58,7 @@ def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx
     assert client.get("/api/library/parts").json()["count"] == before
 
 
+@requires_kicad_cli  # the real /api/ingest/commit merges a symbol lib, which needs kicad-cli
 def test_archive_profile_bypasses_the_gate_through_the_api(client, app_ctx):
     # The one honest bypass (spec section 7): an archive profile grandfathers a legacy
     # import, so the SAME incomplete candidate that is rejected on Main is accepted on

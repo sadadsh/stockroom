@@ -48,6 +48,8 @@ docs/research/
 /.stockroom-enrich-cache/
 /.stockroom-previews/
 .firecrawl/
+# Derived Altium data source (regenerated from JSON like the SQLite index; the .DbLib IS committed)
+libraries/*/altium/*.xlsx
 
 # Agent tooling: installed skills + SuperDesign workspace (never committed)
 .agents/

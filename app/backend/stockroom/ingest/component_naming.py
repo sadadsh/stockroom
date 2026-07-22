@@ -155,3 +155,20 @@ def propose_component_name_from_record(record) -> str:
         getattr(record, "mpn", "") or "",
         getattr(record, "description", "") or "",
     )
+
+
+def derive_value(record) -> str:
+    """The schematic/BOM Value for a part: a passive's parametric value ("5.05k", "1µF",
+    "4.7µH") from its normalized specs; an active's MPN. Blank for a passive whose defining
+    spec is missing (never a guess). Pure + deterministic (reuses _flat/_tight)."""
+    category = getattr(record, "category", "") or ""
+    f = _flat(getattr(record, "specs", {}) or {})
+    g = f.get
+    if category == "Resistors":
+        r = _tight(g("Resistance", ""))
+        return r[:-1] if r.endswith("Ω") else r  # "5.05kΩ" -> "5.05k" (schematic convention)
+    if category == "Capacitors":
+        return _tight(g("Capacitance", ""))
+    if category == "Inductors":
+        return _tight(g("Impedance", "")) or _tight(g("Inductance", ""))
+    return getattr(record, "mpn", "") or ""

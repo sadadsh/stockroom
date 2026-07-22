@@ -85,6 +85,13 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
     return request
 
 
+_CLASSIFICATION_LABELS = {
+    "RohsStatus": "RoHS", "ReachStatus": "REACH",
+    "MoistureSensitivityLevel": "Moisture Sensitivity Level",
+    "ExportControlClassNumber": "ECCN", "HtsusCode": "HTS Code (US)",
+}
+
+
 def _coerce_price(raw) -> float | None:
     """A price may be a number or a currency string ('$0.12'); pull the first numeric run."""
     if raw is None:
@@ -156,10 +163,43 @@ def _parse_digikey_part(product: dict) -> EnrichmentResult:
     dk_pn = _obj_str(var.get("DigiKeyProductNumber"))
     if dk_pn:
         r.dist_pns["digikey"] = dk_pn
+    # The full field set the token returns (previously only RoHS was kept): the parametric table,
+    # the product image, the leaf category, the series, and the whole compliance block. The owner's
+    # "use literally everything the token gives us". Each is setdefault so a higher-priority source
+    # already on the result is never clobbered.
     classifications = product.get("Classifications")
-    rohs = _obj_str(classifications, "RohsStatus") if isinstance(classifications, dict) else ""
-    if rohs:
-        r.specs["RoHS"] = Sourced(rohs, "digikey", "high")
+    if isinstance(classifications, dict):
+        for src_key, label in _CLASSIFICATION_LABELS.items():
+            val = classifications.get(src_key)
+            if isinstance(val, str) and val.strip():
+                r.specs.setdefault(label, Sourced(val.strip(), "digikey", "high"))
+    # The parametric table: the real electrical specs. A "-" ValueText is DigiKey's empty
+    # placeholder and is skipped (an honest gap, never a fabricated value).
+    for prm in product.get("Parameters") or []:
+        if not isinstance(prm, dict):
+            continue
+        label = _obj_str(prm.get("ParameterText"))
+        val = _obj_str(prm.get("ValueText"))
+        if label and val and val != "-":
+            r.specs.setdefault(label, Sourced(val, "digikey", "high"))
+    photo = _obj_str(product.get("PhotoUrl"))
+    if photo:
+        r.specs.setdefault("Image", Sourced(photo, "digikey", "medium"))
+    cat_name = _obj_str(product.get("Category"), "Name")
+    if cat_name and cat_name != "-":
+        r.specs.setdefault("Product Category", Sourced(cat_name, "digikey", "high"))
+    series_name = _obj_str(product.get("Series"), "Name")
+    if series_name and series_name != "-":
+        r.specs.setdefault("Series", Sourced(series_name, "digikey", "high"))
+    pkg_type = _obj_str(var.get("PackageType"), "Name")
+    if pkg_type:
+        r.specs.setdefault("Package Type", Sourced(pkg_type, "digikey", "medium"))
+    moq = var.get("MinimumOrderQuantity")
+    if isinstance(moq, int) and moq > 0:
+        r.specs.setdefault("Minimum Order Quantity", Sourced(str(moq), "digikey", "medium"))
+    std_pkg = var.get("StandardPackage")
+    if isinstance(std_pkg, int) and std_pkg > 0:
+        r.specs.setdefault("Standard Package", Sourced(str(std_pkg), "digikey", "medium"))
     breaks: list[PriceBreak] = []
     pricing = var.get("StandardPricing")
     for b in pricing if isinstance(pricing, list) else []:

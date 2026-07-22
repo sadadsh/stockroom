@@ -511,3 +511,172 @@ def test_extract_from_url_keeps_a_real_description_with_manufacturer_but_no_mpn(
     result = pipe.extract_from_url("https://www.ti.com/product/BQ24074")
     assert result.manufacturer is not None and result.manufacturer.value == "Texas Instruments"
     assert result.description is not None and "BQ24074RGTT" in result.description.value
+
+
+# --- API-first paste-a-link path (Mouser/DigiKey are Akamai-guarded; the official APIs answer
+# --- the exact part in one call, so a recognized distributor link resolves through them and
+# --- never renders the blocked page). ---------------------------------------------------------
+
+
+class _RaisingFetcher:
+    """A render fetcher that MUST NOT be called: the API path resolves without any render."""
+
+    def rendered_html(self, url, timeout=20.0, on_stage=None):
+        raise AssertionError("the render path was taken; the official API should have resolved")
+
+
+def _mouser_full():
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+    r = EnrichmentResult()
+    r.mpn = Sourced("TPD6E05U06RVZR", "mouser", "high")
+    r.manufacturer = Sourced("Texas Instruments", "mouser", "high")
+    r.description = Sourced("ESD Protection Diodes / TVS Diodes 6-CH lo cap", "mouser", "high")
+    r.stock = Sourced(12054, "mouser", "high")
+    r.price_breaks = [PriceBreak(qty=1, price=0.5)]
+    return r
+
+
+class _FakeMouser:
+    enabled = True
+
+    def __init__(self, result):
+        self._r = result
+        self.seen = []
+
+    def lookup(self, mpn):
+        self.seen.append(mpn)
+        return self._r
+
+
+def test_paste_mouser_link_resolves_via_the_official_api_without_rendering(tmp_path):
+    # The reported bug: pasting a Mouser link rendered the Akamai-guarded page and returned
+    # "Nothing was pulled". With a Mouser key configured it now resolves through the official
+    # API - fast, WAF-free - and never touches the browser render.
+    mouser = _FakeMouser(_mouser_full())
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=mouser, jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR?qs=x"
+    )
+    assert r.mpn.value == "TPD6E05U06RVZR"
+    assert r.manufacturer.value == "Texas Instruments"
+    assert r.stock.value == 12054
+    assert r.price_breaks and r.price_breaks[0].price > 0
+    assert mouser.seen == ["TPD6E05U06RVZR"]  # the MPN parsed from the URL drove the API
+    # the pasted link is preserved as the purchase link
+    assert r.specs["product_url"].value.startswith("https://www.mouser.com/")
+
+
+def test_paste_mouser_link_merges_digikey_datasheet_and_specs(tmp_path):
+    # Mouser gives identity/price/stock but no datasheet for this part; DigiKey fills the
+    # datasheet + electrical parametrics. Both official APIs, merged, from one pasted link.
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    mouser = _FakeMouser(_mouser_full())  # carries no datasheet_url
+
+    dk = EnrichmentResult()
+    dk.datasheet_url = Sourced("https://www.ti.com/lit/gpn/tpd6e05u06.pdf", "digikey", "high")
+    dk.specs["Voltage - Clamping (Max) @ Ipp"] = Sourced("14V", "digikey", "high")
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            return dk
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=mouser, digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+    assert r.price_breaks  # from Mouser
+    assert r.stock.value == 12054  # from Mouser
+    assert r.datasheet_url.value.endswith(".pdf")  # filled by DigiKey (Mouser had none)
+    assert r.specs["Voltage - Clamping (Max) @ Ipp"].value == "14V"  # DigiKey parametric
+
+
+def test_paste_digikey_link_resolves_via_api_using_the_path_mpn(tmp_path):
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    dk = EnrichmentResult()
+    dk.mpn = Sourced("TPD6E05U06RVZR", "digikey", "high")
+    dk.datasheet_url = Sourced("https://www.ti.com/lit/gpn/tpd6e05u06.pdf", "digikey", "high")
+    seen = []
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            seen.append(mpn)
+            return dk
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.digikey.com/en/products/detail/texas-instruments/TPD6E05U06RVZR/2094564"
+    )
+    assert r.mpn.value == "TPD6E05U06RVZR"
+    assert seen == ["TPD6E05U06RVZR"]  # parsed from the middle path segment
+
+
+def test_paste_link_captures_both_distributor_buy_links(tmp_path):
+    # The owner's ask: since we call BOTH APIs, store BOTH the Mouser and DigiKey buy links (and
+    # each vendor's own order number) on the part, not only the pasted link.
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    m = _mouser_full()
+    m.product_url = Sourced("https://www.mouser.com/ProductDetail/x", "mouser", "high")
+    m.dist_pns["mouser"] = "595-TPD6E05U06RVZR"
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            r = EnrichmentResult()
+            r.product_url = Sourced(
+                "https://www.digikey.com/en/products/detail/ti/TPD6E05U06RVZR/1", "digikey", "high"
+            )
+            r.dist_pns["digikey"] = "296-39349-2-ND"
+            return r
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=_FakeMouser(m), digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+    assert r.dist_urls["mouser"].startswith("https://www.mouser.com/")
+    assert r.dist_urls["digikey"].startswith("https://www.digikey.com/")
+    assert set(r.dist_pns) == {"mouser", "digikey"}
+
+
+def test_dist_urls_round_trip_through_the_cache():
+    # both buy links must survive caching, so a re-looked-up link keeps both distributors.
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult
+
+    r = EnrichmentResult()
+    r.dist_urls = {"mouser": "https://m/x", "digikey": "https://d/y"}
+    back = _result_from_cache(_result_to_cache(r), "")
+    assert back.dist_urls == {"mouser": "https://m/x", "digikey": "https://d/y"}
+
+
+def test_paste_link_falls_back_to_render_when_the_api_misses(tmp_path):
+    # If the official API has no data (a miss, or the part is not carried), the paste path still
+    # falls back to rendering the page - no regression for a link the API cannot resolve.
+    from stockroom.enrich.schema import EnrichmentResult
+
+    class _MissMouser:
+        enabled = True
+
+        def lookup(self, mpn):
+            return EnrichmentResult()  # empty = a clean miss
+
+    html = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(html),
+                              mouser=_MissMouser(), limiter=_NoWaitLimiter(),
+                              http_fetcher=_StubHttpFetcher(mode="pdf"), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
+    )
+    assert r.mpn.value == "ERJ-P03F1101V"  # the RENDER filled it after the API missed

@@ -19,18 +19,34 @@ inside functions/guards, same discipline as the rest of this file)."""
 from __future__ import annotations
 
 import json
+import logging
 import os
+import shutil
 import tempfile
 import threading
 import time
+import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from stockroom.capture.classify import classify_asset
+from stockroom.capture.requirements import Requirement
+
+_log = logging.getLogger("stockroom.host.cad")
 
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
 _CAD_WINDOW = None
 _CAD_DOWNLOADS_WATCH = None
+# The one live guided-capture session + its tier-2 poll thread. Starting a new capture
+# stops the prior (B4): a stale poll thread must never forward a late file onto a new part.
+_CAD_SESSION = None
+_CAD_POLL_THREAD = None
 _CAD_CAPTURE_LOCK = threading.Lock()
+
+# Loose Altium library suffixes that get pulled out of a captured zip to attach-ready paths.
+_ALTIUM_SUFFIXES = frozenset({".schlib", ".pcblib", ".intlib"})
+_ALTIUM_REQS = frozenset({Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT})
 
 
 def active_window():
@@ -157,10 +173,13 @@ def inject_script(base_url: str, token: str) -> str:
 #   tier 2 (always available): a DownloadsWatch (download_capture.py - pure, Linux-tested)
 #   polled on a background thread, the backstop for whatever tier 1 cannot reach.
 #
-# Whichever tier finds the file first forwards it to the SPA via
-# window.__STOCKROOM_CAD_DOWNLOAD__(path) - the SAME convergence point regardless of which
-# tier fired, so the frontend (Task 4) never has to know which one won. Tier 3 is the
-# existing manual pick_ingest_files() picker, unchanged.
+# Each captured file is classified and forwarded to the SPA via
+# window.__STOCKROOM_CAD_DOWNLOAD__(payload) - the SAME convergence point regardless of which
+# tier fired, so the frontend never has to know which one won. The payload carries the live
+# session token, the requirements the file satisfies, and any loose Altium paths pulled from
+# a captured zip; the CaptureSession's per-requirement record() dedups a redundant re-fire
+# and decides when the capture is complete. Tier 3 is the existing manual pick_ingest_files()
+# picker, unchanged.
 
 
 def cad_window():
@@ -171,69 +190,173 @@ def cad_downloads_watch():
     return _CAD_DOWNLOADS_WATCH
 
 
-def cad_forward_js(path: str) -> str:
-    """The renderer call that hands a captured CAD-download ZIP path to the SPA, exactly
-    mirroring drop_forward_js. Guarded so a renderer that has not registered the hook is a
-    no-op, and JSON-encoded so a quote/backslash in a path cannot break out of the script."""
-    encoded = json.dumps(str(path))
+def cad_forward_js(payload: dict) -> str:
+    """The renderer call that hands a CaptureForward payload to the SPA, mirroring
+    drop_forward_js. Guarded so a renderer that has not registered the hook is a no-op, and
+    JSON-encoded so a quote/backslash in a path cannot break out of the script. `payload` is
+    the object the frontend's useGuidedCapture reads: {path?, token?, requirements?,
+    altiumPaths?, signal?}."""
+    encoded = json.dumps(payload)
     return (
         "window.__STOCKROOM_CAD_DOWNLOAD__ && "
         f"window.__STOCKROOM_CAD_DOWNLOAD__({encoded});"
     )
 
 
-def _forward_cad_capture(path) -> None:
-    """Hand a captured path to the SPA on the MAIN window - never on the remote cad
-    window, which never loads the SPA and so never has the forwarding hook registered."""
+def build_capture_payload(path=None, token=None, requirements=None, altium_paths=None) -> dict:
+    """The JSON-safe CaptureForward dict the host forwards to the SPA. Only non-empty
+    fields are included so the frontend's `p.altiumPaths ?? [p.path]` fallback stays
+    correct (an empty altiumPaths would defeat it). Requirement enum members are emitted as
+    their wire `.value` strings (the shared contract with the TypeScript union)."""
+    payload: dict = {}
+    if path:
+        payload["path"] = str(path)
+    if token:
+        payload["token"] = str(token)
+    if requirements:
+        payload["requirements"] = [
+            r.value if isinstance(r, Requirement) else str(r) for r in requirements
+        ]
+    if altium_paths:
+        payload["altiumPaths"] = [str(p) for p in altium_paths]
+    return payload
+
+
+def _extract_altium_members(zip_path, out_dir) -> list[str]:
+    """Pull every loose Altium library member (.SchLib/.PcbLib/.IntLib) out of a captured
+    zip into out_dir, returning their paths, so the SPA can post them straight to the Altium
+    attach route (which reads loose files off disk). Each member is flattened to its
+    basename inside out_dir, which also neutralizes any zip-slip path in the archive. A
+    non-zip / unreadable archive yields [] (never raises)."""
+    out = Path(out_dir)
+    extracted: list[str] = []
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            members = [n for n in zf.namelist() if Path(n).suffix.lower() in _ALTIUM_SUFFIXES]
+            if members:
+                out.mkdir(parents=True, exist_ok=True)
+            for name in members:
+                dest = out / Path(name).name
+                with zf.open(name) as src, open(dest, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                extracted.append(str(dest))
+    except (zipfile.BadZipFile, OSError):
+        return []
+    return extracted
+
+
+def _altium_paths_from_capture(path, classified, reqs, extract_dir) -> list[str]:
+    """The loose Altium library paths to attach for this capture, or [] when it carries no
+    Altium content the session still needs. A captured zip is unpacked into extract_dir; a
+    loose Altium file (.SchLib/.PcbLib/.IntLib) is handed over by its own path (the backend
+    attach reads and normalizes it directly, extracting a single .IntLib itself)."""
+    if not any(r in _ALTIUM_REQS for r in reqs):
+        return []
+    p = Path(path)
+    if p.suffix.lower() == ".zip":
+        return _extract_altium_members(p, extract_dir) if extract_dir is not None else []
+    return [str(p)]
+
+
+def _emit_to_spa(payload: dict) -> None:
+    """Forward a CaptureForward payload to the SPA on the MAIN window - never on the remote
+    cad window, which never loads the SPA and so never has the forwarding hook registered."""
     spa = active_window()
     if spa is not None:
-        spa.evaluate_js(cad_forward_js(str(path)))
+        spa.evaluate_js(cad_forward_js(payload))
 
 
-def _fire_cad_capture_once(path, state: dict) -> bool:
-    """Thread-safe single-fire gate shared by both tiers for one open_cad_download() call:
-    tier 1 (a WebView2 COM callback thread) and tier 2 (the poll thread below) race to
-    report a captured path, and only the FIRST one to arrive wins - the loser's later find
-    is real but redundant (the same completed download, or a stray leftover zip) once the
-    SPA already has a path to inspect."""
+def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
+    """Classify a captured file, record the requirements it satisfies into `session`, and
+    forward the rich CaptureForward payload (path + live token + classified requirements +
+    any loose Altium paths pulled from a zip) to the SPA.
+
+    The session's per-requirement record() is the dedup gate: tier 1 (a WebView2 COM
+    callback thread) and tier 2 (the poll thread) both call this, and a file that satisfies
+    nothing new (a redundant re-fire, a wrong-format download) records [] and forwards
+    nothing. Held under _CAD_CAPTURE_LOCK so only one thread ever extracts+forwards a given
+    file; the evaluate_js itself runs outside the lock."""
     with _CAD_CAPTURE_LOCK:
-        if state["fired"]:
-            return False
-        state["fired"] = True
-        state["stop"] = True
-    return True
+        classified = classify_asset(Path(path))
+        if session is not None:
+            reqs = session.record(classified.requirements, path)
+            if not reqs:
+                return  # nothing new this capture satisfies - do not re-forward
+            token = session.token
+        else:
+            reqs = sorted(classified.requirements, key=lambda r: r.value)
+            token = None
+        altium_paths = _altium_paths_from_capture(path, classified, reqs, extract_dir)
+        payload = build_capture_payload(path, token, reqs, altium_paths)
+    _emit_to_spa(payload)
+
+
+def _forward_timeout_signal(session) -> None:
+    """Forward an honest {signal:'timeout'} to the SPA (fixes B1 at the host layer): the
+    guided window never hangs forever - if the deadline elapses with unmet needs the poll
+    loop tells the SPA to stop waiting instead of returning silently."""
+    _emit_to_spa({"signal": "timeout", "token": session.token})
+
+
+def _session_complete(session) -> bool:
+    """Read the session's completeness under the capture lock. is_complete() iterates
+    session.received (`set(self.received)`), and the tier-1 WebView2 COM thread mutates that
+    dict via record() under the same lock, so an unguarded read from the tier-2 poll thread
+    could iterate the dict mid-mutation ('dictionary changed size during iteration'). Reading
+    under the lock makes the two mutually exclusive."""
+    with _CAD_CAPTURE_LOCK:
+        return session.is_complete()
 
 
 def _poll_downloads_watch(
     watch,
-    state: dict,
+    session,
     *,
+    extract_dir=None,
     interval: float = 1.5,
     timeout: float = 300.0,
     sleep=time.sleep,
     now=time.time,
 ) -> None:
-    """TIER 2 background loop: poll `watch` (download_capture.DownloadsWatch) until it
-    finds a zip, a tier-1 capture flags state["stop"], or `timeout` elapses with nothing
-    found. Runs on a daemon thread started by open_cad_download. This function has zero
-    pywebview dependency (importable and callable on Linux), but only ever actually finds
-    a real file on a Windows machine watching a real Downloads folder."""
+    """TIER 2 background loop: poll `watch` (download_capture.DownloadsWatch) for captured
+    files, forwarding each into `session` until the session is complete, it is stopped
+    (replaced/closed), or `timeout` elapses. Unlike the prior single-file flow it keeps
+    polling, so a guided capture can collect BOTH its KiCad and its Altium assets as they
+    arrive one at a time. On a genuine timeout (deadline reached with unmet needs) it
+    forwards a timeout signal (fixes B1 at the host layer) rather than returning silently;
+    on a stop it returns silently - the stopper owns teardown, and a timeout signal must
+    never land on the part that replaced this one. Runs on a daemon thread started by
+    open_cad_download. Zero pywebview dependency (importable and callable on Linux); only
+    ever finds a real file on Windows watching a real Downloads folder."""
     deadline = now() + timeout
-    while now() < deadline and not state["stop"]:
+    while not session.stop_flag["stop"] and now() < deadline:
+        if _session_complete(session):
+            return  # all needs met; the temp dir is cleaned on the next capture (see below)
         found = watch.poll()
         if found is not None:
-            if _fire_cad_capture_once(found, state):
-                _forward_cad_capture(found)
-            return
+            _forward_cad_capture(found, session, extract_dir=extract_dir)
+            continue  # re-check completion at once; a burst of files should not each sleep
         sleep(interval)
+    if session.stop_flag["stop"]:
+        return
+    if not _session_complete(session):
+        _forward_timeout_signal(session)
 
 
-def _install_cad_download_intercept(window, target_dir: Path, on_captured, state: dict) -> bool:
+def _install_cad_download_intercept(
+    window, target_dir: Path, on_captured, *, retries: int = 10, delay: float = 0.05, sleep=time.sleep
+) -> bool:
     """TIER 1 (best-effort, Windows only): reach past pywebview's public API - which
     exposes NO download hook, only the ALLOW_DOWNLOADS setting that triggers pywebview's
     own native Save-As dialog - into its vendored WebView2 backend, and redirect THIS ONE
     window's next download save-path into `target_dir`, notifying `on_captured(path)` once
-    WebView2 reports the download Completed.
+    WebView2 reports the download Completed. `on_captured` is idempotent (the CaptureSession
+    dedups by requirement), so a repeated Completed callback forwards nothing extra.
+
+    Readiness (B3): the window's CoreWebView2 initializes asynchronously, so its EdgeChrome
+    browser instance may not be registered the instant create_window() returns. The grab is
+    retried a few times with a short backoff before conceding to tier 2, and every failure
+    is logged instead of silently swallowed.
 
     Why a per-INSTANCE monkeypatch, not a per-CLASS one: pywebview's Windows browser
     (webview.platforms.winforms.BrowserView -> webview.platforms.edgechromium.EdgeChrome)
@@ -263,11 +386,19 @@ def _install_cad_download_intercept(window, target_dir: Path, on_captured, state
     try:
         from webview.platforms.winforms import BrowserView  # pywebview's Windows backend
     except Exception:  # noqa: BLE001 - not the expected Windows backend; tier 2 still covers it
+        _log.warning("cad tier-1 unavailable: pywebview WinForms backend not importable; tier 2 covers it")
         return False
 
-    browser_form = BrowserView.instances.get(getattr(window, "uid", None))
-    edge = getattr(browser_form, "browser", None)
+    edge = None
+    for attempt in range(max(1, retries)):
+        browser_form = BrowserView.instances.get(getattr(window, "uid", None))
+        edge = getattr(browser_form, "browser", None)
+        if edge is not None:
+            break
+        if attempt < retries - 1:
+            sleep(delay)  # CoreWebView2 inits async; give it a beat before conceding to tier 2
     if edge is None:
+        _log.warning("cad tier-1: EdgeChrome browser not ready after %d tries; tier 2 covers it", retries)
         return False
 
     def _on_download_starting(sender, args) -> None:
@@ -288,20 +419,60 @@ def _install_cad_download_intercept(window, target_dir: Path, on_captured, state
                     done = operation.State == CoreWebView2DownloadState.Completed
                 except Exception:  # noqa: BLE001 - best-effort: treat an unreadable state as done
                     done = True
-                if done and _fire_cad_capture_once(dest, state):
-                    on_captured(dest)
+                if done:
+                    on_captured(dest)  # idempotent: the session dedups a repeated Completed
 
             operation.StateChanged += _on_state_changed
             args.ResultFilePath = str(dest)
             args.Handled = True  # skip pywebview's native Save-As dialog for this window
         except Exception:  # noqa: BLE001 - best-effort; fall through to the default save flow
+            _log.warning("cad tier-1: redirect failed; falling through to the OS Downloads folder")
             return
 
     try:
         edge.on_download_starting = _on_download_starting
     except Exception:  # noqa: BLE001 - could not patch this instance; tier 2 still covers it
+        _log.warning("cad tier-1: could not patch this window's download handler; tier 2 covers it")
         return False
     return True
+
+
+def _parse_needs(needs) -> frozenset:
+    """The frontend hands the capture's needs as Requirement `.value` strings; map them back
+    to the Requirement enum, dropping anything unrecognized (never trust remote input)."""
+    out = set()
+    for n in needs or []:
+        try:
+            out.add(Requirement(n))
+        except ValueError:
+            continue
+    return frozenset(out)
+
+
+def _clean_temp(session) -> None:
+    """Remove a finished session's scratch dir. Best-effort - a still-open handle on Windows
+    must never crash teardown."""
+    temp = getattr(session, "temp_dir", None)
+    if temp is not None:
+        shutil.rmtree(temp, ignore_errors=True)
+
+
+def _stop_active_capture() -> None:
+    """Stop and tear down the live capture (B4 + B8): flag the session to stop, join its
+    tier-2 poll thread so it can no longer forward a late file onto whatever part replaces
+    it, then clean its temp dir. Safe to call with nothing active. Called at the top of a
+    new open_cad_download and when the cad window closes."""
+    global _CAD_SESSION, _CAD_POLL_THREAD
+    prior = _CAD_SESSION
+    thread = _CAD_POLL_THREAD
+    if prior is not None:
+        prior.stop()
+    if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+        thread.join(timeout=2.0)
+    if prior is not None:
+        _clean_temp(prior)
+    _CAD_SESSION = None
+    _CAD_POLL_THREAD = None
 
 
 class _HostApi:
@@ -324,6 +495,22 @@ class _HostApi:
         )
         return list(result) if result else []
 
+    def pick_altium_files(self) -> list[str]:
+        """A native picker for a part's Altium assets: a .SchLib + .PcbLib pair, or a single
+        compiled .IntLib. Returns real filesystem paths straight to the frontend, which posts
+        them to /api/altium/parts/{id}/attach (the same host-captured-path path as ingest)."""
+        import webview
+
+        win = active_window()
+        if win is None:
+            return []
+        result = win.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=True,
+            file_types=("Altium libraries (*.IntLib;*.SchLib;*.PcbLib)", "All files (*.*)"),
+        )
+        return list(result) if result else []
+
     def pick_datasheet_file(self) -> list[str]:
         """A native picker for the part's datasheet PDF, so Autofill can attach a
         file already on disk (the frontend sends its path as datasheet_file)."""
@@ -339,31 +526,36 @@ class _HostApi:
         )
         return list(result) if result else []
 
-    def open_cad_download(self, url: str) -> None:
-        """Open a distributor's CAD-download page (e.g. a DigiKey product page) in a
-        SECOND, VISIBLE window dedicated to this one flow - the fetch_window() precedent,
-        but visible instead of hidden, since the owner clicks the vendor's own Download
-        button on it. This window gets NO `loaded` handler at all - not merely relying on
-        should_inject's origin guard, there is simply no wiring through which the
-        per-launch token could ever reach this remote page - and NO js_api bridge either,
-        so nothing this app exposes is reachable from remote content.
+    def open_cad_download(self, url, needs=None) -> str:
+        """Open a vendor CAD-download page (Ultra Librarian / SnapEDA, or a DigiKey product
+        page) in a SECOND, VISIBLE window dedicated to this one guided capture, and return a
+        per-capture session TOKEN the SPA gates every forward on (B4). `needs` is the list of
+        Requirement `.value` strings the part still needs (KiCad and/or Altium); it seeds the
+        CaptureSession that decides when the capture is complete.
+
+        This window gets NO `loaded` handler at all - not merely relying on should_inject's
+        origin guard, there is simply no wiring through which the per-launch token could ever
+        reach this remote page - and NO js_api bridge either, so nothing this app exposes is
+        reachable from remote content.
 
         Arms BOTH capture tiers on every call: tier 1 best-effort redirects this window's
-        next WebView2 download into a fresh app temp dir
-        (_install_cad_download_intercept, Windows only, degrades silently); tier 2 arms a
-        DownloadsWatch over the OS Downloads folder as of right now and polls it on a
-        daemon thread, the always-available backstop for whatever tier 1 cannot reach (an
-        unexpected pywebview version, a non-EdgeChrome renderer, a WebView2 quirk).
-        Whichever tier finds the ZIP first forwards it to the SPA via
-        window.__STOCKROOM_CAD_DOWNLOAD__(path); the other tier's late or redundant find
-        is dropped by the shared single-fire gate (_fire_cad_capture_once).
+        downloads into the session temp dir (_install_cad_download_intercept, Windows only,
+        degrades silently); tier 2 arms a widened DownloadsWatch over the OS Downloads folder
+        and polls it on a daemon thread, the always-available backstop. Each captured file is
+        classified and forwarded into the session with this session's token; the session's
+        per-requirement dedup drops a redundant re-fire. The poll loop keeps running so a
+        capture can collect BOTH its KiCad and its Altium assets as they land.
 
-        Replaces any cad window left over from a previous call (closing it first) rather
-        than piling up extra windows across repeated clicks."""
-        global _CAD_WINDOW, _CAD_DOWNLOADS_WATCH
+        Replaces any prior capture first: stops the prior session + joins its poll thread so a
+        stale file can never misattribute onto this new part (B4), cleans the prior temp dir
+        (B8), and closes the leftover window rather than piling up extra windows."""
+        global _CAD_WINDOW, _CAD_DOWNLOADS_WATCH, _CAD_SESSION, _CAD_POLL_THREAD
         import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
+        from stockroom.capture.session import CaptureSession
         from stockroom.host.download_capture import DownloadsWatch, default_downloads_dir
+
+        _stop_active_capture()
 
         if _CAD_WINDOW is not None:
             try:
@@ -372,25 +564,72 @@ class _HostApi:
                 pass
             _CAD_WINDOW = None
 
+        session = CaptureSession.start("", _parse_needs(needs), now=time.time())
+        session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
+        _CAD_SESSION = session
+
         win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
         _CAD_WINDOW = win
 
+        thread_box: dict = {"t": None}
+
         def _on_cad_closed() -> None:
-            global _CAD_WINDOW
+            global _CAD_WINDOW, _CAD_SESSION, _CAD_POLL_THREAD
             if _CAD_WINDOW is win:
                 _CAD_WINDOW = None
+            session.stop()
+            t = thread_box["t"]
+            if t is not None and t.is_alive() and t is not threading.current_thread():
+                t.join(timeout=2.0)
+            # Deliberately do NOT clean the temp dir here. The SPA attaches the loose Altium
+            # paths pulled into it ASYNC after a forward, and a user commonly closes this
+            # window the moment the download lands - deleting the dir now would yank those
+            # files out from under an in-flight attach. The temp dir is cleaned when the NEXT
+            # capture starts (_stop_active_capture), by which point any attach is long done;
+            # a last, never-followed capture leaves one small dir the OS temp-reaps.
+            if _CAD_SESSION is session:
+                _CAD_SESSION = None
+                _CAD_POLL_THREAD = None
 
         win.events.closed += _on_cad_closed
 
-        capture_state = {"fired": False, "stop": False}
-        target_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
-        _install_cad_download_intercept(win, target_dir, _forward_cad_capture, capture_state)
+        def _on_captured(captured_path) -> None:
+            _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
+
+        _install_cad_download_intercept(win, session.temp_dir, _on_captured)
 
         watch = DownloadsWatch.start(default_downloads_dir())
         _CAD_DOWNLOADS_WATCH = watch
-        threading.Thread(
-            target=_poll_downloads_watch, args=(watch, capture_state), daemon=True
-        ).start()
+        thread = threading.Thread(
+            target=_poll_downloads_watch,
+            args=(watch, session),
+            kwargs={"extract_dir": session.temp_dir},
+            daemon=True,
+        )
+        thread_box["t"] = thread
+        _CAD_POLL_THREAD = thread
+        thread.start()
+        return session.token
+
+
+def _webview_start_kwargs(start_fn, profile_dir) -> dict:
+    """The private_mode/storage_path kwargs that make the guided-capture (vendor) window's
+    login persist across parts and app launches (B5). pywebview's storage is set once at
+    webview.start(), not per window, so a persistent, non-private profile on the shared
+    WebView2 environment is what carries the vendor's login cookies from one capture to the
+    next. Included only when this pywebview version accepts them (older versions ignore the
+    profile and the login simply will not persist). The main SPA is loopback with a
+    per-launch token injected on every load and its service workers unregistered, so a
+    persistent profile changes nothing for it."""
+    import inspect
+
+    params = inspect.signature(start_fn).parameters
+    kwargs: dict = {}
+    if "private_mode" in params:
+        kwargs["private_mode"] = False
+    if "storage_path" in params:
+        kwargs["storage_path"] = str(profile_dir)
+    return kwargs
 
 
 def run_window(base_url: str, token: str) -> None:
@@ -400,6 +639,8 @@ def run_window(base_url: str, token: str) -> None:
     that called run_window (stockroom.host.run), which shuts it down once this returns."""
     global _ACTIVE_WINDOW
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
+
+    from stockroom.store.machine_config import config_dir
 
     # pywebview blocks ALL downloads by default, which silently kills every export
     # in the app (the BOM CSV, the fab zip, the audit markdown are Blob+anchor
@@ -463,7 +704,16 @@ def run_window(base_url: str, token: str) -> None:
     # Adding a vendor ZIP also works through the native file picker exposed as
     # window.pywebview.api.pick_ingest_files (js_api above), the fallback path that
     # never depends on the drag-drop DOM registration above.
+    #
+    # A persistent, non-private WebView2 profile so a vendor login in the guided-capture
+    # window survives across parts and launches (B5). pywebview sets storage once here at
+    # start(), for every window in this session including the later cad window.
+    profile_dir = config_dir() / "webview-profile"
     try:
-        webview.start()  # blocks until the window closes
+        profile_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:  # a read-only/odd config dir must never block launch; login just won't persist
+        pass
+    try:
+        webview.start(**_webview_start_kwargs(webview.start, profile_dir))  # blocks until close
     finally:
         _ACTIVE_WINDOW = None

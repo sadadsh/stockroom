@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
+from stockroom.enrich.distributor_url import distributor_mpn_from_url
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
 from stockroom.scrape.validate import validate_product
@@ -351,6 +352,9 @@ class EnrichmentPipeline:
         # scraper budget, so it gets a dedicated limiter (lifted from KiCost's api_mouser).
         self.mouser_limiter = mouser_limiter or SlidingWindowLimiter(limit=30, window=60.0)
         self.mouser = mouser
+        # Stored (not only handed to the registry) so the paste-a-link path can query the official
+        # APIs directly, before the render, for a recognized Mouser/DigiKey product link.
+        self.digikey = digikey
         # The datasheet PDF is a direct HTTP GET (not a rendered DOM), so it uses an
         # HttpFetcher; injectable so tests never touch the network.
         self.http_fetcher = http_fetcher or HttpFetcher()
@@ -438,13 +442,51 @@ class EnrichmentPipeline:
                 self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
 
+    def _distributor_adapters(self, vendor: str):
+        """The enabled official-API adapters, the pasted link's OWN vendor FIRST so its fields
+        (price/stock/the purchase link) win the per-field merge, then the other to fill the gaps a
+        single distributor leaves (a Mouser link's missing datasheet comes from DigiKey)."""
+        pairs = [
+            (name, adapter)
+            for name, adapter in (("mouser", self.mouser), ("digikey", self.digikey))
+            if adapter is not None and getattr(adapter, "enabled", False)
+        ]
+        pairs.sort(key=lambda p: 0 if p[0] == vendor else 1)
+        return pairs
+
+    def _resolve_via_distributor_apis(self, vendor: str, token: str,
+                                      progress=None) -> EnrichmentResult:
+        """Resolve a distributor part token through the official Search APIs, no render. Queries
+        the link's own vendor first, then the other, merging per-field. An empty result means
+        neither API carried the part (or none is configured), so the caller renders the page."""
+        display = {"mouser": "Mouser", "digikey": "DigiKey"}
+        result = EnrichmentResult()
+        for name, adapter in self._distributor_adapters(vendor):
+            # Both APIs share the KiCost-derived Mouser limiter (paced against the ~30/min cap),
+            # so a burst of adds never trips a distributor's rate limit.
+            if self.mouser_limiter is not None:
+                self.mouser_limiter.acquire()
+            emit(progress, Stage.FETCHING, f"querying {display.get(name, name)}")
+            try:
+                partial = adapter.lookup(token)
+            except Exception:  # noqa: BLE001 - an adapter must never break the paste path
+                continue
+            # Keep THIS vendor's own buy link, so both survive even though the merged result keeps
+            # a single primary product_url. The pasted vendor's link is set to the pasted url below.
+            if partial.product_url is not None:
+                result.dist_urls.setdefault(name, str(partial.product_url.value))
+            result.merge_missing(partial)
+        return result
+
     def extract_from_url(self, url: str, progress=None) -> EnrichmentResult:
-        """Fetch a distributor product page and extract EVERYTHING it exposes, from a
-        URL alone (no candidate, no file): identity, price breaks, stock, datasheet,
-        package, and the full parametric spec table. The fetch goes through the
-        rendered-DOM fetcher (the real WebView2 browser on Windows), so Akamai /
-        Cloudflare JS challenges that 403 a plain HTTP client are passed. Never raises:
-        a blocked or dead page returns an empty result, honestly (spec 2.2)."""
+        """Fill EVERYTHING a distributor product link exposes, from a URL alone (no candidate, no
+        file): identity, price breaks, stock, datasheet, package, and the full parametric spec set.
+
+        A recognized Mouser/DigiKey link resolves through the official Search API FIRST (fast and
+        WAF-free), because rendering those Akamai-guarded pages is slow and usually blocked (the
+        "Nothing was pulled" failure). Any other link, an unconfigured key, or an API miss falls
+        through to the rendered-DOM fetcher (the stealth browser). Never raises: a blocked or dead
+        page returns an empty result, honestly (spec 2.2)."""
         url = (url or "").strip()
         if not url:
             return EnrichmentResult()
@@ -454,6 +496,24 @@ class EnrichmentPipeline:
         if cached is not None:
             return _result_from_cache(cached, cached.get("category", ""))
         sink = monotonic(progress)
+        # API-FIRST: a Mouser/DigiKey product link resolves through the official Search API instead
+        # of rendering the Akamai-guarded page. Only a recognized distributor link with an enabled
+        # key AND a substantive answer takes this path; everything else renders below, unchanged.
+        parsed = distributor_mpn_from_url(url)
+        if parsed is not None:
+            vendor, token = parsed
+            api = self._resolve_via_distributor_apis(vendor, token, sink)
+            if _is_substantive(api):
+                # the pasted link is the user's purchase link: it wins the product_url slot over
+                # the API's own ProductDetailUrl (a Mouser paste stays that Mouser link).
+                api.product_url = Sourced(url, vendor, "high")
+                api.specs["product_url"] = Sourced(url, vendor, "high")
+                # the pasted vendor's buy link is the EXACT link the user pasted (its qs token and
+                # all), not the API's canonical rewrite; the other vendor keeps its API link.
+                api.dist_urls[vendor] = url
+                fill_category(api)
+                self.url_cache.put(url, _result_to_cache(api))
+                return api
         emit(sink, Stage.FETCHING, "loading the page")
         # on_stage raises the render phase (the browser settle) from inside the fetcher;
         # only passed when there is a sink, so a legacy fetcher keeps its old signature.
@@ -634,6 +694,7 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         # sourcing risk + lead the first fresh lookup found).
         "lifecycle": s(r.lifecycle), "lead_time": s(r.lead_time), "product_url": s(r.product_url),
         "dist_pns": dict(r.dist_pns),
+        "dist_urls": dict(r.dist_urls),
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
     }
@@ -649,6 +710,7 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.datasheet_url, r.stock, r.package = s(d.get("datasheet_url")), s(d.get("stock")), s(d.get("package"))
     r.lifecycle, r.lead_time, r.product_url = s(d.get("lifecycle")), s(d.get("lead_time")), s(d.get("product_url"))
     r.dist_pns = dict(d.get("dist_pns", {}))
+    r.dist_urls = dict(d.get("dist_urls", {}))
     r.price_breaks = [PriceBreak(**b) for b in d.get("price_breaks", [])]
     r.specs = {k: Sourced(v["value"], v["source"], v["confidence"]) for k, v in d.get("specs", {}).items()}
     return r

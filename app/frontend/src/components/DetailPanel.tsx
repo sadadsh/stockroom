@@ -20,7 +20,7 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
-import { usePreviewGlb } from "../api/queries";
+import { useCadSourceQuery, usePreviewGlb } from "../api/queries";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
 import {
@@ -122,6 +122,11 @@ export function DetailPanel({
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
   const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
+  // The part's capture needs (KiCad + Altium). Altium presence is not on the detail
+  // record, so this is how the panel knows to offer Complete Part for a part that is
+  // KiCad-complete but still missing its Altium assets (the common case). Cached under
+  // the same key the Complete Part window uses, so it is fetched once and shared.
+  const cadSource = useCadSourceQuery(detail?.id ?? null, true);
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -142,7 +147,12 @@ export function DetailPanel({
     !detail.footprint?.name ? "footprint" : null,
     !hasModel ? "3D model" : null,
   ].filter((x): x is string => x !== null);
-  const needsList = [...missing, ...missingAssets];
+  // Altium gaps come from the capture-needs query (not on the detail record), so an
+  // Altium-only-missing part still offers Complete Part.
+  const altiumNeeds = (cadSource.data?.needs ?? [])
+    .filter((n) => n === "altium_symbol" || n === "altium_footprint")
+    .map((n) => (n === "altium_symbol" ? "Altium symbol" : "Altium footprint"));
+  const needsList = [...missing, ...missingAssets, ...altiumNeeds];
   // The panel is completable when it can edit a field OR attach an asset (a read-only panel gets
   // no Complete Part affordance, only the honest "Not linked" state on the tiles).
   const canComplete = !!(onEditField || onAttachSymbol || onAttachFootprint);

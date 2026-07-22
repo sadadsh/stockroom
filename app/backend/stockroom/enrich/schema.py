@@ -122,6 +122,10 @@ class EnrichmentResult:
     country_of_origin: Sourced | None = None
     tariff_rate: Sourced | None = None
     dist_pns: dict[str, str] = field(default_factory=dict)
+    # Each distributor's own PRODUCT PAGE url ("mouser"->..., "digikey"->...). When both APIs
+    # answer a lookup we keep BOTH buy links, not only the pasted one, so the part carries every
+    # place it can be ordered from (the owner's "store both the Mouser and DigiKey links").
+    dist_urls: dict[str, str] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
@@ -134,6 +138,8 @@ class EnrichmentResult:
             out.add("specs")
         if self.dist_pns:
             out.add("dist_pns")
+        if self.dist_urls:
+            out.add("dist_urls")
         return out
 
     def merge_missing(self, other: "EnrichmentResult") -> None:
@@ -150,3 +156,5 @@ class EnrichmentResult:
             self.specs.setdefault(key, val)
         for key, val in other.dist_pns.items():
             self.dist_pns.setdefault(key, val)
+        for key, val in other.dist_urls.items():
+            self.dist_urls.setdefault(key, val)

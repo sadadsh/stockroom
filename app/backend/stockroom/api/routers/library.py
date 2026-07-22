@@ -384,12 +384,24 @@ def library_router(require_token) -> APIRouter:
         row = ctx.index.get(part_id)
         if row is None:
             raise FileNotFoundError(f"no such part: {part_id}")
+        from stockroom.capture.requirements import capture_needs
+
+        record = ctx.ops.load_record(part_id)
+        needs = [req.value for req in capture_needs(record)]
+        # Primary source: an Ultra Librarian / SnapEDA page (both KiCad + Altium
+        # downloads behind a real control the guided window can click).
+        from stockroom.enrich.asset_source import resolve_asset_page
+
+        page = resolve_asset_page(record.mpn)
+        if page is not None:
+            return {"url": page.url, "mpn": record.mpn, "vendor": page.vendor, "needs": needs}
+        # Fallback: open the DigiKey product page.
         from stockroom.enrich.cad_source import resolve_digikey_cad_source
 
         digikey = next((a for a in build_refresh_adapters(ctx)
                         if getattr(a, "vendor", "") == "DigiKey"), None)
-        url = resolve_digikey_cad_source(row.mpn, digikey) if digikey is not None else None
-        return {"url": url, "mpn": row.mpn, "vendor": "DigiKey"}
+        url = resolve_digikey_cad_source(record.mpn, digikey) if digikey is not None else None
+        return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
 
     @r.post("/rescan")
     def rescan_library(request: Request, force: bool = False) -> dict:
