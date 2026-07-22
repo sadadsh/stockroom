@@ -21,6 +21,8 @@ vi.mock("../api/client", async (importActual) => {
       // hits network and it renders its honest empty state by default.
       partHistory: vi.fn(),
       partDiff: vi.fn(),
+      // the capture-needs query behind the Complete Part trigger (Altium gaps).
+      partCadSource: vi.fn(),
     },
   };
 });
@@ -35,6 +37,12 @@ beforeEach(() => {
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
   mockApi.partHistory.mockResolvedValue({ commits: [], count: 0 });
+  mockApi.partCadSource.mockResolvedValue({
+    url: null,
+    mpn: "",
+    vendor: "DigiKey",
+    needs: [],
+  } as never);
 });
 
 function detail(over: Partial<PartDetail> = {}): PartDetail {
@@ -289,6 +297,21 @@ describe("DetailPanel attach-after affordance", () => {
     ).not.toBeInTheDocument();
     // it degrades to the honest Not Linked state on the tile
     expect(screen.getByText("Not Linked")).toBeInTheDocument();
+  });
+
+  it("offers Complete Part for a KiCad-complete part that still needs Altium assets", async () => {
+    mockApi.partCadSource.mockResolvedValue({
+      url: "https://app.ultralibrarian.com/search?queryText=LM358DR",
+      mpn: "LM358DR",
+      vendor: "UltraLibrarian",
+      needs: ["altium_symbol", "altium_footprint"],
+    } as never);
+    // detail() is fully KiCad-complete (symbol + footprint + model) and BASE.missing is [],
+    // so without the Altium gap the trigger would not show.
+    wrap(<DetailPanel detail={detail()} {...BASE} onAttachSymbol={vi.fn()} />);
+    const trigger = await screen.findByRole("button", { name: /Complete Part/ });
+    expect(trigger).toHaveTextContent("Altium symbol");
+    expect(trigger).toHaveTextContent("Altium footprint");
   });
 });
 
