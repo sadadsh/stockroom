@@ -21,6 +21,7 @@ def _land_bare_part(app_ctx) -> str:
 
 
 def test_cad_source_resolves_ultralibrarian_and_reports_needs(client, app_ctx):
+    app_ctx.config.ul_username = "me@x.com"  # a UL login makes UL the resolved source
     part_id = _land_bare_part(app_ctx)
     resp = client.get(f"/api/library/parts/{part_id}/cad-source")
     assert resp.status_code == 200

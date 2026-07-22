@@ -1,10 +1,21 @@
-def test_cad_source_primary_is_ultralibrarian(client, app_ctx):
+def test_cad_source_is_ultralibrarian_when_ul_login_set(client, app_ctx):
+    app_ctx.config.ul_username = "me@x.com"
     r = client.get("/api/library/parts/tps62130/cad-source")
     assert r.status_code == 200
     body = r.json()
     assert body["vendor"] == "UltraLibrarian"
     assert "ultralibrarian.com" in body["url"]
     assert "needs" in body
+
+
+def test_cad_source_defaults_to_digikey_when_no_vendor_login(client, app_ctx):
+    # No UL/SnapEDA login: DigiKey's page gathers every CAD download in one place, no login needed.
+    app_ctx.config.ul_username = ""
+    app_ctx.config.ul_password = ""
+    app_ctx.config.snapeda_username = ""
+    app_ctx.config.snapeda_password = ""
+    body = client.get("/api/library/parts/tps62130/cad-source").json()
+    assert body["vendor"] == "DigiKey"
 
 
 def test_cad_source_falls_back_to_digikey_when_primary_unresolvable(client, app_ctx, monkeypatch):
