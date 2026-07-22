@@ -205,16 +205,20 @@ export function CompletePartModal({
   }
 
   const requirements = useMemo(
-    () => [
-      { key: "symbol", label: "Symbol", kind: "asset" as const, present: hasSymbol },
-      { key: "footprint", label: "Footprint", kind: "asset" as const, present: hasFootprint },
-      { key: "model", label: "3D Model", kind: "cad-only" as const, present: hasModel },
-      { key: "datasheet", label: "Datasheet", kind: "url" as const, present: hasDatasheet },
-      { key: "mpn", label: "Part Number", kind: "text" as const, present: !!detail.mpn },
-      { key: "manufacturer", label: "Manufacturer", kind: "text" as const, present: !!detail.manufacturer },
-      { key: "description", label: "Value / Description", kind: "text" as const, present: !!detail.description },
-    ],
-    [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet],
+    () =>
+      [
+        { key: "symbol", label: "Symbol", kind: "asset" as const, present: hasSymbol },
+        { key: "footprint", label: "Footprint", kind: "asset" as const, present: hasFootprint },
+        { key: "model", label: "3D Model", kind: "cad-only" as const, present: hasModel },
+        { key: "datasheet", label: "Datasheet", kind: "url" as const, present: hasDatasheet },
+        { key: "mpn", label: "Part Number", kind: "text" as const, present: !!detail.mpn },
+        { key: "manufacturer", label: "Manufacturer", kind: "text" as const, present: !!detail.manufacturer },
+        { key: "description", label: "Value / Description", kind: "text" as const, present: !!detail.description },
+      ]
+        // The 3D model has no manual attach path (download only), so when the CAD Files
+        // section is shown it owns the model row; drop the redundant duplicate here.
+        .filter((r) => !(showCad && r.key === "model")),
+    [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet, showCad],
   );
   const doneCount = requirements.filter((r) => r.present).length;
   const total = requirements.length;
