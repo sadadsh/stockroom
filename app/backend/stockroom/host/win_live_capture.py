@@ -211,11 +211,15 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         result["status_text"] = (
             cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
         )
-        # light diagnostics (small node sets, no '*' scan) so we can see the real CAD markup
-        result["all_headings"] = (
+        # did the page actually scroll? (a custom scroll container would leave window.scrollY at 0)
+        result["scrollY"] = cad.evaluate_js("Math.round(window.scrollY||0)")
+        result["scrollHeight"] = cad.evaluate_js("Math.round(document.body.scrollHeight||0)")
+        # bounded text search (specific tags, not '*') for the CAD section anywhere in the DOM
+        result["cad_text_hits"] = (
             cad.evaluate_js(
-                "JSON.stringify(Array.from(document.querySelectorAll('h2,h3,h4'))"
-                ".map(function(h){return (h.textContent||'').trim().slice(0,40)}).filter(Boolean).slice(0,30))"
+                "JSON.stringify(Array.from(document.querySelectorAll('div,span,section,a,button,h1,h2,h3,h4,h5,h6'))"
+                ".filter(function(e){return e.children.length===0 && /eda|cad model|pcb symbol|footprint|3d model/i.test(e.textContent||'')})"
+                ".map(function(e){return e.tagName+': '+(e.textContent||'').trim().slice(0,35)}).slice(0,10))"
             )
             or "[]"
         )
