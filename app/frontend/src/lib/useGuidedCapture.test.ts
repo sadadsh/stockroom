@@ -4,10 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { Requirement, StagingCandidate } from "../api/types";
 import { useGuidedCapture } from "./useGuidedCapture";
+import { CaptureProvider } from "./capture";
 
 function wrapperWith(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
-    createElement(QueryClientProvider, { client: qc }, children);
+    createElement(
+      QueryClientProvider,
+      { client: qc },
+      createElement(CaptureProvider, null, children),
+    );
 }
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {

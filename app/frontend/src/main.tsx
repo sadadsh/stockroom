@@ -7,6 +7,7 @@ import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
+import { CaptureProvider } from "./lib/capture";
 // The interface face, bundled offline (no CDN) so it renders identically inside
 // WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
 // carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
@@ -38,9 +39,11 @@ createRoot(rootEl).render(
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider>
-              <AddPartProvider>
-                <App />
-              </AddPartProvider>
+              <CaptureProvider>
+                <AddPartProvider>
+                  <App />
+                </AddPartProvider>
+              </CaptureProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>
