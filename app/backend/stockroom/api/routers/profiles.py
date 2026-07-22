@@ -22,6 +22,10 @@ def profiles_router(require_token) -> APIRouter:
     def create_profile(request: Request, body: dict) -> dict:
         ctx = request.app.state.ctx
         ctx.profile_store.create(body["name"], archive=bool(body.get("archive", False)))
+        # A created profile is a library write (it commits the new libraries/<name>/ tree), so it
+        # auto-pushes like a part add. Without this the profile committed only locally while the
+        # app still read "synced", so a new profile silently never reached the remote.
+        ctx.auto_push()
         return {"profiles": ctx.profile_store.list(), "active": ctx.profile.name}
 
     @r.post("/{name}/activate")
@@ -38,6 +42,7 @@ def profiles_router(require_token) -> APIRouter:
         if name == ctx.profile.name:
             raise ApiError(400, "cannot delete the active profile; switch first")
         ctx.profile_store.delete(name)
+        ctx.auto_push()  # deleting a profile commits the removal; push it like any library write
         return Response(status_code=204)
 
     return r

@@ -39,3 +39,22 @@ def test_cannot_delete_the_active_profile(client):
 def test_delete_a_nonactive_profile(client):
     client.post("/api/profiles", json={"name": "Scratch"})
     assert client.delete("/api/profiles/Scratch").status_code == 204
+
+
+def test_creating_a_profile_auto_pushes_it(client, app_ctx):
+    # A created profile commits locally; like EVERY other library write (a part add, an edit) it
+    # must also auto-push, or it silently never leaves the machine while the app still reads
+    # "synced". Regression lock for the profile-not-synced bug.
+    calls = []
+    app_ctx.auto_push = lambda: calls.append(1)
+    r = client.post("/api/profiles", json={"name": "Synced"})
+    assert r.status_code == 200
+    assert calls == [1]  # the create pushed exactly once, like a part add
+
+
+def test_deleting_a_profile_auto_pushes_the_removal(client, app_ctx):
+    client.post("/api/profiles", json={"name": "Scratch"})
+    calls = []
+    app_ctx.auto_push = lambda: calls.append(1)
+    assert client.delete("/api/profiles/Scratch").status_code == 204
+    assert calls == [1]  # the deletion commit is pushed too
