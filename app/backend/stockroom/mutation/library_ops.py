@@ -394,7 +394,7 @@ class LibraryOps:
         required data fields are excluded and reported (never half-placed)."""
         from stockroom.altium.datasource import emit_xlsx
         from stockroom.altium.dblib import emit_dblib
-        from stockroom.model.part import altium_assets_ready
+        from stockroom.model.part import altium_place_ready
 
         altium_dir = self.lib.parts_dir.parent / "altium"
         altium_dir.mkdir(parents=True, exist_ok=True)
@@ -412,10 +412,9 @@ class LibraryOps:
         ready, skipped = [], []
         for json_path in sorted(self.lib.parts_dir.glob("*.json")):
             record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
-            # NB: value is intentionally NOT required here (nothing in the real pipeline persists
-            # it; the emitter derives the Value column). Requiring it skipped every real part.
-            required = bool(record.mpn and record.manufacturer and record.description)
-            if altium_assets_ready(record) and required:
+            # value is intentionally NOT required (nothing persists it; the emitter derives the
+            # Value column). altium_place_ready is the shared predicate the status view also uses.
+            if altium_place_ready(record):
                 ready.append(record)
             else:
                 skipped.append(record.id)

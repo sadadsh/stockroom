@@ -81,6 +81,16 @@ def altium_assets_ready(record) -> bool:
     )
 
 
+def altium_place_ready(record) -> bool:
+    """The single predicate for "this part becomes a DbLib row": Altium assets present AND the
+    required data fields present (MPN, Manufacturer, Description). The DbLib emitter and the
+    status view both call this, so the "N of M ready" count can never disagree with what is
+    actually emitted."""
+    return altium_assets_ready(record) and bool(
+        record.mpn and record.manufacturer and record.description
+    )
+
+
 @dataclass
 class Datasheet:
     file: str = ""

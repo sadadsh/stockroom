@@ -6,21 +6,28 @@ Everything is scoped to the ACTIVE profile via ctx.ops / ctx.profile, so switchi
 switches the DbLib this surface reflects."""
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.errors import ApiError
 from stockroom.ingest.component_naming import derive_value
-from stockroom.model.part import altium_assets_ready
+from stockroom.model.part import PartRecord, altium_place_ready
+
+# regenerate + attach both commit to the one git repo and write the shared .xlsx/.DbLib, and
+# FastAPI runs these sync handlers in the threadpool, so two triggers (the Settings Regenerate,
+# the modal's attach-then-regenerate, two quick attaches) can overlap. Serialize every
+# library-mutating altium call so concurrent git commits can never collide on .git/index.lock.
+_WRITE_LOCK = threading.Lock()
 
 
 def _row(record) -> dict:
     """One status row per part: its identity + the Value the emitter would write + the resolved
-    Altium symbol/footprint names, and whether it is place-ready (assets + required fields)."""
+    Altium symbol/footprint names, and whether it is place-ready. Uses the SAME predicate the
+    emitter uses (altium_place_ready), so the count can never disagree with what is emitted."""
     sym = record.altium_symbol
     fp = record.altium_footprint
-    required = bool(record.mpn and record.manufacturer and record.description)
     return {
         "id": record.id,
         "display_name": record.display_name,
@@ -29,7 +36,7 @@ def _row(record) -> dict:
         "value": record.value or derive_value(record),
         "symbol": sym.name if sym else "",
         "footprint": fp.name if fp else "",
-        "ready": bool(altium_assets_ready(record) and required),
+        "ready": altium_place_ready(record),
     }
 
 
@@ -39,8 +46,18 @@ def altium_router(require_token) -> APIRouter:
     @r.get("/status")
     def status(request: Request) -> dict:
         ctx = request.app.state.ctx
-        rows = [_row(ctx.ops.load_record(row.id)) for row in ctx.index.search("")]
-        altium_dir = ctx.profile.library.parts_dir.parent / "altium"
+        parts_dir = ctx.profile.library.parts_dir
+        # Read records straight from parts_dir (the SAME source regenerate globs) so the count
+        # agrees with the emitter, and skip a bad/missing record rather than 404 the whole
+        # surface on a stale index (mirrors the guarded full-scan in library.py).
+        rows = []
+        for json_path in sorted(parts_dir.glob("*.json")):
+            try:
+                record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            rows.append(_row(record))
+        altium_dir = parts_dir.parent / "altium"
         return {
             "profile": ctx.profile.name,
             "dblib": str(altium_dir / "Stockroom.DbLib"),
@@ -54,8 +71,9 @@ def altium_router(require_token) -> APIRouter:
     @r.post("/regenerate")
     def regenerate(request: Request) -> dict:
         ctx = request.app.state.ctx
-        result = ctx.ops.regenerate_altium_dblib()
-        ctx.auto_push()  # the DbLib commit pushes like any other library write (no-op without a token)
+        with _WRITE_LOCK:
+            result = ctx.ops.regenerate_altium_dblib()
+            ctx.auto_push()  # the DbLib commit pushes like any library write (no-op without a token)
         return {
             "emitted": result["emitted"],
             "skipped": result["skipped"],
@@ -70,9 +88,10 @@ def altium_router(require_token) -> APIRouter:
         sources = [Path(p) for p in body.get("paths", [])]
         if not sources:
             raise ApiError(422, "attach needs a .SchLib and .PcbLib pair, or a single .IntLib")
-        record = ctx.ops.attach_altium_assets(part_id, *sources)  # ValueError -> 400 on bad source
-        ctx.rebuild_index()
-        ctx.auto_push()
+        with _WRITE_LOCK:
+            record = ctx.ops.attach_altium_assets(part_id, *sources)  # ValueError -> 400 on bad source
+            ctx.rebuild_index()
+            ctx.auto_push()
         return record.to_dict()
 
     return r
