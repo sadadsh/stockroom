@@ -1,0 +1,57 @@
+[OutputDatabaseLinkFile]
+Version=1.1
+[DatabaseLinks]
+ConnectionString=Provider=Microsoft.ACE.OLEDB.12.0;Data Source=.\stockroom-parts.xlsx;Extended Properties="Excel 12.0 Xml;HDR=YES;IMEX=1";
+AddMode=3
+RemoveMode=1
+UpdateMode=2
+ViewMode=0
+LeftQuote=[
+RightQuote=]
+QuoteTableNames=1
+UseTableSchemaName=0
+DefaultColumnType=VARCHAR(255)
+LibraryDatabaseType=Excel
+LibraryDatabasePath=.\stockroom-parts.xlsx
+DatabasePathRelative=1
+LibrarySearchPath=.
+[Table1]
+SchemaName=
+TableName=Parts$
+Enabled=True
+UserWhere=0
+UserWhereText=
+[FieldMap1]
+Options=FieldName=Parts$.MPN|TableNameOnly=Parts$|FieldNameOnly=MPN|FieldType=1|ParameterName=MPN|VisibleOnAdd=True|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap2]
+Options=FieldName=Parts$.Library Ref|TableNameOnly=Parts$|FieldNameOnly=Library Ref|FieldType=1|ParameterName=[Library Ref]|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap3]
+Options=FieldName=Parts$.Library Path|TableNameOnly=Parts$|FieldNameOnly=Library Path|FieldType=1|ParameterName=[Library Path]|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap4]
+Options=FieldName=Parts$.Footprint Ref|TableNameOnly=Parts$|FieldNameOnly=Footprint Ref|FieldType=1|ParameterName=[Footprint Ref]|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap5]
+Options=FieldName=Parts$.Footprint Path|TableNameOnly=Parts$|FieldNameOnly=Footprint Path|FieldType=1|ParameterName=[Footprint Path]|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap6]
+Options=FieldName=Parts$.Value|TableNameOnly=Parts$|FieldNameOnly=Value|FieldType=1|ParameterName=Value|VisibleOnAdd=True|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap7]
+Options=FieldName=Parts$.Manufacturer|TableNameOnly=Parts$|FieldNameOnly=Manufacturer|FieldType=1|ParameterName=Manufacturer|VisibleOnAdd=True|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap8]
+Options=FieldName=Parts$.Description|TableNameOnly=Parts$|FieldNameOnly=Description|FieldType=1|ParameterName=[Description]|VisibleOnAdd=True|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap9]
+Options=FieldName=Parts$.ComponentLink1Description|TableNameOnly=Parts$|FieldNameOnly=ComponentLink1Description|FieldType=1|ParameterName=ComponentLink1Description|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap10]
+Options=FieldName=Parts$.ComponentLink1URL|TableNameOnly=Parts$|FieldNameOnly=ComponentLink1URL|FieldType=1|ParameterName=ComponentLink1URL|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap11]
+Options=FieldName=Parts$.Supplier|TableNameOnly=Parts$|FieldNameOnly=Supplier|FieldType=1|ParameterName=Supplier|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap12]
+Options=FieldName=Parts$.SupplierPartNumber|TableNameOnly=Parts$|FieldNameOnly=SupplierPartNumber|FieldType=1|ParameterName=SupplierPartNumber|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap13]
+Options=FieldName=Parts$.SupplierURL|TableNameOnly=Parts$|FieldNameOnly=SupplierURL|FieldType=1|ParameterName=SupplierURL|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap14]
+Options=FieldName=Parts$.Price|TableNameOnly=Parts$|FieldNameOnly=Price|FieldType=1|ParameterName=Price|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap15]
+Options=FieldName=Parts$.Stock|TableNameOnly=Parts$|FieldNameOnly=Stock|FieldType=1|ParameterName=Stock|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap16]
+Options=FieldName=Parts$.Lifecycle|TableNameOnly=Parts$|FieldNameOnly=Lifecycle|FieldType=1|ParameterName=Lifecycle|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap17]
+Options=FieldName=Parts$.Category|TableNameOnly=Parts$|FieldNameOnly=Category|FieldType=1|ParameterName=Category|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
