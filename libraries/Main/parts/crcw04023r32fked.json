@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "3.3",
+  "display_name": "3.3Ω 1% 0402 Vishay CRCW04023R32FKED",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED?qs=%2FGvPWUwWV9YPS%252BJP%2FiUvGA%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:08:52.881689+00:00",
+      "part_number": "71-CRCW0402-3.32-E3",
       "price_breaks": [
         {
           "price": 0.1,
@@ -64,23 +64,29 @@
           "qty": 10000
         }
       ],
-      "stock": 91174,
-      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED",
+      "stock": 91162,
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04023R32FKED?qs=%2FGvPWUwWV9YPS%252BJP%2FiUvGA%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Automotive Grade",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Vishay",
     "Case Code - in": "0402",
     "Case Code - mm": "1005",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Israel",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "10000",
     "Height": "0.35 mm (0.014 in)",
     "Length": "1 mm (0.039 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Vishay",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0402",
     "Packaging": "Reel",
     "Part # Aliases": "CRCW04023R32FNED",
     "Power Rating": "100 mW (1/10 W)",
@@ -93,9 +99,10 @@
     "Series": "D/CRCW e3",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
+    "US Tariff %": 10.0,
     "Unit Weight": "0.000023 oz",
     "Voltage Rating": "75 V",
     "Width": "0.5 mm (0.02 in)"
