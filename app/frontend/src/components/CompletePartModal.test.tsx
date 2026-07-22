@@ -75,23 +75,22 @@ afterEach(() => {
   delete window.__STOCKROOM_CAD_DOWNLOAD__;
 });
 
+const track = (tool: string) => document.querySelector(`[data-track='${tool}']`) as HTMLElement;
+
 describe("CompletePartModal - guided capture", () => {
-  it("renders the both-format checklist and the guided button", async () => {
+  it("lays out the FILES and DETAILS regions with the both-format checklist", async () => {
     mockCadSource(["kicad_symbol", "kicad_footprint", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
 
-    expect(await screen.findByText("CAD Files")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Get CAD Files (KiCad + Altium)" }),
-    ).toBeInTheDocument();
-    const kicadGroup = screen.getByText("KiCad").parentElement as HTMLElement;
-    const altiumGroup = screen.getByText("Altium").parentElement as HTMLElement;
-    // Each needed row renders under its tool group.
-    expect(within(kicadGroup).getByText("Symbol")).toBeInTheDocument();
-    expect(within(kicadGroup).getByText("Footprint")).toBeInTheDocument();
-    expect(within(altiumGroup).getByText("Symbol")).toBeInTheDocument();
+    expect(await screen.findByText("Files")).toBeInTheDocument();
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
+    // Each needed row renders under its tool track.
+    expect(within(track("KiCad")).getByText("Symbol")).toBeInTheDocument();
+    expect(within(track("KiCad")).getByText("Footprint")).toBeInTheDocument();
+    expect(within(track("Altium")).getByText("Symbol")).toBeInTheDocument();
     // KiCad 3D Model was not needed here, so it is not listed.
-    expect(within(kicadGroup).queryByText("3D Model")).toBeNull();
+    expect(within(track("KiCad")).queryByText("3D Model")).toBeNull();
   });
 
   it("marks a requirement received when a capture lands", async () => {
@@ -111,8 +110,8 @@ describe("CompletePartModal - guided capture", () => {
     vi.spyOn(api, "assetsCommit").mockResolvedValue({} as never);
 
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
-    await screen.findByText("CAD Files");
-    await user.click(screen.getByRole("button", { name: "Get CAD Files (KiCad + Altium)" }));
+    await screen.findByText("Files");
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     await act(async () => {
       window.__STOCKROOM_CAD_DOWNLOAD__!({
@@ -123,10 +122,25 @@ describe("CompletePartModal - guided capture", () => {
       await Promise.resolve();
     });
 
-    // The KiCad Symbol row (the first "Symbol" row) flips to received.
     await waitFor(() => {
-      const kicadGroup = screen.getByText("KiCad").parentElement as HTMLElement;
-      expect(within(kicadGroup).getByText("Received")).toBeInTheDocument();
+      expect(within(track("KiCad")).getByText("Received")).toBeInTheDocument();
     });
+  });
+
+  it("hands the capture to the background and closes on Keep Working", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    const open = vi.fn().mockResolvedValue("tok");
+    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
+      api: { open_cad_download: open },
+    };
+    const onClose = vi.fn();
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
+    await screen.findByText("Files");
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+    // once capturing, Keep Working appears and hands off + closes
+    const keep = await screen.findByRole("button", { name: "Keep Working" });
+    await user.click(keep);
+    expect(onClose).toHaveBeenCalled();
   });
 });
