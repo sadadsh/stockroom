@@ -60,7 +60,7 @@ def _step(step: str, selectors: list[str], ok_msg: str, fail_msg: str) -> str:
 _DIGIKEY_DRIVER = (
     "function report(step,ok,msg){try{var o=window.__STOCKROOM_OVERLAY__;"
     "o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
-    "report('start',true,'DigiKey gathers the SnapEDA, Ultra Librarian and SamacSys downloads in one place.');"
+    "report('start',true,'DigiKey lists the symbol, footprint and 3D model together. Download them and they attach here.');"
     "function findCad(){try{"
     "var sels=['#cad-models','[data-testid=\"cad-models\"]','#eda-models','#ecad-models'];"
     "for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el)return el;}"
@@ -79,7 +79,7 @@ _DIGIKEY_DRIVER = (
     "report('cad',true,'Download the symbol, footprint and 3D model from this CAD Models section.');return;}"
     "if(tries<12){setTimeout(tick,900);}"
     "else{try{window.scrollTo(0,0);}catch(e){}"
-    "report('cad',false,'Scroll to the EDA / CAD Models section and download the files.');}}"
+    "report('cad',false,'Open the EDA / CAD Models section on this page to download the symbol, footprint and 3D model.');}}"
     "setTimeout(tick,600);"
 )
 
