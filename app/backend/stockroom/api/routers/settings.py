@@ -15,7 +15,8 @@ from stockroom.kicad.common_json import read_env_var
 def _hint(key: str) -> str:
     """The last four characters, so the user can confirm which key is stored
     without the surface ever revealing the whole secret. Short keys reveal
-    nothing."""
+    nothing. Tolerates a null field in a hand-edited config.json."""
+    key = key or ""
     return key[-4:] if len(key) >= 4 else ""
 
 
@@ -71,11 +72,15 @@ def settings_router(require_token) -> APIRouter:
         if "mouser_api_key" in body:
             ctx.config.mouser_api_key = str(body["mouser_api_key"] or "")
             ctx.config.save()
-        # Saved vendor logins (no live-apply side effect): write only the fields sent.
+        # Saved vendor logins (no live-apply side effect): write only the fields sent,
+        # then persist once (not once per field).
+        _vendor_dirty = False
         for _vendor_field in ("ul_username", "ul_password", "snapeda_username", "snapeda_password"):
             if _vendor_field in body:
                 setattr(ctx.config, _vendor_field, str(body[_vendor_field] or ""))
-                ctx.config.save()
+                _vendor_dirty = True
+        if _vendor_dirty:
+            ctx.config.save()
         if "github_token" in body:
             ctx.config.github_token = str(body["github_token"] or "").strip()
             ctx.config.save()

@@ -46,3 +46,10 @@ def test_needs_omits_altium_when_present():
     needs = capture_needs(rec)
     assert Requirement.ALTIUM_SYMBOL not in needs
     assert Requirement.ALTIUM_FOOTPRINT not in needs
+
+
+def test_needs_includes_altium_when_ref_present_but_name_blank():
+    rec = _Rec(_missing=[], altium_symbol=_Ref(""), altium_footprint=_Ref(""))
+    needs = capture_needs(rec)
+    assert Requirement.ALTIUM_SYMBOL in needs
+    assert Requirement.ALTIUM_FOOTPRINT in needs
