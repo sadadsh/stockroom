@@ -170,15 +170,73 @@ def _drive_digikey(webview, base: str, captured: list, result: dict) -> None:
     result["ok"] = overlay_present and bool(outlined) and "CAD" in status
 
 
+def _resolve_digikey_url(mpn: str):
+    """Resolve a real DigiKey product-detail URL for an MPN via the app's DigiKey resolver +
+    configured creds, so the live check opens the same page the guided window would."""
+    try:
+        from stockroom.api.context import build_context
+        from stockroom.api.routers.library import build_refresh_adapters
+        from stockroom.enrich.cad_source import resolve_digikey_cad_source
+
+        ctx = build_context()
+        dk = next((a for a in build_refresh_adapters(ctx) if getattr(a, "vendor", "") == "DigiKey"), None)
+        return resolve_digikey_cad_source(mpn, dk) if dk is not None else None
+    except Exception as e:  # noqa: BLE001
+        print("RESOLVE_ERROR", repr(e))
+        return None
+
+
+def _drive_live(webview, base: str, captured: list, result: dict) -> None:
+    import os
+
+    url = os.environ.get("STOCKROOM_LIVE_URL", "")
+    if not url:
+        url = _resolve_digikey_url(os.environ.get("STOCKROOM_LIVE_MPN", "2N7002")) or ""
+    result["url"] = url
+    if not url:
+        result["error"] = "no DigiKey URL resolved (check DigiKey API creds in config)"
+        return
+    time.sleep(1.5)
+    W._HostApi().open_cad_download(url, ["kicad_symbol", "altium_symbol", "altium_footprint"])
+    time.sleep(10.0)  # a real DigiKey page: load + any bot check + the driver's scroll/highlight
+    cad = W.cad_window()
+    try:
+        result["overlay_present"] = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
+        result["page_title"] = cad.evaluate_js("document.title||''") or ""
+        result["status_text"] = (
+            cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
+        )
+        result["cad_headings"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4'))"
+                ".map(function(h){return (h.textContent||'').trim().slice(0,50)})"
+                ".filter(function(t){return /cad|symbol|eda|3d model/i.test(t)}).slice(0,6))"
+            )
+            or "[]"
+        )
+    except Exception as e:  # noqa: BLE001
+        result["error"] = repr(e)
+    try:
+        from PIL import ImageGrab
+
+        out = r"C:\srverify\ui_digikey_live.png"
+        ImageGrab.grab().save(out)
+        result["screenshot"] = out
+    except Exception as e:  # noqa: BLE001
+        result["screenshot_error"] = repr(e)
+    result["ok"] = bool(result.get("overlay_present"))
+
+
 def main() -> int:
     import webview
 
-    digikey = "--digikey" in sys.argv
-    fixture = "--fixture" in sys.argv and not digikey
+    live = "--live" in sys.argv
+    digikey = "--digikey" in sys.argv and not live
+    fixture = "--fixture" in sys.argv and not digikey and not live
     captured: list[dict] = []
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
-    mode = "digikey" if digikey else "fixture" if fixture else "download"
+    mode = "live" if live else "digikey" if digikey else "fixture" if fixture else "download"
     result: dict = {"mode": mode, "ok": False, "error": None}
 
     main_win = webview.create_window("stockroom-live", html="<html><body>host</body></html>", hidden=True)
@@ -190,7 +248,15 @@ def main() -> int:
 
     def driver() -> None:
         try:
-            drive = _drive_digikey if digikey else _drive_fixture if fixture else _drive_download
+            drive = (
+                _drive_live
+                if live
+                else _drive_digikey
+                if digikey
+                else _drive_fixture
+                if fixture
+                else _drive_download
+            )
             drive(webview, base, captured, result)
         except Exception as e:  # noqa: BLE001
             result["error"] = repr(e)
