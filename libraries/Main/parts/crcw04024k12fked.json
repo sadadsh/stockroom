@@ -6,7 +6,7 @@
     "source_url": "https://www.vishay.com/docs/20035/dcrcwe3.pdf"
   },
   "description": "Resistor, small symbol",
-  "display_name": "4.12k",
+  "display_name": "4.12k 1% 0402 Vishay CRCW04024K12FKED",
   "enrichment": {},
   "footprint": {
     "lib": "Resistor_SMD",
@@ -22,69 +22,75 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED?qs=hAuyw6LW%252BLh45zlhMS0oKQ%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:09:08.249378+00:00",
+      "part_number": "71-CRCW0402-4.12K-E3",
       "price_breaks": [
         {
-          "price": 0.15,
+          "price": 0.1,
           "qty": 1
         },
         {
-          "price": 0.089,
+          "price": 0.02,
           "qty": 10
         },
         {
-          "price": 0.038,
+          "price": 0.016,
           "qty": 100
         },
         {
-          "price": 0.03,
+          "price": 0.013,
           "qty": 250
         },
         {
-          "price": 0.027,
+          "price": 0.011,
           "qty": 500
         },
         {
-          "price": 0.025,
+          "price": 0.009,
           "qty": 1000
         },
         {
-          "price": 0.018,
+          "price": 0.007,
           "qty": 5000
         },
         {
-          "price": 0.017,
+          "price": 0.005,
           "qty": 10000
         },
         {
-          "price": 0.016,
+          "price": 0.004,
           "qty": 20000
         }
       ],
-      "stock": 10238,
-      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED",
+      "stock": 10228,
+      "url": "https://www.mouser.com/en/ProductDetail/Vishay/CRCW04024K12FKED?qs=hAuyw6LW%252BLh45zlhMS0oKQ%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Automotive Grade",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Vishay",
     "Case Code - in": "0402",
     "Case Code - mm": "1005",
-    "Factory Pack Quantity: Factory Pack Quantity": "10000",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "10000",
     "Height": "0.35 mm (0.014 in)",
     "Length": "1 mm (0.039 in)",
+    "Lifecycle": "Active",
     "Manufacturer": "Vishay",
     "Maximum Operating Temperature": "+ 155 C",
     "Minimum Operating Temperature": "- 55 C",
     "Mounting Style": "PCB Mount",
+    "Package": "0402",
     "Packaging": "Reel",
     "Power Rating": "100 mW (1/10 W)",
     "Product": "Thick Film Resistors SMD",
@@ -96,9 +102,10 @@
     "Series": "D/CRCW e3",
     "Subcategory": "Resistors",
     "Technology": "Thick Film",
-    "Temperature Coefficient": "100 PPM / C",
+    "Temperature Coefficient": "100 PPM/C",
     "Termination Style": "SMD/SMT",
-    "Tolerance": "1 %",
+    "Tolerance": "1%",
+    "US Tariff %": 10.0,
     "Unit Weight": "0.000023 oz",
     "Voltage Rating": "75 V",
     "Width": "0.5 mm (0.02 in)"
