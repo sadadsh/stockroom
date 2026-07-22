@@ -400,13 +400,21 @@ class LibraryOps:
         altium_dir.mkdir(parents=True, exist_ok=True)
         xlsx_path = altium_dir / "stockroom-parts.xlsx"
         dblib_path = altium_dir / "Stockroom.DbLib"
+        gitignore_path = altium_dir / ".gitignore"
+        # A local .gitignore travels with the library, so the derived .xlsx stays ignored even if
+        # the library lives in a repo without the app repo's root rule (the private-repo fallback).
+        gitignore_path.write_text(
+            "# Derived Altium data source (regenerated from records; the .DbLib IS committed).\n"
+            "stockroom-parts.xlsx\n",
+            encoding="utf-8",
+        )
 
         ready, skipped = [], []
         for json_path in sorted(self.lib.parts_dir.glob("*.json")):
             record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
-            required = bool(
-                record.mpn and record.manufacturer and record.description and record.value
-            )
+            # NB: value is intentionally NOT required here (nothing in the real pipeline persists
+            # it; the emitter derives the Value column). Requiring it skipped every real part.
+            required = bool(record.mpn and record.manufacturer and record.description)
             if altium_assets_ready(record) and required:
                 ready.append(record)
             else:
@@ -416,6 +424,7 @@ class LibraryOps:
         with Transaction(self.repo) as txn:
             emit_dblib("Parts$", xlsx_path.name, dblib_path)
             txn.track(dblib_path)
+            txn.track(gitignore_path)
             txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")
         return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "xlsx": xlsx_path}
 
@@ -427,7 +436,7 @@ class LibraryOps:
         touched path is restored (zero trace). Fails loud if the source cannot be normalized or
         an entry name cannot be read (part left untouched)."""
         from stockroom.altium.extract import normalize_altium_source
-        from stockroom.altium.oleread import read_footprint_names, read_symbol_names
+        from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
 
         record = self.load_record(part_id)
         altium_dir = self.lib.parts_dir.parent / "altium"
@@ -436,14 +445,10 @@ class LibraryOps:
         with tempfile.TemporaryDirectory() as td:
             # normalize to a loose (schlib, pcblib) pair (extracting an IntLib into the tempdir)
             sch_src, pcb_src = normalize_altium_source(*sources, out_dir=td)
-            sym_names = read_symbol_names(sch_src)
-            fp_names = read_footprint_names(pcb_src)
-            if not sym_names:
-                raise ValueError(f"no symbol entry found in {Path(sch_src).name}")
-            if not fp_names:
-                raise ValueError(f"no footprint entry found in {Path(pcb_src).name}")
-            sym_name = record.mpn if record.mpn in sym_names else sym_names[0]
-            fp_name = fp_names[0]
+            # pick the one entry to bind; an exact MPN match wins for the symbol, a multi-entry
+            # library is rejected rather than silently binding the alphabetically-first (wrong part)
+            sym_name = pick_entry(read_symbol_names(sch_src), "symbol", prefer=record.mpn)
+            fp_name = pick_entry(read_footprint_names(pcb_src), "footprint")
 
             # mkdir AFTER validation so a normalize/read failure leaves zero trace
             fresh = [] if altium_dir.exists() else [altium_dir]
@@ -452,9 +457,11 @@ class LibraryOps:
             pcb_dst = altium_dir / f"{part_id}.PcbLib"
             with Transaction(self.repo) as txn:
                 txn.track_dir(*fresh)
+                # track EACH file right after its copy so a failure of the second copy still
+                # rolls back the first (no leaked .SchLib on a partial failure)
                 shutil.copyfile(sch_src, sch_dst)
-                shutil.copyfile(pcb_src, pcb_dst)
                 txn.track(sch_dst)
+                shutil.copyfile(pcb_src, pcb_dst)
                 txn.track(pcb_dst)
                 record.altium_symbol = AltiumRef(lib=sch_dst.name, name=sym_name)
                 record.altium_footprint = AltiumRef(lib=pcb_dst.name, name=fp_name)
