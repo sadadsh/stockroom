@@ -96,7 +96,7 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="Altium Database Library"
-        className="flex max-h-[86vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise"
+        className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise"
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
           <div className="flex items-baseline gap-2.5">
@@ -147,29 +147,35 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           ) : (
-            <table className="w-full border-collapse">
+            <table className="w-full table-fixed border-collapse">
               <thead>
                 <tr>
                   <th className={TH}>Part</th>
-                  <th className={TH}>MPN</th>
-                  <th className={TH}>Value</th>
-                  <th className={TH}>Symbol</th>
-                  <th className={TH}>Footprint</th>
-                  <th className={TH}>Status</th>
-                  <th className={`${TH} text-right`}>{""}</th>
+                  <th className={`${TH} w-[164px]`}>MPN</th>
+                  <th className={`${TH} w-[76px]`}>Value</th>
+                  <th className={`${TH} w-[108px]`}>Symbol</th>
+                  <th className={`${TH} w-[120px]`}>Footprint</th>
+                  <th className={`${TH} w-[104px]`}>Status</th>
+                  <th className={`${TH} w-[132px]`} aria-label="Attach" />
                 </tr>
               </thead>
               <tbody>
                 {shown.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-b-0 hover:bg-raise2">
-                    <td className={`${TD} max-w-[200px] truncate text-t2`} title={row.display_name}>
+                    <td className={`${TD} truncate text-t2`} title={row.display_name}>
                       {row.display_name}
                     </td>
-                    <td className={`${TD} font-mono text-t1`}>{row.mpn || "—"}</td>
-                    <td className={`${TD} font-mono text-t2`}>{row.value || "—"}</td>
-                    <td className={`${TD} font-mono text-t3`}>{row.symbol || "—"}</td>
-                    <td className={`${TD} font-mono text-t3`}>{row.footprint || "—"}</td>
-                    <td className={TD}>
+                    <td className={`${TD} truncate font-mono text-t1`} title={row.mpn}>
+                      {row.mpn || "—"}
+                    </td>
+                    <td className={`${TD} truncate font-mono text-t2`}>{row.value || "—"}</td>
+                    <td className={`${TD} truncate font-mono text-t3`} title={row.symbol}>
+                      {row.symbol || "—"}
+                    </td>
+                    <td className={`${TD} truncate font-mono text-t3`} title={row.footprint}>
+                      {row.footprint || "—"}
+                    </td>
+                    <td className={`${TD} whitespace-nowrap`}>
                       {row.ready ? (
                         <span className="inline-flex items-center gap-1.5">
                           <Dot tone="ok" />
@@ -181,7 +187,7 @@ export function AltiumDbLibModal({ onClose }: { onClose: () => void }) {
                         </Badge>
                       )}
                     </td>
-                    <td className={`${TD} text-right`}>
+                    <td className={`${TD} whitespace-nowrap text-right`}>
                       {row.ready ? null : (
                         <Button
                           small
