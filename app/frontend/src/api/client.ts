@@ -8,6 +8,8 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  AltiumRegenerateResult,
+  AltiumStatus,
   AuditResult,
   BomDiffResult,
   BomExportKind,
@@ -957,5 +959,25 @@ export const api = {
   // Undo the project's last Prepare / Fill by git-reverting that commit as a new commit (M7f-D).
   restore(id: string): Promise<RestoreResult> {
     return request<RestoreResult>("POST", `/api/projects/${encodeURIComponent(id)}/restore`);
+  },
+
+  // The Altium Database Library status for the active profile: place-ready count + per-part rows.
+  altiumStatus(): Promise<AltiumStatus> {
+    return apiGet<AltiumStatus>("/api/altium/status");
+  },
+
+  // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).
+  altiumRegenerate(): Promise<AltiumRegenerateResult> {
+    return request<AltiumRegenerateResult>("POST", "/api/altium/regenerate");
+  },
+
+  // Attach a part's Altium assets (a .SchLib + .PcbLib pair or a single .IntLib) by their native
+  // filesystem paths (host-captured, same as ingest). Synchronous, one atomic commit.
+  altiumAttach(partId: string, paths: string[]): Promise<unknown> {
+    return request<unknown>(
+      "POST",
+      `/api/altium/parts/${encodeURIComponent(partId)}/attach`,
+      { body: { paths } },
+    );
   },
 };
