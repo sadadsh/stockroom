@@ -205,12 +205,12 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
     cad = W.cad_window()
     # DigiKey lazy-loads below-the-fold sections; scroll the page to force them into the DOM.
     try:
-        for frac in (0.25, 0.5, 0.75, 1.0, 0.55):
+        for frac in (0.4, 0.75, 1.0):
             cad.evaluate_js(f"window.scrollTo(0, document.body.scrollHeight*{frac})")
-            time.sleep(1.3)
+            time.sleep(1.5)
     except Exception:  # noqa: BLE001
         pass
-    time.sleep(2.0)
+    time.sleep(1.5)
     try:
         result["overlay_present"] = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
         result["page_title"] = cad.evaluate_js("document.title||''") or ""
@@ -220,19 +220,19 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         result["all_headings"] = (
             cad.evaluate_js(
                 "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4,h5'))"
-                ".map(function(h){return (h.textContent||'').trim().slice(0,45)}).filter(Boolean).slice(0,40))"
-            )
-            or "[]"
-        )
-        result["cad_hits"] = (
-            cad.evaluate_js(
-                "JSON.stringify(Array.from(document.querySelectorAll('*')).filter(function(e){"
-                "return e.children.length===0 && /cad models|pcb symbol|footprint|eda\\/cad|3d model/i.test(e.textContent||'')})"
-                ".map(function(e){return e.tagName+': '+(e.textContent||'').trim().slice(0,40)}).slice(0,10))"
+                ".map(function(h){return (h.textContent||'').trim().slice(0,45)}).filter(Boolean).slice(0,35))"
             )
             or "[]"
         )
         result["iframes"] = cad.evaluate_js("document.querySelectorAll('iframe').length")
+        # the SnapEDA-powered CAD widget on DigiKey is usually an iframe; capture its src host
+        result["iframe_srcs"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('iframe'))"
+                ".map(function(f){return (f.src||'').slice(0,60)}).filter(Boolean).slice(0,8))"
+            )
+            or "[]"
+        )
     except Exception as e:  # noqa: BLE001
         result["error"] = repr(e)
     try:
