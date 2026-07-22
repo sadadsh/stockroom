@@ -99,14 +99,24 @@ function hostOpenCadDownload():
   ).pywebview?.api?.open_cad_download;
 }
 
-export function useGuidedCapture(partId: string) {
+export function useGuidedCapture(partId: string, needs: Requirement[] = []) {
   const [state, setState] = useState<State>(IDLE);
   const qc = useQueryClient();
   const tokenRef = useRef<string | null>(null);
-  const needsRef = useRef<Requirement[]>([]);
+  const needsRef = useRef<Requirement[]>(needs);
   const receivedRef = useRef<Received>({});
   const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlerRef = useRef<((payload: CaptureForward | string) => void) | null>(null);
+
+  // The needs are owned by the caller's cad-source query, so needsRef is populated
+  // even before start() runs. Without this, the manual "Browse For Files" path would
+  // mark nothing (needsRef empty) and falsely report "done".
+  const needsKey = needs.join(",");
+  useEffect(() => {
+    needsRef.current = needs;
+    setState((s) => ({ ...s, needs }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsKey]);
 
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["parts"] });
@@ -278,7 +288,8 @@ export function useGuidedCapture(partId: string) {
     clearHandler();
     receivedRef.current = {};
     tokenRef.current = null;
-    setState({ ...IDLE, status: "resolving", message: "Looking up the download page..." });
+    // Keep the caller-owned needs (from the cad-source query) across the reset.
+    setState({ ...IDLE, status: "resolving", message: "Looking up the download page...", needs: needsRef.current });
     let source: { url: string | null; vendor: string; needs: Requirement[] };
     try {
       source = await api.partCadSource(partId);
@@ -290,9 +301,7 @@ export function useGuidedCapture(partId: string) {
       setState((s) => ({ ...s, status: "unavailable", message: "No CAD source page for this part." }));
       return;
     }
-    const needs = source.needs ?? [];
-    needsRef.current = needs;
-    setState((s) => ({ ...s, url: source.url, vendor: source.vendor, needs, received: {} }));
+    setState((s) => ({ ...s, url: source.url, vendor: source.vendor, received: {} }));
     const open = hostOpenCadDownload();
     if (!open) {
       // A plain browser (no host bridge): guidance-only. The user opens the page,
@@ -306,7 +315,7 @@ export function useGuidedCapture(partId: string) {
       return;
     }
     try {
-      const returned = await open(source.url, needs);
+      const returned = await open(source.url, needsRef.current);
       tokenRef.current = typeof returned === "string" && returned ? returned : null;
     } catch {
       // best-effort; the host may not echo a token, and the widened watch still fires.
@@ -330,11 +339,18 @@ export function useGuidedCapture(partId: string) {
         await attachKicad(paths);
         markReceived(KICAD_REQS);
         invalidate();
-        setState((s) =>
-          allReceived()
-            ? { ...s, status: "done", message: "All files received and attached." }
-            : { ...s, status: "receiving", message: "Received. Waiting for the remaining files..." },
-        );
+        if (allReceived()) {
+          clearHandler();
+          setState((s) => ({ ...s, status: "done", message: "All files received and attached." }));
+        } else {
+          // Re-arm the watchdog so the remaining files can never hang forever (B1).
+          armCapture(onCaptureRef.current);
+          setState((s) => ({
+            ...s,
+            status: "receiving",
+            message: "Received. Waiting for the remaining files...",
+          }));
+        }
       } catch (err) {
         setState((s) => ({
           ...s,
@@ -343,16 +359,16 @@ export function useGuidedCapture(partId: string) {
         }));
       }
     },
-    [attachKicad, markReceived, invalidate, allReceived, clearWatchdog],
+    [attachKicad, markReceived, invalidate, allReceived, clearWatchdog, clearHandler, armCapture],
   );
 
   const reset = useCallback(() => {
     clearWatchdog();
     clearHandler();
     tokenRef.current = null;
-    needsRef.current = [];
     receivedRef.current = {};
-    setState(IDLE);
+    // needs are caller-owned (synced from the cad-source query), so keep them.
+    setState({ ...IDLE, needs: needsRef.current });
   }, [clearWatchdog, clearHandler]);
 
   return {

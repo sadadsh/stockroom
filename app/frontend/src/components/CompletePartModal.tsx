@@ -176,9 +176,10 @@ export function CompletePartModal({
   // guided window, and fill the checklist as each file lands. The needs come from
   // the cad-source query up front so the checklist renders before start().
   const cadSource = useCadSourceQuery(detail.id, true);
-  const download = useGuidedCapture(detail.id);
+  const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
+  const download = useGuidedCapture(detail.id, cadNeeds);
   const { toast } = useToast();
-  const needs: Requirement[] = download.needs.length ? download.needs : cadSource.data?.needs ?? [];
+  const needs: Requirement[] = download.needs;
   const receivedCount = needs.filter((n) => download.received[n]).length;
   const showCad = needs.length > 0;
   const cadBusy =
