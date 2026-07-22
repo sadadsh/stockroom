@@ -566,7 +566,7 @@ def test_vendor_from_url_maps_key_and_label():
         "Ultra Librarian",
     )
     assert _vendor_from_url("https://www.snapeda.com/parts/x") == ("snapeda", "SnapEDA")
-    assert _vendor_from_url("https://www.digikey.com/x")[1] == "DigiKey"
+    assert _vendor_from_url("https://www.digikey.com/x") == ("digikey", "DigiKey")
     assert _vendor_from_url("")[0] == ""
 
 

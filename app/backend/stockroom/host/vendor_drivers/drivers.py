@@ -51,8 +51,38 @@ def _step(step: str, selectors: list[str], ok_msg: str, fail_msg: str) -> str:
     )
 
 
+# DigiKey aggregates the SnapEDA / Ultra Librarian / SamacSys downloads on the product page
+# (its "EDA / CAD Models" section) rather than behind format toggles, and needs no login to
+# browse - so its driver GUIDES rather than force-clicks: it scrolls the CAD section into view
+# and highlights it, then reports what to download. It finds the section by a few id selectors
+# (OWNER-VALIDATE) but degrades to a heading-text match (cad / symbol / eda), so a DigiKey markup
+# change never breaks it - no selector tuning required.
+_DIGIKEY_DRIVER = (
+    "function report(step,ok,msg){try{var o=window.__STOCKROOM_OVERLAY__;"
+    "o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
+    "report('start',true,'DigiKey gathers the SnapEDA, Ultra Librarian and SamacSys downloads in one place.');"
+    "try{"
+    "var el=null,sels=['#cad-models','[data-testid=\"cad-models\"]','#eda-models','#ecad-models'];"
+    "for(var i=0;i<sels.length;i++){el=document.querySelector(sels[i]);if(el)break;}"
+    "if(!el){var hs=document.querySelectorAll('h2,h3,h4');"
+    "for(var j=0;j<hs.length;j++){var t=(hs[j].textContent||'').toLowerCase();"
+    "if(t.indexOf('cad')>=0||t.indexOf('symbol')>=0||t.indexOf('eda')>=0){el=hs[j];break;}}}"
+    "if(el){el.scrollIntoView({behavior:'smooth',block:'center'});"
+    "try{el.style.outline='2px solid #5fd39a';el.style.outlineOffset='4px';}catch(e){}"
+    "report('cad',true,'Download the symbol, footprint and 3D model from this CAD Models section.');}"
+    "else{report('cad',false,'Scroll to the EDA / CAD Models section and download the files.');}"
+    "}catch(e){report('cad',false,'Scroll to the EDA / CAD Models section and download the files.');}"
+)
+
+
+def _digikey_driver_js() -> str:
+    return f"(function(){{{_DIGIKEY_DRIVER}}})();"
+
+
 def build_driver_js(vendor: str, formats: list[str]) -> str:
     key = (vendor or "").strip().lower()
+    if key == "digikey":
+        return _digikey_driver_js()
     spec = _VENDORS.get(key)
     if spec is None:
         # Guidance-only: never click anything, but tell the overlay so it can guide manually.

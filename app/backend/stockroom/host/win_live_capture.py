@@ -66,12 +66,26 @@ document.querySelector("[data-testid='download']").addEventListener('click',func
 </body></html>"""
 
 
+# A DigiKey-shaped product page: a tall page with an "EDA / CAD Models" heading (no id the
+# driver knows), to prove the DigiKey driver finds the section by heading text, scrolls to it and
+# highlights it.
+_DK_FIXTURE_HTML = b"""<!doctype html><html><head><meta charset="utf-8"><title>DK fixture</title></head>
+<body style="font:14px system-ui;padding:24px">
+<h1>Example Part (DigiKey fixture)</h1>
+<div style="height:1400px">product overview</div>
+<h2 id="cad-heading">EDA / CAD Models</h2>
+<a download href="/stockroom-live-part.zip" data-testid="download">Download CAD</a>
+</body></html>"""
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.rstrip("/").endswith(".zip"):
             self._send(_ZIP, "application/octet-stream", attachment="stockroom-live-part.zip")
         elif "ultralibrarian" in self.path.lower():
             self._send(_FIXTURE_HTML, "text/html")
+        elif "digikey" in self.path.lower():
+            self._send(_DK_FIXTURE_HTML, "text/html")
         else:
             self._send(b"<!doctype html><meta charset=utf-8><body>download</body>", "text/html")
 
@@ -134,14 +148,38 @@ def _drive_fixture(webview, base: str, captured: list, result: dict) -> None:
     result["ok"] = overlay_present and needed_clicks.issubset(set(clicks)) and bool(captured)
 
 
+def _drive_digikey(webview, base: str, captured: list, result: dict) -> None:
+    time.sleep(1.5)
+    needs = ["kicad_symbol", "altium_symbol", "altium_footprint"]
+    # URL contains 'digikey' -> open_cad_download injects the DigiKey guide driver on load
+    W._HostApi().open_cad_download(f"{base}/product/digikey", needs)
+    time.sleep(3.0)  # let the overlay + driver run (scroll + highlight the CAD section)
+    cad = W.cad_window()
+    overlay_present, outlined, status = False, "", ""
+    try:
+        overlay_present = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
+        outlined = cad.evaluate_js("(document.getElementById('cad-heading')||{}).style?document.getElementById('cad-heading').style.outline:''") or ""
+        status = cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
+    except Exception as e:  # noqa: BLE001
+        result["error"] = repr(e)
+    result["overlay_present"] = overlay_present
+    result["cad_heading_outlined"] = bool(outlined)
+    result["status_text"] = status
+    # PASS when the overlay rendered AND the driver found + highlighted the CAD section AND updated
+    # the guidance to the DigiKey CAD-section message.
+    result["ok"] = overlay_present and bool(outlined) and "CAD" in status
+
+
 def main() -> int:
     import webview
 
-    fixture = "--fixture" in sys.argv
+    digikey = "--digikey" in sys.argv
+    fixture = "--fixture" in sys.argv and not digikey
     captured: list[dict] = []
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
-    result: dict = {"mode": "fixture" if fixture else "download", "ok": False, "error": None}
+    mode = "digikey" if digikey else "fixture" if fixture else "download"
+    result: dict = {"mode": mode, "ok": False, "error": None}
 
     main_win = webview.create_window("stockroom-live", html="<html><body>host</body></html>", hidden=True)
     W._ACTIVE_WINDOW = main_win
@@ -152,7 +190,8 @@ def main() -> int:
 
     def driver() -> None:
         try:
-            (_drive_fixture if fixture else _drive_download)(webview, base, captured, result)
+            drive = _drive_digikey if digikey else _drive_fixture if fixture else _drive_download
+            drive(webview, base, captured, result)
         except Exception as e:  # noqa: BLE001
             result["error"] = repr(e)
         finally:
