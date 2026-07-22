@@ -211,11 +211,27 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         result["status_text"] = (
             cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
         )
+        # light diagnostics (small node sets, no '*' scan) so we can see the real CAD markup
+        result["cad_headings"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4,h5'))"
+                ".map(function(h){return (h.textContent||'').trim().slice(0,45)})"
+                ".filter(function(t){return /cad|symbol|footprint|eda|3d/i.test(t)}).slice(0,8))"
+            )
+            or "[]"
+        )
+        result["iframe_srcs"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('iframe'))"
+                ".map(function(f){return (f.src||'').replace(/\\?.*/,'').slice(0,55)}).filter(Boolean).slice(0,8))"
+            )
+            or "[]"
+        )
     except Exception as e:  # noqa: BLE001
         result["error"] = repr(e)
     # PASS = the page loaded, the overlay rendered, and the driver located + guided to the CAD
-    # section (status flips to the found-it message).
-    result["found_cad"] = "CAD Models section" in str(result.get("status_text", ""))
+    # section (its found-it message, distinct from the not-found guidance).
+    result["found_cad"] = "from this CAD Models section" in str(result.get("status_text", ""))
     result["ok"] = bool(result.get("overlay_present")) and result["found_cad"]
     try:
         from PIL import ImageGrab
