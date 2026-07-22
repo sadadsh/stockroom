@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
+import { CaptureProvider } from "../lib/capture";
 import { CompletePartModal } from "./CompletePartModal";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -12,7 +13,7 @@ function wrapper({ children }: { children: ReactNode }) {
   return createElement(
     QueryClientProvider,
     { client: qc },
-    createElement(ToastProvider, null, children),
+    createElement(CaptureProvider, null, createElement(ToastProvider, null, children)),
   );
 }
 
