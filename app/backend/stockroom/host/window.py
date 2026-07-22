@@ -298,6 +298,16 @@ def _forward_timeout_signal(session) -> None:
     _emit_to_spa({"signal": "timeout", "token": session.token})
 
 
+def _session_complete(session) -> bool:
+    """Read the session's completeness under the capture lock. is_complete() iterates
+    session.received (`set(self.received)`), and the tier-1 WebView2 COM thread mutates that
+    dict via record() under the same lock, so an unguarded read from the tier-2 poll thread
+    could iterate the dict mid-mutation ('dictionary changed size during iteration'). Reading
+    under the lock makes the two mutually exclusive."""
+    with _CAD_CAPTURE_LOCK:
+        return session.is_complete()
+
+
 def _poll_downloads_watch(
     watch,
     session,
@@ -320,8 +330,8 @@ def _poll_downloads_watch(
     ever finds a real file on Windows watching a real Downloads folder."""
     deadline = now() + timeout
     while not session.stop_flag["stop"] and now() < deadline:
-        if session.is_complete():
-            return  # all needs met; the temp dir is cleaned on window close / next capture
+        if _session_complete(session):
+            return  # all needs met; the temp dir is cleaned on the next capture (see below)
         found = watch.poll()
         if found is not None:
             _forward_cad_capture(found, session, extract_dir=extract_dir)
@@ -329,7 +339,7 @@ def _poll_downloads_watch(
         sleep(interval)
     if session.stop_flag["stop"]:
         return
-    if not session.is_complete():
+    if not _session_complete(session):
         _forward_timeout_signal(session)
 
 
@@ -571,7 +581,12 @@ class _HostApi:
             t = thread_box["t"]
             if t is not None and t.is_alive() and t is not threading.current_thread():
                 t.join(timeout=2.0)
-            _clean_temp(session)
+            # Deliberately do NOT clean the temp dir here. The SPA attaches the loose Altium
+            # paths pulled into it ASYNC after a forward, and a user commonly closes this
+            # window the moment the download lands - deleting the dir now would yank those
+            # files out from under an in-flight attach. The temp dir is cleaned when the NEXT
+            # capture starts (_stop_active_capture), by which point any attach is long done;
+            # a last, never-followed capture leaves one small dir the OS temp-reaps.
             if _CAD_SESSION is session:
                 _CAD_SESSION = None
                 _CAD_POLL_THREAD = None

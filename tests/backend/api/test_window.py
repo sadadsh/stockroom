@@ -453,6 +453,19 @@ def test_poll_loop_forwards_a_capture_then_returns_on_completion(tmp_path, monke
     assert all("signal" not in p for p in payloads)  # completed, no timeout signal
 
 
+def test_session_complete_matches_is_complete_under_the_lock():
+    # _session_complete reads completeness under _CAD_CAPTURE_LOCK (so the tier-1 COM thread's
+    # record() cannot mutate session.received mid-iteration); it must still report the same
+    # truth is_complete() does.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host.window import _session_complete
+
+    s = _session({R.KICAD_SYMBOL, R.ALTIUM_SYMBOL})
+    assert _session_complete(s) is False
+    s.record([R.KICAD_SYMBOL, R.ALTIUM_SYMBOL], Path("/x"))
+    assert _session_complete(s) is True
+
+
 def test_poll_loop_forwards_a_timeout_signal_when_nothing_lands(tmp_path, monkeypatch):
     from stockroom.capture.requirements import Requirement as R
     from stockroom.host import window as W
