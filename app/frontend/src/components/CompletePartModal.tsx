@@ -229,6 +229,13 @@ export function CompletePartModal({
   // "Keep Working" only makes sense while a capture is actually in flight through the host.
   const canBackground = cadBusy;
 
+  // Closing the window while a capture is still in flight must not lose it: hand it to the
+  // background pill instead of dropping it. Every close path (backdrop, the X, Done) goes here.
+  function handleClose() {
+    if (cadBusy) download.keepWorking();
+    onClose();
+  }
+
   // Feel-good validation: toast each requirement the moment it flips to received.
   const prevReceived = useRef<Partial<Record<Requirement, boolean>>>({});
   useEffect(() => {
@@ -280,7 +287,7 @@ export function CompletePartModal({
     <div
       className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh] backdrop-blur-sm"
       role="presentation"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <motion.div
         className="w-full max-w-[560px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
@@ -305,7 +312,7 @@ export function CompletePartModal({
             </span>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               aria-label="Close"
               className="grid h-7 w-7 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
             >
@@ -431,7 +438,7 @@ export function CompletePartModal({
         </div>
 
         <div className="flex justify-end border-t border-line px-5 py-3.5">
-          <Button variant="accent" small onClick={onClose}>
+          <Button variant="accent" small onClick={handleClose}>
             Done
           </Button>
         </div>

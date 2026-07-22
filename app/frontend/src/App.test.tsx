@@ -6,6 +6,7 @@ import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
+import { CaptureProvider } from "./lib/capture";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 
@@ -65,9 +66,11 @@ describe("App shell", () => {
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider initial="components">
-              <AddPartProvider>
-                <App />
-              </AddPartProvider>
+              <CaptureProvider>
+                <AddPartProvider>
+                  <App />
+                </AddPartProvider>
+              </CaptureProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>
@@ -98,9 +101,11 @@ describe("App shell", () => {
         <ThemeProvider>
           <ToastProvider>
             <RouterProvider initial="components">
-              <AddPartProvider>
-                <App />
-              </AddPartProvider>
+              <CaptureProvider>
+                <AddPartProvider>
+                  <App />
+                </AddPartProvider>
+              </CaptureProvider>
             </RouterProvider>
           </ToastProvider>
         </ThemeProvider>
