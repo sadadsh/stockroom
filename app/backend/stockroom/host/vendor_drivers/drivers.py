@@ -61,26 +61,25 @@ _DIGIKEY_DRIVER = (
     "function report(step,ok,msg){try{var o=window.__STOCKROOM_OVERLAY__;"
     "o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
     "report('start',true,'DigiKey lists the symbol, footprint and 3D model together. Download them and they attach here.');"
+    # DigiKey renders the CAD section title as a <div> (not a heading), so match by the section's
+    # own text across div/span/anchors (skipping our overlay), and use element.scrollIntoView -
+    # which scrolls DigiKey's custom scroll container (window.scrollTo does not move it).
     "function findCad(){try{"
-    "var sels=['#cad-models','[data-testid=\"cad-models\"]','#eda-models','#ecad-models'];"
-    "for(var i=0;i<sels.length;i++){var el=document.querySelector(sels[i]);if(el)return el;}"
-    "var hs=document.querySelectorAll('h1,h2,h3,h4,h5');"
-    "for(var j=0;j<hs.length;j++){var t=(hs[j].textContent||'').toLowerCase();"
-    "if(t.indexOf('cad model')>=0||t.indexOf('pcb symbol')>=0||t.indexOf('eda')>=0||"
-    "(t.indexOf('symbol')>=0&&t.indexOf('footprint')>=0)){return hs[j];}}"
+    "var sels=['#cad-models','[data-testid=\"cad-models\"]','#eda-models'];"
+    "for(var i=0;i<sels.length;i++){var s=document.querySelector(sels[i]);if(s)return s;}"
+    "var ov=document.getElementById('__stockroom_overlay__');"
+    "var nodes=document.querySelectorAll('a,div,span,h1,h2,h3,h4,h5,h6');"
+    "for(var j=0;j<nodes.length;j++){var n=nodes[j];if(ov&&ov.contains(n))continue;if(n.children.length>3)continue;"
+    "var t=(n.textContent||'').trim().toLowerCase();"
+    "if(t==='cad models'||t==='eda/cad models'||t==='eda models'||t.indexOf('pcb symbol, footprint')>=0){return n;}}"
     "}catch(e){}return null;}"
-    # DigiKey lazy-loads the CAD section below the fold, so poll + scroll (async, never blocks)
-    # for a few seconds before conceding to guidance.
-    "var tries=0;function tick(){tries++;"
-    "try{window.scrollTo(0,document.body.scrollHeight*Math.min(tries/6,1));}catch(e){}"
-    "var el=findCad();"
+    "var tries=0;function tick(){tries++;var el=findCad();"
     "if(el){try{el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}"
     "try{el.style.outline='2px solid #5fd39a';el.style.outlineOffset='4px';}catch(e){}"
     "report('cad',true,'Download the symbol, footprint and 3D model from this CAD Models section.');return;}"
     "if(tries<12){setTimeout(tick,900);}"
-    "else{try{window.scrollTo(0,0);}catch(e){}"
-    "report('cad',false,'Open the EDA / CAD Models section on this page to download the symbol, footprint and 3D model.');}}"
-    "setTimeout(tick,600);"
+    "else{report('cad',false,'Open the EDA / CAD Models section on this page to download the symbol, footprint and 3D model.');}}"
+    "setTimeout(tick,700);"
 )
 
 
