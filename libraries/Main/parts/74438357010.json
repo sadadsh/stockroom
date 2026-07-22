@@ -6,7 +6,7 @@
     "source_url": "https://www.we-online.com/components/products/datasheet/74438357010.pdf"
   },
   "description": "Wurth 74438357010",
-  "display_name": "1uH",
+  "display_name": "1uH 20% 4030 Wurth 74438357010",
   "enrichment": {},
   "footprint": {
     "lib": "Inductor_SMD",
@@ -22,14 +22,14 @@
   "provenance": {
     "ingested_at": "",
     "original_zip_sha256": "",
-    "source": "finale-sauce-bom",
-    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010"
+    "source": "finale-sauce-source",
+    "source_url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010?qs=AQlKX63v8RstGPuQmrueWg%3D%3D"
   },
   "purchase": [
     {
       "currency": "USD",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-22T02:08:02.174827+00:00",
+      "part_number": "710-74438357010",
       "price_breaks": [
         {
           "price": 1.68,
@@ -52,20 +52,25 @@
           "qty": 700
         }
       ],
-      "stock": 11706,
-      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010",
+      "stock": 15003,
+      "url": "https://www.mouser.com/en/ProductDetail/Wurth-Elektronik/74438357010?qs=AQlKX63v8RstGPuQmrueWg%3D%3D",
       "vendor": "Mouser"
     }
   ],
   "specs": {
     "Application": "Power",
+    "Assembly Country of Origin": "Not available",
     "Brand": "Wurth Elektronik",
     "Core Material": "Iron Alloy",
     "Core Type": "Molded",
-    "Factory Pack Quantity: Factory Pack Quantity": "700",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Korea, Republic of",
+    "ECCN": "EAR99",
+    "Factory Pack Quantity": "700",
     "Height": "3.1 mm",
     "Inductance": "1 uH",
     "Length": "4.1 mm",
+    "Lifecycle": "Active",
     "Manufacturer": "Wurth Elektronik",
     "Maximum DC Current": "10.25 A",
     "Maximum DC Resistance": "13.5 mOhms",
@@ -86,8 +91,9 @@
     "Termination": "Standard",
     "Termination Style": "SMD/SMT",
     "Test Frequency": "100 kHz",
-    "Tolerance": "20 %",
+    "Tolerance": "20%",
     "Type": "Power Inductor",
+    "US Tariff %": 0.0,
     "Unit Weight": "0.011993 oz",
     "Width": "4.1 mm"
   },
