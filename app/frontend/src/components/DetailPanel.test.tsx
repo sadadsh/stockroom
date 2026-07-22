@@ -239,6 +239,8 @@ describe("DetailPanel pinout (M6i)", () => {
       specs: { pinout: [{ pin: "1", name: "GND" }, { pin: "2", name: "OUT" }] },
     });
     const { rerender } = render(view(A));
+    // Pinout now lives in the workbench's Pinout tab; open it before filtering.
+    await userEvent.click(screen.getByRole("tab", { name: "Pinout" }));
     await userEvent.type(screen.getByRole("textbox", { name: /filter pins/i }), "vcc");
     expect(screen.getByText("VCC")).toBeInTheDocument();
 
@@ -358,5 +360,74 @@ describe("DetailPanel sourcing vendor label", () => {
     );
     // known-vendor map misses, so it Title Cases the stored name's first letter
     expect(screen.getByText("Acme parts")).toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel spec sheet + identity", () => {
+  it("drops catalog metadata from the spec sheet but keeps the real parametric specs", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          category: "Resistors",
+          specs: {
+            Resistance: "1.1 kOhms",
+            Manufacturer: "Acme Corp",
+            "Country of Origin": "Malaysia",
+            Packaging: "Reel",
+            "US Tariff %": "8",
+          },
+        })}
+        {...BASE}
+      />,
+    );
+    // the real spec shows (unit prettified for display)
+    expect(screen.getByText("Resistance")).toBeInTheDocument();
+    expect(screen.getByText("1.1 kΩ")).toBeInTheDocument();
+    // the distributor-page metadata never reaches the physical spec sheet
+    expect(screen.queryByText("Country of Origin")).not.toBeInTheDocument();
+    expect(screen.queryByText("Malaysia")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reel")).not.toBeInTheDocument();
+    expect(screen.queryByText("US Tariff %")).not.toBeInTheDocument();
+  });
+
+  it("headlines an opaque part (IC) by its display name, not its bare MPN, and reads the MPN once", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          category: "ICs",
+          display_name: "Dual Op-Amp LM358",
+          mpn: "LM358DR",
+          specs: {},
+        })}
+        {...BASE}
+      />,
+    );
+    // deriveTitle falls back to the MPN for a spec-less IC; the header prefers the human name
+    expect(
+      screen.getByRole("heading", { name: "Dual Op-Amp LM358" }),
+    ).toBeInTheDocument();
+    // the MPN still reads once, on the identity line below the headline
+    expect(screen.getByText("LM358DR")).toBeInTheDocument();
+    // and it is NOT the headline (no duplicate identity)
+    expect(
+      screen.queryByRole("heading", { name: "LM358DR" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("headlines a passive by its derived title", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          category: "Resistors",
+          display_name: "10k 1% 0603",
+          mpn: "RC0603",
+          specs: { Resistance: "10 kOhms", Tolerance: "1%" },
+        })}
+        {...BASE}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "10 kΩ ±1% Resistor" }),
+    ).toBeInTheDocument();
   });
 });

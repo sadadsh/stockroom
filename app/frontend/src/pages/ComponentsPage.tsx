@@ -255,8 +255,9 @@ export function ComponentsPage() {
           </div>
         </div>
 
-        {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto border-l border-line px-[30px] pt-[22px]">
+        {/* detail: the panel owns its own height, padding, and internal scroll (a fixed
+            rail + a tabbed workbench), so this column is a non-scrolling viewport. */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
           {selectedId ? (
             <DetailPanel
               detail={detailQuery.data}
