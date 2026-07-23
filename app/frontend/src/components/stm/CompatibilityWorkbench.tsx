@@ -16,6 +16,7 @@ import type { CompatUnionBody } from "../../api/types";
 import type { StmScope } from "../../pages/StmViewerPage";
 import { FamilyPicker } from "./FamilyPicker";
 import { CompatUnionMap } from "./CompatUnionMap";
+import { CompatVerdictBanner } from "./CompatVerdictBanner";
 import { BuildIndexGate } from "./BuildIndexGate";
 import { Button, Eyebrow } from "../primitives";
 
@@ -150,6 +151,8 @@ export function CompatibilityWorkbench() {
           </div>
         ) : union.data ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3 pb-4">
+            {/* The verdict is the one dominant focal element, above the map (CONTEXT decision 5). */}
+            <CompatVerdictBanner verdict={union.data.verdict} />
             <CompatUnionMap union={union.data} />
           </div>
         ) : (
