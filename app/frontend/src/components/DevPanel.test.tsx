@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
+import { api } from "../api/client";
 import { Text } from "../lib/copy";
 import { DevPanel } from "./DevPanel";
 import { DevInspector } from "./DevInspector";
@@ -136,11 +137,11 @@ describe("DevPanel inspect-first shell", () => {
     expect(scrollIntoViewMock).toHaveBeenCalled();
   });
 
-  it("enables the Icon facet tab and keeps the Box tab disabled", () => {
+  it("enables the Icon and Box facet tabs", () => {
     render(<Harness />);
     toggleDevMode();
     expect(screen.getByRole("tab", { name: "Icon" })).toBeEnabled();
-    expect(screen.getByRole("tab", { name: "Box" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Box" })).toBeEnabled();
   });
 
   it("the Icon tab shows an empty state when the selection has no icon", () => {
@@ -267,5 +268,80 @@ describe("DevPanel inspect-first shell", () => {
     clickButton("Show IDs");
     const count = document.querySelectorAll("[data-dev-id]").length;
     expect(screen.getAllByTestId("dev-id-badge")).toHaveLength(count);
+  });
+
+  // --- the [Box] tab (ELEM-02): per-element resize + spacing overrides on the selected element ---
+
+  // Select the bg-acc button and open the Box tab; returns the live [data-dev-id] node under edit.
+  function selectAndOpenBox(): HTMLElement {
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    inspectClick(target);
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+    return document.querySelector('[data-dev-id="detail.complete-part"]') as HTMLElement;
+  }
+
+  it("editing a Box field updates the live element AND the save payload's elements block", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectAndOpenBox();
+
+    // Each field carries the element's computed value as its placeholder (jsdom yields limited values,
+    // so assert the attribute is PRESENT rather than a specific px).
+    const width = screen.getByLabelText("Width value");
+    expect(width).toHaveAttribute("placeholder");
+
+    // Typing writes the override live: the Plan 01 apply effect sets the inline style on the node.
+    fireEvent.change(width, { target: { value: "300px" } });
+    expect(node.style.width).toBe("300px");
+
+    // Save carries the working override as an `elements` block for the backend writer.
+    const devSave = vi.mocked(api.devSave);
+    devSave.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Save to source/ }));
+    expect(devSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elements: { "detail.complete-part": { width: "300px" } },
+      }),
+    );
+  });
+
+  it("a Box field's per-property reset clears its inline style and empties the field", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectAndOpenBox();
+
+    const width = screen.getByLabelText("Width value");
+    fireEvent.change(width, { target: { value: "300px" } });
+    expect(node.style.width).toBe("300px");
+
+    // With the override set, the row shows a ResetDot; clicking it removes just that property.
+    fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    expect(node.style.width).toBe("");
+    expect(screen.getByLabelText("Width value")).toHaveValue("");
+  });
+
+  it("Clear All wipes every override on the selected element", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectAndOpenBox();
+
+    // Use two longhand properties (one resize, one spacing): jsdom's removeProperty does not reliably
+    // clear a CSS shorthand like `padding`, so assert on longhands the environment handles cleanly.
+    fireEvent.change(screen.getByLabelText("Width value"), { target: { value: "300px" } });
+    fireEvent.change(screen.getByLabelText("Margin Top value"), { target: { value: "8px" } });
+    expect(node.style.width).toBe("300px");
+    expect(node.style.marginTop).toBe("8px");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear All" }));
+    expect(node.style.width).toBe("");
+    expect(node.style.marginTop).toBe("");
+  });
+
+  it("the Box tab shows an empty state with no selection and renders no fields", () => {
+    render(<Harness />);
+    toggleDevMode();
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+    expect(screen.getByText(/select an element to override its box/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Width value")).not.toBeInTheDocument();
   });
 });

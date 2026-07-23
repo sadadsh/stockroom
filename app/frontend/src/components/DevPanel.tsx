@@ -532,6 +532,144 @@ function IconTab() {
   );
 }
 
+// The ELEM-02 first-cut whitelist (D-03): the box properties the [Box] tab exposes as labelled rows.
+// ORDER / GRID-COLUMN / GRID-ROW are deliberately EXCLUDED here (Phase F / layout), even though the
+// backend already accepts them. Labels are Title Case per the design contract; each `prop` is the raw
+// kebab CSS property the runtime applies via `el.style.setProperty(prop, value)` (min-width -> minWidth).
+const BOX_RESIZE_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "width", label: "Width" },
+  { prop: "height", label: "Height" },
+  { prop: "min-width", label: "Min Width" },
+  { prop: "min-height", label: "Min Height" },
+  { prop: "max-width", label: "Max Width" },
+  { prop: "max-height", label: "Max Height" },
+];
+const BOX_SPACING_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "margin", label: "Margin" },
+  { prop: "margin-top", label: "Margin Top" },
+  { prop: "margin-right", label: "Margin Right" },
+  { prop: "margin-bottom", label: "Margin Bottom" },
+  { prop: "margin-left", label: "Margin Left" },
+  { prop: "padding", label: "Padding" },
+  { prop: "padding-top", label: "Padding Top" },
+  { prop: "padding-right", label: "Padding Right" },
+  { prop: "padding-bottom", label: "Padding Bottom" },
+  { prop: "padding-left", label: "Padding Left" },
+  { prop: "gap", label: "Gap" },
+];
+
+// One box-property row (D-04): reuses the ColorRow/ScaleRow shape - a truncating label, an optional
+// ResetDot, and the mono value field styled like the token fields. The field's value is the working
+// override (empty when none), its placeholder is the element's live computed value for the property,
+// and editing writes the override live (an emptied field removes the override, mirroring per-prop reset).
+function BoxRow({
+  id,
+  prop,
+  label,
+  placeholder,
+}: {
+  id: string;
+  prop: string;
+  label: string;
+  placeholder: string;
+}) {
+  const dev = useDevMode();
+  const value = dev.elementOverridesFor(id)?.[prop] ?? "";
+  const overridden = dev.isElementPropOverridden(id, prop);
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="min-w-0 flex-1 truncate text-xs text-t2">{label}</span>
+      {overridden ? <ResetDot onClick={() => dev.resetElementProp(id, prop)} /> : null}
+      <input
+        type="text"
+        aria-label={`${label} value`}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const next = e.target.value;
+          // Clearing the text removes the override, so the token/class styling underneath re-emerges.
+          if (next === "") dev.resetElementProp(id, prop);
+          else dev.setElementProp(id, prop, next);
+        }}
+        className="tnum w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+      />
+    </div>
+  );
+}
+
+// The Box facet (D-04, ELEM-02): the owner-facing editing surface for the per-element escape hatch.
+// For the selected element it renders a labelled RESIZE + SPACING control per whitelisted property,
+// each editing the element's override live through the Plan 01 dev-mode API, with a per-property reset,
+// a clear-all-for-this-element, and the element's current computed value as each field's placeholder.
+// With no selection it shows an empty state, mirroring the Copy / Icon tabs.
+function BoxTab() {
+  const dev = useDevMode();
+  const { selectedDevId } = dev;
+
+  // Resolve the live node once and read its computed style for the placeholders. A catalogue id with
+  // no mounted element (a null node) falls back to empty placeholders. getComputedStyle is a live view,
+  // so a placeholder reflects the element's current value even after an override is cleared.
+  const computed = useMemo(() => {
+    if (!selectedDevId) return null;
+    const node = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    return node ? getComputedStyle(node) : null;
+  }, [selectedDevId]);
+
+  if (!selectedDevId) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        Select an element to override its box size and spacing.
+      </div>
+    );
+  }
+
+  const overrides = dev.elementOverridesFor(selectedDevId);
+  const hasAny = overrides != null && Object.keys(overrides).length > 0;
+  const placeholderFor = (prop: string) => computed?.getPropertyValue(prop) ?? "";
+
+  return (
+    <div className="px-3.5 py-2">
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Resize
+        </div>
+        {BOX_RESIZE_PROPS.map((p) => (
+          <BoxRow
+            key={p.prop}
+            id={selectedDevId}
+            prop={p.prop}
+            label={p.label}
+            placeholder={placeholderFor(p.prop)}
+          />
+        ))}
+      </section>
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Spacing
+        </div>
+        {BOX_SPACING_PROPS.map((p) => (
+          <BoxRow
+            key={p.prop}
+            id={selectedDevId}
+            prop={p.prop}
+            label={p.label}
+            placeholder={placeholderFor(p.prop)}
+          />
+        ))}
+      </section>
+      {hasAny ? (
+        <button
+          type="button"
+          onClick={() => dev.clearElement(selectedDevId)}
+          className="mt-2 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Clear All
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 // The collapsible Catalogue: the 196 ids filtered by the toolbar search and grouped by area. Clicking
 // an entry selects it and locates the live element (scrollIntoView + a transient flash outline).
 function Catalogue({
@@ -684,7 +822,7 @@ function SelectionPane({
         <FacetTab id="icon" active={facet} onSelect={setFacet}>
           Icon
         </FacetTab>
-        <FacetTab id="box" active={facet} onSelect={setFacet} disabled>
+        <FacetTab id="box" active={facet} onSelect={setFacet}>
           Box
         </FacetTab>
       </div>
@@ -692,6 +830,7 @@ function SelectionPane({
       {facet === "tokens" ? <TokensTab showAll={showAll} setShowAll={setShowAll} /> : null}
       {facet === "copy" ? <CopyTab /> : null}
       {facet === "icon" ? <IconTab /> : null}
+      {facet === "box" ? <BoxTab /> : null}
     </div>
   );
 }
