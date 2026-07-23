@@ -180,6 +180,25 @@ def test_status_reports_unbuilt_when_index_absent(client, app_ctx):
     assert body["source_path"] != ""  # non-empty: configured/default source discovery
 
 
+def test_status_names_the_expected_source_on_a_bare_machine(client, monkeypatch):
+    # A machine with NO configured path, no env override, and no candidate present (a CI
+    # runner, a fresh install): discovery finds nothing, but status must still NAME the
+    # expected location so the UI can tell the user where the source belongs, with
+    # source_present=false carrying the honest "it is not there".
+    from stockroom.api.routers import stm as stm_router_mod
+
+    monkeypatch.setattr(stm_router_mod.stm_source, "default_cubemx_source", lambda: None)
+    monkeypatch.setattr(
+        stm_router_mod.stm_source, "_WINDOWS_CANDIDATES", ("/nonexistent/cubemx/db/mcu",)
+    )
+    r = client.get("/api/stm/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["built"] is False
+    assert body["source_path"] != ""
+    assert body["source_present"] is False
+
+
 def test_status_reports_built_and_echoes_stamp(client, app_ctx):
     _seed_stm_index(app_ctx)
     r = client.get("/api/stm/status")
