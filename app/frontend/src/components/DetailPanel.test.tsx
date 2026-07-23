@@ -187,7 +187,7 @@ describe("DetailPanel git timeline (M6k)", () => {
       count: 1,
     });
     wrap(<DetailPanel detail={detail()} {...BASE} />);
-    expect(screen.getByText("History")).toBeInTheDocument();
+    expect(screen.getByText("Timeline")).toBeInTheDocument();
     // the timeline is wired to this part id, so its commit renders
     expect(await screen.findByText("Add lm358")).toBeInTheDocument();
     expect(mockApi.partHistory).toHaveBeenCalledWith("lm358");

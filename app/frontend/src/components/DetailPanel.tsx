@@ -209,7 +209,8 @@ export function DetailPanel({
     { id: "specs", label: "Details" },
     ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
     ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
-    { id: "history", label: "History" },
+    // Labelled Timeline (the component IS PartTimeline) - "History" broke the no-y copy rule.
+    { id: "history", label: "Timeline" },
   ];
   const activeTab = tabs.some((t) => t.id === tab) ? tab : "specs";
 
@@ -264,7 +265,11 @@ export function DetailPanel({
         <WorkbenchPanel
           id="specs"
           active={activeTab}
-          className="mt-3 grid min-h-0 flex-1 grid-cols-[288px_minmax(0,1fr)_320px]"
+          // grid-rows-[minmax(0,1fr)]: without it the single implicit row sizes to its tallest
+          // column, so a long specs list grew the whole sheet instead of scrolling inside its
+          // own pane. Pinning the row to the container height lets each column's own
+          // overflow-y-auto engage.
+          className="mt-3 grid min-h-0 flex-1 grid-cols-[288px_minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)]"
         >
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
@@ -326,22 +331,23 @@ export function DetailPanel({
             </div>
           </div>
 
-          <ReadinessBlock
-            kicad={kicad}
-            altium={altium}
-            altiumNeeds={altiumNeeds}
-            canComplete={canComplete}
-            needsList={needsList}
-            onComplete={() => setCompleteOpen(true)}
-          />
-          {/* filing (category) moved off the footer into the part pane, as one more labelled,
-              editable field that matches the rest - and it fills the pane so there is less dead space. */}
-          <Filing
-            category={detail.category}
-            categories={categories}
-            onMoveCategory={onMoveCategory}
-            busy={busy}
-          />
+          {/* the CAD status + Filing as ONE tight cluster of matching property rows */}
+          <div className="flex flex-col gap-1.5">
+            <ReadinessBlock
+              kicad={kicad}
+              altium={altium}
+              altiumNeeds={altiumNeeds}
+              canComplete={canComplete}
+              needsList={needsList}
+              onComplete={() => setCompleteOpen(true)}
+            />
+            <Filing
+              category={detail.category}
+              categories={categories}
+              onMoveCategory={onMoveCategory}
+              busy={busy}
+            />
+          </div>
           </div>
 
           {/* COLUMN 2 - the specifications, the technical heart, in one clean single column. */}
@@ -644,8 +650,10 @@ function DetailSection({
 }: { title: ReactNode; action?: ReactNode } & Omit<HTMLAttributes<HTMLElement>, "title">) {
   return (
     <section className={className} {...rest}>
-      <div className="mb-1.5 flex h-4 items-center justify-between gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">{title}</span>
+      {/* Pane-level heading: Title Case, t1 - a clear step ABOVE the uppercase micro-eyebrows
+          the spec groups use, so "Specifications" and "Electrical" never read as the same level. */}
+      <div className="mb-2 flex h-5 items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-t1">{title}</span>
         {action}
       </div>
       {children}
@@ -704,21 +712,22 @@ function ReadinessBlock({
   // popover carrying the KiCad + Altium detail and the Complete action, so the pane stays clean.
   return (
     <div className="relative" data-dev-id="detail.readiness">
+      {/* The same row anatomy as Filing below (icon + uppercase label + value + chevron), so the
+          two controls read as one unified property cluster, not two widget species. */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-field px-3 py-2 text-left transition hover:bg-raise2"
+        className="flex h-[34px] w-full items-center gap-2.5 rounded-control border border-line bg-field px-3 text-left transition-colors hover:bg-raise2"
       >
-        <span className="flex items-center gap-2">
-          {allReady ? (
-            <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
-          ) : (
-            <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
-          )}
-          <span className="text-xs font-semibold text-t1">
-            {allReady ? "CAD complete" : "CAD incomplete"}
-          </span>
+        {allReady ? (
+          <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
+        ) : (
+          <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
+        )}
+        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">CAD</span>
+        <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">
+          {allReady ? "Complete" : "Incomplete"}
         </span>
         <Icon
           id="detail.chevron-right"
@@ -934,36 +943,47 @@ function Filing({
   onMoveCategory?: (category: string) => void;
   busy?: boolean;
 }) {
-  // Filing is now a labelled section field like every other, and editable (a category dropdown)
-  // when moves are allowed - so it matches the rest instead of sitting oddly in the footer.
+  // Filing shares the CAD row's exact anatomy (icon + uppercase label + value + chevron): the
+  // visual row is one flat control, and in editable mode a transparent native <select> overlays
+  // it so clicking still opens the real category dropdown.
+  const editable = !!(onMoveCategory && categories && categories.length > 0);
   return (
-    <DetailSection title={<Text id="detail.filing">Filing</Text>} data-dev-id="detail.filing">
-      {onMoveCategory && categories && categories.length > 0 ? (
-        <div className="relative">
-          <select
-            aria-label="Category"
-            value={category}
-            disabled={busy}
-            onChange={(e) => {
-              if (e.target.value !== category) onMoveCategory(e.target.value);
-            }}
-            className="w-full appearance-none rounded-control border border-line bg-field py-1.5 pl-2.5 pr-7 text-xs font-medium text-t1 outline-none hover:border-line2 focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <Icon
-            id="detail.select-chevron"
-            className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-t3"
-          />
-        </div>
-      ) : (
-        <span className="text-xs text-t2">{category}</span>
-      )}
-    </DetailSection>
+    <div className="group relative" data-dev-id="detail.filing">
+      <div
+        aria-hidden={editable || undefined}
+        className={
+          "flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field px-3 transition-colors " +
+          (editable ? "group-hover:bg-raise2 " : "") +
+          (busy ? "opacity-50" : "")
+        }
+      >
+        <Icon id="detail.filing-folder" className="h-3.5 w-3.5 flex-none text-t3" />
+        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+          <Text id="detail.filing">Filing</Text>
+        </span>
+        <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">{category}</span>
+        {editable ? (
+          <Icon id="detail.select-chevron" className="h-3 w-3 flex-none text-t3" />
+        ) : null}
+      </div>
+      {editable ? (
+        <select
+          aria-label="Category"
+          value={category}
+          disabled={busy}
+          onChange={(e) => {
+            if (e.target.value !== category) onMoveCategory!(e.target.value);
+          }}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+        >
+          {categories!.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
   );
 }
 

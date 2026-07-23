@@ -10,7 +10,12 @@ import { AddPartModal } from "./AddPartModal";
 import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
 import { useRouter } from "../lib/router";
-import { useFacetsQuery } from "../api/queries";
+import {
+  useFacetsQuery,
+  useProfiles,
+  useSettings,
+  useUpdateCheck,
+} from "../api/queries";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { open: openAddPart } = useAddPart();
@@ -55,38 +60,48 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-// The bottom status bar: an Altium signature, and honest about the library. The dot + label
-// reflect the real facets query state (ready / loading / error); the right slot carries the
-// live library part count and the active section. Reads global server state already cached by
-// the pages, so it costs no extra request.
+// The bottom status bar: an Altium signature, and honest about the app's real state. Left:
+// the components load state (Title Case, no status dot) and the active section. Right: the
+// working context that actually matters day to day - the active profile, whether KiCad is
+// wired to it, and an update notice when one exists. All read from queries the app already
+// caches, so the bar costs nothing extra.
 function ShellStatusBar() {
   const { route } = useRouter();
   const facets = useFacetsQuery();
-  const total = facets.data
-    ? Object.values(facets.data.by_category).reduce((sum, n) => sum + n, 0)
-    : null;
+  const settings = useSettings();
+  const profiles = useProfiles();
+  const update = useUpdateCheck();
   const section = route.charAt(0).toUpperCase() + route.slice(1);
-  // State labels reuse the app's own noun for the collection ("components", as in the
-  // rail, the list title, and the parts count) - no new vocabulary, and no y-words.
-  const state = facets.isError
-    ? { dot: "bg-err", label: "Component load failed" }
+  const label = facets.isError
+    ? "Component Load Failed"
     : facets.isLoading
-      ? { dot: "bg-t3", label: "Loading components" }
-      : { dot: "bg-ok", label: "Components loaded" };
+      ? "Loading Components"
+      : "Components Loaded";
   return (
     <footer
       data-dev-id="shell.statusbar"
       className="flex h-[24px] flex-none items-center gap-2.5 border-t border-line bg-band px-3 text-2xs text-t2"
     >
-      <span className="flex items-center gap-1.5">
-        <span className={"inline-block h-[6px] w-[6px] flex-none rounded-full " + state.dot} />
-        {state.label}
-      </span>
+      <span className={facets.isError ? "text-err" : undefined}>{label}</span>
       <span className="text-t3">/</span>
       <span className="text-t3">{section}</span>
-      {total != null ? (
-        <span className="ml-auto tabular-nums text-t3">{total.toLocaleString()} parts</span>
-      ) : null}
+      <span className="ml-auto flex items-center gap-2.5 text-t3">
+        {profiles.data?.active ? <span>Profile {profiles.data.active}</span> : null}
+        {settings.data ? (
+          <>
+            <span className="text-line2">|</span>
+            <span className={settings.data.kicad_wired ? undefined : "text-warn"}>
+              {settings.data.kicad_wired ? "KiCad Wired" : "KiCad Not Wired"}
+            </span>
+          </>
+        ) : null}
+        {update.data?.update_available ? (
+          <>
+            <span className="text-line2">|</span>
+            <span className="text-t2">Update Available</span>
+          </>
+        ) : null}
+      </span>
     </footer>
   );
 }
