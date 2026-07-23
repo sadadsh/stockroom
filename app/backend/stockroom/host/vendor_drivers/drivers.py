@@ -109,18 +109,20 @@ _DIGIKEY_HELPERS = (
     "try{o&&o.disconnect();}catch(e){}clearTimeout(t);cb(v);}"
     "function chk(){var v=null;try{v=pred();}catch(e){v=null;}if(v)fin(v);}"
     "o=observe(chk);var t=setTimeout(function(){fin(null);},wd||30000);chk();}"
-    "function txt(el){try{return (el.innerText||el.textContent||'').toLowerCase();}catch(e){return '';}}"
+    "function txt(el){try{return (el.textContent||'').toLowerCase();}catch(e){return '';}}"
     "function senseError(){try{var ns=document.querySelectorAll("
     "'[role=alert],.toast,.notification,[class*=error i],[class*=toast i],[class*=alert i]');"
     "for(var i=0;i<ns.length;i++){if(vis(ns[i])){var t=txt(ns[i]);"
     "if(/download failed|failed to (generate|download|create)|model download failed|"
     "unable to (generate|download)|something went wrong/.test(t))return true;}}return false;}catch(e){return false;}}"
+    # CHEAP - never read document.body.innerText (it forces a full layout; called on a health-check it
+    # would starve the vendor's download JS). Cloudflare's interstitial is identifiable by its own
+    # elements + the document title; a login wall by a password field in a form.
     "function senseWall(){try{if(document.querySelector("
     "'iframe[src*=\"challenges.cloudflare.com\"],#challenge-running,#cf-challenge-running,.cf-turnstile'))return true;"
-    "var b=(document.body&&document.body.innerText||'').toLowerCase();"
-    "if(/verify you are (a )?human|checking your browser|complete the security check|"
-    "review the security of your connection/.test(b))return true;"
-    "if(document.querySelector('input[type=password]')&&/sign ?in|log ?in/.test(b))return true;"
+    "var t=(document.title||'').toLowerCase();"
+    "if(/just a moment|attention required|verify you are|checking your browser/.test(t))return true;"
+    "if(document.querySelector('input[type=password]')&&document.querySelector('form input[type=password]'))return true;"
     "return false;}catch(e){return false;}}"
 )
 
@@ -134,13 +136,19 @@ _DIGIKEY_HELPERS = (
 _DIGIKEY_REACTOR = (
     "window.__SR_DL_CB__=null;"
     "window.__SR_DL__=function(evt){trace('dl',evt&&evt.state);var cb=window.__SR_DL_CB__;if(cb)cb(evt);};"
-    "function awaitDownload(spec,onDone,onFail){var settled=false,obs=null,wd=null;"
+    "function awaitDownload(spec,onDone,onFail){var settled=false,iv=null,wd=null;"
     "function settle(fn,why){if(settled)return;settled=true;window.__SR_DL_CB__=null;"
-    "try{obs&&obs.disconnect();}catch(e){}clearTimeout(wd);trace('await',spec.key,why);fn(why);}"
+    "clearInterval(iv);clearTimeout(wd);trace('await',spec.key,why);fn(why);}"
     "window.__SR_DL_CB__=function(evt){"
     "if(evt&&evt.state==='completed'&&(!evt.format||evt.format===spec.key))settle(onDone,'completed');};"
-    "function pg(){if(senseWall())settle(onFail,'wall');else if(senseError())settle(onFail,'error');}"
-    "obs=observe(pg);wd=setTimeout(function(){settle(onFail,'timeout');},GEN_WD);pg();}"
+    # While the vendor generates the file server-side (up to a minute+), watch for a failure with a
+    # LIGHT periodic health-check (a wall/error toast), NOT a per-frame MutationObserver: the download
+    # phase mutates the DOM constantly (the spinner), so an every-frame observer that read innerText
+    # would force a full layout every frame and STARVE the vendor's own download JS - the file would
+    # never finish (live-observed 2026-07-23; the old light-poll driver completed, this did not). The
+    # completion itself arrives as the real event above; this interval only catches a stall/wall.
+    "iv=setInterval(function(){if(senseWall())settle(onFail,'wall');else if(senseError())settle(onFail,'error');},1500);"
+    "wd=setTimeout(function(){settle(onFail,'timeout');},GEN_WD);}"
     "function refreshes(){try{return parseInt(sessionStorage.getItem('__SR_REFRESH__')||'0',10)||0;}catch(e){return 0;}}"
     "function refresh(){try{sessionStorage.setItem('__SR_REFRESH__',''+(refreshes()+1));}catch(e){}"
     "trace('refresh',refreshes());location.reload();}"
