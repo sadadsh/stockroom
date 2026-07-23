@@ -32,6 +32,47 @@ export function isValidOrder(value: string): boolean {
   return ORDER_RE.test(value);
 }
 
+// A Tailwind grid-cols-N utility, read WHOLE-token off the container className (grid-cols-2 -> 2), the
+// same getAttribute("class") convention as containerLayoutOf so it stays deterministic under jsdom.
+const GRID_COLS_RE = /^grid-cols-(\d+)$/;
+
+/**
+ * The declared column-track count of a grid container, read from its `grid-cols-N` class (e.g.
+ * grid-cols-2 -> 2), or 0 when no such class is present. Reads className via getAttribute("class")
+ * (never getComputedStyle), so it is deterministic under jsdom; the slot picker derives its column /
+ * row position options from this count. Only the first grid-cols-N token is honoured.
+ */
+export function gridColumnsOf(container: Element | null | undefined): number {
+  if (!container) return 0;
+  const classes = (container.getAttribute("class") ?? "").split(/\s+/);
+  for (const cls of classes) {
+    const m = GRID_COLS_RE.exec(cls);
+    if (m) return parseInt(m[1], 10);
+  }
+  return 0;
+}
+
+// The client-side mirror of the backend grid-slot grammar (dev.py `_GRID_TOKEN_RE` / `_valid_grid_slot`),
+// kept as a SAFE SUBSET of it: a token is `auto`, a small (1-4 digit) signed integer, or `span N`. The
+// backend additionally accepts bare named grid lines (an identifier like `red`), but the slot picker
+// never emits those - it offers only auto / integer / span positions - so the client stays deliberately
+// stricter. That keeps the guarantee that matters (every value the panel could emit is one the backend
+// accepts, so a slot write can never earn a 400) while rejecting stray identifiers the picker cannot mean.
+const GRID_TOKEN_RE = /^(?:auto|-?\d{1,4}|span\s+\d{1,4})$/;
+
+/**
+ * True only for a grid-column / grid-row value in the safe slot grammar: one or two line tokens
+ * separated by a single `/`, each token `auto`, a small signed integer, or `span N`. Rejects a
+ * three-part slot ("1 / 2 / 3"), the empty string, a stray identifier ("red"), and any token carrying
+ * punctuation ("1;2"). A strict subset of the backend `_valid_grid_slot`, so the panel never writes a
+ * value the writer would reject; the backend grammar remains the authority on what may ship.
+ */
+export function isValidGridSlot(value: string): boolean {
+  const parts = value.split("/").map((p) => p.trim());
+  if (parts.length < 1 || parts.length > 2) return false;
+  return parts.every((p) => p !== "" && GRID_TOKEN_RE.test(p));
+}
+
 // Which direction a reorder moves the selected element among its siblings: one visual step earlier
 // ("up") or later ("down").
 export type ReorderDirection = "up" | "down";
