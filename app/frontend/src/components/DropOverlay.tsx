@@ -59,7 +59,7 @@ export function DropOverlay({ onDrop }: { onDrop: (paths: string[]) => void }) {
 
   if (!active) return null;
   return (
-    <div data-dev-id="shell.drop-overlay" className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.55)] backdrop-blur-sm">
+    <div data-dev-id="shell.drop-overlay" className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.55)]">
       {/* the scrim is dark in both themes, so this card is fixed light-on-dark
           rather than theme-tokened (a light-theme accent would vanish here). */}
       <div className="rounded-card border-2 border-dashed border-white/70 bg-white/5 px-10 py-8 text-center">

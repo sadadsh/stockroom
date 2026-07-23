@@ -178,9 +178,9 @@ function RunningBody({
   const pct = tally.total > 0 ? Math.min(100, Math.round((tally.done / tally.total) * 100)) : 0;
   return (
     <div className="flex flex-col gap-2.5" data-testid="rescan-running">
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2">
+      <div className="h-1.5 w-full overflow-hidden bg-raise2">
         <div
-          className="h-full rounded-full bg-acc transition-[width]"
+          className="h-full bg-acc transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>

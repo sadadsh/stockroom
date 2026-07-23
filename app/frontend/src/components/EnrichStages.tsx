@@ -61,12 +61,12 @@ export function EnrichStages({
           const done = i < activeIndex;
           const isActive = i === activeIndex;
           return (
-            <div key={s.key} className="h-1 flex-1 overflow-hidden rounded-full bg-raise2">
+            <div key={s.key} className="h-1 flex-1 overflow-hidden bg-raise2">
               {done ? (
-                <div className="h-full w-full rounded-full bg-acc" />
+                <div className="h-full w-full bg-acc" />
               ) : isActive ? (
                 <motion.div
-                  className="h-full w-1/2 rounded-full bg-acc"
+                  className="h-full w-1/2 bg-acc"
                   animate={{ x: ["-60%", "220%"] }}
                   transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }}
                 />

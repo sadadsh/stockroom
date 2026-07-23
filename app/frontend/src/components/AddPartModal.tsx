@@ -48,7 +48,7 @@ export function AddPartModal() {
   return (
     <div
       data-dev-id="addpart.scrim"
-      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[8vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[8vh]"
       role="presentation"
       onClick={close}
     >
@@ -65,9 +65,9 @@ export function AddPartModal() {
       >
         <div
           data-dev-id="addpart.header"
-          className="flex h-14 flex-none items-center justify-between border-b border-line px-5"
+          className="flex h-[38px] flex-none items-center justify-between border-b border-line bg-band px-4"
         >
-          <div className="text-base font-semibold text-t1">
+          <div className="text-sm font-semibold text-t1">
             <Text id="modal.addPart.title">Add a Part</Text>
           </div>
           <button
@@ -75,12 +75,12 @@ export function AddPartModal() {
             data-dev-id="addpart.close"
             aria-label={closeLabel}
             onClick={close}
-            className="flex h-8 w-8 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            className="flex h-[26px] w-[26px] items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
           >
             <Icon id="action.close" />
           </button>
         </div>
-        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <IngestPage />
         </div>
       </motion.div>
