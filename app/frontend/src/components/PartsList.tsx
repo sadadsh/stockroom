@@ -77,6 +77,7 @@ export function RowThumbnail({ id, category }: { id: string; category: string })
   return (
     <span
       ref={ref}
+      data-dev-id="components.row-thumbnail"
       className="flex h-[30px] w-[30px] flex-none items-center justify-center overflow-hidden rounded-control border border-line bg-field"
     >
       {thumb ? (
@@ -171,10 +172,13 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div data-dev-id="components.list" className="flex flex-col gap-0.5">
       {grouped.map(([category, items]) => (
         <div key={category} className="flex flex-col gap-0.5">
-          <div className="sticky top-0 z-[1] mb-0.5 flex items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur">
+          <div
+            data-dev-id="components.category-header"
+            className="sticky top-0 z-[1] mb-0.5 flex items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
+          >
             <span className="text-2xs font-semibold text-t3">{category}</span>
             <span className="tnum font-mono text-2xs text-t3">{items.length}</span>
           </div>
@@ -184,6 +188,7 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
               <button
                 key={p.id}
                 type="button"
+                data-dev-id="components.row"
                 onClick={() => onSelect(p.id)}
                 aria-current={selected ? "true" : undefined}
                 className={
@@ -206,7 +211,11 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
                       {p.display_name}
                     </span>
                     {duplicateIds?.has(p.id) ? (
-                      <span className="flex-none" title="Another part shares this MPN">
+                      <span
+                        data-dev-id="components.row-duplicate"
+                        className="flex-none"
+                        title="Another part shares this MPN"
+                      >
                         <Badge tone="warn" size="sm">
                           Duplicate
                         </Badge>
@@ -221,6 +230,7 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
                 </div>
                 {!p.is_complete ? (
                   <span
+                    data-dev-id="components.row-warn"
                     className="mt-0.5 flex flex-none items-center text-warn"
                     title={`Incomplete: missing ${p.missing.join(", ")}`}
                   >

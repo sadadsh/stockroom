@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
+import { DEV_ID_BY_ID } from "../lib/devIds";
 
 // A controllable router stand-in so the rail can be tested in isolation.
 const { state, navigate } = vi.hoisted(() => ({
@@ -43,6 +44,24 @@ describe("Rail", () => {
     expect(library).toHaveAttribute("aria-current", "page");
     await userEvent.click(library);
     expect(navigate).toHaveBeenCalledWith("components");
+  });
+
+  it("carries stable data-dev-id attributes, including the derived rail.nav-* ids, that all resolve via DEV_ID_BY_ID", () => {
+    const { container } = render(<Rail />);
+    // The rail shell and the About trigger are static ids on their anchor elements.
+    // The three primary/footer destinations get their id derived on the reusable RailItem.
+    const expected = [
+      "rail.root",
+      "rail.about",
+      "rail.nav-components",
+      "rail.nav-projects",
+      "rail.nav-settings",
+    ];
+    for (const id of expected) {
+      const el = container.querySelector(`[data-dev-id="${id}"]`);
+      expect(el, `expected an element with data-dev-id="${id}"`).not.toBeNull();
+      expect(DEV_ID_BY_ID.has(id), `expected ${id} to resolve via DEV_ID_BY_ID`).toBe(true);
+    }
   });
 
 });

@@ -72,10 +72,14 @@ export function Rail() {
   return (
     <nav
       aria-label="Primary"
+      data-dev-id="rail.root"
       className="flex w-[190px] flex-none flex-col border-r border-line bg-rail px-3 py-4"
     >
       {/* wordmark card (north-star .wm): the stockroom, in miniature, set in a raised tile */}
-      <div className="mb-3.5 flex items-center gap-2.5 rounded-control bg-raise2 px-[11px] py-[9px] shadow-card">
+      <div
+        data-dev-id="rail.wordmark"
+        className="mb-3.5 flex items-center gap-2.5 rounded-control bg-raise2 px-[11px] py-[9px] shadow-card"
+      >
         <svg {...svgProps} className="ico h-5 w-5 flex-none text-t1">
           <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
           <path d="M12 22V12" />
@@ -87,7 +91,7 @@ export function Rail() {
         </span>
       </div>
 
-      <div className="flex flex-col gap-0.5">
+      <div data-dev-id="rail.nav" className="flex flex-col gap-0.5">
         {primary.map((item) => (
           <RailItem
             key={item.route}
@@ -100,7 +104,10 @@ export function Rail() {
 
       {/* footer (north-star .navfoot), pinned to the bottom: Settings, then a utility row -
           the Update action (when one is available) beside the light/dark theme toggle. */}
-      <div className="mt-auto flex flex-col gap-0.5 border-t border-line pt-2">
+      <div
+        data-dev-id="rail.footer"
+        className="mt-auto flex flex-col gap-0.5 border-t border-line pt-2"
+      >
         {footItems.map((item) => (
           <RailItem
             key={item.route}
@@ -111,6 +118,7 @@ export function Rail() {
         ))}
         <button
           type="button"
+          data-dev-id="rail.about"
           onClick={() => setAboutOpen(true)}
           className="flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
         >
@@ -122,10 +130,11 @@ export function Rail() {
           </span>
           <Text id="nav.about">About</Text>
         </button>
-        <div className="mt-1.5 flex items-center gap-1.5">
+        <div data-dev-id="rail.utility" className="mt-1.5 flex items-center gap-1.5">
           {hasUpdate ? (
             <button
               type="button"
+              data-dev-id="rail.update"
               title="A new version is available"
               className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line2 bg-raise2 px-2.5 text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
             >
@@ -138,6 +147,7 @@ export function Rail() {
             </button>
           ) : (
             <div
+              data-dev-id="rail.update"
               className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2"
               title="You have the latest version"
             >
@@ -149,6 +159,7 @@ export function Rail() {
           )}
           <button
             type="button"
+            data-dev-id="rail.theme-toggle"
             onClick={toggle}
             aria-label="Toggle light or dark theme"
             title="Toggle light or dark theme"
@@ -178,6 +189,7 @@ export function Rail() {
 function AboutModal({ onClose }: { onClose: () => void }) {
   return (
     <div
+      data-dev-id="about.scrim"
       className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
       role="presentation"
       onClick={onClose}
@@ -186,10 +198,14 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="About Stockroom"
+        data-dev-id="about.root"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop"
       >
-        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card">
+        <div
+          data-dev-id="about.icon"
+          className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card"
+        >
           <svg {...svgProps} className="ico h-6 w-6 text-t1">
             <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
             <path d="M12 22V12" />
@@ -197,11 +213,11 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             <path d="m7.5 4.27 9 5.15" />
           </svg>
         </div>
-        <div className="text-lg font-semibold tracking-[-0.02em] text-t1">Stockroom</div>
-        <p className="mt-1 text-sm text-t2">
+        <div data-dev-id="about.title" className="text-lg font-semibold tracking-[-0.02em] text-t1">Stockroom</div>
+        <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
           Developed with love by <span className="font-medium text-t1">Sadad Haidari</span>.
         </p>
-        <div className="mt-4 flex justify-center gap-2.5">
+        <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
           <a
             href="https://www.linkedin.com/in/sadadhaidari"
             target="_blank"
@@ -242,6 +258,7 @@ function RailItem({
   return (
     <button
       type="button"
+      data-dev-id={`rail.nav-${item.route}`}
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={
