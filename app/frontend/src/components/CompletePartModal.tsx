@@ -139,7 +139,7 @@ function CaptureRow({ label, done }: { label: string; done: boolean }) {
           (done ? "bg-ok/15 text-ok" : "bg-raise2 text-t3")
         }
       >
-        {done ? "Received" : "Waiting"}
+        {done ? "Received" : "Needed"}
       </span>
     </div>
   );
@@ -399,7 +399,14 @@ export function CompletePartModal({
                     </Button>
                   ) : null}
                   {!isDone ? (
-                    <Button small disabled={cadBusy} onClick={() => void browse()}>
+                    // When no guided source resolves (no CAD URL), Browse is the ONLY path,
+                    // so it becomes the primary; otherwise it stays the quiet manual fallback.
+                    <Button
+                      small
+                      variant={cadSource.data?.url ? undefined : "accent"}
+                      disabled={cadBusy}
+                      onClick={() => void browse()}
+                    >
                       Browse For Files
                     </Button>
                   ) : null}

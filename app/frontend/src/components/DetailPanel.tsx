@@ -301,8 +301,12 @@ export function DetailPanel({
               <DataRow
                 label="Datasheet"
                 value={detail.datasheet?.source_url || detail.datasheet?.file || ""}
+                displayValue={
+                  detail.datasheet?.source_url
+                    ? datasheetLabel(detail.datasheet.source_url)
+                    : undefined
+                }
                 href={detail.datasheet?.source_url || undefined}
-                mono
                 onSave={onEditField ? (v) => onEditField("datasheet", v) : undefined}
                 busy={busy}
               />
@@ -784,6 +788,7 @@ function PanelMessage({
 function DataRow({
   label,
   value,
+  displayValue,
   mono,
   href,
   onSave,
@@ -792,6 +797,7 @@ function DataRow({
 }: {
   label: string;
   value: string;
+  displayValue?: string;
   mono?: boolean;
   href?: string;
   onSave?: (value: string) => void;
@@ -812,6 +818,7 @@ function DataRow({
           <>
             <EditableText
               value={value}
+              display={displayValue}
               onSave={onSave}
               label={label}
               placeholder="Missing"
@@ -840,7 +847,7 @@ function DataRow({
             rel="noreferrer"
             className="inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 font-medium text-t1 underline decoration-line2 underline-offset-2 transition-colors hover:bg-raise2 hover:decoration-current"
           >
-            <span className="min-w-0 break-words">{value}</span>
+            <span className="min-w-0 break-words">{displayValue ?? value}</span>
             <ExternalIcon className="flex-none text-t3" />
           </a>
         ) : (
@@ -1172,5 +1179,22 @@ function normalizePriceBreaks(raw: unknown[]): NormalizedBreak[] {
 function formatPrice(value: number, currency: string): string {
   const symbol = currency === "USD" || !currency ? "$" : "";
   const suffix = symbol ? "" : ` ${currency}`;
-  return `${symbol}${value.toFixed(2)}${suffix}`;
+  // Sub-cent unit prices are common on passives at volume; two decimals collapse them
+  // to "$0.00", which reads as free/broken. Show real precision (trim trailing zeros)
+  // so a fraction of a cent reads as an actual price.
+  const body =
+    value > 0 && value < 0.01
+      ? value.toFixed(4).replace(/0+$/, "")
+      : value.toFixed(2);
+  return `${symbol}${body}${suffix}`;
+}
+
+// A clean, human label for a datasheet URL: the host (minus www.), so the Overview shows
+// "weblib.samsungsem.com" instead of a raw, truncated query string. Editing still uses the URL.
+function datasheetLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }

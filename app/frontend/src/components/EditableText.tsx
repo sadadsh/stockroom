@@ -17,6 +17,9 @@ interface Props {
   mono?: boolean;
   disabled?: boolean;
   displayClassName?: string;
+  // A clean label to SHOW when not editing (e.g. a datasheet's host instead of the
+  // raw URL). Editing still operates on `value`, so nothing about save changes.
+  display?: string;
 }
 
 export function EditableText({
@@ -28,6 +31,7 @@ export function EditableText({
   mono = false,
   disabled = false,
   displayClassName,
+  display,
 }: Props) {
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
@@ -88,7 +92,7 @@ export function EditableText({
         (displayClassName ?? "text-base")
       }
     >
-      <span className="min-w-0 break-words">{empty ? placeholder : value}</span>
+      <span className="min-w-0 break-words">{empty ? placeholder : (display ?? value)}</span>
     </button>
   );
 }

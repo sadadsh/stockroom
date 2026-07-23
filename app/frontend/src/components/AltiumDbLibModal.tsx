@@ -16,7 +16,9 @@ import { CloseIcon, UploadIcon } from "./icons";
 type Filter = "all" | "ready" | "needs";
 
 const TH =
-  "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-2.5 text-left " +
+  // bg-popover (opaque), NOT bg-raise (7% translucent): a sticky header over translucent
+  // fill lets the rows scrolling under it bleed through. Opaque so it occludes cleanly.
+  "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-popover px-3 py-2.5 text-left " +
   "text-[10px] font-bold uppercase tracking-[0.06em] text-t3";
 const TD = "whitespace-nowrap px-3 py-2.5 text-sm";
 
@@ -107,7 +109,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label="Altium Database Library"
-        className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
+        className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-popover shadow-raise focus:outline-none"
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
           <div className="flex items-baseline gap-2.5">
