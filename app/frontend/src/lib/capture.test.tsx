@@ -104,4 +104,75 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.partId).toBeNull();
     expect(result.current.active.status).toBe("idle");
   });
+
+  // -- Phase 3 (DONE-02, HUD-01): the host done signal + the part-name pass-through --
+
+  it("consumes a token-matching done signal into the terminal done state and tears down the handler", async () => {
+    mockSource();
+    mockHost();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "One", ["kicad_symbol"]);
+    });
+    expect(result.current.active.status).toBe("receiving");
+
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
+      await Promise.resolve();
+    });
+
+    expect(result.current.active.status).toBe("done");
+    expect(window.__STOCKROOM_CAD_DOWNLOAD__).toBeUndefined();
+  });
+
+  it("ignores a done whose token does not match the active capture (B4 guard)", async () => {
+    mockSource();
+    mockHost();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "One", ["kicad_symbol"]);
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "STALE" });
+      await Promise.resolve();
+    });
+
+    expect(result.current.active.status).toBe("receiving"); // never marked the replaced part done
+  });
+
+  it("treats a repeated done as a no-op once the capture is already done", async () => {
+    mockSource();
+    mockHost();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "One", ["kicad_symbol"]);
+    });
+    const handler = window.__STOCKROOM_CAD_DOWNLOAD__!;
+    await act(async () => {
+      handler({ signal: "done", token: "tok" });
+      await Promise.resolve();
+    });
+    expect(result.current.active.status).toBe("done");
+
+    await act(async () => {
+      handler({ signal: "done", token: "tok" }); // a duplicate late done must not corrupt the state
+      await Promise.resolve();
+    });
+    expect(result.current.active.status).toBe("done");
+  });
+
+  it("passes the active part name to the host open so the HUD can show it (HUD-01)", async () => {
+    mockSource();
+    const open = mockHost();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "BQ24074", ["kicad_symbol"]);
+    });
+
+    expect(open).toHaveBeenCalledWith("https://app.ultralibrarian.com/x", ["kicad_symbol"], "BQ24074");
+  });
 });
