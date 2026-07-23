@@ -8,9 +8,20 @@ import {
   useStmFamilies,
   useStmPinout,
   useBuildStmIndex,
+  useStmCompatUnion,
 } from "./stmQueries";
 import { api, ApiError } from "./client";
-import type { McusResponse, PinoutDTO, StmStatusDTO } from "./types";
+import type { McusResponse, PinoutDTO, StmStatusDTO, UnionDTO } from "./types";
+
+const UNION: UnionDTO = {
+  parts: ["STM32F407VETx"],
+  resolved: [{ ref: "A", mpn: "STM32F407VETx" }],
+  package: "LQFP100",
+  family: "STM32F4",
+  grain: "per-part",
+  positions: [],
+  verdict: { interchangeable: true, swaps_required: 0, blocking: [] },
+};
 
 const STATUS: StmStatusDTO = {
   built: true,
@@ -124,5 +135,30 @@ describe("STM query hooks", () => {
     const { result } = renderHook(() => useBuildStmIndex(), { wrapper: wrapperWith(freshClient()) });
     result.current.start();
     await waitFor(() => expect(buildSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it("useStmCompatUnion posts a (family, package) group body and resolves the UnionDTO", async () => {
+    const spy = vi.spyOn(api, "postStmCompatUnion").mockResolvedValue(UNION);
+    const { result } = renderHook(() => useStmCompatUnion(), { wrapper: wrapperWith(freshClient()) });
+    result.current.mutate({ family: "STM32F4", package: "LQFP100" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith({ family: "STM32F4", package: "LQFP100" });
+    expect(result.current.data?.verdict.interchangeable).toBe(true);
+  });
+
+  it("useStmCompatUnion also accepts an explicit ref-list body (both input shapes)", async () => {
+    const spy = vi.spyOn(api, "postStmCompatUnion").mockResolvedValue(UNION);
+    const { result } = renderHook(() => useStmCompatUnion(), { wrapper: wrapperWith(freshClient()) });
+    result.current.mutate({ parts: ["STM32F407VETx", "STM32F407VGTx"] });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith({ parts: ["STM32F407VETx", "STM32F407VGTx"] });
+  });
+
+  it("useStmCompatUnion surfaces a 409 as an ApiError the workbench can branch on", async () => {
+    vi.spyOn(api, "postStmCompatUnion").mockRejectedValue(new ApiError(409, "STM index not built"));
+    const { result } = renderHook(() => useStmCompatUnion(), { wrapper: wrapperWith(freshClient()) });
+    result.current.mutate({ family: "STM32F4", package: "LQFP100" });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect((result.current.error as ApiError).status).toBe(409);
   });
 });

@@ -78,6 +78,8 @@ import type {
   McusResponse,
   FamiliesResponse,
   PinoutDTO,
+  CompatUnionBody,
+  UnionDTO,
 } from "./types";
 
 export class ApiError extends Error {
@@ -1043,5 +1045,13 @@ export const api = {
   // job's SSE (useJob). A second submit while one is in flight returns the same job id.
   buildStmIndex(): Promise<JobRef> {
     return request<JobRef>("POST", "/api/stm/build");
+  },
+
+  // The socket-union of an assembled set + its set-level verdict (COMPAT-01/02/03/05). The body is
+  // EITHER an explicit ref list ({ parts }) OR a (family, package) group; both shapes the endpoint
+  // accepts (section 4). The result is ephemeral facts, not a stored resource, so nothing is
+  // invalidated after it resolves. A 409 raises ApiError(409) the caller routes to the build gate.
+  postStmCompatUnion(body: CompatUnionBody): Promise<UnionDTO> {
+    return request<UnionDTO>("POST", "/api/stm/compat/union", { body });
   },
 };

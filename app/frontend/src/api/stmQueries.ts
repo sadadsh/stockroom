@@ -10,9 +10,9 @@
  * sections 5 + 7); adding them now with no consumer would be premature.
  */
 import { useCallback } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { api, type StmMcusArgs } from "./client";
-import type { StmStatusDTO } from "./types";
+import type { CompatUnionBody, StmStatusDTO } from "./types";
 import { useJob } from "../lib/useJob";
 
 // The build/source/stamp state. retry:false so a 409 (index not built) resolves to an error
@@ -71,4 +71,15 @@ export function useBuildStmIndex() {
   const job = useJob<StmStatusDTO>();
   const start = useCallback(() => job.start(() => api.buildStmIndex()), [job]);
   return { ...job, start };
+}
+
+// The socket-union of an assembled set (COMPAT-01/02/03/05). A plain useMutation mirroring
+// useSetLibrary: the union body is either an explicit ref list or a (family, package) group, and
+// the UnionDTO result is ephemeral React state, not a stored resource, so nothing is invalidated on
+// success (ARCHITECTURE Pattern 2 — a synchronous Layer B read, NOT routed through useJob/SSE). The
+// caller branches on ApiError.status === 409 to show the reused "index not built" state.
+export function useStmCompatUnion() {
+  return useMutation({
+    mutationFn: (body: CompatUnionBody) => api.postStmCompatUnion(body),
+  });
 }
