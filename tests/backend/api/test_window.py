@@ -497,9 +497,115 @@ def test_forward_cad_capture_pushes_a_received_tick_to_the_cad_window(tmp_path, 
     assert dl.startswith("window.__SR_DL__ &&")
     assert json.dumps({"state": "completed", "format": "kicad"}) in dl
 
-    # a dedup re-fire satisfies nothing new -> nothing new pushed to the CAD window
+    # A dedup re-fire satisfies nothing new -> no HUD tick and no SPA re-forward, but the
+    # completed relay STILL fires: the reactor is the decider (its settled/format matching makes a
+    # stray relay harmless), while a swallowed relay left the reactor waiting out a 150s watchdog
+    # on a file that had already landed (live-observed 2026-07-23).
     W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
-    assert len(cad.scripts) == 2
+    assert len(cad.scripts) == 3
+    assert json.dumps({"state": "completed", "format": "kicad"}) in cad.scripts[2]
+    assert len(_capture_payloads(spa)) == 1  # the SPA is still forwarded exactly once
+
+
+def test_capture_formats_require_the_core_symbol_footprint_pair():
+    # The relay names a format ONLY when the captured file carries that format's symbol+footprint
+    # pair. A stray STEP (classifies as kicad_model alone) must not masquerade as the KiCad
+    # delivery: live 2026-07-23, UL served an Altium+STEP bundle against a KiCad request, and a
+    # kicad_model-implies-kicad relay would have falsely advanced the reactor past KiCad.
+    from stockroom.host.window import _capture_formats
+
+    assert _capture_formats(["kicad_symbol", "kicad_footprint", "kicad_model"]) == ["kicad"]
+    assert _capture_formats(["kicad_model"]) == []
+    assert _capture_formats(["altium_symbol", "altium_footprint", "kicad_model"]) == ["altium"]
+    assert _capture_formats(
+        ["kicad_symbol", "kicad_footprint", "altium_symbol", "altium_footprint"]
+    ) == ["kicad", "altium"]
+    assert _capture_formats([]) == []
+
+
+def test_forward_cad_capture_relays_a_wrong_format_completion(tmp_path, monkeypatch):
+    # The vendor can deliver the WRONG format outright (live 2026-07-23: a sticky prior selection
+    # made UL serve its Altium+STEP bundle against a KiCad request). The file satisfies nothing the
+    # session needs -> no HUD tick, no SPA forward - but the reactor MUST still hear a completed
+    # event naming what actually arrived, so it reacts (wrongfile -> reselect) instead of waiting
+    # out its watchdog on a download that already finished.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "a.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("Altium/part.SchLib", "SCHDATA")
+        zf.writestr("Altium/part.PcbLib", "PCBDATA")
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT})  # a KiCad-only session
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    assert _capture_payloads(spa) == []  # nothing needed was satisfied
+    [dl] = cad.scripts  # no HUD tick - only the completed relay
+    assert dl.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "altium"}) in dl
+
+
+def test_forward_cad_capture_relays_unknown_for_a_file_with_no_cad_content(tmp_path, monkeypatch):
+    # A completed download that classifies as nothing (a junk/empty archive) still completed - the
+    # reactor hears "unknown", treats it as a wrong file, and reacts instead of hanging.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", _RecordingWindow())
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "junk.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("readme.txt", "nothing useful")
+    s = _session({R.KICAD_SYMBOL})
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    [dl] = cad.scripts
+    assert json.dumps({"state": "completed", "format": "unknown"}) in dl
+
+
+def test_unique_dest_never_overwrites_an_earlier_capture(tmp_path):
+    # The vendor names EVERY export the same (<MPN>.zip), so a second format's download would
+    # OVERWRITE the first zip while its async SPA attach may still be reading it (live
+    # 2026-07-23: the Altium zip replaced the just-captured KiCad zip on disk seconds after the
+    # KiCad forward). The save path must be collision-free.
+    from stockroom.host.window import _unique_dest
+
+    first = _unique_dest(tmp_path, "part.zip")
+    assert first == tmp_path / "part.zip"
+    first.write_bytes(b"a")
+    second = _unique_dest(tmp_path, "part.zip")
+    assert second == tmp_path / "part-2.zip"
+    second.write_bytes(b"b")
+    assert _unique_dest(tmp_path, "part.zip") == tmp_path / "part-3.zip"
+    assert _unique_dest(tmp_path, "") == tmp_path / "cad-download.zip"
+
+
+def test_dispatch_captured_runs_off_the_calling_thread_and_returns_immediately():
+    # Tier 1's StateChanged fires on WebView2's download COM thread. Running the forward pipeline
+    # (classify + extract + blocking evaluate_js) on that thread hung it mid-relay (live-observed
+    # 2026-07-23: the HUD ticked, then the completed relay never reached the page and the harness
+    # line after the forward never ran). The dispatch helper must hand the callback to a worker
+    # thread and return without waiting for it.
+    from stockroom.host.window import _dispatch_captured
+
+    started = threading.Event()
+    release = threading.Event()
+    seen: dict = {}
+
+    def _blocked_capture(path):
+        seen["thread"] = threading.current_thread()
+        seen["path"] = path
+        started.set()
+        release.wait(timeout=5.0)
+
+    _dispatch_captured(_blocked_capture, "dest.zip")  # must NOT block on the callback
+    assert started.wait(timeout=5.0)  # the callback did run...
+    assert seen["thread"] is not threading.current_thread()  # ...on a different thread
+    release.set()
+    assert seen["path"] == "dest.zip"
 
 
 def test_forward_cad_capture_no_cad_window_still_forwards_to_the_spa(tmp_path, monkeypatch):

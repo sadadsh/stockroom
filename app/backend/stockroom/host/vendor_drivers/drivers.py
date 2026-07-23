@@ -139,8 +139,13 @@ _DIGIKEY_REACTOR = (
     "function awaitDownload(spec,onDone,onFail){var settled=false,iv=null,wd=null;"
     "function settle(fn,why){if(settled)return;settled=true;window.__SR_DL_CB__=null;"
     "clearInterval(iv);clearTimeout(wd);trace('await',spec.key,why);fn(why);}"
-    "window.__SR_DL_CB__=function(evt){"
-    "if(evt&&evt.state==='completed'&&(!evt.format||evt.format===spec.key))settle(onDone,'completed');};"
+    # A completed download of the WRONG format is sensed and reacted to AT ONCE: the vendor can
+    # deliver the wrong file outright (live 2026-07-23: a sticky prior selection made UL serve its
+    # Altium+STEP bundle against a KiCad request), and waiting out the watchdog on it left the
+    # capture hanging 150s on a download that had already finished.
+    "window.__SR_DL_CB__=function(evt){if(!evt||evt.state!=='completed')return;"
+    "if(!evt.format||evt.format===spec.key){settle(onDone,'completed');}"
+    "else{settle(onFail,'wrongfile');}};"
     # While the vendor generates the file server-side (up to a minute+), watch for a failure with a
     # LIGHT periodic health-check (a wall/error toast), NOT a per-frame MutationObserver: the download
     # phase mutates the DOM constantly (the spinner), so an every-frame observer that read innerText
@@ -188,6 +193,14 @@ _DIGIKEY_RUN = (
 # export modal has a matching data-original label), pick it + the STEP 3D radio, click Download (each
 # click gated on actionable()), then AWAIT the real browser download. It does NOT hardcode a provider;
 # whatever visible source can deliver the format wins ("trying the next source" otherwise).
+#
+# The selection is VERIFIED, never assumed from a click (live 2026-07-23): the persistent profile
+# restores the PREVIOUS session's selection, so the modal can open pre-armed (download button already
+# enabled) on the WRONG format, and UL then serves that wrong bundle. pickVerified reads the real
+# selection state back (input.checked / aria-checked / an active class), retries, sweeps every stale
+# selection off, tolerates a 3D radio that shares (and would steal) the format's radio group, and only
+# then lets Download fire. A wrong file that still slips through comes back as awaitDownload's
+# 'wrongfile' and the format is retried once in place - selection re-verified - before refresh recovery.
 _DIGIKEY_DOWNLOAD = (
     "function fmtBtn(){var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
     "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||''))return cs[i];}return null;}"
@@ -197,12 +210,47 @@ _DIGIKEY_DOWNLOAD = (
     "return (d&&!d.disabled&&actionable(d))?d:null;}"
     "function closeModal(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
     "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}}"
-    "function pickFormat(spec){var m=exportModal();if(!m)return false;var ls=m.querySelectorAll('label'),has=false;"
+    "function findLabel(m,re){var ls=m.querySelectorAll('label');"
     "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
-    "if(spec.re.test(t)){has=true;var inp=labelInput(ls[j]);try{(inp||ls[j]).click();}catch(e){}break;}}"
-    "if(has){for(var k=0;k<ls.length;k++){var t2=(ls[k].getAttribute('data-original')||ls[k].textContent||'').trim();"
-    "if(/^step$/i.test(t2)){var si=labelInput(ls[k]);try{(si||ls[k]).click();}catch(e){}break;}}}return has;}"
-    "function downloadFormat(present,spec,done){var pi=0;function tryProvider(){"
+    "if(re.test(t))return ls[j];}return null;}"
+    "function isOn(l){try{var i=labelInput(l);if(i&&typeof i.checked==='boolean')return i.checked;"
+    "var a=(l.getAttribute('aria-checked')||'').toLowerCase();if(a)return a==='true';"
+    "return /\\b(active|checked|selected)\\b/i.test(l.className||'');}catch(e){return false;}}"
+    "function setOn(l){try{var i=labelInput(l);(i||l).click();}catch(e){}}"
+    # UL persists the LAST exported selection in localStorage and its async displayExportModal
+    # re-render restores it - the source of the sticky wrong format. Clearing the keys is safe:
+    # the vendor's own code handles their absence (it re-saves them on the next export).
+    "function clearSticky(){try{localStorage.removeItem('ultraDownloadFormat2D');"
+    "localStorage.removeItem('ultraDownloadFormat3D');}catch(e){}}"
+    "function pickVerified(modal,spec,cb){var target=findLabel(modal,spec.re);"
+    "if(!target){cb(false,null);return;}"
+    "var step=findLabel(modal,/^step$/i);var tries=0;"
+    "function sweep(){var ls=modal.querySelectorAll('label');"
+    "for(var j=0;j<ls.length;j++){var l=ls[j];if(l===target||l===step)continue;"
+    "if(isOn(l))setOn(l);}}"
+    "function attempt(){tries++;trace('pick',spec.key,'attempt',tries);clearSticky();"
+    "if(!isOn(target))setOn(target);"
+    "var stepWanted=!!step;"
+    "if(stepWanted&&!isOn(step)){setOn(step);"
+    "if(!isOn(target)){setOn(target);stepWanted=false;trace('pick',spec.key,'step shares the group; format wins');}}"
+    "sweep();if(!isOn(target))setOn(target);"
+    "until(function(){if(!isOn(target))return null;if(stepWanted&&!isOn(step))return null;"
+    "var ls=modal.querySelectorAll('label');"
+    "for(var j=0;j<ls.length;j++){if(ls[j]!==target&&ls[j]!==step&&isOn(ls[j]))return null;}"
+    "return {ok:1};},function(v){"
+    "if(v){trace('pick',spec.key,'verified step='+(stepWanted?1:0));"
+    "cb(true,{t:target,s:step,w:stepWanted});return;}"
+    "if(tries<3){attempt();return;}"
+    "if(isOn(target)){trace('pick',spec.key,'format on; stale extras would not clear');"
+    "cb(true,{t:target,s:step,w:stepWanted});return;}"
+    "cb(false,null);},2000);}attempt();}"
+    # The Download click is ATOMIC with a SYNCHRONOUS selection re-check: the vendor's export
+    # handler reads input:checked synchronously in the click chain, so nothing can re-render
+    # between this check and the read (live 2026-07-23: an async modal re-render wiped a verified
+    # selection ~80ms before the click and the sticky wrong format was exported instead). A wiped
+    # selection re-picks reactively (bounded), never clicks blind.
+    "function selOn(sel){return !!(sel&&isOn(sel.t)&&(!sel.w||isOn(sel.s)));}"
+    "function downloadFormat(present,spec,done){var pi=0,redrives=0;function tryProvider(){"
     "if(pi>=present.length){report(spec.key,false,'No visible source offers '+spec.name+'; download it by hand.');done();return;}"
     "var prov=present[pi++];trace('tryProvider',spec.key,prov[1]);"
     "if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row){try{row.click();}catch(e){}}}"
@@ -211,14 +259,33 @@ _DIGIKEY_DOWNLOAD = (
     "try{btn.click();}catch(e){}"
     "until(exportModal,function(modal){"
     "if(!modal){report('provider',false,prov[1]+' showed no formats; trying the next source.');tryProvider();return;}"
-    "if(!pickFormat(spec)){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();tryProvider();return;}"
+    "pickVerified(modal,spec,function(ok,sel){"
+    "if(!ok){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();tryProvider();return;}"
     "report(spec.key,true,'Selected '+spec.name+' plus the 3D model from '+prov[1]+'.');"
-    "until(dlBtn,function(dl){"
-    "if(!dl){report('download',false,'Select a format, then click Download.');return;}"
-    "try{dl.click();}catch(e){}"
+    # The download seek SENSES two states, reacting to whichever happens first: the button
+    # enables (verify the selection SYNCHRONOUSLY in the same task, then click - atomic vs a
+    # re-render), or the vendor's async re-render WIPES the selection - which also closes the
+    # modal and keeps the button disabled forever (live 2026-07-23), so the reaction is a full
+    # bounded re-drive of this provider: re-open the modal, re-pick, re-seek. A watchdog
+    # dead-end recovers (refresh); it never strands the run on a guidance message.
+    "function seekDl(){until(function(){var d=dlBtn();if(d)return {d:d};"
+    "if(!selOn(sel))return {re:1};return null;},function(v){"
+    "if(!v){report('download',false,'Select a format, then click Download.');recover(spec,done);return;}"
+    "if(v.re){trace('pick',spec.key,'selection wiped; redriving');"
+    "if(++redrives>3){recover(spec,done);return;}"
+    "pi=Math.max(0,pi-1);tryProvider();return;}"
+    "if(!selOn(sel)){trace('pick',spec.key,'selection wiped at click; repicking');"
+    "if(++redrives>3){recover(spec,done);return;}"
+    "var m2=exportModal()||modal;pickVerified(m2,spec,function(ok2,sel2){"
+    "if(!ok2){recover(spec,done);return;}sel=sel2;seekDl();});return;}"
+    "try{v.d.click();}catch(e){}"
     "report('download',true,'Downloading '+spec.name+' from '+prov[1]+'; watching for the file.');"
     "awaitDownload(spec,function(){report('progress',true,'Finished '+spec.name+'.');done();},"
-    "function(why){recover(spec,done);});},12000);},12000);},12000);}tryProvider();}"
+    "function(why){"
+    "if(why==='wrongfile'&&!spec.__retried){spec.__retried=1;"
+    "report(spec.key,false,'That was not the '+spec.name+' file; selecting it again.');"
+    "pi=Math.max(0,pi-1);tryProvider();return;}"
+    "recover(spec,done);});},12000);}seekDl();});},12000);},12000);}tryProvider();}"
 )
 
 
