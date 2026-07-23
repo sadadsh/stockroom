@@ -19,7 +19,14 @@ import { useDevMode } from "../lib/devMode";
 import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../lib/devTokens";
 import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
-import { containerLayoutOf, isValidOrder, reorderSiblings, reorderSiblingsOf } from "../lib/elementLayout";
+import {
+  containerLayoutOf,
+  gridColumnsOf,
+  isValidGridSlot,
+  isValidOrder,
+  reorderSiblings,
+  reorderSiblingsOf,
+} from "../lib/elementLayout";
 import { Button } from "./primitives";
 import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
@@ -598,6 +605,61 @@ function BoxRow({
   );
 }
 
+// The slot values the grid picker offers for a container with `cols` column tracks: `auto` (the
+// default, which clears the override), each 1-based line position 1..cols, and a `span N` for 2..cols.
+// Every option passes isValidGridSlot, so the picker can never emit a value the backend writer rejects.
+function gridSlotOptions(cols: number): string[] {
+  const opts = ["auto"];
+  for (let i = 1; i <= cols; i++) opts.push(String(i));
+  for (let s = 2; s <= cols; s++) opts.push(`span ${s}`);
+  return opts;
+}
+
+// One grid-slot control (Phase F / LAYOUT-01): a select of derived line / span positions for a single
+// grid property (grid-column or grid-row) on the selected element. Choosing `auto` clears the override
+// (the grid's own flow re-emerges); any other choice writes the validated slot value live through Phase
+// E's per-element setter (the same map that applies inline by id and ships in the save `elements` block).
+// The current committed / working value is preselected, and shown as an option even if it is outside the
+// derived set (a hand-committed value stays visible rather than silently snapping to auto).
+function GridSlotControl({
+  id,
+  prop,
+  label,
+  cols,
+}: {
+  id: string;
+  prop: string;
+  label: string;
+  cols: number;
+}) {
+  const dev = useDevMode();
+  const current = dev.elementOverridesFor(id)?.[prop] ?? "auto";
+  const options = gridSlotOptions(cols);
+  const opts = options.includes(current) ? options : [current, ...options];
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="min-w-0 flex-1 truncate text-xs text-t2">{label}</span>
+      <select
+        aria-label={label}
+        value={current}
+        onChange={(e) => {
+          const v = e.target.value;
+          // `auto` is the grid default: clear the override so the container's own flow returns.
+          if (v === "auto") dev.resetElementProp(id, prop);
+          else if (isValidGridSlot(v)) dev.setElementProp(id, prop, v);
+        }}
+        className="w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+      >
+        {opts.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // The Layout section (Phase F / LAYOUT-01): reorder the selected element among its container siblings
 // via CSS `order`, keyed by data-dev-id. Renders only when the selection sits in a flex/grid container
 // (className-detected) with at least two dev-id siblings - otherwise there is nothing to reorder and it
@@ -642,6 +704,18 @@ function LayoutSection({ id }: { id: string }) {
   };
   const anyOrder = orderedIds.some((sid) => dev.isElementPropOverridden(sid, "order"));
 
+  // Grid child (decision 1b): the selection sits in a grid container, so it may also be reassigned to a
+  // grid slot. The column / row controls derive their positions from the container's grid-cols-N count;
+  // Reset slot clears ONLY grid-column / grid-row for THIS element (order / size / spacing untouched).
+  const isGridChild = layout === "grid";
+  const cols = isGridChild ? gridColumnsOf(node.parentElement) : 0;
+  const resetSlot = () => {
+    dev.resetElementProp(id, "grid-column");
+    dev.resetElementProp(id, "grid-row");
+  };
+  const anySlot =
+    dev.isElementPropOverridden(id, "grid-column") || dev.isElementPropOverridden(id, "grid-row");
+
   return (
     <section className="py-1.5">
       <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Layout</div>
@@ -669,6 +743,24 @@ function LayoutSection({ id }: { id: string }) {
         >
           Reset Order
         </button>
+      ) : null}
+      {isGridChild ? (
+        <div className="mt-1.5">
+          <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+            Grid Slot
+          </div>
+          <GridSlotControl id={id} prop="grid-column" label="Grid Column" cols={cols} />
+          <GridSlotControl id={id} prop="grid-row" label="Grid Row" cols={cols} />
+          {anySlot ? (
+            <button
+              type="button"
+              onClick={resetSlot}
+              className="mt-1 text-2xs font-semibold text-t2 hover:text-t1"
+            >
+              Reset Slot
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

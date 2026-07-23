@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   containerLayoutOf,
+  gridColumnsOf,
+  isValidGridSlot,
   isValidOrder,
   reorderSiblings,
   reorderSiblingsOf,
@@ -117,6 +119,37 @@ describe("reorderSiblings", () => {
     expect(seq).toEqual(["b", "c", "a"]);
     seq = seqFrom(reorderSiblings(seq, "a", "down")); // at the end: no change
     expect(seq).toEqual(["b", "c", "a"]);
+  });
+});
+
+describe("gridColumnsOf", () => {
+  it("reads the column-track count from a grid-cols-N class", () => {
+    expect(gridColumnsOf(makeContainer("grid grid-cols-2 gap-2", []))).toBe(2);
+    expect(gridColumnsOf(makeContainer("grid grid-cols-12", []))).toBe(12);
+    expect(gridColumnsOf(makeContainer("inline-grid grid-cols-3", []))).toBe(3);
+  });
+
+  it("returns 0 when no grid-cols-N class is present, and is null-safe", () => {
+    expect(gridColumnsOf(makeContainer("grid gap-2", []))).toBe(0);
+    expect(gridColumnsOf(makeContainer("flex flex-col", []))).toBe(0);
+    // A partial token must not match (whole grid-cols-N only).
+    expect(gridColumnsOf(makeContainer("grid-cols", []))).toBe(0);
+    expect(gridColumnsOf(null)).toBe(0);
+    expect(gridColumnsOf(undefined)).toBe(0);
+  });
+});
+
+describe("isValidGridSlot", () => {
+  it("accepts one or two safe line tokens (auto / small integer / span N)", () => {
+    for (const v of ["1", "1 / 3", "span 2", "auto", "2", "-1", "1 / span 2", "auto / 3"]) {
+      expect(isValidGridSlot(v)).toBe(true);
+    }
+  });
+
+  it("rejects a three-part slot, empty, a stray identifier, and punctuation", () => {
+    for (const v of ["1 / 2 / 3", "red", "", "1;2", "1 / red", "12345", "1 2"]) {
+      expect(isValidGridSlot(v)).toBe(false);
+    }
   });
 });
 

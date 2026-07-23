@@ -58,6 +58,16 @@ function Harness() {
             Nav Settings
           </button>
         </div>
+        {/* A real grid container (grid-cols-2) with dev-id children, so the grid slot picker path has a
+            genuine grid child under jsdom. */}
+        <div data-dev-id="detail.actions" className="grid grid-cols-2 gap-2">
+          <button type="button" data-dev-id="detail.action-a" className="text-t1">
+            Action A
+          </button>
+          <button type="button" data-dev-id="detail.action-b" className="text-t1">
+            Action B
+          </button>
+        </div>
         <DevPanel />
         <DevInspector />
       </DevModeProvider>
@@ -415,6 +425,75 @@ describe("DevPanel inspect-first shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
     expect(first.style.order).toBe("2");
     expect(last.style.order).toBe("1");
+  });
+
+  // --- the grid slot picker (Phase F / LAYOUT-01, decision 1b): grid-column / grid-row on a grid child ---
+
+  it("shows a grid slot picker only for a grid child, not for a flex child", () => {
+    render(<Harness />);
+    toggleDevMode();
+    // A grid-container child: the slot picker (column + row controls) appears.
+    selectNavAndOpenBox("detail.action-a", "Action A");
+    expect(screen.getByLabelText("Grid Column")).toBeInTheDocument();
+    expect(screen.getByLabelText("Grid Row")).toBeInTheDocument();
+
+    // A flex-container child still gets the reorder controls but NO grid slot picker.
+    fireEvent.click(screen.getByRole("button", { name: "Nav Components" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+    expect(screen.getByRole("button", { name: "Move Up" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Grid Column")).not.toBeInTheDocument();
+  });
+
+  it("choosing a column slot writes a validated grid-column live and into the save `elements` block", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectNavAndOpenBox("detail.action-a", "Action A");
+
+    // The options are derived from the container's grid-cols-2: auto, 1, 2, span 2.
+    fireEvent.change(screen.getByLabelText("Grid Column"), { target: { value: "2" } });
+    expect(node.style.getPropertyValue("grid-column")).toBe("2");
+
+    // Save carries the slot purely as a grid-column entry in the `elements` block for the backend writer.
+    const devSave = vi.mocked(api.devSave);
+    devSave.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Save to source/ }));
+    expect(devSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elements: expect.objectContaining({ "detail.action-a": { "grid-column": "2" } }),
+      }),
+    );
+  });
+
+  it("Reset Slot clears only grid-column / grid-row, leaving the element's order untouched", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectNavAndOpenBox("detail.action-a", "Action A");
+
+    fireEvent.change(screen.getByLabelText("Grid Column"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Grid Row"), { target: { value: "span 2" } });
+    // Also reorder within the grid, so we can prove Reset Slot leaves `order` alone.
+    fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
+    expect(node.style.getPropertyValue("grid-column")).toBe("2");
+    expect(node.style.getPropertyValue("grid-row")).toBe("span 2");
+    expect(node.style.order).toBe("1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset Slot" }));
+    expect(node.style.getPropertyValue("grid-column")).toBe("");
+    expect(node.style.getPropertyValue("grid-row")).toBe("");
+    // The order override survives: Reset Slot touches only the grid slot properties.
+    expect(node.style.order).toBe("1");
+    expect(screen.queryByRole("button", { name: "Reset Slot" })).not.toBeInTheDocument();
+  });
+
+  it("choosing auto clears the grid-column override (the grid's own flow returns)", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectNavAndOpenBox("detail.action-a", "Action A");
+
+    fireEvent.change(screen.getByLabelText("Grid Column"), { target: { value: "2" } });
+    expect(node.style.getPropertyValue("grid-column")).toBe("2");
+    fireEvent.change(screen.getByLabelText("Grid Column"), { target: { value: "auto" } });
+    expect(node.style.getPropertyValue("grid-column")).toBe("");
   });
 
   it("Reset Order clears every sibling's order and drops it from the save `elements` block", async () => {
