@@ -38,6 +38,16 @@ export default {
         // the loud neutral (near-white/near-black) and its low-alpha active-surface wash
         "acc-strong": "var(--c-acc-strong)",
         "acc-soft": "var(--c-acc-soft)",
+        // STM pin electrical-class fill hues (VIZ-02): color IS the data on the pinout map, so
+        // these are the one saturated channel, used on the pad fill only (a SEPARATE taxonomy from
+        // the BOM-component --cat-* hues above; never reuse those here).
+        "stm-cat-io": "var(--stm-cat-io)",
+        "stm-cat-power": "var(--stm-cat-power)",
+        "stm-cat-ground": "var(--stm-cat-ground)",
+        "stm-cat-reset": "var(--stm-cat-reset)",
+        "stm-cat-boot": "var(--stm-cat-boot)",
+        "stm-cat-vcap": "var(--stm-cat-vcap)",
+        "stm-cat-nc": "var(--stm-cat-nc)",
       },
       borderRadius: {
         // North-star direction (owner decision 2026-07-17): the rounder card + control.
