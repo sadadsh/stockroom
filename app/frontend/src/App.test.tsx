@@ -84,7 +84,7 @@ describe("App shell", () => {
     expect(
       screen.queryByRole("tab", { name: /BOM Coverage|Duplicates|Doctor/ }),
     ).toBeNull();
-    expect(screen.getByRole("tab", { name: "Specs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Specifications" })).toBeInTheDocument();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {

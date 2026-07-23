@@ -207,7 +207,7 @@ export function DetailPanel({
   // falls back to Specs when the current id is not in the set (a part switch).
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
-    { id: "specs", label: "Specs" },
+    { id: "specs", label: "Specifications" },
     { id: "sourcing", label: "Sourcing" },
     ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
     ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
@@ -216,28 +216,38 @@ export function DetailPanel({
   const activeTab = tabs.some((t) => t.id === tab) ? tab : "specs";
 
   return (
-    <div data-dev-id="detail.root" className="flex h-full flex-col px-[30px] pb-4 pt-[22px]">
-      <div className="flex min-h-0 w-full max-w-[1360px] flex-1 gap-7">
+    <div data-dev-id="detail.root" className="flex h-full min-h-0 flex-col">
+      {/* the opened component reads as a docked Altium panel: a title-strip band (the part name +
+          its category), the SAME band + hairline as the Components list header and the rail header,
+          so the three panes read as one workspace. Then the padded body. */}
+      <div
+        data-dev-id="detail.title-strip"
+        className="flex h-[34px] flex-none items-center gap-3 border-b border-line bg-band px-6"
+      >
+        <TitleBlock
+          headline={headline}
+          name={detail.display_name}
+          onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
+          busy={busy}
+        />
+        <span className="ml-auto flex-none truncate text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+          {detail.category}
+        </span>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-4">
+        <div className="flex min-h-0 w-full max-w-[1360px] flex-1 gap-7">
         {/* LEFT rail: the specimen card - identity, the physical object + its embodiments,
             and the single readiness read with the one Complete Part action. */}
         <aside data-dev-id="detail.identity" className="flex w-[344px] flex-none flex-col gap-4 overflow-y-auto pr-1">
-          <div>
-            <TitleBlock
-              headline={headline}
-              name={detail.display_name}
-              onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
-              busy={busy}
-            />
-            <IdentityLine
-              mpn={detail.mpn}
-              manufacturer={detail.manufacturer}
-              onEditMpn={onEditField ? (v) => onEditField("mpn", v) : undefined}
-              onEditManufacturer={
-                onEditField ? (v) => onEditField("manufacturer", v) : undefined
-              }
-              busy={busy}
-            />
-          </div>
+          <IdentityLine
+            mpn={detail.mpn}
+            manufacturer={detail.manufacturer}
+            onEditMpn={onEditField ? (v) => onEditField("mpn", v) : undefined}
+            onEditManufacturer={
+              onEditField ? (v) => onEditField("manufacturer", v) : undefined
+            }
+            busy={busy}
+          />
 
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments */}
           <div data-dev-id="detail.canvas" className="flex flex-col gap-2.5">
@@ -411,6 +421,7 @@ export function DetailPanel({
           </button>
         ) : null}
       </footer>
+      </div>
 
       {/* The one Complete-Part window: every missing file (symbol / footprint / 3D model) and
           data field (datasheet, MPN, ...) is added here, replacing the per-tile attach buttons
@@ -530,14 +541,14 @@ function TitleBlock({
             cancel();
           }
         }}
-        className="w-full rounded-control border border-line2 bg-field px-2 py-1 text-2xl font-bold tracking-[-0.02em] text-t1 outline-none focus:border-acc"
+        className="w-[280px] max-w-full rounded-control border border-line2 bg-field px-2 py-0.5 text-base font-semibold tracking-[-0.01em] text-t1 outline-none focus:border-acc"
       />
     );
   }
 
   return (
-    <div className="group flex items-start gap-1.5">
-      <h1 data-dev-id="detail.title" className="min-w-0 break-words text-2xl font-bold leading-[1.06] tracking-[-0.022em] text-t1">
+    <div className="group flex min-w-0 items-center gap-1.5">
+      <h1 data-dev-id="detail.title" className="min-w-0 truncate text-base font-semibold tracking-[-0.01em] text-t1">
         {headline}
       </h1>
       {onRename ? (
@@ -546,9 +557,9 @@ function TitleBlock({
           onClick={begin}
           disabled={busy}
           aria-label="Rename Part"
-          className="mt-1 grid h-6 w-6 flex-none place-items-center rounded-control text-t3 opacity-0 transition hover:bg-raise2 hover:text-t1 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-0"
+          className="grid h-5 w-5 flex-none place-items-center rounded-control text-t3 opacity-0 transition hover:bg-raise2 hover:text-t1 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-0"
         >
-          <Icon id="detail.rename" className="h-3.5 w-3.5" />
+          <Icon id="detail.rename" className="h-3 w-3" />
         </button>
       ) : null}
     </div>
@@ -684,7 +695,7 @@ function RailReference({
   busy?: boolean;
 }) {
   return (
-    <div data-dev-id="detail.reference" className="flex flex-col gap-1 border-t border-line pt-3">
+    <div data-dev-id="detail.reference" className="mt-auto flex flex-col gap-1 border-t border-line pt-3">
       <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
         <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t2">
           <Text id="detail.datasheet">Datasheet</Text>
@@ -1040,7 +1051,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
   return (
     <div data-dev-id="detail.specs">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t2">
+        <span className="text-xs font-semibold text-t2">
           <Text id="detail.specifications">Specifications</Text>
         </span>
         <span className="tnum font-mono text-2xs text-t3">{count}</span>
@@ -1052,7 +1063,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
       <div className="flex max-w-[460px] flex-col gap-5">
         {groups.map((group) => (
           <section key={group.title} data-dev-id="detail.spec-group">
-            <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.05em] text-t2">
+            <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
               {group.title}
             </div>
             <dl>

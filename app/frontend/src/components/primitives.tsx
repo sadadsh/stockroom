@@ -149,14 +149,12 @@ export function PanelTitle({
   return (
     <div
       className={cx(
-        "flex h-[26px] flex-none items-center justify-between gap-2 border-b border-line bg-band px-3",
+        "flex h-[34px] flex-none items-center justify-between gap-2 border-b border-line bg-band px-3.5",
         className,
       )}
       {...rest}
     >
-      <span className="truncate text-2xs font-semibold uppercase tracking-[0.09em] text-t2">
-        {children}
-      </span>
+      <span className="truncate text-xs font-semibold text-t2">{children}</span>
       {right != null ? (
         <span className="flex-none text-2xs tabular-nums text-t3">{right}</span>
       ) : null}

@@ -57,6 +57,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "components.row-duplicate", label: "Duplicate badge", area: "components" },
   { id: "components.row-warn", label: "Incomplete warning icon", area: "components" },
   { id: "detail.root", label: "Detail panel", area: "detail" },
+  { id: "detail.title-strip", label: "Detail title strip", area: "detail" },
   { id: "detail.identity", label: "Identity / specimen rail", area: "detail" },
   { id: "detail.title", label: "Part headline", area: "detail" },
   { id: "detail.identity-line", label: "MPN + manufacturer line", area: "detail" },
