@@ -134,11 +134,15 @@ def test_stmindex_build_itself_refuses_on_a_real_pin_count_mismatch(tmp_path):
     assert "pin-count mismatch" in str(exc_info.value)
 
 
-def test_af_range_checks_are_not_part_of_this_gate():
-    """DATA-07 mentions AF-range checks, but no pin_alternate_function table
-    exists in Phase 1 - the gate must not reference AF concepts at all."""
+def test_af_range_checks_were_out_of_phase1s_gate_and_are_now_phase2s_extension():
+    """DATA-07 mentions AF-range checks; Phase 1 shipped with no
+    pin_alternate_function table so the gate referenced no AF concepts at
+    all. Phase 2 (02-02 task 1) legitimately EXTENDS this SAME gate function
+    with an AF-range + orphan-join clause once the table exists - this test
+    now asserts the extension is present, superseding the original Phase 1
+    scope guard (which asserted the opposite)."""
     import inspect
 
     src = inspect.getsource(db_mod.run_self_audit)
-    assert "af_index" not in src
-    assert "pin_alternate_function" not in src
+    assert "af_index" in src
+    assert "pin_alternate_function" in src
