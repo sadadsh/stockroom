@@ -21,7 +21,7 @@ export type { PinCategory };
 export const PIN_CATEGORIES = PIN_CATEGORY_HUES;
 
 // The category fill as a token reference (never a raw hex). An UNKNOWN category renders as a neutral
-// line tint on the map (--c-line2) — visibly un-categorized, never silently painted as another
+// line tint on the map (--c-line2) - visibly un-categorized, never silently painted as another
 // category (that exact fallback once masked a real vocabulary mismatch as a "Not Connected" pin).
 export function categoryFill(category: string): string {
   const hue = pinElectricalHue(category);

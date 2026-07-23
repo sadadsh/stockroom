@@ -6,7 +6,7 @@
  *
  * This is strictly READ-ONLY and non-mutating (CONTEXT decision 4): it describes a swap, it never
  * applies one and issues no request of any kind. It holds no mutation hook and no write call by
- * design — a swap is shown, never performed (no CubeMX-style silent auto-remap).
+ * design - a swap is shown, never performed (no CubeMX-style silent auto-remap).
  */
 import type { UnionPositionDTO } from "../../api/types";
 import { Badge, Card } from "../primitives";

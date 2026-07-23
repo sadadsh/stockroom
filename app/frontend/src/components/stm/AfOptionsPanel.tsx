@@ -1,6 +1,6 @@
 /**
  * AfOptionsPanel (SWAP-01/02): the alternate-function vocabulary that makes remapping possible,
- * reachable from BOTH directions and always visible (CONTEXT decision 7 — the fix for CubeMX's
+ * reachable from BOTH directions and always visible (CONTEXT decision 7 - the fix for CubeMX's
  * hidden Ctrl-click discoverability failure):
  * - From a selected pin: its complete AF0-15 set (GET /api/stm/pin/af), ordered by AF index.
  * - From a chosen peripheral signal: every candidate pin it can route to across the part
@@ -17,7 +17,7 @@ import { ApiError } from "../../api/client";
 import { Eyebrow } from "../primitives";
 
 // The single numeric-aware collation (mirrors PinoutViewer.tsx): it orders "1","2","10" correctly
-// AND handles alphanumeric BGA labels "A1".."A10","AB12" — drop { numeric: true } and it goes red.
+// AND handles alphanumeric BGA labels "A1".."A10","AB12" - drop { numeric: true } and it goes red.
 function comparePositions(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true });
 }

@@ -1,7 +1,7 @@
 /**
  * SuggestionGroupList (COMPAT-04): the auto-discovered compatible sets for a (package, family) scope,
  * grouped by pin-divergence signature and rendered as a clickable list. Picking a group loads its
- * refs into the workbench assembly as an EXPLICIT user action (CONTEXT decision 6) — it never
+ * refs into the workbench assembly as an EXPLICIT user action (CONTEXT decision 6) - it never
  * auto-selects, never auto-replaces the current selection silently, and never auto-runs the union
  * (the user still presses Build Set).
  *

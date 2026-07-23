@@ -4,7 +4,7 @@
  * co-equal workflow. Software / informational only: a swap is shown, never applied (CONTEXT
  * decision 4); no in-progress state is ever persisted (decision 8).
  *
- * Set assembly reuses Phase 4's FamilyPicker (CONTEXT decision 2 — no second picker): the union
+ * Set assembly reuses Phase 4's FamilyPicker (CONTEXT decision 2 - no second picker): the union
  * scope is one family plus one of its packages (the group path, POST { family, package }), OR an
  * explicit ref list (POST { parts }) that 05-02's suggestion list loads into the assembly. On a 409
  * the reused BuildIndexGate renders (decision 9), never a crash or a blank pane.
@@ -29,7 +29,7 @@ export interface Assembly {
 }
 
 // The union body from the current assembly, or null when it is not yet buildable. An explicit ref
-// list posts { parts }; otherwise a complete (family, package) group posts { family, package } —
+// list posts { parts }; otherwise a complete (family, package) group posts { family, package } -
 // both shapes POST /api/stm/compat/union accepts (INTERFACES section 4). A partial group (a family
 // but no package) is not buildable, so Build Set stays disabled rather than posting a bad request.
 export function unionBody(a: Assembly): CompatUnionBody | null {
@@ -183,7 +183,7 @@ function ChamberMessage({ children }: { children: React.ReactNode }) {
 
 // The per-ref assignment the union's reconcile proposes: for each part, the position -> { signal,
 // af_index } swaps that make it carry the union's required signals. Derived purely from the union
-// result already in React state, never persisted (CONTEXT decision 8) — the input to an af-check.
+// result already in React state, never persisted (CONTEXT decision 8) - the input to an af-check.
 export function buildAssignments(union: UnionDTO): Record<string, AfCheckBody["assignment"]> {
   const byRef: Record<string, AfCheckBody["assignment"]> = {};
   for (const pos of union.positions) {
