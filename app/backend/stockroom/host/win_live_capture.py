@@ -577,17 +577,74 @@ def _drive_signin(webview, base: str, captured: list, result: dict) -> None:
     result["ok"] = signed
 
 
+def _drive_production(webview, base: str, captured: list, result: dict) -> None:
+    """Drive the REAL production guided-capture driver (build_driver_js) end-to-end against a live
+    DigiKey part: open the product page, inject the overlay + driver on EACH `loaded` (mirroring the
+    host's re-injection so the driver runs again after it navigates product -> models), and let the
+    two-phase state machine navigate + download the requested formats. The persistent profile keeps
+    the signed-in session; the downloads are proven by the external Downloads-folder check."""
+    import os
+    import time as _t
+
+    from stockroom.host.overlay import build_overlay_js
+    from stockroom.host.vendor_drivers.drivers import build_driver_js
+
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
+    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
+        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    )
+    result["url"] = url
+    needs = ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"]
+    formats = ["kicad", "altium"]
+    cad = webview.create_window("stockroom-driver", url=url, width=1340, height=980)
+
+    def on_loaded() -> None:
+        try:
+            cad.evaluate_js(build_overlay_js(needs, "DigiKey", mpn))
+            cad.evaluate_js(build_driver_js("digikey", formats))
+            print("DRIVER: injected overlay + production driver on load.", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print("DRIVER: inject failed " + repr(e), flush=True)
+
+    try:
+        cad.events.loaded += on_loaded
+    except Exception as e:  # noqa: BLE001
+        result["error"] = "loaded-bind: " + repr(e)
+        on_loaded()  # at least inject once on the initial page
+
+    wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "85"))
+    print(f"DRIVER: letting the production driver run for {wait_s:.0f}s...", flush=True)
+    _t.sleep(wait_s)
+    try:
+        result["final_url"] = cad.evaluate_js("location.href.slice(0,110)") or ""
+        result["hud_state"] = cad.evaluate_js(
+            "(function(){var o=document.getElementById('__stockroom_overlay__');"
+            "return o?(o.innerText||'').replace(/\\n+/g,' | ').slice(0,400):'NO_HUD';})()"
+        ) or ""
+    except Exception as e:  # noqa: BLE001
+        result["error"] = repr(e)
+    result["ok"] = True
+
+
 def main() -> int:
     import webview
 
-    signin = "--signin" in sys.argv
-    live = "--live" in sys.argv and not signin
-    digikey = "--digikey" in sys.argv and not live and not signin
-    fixture = "--fixture" in sys.argv and not digikey and not live and not signin
+    driver_mode = "--driver" in sys.argv
+    signin = "--signin" in sys.argv and not driver_mode
+    live = "--live" in sys.argv and not signin and not driver_mode
+    digikey = "--digikey" in sys.argv and not live and not signin and not driver_mode
+    fixture = "--fixture" in sys.argv and not digikey and not live and not signin and not driver_mode
     captured: list[dict] = []
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
-    mode = "signin" if signin else "live" if live else "digikey" if digikey else "fixture" if fixture else "download"
+    mode = (
+        "driver" if driver_mode
+        else "signin" if signin
+        else "live" if live
+        else "digikey" if digikey
+        else "fixture" if fixture
+        else "download"
+    )
     result: dict = {"mode": mode, "ok": False, "error": None}
 
     main_win = webview.create_window("stockroom-live", html="<html><body>host</body></html>", hidden=True)
@@ -600,7 +657,9 @@ def main() -> int:
     def driver() -> None:
         try:
             drive = (
-                _drive_signin
+                _drive_production
+                if driver_mode
+                else _drive_signin
                 if signin
                 else _drive_live
                 if live

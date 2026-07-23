@@ -17,19 +17,18 @@ def test_snapeda_driver_is_built_for_snapeda():
     assert "__STOCKROOM_OVERLAY__" in js
 
 
-def test_digikey_driver_dismisses_consent_finds_cad_and_opens_a_provider_control():
-    # The adaptive state machine: dismiss consent -> keep findCad (custom-scroll container +
-    # div-text match, live-validated) -> detect the aggregated providers -> open a download control.
+def test_digikey_driver_navigates_to_the_models_page_and_drives_a_provider_download():
+    # Live-validated 2026-07-23: product page -> the stable eda-cad-model-link -> /en/models/<id>,
+    # then the provider left-bar rows + the Select Download Format modal + the footer download button.
     js = build_driver_js("digikey", ["kicad", "altium"])
     low = js.lower()
-    # step 1: a cookie/consent banner is dismissed first
-    assert "onetrust" in low or "accept" in low or "consent" in low
-    # step 2: findCad KEPT verbatim in behavior (custom scroll container + div-text match)
-    assert "scrollintoview" in low and "textcontent" in low
-    # step 3: detects the three providers DigiKey aggregates in its EDA / CAD Models section
-    assert ("ultra" in low or "librarian" in low) and "snapeda" in low and "samacsys" in low
-    # step 4: opens the Download / Add To Library control (no user click)
-    assert "download" in low and "add to library" in low
+    # phase 1: find + open the dedicated CAD models page via its stable link/href
+    assert "eda-cad-model-link" in js and "/models/" in js
+    # phase 2: the provider left-bar rows, the format control, the export modal, the download button
+    assert "media-active" in low  # #<prov>-media-active provider rows
+    assert "select download format" in low  # the control that opens the modal
+    assert "export-options" in low  # the #<prov>-export-options format modal
+    assert "btn-download-" in low  # the footer #btn-download-<Provider> that fires exportUltraFile
     # reports every step into the overlay bridge, guarded, one self-contained IIFE
     assert "__STOCKROOM_OVERLAY__" in js
     assert js.count("try") >= 4 and js.count("catch") >= 4
@@ -38,47 +37,39 @@ def test_digikey_driver_dismisses_consent_finds_cad_and_opens_a_provider_control
     assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")
 
 
-def test_digikey_driver_prefers_ultra_librarian_before_snapeda_and_samacsys():
-    # Ultra Librarian is the most-complete default, so it is detected/preferred first, then
-    # SnapEDA, then SamacSys - the preference order is encoded in the generated machine.
+def test_digikey_driver_enumerates_visible_providers_preferring_ultra_librarian():
+    # Per-part coverage varies (owner: "DigiKey shows which suppliers have what"), so the driver
+    # enumerates only the VISIBLE provider rows (a display:none row has offsetParent===null), in
+    # preference order Ultra Librarian first. The preference order is encoded in the machine.
     low = build_driver_js("digikey", ["kicad"]).lower()
+    assert "offsetparent" in low  # visibility gate = adaptive coverage, not a fixed provider
     ul = low.find("ultra librarian")
-    if ul < 0:
-        ul = low.find("librarian")
-    assert 0 <= ul < low.find("snapeda") < low.find("samacsys")
+    assert 0 <= ul < low.find("snapmagic") < low.find("cadenas")
 
 
-def test_digikey_driver_is_resilient_via_a_text_fallback():
-    # DigiKey's markup changes, so the driver also matches by textContent, not brittle ids only.
+def test_digikey_driver_is_resilient_via_a_text_and_label_match():
+    # DigiKey's element ids change, so the format is chosen by its STABLE data-original label text.
     js = build_driver_js("digikey", ["kicad"])
     assert "textContent" in js or "innerText" in js
+    assert "data-original" in js
 
 
 def test_digikey_driver_gates_requested_formats():
-    # only the requested tools are targeted; an un-requested format's quoted name never appears
+    # only the requested tools are targeted; an un-requested format's name never appears anywhere
     both = build_driver_js("digikey", ["kicad", "altium"]).lower()
     assert "kicad" in both and "altium" in both
     only_kicad = build_driver_js("digikey", ["kicad"])
-    assert '"kicad"' in only_kicad  # requested format encoded via json.dumps
-    assert '"altium"' not in only_kicad  # the Altium tool step is gated out entirely
+    assert '"kicad"' in only_kicad  # requested format key encoded via json.dumps
+    assert "altium" not in only_kicad.lower()  # the Altium spec (name + regex) is gated out entirely
 
 
-def test_digikey_driver_downloads_symbol_footprint_then_the_3d_model():
-    low = build_driver_js("digikey", ["kicad", "altium"]).lower()
-    assert "symbol" in low and "footprint" in low  # symbol + footprint asset step
-    assert "3d" in low or "model" in low or "step" in low  # the 3D model asset step
-    # symbol/footprint is attempted before the 3D model
-    sf = low.find("symbolfootprint")
-    m3 = low.find("model3d")
-    assert 0 <= sf < m3
-
-
-def test_digikey_driver_attempts_all_providers_for_fill():
-    # the per-provider download sub-sequence runs for every present provider (multi-provider fill),
-    # so a gap left by the preferred provider is filled by the next one (the host dedups).
+def test_digikey_driver_selects_the_eda_format_plus_the_3d_step_model():
+    # One download per format carries the symbol + footprint (the chosen EDA format) AND the 3D
+    # model (the STEP radio, selected alongside), then the footer download button fires it.
     low = build_driver_js("digikey", ["kicad"]).lower()
-    assert ("ultra" in low or "librarian" in low) and "snapeda" in low and "samacsys" in low
-    assert "downloadfrom" in low  # a reusable per-provider sub-sequence iterated over providers
+    assert "kicad" in low  # the 2D EDA format radio, matched by data-original label
+    assert "step" in low  # the 3D model radio, selected in the same modal
+    assert "btn-download-" in low  # the footer download button that fires the real download
 
 
 def test_unknown_vendor_is_a_guidance_only_noop():
