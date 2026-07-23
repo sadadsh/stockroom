@@ -9,6 +9,7 @@ import { useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
+import { statusTone } from "../lib/statusTone";
 import { useUpdateCheck } from "../api/queries";
 
 const svgProps = {
@@ -124,7 +125,11 @@ export function Rail() {
             <button
               type="button"
               title="A new version is available"
-              className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line2 bg-raise2 px-2.5 text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
+              className={
+                "flex h-[34px] flex-1 items-center gap-2 rounded-control border px-2.5 text-xs font-semibold shadow-card transition hover:brightness-110 " +
+                "border-[color-mix(in_srgb,var(--c-acc)_38%,transparent)] " +
+                statusTone("update-available").className
+              }
             >
               <svg {...svgProps} className="h-4 w-4 flex-none">
                 <path d="M12 17V3" />
