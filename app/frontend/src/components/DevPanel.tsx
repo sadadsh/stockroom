@@ -19,7 +19,7 @@ import { useDevMode } from "../lib/devMode";
 import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../lib/devTokens";
 import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
-import { containerLayoutOf, reorderSiblings, reorderSiblingsOf } from "../lib/elementLayout";
+import { containerLayoutOf, isValidOrder, reorderSiblings, reorderSiblingsOf } from "../lib/elementLayout";
 import { Button } from "./primitives";
 import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
@@ -629,8 +629,18 @@ function LayoutSection({ id }: { id: string }) {
 
   const move = (direction: "up" | "down") => {
     const next = reorderSiblings(orderedIds, id, direction);
-    for (const [sid, order] of Object.entries(next)) dev.setElementProp(sid, "order", order);
+    // Only write values that pass the backend `order` grammar, so the panel never emits a doomed value.
+    for (const [sid, order] of Object.entries(next)) {
+      if (isValidOrder(order)) dev.setElementProp(sid, "order", order);
+    }
   };
+
+  // Reset order clears ONLY the `order` override on every sibling (leaving size/spacing intact), so the
+  // container returns to its original DOM order with no order entries left in the map.
+  const resetOrder = () => {
+    for (const sid of orderedIds) dev.resetElementProp(sid, "order");
+  };
+  const anyOrder = orderedIds.some((sid) => dev.isElementPropOverridden(sid, "order"));
 
   return (
     <section className="py-1.5">
@@ -651,6 +661,15 @@ function LayoutSection({ id }: { id: string }) {
           Move Down
         </button>
       </div>
+      {anyOrder ? (
+        <button
+          type="button"
+          onClick={resetOrder}
+          className="mt-1 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Reset Order
+        </button>
+      ) : null}
     </section>
   );
 }

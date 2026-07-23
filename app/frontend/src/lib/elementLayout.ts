@@ -18,6 +18,20 @@
 // The container layout kinds this module recognises (className-driven, decision 1a).
 export type ContainerLayout = "flex" | "grid" | "none";
 
+// The client-side mirror of the backend `order` grammar (dev.py `_ORDER_RE = ^-?\d{1,3}$`): an
+// optionally-signed integer of one to three digits. It gates every `order` value the panel writes so a
+// reorder can never emit a value the /api/dev/save writer would reject with a 400. The backend stays the
+// sole authority on what may ship; this only keeps the panel from producing a doomed request.
+const ORDER_RE = /^-?\d{1,3}$/;
+
+/**
+ * True only for an `order` value in the safe backend grammar (a signed 1-3 digit integer). Rejects the
+ * empty string, four-plus digits, slot syntax like "1 / 2", and any non-numeric text.
+ */
+export function isValidOrder(value: string): boolean {
+  return ORDER_RE.test(value);
+}
+
 // Which direction a reorder moves the selected element among its siblings: one visual step earlier
 // ("up") or later ("down").
 export type ReorderDirection = "up" | "down";
