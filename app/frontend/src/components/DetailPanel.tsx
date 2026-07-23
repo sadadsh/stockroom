@@ -280,7 +280,6 @@ export function DetailPanel({
             <AssetTile
               devId="detail.asset-hero"
               stageDevId="detail.asset-stage"
-              variant="hero"
               name="3D Model"
               present={hasModel}
               className="min-h-[300px] flex-1"
@@ -302,7 +301,6 @@ export function DetailPanel({
             <div className="grid grid-cols-2 gap-2.5">
               <AssetTile
                 devId="detail.asset-symbol"
-                variant="tile"
                 name="Symbol"
                 present={!!detail.symbol?.name}
                 className="h-[142px]"
@@ -316,7 +314,6 @@ export function DetailPanel({
               />
               <AssetTile
                 devId="detail.asset-footprint"
-                variant="tile"
                 name="Footprint"
                 present={!!detail.footprint?.name}
                 className="h-[142px]"
@@ -1000,7 +997,6 @@ function AssetTile({
   thumb,
   onOpen,
   onAttach,
-  variant,
   className,
   devId,
   stageDevId,
@@ -1016,7 +1012,6 @@ function AssetTile({
   // When the asset is MISSING and set, the whole tile is a button that opens the
   // Attach modal. Ignored when the asset is present.
   onAttach?: () => void;
-  variant: "hero" | "tile";
   // Height / extra classes for the tile shell (the caller sizes it in its layout).
   className?: string;
   // The stable dev-mode id for the tile shell; each of the three call sites passes a
@@ -1033,19 +1028,9 @@ function AssetTile({
         (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
       }
     >
-      {/* the hero specimen chamber: a warm copper glow rising from the pedestal, a
-          bright focus pool under the part, and an edge vignette, so the 3D reads as a
-          lit object on a bench. Only when a specimen is present - no glow under an empty
-          chamber. */}
-      {variant === "hero" && present ? (
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(48% 42% at 50% 70%, var(--c-hero-glow), transparent 66%), radial-gradient(125% 120% at 50% 34%, transparent 50%, rgba(0,0,0,0.34))",
-          }}
-        />
-      ) : null}
+      {/* no stage dressing: the 3D chamber is the flat bg-stage surface (owner's call - the
+          glow/vignette gradient is gone), so the render sits on a plain field like the
+          symbol and footprint tiles */}
       {/* absolute so the preview image / 3D canvas is taken OUT of the intrinsic-height flow:
           otherwise a large SVG/GLB render leaks its natural height into the flex/grid column and
           balloons the whole row. The stage (relative, min-h-0) then collapses to nothing on its
