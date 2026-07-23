@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.errors import ApiError
-from stockroom.ingest.component_naming import derive_value
+from stockroom.ingest.component_naming import derive_display_value
 from stockroom.model.part import PartRecord, altium_place_ready
 
 # regenerate + attach both commit to the one git repo and write the shared .xlsx/.DbLib, and
@@ -23,9 +23,10 @@ _WRITE_LOCK = threading.Lock()
 
 
 def _row(record) -> dict:
-    """One status row per part: its identity + the Value the emitter would write + the resolved
-    Altium symbol/footprint names, and whether it is place-ready. Uses the SAME predicate the
-    emitter uses (altium_place_ready), so the count can never disagree with what is emitted."""
+    """One status row per part: its identity + the human-facing display Value (a resistor keeps
+    its Ω, unlike the schematic-convention value the DbLib emitter writes) + the resolved Altium
+    symbol/footprint names, and whether it is place-ready. Uses the SAME predicate the emitter
+    uses (altium_place_ready), so the count can never disagree with what is emitted."""
     sym = record.altium_symbol
     fp = record.altium_footprint
     return {
@@ -33,7 +34,7 @@ def _row(record) -> dict:
         "display_name": record.display_name,
         "category": record.category,
         "mpn": record.mpn,
-        "value": record.value or derive_value(record),
+        "value": record.value or derive_display_value(record),
         "symbol": sym.name if sym else "",
         "footprint": fp.name if fp else "",
         "ready": altium_place_ready(record),
