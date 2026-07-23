@@ -67,8 +67,7 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
     el: <LibraryIcon className="h-4 w-4" />,
     svg:
       '<svg class="ico h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/>' +
-      '<path d="M6.5 8h0M6.5 12h0M17.5 8h0M17.5 12h0"/></svg>',
+      '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>',
   },
   {
     name: "AddPartIcon (primary, default size)",
@@ -78,40 +77,39 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
       '<path d="M12 5v14M5 12h14"/></svg>',
   },
   {
-    name: "SearchIcon (bespoke)",
+    name: "SearchIcon (bespoke, lucide search)",
     el: <SearchIcon className="text-t3" />,
     svg:
-      '<svg class="text-t3" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+      '<svg class="text-t3" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>',
   },
   {
-    name: "UploadIcon (bespoke, weight 1.4)",
+    name: "UploadIcon (bespoke, weight 1.4, lucide upload)",
     el: <UploadIcon className="up" />,
     svg:
-      '<svg class="up" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">' +
-      '<path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
+      '<svg class="up" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>',
   },
   {
-    name: "CloseIcon (bespoke, path-level cap)",
+    name: "CloseIcon (bespoke, lucide x)",
     el: <CloseIcon className="cl" />,
     svg:
-      '<svg class="cl" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">' +
-      '<path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>',
+      '<svg class="cl" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
   },
   {
-    name: "WarnIcon (bespoke, filled sub-shape)",
+    name: "WarnIcon (bespoke, lucide triangle-alert)",
     el: <WarnIcon className="text-warn" />,
     svg:
-      '<svg class="text-warn" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M12 3.4l9.3 16.1H2.7z" stroke-linejoin="round"/><path d="M12 10v4.2" stroke-linecap="round"/>' +
-      '<circle cx="12" cy="17.4" r="0.5" fill="currentColor" stroke="none"/></svg>',
+      '<svg class="text-warn" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
   },
   {
-    name: "ExternalIcon (bespoke, path-level caps)",
+    name: "ExternalIcon (bespoke, lucide external-link)",
     el: <ExternalIcon className="ext" />,
     svg:
-      '<svg class="ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M14 4h6v6M20 4l-9 9M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      '<svg class="ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
   },
   {
     name: "SymbolArt (art, inner-group style)",
