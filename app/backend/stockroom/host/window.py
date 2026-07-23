@@ -439,15 +439,46 @@ def _install_cad_download_intercept(
     return True
 
 
+# Per-vendor login DOM selector sets (username-or-email + password). The download happens ON
+# DigiKey (owner correction 2026-07-22), so the DigiKey ACCOUNT web login is the PRIMARY autofill -
+# signing into DigiKey prepares login for everything - with Ultra Librarian / SnapEDA / SamacSys
+# KEPT as backups in case one is prompted in-page. Selectors are OWNER-VALIDATE first-guesses
+# against the live login DOMs (which change); the generic set is the unknown-vendor fallback.
+_LOGIN_SELECTORS: dict[str, dict[str, str]] = {
+    "digikey": {
+        "user": "input#username,input[name='username'],input[type='email'],input[name*='user' i]",
+        "pass": "input#password,input[type='password'],input[name='password']",
+    },
+    "ultralibrarian": {
+        "user": "input[name='Email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='Password'],input[type='password']",
+    },
+    "snapeda": {
+        "user": "input[name='email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='password'],input[type='password']",
+    },
+    "samacsys": {
+        "user": "input[name='email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='password'],input[type='password']",
+    },
+}
+_GENERIC_LOGIN_SELECTORS = {
+    "user": "input[type='email'],input[name='username'],input[name='email'],input[name*='user']",
+    "pass": "input[type='password']",
+}
+
+
 def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
     """A best-effort login auto-fill for the vendor window, from the per-machine saved creds
     (Settings). Pure string builder. Empty when there is nothing to fill (so nothing is
-    injected). Creds are JSON-encoded (never string-concatenated) and every field fill is
-    guarded, so a page without a matching field is a silent no-op. Injected ONLY into the
-    remote cad window on its `loaded` event - never the SPA. `vendor` is accepted for future
-    per-vendor login DOMs; the current fill is generic (email/username + password)."""
+    injected - the LGN-02 "log in once" path). Creds are JSON-encoded (never string-concatenated)
+    and every field fill is guarded, so a page without a matching field is a silent no-op. Injected
+    ONLY into the remote cad window on its `loaded` event - never the SPA. `vendor` selects the
+    per-vendor login DOM (digikey account primary / ultralibrarian / snapeda / samacsys), falling
+    back to a generic email/username + password fill for an unknown vendor."""
     if not (username or password):
         return ""
+    sels = _LOGIN_SELECTORS.get((vendor or "").strip().lower(), _GENERIC_LOGIN_SELECTORS)
     j = json.dumps
     return (
         "(function(){try{"
@@ -455,8 +486,8 @@ def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
         "function set(sel,val){if(!val)return false;var el=document.querySelector(sel);"
         "if(el){el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));"
         "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;}"
-        "set(\"input[type='email'],input[name='username'],input[name='email'],input[name*='user']\",u);"
-        "set(\"input[type='password']\",p);"
+        f"set({j(sels['user'])},u);"
+        f"set({j(sels['pass'])},p);"
         "}catch(e){}})();"
     )
 
@@ -481,6 +512,8 @@ def _vendor_from_url(url: str) -> tuple[str, str]:
         return ("ultralibrarian", "Ultra Librarian")
     if "snapeda" in u:
         return ("snapeda", "SnapEDA")
+    if "componentsearchengine" in u or "samacsys" in u:
+        return ("samacsys", "SamacSys")
     if "digikey" in u:
         return ("digikey", "DigiKey")
     return ("", "the vendor")
@@ -503,8 +536,12 @@ def cad_loaded_scripts(needs, vendor_key: str, vendor_label: str, formats, creds
 
 def _load_vendor_creds(vendor_key: str) -> dict:
     """The saved login for a vendor from the per-machine config, or {} (best-effort - a missing
-    or unreadable config never blocks the capture)."""
-    if vendor_key not in ("ultralibrarian", "snapeda"):
+    or unreadable config never blocks the capture). Handles digikey + ultralibrarian + snapeda +
+    samacsys. The digikey ACCOUNT web login (digikey_username/password - NOT the API
+    client_id/secret) and samacsys_* fields are read via getattr so they degrade to blank before
+    Phase 4 SET-01 adds them (nothing injected -> the LGN-02 "log in once" path); ul/snapeda read
+    their existing fields."""
+    if vendor_key not in ("digikey", "ultralibrarian", "snapeda", "samacsys"):
         return {}
     try:
         from stockroom.store.machine_config import MachineConfig
@@ -512,9 +549,19 @@ def _load_vendor_creds(vendor_key: str) -> dict:
         cfg = MachineConfig.load()
     except Exception:  # noqa: BLE001 - no config / unreadable: just skip the auto-fill
         return {}
+    if vendor_key == "digikey":
+        return {
+            "username": getattr(cfg, "digikey_username", ""),
+            "password": getattr(cfg, "digikey_password", ""),
+        }
     if vendor_key == "ultralibrarian":
         return {"username": cfg.ul_username, "password": cfg.ul_password}
-    return {"username": cfg.snapeda_username, "password": cfg.snapeda_password}
+    if vendor_key == "snapeda":
+        return {"username": cfg.snapeda_username, "password": cfg.snapeda_password}
+    return {
+        "username": getattr(cfg, "samacsys_username", ""),
+        "password": getattr(cfg, "samacsys_password", ""),
+    }
 
 
 def _parse_needs(needs) -> frozenset:

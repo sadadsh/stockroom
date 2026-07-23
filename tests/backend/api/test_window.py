@@ -549,6 +549,59 @@ def test_login_autofill_json_encodes_creds_and_is_guarded():
     assert "password" in js  # fills a password field
 
 
+def test_login_autofill_fills_every_supported_vendor_and_is_empty_when_blank():
+    # DigiKey account (primary) + Ultra Librarian + SnapEDA + SamacSys each auto-fill their own
+    # login DOM, JSON-encoded + guarded; blank creds inject nothing (the LGN-02 "log in once" path).
+    from stockroom.host.window import build_login_autofill_js
+
+    for vk in ("digikey", "ultralibrarian", "snapeda", "samacsys"):
+        js = build_login_autofill_js(vk, "me@x.com", "s3cr3t")
+        assert js.strip().startswith("(") and "try" in js and "catch" in js
+        assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
+        assert "password" in js
+        assert build_login_autofill_js(vk, "", "") == ""
+
+
+def test_load_vendor_creds_digikey_and_samacsys_degrade_before_phase4(monkeypatch):
+    # digikey + samacsys creds are read via getattr, so before Phase 4 SET-01 adds those config
+    # fields they degrade to blank (nothing injected -> LGN-02); ul/snapeda read their real fields.
+    from stockroom.host import window as W
+    from stockroom.store import machine_config as MC
+
+    class _Cfg:
+        ul_username = "ulu"
+        ul_password = "ulp"
+        snapeda_username = "snu"
+        snapeda_password = "snp"
+        # deliberately NO digikey_username / samacsys_username (Phase 4 SET-01 adds them)
+
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: _Cfg()))
+    assert W._load_vendor_creds("digikey") == {"username": "", "password": ""}
+    assert W._load_vendor_creds("samacsys") == {"username": "", "password": ""}
+    assert W._load_vendor_creds("ultralibrarian") == {"username": "ulu", "password": "ulp"}
+    assert W._load_vendor_creds("snapeda") == {"username": "snu", "password": "snp"}
+
+
+def test_load_vendor_creds_reads_digikey_and_samacsys_when_present(monkeypatch):
+    # once the Phase 4 fields exist, the DigiKey ACCOUNT web login + SamacSys creds are read.
+    from stockroom.host import window as W
+    from stockroom.store import machine_config as MC
+
+    class _Cfg:
+        digikey_username = "dku"
+        digikey_password = "dkp"
+        samacsys_username = "smu"
+        samacsys_password = "smp"
+        ul_username = ""
+        ul_password = ""
+        snapeda_username = ""
+        snapeda_password = ""
+
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: _Cfg()))
+    assert W._load_vendor_creds("digikey") == {"username": "dku", "password": "dkp"}
+    assert W._load_vendor_creds("samacsys") == {"username": "smu", "password": "smp"}
+
+
 def test_formats_for_needs_maps_kicad_and_altium():
     from stockroom.host.window import _formats_for_needs
 
@@ -567,6 +620,9 @@ def test_vendor_from_url_maps_key_and_label():
     )
     assert _vendor_from_url("https://www.snapeda.com/parts/x") == ("snapeda", "SnapEDA")
     assert _vendor_from_url("https://www.digikey.com/x") == ("digikey", "DigiKey")
+    # SamacSys is served from componentsearchengine / samacsys; ul/snapeda/digikey are KEPT
+    assert _vendor_from_url("https://componentsearchengine.com/part/x") == ("samacsys", "SamacSys")
+    assert _vendor_from_url("https://www.samacsys.com/x") == ("samacsys", "SamacSys")
     assert _vendor_from_url("")[0] == ""
 
 
