@@ -41,6 +41,19 @@ def test_switch_library_repoints_and_preserves_token_and_clears_caches(tmp_path)
     assert ctx.profile_store.list() == ["Main"]  # points at B's profiles now
 
 
+def test_switch_library_leaves_stm_index_untouched(tmp_path):
+    """The CubeMX source is machine-global config (stm-viewer workstream, Phase 3), not
+    library-scoped - unlike `index`, switch_library must never rebuild or repoint it."""
+    a, b = _library(tmp_path / "A"), _library(tmp_path / "B")
+    ctx = build_context(a, kicad_dir=tmp_path / "k", config=MachineConfig(active_profile="Main"), token="T")
+    sentinel = object()
+    ctx.stm_index = sentinel
+
+    ctx.switch_library(b)
+
+    assert ctx.stm_index is sentinel
+
+
 def test_switch_library_preserves_host_wired_hooks(tmp_path):
     a, b = _library(tmp_path / "A"), _library(tmp_path / "B")
     ctx = build_context(a, kicad_dir=tmp_path / "k", config=MachineConfig(active_profile="Main"), token="T")
