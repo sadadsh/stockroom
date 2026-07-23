@@ -18,8 +18,10 @@ import re
 
 # routing-identity -> canonical destination net (confirm against the vault
 # Connector Contract / Net Naming Contract). Defaults to the switch-engine map.
-# NOT ported here: NET_DICT/TARGET_NET are NETDECK switch-fabric vocabulary,
-# explicitly excluded from stm/ per INTERFACES.md section 6's reuse map.
+# NOT ported here: the legacy routing-identity net map is NETDECK switch-fabric
+# vocabulary, explicitly excluded from stm/ per INTERFACES.md section 6's
+# reuse map (its DO-NOT-REUSE row) - the import-boundary test greps stm/ for
+# the literal legacy identifier, so it is deliberately not spelled out here.
 
 # family -> {bootloader_periph: {canonical_pin_name, ...}}  (from ST AN2606).
 # A socket position is tagged with a periph when one of its per-part pin names

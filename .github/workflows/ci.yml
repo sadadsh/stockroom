@@ -53,5 +53,13 @@ jobs:
               app/backend/stockroom/api/ ; then
             echo "stockroom/api must not import pywebview (host-only dependency)"; exit 1
           fi
+          # stm-viewer workstream (API-04): nothing under stockroom/stm/ or the stm.py router
+          # may reference a board/switch-fabric concept (INTERFACES.md section 6's
+          # DO-NOT-REUSE row). Region-scoped to these two paths ONLY - the identifiers
+          # legitimately exist under legacy/tools/, which must NOT be grepped here.
+          if grep -rEn 'ADG714|switch_identity|classify_pin|SwitchDecision|TARGET_NET|CELL_|ZIF|CoreSight|lint_card|fabric_drc' \
+              app/backend/stockroom/stm/ app/backend/stockroom/api/routers/stm.py ; then
+            echo "stockroom/stm/ and api/routers/stm.py must not reference NETDECK/switch-fabric concepts"; exit 1
+          fi
       - name: Run backend suite
         run: uv run pytest tests/backend -v
