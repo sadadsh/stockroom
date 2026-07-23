@@ -1,0 +1,219 @@
+"""Task 1 tracer: text source -> stamped, loadable StmIndex.
+
+Fixtures (tests/backend/fixtures/stm/, real CubeMX XML, cited in the phase CONTEXT):
+  STM32F030RCTx.xml  - LQFP64, numeric positions
+  STM32F048C6Ux.xml  - UFQFPN48, numeric positions (QFN)
+  STM32F072RBIx.xml  - UFBGA64, alphanumeric positions A1..H8
+  STM32F407V(E-G)Tx.xml - LQFP100, the rich mcu_spec/mcu_peripheral sample
+"""
+
+from pathlib import Path
+
+import pytest
+
+from stockroom.stm import db as db_mod
+
+FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stm"
+
+
+def test_build_populates_nine_table_schema_and_meta_stamp():
+    idx = db_mod.StmIndex.build(FIXTURES)
+    assert idx.mcu_count() == 4
+
+    conn = idx._conn
+    tables = {
+        r[0]
+        for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    assert tables >= {
+        "meta",
+        "source_artifact",
+        "mcu",
+        "mcu_spec",
+        "mcu_peripheral",
+        "mcu_package_pin",
+        "pin_function",
+        "pin_role",
+        "package_geometry",
+    }
+    assert "pin_alternate_function" not in tables  # Phase 2 owns this table
+
+    assert conn.execute("SELECT COUNT(*) FROM source_artifact").fetchone()[0] == 1
+
+    meta = idx.meta()
+    for key in (
+        "classifier_rev",
+        "geometry_rev",
+        "source_sha256",
+        "source_file_count",
+        "source_path",
+        "built_at",
+        "all_families",
+        "device_xml_count",
+        "family_count",
+    ):
+        assert key in meta, f"missing meta key: {key}"
+    assert meta["classifier_rev"] == str(db_mod.CLASSIFIER_REV)
+
+
+def test_mcu_package_pin_populated_for_every_fixture_with_typed_positions():
+    idx = db_mod.StmIndex.build(FIXTURES)
+    conn = idx._conn
+
+    # Every fixture MCU has a non-zero pin count.
+    rows = conn.execute("SELECT id, ref_name, pin_count FROM mcu").fetchall()
+    assert len(rows) == 4
+    for r in rows:
+        assert r["pin_count"] > 0, f"{r['ref_name']} parsed zero pins"
+
+    # UFBGA64 (STM32F072RBIx) keeps all 64 alnum positions.
+    bga_mcu = conn.execute(
+        "SELECT id FROM mcu WHERE ref_name = 'STM32F072RBIx'"
+    ).fetchone()
+    assert bga_mcu is not None
+    bga_pins = conn.execute(
+        "SELECT position_kind, lqfp_side, bga_row, bga_col FROM mcu_package_pin "
+        "WHERE mcu_id = ?",
+        (bga_mcu["id"],),
+    ).fetchall()
+    assert len(bga_pins) == 64
+    for p in bga_pins:
+        assert p["position_kind"] == "alnum"
+        assert p["lqfp_side"] is None
+        assert p["bga_row"] is not None
+        assert p["bga_col"] is not None
+
+    # The numeric fixtures get position_kind='numeric' and a non-null lqfp_side.
+    numeric_mcu = conn.execute(
+        "SELECT id FROM mcu WHERE ref_name = 'STM32F030RCTx'"
+    ).fetchone()
+    numeric_pins = conn.execute(
+        "SELECT position_kind, lqfp_side, bga_row, bga_col FROM mcu_package_pin "
+        "WHERE mcu_id = ?",
+        (numeric_mcu["id"],),
+    ).fetchall()
+    assert len(numeric_pins) > 0
+    for p in numeric_pins:
+        assert p["position_kind"] == "numeric"
+        assert p["lqfp_side"] is not None
+        assert p["bga_row"] is None
+        assert p["bga_col"] is None
+
+
+def test_load_round_trips_a_file_backed_build(tmp_path):
+    db_path = tmp_path / "index.sqlite"
+    built = db_mod.StmIndex.build(FIXTURES, db_path=db_path)
+    built_count = built.mcu_count()
+    built.close()
+
+    assert db_path.exists()
+    loaded = db_mod.StmIndex.load(db_path)
+    assert loaded is not None
+    assert loaded.mcu_count() == built_count
+    loaded.close()
+
+
+def test_load_returns_none_on_classifier_rev_mismatch(tmp_path, monkeypatch):
+    db_path = tmp_path / "index.sqlite"
+    db_mod.StmIndex.build(FIXTURES, db_path=db_path).close()
+
+    monkeypatch.setattr(db_mod, "CLASSIFIER_REV", db_mod.CLASSIFIER_REV + 1)
+    assert db_mod.StmIndex.load(db_path) is None
+
+
+def test_load_returns_none_on_geometry_rev_mismatch(tmp_path, monkeypatch):
+    db_path = tmp_path / "index.sqlite"
+    db_mod.StmIndex.build(FIXTURES, db_path=db_path).close()
+
+    monkeypatch.setattr(db_mod.geometry_mod, "GEOMETRY_REV", db_mod.geometry_mod.GEOMETRY_REV + 1)
+    assert db_mod.StmIndex.load(db_path) is None
+
+
+def test_load_returns_none_on_missing_file(tmp_path):
+    assert db_mod.StmIndex.load(tmp_path / "nope.sqlite") is None
+
+
+def test_load_returns_none_on_corrupt_file(tmp_path):
+    db_path = tmp_path / "corrupt.sqlite"
+    db_path.write_text("not a sqlite file at all", encoding="utf-8")
+    assert db_mod.StmIndex.load(db_path) is None
+
+
+def test_rebuild_with_unchanged_source_skips_reparse(tmp_path):
+    db_path = tmp_path / "index.sqlite"
+    first = db_mod.StmIndex.build(FIXTURES, db_path=db_path)
+    first_stamp = first.meta()["built_at"]
+    first.close()
+
+    # Rebuilding against the SAME unchanged source short-circuits: the returned
+    # index is the pre-existing one (same built_at stamp), not a fresh parse.
+    second = db_mod.StmIndex.build(FIXTURES, db_path=db_path)
+    assert second.meta()["built_at"] == first_stamp
+    second.close()
+
+
+def test_changing_an_input_byte_changes_source_sha256(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "STM32F030RCTx.xml").write_bytes(
+        (FIXTURES / "STM32F030RCTx.xml").read_bytes()
+    )
+    sha_before = db_mod.StmIndex.build(src).meta()["source_sha256"]
+
+    # append a byte of trailing whitespace (well-formed XML unaffected; the raw
+    # source bytes, and therefore source_sha256, must still change)
+    xml_path = src / "STM32F030RCTx.xml"
+    xml_path.write_bytes(xml_path.read_bytes() + b"\n")
+    sha_after = db_mod.StmIndex.build(src).meta()["source_sha256"]
+
+    assert sha_before != sha_after
+
+
+def test_rebuild_reparses_when_source_changes(tmp_path):
+    db_path = tmp_path / "index.sqlite"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "STM32F030RCTx.xml").write_bytes(
+        (FIXTURES / "STM32F030RCTx.xml").read_bytes()
+    )
+    first = db_mod.StmIndex.build(src, db_path=db_path)
+    assert first.mcu_count() == 1
+    first.close()
+
+    (src / "STM32F048C6Ux.xml").write_bytes(
+        (FIXTURES / "STM32F048C6Ux.xml").read_bytes()
+    )
+    second = db_mod.StmIndex.build(src, db_path=db_path)
+    assert second.mcu_count() == 2
+    second.close()
+
+
+_PINREMAP_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Mcu ClockTree="STM32F0" DBVersion="V3.0" Family="STM32F0" HasPowerPad="false" \
+IOType="" Line="STM32F0x0" Package="LQFP48" RefName="SYNTH_PINREMAP_Tx" \
+xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Voltage Max="3.6" Min="2"/>
+    <Pin Name="PA9" Position="30" Type="I/O">
+        <Signal Name="USART1_TX" IOModes="Alternate"/>
+    </Pin>
+    <Pin Name="PA9_Remap" Position="30" Type="I/O" Variant="PINREMAP">
+        <Signal Name="USART2_TX" IOModes="Alternate"/>
+    </Pin>
+</Mcu>
+"""
+
+
+def test_same_position_pinremap_identities_are_not_collapsed(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "SYNTH_PINREMAP_Tx.xml").write_text(_PINREMAP_XML, encoding="utf-8")
+
+    idx = db_mod.StmIndex.build(src)
+    conn = idx._conn
+    rows = conn.execute(
+        "SELECT physical_pin_number, raw_pin_name FROM mcu_package_pin "
+        "WHERE physical_pin_number = '30'"
+    ).fetchall()
+    assert len(rows) == 2
+    raw_names = {r["raw_pin_name"] for r in rows}
+    assert raw_names == {"PA9", "PA9_Remap"}
