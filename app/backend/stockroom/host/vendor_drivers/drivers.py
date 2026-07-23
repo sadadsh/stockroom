@@ -139,11 +139,18 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     "var d=(m&&m.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');return (d&&!d.disabled)?d:null;}"
     "function completeModal(){var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
     "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/download complete/i.test(dlg[w].textContent||''))return dlg[w];}return null;}"
+    "function dismissComplete(){var cm=completeModal();if(cm){try{var x=cm.querySelector('.dk-modal__close,[data-modal-dismiss]')||"
+    "Array.from(cm.querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
+    "if(x)x.click();}catch(e){}}}"
     "function closeModal(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
     "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}}"
     "function downloadFormat(present,spec,done){var pi=0;function tryProvider(){"
     "if(pi>=present.length){report(spec.key,false,'No visible source offers '+spec.name+' for this part; download it manually.');done();return;}"
     "var prov=present[pi++];"
+    # FIRST clear any leftover "Download complete" dialog from the previous format - it stays up and,
+    # though the Select Download Format link is still in layout, the overlay intercepts the click, so
+    # the next pass would silently no-op (live-observed 2026-07-23, Altium stuck at 3/5).
+    "waitFor(function(){dismissComplete();return completeModal()?null:true;},function(){"
     "try{if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}}catch(e){}"
     # poll for the Select Download Format control (proceeds the instant it renders), then click it
     "waitFor(fmtBtn,function(btn){"
@@ -162,11 +169,9 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     "report('download',fired,fired?('Downloading '+spec.name+' from '+prov[1]+'.'):('Select a format, then click Download.'));"
     # poll (up to 3 min - the vendor generates each export server-side on demand) for the "Download
     # complete" modal, close it, then move to the next format the INSTANT it appears (no fixed gap).
-    "waitFor(completeModal,function(cm){if(cm){var cb=cm.querySelector('.dk-modal__close,[data-modal-dismiss]')||"
-    "Array.from(cm.querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
-    "if(cb){try{cb.click();}catch(e){}}}"
+    "waitFor(completeModal,function(cm){dismissComplete();"
     "report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,150);},180000,500);"
-    "},9000,150);},9000,150);},9000,150);}"
+    "},9000,150);},9000,150);},9000,150);},6000,200);}"
     "tryProvider();}"
 )
 
