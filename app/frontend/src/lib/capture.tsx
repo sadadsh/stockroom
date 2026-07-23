@@ -42,7 +42,7 @@ export interface CaptureForward {
   token?: string;
   requirements?: Requirement[];
   altiumPaths?: string[];
-  signal?: "timeout";
+  signal?: "timeout" | "done";
 }
 
 export const KICAD_REQS: Requirement[] = ["kicad_symbol", "kicad_footprint", "kicad_model"];
@@ -84,7 +84,7 @@ export function subsetComplete(needs: Requirement[], received: Received, subset:
 }
 
 function hostOpenCadDownload():
-  | ((url: string, needs?: Requirement[]) => Promise<string | void> | string | void)
+  | ((url: string, needs?: Requirement[], partName?: string) => Promise<string | void> | string | void)
   | undefined {
   return (
     window as unknown as {
@@ -93,6 +93,7 @@ function hostOpenCadDownload():
           open_cad_download?: (
             url: string,
             needs?: Requirement[],
+            partName?: string,
           ) => Promise<string | void> | string | void;
         };
       };
@@ -237,6 +238,20 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (tokenRef.current && p.token && p.token !== tokenRef.current) return; // B4 guard
+      if (p.signal === "done") {
+        // The host finished the capture and closed the vendor window: land on a clean terminal
+        // done state directly, rather than relying only on the last per-file forward (a host that
+        // completes faster than the final forward still resolves cleanly here). Placed AFTER the
+        // B4 guard so a stale done cannot mark a replaced part complete; idempotent when already done.
+        clearWatchdog();
+        clearHandler();
+        setState((s) =>
+          s.status === "done"
+            ? s
+            : { ...s, status: "done", message: "All files received and attached." },
+        );
+        return;
+      }
       // Scope this forward to the part that was active when it arrived: if the user replaces the
       // capture (starts another part) while this one's attach is in flight, bail rather than mark
       // the new part's checklist. (The attach itself is already safe - attachKicad/attachAltium
@@ -329,7 +344,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const returned = await open(source.url, needsRef.current);
+        const returned = await open(source.url, needsRef.current, partName);
         tokenRef.current = typeof returned === "string" && returned ? returned : null;
       } catch {
         // best-effort; the host may not echo a token, and the widened watch still fires.
