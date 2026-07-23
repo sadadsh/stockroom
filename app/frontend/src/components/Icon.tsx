@@ -18,7 +18,8 @@
  * replaces. An unknown id renders nothing (a safe no-op).
  */
 import { ICON_BY_ID, type IconEntry } from "../lib/iconRegistry";
-import { ICON_OVERRIDES } from "../lib/icon.overrides";
+import { ICON_OVERRIDES, type IconOverride } from "../lib/icon.overrides";
+import { useDevMode } from "../lib/devMode";
 
 // -- sanitiser ----------------------------------------------------------------------------------
 // Elements that may never appear in an icon body (stripped whole, with their contents). Longer
@@ -85,8 +86,15 @@ interface ResolvedIcon {
  * Walk the override chain for an id: follow `swapToId` hops (guarding against cycles and dangling
  * targets) to the terminal entry, then take that entry's `body` override if present, else its
  * registry default. Returns null for an unknown id so <Icon> can no-op.
+ *
+ * `overrideFor` supplies the override for an id. It defaults to reading the committed ICON_OVERRIDES
+ * module, so the exported resolveIcon(id) keeps its original signature/behaviour; <Icon> passes the
+ * dev-mode context's resolveIconOverride instead, so a working-state edit resolves live (D-02).
  */
-export function resolveIcon(id: string): ResolvedIcon | null {
+export function resolveIcon(
+  id: string,
+  overrideFor: (id: string) => IconOverride | undefined = (i) => ICON_OVERRIDES[i],
+): ResolvedIcon | null {
   const seen = new Set<string>();
   let currentId = id;
 
@@ -94,7 +102,7 @@ export function resolveIcon(id: string): ResolvedIcon | null {
   for (;;) {
     if (seen.has(currentId)) break;
     seen.add(currentId);
-    const override = ICON_OVERRIDES[currentId];
+    const override = overrideFor(currentId);
     if (override?.swapToId && ICON_BY_ID.has(override.swapToId)) {
       currentId = override.swapToId;
       continue;
@@ -105,7 +113,7 @@ export function resolveIcon(id: string): ResolvedIcon | null {
   const entry = ICON_BY_ID.get(currentId);
   if (!entry) return null;
 
-  const override = ICON_OVERRIDES[currentId];
+  const override = overrideFor(currentId);
   const body = override?.body != null ? override.body : entry.body;
   return { entry, body };
 }
@@ -127,7 +135,11 @@ function sizeAttrs(size: IconEntry["size"]): { width?: number; height?: number }
 }
 
 export function Icon({ id, className, title }: IconProps) {
-  const resolved = resolveIcon(id);
+  // D-02: resolve overrides through the dev-mode context (the working-state under a provider, the
+  // committed ICON_OVERRIDES on the no-op DEFAULT), so a working edit renders live while an
+  // unprovided <Icon> is byte-identical to today.
+  const { enabled, resolveIconOverride } = useDevMode();
+  const resolved = resolveIcon(id, resolveIconOverride);
   if (!resolved) return null;
 
   const { entry, body } = resolved;
@@ -137,6 +149,11 @@ export function Icon({ id, className, title }: IconProps) {
   // glyphs default to aria-hidden (as the source `Svg` helper did); the bespoke/art/brand sources
   // set no aria attribute, so an untitled non-primary icon stays bare - a faithful refactor.
   const namedA11y = title ? ({ role: "img" as const, "aria-label": title }) : {};
+  // D-02 / D-03: in dev mode the <svg> advertises which registry glyph it draws (the icon analog of
+  // <Text>'s data-copy-id), so the Selection pane can map a selected element to its icon id. Gated
+  // on `enabled` exactly like <Text> only wraps in dev mode: OFF dev mode this is the empty object,
+  // so the rendered DOM is byte-identical to today and every render-diff guard still holds.
+  const devId = enabled ? { "data-icon-id": id } : {};
 
   if (entry.category === "primary") {
     // The shared line-icon preset: `.ico` routes stroke-width through --icon-stroke; the
@@ -152,6 +169,7 @@ export function Icon({ id, className, title }: IconProps) {
         strokeLinejoin="round"
         aria-hidden={title ? undefined : true}
         {...namedA11y}
+        {...devId}
         dangerouslySetInnerHTML={{ __html: inner }}
       />
     );
@@ -173,6 +191,7 @@ export function Icon({ id, className, title }: IconProps) {
       strokeLinejoin={entry.strokeLinejoin}
       style={entry.style}
       {...namedA11y}
+      {...devId}
       dangerouslySetInnerHTML={{ __html: inner }}
     />
   );
