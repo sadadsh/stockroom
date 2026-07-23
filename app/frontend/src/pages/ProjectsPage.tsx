@@ -101,6 +101,7 @@ import {
   Card,
   Dot,
   Eyebrow,
+  PanelTitle,
   TabPanel,
   TabStrip,
   type TabItem,
@@ -111,7 +112,7 @@ import { ExternalIcon } from "../components/icons";
 import { Icon } from "../components/Icon";
 
 const INPUT_CLS =
-  "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 " +
+  "h-[29px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 " +
   "text-sm text-t1 outline-none focus:border-acc disabled:opacity-50";
 
 // Severity -> the shared tone (err/warn/neutral) so the findings table and the
@@ -194,15 +195,16 @@ export function ProjectsPage() {
   return (
     <>
       <div className="flex min-h-0 flex-1" data-dev-id="projects.root">
-      {/* picker: self-heads like the Components picker (no full-width page header band) */}
-      <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-4" data-dev-id="projects.picker">
-          <div className="flex items-baseline gap-2 px-2 pb-2.5">
-            <h1 className="text-lg font-semibold text-t1" data-dev-id="projects.picker-title">Projects</h1>
-            {projectsQuery.data ? (
-              <span className="tnum font-mono text-2xs text-t3">{projects.length}</span>
-            ) : null}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1">
+        {/* picker: a docked panel - the shared PanelTitle strip, then the padded body,
+            mirroring the Components picker exactly */}
+        <div className="flex w-[348px] flex-none flex-col border-r border-line" data-dev-id="projects.picker">
+          <PanelTitle
+            data-dev-id="projects.picker-title"
+            right={projectsQuery.data ? projects.length.toLocaleString() : undefined}
+          >
+            Projects
+          </PanelTitle>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2.5">
             <ProjectPicker
               isLoading={projectsQuery.isLoading}
               error={projectsQuery.error}
@@ -220,8 +222,8 @@ export function ProjectsPage() {
           />
         </div>
 
-        {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto px-[30px] pt-[22px]" data-dev-id="projects.detail">
+        {/* detail: the view owns its title strip, scroll, and footer (no scroll here) */}
+        <div className="flex min-w-0 flex-1 flex-col" data-dev-id="projects.detail">
           {selected ? (
             <ProjectDetailView
               key={selected.id}
@@ -230,7 +232,7 @@ export function ProjectsPage() {
               removeBusy={del.isPending}
             />
           ) : (
-            <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
+            <div className="flex min-h-[300px] flex-1 items-center justify-center text-sm text-t3">
               {projectsQuery.isLoading
                 ? "Loading projects..."
                 : "Select a project to see its health."}
@@ -307,7 +309,7 @@ function ProjectPicker({
     );
   }
   return (
-    <div className="flex flex-col gap-1.5" data-dev-id="projects.list">
+    <div className="flex flex-col gap-0.5" data-dev-id="projects.list">
       {projects.map((project) => (
         <ProjectRow
           key={project.id}
@@ -335,11 +337,14 @@ function ProjectRow({
       data-dev-id="projects.row"
       data-testid={`project-row-${project.id}`}
       onClick={onSelect}
+      aria-current={selected ? "true" : undefined}
       className={
-        "flex w-full items-start gap-3 rounded-card border px-3 py-3 text-left transition " +
+        // The same flat row idiom as the Components list: whitespace-separated rows,
+        // the selection is the acc-soft fill plus the inset accent bar, never a lifted card.
+        "flex w-full items-start gap-3 rounded-control px-2.5 py-2.5 text-left transition-colors " +
         (selected
-          ? "border-acc bg-raise2 shadow-card"
-          : "border-line bg-raise hover:-translate-y-px hover:border-line2 hover:bg-raise2 hover:shadow-card")
+          ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
+          : "hover:bg-[var(--c-hover)]")
       }
     >
       <span
@@ -391,7 +396,7 @@ function RegisterBar({
   busy: boolean;
 }) {
   return (
-    <div className="flex-none border-t border-line px-2 py-3" data-dev-id="projects.register">
+    <div className="flex-none border-t border-line px-3 py-3" data-dev-id="projects.register">
       <Eyebrow className="mb-1.5">Register Project</Eyebrow>
       <div className="flex flex-col gap-2">
         <input
@@ -456,49 +461,66 @@ function ProjectDetailView({
   const [tab, setTab] = useState<ProjectTab>("overview");
 
   return (
-    <div className="max-w-[860px] pb-12">
-      <div className="mb-4 flex items-start justify-between gap-4" data-dev-id="projects.detail-header">
-        <div className="min-w-0">
-          <div className="truncate text-xl font-semibold text-t1">{project.name}</div>
-          <div className="truncate font-mono text-xs text-t3" title={project.root}>
-            {project.root}
-          </div>
-        </div>
-        <Button
-          variant="danger"
-          small
-          onClick={onRemove}
-          disabled={removeBusy}
-          className="flex-none"
-          data-dev-id="projects.remove"
-        >
-          Remove Project
-        </Button>
+    <div className="flex h-full min-h-0 flex-col">
+      {/* title strip: the same band + hairline as the opened component's, so the two
+          flagship detail panes read identically */}
+      <div
+        className="flex h-[34px] flex-none items-center gap-3 border-b border-line bg-band px-6"
+        data-dev-id="projects.detail-header"
+      >
+        <span className="min-w-0 truncate text-sm font-semibold text-t1">{project.name}</span>
+        <span className="ml-auto flex-none truncate text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+          {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
+          {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
+        </span>
       </div>
+      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+        {/* sub-header: the project's path on the left, the view tabs on the right */}
+        <div className="flex flex-none items-center justify-between gap-4 border-b border-line pb-2.5">
+          <span className="min-w-0 truncate font-mono text-xs text-t3" title={project.root}>
+            {project.root}
+          </span>
+          <TabStrip
+            tabs={PROJECT_TABS}
+            active={tab}
+            onSelect={setTab}
+            idBase="project"
+            devIdBase="projects"
+            className="flex-none"
+            aria-label="Project sections"
+          />
+        </div>
 
-      <TabStrip
-        tabs={PROJECT_TABS}
-        active={tab}
-        onSelect={setTab}
-        idBase="project"
-        devIdBase="projects"
-        className="mb-6"
-        aria-label="Project sections"
-      />
+        <div className="min-h-0 flex-1 overflow-y-auto pt-4">
+          <TabPanel idBase="project" tab={tab} className={TAB_BODY_CLS + " max-w-[900px] pb-4"}>
+            {tab === "overview" ? (
+              <OverviewTab projectId={project.id} />
+            ) : tab === "health" ? (
+              <HealthTab projectId={project.id} />
+            ) : tab === "bom" ? (
+              <BomTab projectId={project.id} />
+            ) : tab === "setup" ? (
+              <SetupTab projectId={project.id} />
+            ) : (
+              <NetClassesTab projectId={project.id} />
+            )}
+          </TabPanel>
+        </div>
 
-      <TabPanel idBase="project" tab={tab} className={TAB_BODY_CLS}>
-        {tab === "overview" ? (
-          <OverviewTab projectId={project.id} />
-        ) : tab === "health" ? (
-          <HealthTab projectId={project.id} />
-        ) : tab === "bom" ? (
-          <BomTab projectId={project.id} />
-        ) : tab === "setup" ? (
-          <SetupTab projectId={project.id} />
-        ) : (
-          <NetClassesTab projectId={project.id} />
-        )}
-      </TabPanel>
+        {/* footer: the destructive action sits alone at the end, same as the component pane */}
+        <footer className="mt-3 flex flex-none items-center justify-end border-t border-line pt-2.5">
+          <Button
+            variant="danger"
+            small
+            onClick={onRemove}
+            disabled={removeBusy}
+            className="flex-none"
+            data-dev-id="projects.remove"
+          >
+            Remove Project
+          </Button>
+        </footer>
+      </div>
     </div>
   );
 }
@@ -771,6 +793,13 @@ const BUILD_SIGNAL_LABEL: Record<string, string> = {
   not_git: "No Git",
 };
 
+// The backend's detail/next_step strings sometimes end with their own period; render
+// each as exactly one sentence, never "text.. text..".
+function sentence(s: string): string {
+  const trimmed = s.trim().replace(/\.+$/, "");
+  return trimmed ? `${trimmed}.` : "";
+}
+
 function buildSignalTone(state: string): "ok" | "warn" | "err" {
   if (state === "pass" || state === "clean") return "ok";
   if (state === "fail" || state === "not_run" || state === "not_built") return "err";
@@ -824,7 +853,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
           </p>
         </div>
         <Badge tone={v.ready ? "ok" : "err"} className="text-sm">
-          {v.ready ? "Ready to Build" : "Not Ready"}
+          {v.ready ? "Buildable" : "Not Buildable"}
         </Badge>
       </div>
 
@@ -855,7 +884,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
                   <Dot tone="err" />
                 </span>
                 <span>
-                  {b.detail}. <span className="text-t3">{b.next_step}.</span>
+                  {sentence(b.detail)} <span className="text-t3">{sentence(b.next_step)}</span>
                 </span>
               </li>
             ))}
@@ -873,7 +902,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
                   <Dot tone="warn" />
                 </span>
                 <span>
-                  {w.detail}. <span className="text-t3">{w.next_step}.</span>
+                  {sentence(w.detail)} <span className="text-t3">{sentence(w.next_step)}</span>
                 </span>
               </li>
             ))}
