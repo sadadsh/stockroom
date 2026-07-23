@@ -1484,3 +1484,181 @@ export interface DevSaveResult {
   icons: number;
   elements: number;
 }
+
+// --- STM Viewer DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4) ---
+// These mirror the FastAPI Pydantic models on api/routers/stm.py + api/schemas.py. Kept in
+// lockstep with that frozen contract; a genuine gap is an INTERFACES.md amendment + a Phase-3
+// fix, never a client-side shim.
+
+// GET /api/stm/status
+export interface StmStatusDTO {
+  built: boolean;
+  building: boolean;
+  source_path: string;
+  source_present: boolean;
+  all_families: boolean;
+  device_xml_count: number;
+  family_count: number;
+  families: string[];
+  mcu_count: number;
+  classifier_rev: number;
+  af_schema_rev: number;
+  geometry_rev: number;
+  source_sha256: string;
+  built_at: string;
+}
+
+// One spec-matrix row (the ST-MCU-FINDER column set). `part` is the addressable ref_name used
+// as ?part=; `mpn_example` is the real MPN shown to the user (ref_name is never displayed).
+export interface McuSpecRow {
+  part: string;
+  mpn_example: string;
+  series: string;
+  line: string;
+  core: string;
+  package: string;
+  pin_count: number;
+  io_count: number;
+  flash_kb: number;
+  ram_kb: number;
+  max_freq_mhz: number;
+  vdd_min: number;
+  vdd_max: number;
+  temp_min_c: number;
+  temp_max_c: number;
+  // peripheral name -> instance count (USART, SPI, I2C, TIM, ADC, USB, ...)
+  peripherals: Record<string, number>;
+}
+
+// GET /api/stm/mcus -> the full matrix + server-computed facet counts for the coarse scope.
+export interface McusResponse {
+  mcus: McuSpecRow[];
+  count: number;
+  facets: {
+    family: Record<string, number>;
+    core: Record<string, number>;
+    package: Record<string, number>;
+    series: Record<string, number>;
+  };
+}
+
+// GET /api/stm/families -> { families: FamilyDTO[] }
+export interface FamilyDTO {
+  family: string;
+  lines: string[];
+  mcu_count: number;
+  packages: string[];
+}
+
+export interface FamiliesResponse {
+  families: FamilyDTO[];
+}
+
+// One alternate-function option on a pin (SWAP-01). Declared once here and REUSED by Phase 5;
+// nested on PinDTO.alternate_functions and shown read-only by the inspector in Phase 4.
+export interface AfOptionDTO {
+  af_index: number;
+  signal: string;
+  peripheral: string | null;
+}
+
+// Every derived fact for one pin (VIZ-03).
+export interface PinDTO {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  canonical_pin_name: string;
+  raw_pin_name: string;
+  pin_type: string;
+  electrical_class: "io" | "power" | "ground" | "reset" | "boot" | "vcap" | "nc";
+  // the visual-encoding category (color-is-data); tracks electrical_class today
+  category: string;
+  roles: { role_name: string; role_class: string }[];
+  functions: { signal: string; io_modes: string }[];
+  alternate_functions: AfOptionDTO[];
+  five_v: { tolerant: boolean; by_family: Record<string, boolean>; caveat: string } | null;
+  // the VDD/VDDA/VBAT domain, when a power pin
+  supply: string | null;
+}
+
+// GET /api/stm/pinout?part= -> the full pinout with every pin's facts inlined (one call feeds
+// both the map and the inspector; decision 4).
+export interface PinoutGeometryDTO {
+  body_shape: "qfp" | "qfn" | "bga" | "wlcsp";
+  pin_count: number;
+  rows: number | null;
+  cols: number | null;
+  pitch_mm: number | null;
+  has_center_pad: boolean;
+  // "curated": from the cited PACKAGE_GEOMETRY table; "inferred": derived at request time
+  // from the package name + real pin positions (the map badges this honestly).
+  source?: "curated" | "inferred";
+}
+
+export interface PinoutDTO {
+  part: string;
+  mpn_example: string;
+  package: string;
+  geometry: PinoutGeometryDTO;
+  pins: PinDTO[];
+}
+
+// --- Compatibility Workbench DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4).
+// POST /api/stm/compat/union returns UnionDTO; every field mirrors the frozen Pydantic shape. The
+// classification vocabulary is exactly shared | divergent | partial (never the retired switch-fabric
+// identity), and reconcile is a read-only description of the alternate-function remap, never applied.
+
+// One union position at (mcu, package, position) grain, classified from the per-part facts so the
+// classification is auditable (never a silent package-majority collapse). lqfp_side / bga_row /
+// bga_col carry the same geometry hint PinDTO does, so lib/pinMapGeometry lays these out unchanged.
+export interface UnionPositionDTO {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  classification: "shared" | "divergent" | "partial";
+  present_on: number;
+  total: number;
+  // the raw per-part trail behind the classification (inspector detail on click, never per-pad).
+  per_part: {
+    ref: string;
+    canonical_pin_name: string;
+    roles: string[];
+    functions: string[];
+  }[];
+  // for a divergent position (COMPAT-03): the AF remap that makes each part carry the union's
+  // required signal here, or swappable:false + a reason. Read-only, never applied. null when the
+  // position needs no reconcile (a shared / partial position).
+  reconcile: {
+    swappable: boolean;
+    swaps: { ref: string; target_signal: string; via_af_index: number }[];
+    reason: string | null;
+  } | null;
+}
+
+// POST /api/stm/compat/union -> the socket-union of a set + its set-level verdict (COMPAT-01/02/03/05).
+export interface UnionDTO {
+  parts: string[];
+  resolved: { ref: string; mpn: string }[];
+  package: string;
+  family: string;
+  grain: "per-part";
+  positions: UnionPositionDTO[];
+  // the one dominant verdict (COMPAT-05): interchangeable with N swaps, or incompatible with the
+  // blocking signal(s) that cannot be placed listed beneath.
+  verdict: {
+    interchangeable: boolean;
+    swaps_required: number;
+    blocking: { position: string; signal: string; reason: string }[];
+  };
+}
+
+// The body POST /api/stm/compat/union accepts: an explicit set of refs OR a (family, package) group.
+export interface CompatUnionBody {
+  parts?: string[];
+  family?: string;
+  package?: string;
+}

@@ -572,4 +572,86 @@ describe("api client", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.rules).toEqual({ min_track_width: 0.13 });
   });
+
+  // --- STM Viewer (Phase 3 contract) ---
+
+  it("getStmMcus builds the mcus URL with only the provided scope params", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ mcus: [], count: 0, facets: {} }));
+
+    await api.getStmMcus({ family: "STM32F4", q: "", core: "Cortex-M4", package: "" });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/mcus");
+    expect(url.searchParams.get("family")).toBe("STM32F4");
+    expect(url.searchParams.get("core")).toBe("Cortex-M4");
+    // empty q + package are dropped from the query, exactly like listParts
+    expect(url.searchParams.has("q")).toBe(false);
+    expect(url.searchParams.has("package")).toBe(false);
+  });
+
+  it("getStmMcus with a blank scope requests the full matrix (no query params)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ mcus: [], count: 0, facets: {} }));
+
+    await api.getStmMcus();
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/mcus");
+    expect(url.search).toBe("");
+  });
+
+  it("getStmPinout passes part as a query param (never path-encoded)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ part: "x", pins: [] }));
+
+    await api.getStmPinout("STM32F407V(E-G)Tx");
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/pinout");
+    // the ref name's parentheses live in the ?part= value, not the path
+    expect(url.searchParams.get("part")).toBe("STM32F407V(E-G)Tx");
+  });
+
+  it("getStmStatus and getStmFamilies send the bearer token", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ built: false }));
+    await api.getStmStatus();
+    const [statusUrl, statusInit] = fetchMock.mock.calls[0];
+    expect(String(statusUrl)).toContain("/api/stm/status");
+    expect((statusInit as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+
+    fetchMock.mockResolvedValueOnce(okJson({ families: [] }));
+    await api.getStmFamilies();
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/api/stm/families");
+  });
+
+  it("buildStmIndex POSTs to /api/stm/build and resolves the job ref", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job-42" }));
+
+    const ref = await api.buildStmIndex();
+
+    expect(ref).toEqual({ job_id: "job-42" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/stm/build");
+    expect((init as RequestInit).method).toBe("POST");
+  });
+
+  it("a 409 from an STM read surfaces as ApiError.status === 409 the caller can branch on", async () => {
+    fetchMock.mockResolvedValueOnce(errJson(409, { detail: "STM index not built" }));
+
+    await expect(api.getStmMcus()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 409,
+    });
+    // and the message is carried through for an honest surface
+    await expect(
+      (async () => {
+        fetchMock.mockResolvedValueOnce(errJson(409, { detail: "STM index not built" }));
+        try {
+          await api.getStmStatus();
+        } catch (err) {
+          throw err instanceof ApiError ? err.message : "wrong error type";
+        }
+      })(),
+    ).rejects.toBe("STM index not built");
+  });
 });

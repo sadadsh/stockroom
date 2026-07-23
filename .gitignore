@@ -52,6 +52,10 @@ docs/research/
 /.stockroom-enrich-cache/
 /.stockroom-previews/
 .firecrawl/
+# The derived STM32 pinout/spec index (config_dir()/stm/index.sqlite by default,
+# outside the repo already; these are belt-and-suspenders for any in-repo fallback path)
+/.stockroom-stm-index/
+*.stm-index.sqlite
 # Derived Altium data source (regenerated from JSON like the SQLite index; the .DbLib IS committed)
 libraries/*/altium/*.xlsx
 

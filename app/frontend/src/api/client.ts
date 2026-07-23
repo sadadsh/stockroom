@@ -76,6 +76,12 @@ import type {
   SystemInfo,
   UpdateApply,
   UpdateCheck,
+  StmStatusDTO,
+  McusResponse,
+  FamiliesResponse,
+  PinoutDTO,
+  CompatUnionBody,
+  UnionDTO,
 } from "./types";
 
 export class ApiError extends Error {
@@ -236,6 +242,17 @@ export interface ListPartsArgs {
 export interface SearchArgs extends ListPartsArgs {
   // repeated spec constraints: "<key>:<value>" (an option) or "<key>:<min>~<max>" (a range)
   spec?: string[];
+}
+
+// The coarse server-side scope for GET /api/stm/mcus. Every field is optional; an omitted /
+// empty field is dropped from the query (like listParts), so a blank scope returns the FULL
+// spec matrix for client-side TanStack filtering (INTERFACES.md section 4).
+export interface StmMcusArgs {
+  q?: string;
+  family?: string;
+  core?: string;
+  package?: string;
+  series?: string;
 }
 
 export const api = {
@@ -997,5 +1014,52 @@ export const api = {
       `/api/altium/parts/${encodeURIComponent(partId)}/attach`,
       { body: { paths } },
     );
+  },
+
+  // --- STM Viewer (Phase 3 contract, section 4). Every read raises ApiError(409, "STM index
+  // not built") when the index is absent; the caller branches on .status === 409 to show the
+  // Build the index call to action instead of a raw error. ---
+
+  // The build/source/stamp state of the derived STM index (drives the 409 build gate + status).
+  getStmStatus(): Promise<StmStatusDTO> {
+    return apiGet<StmStatusDTO>("/api/stm/status");
+  },
+
+  // The families + their lines/packages/counts, for the FamilyPicker scope control.
+  getStmFamilies(): Promise<FamiliesResponse> {
+    return apiGet<FamiliesResponse>("/api/stm/families");
+  },
+
+  // The MCU spec matrix. Only the provided scope fields narrow server-side (omitting empty ones,
+  // exactly like listParts); every finer facet is a client-side TanStack column filter over the
+  // returned rows, so this fires once per coarse scope change, never per facet toggle (decision 3).
+  getStmMcus(args: StmMcusArgs = {}): Promise<McusResponse> {
+    const params: Record<string, string> = {};
+    if (args.q) params.q = args.q;
+    if (args.family) params.family = args.family;
+    if (args.core) params.core = args.core;
+    if (args.package) params.package = args.package;
+    if (args.series) params.series = args.series;
+    return apiGet<McusResponse>("/api/stm/mcus", params);
+  },
+
+  // One part's full pinout (every pin's derived facts inlined). `part` is a ref_name OR a real
+  // MPN, passed as a query param so the ref name's parentheses are never path-encoded (section 4).
+  getStmPinout(part: string): Promise<PinoutDTO> {
+    return apiGet<PinoutDTO>("/api/stm/pinout", { part });
+  },
+
+  // Submit the one-time index build as a READ-lane JobRunner job; progress streams over the
+  // job's SSE (useJob). A second submit while one is in flight returns the same job id.
+  buildStmIndex(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/stm/build");
+  },
+
+  // The socket-union of an assembled set + its set-level verdict (COMPAT-01/02/03/05). The body is
+  // EITHER an explicit ref list ({ parts }) OR a (family, package) group; both shapes the endpoint
+  // accepts (section 4). The result is ephemeral facts, not a stored resource, so nothing is
+  // invalidated after it resolves. A 409 raises ApiError(409) the caller routes to the build gate.
+  postStmCompatUnion(body: CompatUnionBody): Promise<UnionDTO> {
+    return request<UnionDTO>("POST", "/api/stm/compat/union", { body });
   },
 };

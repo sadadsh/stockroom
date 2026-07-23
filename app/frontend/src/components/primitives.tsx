@@ -191,7 +191,7 @@ export function Eyebrow({
   );
 }
 
-type BadgeTone = "warn" | "err" | "ok" | "neutral";
+export type BadgeTone = "warn" | "err" | "ok" | "neutral";
 type BadgeSize = "default" | "sm";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

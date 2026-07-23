@@ -40,6 +40,12 @@ class MachineConfig:
     # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
     libraries_root: str = ""
+    # Where the STM32CubeMX MCU XML tree lives on this machine (stm-viewer workstream,
+    # Phase 3, API-02). Blank until the user points it there (the all-families source is
+    # Windows-side per research and is not bundled); stm.source.default_cubemx_source()
+    # prefers this setting ahead of its own STM32_CUBEMX env-var/candidate-path fallback.
+    # Not a secret - a plain filesystem path, echoed raw (never masked) in the settings DTO.
+    stm_cubemx_source: str = ""
     mouser_api_key: str = ""
     # DigiKey Product Information API v4 OAuth2 client-credentials (opt-in, OFF by default —
     # spec section 6). Both must be set for enrich/routers/enrich.py:_make_pipeline to build a
