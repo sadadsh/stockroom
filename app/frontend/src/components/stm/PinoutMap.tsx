@@ -55,6 +55,12 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
     if (!svg) return;
     const behavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
+      // A constant extent matching the fixed viewBox: deterministic, and it avoids d3-zoom reading
+      // the SVG's live geometry (which the fixed-size viewBox makes unnecessary).
+      .extent([
+        [0, 0],
+        [VIEW, VIEW],
+      ])
       .on("zoom", (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
         const { k, x, y } = event.transform;
         setCamera({ k, x, y });
