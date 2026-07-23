@@ -663,8 +663,18 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
 
     win = webview.create_window("stockroom-cad", url=url, width=1340, height=980)
 
+    requested_formats = W._formats_for_needs(needs_values)
+
+    def _next_format():
+        if "kicad" in requested_formats and not session.kicad_complete():
+            return "kicad"
+        if "altium" in requested_formats and not session.altium_complete():
+            return "altium"
+        return None
+
     def _on_loaded() -> None:
-        W._inject_cad_scripts(win, url, needs_values, mpn)
+        nxt = _next_format()
+        W._inject_cad_scripts(win, url, needs_values, mpn, driver_formats=([nxt] if nxt else []))
 
     win.events.loaded += _on_loaded
 
@@ -672,6 +682,12 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
         W._forward_cad_capture(path, session, extract_dir=session.temp_dir)
         print(f"CAPTURE: {len(session.received)}/{len(session.needs)} -> "
               f"{sorted(r.value for r in session.received)}", flush=True)
+        if not session.is_complete() and _next_format() is not None:
+            print(f"CAPTURE: reloading for the next format ({_next_format()})", flush=True)
+            try:
+                win.evaluate_js("setTimeout(function(){location.reload();},600);")
+            except Exception:  # noqa: BLE001
+                pass
 
     armed = W._install_cad_download_intercept(win, session.temp_dir, _on_captured)
     print(f"REALCAPTURE: tier-1 intercept armed={armed}; needs={sorted(needs_values)}", flush=True)

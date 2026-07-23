@@ -867,7 +867,7 @@ def test_cad_scripts_for_url_digikey_includes_the_digikey_autofill(monkeypatch):
     assert len(scripts) == 3  # overlay, DigiKey autofill, driver
     assert "__STOCKROOM_OVERLAY__" in scripts[0]
     assert json.dumps("dku") in scripts[1] and "password" in scripts[1]  # digikey autofill second
-    assert "scrollIntoView" in scripts[2]  # the digikey driver last
+    assert "eda-cad-model-link" in scripts[2]  # the digikey models-page driver last
 
 
 def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
@@ -892,7 +892,7 @@ def test_cad_scripts_for_url_without_creds_is_overlay_and_driver_only(monkeypatc
     _stub_creds(monkeypatch)  # nothing saved
     scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"])
     assert len(scripts) == 2  # overlay + driver, autofill omitted
-    assert "__STOCKROOM_OVERLAY__" in scripts[0] and "scrollIntoView" in scripts[1]
+    assert "__STOCKROOM_OVERLAY__" in scripts[0] and "eda-cad-model-link" in scripts[1]
 
 
 def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
