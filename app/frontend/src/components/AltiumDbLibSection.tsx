@@ -12,14 +12,16 @@ import { useAltiumRegenerate, useAltiumStatus, useOdbcStatus } from "../api/quer
 import { useToast } from "../lib/toast";
 import { Text } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
+import { AltiumSetupModal } from "./AltiumSetupModal";
 import { Button, Card, Dot, Eyebrow } from "./primitives";
-import { RefreshIcon, LibraryIcon, DownloadIcon } from "./icons";
+import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon } from "./icons";
 
 export function AltiumDbLibSection() {
   const status = useAltiumStatus();
   const regenerate = useAltiumRegenerate();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const data = status.data;
   const pct = data && data.total > 0 ? Math.round((data.ready / data.total) * 100) : 0;
@@ -118,10 +120,17 @@ export function AltiumDbLibSection() {
           >
             View Library
           </Button>
+          <Button
+            onClick={() => setSetupOpen(true)}
+            icon={<ExternalIcon className="h-3.5 w-3.5" />}
+          >
+            <Text id="altiumdb.section-setup">Setup Guide</Text>
+          </Button>
         </div>
       </Card>
 
       <AltiumDbLibModal open={open} onClose={() => setOpen(false)} />
+      <AltiumSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
 
     </section>
   );
