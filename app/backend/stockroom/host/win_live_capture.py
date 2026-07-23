@@ -661,46 +661,55 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
     session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
     W._CAD_SESSION = session
 
-    win = webview.create_window("stockroom-cad", url=url, width=1340, height=980)
-
-    def _on_loaded() -> None:
-        # ONE session, ALL requested formats: the driver fires each format's download back-to-back
-        # (owner: "just click Download again for altium"); the downloads run concurrently as separate zips.
-        W._inject_cad_scripts(win, url, needs_values, mpn)
-
-    win.events.loaded += _on_loaded
-
     def _on_captured(path) -> None:
         W._forward_cad_capture(path, session, extract_dir=session.temp_dir)
         print(f"CAPTURE: {len(session.received)}/{len(session.needs)} -> "
               f"{sorted(r.value for r in session.received)}", flush=True)
 
-    armed = W._install_cad_download_intercept(win, session.temp_dir, _on_captured)
-    print(f"REALCAPTURE: tier-1 intercept armed={armed}; needs={sorted(needs_values)}", flush=True)
+    # tier-2 DownloadsWatch runs once for the whole session (the OS Downloads backstop).
     watch = DownloadsWatch.start(default_downloads_dir())
-    thread = threading.Thread(
+    threading.Thread(
         target=W._poll_downloads_watch, args=(watch, session),
         kwargs={"extract_dir": session.temp_dir}, daemon=True,
-    )
-    thread.start()
+    ).start()
 
-    wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "220"))
-    print(f"REALCAPTURE: running the real capture pipeline for up to {wait_s:.0f}s...", flush=True)
-    deadline = _t.time() + wait_s
-    last_dump = 0.0
-    while _t.time() < deadline and not session.is_complete():
-        _t.sleep(2.0)
-        if _t.time() - last_dump > 12:
-            last_dump = _t.time()
-            try:
-                hud = win.evaluate_js(
-                    "(function(){var o=document.getElementById('__stockroom_overlay__');"
-                    "return o?((o.innerText||'').replace(/\\n+/g,' | ').replace(/ +/g,' ').slice(-170)):'NO_HUD';})()"
-                )
-                cur = win.evaluate_js("location.pathname")
-                print(f"HUD [{cur}]: {hud}", flush=True)
-            except Exception as e:  # noqa: BLE001
-                print(f"HUD dump failed: {e!r}", flush=True)
+    def _complete(fmt: str) -> bool:
+        if fmt == "kicad":
+            return session.kicad_complete()
+        if fmt == "altium":
+            return session.altium_complete()
+        return True
+
+    # FRESH WINDOW per format: the first (pristine) pass always works, so drive EACH format in its own
+    # fresh window (owner: "redo the entire kicad process for altium") rather than reusing the stateful
+    # models page. The shared session accumulates; each window re-arms tier-1; close the window between
+    # formats so the next starts pristine. This reuses the PROVEN single-format path for both.
+    per_fmt = float(os.environ.get("STOCKROOM_FORMAT_WAIT", "170"))
+    for fmt in formats:
+        if _complete(fmt):
+            print(f"REALCAPTURE: {fmt} already captured; skipping.", flush=True)
+            continue
+        print(f"REALCAPTURE: === fresh window for {fmt} ===", flush=True)
+        fwin = webview.create_window("stockroom-cad", url=url, width=1340, height=980)
+
+        def _mk_loaded(w, f):
+            def _on_loaded() -> None:
+                W._inject_cad_scripts(w, url, needs_values, mpn, driver_formats=[f])
+            return _on_loaded
+
+        fwin.events.loaded += _mk_loaded(fwin, fmt)
+        armed = W._install_cad_download_intercept(fwin, session.temp_dir, _on_captured)
+        print(f"REALCAPTURE: tier-1 armed={armed} for {fmt}", flush=True)
+        fdl = _t.time() + per_fmt
+        while _t.time() < fdl and not _complete(fmt):
+            _t.sleep(2.0)
+        print(f"REALCAPTURE: {fmt} pass finished (complete={_complete(fmt)}); closing its window.", flush=True)
+        try:
+            fwin.destroy()
+        except Exception:  # noqa: BLE001
+            pass
+        _t.sleep(2.5)  # let the window fully close before the next format opens
+
     result["received"] = sorted(r.value for r in session.received)
     result["remaining"] = sorted(r.value for r in session.remaining())
     result["forwards"] = len(captured)
