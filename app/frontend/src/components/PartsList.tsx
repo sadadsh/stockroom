@@ -145,7 +145,7 @@ export function PartsList({ parts, selectedId, onSelect, duplicateIds }: Props) 
             data-dev-id="components.category-header"
             className="sticky top-0 z-[1] mb-0.5 flex items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
           >
-            <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t2">{category}</span>
+            <span className="text-xs font-semibold text-t2">{category}</span>
             <span className="tnum font-mono text-2xs text-t3">{items.length}</span>
           </div>
           {items.map((p) => {

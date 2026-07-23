@@ -40,16 +40,17 @@ export function Rail() {
       data-dev-id="rail.root"
       className="flex w-[190px] flex-none flex-col border-r border-line bg-rail px-3 py-4"
     >
-      {/* wordmark (north-star .wm): the rail's panel header - the brand on the rail with a
-          bottom hairline that spans the rail width, the way a docked Altium panel is titled. */}
+      {/* wordmark (north-star .wm): the rail's panel-title bar - same band + bottom hairline as every
+          other docked panel header (Components list, the opened component), so the three panes read
+          as one Altium workspace. Full-bleed to the rail edges via negative margins. */}
       <div
         data-dev-id="rail.wordmark"
-        className="-mx-3 mb-3 flex items-center gap-2.5 border-b border-line px-3.5 pb-3 pt-0.5"
+        className="-mx-3 -mt-4 mb-3 flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-band px-3.5"
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
         <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
-        <span className="text-lg font-semibold tracking-[-0.02em] text-t1">
+        <span className="text-base font-semibold tracking-[-0.01em] text-t1">
           <Text id="nav.brand">Stockroom</Text>
         </span>
       </div>
