@@ -328,6 +328,40 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
         _emit_to_cad_window(cad_overlay_received_js(reqs))
 
 
+def cad_overlay_complete_js() -> str:
+    """The host to page push that reveals the HUD Complete flash on session completion, guarded so a
+    remote page without the overlay bridge is a silent no-op. One-way: the cad window has no js_api."""
+    return "window.__STOCKROOM_OVERLAY__ && window.__STOCKROOM_OVERLAY__.complete();"
+
+
+def _forward_done_signal(session) -> None:
+    """Forward a distinct {signal:'done'} to the SPA on completion (DONE-01), mirroring
+    _forward_timeout_signal: the SPA lands in a clean terminal done state the instant the browser
+    finishes, token-scoped so a stale done from a replaced capture cannot mark a new part done."""
+    _emit_to_spa({"signal": "done", "token": session.token})
+
+
+def _finish_and_close(session, *, sleep=time.sleep, close_delay: float = 1.0) -> None:
+    """The ordered finish-and-close on session completion (DONE-01): flash Complete on the HUD, tell
+    the SPA the capture is done, hold briefly (close_delay, via the injectable sleep) so the flash is
+    visible, then close the cad window best-effort (read the _CAD_WINDOW global, guarded destroy).
+
+    Closing from the poll thread is safe: _on_cad_closed guards its poll-thread join with a
+    current-thread check, so there is no self-join deadlock. The temp dir is DELIBERATELY left intact
+    - the async Altium attach still reads the loose paths pulled into it, and the NEXT capture cleans
+    it; double-cleaning here would yank files from an in-flight attach (documented invariant)."""
+    _emit_to_cad_window(cad_overlay_complete_js())
+    _forward_done_signal(session)
+    if close_delay:
+        sleep(close_delay)
+    win = _CAD_WINDOW
+    if win is not None:
+        try:
+            win.destroy()
+        except Exception:  # noqa: BLE001 - the window may already be gone; closing is best-effort
+            pass
+
+
 def _forward_timeout_signal(session) -> None:
     """Forward an honest {signal:'timeout'} to the SPA (fixes B1 at the host layer): the
     guided window never hangs forever - if the deadline elapses with unmet needs the poll
@@ -352,6 +386,7 @@ def _poll_downloads_watch(
     extract_dir=None,
     interval: float = 1.5,
     timeout: float = 300.0,
+    close_delay: float = 1.0,
     sleep=time.sleep,
     now=time.time,
 ) -> None:
@@ -368,7 +403,11 @@ def _poll_downloads_watch(
     deadline = now() + timeout
     while not session.stop_flag["stop"] and now() < deadline:
         if _session_complete(session):
-            return  # all needs met; the temp dir is cleaned on the next capture (see below)
+            # all needs met: flash Complete on the HUD, tell the SPA it is done, and auto-close the
+            # cad window (DONE-01). The temp dir is left for the async Altium attach (cleaned on the
+            # next capture); no double-clean here.
+            _finish_and_close(session, sleep=sleep, close_delay=close_delay)
+            return
         found = watch.poll()
         if found is not None:
             _forward_cad_capture(found, session, extract_dir=extract_dir)
