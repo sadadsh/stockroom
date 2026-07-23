@@ -193,7 +193,6 @@ export function DetailPanel({
       rows: group.rows.filter((row) => !isReferenceOnlySpecKey(row.key)),
     }))
     .filter((group) => group.rows.length > 0);
-  const specCount = specGroups.reduce((total, group) => total + group.rows.length, 0);
   // The persisted pinout (M6i) reads from the record's specs, its provenance from
   // the enrichment map. Shown when present, in both read-only and editable modes.
   const pinout = parsePinout(detail.specs);
@@ -208,7 +207,6 @@ export function DetailPanel({
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
     { id: "specs", label: "Specifications" },
-    { id: "sourcing", label: "Sourcing" },
     ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
     ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
     { id: "history", label: "History" },
@@ -336,7 +334,6 @@ export function DetailPanel({
           <RailReference
             datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
             datasheetHref={detail.datasheet?.source_url || undefined}
-            purchase={detail.purchase}
             description={detail.description}
             onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
             onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
@@ -360,16 +357,21 @@ export function DetailPanel({
               {/* The specifications ARE the component - they lead the tab, fully visible (never
                   collapsed). The old derived-attribute chips duplicated these rows, so they were
                   removed; user tags follow as a quiet footer. */}
-              <SpecificationsSection groups={specGroups} count={specCount} />
+              <SpecificationsSection groups={specGroups} />
+              {/* Sourcing surfaced inline, not hidden behind a tab: the stock, unit price, and
+                  volume breaks the owner wants visible, plus each vendor product page as its own
+                  row (a modular list - more than one distributor shows here at once). */}
+              <div className="mt-5 border-t border-line pt-4">
+                <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+                  <Text id="detail.sourcing-head">Sourcing</Text>
+                </div>
+                <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+              </div>
               <TagsCard
                 tags={detail.tags}
                 onEditTags={onEditField ? (next) => onEditField("tags", next) : undefined}
                 busy={busy}
               />
-            </WorkbenchPanel>
-
-            <WorkbenchPanel id="sourcing" active={activeTab}>
-              <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
             </WorkbenchPanel>
 
             {pinout.length > 0 ? (
@@ -692,7 +694,6 @@ function ReadinessRow({
 function RailReference({
   datasheetUrl,
   datasheetHref,
-  purchase,
   description,
   onEditDatasheet,
   onEditDescription,
@@ -700,13 +701,11 @@ function RailReference({
 }: {
   datasheetUrl: string;
   datasheetHref?: string;
-  purchase: PurchaseRef[];
   description: string;
   onEditDatasheet?: (value: string) => void;
   onEditDescription?: (value: string) => void;
   busy?: boolean;
 }) {
-  const buy = purchase.find((p) => p.url);
   return (
     <div data-dev-id="detail.reference" className="mt-auto flex flex-col gap-3 border-t border-line pt-3">
       <div>
@@ -758,37 +757,18 @@ function RailReference({
               ) : null}
             </span>
           </div>
-          {buy ? (
-            <div data-dev-id="detail.buy-row" className="flex items-baseline gap-2">
-              <span className="w-[58px] flex-none pt-0.5 text-xs text-t2">
-                <Text id="detail.buy">Product</Text>
-              </span>
-              <a
-                href={buy.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-w-0 items-center gap-1 px-1.5 text-xs text-acc hover:underline"
-              >
-                <span className="truncate">
-                  {vendorLabel(buy.vendor, buy.url)}
-                  {buy.part_number ? ` · ${buy.part_number}` : ""}
-                </span>
-                <ExternalIcon className="flex-none" />
-              </a>
-            </div>
-          ) : null}
         </div>
       </div>
       <div data-dev-id="detail.notes-row">
         <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          <Text id="detail.notes">Notes</Text>
+          <Text id="detail.notes">Description</Text>
         </div>
         {onEditDescription ? (
           <EditableText
             value={description}
             onSave={onEditDescription}
             label="Description"
-            placeholder="Add a note"
+            placeholder="Add a description"
             multiline
             clampLines={3}
             disabled={busy}
@@ -1089,51 +1069,42 @@ function AssetTile({
 // two-column definition list - the key in quiet sans on the left, the value in the mono readout
 // face on the right - so a long value wraps in place. The tab owns the scroll, so however many
 // specs a part carries, they never grow the page.
-function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: number }) {
+function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
   if (groups.length === 0) {
     return (
       <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
     );
   }
+  // Two balanced columns (Altium's property-grid density) so every parameter is visible without
+  // scrolling: the four groups flow into two columns, each group kept whole (break-inside-avoid).
+  // The tab header already names the sheet, so no redundant "Specifications" title here.
   return (
-    <div data-dev-id="detail.specs">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-xs font-semibold text-t2">
-          <Text id="detail.specifications">Specifications</Text>
-        </span>
-        <span className="tnum font-mono text-2xs text-t3">{count}</span>
-      </div>
-      {/* One column (the owner's call): label on the left, value aligned to the right of a
-          capped block, so the value column lines up and no hairline trails off into empty
-          space. At single-column width both label and value have room, so nothing truncates.
-          The tab owns the scroll, so however many rows a part carries never grow the page. */}
-      <div className="flex max-w-[460px] flex-col gap-5">
-        {groups.map((group) => (
-          <section key={group.title} data-dev-id="detail.spec-group">
-            <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
-              {group.title}
-            </div>
-            <dl>
-              {group.rows.map((row) => (
-                <div
-                  key={row.key}
-                  className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1.5 last:border-0"
+    <div data-dev-id="detail.specs" className="columns-2 gap-x-9">
+      {groups.map((group) => (
+        <section key={group.title} data-dev-id="detail.spec-group" className="mb-4 break-inside-avoid">
+          <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+            {group.title}
+          </div>
+          <dl>
+            {group.rows.map((row) => (
+              <div
+                key={row.key}
+                className="flex items-baseline justify-between gap-3 border-b border-line/50 py-1 last:border-0"
+              >
+                <dt
+                  className="min-w-0 flex-1 break-words text-xs text-t2"
+                  title={typeof row.label === "string" ? row.label : undefined}
                 >
-                  <dt
-                    className="min-w-0 flex-1 break-words text-xs text-t2"
-                    title={typeof row.label === "string" ? row.label : undefined}
-                  >
-                    {row.label}
-                  </dt>
-                  <dd className="tnum max-w-[56%] flex-none break-words text-right font-mono text-sm text-t1">
-                    {row.unit ? `${row.value} ${row.unit}` : row.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ))}
-      </div>
+                  {row.label}
+                </dt>
+                <dd className="tnum max-w-[54%] flex-none break-words text-right font-mono text-xs text-t1">
+                  {row.unit ? `${row.value} ${row.unit}` : row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
     </div>
   );
 }
