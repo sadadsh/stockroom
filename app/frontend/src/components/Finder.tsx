@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { Facets } from "../api/types";
 import { SearchIcon } from "./icons";
+import { useText } from "../lib/copy";
 
 interface Props {
   search: string;
@@ -43,6 +44,9 @@ export function Finder({
   const categories = facets
     ? Object.entries(facets.by_category).sort((a, b) => a[0].localeCompare(b[0]))
     : [];
+  // Copy for an attribute (placeholder + label), so it is reworded through the same override
+  // as any <Text> label when dev mode saves it.
+  const searchLabel = useText("components.search-placeholder", "Search Parts");
 
   return (
     <div className="relative">
@@ -58,8 +62,8 @@ export function Finder({
               : undefined
           }
           readOnly={!!onOpenSearch}
-          placeholder="Search Parts"
-          aria-label="Search Parts"
+          placeholder={searchLabel}
+          aria-label={searchLabel}
           className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
         {onOpenSearch ? (
