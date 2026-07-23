@@ -804,6 +804,12 @@ def test_vendor_from_url_maps_key_and_label():
     assert _vendor_from_url("https://componentsearchengine.com/part/x") == ("samacsys", "SamacSys")
     assert _vendor_from_url("https://www.samacsys.com/x") == ("samacsys", "SamacSys")
     assert _vendor_from_url("")[0] == ""
+    # A DigiKey CAD models page carries a ?tab=<provider> query; it MUST route to the DigiKey driver,
+    # not the legacy provider driver (the guided capture happens on DigiKey). Regression 2026-07-23.
+    assert _vendor_from_url("https://www.digikey.com/en/models/726880?tab=ultralibrarian") == (
+        "digikey",
+        "DigiKey",
+    )
 
 
 def test_cad_loaded_scripts_order_and_omission():
