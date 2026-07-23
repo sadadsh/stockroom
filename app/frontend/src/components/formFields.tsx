@@ -1,17 +1,29 @@
 /**
  * Small labelled form controls shared by the Add-A-Part flow (a combobox backed by a
  * datalist, a plain select, and a text field with an optional hint). One home so the
- * passive add section and the candidate editor render identical controls.
+ * passive add section and the candidate editor render identical controls. An optional
+ * copyId renders the label through the copy layer, so it is dev-mode editable.
  */
+import { Text } from "../lib/copy";
+
+function FieldLabel({ label, copyId }: { label: string; copyId?: string }) {
+  return (
+    <span className="text-xs text-t3">
+      {copyId ? <Text id={copyId}>{label}</Text> : label}
+    </span>
+  );
+}
 
 export function ComboField({
   label,
+  copyId,
   value,
   onChange,
   options,
   listId,
 }: {
   label: string;
+  copyId?: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
@@ -19,7 +31,7 @@ export function ComboField({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-t3">{label}</span>
+      <FieldLabel label={label} copyId={copyId} />
       <input
         list={listId}
         value={value}
@@ -37,12 +49,14 @@ export function ComboField({
 
 export function SelectField({
   label,
+  copyId,
   value,
   onChange,
   placeholder,
   options,
 }: {
   label: string;
+  copyId?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
@@ -50,7 +64,7 @@ export function SelectField({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-t3">{label}</span>
+      <FieldLabel label={label} copyId={copyId} />
       <select
         aria-label={label}
         value={value}
@@ -70,12 +84,14 @@ export function SelectField({
 
 export function TextField({
   label,
+  copyId,
   value,
   onChange,
   placeholder,
   hint,
 }: {
   label: string;
+  copyId?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -84,7 +100,7 @@ export function TextField({
   return (
     <div className="flex flex-col gap-1">
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-t3">{label}</span>
+        <FieldLabel label={label} copyId={copyId} />
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -33,7 +33,7 @@ export function AddPartModal() {
     // Land the caret in the hero input so a pasted link is one keystroke away.
     const focusTimer = window.setTimeout(() => {
       document
-        .querySelector<HTMLInputElement>('[aria-label="Product link or part number"]')
+        .querySelector<HTMLInputElement>('[data-dev-id="ingest.input"]')
         ?.focus();
     }, 60);
     return () => {

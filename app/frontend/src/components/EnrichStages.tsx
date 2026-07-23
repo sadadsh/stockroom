@@ -9,6 +9,7 @@
  */
 import { motion } from "motion/react";
 import type { JobProgress } from "../lib/useJob";
+import { Text, useText } from "../lib/copy";
 
 const STAGES = [
   { key: "fetching", label: "Fetching", pct: 15 },
@@ -42,19 +43,23 @@ export function EnrichStages({
   for (let i = 0; i < STAGES.length; i++) {
     if (pct >= STAGES[i].pct) activeIndex = i;
   }
-  const activeLabel = STAGES[activeIndex]?.label ?? "Working";
+  // Copy layer: the stage label + hint resolve through useText (dynamic id, stable hook count)
+  // so the aria string carries any override; the visible copies below are <Text> so each stage
+  // name and fallback hint is click-editable in dev mode.
+  const activeKey = STAGES[activeIndex].key;
+  const activeLabel = useText(`enrich.stage-${activeKey}`, STAGES[activeIndex]?.label ?? "Working");
   // The live message reflects the current activity (the pipeline's own message when present).
   // Before any phase is reached (pct 0, the job just queued) show the starting hint; otherwise
   // fall back to a plain-language hint for the reached phase.
-  const hint = pct < STAGES[0].pct ? STAGE_HINT.queued : STAGE_HINT[STAGES[activeIndex].key];
-  const message = progress?.message || hint || "Working";
+  const hintKey = pct < STAGES[0].pct ? "queued" : activeKey;
+  const stagesAria = useText("enrich.stages-aria", "Enriching from the distributor");
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       <div
         className="flex items-center gap-1.5"
         role="progressbar"
-        aria-label="Enriching from the distributor"
+        aria-label={stagesAria}
         aria-valuetext={activeLabel}
       >
         {STAGES.map((s, i) => {
@@ -76,9 +81,13 @@ export function EnrichStages({
         })}
       </div>
       <span className="text-xs text-t2">
-        <span className="font-medium text-t1">{activeLabel}</span>
+        <span className="font-medium text-t1">
+          <Text id={`enrich.stage-${activeKey}`}>{STAGES[activeIndex]?.label ?? "Working"}</Text>
+        </span>
         <span className="text-t3"> · </span>
-        {message}
+        {progress?.message || (
+          <Text id={`enrich.hint-${hintKey}`}>{STAGE_HINT[hintKey] ?? "Working"}</Text>
+        )}
       </span>
     </div>
   );
