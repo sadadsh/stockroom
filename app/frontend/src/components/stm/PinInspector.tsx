@@ -8,6 +8,7 @@
  * values so signals/AF columns align; Title Case section labels; no em dashes.
  */
 import type { PinDTO } from "../../api/types";
+import { Eyebrow } from "../primitives";
 import { categoryFill, categoryLabel, isFiveVoltTolerant } from "./pinEncoding";
 import { AfOptionsPanel } from "./AfOptionsPanel";
 
@@ -175,7 +176,7 @@ function Sep() {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <div className="mb-1.5 text-2xs font-semibold text-t3">{label}</div>
+      <Eyebrow className="mb-1.5">{label}</Eyebrow>
       {children}
     </section>
   );
@@ -184,7 +185,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-2xs font-semibold text-t3">{label}</span>
+      <Eyebrow>{label}</Eyebrow>
       {children}
     </div>
   );
