@@ -43,6 +43,11 @@ def _isolate_machine_config(tmp_path, monkeypatch):
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    # The committed STM baked seed (data/stm/index.sqlite.xz) must not leak into the
+    # suite: build_context seed-restores when no index exists, which would turn every
+    # index-absent 409 test into a false "built" state. Point the seed at a
+    # nonexistent path; stm/test_seed.py covers the restore behavior explicitly.
+    monkeypatch.setenv("STOCKROOM_STM_SEED", str(tmp_path / "no-such-seed.sqlite.xz"))
 
 
 @pytest.fixture
