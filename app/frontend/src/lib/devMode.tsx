@@ -23,7 +23,7 @@ import {
 import { api } from "../api/client";
 import { ApiError } from "../api/client";
 import { useTheme, type Theme } from "./theme";
-import { DEV_TOKENS } from "./devTokens";
+import { DEV_TOKENS, DEV_TOKEN_BY_VAR } from "./devTokens";
 import { TOKEN_OVERRIDES } from "./token.overrides";
 import { COPY_OVERRIDES } from "./copy.overrides";
 
@@ -80,7 +80,7 @@ const DEFAULT: DevModeContextValue = {
   toggle: noop,
   theme: "dark",
   tokenValue: (cssVar) => {
-    const t = DEV_TOKENS.find((d) => d.cssVar === cssVar);
+    const t = DEV_TOKEN_BY_VAR.get(cssVar);
     return t?.default.dark ?? "";
   },
   isTokenOverridden: () => false,
@@ -148,7 +148,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
 
   const tokenValue = useCallback(
     (cssVar: string): string => {
-      const token = DEV_TOKENS.find((d) => d.cssVar === cssVar);
+      const token = DEV_TOKEN_BY_VAR.get(cssVar);
       if (!token) return "";
       const selector: TokenSelector = token.themed ? activeSelector : "root";
       const override = tokens[selector][cssVar];
@@ -162,7 +162,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
 
   const isTokenOverridden = useCallback(
     (cssVar: string): boolean => {
-      const token = DEV_TOKENS.find((d) => d.cssVar === cssVar);
+      const token = DEV_TOKEN_BY_VAR.get(cssVar);
       if (!token) return false;
       const selector: TokenSelector = token.themed ? activeSelector : "root";
       return tokens[selector][cssVar] != null;
@@ -172,7 +172,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
 
   const setToken = useCallback(
     (cssVar: string, value: string) => {
-      const token = DEV_TOKENS.find((d) => d.cssVar === cssVar);
+      const token = DEV_TOKEN_BY_VAR.get(cssVar);
       if (!token) return;
       const selector: TokenSelector = token.themed ? activeSelector : "root";
       setTokens((prev) => ({ ...prev, [selector]: { ...prev[selector], [cssVar]: value } }));
@@ -182,7 +182,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
 
   const resetToken = useCallback(
     (cssVar: string) => {
-      const token = DEV_TOKENS.find((d) => d.cssVar === cssVar);
+      const token = DEV_TOKEN_BY_VAR.get(cssVar);
       if (!token) return;
       const selector: TokenSelector = token.themed ? activeSelector : "root";
       setTokens((prev) => {

@@ -137,3 +137,8 @@ export const DEV_TOKENS: DevToken[] = [
 
 // The groups in panel order.
 export const DEV_TOKEN_GROUPS = ["Accent", "Surfaces", "Text", "Status", "Shape"] as const;
+
+// A by-variable lookup so consumers resolve a token in one call instead of re-scanning the list.
+export const DEV_TOKEN_BY_VAR: ReadonlyMap<string, DevToken> = new Map(
+  DEV_TOKENS.map((token) => [token.cssVar, token]),
+);
