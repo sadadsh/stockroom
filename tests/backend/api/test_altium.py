@@ -64,3 +64,17 @@ def test_attach_unknown_part_is_404(client):
 def test_attach_without_paths_is_422(client):
     r = client.post("/api/altium/parts/tps62130/attach", json={"paths": []})
     assert r.status_code == 422
+
+
+def test_status_resistor_value_keeps_ohm_unit(client, app_ctx):
+    # FIX-07 (backend): the human-facing status modal shows a resistor's value WITH the Ω unit,
+    # while the emitted DbLib keeps the schematic convention (no Ω) via row_for/derive_value.
+    from stockroom.model.part import PartRecord
+
+    rec = PartRecord(id="res1", display_name="5.05kΩ 0402", category="Resistors",
+                     mpn="RES-5K05", specs={"Resistance": "5.05 kOhms"})
+    (app_ctx.profile.library.parts_dir / "res1.json").write_text(rec.dumps(), encoding="utf-8")
+
+    row = next(x for x in client.get("/api/altium/status").json()["rows"] if x["id"] == "res1")
+    assert row["value"].endswith("Ω")
+    assert row["value"] == "5.05kΩ"
