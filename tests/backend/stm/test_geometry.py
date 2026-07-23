@@ -91,3 +91,25 @@ def test_no_package_in_the_build_ends_with_zero_pins():
     assert len(rows) == 4
     for r in rows:
         assert r["n"] > 0, f"package {r['package_name']} parsed zero pins"
+
+
+def test_infer_body_shape_by_package_name_and_position_evidence():
+    """A package with no curated PACKAGE_GEOMETRY row still gets an honest body shape:
+    the name decides when it can (WLCSP/BGA/QFN vocabulary), and alnum ball positions
+    force an area-array shape even for a name the vocabulary does not know."""
+    infer = geometry_mod.infer_body_shape
+    # area-array names, with or without ball evidence
+    assert infer("UFBGA176", True) == "bga"
+    assert infer("TFBGA100", True) == "bga"
+    assert infer("LFBGA354", True) == "bga"
+    assert infer("WLCSP49", True) == "wlcsp"
+    # ball evidence wins over an unknown name
+    assert infer("MYSTERY99", True) == "bga"
+    # perimeter names
+    assert infer("UFQFPN28", False) == "qfn"
+    assert infer("VFQFPN32", False) == "qfn"
+    assert infer("UQFN48", False) == "qfn"
+    assert infer("LQFP32", False) == "qfp"
+    assert infer("TSSOP20", False) == "qfp"
+    # unknown perimeter name falls back to the quad-flat default
+    assert infer("", False) == "qfp"

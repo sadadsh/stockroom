@@ -117,6 +117,25 @@ def per_pin_geometry(package_name: str, raw_position: str, pin_count: int) -> di
     }
 
 
+def infer_body_shape(package_name: str, has_alnum_positions: bool) -> str:
+    """Best-effort body shape for a package with NO curated PACKAGE_GEOMETRY row,
+    so an uncurated package still renders honestly instead of falling back to a
+    perimeter default that a ball-grid package cannot satisfy. The name decides
+    when its vocabulary is known (WLCSP/CSP, BGA, QFN-family); real alnum ball
+    positions force an area-array shape even for an unknown name. A consumer must
+    surface the result as inferred, never as a curated fact."""
+    name = (package_name or "").upper()
+    if "WLCSP" in name or "CSP" in name:
+        return "wlcsp"
+    if "BGA" in name:
+        return "bga"
+    if has_alnum_positions:
+        return "bga"
+    if "QFPN" in name or "QFN" in name or "DFN" in name or "SON" in name:
+        return "qfn"
+    return "qfp"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PACKAGE_GEOMETRY - hand-curated package mechanical facts CubeMX never states
 # (Plan 02 / DATA-03). Keyed by CubeMX Package name.
