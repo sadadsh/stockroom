@@ -241,24 +241,66 @@ def _digikey_providers_js(formats: list[str]) -> str:
     return json.dumps(out)
 
 
+def _digikey_downloadfrom_js(formats: list[str]) -> str:
+    """The per-provider download sub-sequence: open the provider's download control; then
+    (direct-first, then picker) gate a KiCad tool-select step behind kicad in `formats` and an
+    Altium tool-select step behind altium in `formats` - each a guarded no-op when the provider is
+    single-tool (no picker); then click download for the needed assets in order, symbol+footprint
+    first then the 3D model. The Altium step is emitted ONLY when requested, so an un-requested
+    format's quoted name never appears in the script. Every step reports; a missing target degrades
+    to a guidance message and the machine continues to the next asset / provider."""
+    parts = [
+        "function downloadFrom(pr){",
+        "tryClick('open',pr.download,pr.downloadText,"
+        "'Opened '+pr.label+' download.','Open '+pr.label+' Download / Add To Library control.');",
+    ]
+    if "kicad" in formats:
+        parts.append(
+            "if(pr.kicad){tryClick('kicad',pr.kicad,pr.kicadText,"
+            "'Selected KiCad on '+pr.label+'.',"
+            "'No KiCad picker on '+pr.label+' (single-tool provider).');}"
+        )
+    if "altium" in formats:
+        parts.append(
+            "if(pr.altium){tryClick('altium',pr.altium,pr.altiumText,"
+            "'Selected Altium on '+pr.label+'.',"
+            "'No Altium picker on '+pr.label+' (single-tool provider).');}"
+        )
+    parts.append(
+        "tryClick('symbolFootprint',pr.symbolFootprint,pr.symbolFootprintText,"
+        "'Downloading the symbol and footprint from '+pr.label+'.',"
+        "'Download the symbol and footprint from '+pr.label+'.');"
+    )
+    parts.append(
+        "tryClick('model3d',pr.model3d,pr.model3dText,"
+        "'Downloading the 3D model from '+pr.label+'.',"
+        "'Download the 3D model from '+pr.label+'.');"
+    )
+    parts.append("}")
+    return "".join(parts)
+
+
 def _digikey_runproviders_js(formats: list[str]) -> str:
-    """Task 1 runProviders: detect the present providers from `_DIGIKEY_PROVIDERS` in preference
-    order (report each present / skipped), then open the PREFERRED (first present) provider's
-    download control. Task 2 replaces the open-only body with the full per-provider sub-sequence
-    iterated across every present provider."""
+    """runProviders: detect the present providers from `_DIGIKEY_PROVIDERS` in preference order
+    (report each present / skipped), then iterate the per-provider download sub-sequence
+    (`downloadFrom`) over EVERY present provider (multi-provider fill) - Ultra Librarian first, then
+    SnapEDA, then SamacSys - so a gap the preferred provider leaves is filled by the next one. The
+    host CaptureSession dedups + accumulates across the session, so re-attempting a satisfied asset
+    is harmless. Each provider attempt is guarded and reports which provider it is driving."""
     return (
-        "function runProviders(sec){"
+        _digikey_downloadfrom_js(formats)
+        + "function runProviders(sec){"
         "var provs=" + _digikey_providers_js(formats) + ";"
         "var present=[];"
         "for(var i=0;i<provs.length;i++){var pr=provs[i];var f=false;"
         "try{f=hasSel(pr.present)||textPresent(pr.presentText,sec);}catch(e){}"
         "if(f){present.push(pr);report('provider',true,'Found '+pr.label+' in the CAD Models section.');}"
         "else{report('provider',false,pr.label+' is not offered for this part; skipping.');}}"
-        "if(!present.length){report('open',false,"
+        "if(!present.length){report('fill',false,"
         "'No known CAD provider is offered; download the files from this section manually.');return;}"
-        "var pref=present[0];"
-        "tryClick('open',pref.download,pref.downloadText,"
-        "'Opened '+pref.label+' download.','Open '+pref.label+' Download / Add To Library control.');"
+        "for(var k=0;k<present.length;k++){var pp=present[k];"
+        "report('fill',true,'Driving '+pp.label+' for the needed files.');"
+        "try{downloadFrom(pp);}catch(e){report('fill',false,'Continuing with the next provider.');}}"
         "}"
     )
 

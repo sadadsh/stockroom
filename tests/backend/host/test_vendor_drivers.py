@@ -54,6 +54,33 @@ def test_digikey_driver_is_resilient_via_a_text_fallback():
     assert "textContent" in js or "innerText" in js
 
 
+def test_digikey_driver_gates_requested_formats():
+    # only the requested tools are targeted; an un-requested format's quoted name never appears
+    both = build_driver_js("digikey", ["kicad", "altium"]).lower()
+    assert "kicad" in both and "altium" in both
+    only_kicad = build_driver_js("digikey", ["kicad"])
+    assert '"kicad"' in only_kicad  # requested format encoded via json.dumps
+    assert '"altium"' not in only_kicad  # the Altium tool step is gated out entirely
+
+
+def test_digikey_driver_downloads_symbol_footprint_then_the_3d_model():
+    low = build_driver_js("digikey", ["kicad", "altium"]).lower()
+    assert "symbol" in low and "footprint" in low  # symbol + footprint asset step
+    assert "3d" in low or "model" in low or "step" in low  # the 3D model asset step
+    # symbol/footprint is attempted before the 3D model
+    sf = low.find("symbolfootprint")
+    m3 = low.find("model3d")
+    assert 0 <= sf < m3
+
+
+def test_digikey_driver_attempts_all_providers_for_fill():
+    # the per-provider download sub-sequence runs for every present provider (multi-provider fill),
+    # so a gap left by the preferred provider is filled by the next one (the host dedups).
+    low = build_driver_js("digikey", ["kicad"]).lower()
+    assert ("ultra" in low or "librarian" in low) and "snapeda" in low and "samacsys" in low
+    assert "downloadfrom" in low  # a reusable per-provider sub-sequence iterated over providers
+
+
 def test_unknown_vendor_is_a_guidance_only_noop():
     js = build_driver_js("mouser", ["kicad"])
     # a benign script: no auto-click attempts, but still reports guidance to the overlay
