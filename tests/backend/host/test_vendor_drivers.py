@@ -139,10 +139,13 @@ def test_digikey_reactor_is_event_driven_not_timed():
 
 
 def test_digikey_reactor_recovers_like_a_human_refresh_and_your_turn():
-    # It never gets left on a hang: a stall/error refreshes the page (the owner's move), bounded so it
-    # can't loop; a Cloudflare / login wall hands off to the user via the overlay "Your Turn".
+    # It never gets left on a hang: a stall/error re-navigates through the PRODUCT page (live
+    # 2026-07-23: a reloaded models page never renders its provider controls again, so recovery
+    # retraces the proven product -> models-link path; plain reload is only the fallback), bounded
+    # so it can't loop; a Cloudflare / login wall hands off to the user via the overlay "Your Turn".
     js = build_driver_js("digikey", ["kicad", "altium"])
-    assert "location.reload" in js and "MAX_REFRESH" in js  # bounded refresh recovery
+    assert "__SR_PRODUCT__" in js  # recovery retraces the proven product-page path
+    assert "location.reload" in js and "MAX_REFRESH" in js  # bounded fallback refresh
     assert "senseError" in js and "senseWall" in js  # watches for the error toast + the wall
     assert ".action({needsUser:true" in js  # Cloudflare/login -> "Your Turn" hand-off
 
