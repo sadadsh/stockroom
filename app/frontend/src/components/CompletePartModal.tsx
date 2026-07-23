@@ -13,8 +13,9 @@ import type { PartDetail, Requirement } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { useToast } from "../lib/toast";
+import { Text, useText } from "../lib/copy";
 import { Button } from "./primitives";
-import { DownloadIcon } from "./icons";
+import { Icon } from "./Icon";
 
 interface Props {
   detail: PartDetail;
@@ -25,12 +26,6 @@ interface Props {
   onEditField?: (field: string, value: unknown) => void;
   busy?: boolean;
 }
-
-const CheckMark = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
-);
 
 // A soft progress meter that fills as received/needs grows (the "feel-good" fill).
 function CaptureMeter({ received, total }: { received: number; total: number }) {
@@ -69,19 +64,32 @@ function CaptureChecklist({
   received: Partial<Record<Requirement, boolean>>;
 }) {
   const groups = [
-    { name: "KiCad", rows: KICAD_ROWS.filter((r) => needs.includes(r.req)) },
-    { name: "Altium", rows: ALTIUM_ROWS.filter((r) => needs.includes(r.req)) },
+    {
+      name: "KiCad",
+      copyId: "modal.completePart.group-kicad",
+      rows: KICAD_ROWS.filter((r) => needs.includes(r.req)),
+    },
+    {
+      name: "Altium",
+      copyId: "modal.completePart.group-altium",
+      rows: ALTIUM_ROWS.filter((r) => needs.includes(r.req)),
+    },
   ].filter((g) => g.rows.length > 0);
   return (
     <div data-dev-id="complete.cad-checklist" className="flex flex-col gap-3">
       {groups.map((g) => (
         <div key={g.name}>
           <div className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-t3">
-            {g.name}
+            <Text id={g.copyId}>{g.name}</Text>
           </div>
           <div className="flex flex-col gap-1.5">
             {g.rows.map((r) => (
-              <CaptureRow key={r.req} label={r.label} done={!!received[r.req]} />
+              <CaptureRow
+                key={r.req}
+                label={r.label}
+                copyId={r.copyId}
+                done={!!received[r.req]}
+              />
             ))}
           </div>
         </div>
@@ -90,7 +98,7 @@ function CaptureChecklist({
   );
 }
 
-function CaptureRow({ label, done }: { label: string; done: boolean }) {
+function CaptureRow({ label, copyId, done }: { label: string; copyId: string; done: boolean }) {
   return (
     <div className="flex items-center gap-2.5" data-received={done}>
       <motion.span
@@ -102,11 +110,17 @@ function CaptureRow({ label, done }: { label: string; done: boolean }) {
         animate={done ? { scale: [1, 1.28, 1] } : { scale: 1 }}
         transition={{ duration: 0.34, ease: "easeOut" }}
       >
-        <CheckMark />
+        <Icon id="modal.check" className="h-3 w-3" />
       </motion.span>
-      <span className={"flex-1 text-sm " + (done ? "text-t2" : "text-t1")}>{label}</span>
+      <span className={"flex-1 text-sm " + (done ? "text-t2" : "text-t1")}>
+        <Text id={copyId}>{label}</Text>
+      </span>
       <span className={"text-xs " + (done ? "font-medium text-ok" : "text-t3")}>
-        {done ? "Received" : "Waiting"}
+        {done ? (
+          <Text id="modal.completePart.checklist-received">Received</Text>
+        ) : (
+          <Text id="modal.completePart.checklist-waiting">Waiting</Text>
+        )}
       </span>
     </div>
   );
@@ -130,15 +144,36 @@ function cadLabel(status: GuidedStatus): string {
   }
 }
 
-// Checklist row layout, per tool. Only the rows a part actually needs render.
+// The copy id for each cadLabel state, so the button caption resolves its own override while
+// cadLabel keeps returning the plain default string.
+function cadButtonId(status: GuidedStatus): string {
+  switch (status) {
+    case "resolving":
+      return "modal.completePart.cad-btn-resolving";
+    case "window-open":
+    case "receiving":
+      return "modal.completePart.cad-btn-waiting";
+    case "attaching":
+      return "modal.completePart.cad-btn-attaching";
+    case "timed-out":
+    case "unavailable":
+    case "error":
+      return "modal.completePart.cad-btn-retry";
+    default:
+      return "modal.completePart.cad-btn-start";
+  }
+}
+
+// Checklist row layout, per tool. Only the rows a part actually needs render. Symbol/Footprint
+// share one copy id across KiCad and Altium, so a single override serves both groups.
 const KICAD_ROWS = [
-  { req: "kicad_symbol", label: "Symbol" },
-  { req: "kicad_footprint", label: "Footprint" },
-  { req: "kicad_model", label: "3D Model" },
+  { req: "kicad_symbol", label: "Symbol", copyId: "modal.completePart.row-symbol" },
+  { req: "kicad_footprint", label: "Footprint", copyId: "modal.completePart.row-footprint" },
+  { req: "kicad_model", label: "3D Model", copyId: "modal.completePart.row-model" },
 ] as const;
 const ALTIUM_ROWS = [
-  { req: "altium_symbol", label: "Symbol" },
-  { req: "altium_footprint", label: "Footprint" },
+  { req: "altium_symbol", label: "Symbol", copyId: "modal.completePart.row-symbol" },
+  { req: "altium_footprint", label: "Footprint", copyId: "modal.completePart.row-footprint" },
 ] as const;
 
 // Sentence-case toast copy fired as each requirement lands (body prose, not a label).
@@ -179,6 +214,21 @@ export function CompletePartModal({
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds);
   const { toast } = useToast();
+  // Resolve the five per-requirement toast strings through the copy layer at the top (hooks run
+  // unconditionally, fixed order), keeping REQ_TOAST's prose as the fallbacks. A ref carries the
+  // latest resolved map into the received-watch effect without widening its dependency set.
+  const reqToast: Record<Requirement, string> = {
+    kicad_symbol: useText("modal.completePart.toast-kicad-symbol", REQ_TOAST.kicad_symbol),
+    kicad_footprint: useText("modal.completePart.toast-kicad-footprint", REQ_TOAST.kicad_footprint),
+    kicad_model: useText("modal.completePart.toast-kicad-model", REQ_TOAST.kicad_model),
+    altium_symbol: useText("modal.completePart.toast-altium-symbol", REQ_TOAST.altium_symbol),
+    altium_footprint: useText("modal.completePart.toast-altium-footprint", REQ_TOAST.altium_footprint),
+  };
+  const reqToastRef = useRef(reqToast);
+  reqToastRef.current = reqToast;
+  // The dialog and Close accessible names live in attributes, so they resolve through useText.
+  const dialogLabel = useText("modal.completePart.aria", "Complete this part");
+  const closeLabel = useText("modal.completePart.close", "Close");
   const needs: Requirement[] = download.needs;
   const receivedCount = needs.filter((n) => download.received[n]).length;
   const showCad = needs.length > 0;
@@ -193,7 +243,7 @@ export function CompletePartModal({
   useEffect(() => {
     const rec = download.received;
     (Object.keys(rec) as Requirement[]).forEach((req) => {
-      if (rec[req] && !prevReceived.current[req]) toast(REQ_TOAST[req], "ok");
+      if (rec[req] && !prevReceived.current[req]) toast(reqToastRef.current[req], "ok");
     });
     prevReceived.current = { ...rec };
   }, [download.received, toast]);
@@ -208,13 +258,13 @@ export function CompletePartModal({
   const requirements = useMemo(
     () =>
       [
-        { key: "symbol", label: "Symbol", kind: "asset" as const, present: hasSymbol },
-        { key: "footprint", label: "Footprint", kind: "asset" as const, present: hasFootprint },
-        { key: "model", label: "3D Model", kind: "cad-only" as const, present: hasModel },
-        { key: "datasheet", label: "Datasheet", kind: "url" as const, present: hasDatasheet },
-        { key: "mpn", label: "Part Number", kind: "text" as const, present: !!detail.mpn },
-        { key: "manufacturer", label: "Manufacturer", kind: "text" as const, present: !!detail.manufacturer },
-        { key: "description", label: "Value / Description", kind: "text" as const, present: !!detail.description },
+        { key: "symbol", label: "Symbol", copyId: "modal.completePart.row-symbol", kind: "asset" as const, present: hasSymbol },
+        { key: "footprint", label: "Footprint", copyId: "modal.completePart.row-footprint", kind: "asset" as const, present: hasFootprint },
+        { key: "model", label: "3D Model", copyId: "modal.completePart.row-model", kind: "cad-only" as const, present: hasModel },
+        { key: "datasheet", label: "Datasheet", copyId: "modal.completePart.row-datasheet", kind: "url" as const, present: hasDatasheet },
+        { key: "mpn", label: "Part Number", copyId: "modal.completePart.row-mpn", kind: "text" as const, present: !!detail.mpn },
+        { key: "manufacturer", label: "Manufacturer", copyId: "modal.completePart.row-manufacturer", kind: "text" as const, present: !!detail.manufacturer },
+        { key: "description", label: "Value / Description", copyId: "modal.completePart.row-description", kind: "text" as const, present: !!detail.description },
       ]
         // The 3D model has no manual attach path (download only), so when the CAD Files
         // section is shown it owns the model row; drop the redundant duplicate here.
@@ -235,7 +285,7 @@ export function CompletePartModal({
         className="w-full max-w-[540px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
-        aria-label="Complete this part"
+        aria-label={dialogLabel}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -243,9 +293,13 @@ export function CompletePartModal({
           className="flex items-start justify-between border-b border-line px-5 py-4"
         >
           <div>
-            <div className="text-base font-semibold text-t1">Complete This Part</div>
+            <div className="text-base font-semibold text-t1">
+              <Text id="modal.completePart.title">Complete This Part</Text>
+            </div>
             <div className="mt-0.5 text-xs text-t3">
-              Add the files and data this part still needs.
+              <Text id="modal.completePart.subtitle">
+                Add the files and data this part still needs.
+              </Text>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -255,12 +309,10 @@ export function CompletePartModal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={closeLabel}
               className="grid h-7 w-7 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3.5 w-3.5">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
+              <Icon id="modal.close" className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -276,7 +328,9 @@ export function CompletePartModal({
             >
               <div className="flex items-start justify-between gap-3 border-b border-line px-3.5 py-2.5">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-t1">CAD Files</div>
+                  <div className="text-sm font-semibold text-t1">
+                    <Text id="modal.completePart.cad-title">CAD Files</Text>
+                  </div>
                   <p
                     className={
                       "mt-0.5 text-xs " +
@@ -303,15 +357,15 @@ export function CompletePartModal({
                     <Button
                       variant="accent"
                       small
-                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
+                      icon={<Icon id="action.download" className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
                       onClick={() => void download.start()}
                     >
-                      {cadLabel(download.status)}
+                      <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
                     </Button>
                   ) : null}
                   <Button small disabled={cadBusy} onClick={() => void browse()}>
-                    Browse For Files
+                    <Text id="modal.completePart.browse">Browse For Files</Text>
                   </Button>
                 </div>
               </div>
@@ -334,7 +388,7 @@ export function CompletePartModal({
 
         <div className="flex justify-end border-t border-line px-5 py-3.5">
           <Button data-dev-id="complete.done" variant="accent" small onClick={onClose}>
-            Done
+            <Text id="modal.completePart.done">Done</Text>
           </Button>
         </div>
       </div>
@@ -345,6 +399,7 @@ export function CompletePartModal({
 type Req = {
   key: string;
   label: string;
+  copyId: string;
   kind: "asset" | "cad-only" | "url" | "text";
   present: boolean;
 };
@@ -391,15 +446,19 @@ function Requirement({
             (req.present ? "bg-ok text-white" : "border-[1.5px] border-line2 text-transparent")
           }
         >
-          <CheckMark />
+          <Icon id="modal.check" className="h-3 w-3" />
         </span>
         <span className={"flex-1 text-sm " + (req.present ? "text-t2" : "font-medium text-t1")}>
-          {req.label}
+          <Text id={req.copyId}>{req.label}</Text>
         </span>
         {req.present ? (
-          <span className="text-xs text-t3">Added</span>
+          <span className="text-xs text-t3">
+            <Text id="modal.completePart.req-added">Added</Text>
+          </span>
         ) : req.kind === "cad-only" ? (
-          <span className="text-xs text-t3">From the CAD files above</span>
+          <span className="text-xs text-t3">
+            <Text id="modal.completePart.req-from-cad">From the CAD files above</Text>
+          </span>
         ) : editable ? (
           <button
             type="button"
@@ -407,7 +466,11 @@ function Requirement({
             aria-label={open ? undefined : `Add ${req.label}`}
             className="rounded-control border border-line2 px-2.5 py-1 text-xs font-semibold text-t2 hover:border-acc hover:text-t1"
           >
-            {open ? "Cancel" : "Add"}
+            {open ? (
+              <Text id="modal.completePart.req-cancel">Cancel</Text>
+            ) : (
+              <Text id="modal.completePart.req-add">Add</Text>
+            )}
           </button>
         ) : null}
       </div>
@@ -416,16 +479,17 @@ function Requirement({
         <div className="mt-2.5 pl-6.5">
           {req.kind === "asset" ? (
             <div className="flex flex-wrap items-end gap-2">
-              <Field label="Library" value={lib} onChange={setLib} placeholder={req.key === "symbol" ? "Device" : "Resistor_SMD"} />
-              <Field label="Name" value={name} onChange={setName} placeholder={req.key === "symbol" ? "R" : "R_0603_1608Metric"} onEnter={applyAsset} />
+              <Field label="Library" copyId="modal.completePart.field-library" value={lib} onChange={setLib} placeholder={req.key === "symbol" ? "Device" : "Resistor_SMD"} />
+              <Field label="Name" copyId="modal.completePart.field-name" value={name} onChange={setName} placeholder={req.key === "symbol" ? "R" : "R_0603_1608Metric"} onEnter={applyAsset} />
               <Button small variant="accent" disabled={busy || !lib.trim() || !name.trim()} onClick={applyAsset}>
-                Attach
+                <Text id="modal.completePart.attach">Attach</Text>
               </Button>
             </div>
           ) : (
             <div className="flex flex-wrap items-end gap-2">
               <Field
                 label={req.kind === "url" ? "URL" : req.label}
+                copyId={req.kind === "url" ? "modal.completePart.field-url" : undefined}
                 value={text}
                 onChange={setText}
                 placeholder={req.kind === "url" ? "https://..." : ""}
@@ -433,7 +497,7 @@ function Requirement({
                 onEnter={() => applyValue(req.key)}
               />
               <Button small variant="accent" disabled={busy || !text.trim()} onClick={() => applyValue(req.key)}>
-                Save
+                <Text id="modal.completePart.save">Save</Text>
               </Button>
             </div>
           )}
@@ -445,6 +509,7 @@ function Requirement({
 
 function Field({
   label,
+  copyId,
   value,
   onChange,
   placeholder,
@@ -452,6 +517,7 @@ function Field({
   onEnter,
 }: {
   label: string;
+  copyId?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -460,7 +526,9 @@ function Field({
 }) {
   return (
     <label className={"flex flex-col gap-1 " + (wide ? "min-w-[280px] flex-1" : "")}>
-      <span className="text-2xs font-medium uppercase tracking-wide text-t3">{label}</span>
+      <span className="text-2xs font-medium uppercase tracking-wide text-t3">
+        {copyId ? <Text id={copyId}>{label}</Text> : label}
+      </span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
