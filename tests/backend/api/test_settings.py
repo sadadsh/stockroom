@@ -71,6 +71,10 @@ def test_settings_is_token_guarded(anon_client):
     assert anon_client.patch(
         "/api/settings", json={"mouser_api_key": "x"}
     ).status_code in (401, 403)
+    # a new credential field is guarded by the same per-launch token dependency
+    assert anon_client.patch(
+        "/api/settings", json={"digikey_client_secret": "x"}
+    ).status_code in (401, 403)
 
 
 # -- GitHub personal access token (auto-push auth) -----------------------------
@@ -214,3 +218,89 @@ def test_get_settings_tolerates_a_null_secret_field(client, app_ctx):
     assert resp.status_code == 200
     assert resp.json()["ul_password_set"] is False
     assert resp.json()["ul_password_hint"] == ""
+
+
+# -- SamacSys (kept in-DigiKey CAD provider) -----------------------------------
+
+
+def test_patch_sets_samacsys_login_live_and_persists(client, app_ctx):
+    r = client.patch("/api/settings", json={
+        "samacsys_username": "sam@x.com", "samacsys_password": "samsecret",
+    })
+    assert r.status_code == 200
+    assert app_ctx.config.samacsys_username == "sam@x.com"
+    assert app_ctx.config.samacsys_password == "samsecret"
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["samacsys_username"] == "sam@x.com"
+    assert saved["samacsys_password"] == "samsecret"
+
+
+def test_get_settings_masks_samacsys_password(client, app_ctx):
+    app_ctx.config.samacsys_username = "sam@x.com"
+    app_ctx.config.samacsys_password = "samsecret"
+    body = client.get("/api/settings").json()
+    assert body["samacsys_username"] == "sam@x.com"
+    assert body["samacsys_password_set"] is True
+    assert body["samacsys_password_hint"] == "cret"
+    assert "samacsys_password" not in body
+    assert "samsecret" not in json.dumps(body)
+
+
+def test_get_settings_tolerates_a_null_samacsys_password(client, app_ctx):
+    app_ctx.config.samacsys_password = None
+    resp = client.get("/api/settings")
+    assert resp.status_code == 200
+    assert resp.json()["samacsys_password_set"] is False
+    assert resp.json()["samacsys_password_hint"] == ""
+
+
+# -- DigiKey API creds (OAuth client-credentials, now writable via settings) ----
+
+
+def test_patch_sets_digikey_api_creds_live_and_persists(client, app_ctx):
+    r = client.patch("/api/settings", json={
+        "digikey_client_id": "CLIENTID", "digikey_client_secret": "APISECRET1234",
+    })
+    assert r.status_code == 200
+    assert app_ctx.config.digikey_client_id == "CLIENTID"
+    assert app_ctx.config.digikey_client_secret == "APISECRET1234"
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["digikey_client_id"] == "CLIENTID"
+    assert saved["digikey_client_secret"] == "APISECRET1234"
+
+
+def test_get_settings_echoes_client_id_and_masks_the_secret(client, app_ctx):
+    app_ctx.config.digikey_client_id = "CLIENTID"
+    app_ctx.config.digikey_client_secret = "APISECRET1234"
+    body = client.get("/api/settings").json()
+    assert body["digikey_client_id"] == "CLIENTID"
+    assert body["digikey_client_secret_set"] is True
+    assert body["digikey_client_secret_hint"] == "1234"
+    assert "digikey_client_secret" not in body
+    assert "APISECRET" not in json.dumps(body)
+
+
+# -- DigiKey account web login (the driver's hands-free sign-in) ----------------
+
+
+def test_patch_sets_digikey_account_login_live_and_persists(client, app_ctx):
+    r = client.patch("/api/settings", json={
+        "digikey_username": "dk@x.com", "digikey_password": "accountpw1234",
+    })
+    assert r.status_code == 200
+    assert app_ctx.config.digikey_username == "dk@x.com"
+    assert app_ctx.config.digikey_password == "accountpw1234"
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["digikey_username"] == "dk@x.com"
+    assert saved["digikey_password"] == "accountpw1234"
+
+
+def test_get_settings_echoes_digikey_username_and_masks_the_password(client, app_ctx):
+    app_ctx.config.digikey_username = "dk@x.com"
+    app_ctx.config.digikey_password = "accountpw1234"
+    body = client.get("/api/settings").json()
+    assert body["digikey_username"] == "dk@x.com"
+    assert body["digikey_password_set"] is True
+    assert body["digikey_password_hint"] == "1234"
+    assert "digikey_password" not in body
+    assert "accountpw1234" not in json.dumps(body)
