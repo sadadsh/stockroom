@@ -626,7 +626,7 @@ function VendorLogin({
   identifierLabel,
   secretLabel,
   saveLabel,
-  identifierPlaceholder = "Username or email",
+  identifierPlaceholder,
   savedIdentifier,
   secretSet,
   secretHint,
@@ -674,7 +674,7 @@ function VendorLogin({
             setEdited(true);
             setIdentifier(e.target.value);
           }}
-          placeholder={identifierPlaceholder}
+          placeholder={identifierPlaceholder ?? identifierLabel}
           className={INPUT_CLS}
         />
         <label htmlFor={`${slug}-secret`} className="sr-only">
@@ -737,7 +737,6 @@ function VendorLoginsSection() {
           identifierLabel="DigiKey API Client ID"
           secretLabel="DigiKey API Client Secret"
           saveLabel="Save DigiKey API Creds"
-          identifierPlaceholder="Client ID"
           savedIdentifier={d?.digikey_client_id ?? ""}
           secretSet={d?.digikey_client_secret_set ?? false}
           secretHint={d?.digikey_client_secret_hint ?? ""}
