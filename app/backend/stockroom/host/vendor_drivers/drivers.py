@@ -51,269 +51,141 @@ def _step(step: str, selectors: list[str], ok_msg: str, fail_msg: str) -> str:
     )
 
 
-# DigiKey serves the CAD files through its OWN "EDA / CAD Models" section (owner correction
-# 2026-07-22: no navigation to a provider website), aggregating Ultra Librarian / SnapEDA /
-# SamacSys there. So the driver is an ADAPTIVE STATE MACHINE, not guidance-only: dismiss consent,
-# find the CAD section (KEEPING the live-validated div-text match + custom-scroll-container
-# scrollIntoView - window.scrollTo does not move DigiKey's container), detect which providers
-# DigiKey offers for THIS part in preference order (Ultra Librarian first as the most-complete
-# default, then SnapEDA, then SamacSys), and open the preferred provider's download control - all
-# guarded, reporting each step into the overlay, degrading a missing target to a guidance message.
-#
-# Per-part coverage VARIES, so `_DIGIKEY_PROVIDERS` is preference-ordered and Task 2 iterates the
-# per-provider download sub-sequence across every present provider (the host CaptureSession dedups
-# + accumulates, so combining providers is safe). Selectors are OWNER-VALIDATE against the live
-# DigiKey + in-DigiKey provider markup (login-gated, changes); the resilient text/attr fallbacks
-# and the fixture tests are the deterministic guard.
-#
-# Each provider entry: label + presence (selectors + provider-name text scoped to the CAD section)
-# + download control (Download / Add To Library selectors + text) + per-format tool selectors
-# (kicad / altium) + per-asset selectors (symbol+footprint, then the 3D model). Task 1 consumes
-# label/present/download; Task 2 consumes the tool + asset fields.
-_DIGIKEY_PROVIDERS: list[dict] = [
-    {
-        "label": "Ultra Librarian",
-        "present": [
-            "[data-provider='ultralibrarian']",
-            "img[alt*='Ultra Librarian' i]",
-            "a[href*='ultralibrarian']",
-        ],
-        "present_text": ["ultra librarian", "ultralibrarian"],
-        "download": [
-            "[data-provider='ultralibrarian'] button",
-            "[data-testid*='ultralibrarian'] a[download]",
-            "button[title*='Download' i]",
-        ],
-        "download_text": ["download", "add to library"],
-        "kicad": ["[data-ecad='KiCad' i]", "label[for*='kicad' i]", "button[title*='KiCad' i]"],
-        "kicad_text": ["kicad"],
-        "altium": ["[data-ecad='Altium' i]", "label[for*='altium' i]", "button[title*='Altium' i]"],
-        "altium_text": ["altium"],
-        "symbolFootprint": [
-            "a[href*='symbol' i]",
-            "button[title*='Symbol' i]",
-            "button[title*='Footprint' i]",
-        ],
-        "symbolFootprint_text": ["symbol", "footprint"],
-        "model3d": ["a[href*='step' i]", "button[title*='3D' i]", "button[title*='Model' i]"],
-        "model3d_text": ["3d", "model", "step"],
-    },
-    {
-        "label": "SnapEDA",
-        "present": ["[data-provider='snapeda']", "img[alt*='SnapEDA' i]", "a[href*='snapeda']"],
-        "present_text": ["snapeda"],
-        "download": [
-            "[data-provider='snapeda'] a.download-button",
-            "[data-testid*='snapeda'] a[download]",
-            "a.download-button",
-        ],
-        "download_text": ["download", "add to library"],
-        "kicad": ["a[href*='kicad' i]", "[data-format='kicad' i]", "button[title*='KiCad' i]"],
-        "kicad_text": ["kicad"],
-        "altium": ["a[href*='altium' i]", "[data-format='altium' i]", "button[title*='Altium' i]"],
-        "altium_text": ["altium"],
-        "symbolFootprint": [
-            "a[href*='symbol' i]",
-            "button[title*='Symbol' i]",
-            "button[title*='Footprint' i]",
-        ],
-        "symbolFootprint_text": ["symbol", "footprint"],
-        "model3d": ["a[href*='step' i]", "button[title*='3D' i]", "button[title*='Model' i]"],
-        "model3d_text": ["3d", "model", "step"],
-    },
-    {
-        "label": "SamacSys",
-        "present": [
-            "[data-provider='samacsys']",
-            "img[alt*='SamacSys' i]",
-            "a[href*='componentsearchengine']",
-            "a[href*='samacsys']",
-        ],
-        "present_text": ["samacsys", "componentsearchengine"],
-        "download": [
-            "[data-provider='samacsys'] button",
-            "[data-testid*='samacsys'] a[download]",
-            "button[title*='Download' i]",
-        ],
-        "download_text": ["download", "add to library"],
-        "kicad": ["[data-format='kicad' i]", "label[for*='kicad' i]", "button[title*='KiCad' i]"],
-        "kicad_text": ["kicad"],
-        "altium": ["[data-format='altium' i]", "label[for*='altium' i]", "button[title*='Altium' i]"],
-        "altium_text": ["altium"],
-        "symbolFootprint": [
-            "a[href*='symbol' i]",
-            "button[title*='Symbol' i]",
-            "button[title*='Footprint' i]",
-        ],
-        "symbolFootprint_text": ["symbol", "footprint"],
-        "model3d": ["a[href*='step' i]", "button[title*='3D' i]", "button[title*='Model' i]"],
-        "model3d_text": ["3d", "model", "step"],
-    },
+# DigiKey serves CAD files through a DEDICATED models page, not an in-page section (live-validated
+# 2026-07-23 against the signed-in DOM). The product page carries a link
+# `a[data-testid="eda-cad-model-link"]` -> href `/en/models/<productId>`; that page lists the
+# aggregating providers as left-bar rows (`#ultra-media-active`, `#mfr-media-active`,
+# `#snapmagic-media-active`, `#traceparts-media-active`, `#cadenas-media-active`), the ones NOT
+# offered for the part hidden with display:none (so `offsetParent===null`). A provider's "Select
+# Download Format" control (`a.btn-download-model`, onclick=displayExportModal) opens a
+# `#<prov>-export-options` modal of radio formats keyed by a STABLE `data-original` label
+# (KiCAD v6+, Altium Designer, STEP, ...); picking one calls toggleRadioButton and enables the footer
+# `#btn-download-<Provider>` (onclick=exportUltraFile) that fires the real download (intercepted host
+# side). So the driver is a TWO-PHASE state machine: on the product page navigate to the models page;
+# on the models page, per REQUESTED format, drive the visible providers' modal to select + download.
+# Every step is guarded and reported into the overlay; a missing target degrades to guidance. The
+# per-part provider coverage VARIES, so it enumerates the VISIBLE provider rows (owner note
+# 2026-07-23: "DigiKey shows which suppliers have what"), preferring Ultra Librarian.
+
+# Preference-ordered providers: (id-prefix, display label). Ultra Librarian (most complete) first.
+_DIGIKEY_PROVIDER_KEYS: list[list[str]] = [
+    ["ultra", "Ultra Librarian"],
+    ["mfr", "Manufacturer Provided"],
+    ["snapmagic", "SnapMagic"],
+    ["traceparts", "TraceParts"],
+    ["cadenas", "CADENAS"],
 ]
 
-# Guarded JS helpers shared by the DigiKey machine: report into the overlay bridge, click by
-# selector list, click by scoped textContent match (skipping our own overlay node), a presence
-# check, and a combined selector-then-text click that reports its own outcome. Every helper is
-# guarded so a hostile / changed DOM degrades, never throws.
+# Guarded shared helpers: overlay report, a visibility test (a display:none provider row has
+# offsetParent===null), and the input a <label> controls. All guarded so a changed DOM degrades.
 _DIGIKEY_HELPERS = (
     "function report(step,ok,msg){try{var o=window.__STOCKROOM_OVERLAY__;"
     "o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
-    "function click(sels){for(var i=0;i<sels.length;i++){try{"
-    "var el=document.querySelector(sels[i]);if(el){el.click();return true;}}catch(e){}}return false;}"
-    "function hasSel(sels){for(var i=0;i<sels.length;i++){try{"
-    "if(document.querySelector(sels[i]))return true;}catch(e){}}return false;}"
-    "function clickText(words){try{var ov=document.getElementById('__stockroom_overlay__');"
-    "var nodes=document.querySelectorAll('a,button,div,span,label');"
-    "for(var i=0;i<nodes.length;i++){var n=nodes[i];if(ov&&ov.contains(n))continue;"
-    "if(n.children.length>3)continue;var t=(n.textContent||'').trim().toLowerCase();"
-    "for(var k=0;k<words.length;k++){if(t.indexOf(words[k])>=0){try{n.click();return true;}catch(e){}}}}"
-    "}catch(e){}return false;}"
-    "function textPresent(words,scope){try{var root=scope||document;"
-    "var nodes=root.querySelectorAll('a,div,span,img,button');"
-    "for(var i=0;i<nodes.length;i++){var n=nodes[i];"
-    "var alt=(n.getAttribute&&n.getAttribute('alt'))||'';"
-    "var t=((n.textContent||'')+' '+alt).toLowerCase();"
-    "for(var k=0;k<words.length;k++){if(t.indexOf(words[k])>=0)return true;}}"
-    "}catch(e){}return false;}"
-    "function tryClick(step,sels,words,okmsg,failmsg){try{var _ok=click(sels);"
-    "if(!_ok&&words&&words.length){_ok=clickText(words);}"
-    "report(step,_ok,_ok?okmsg:failmsg);return _ok;}catch(e){report(step,false,failmsg);return false;}}"
+    "function vis(el){try{return !!(el&&el.offsetParent!==null);}catch(e){return false;}}"
+    "function labelInput(l){try{return l.htmlFor?document.getElementById(l.htmlFor):"
+    "(l.querySelector('input')||l.previousElementSibling);}catch(e){return null;}}"
 )
 
-# Step 1: dismiss a DigiKey cookie/consent banner (resilient id + attribute + accept/agree text),
-# guarded so no banner is a silent no-op reported as guidance.
-_DIGIKEY_CONSENT = (
-    "tryClick('consent',"
-    "['#onetrust-accept-btn-handler','#onetrust-accept','[aria-label*=\"accept\" i]',"
-    "'[aria-label*=\"agree\" i]','button[title*=\"accept\" i]'],"
-    "['accept','agree','allow all','i agree'],"
-    "'Dismissed the cookie banner.','No cookie banner to dismiss.');"
+# Phase 1 (product page): find the CAD models link and navigate to it in-place (the <a> may be
+# target=_blank; setting location.href keeps it in the cad window so the driver re-injects on the
+# models page). Bounded tick loop for DigiKey's async render, then degrade to guidance.
+_DIGIKEY_GOTO_MODELS = (
+    "function gotoModels(){var tries=0;function tick(){tries++;try{"
+    "var a=document.querySelector('[data-testid=\"eda-cad-model-link\"]');"
+    "if(!a){var as=document.querySelectorAll('a[href]');for(var i=0;i<as.length;i++){"
+    "if(/\\/models\\//.test(as[i].getAttribute('href')||'')){a=as[i];break;}}}"
+    "if(a&&a.getAttribute('href')){report('cad',true,'Opening the EDA / CAD Models page.');"
+    "var h=a.getAttribute('href');location.href=(h.charAt(0)==='/')?(location.origin+h):h;return;}"
+    "}catch(e){}"
+    "if(tries<14){setTimeout(tick,800);}else{report('cad',false,"
+    "'Open the EDA / CAD Models section on this page to download the files.');}}"
+    "setTimeout(tick,600);}"
 )
 
-# Step 2: findCad KEPT verbatim (div-text match + element.scrollIntoView on DigiKey's custom
-# scroll container). On success it hands the section to runProviders; a bounded tick loop waits
-# for DigiKey's async render, then degrades to a guidance message.
-_DIGIKEY_FINDCAD = (
-    "function findCad(){try{"
-    "var sels=['#cad-models','[data-testid=\"cad-models\"]','#eda-models'];"
-    "for(var i=0;i<sels.length;i++){var s=document.querySelector(sels[i]);if(s)return s;}"
-    "var ov=document.getElementById('__stockroom_overlay__');"
-    "var nodes=document.querySelectorAll('a,div,span,h1,h2,h3,h4,h5,h6');"
-    "for(var j=0;j<nodes.length;j++){var n=nodes[j];if(ov&&ov.contains(n))continue;if(n.children.length>3)continue;"
-    "var t=(n.textContent||'').trim().toLowerCase();"
-    "if(t==='cad models'||t==='eda/cad models'||t==='eda models'||t.indexOf('pcb symbol, footprint')>=0){return n;}}"
-    "}catch(e){}return null;}"
-    "var tries=0;function tick(){tries++;var el=findCad();"
-    "if(el){try{el.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}"
-    "try{el.style.outline='2px solid #5fd39a';el.style.outlineOffset='4px';}catch(e){}"
-    "report('cad',true,'Found the EDA / CAD Models section.');"
-    "try{runProviders(el);}catch(e){report('cad',false,'Open the EDA / CAD Models section to download the files.');}return;}"
-    "if(tries<12){setTimeout(tick,900);}"
-    "else{report('cad',false,'Open the EDA / CAD Models section on this page to download the symbol, footprint and 3D model.');}}"
-    "setTimeout(tick,700);"
+# Phase 2 (models page): wait for the provider bar, enumerate the VISIBLE provider rows in
+# preference order, then drive each requested format sequentially through downloadFormat.
+_DIGIKEY_RUN_MODELS = (
+    "function runModels(){var tries=0;function tick(){tries++;try{"
+    "var present=[];for(var i=0;i<PROVS.length;i++){var k=PROVS[i][0];"
+    "var el=document.querySelector('#'+k+'-media-active');if(vis(el)){present.push(PROVS[i]);}}"
+    "if(present.length){report('provider',true,'Providers offered here: '"
+    "+present.map(function(p){return p[1];}).join(', ')+'.');driveFormats(present);return;}"
+    "}catch(e){}"
+    "if(tries<16){setTimeout(tick,800);}else{report('provider',false,"
+    "'No CAD provider is offered for this part; download the files from this page manually.');}}"
+    "setTimeout(tick,700);}"
+    "function driveFormats(present){var qi=0;function nextFmt(){"
+    "if(qi>=SPECS.length){report('done',true,'All requested downloads were triggered.');return;}"
+    "var spec=SPECS[qi++];try{downloadFormat(present,spec,nextFmt);}"
+    "catch(e){report(spec.key,false,'Select '+spec.name+' and download it from this page.');nextFmt();}}"
+    "nextFmt();}"
+)
+
+# The per-format download sub-sequence (async, since the row content + modal lazy-load): open the
+# preferred present provider, open its Select Download Format modal, pick the format radio by its
+# stable data-original label AND the STEP 3D radio (one download = symbol + footprint + 3D model),
+# then click the footer #btn-download-<Provider>. Each stage guarded + reported.
+_DIGIKEY_DOWNLOAD_FORMAT = (
+    "function downloadFormat(present,spec,done){var prov=present[0];"
+    "try{var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}catch(e){}"
+    "setTimeout(function(){try{var btn=null;"
+    "var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
+    "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){btn=cs[i];break;}}"
+    "if(btn)btn.click();}catch(e){}"
+    "setTimeout(function(){var picked=false;try{"
+    "var modal=document.querySelector('[id$=\"-export-options\"]');if(modal){"
+    "var ls=modal.querySelectorAll('label');"
+    "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
+    "if(spec.re.test(t)){var inp=labelInput(ls[j]);try{(inp||ls[j]).click();picked=true;}catch(e){}break;}}"
+    "for(var m=0;m<ls.length;m++){var t2=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
+    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}"
+    "}catch(e){}"
+    "report(spec.key,picked,picked?('Selected '+spec.name+' plus the 3D model; downloading.'):"
+    "('Pick '+spec.name+' in the Choose Download Format dialog.'));"
+    "setTimeout(function(){var fired=false;try{"
+    "var modal2=document.querySelector('[id$=\"-export-options\"]');"
+    "var dl=(modal2&&modal2.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');"
+    "if(dl&&!dl.disabled){dl.click();fired=true;}}catch(e){}"
+    "report('download',fired,fired?('Downloading the '+spec.name+' symbol, footprint and 3D model.'):"
+    "('Select a format, then click Download.'));"
+    "setTimeout(done,3800);},900);},1600);},2400);}"
 )
 
 
-def _digikey_providers_js(formats: list[str]) -> str:
-    """The preference-ordered provider list as a JS array literal, with the per-format tool
-    selectors GATED so an un-requested format's selectors (and its quoted name) never appear in the
-    generated script (the only-requested-formats contract). Asset selectors are always present."""
-    out: list[dict] = []
-    for p in _DIGIKEY_PROVIDERS:
-        d: dict = {
-            "label": p["label"],
-            "present": p["present"],
-            "presentText": p["present_text"],
-            "download": p["download"],
-            "downloadText": p["download_text"],
-            "symbolFootprint": p["symbolFootprint"],
-            "symbolFootprintText": p["symbolFootprint_text"],
-            "model3d": p["model3d"],
-            "model3dText": p["model3d_text"],
-        }
-        if "kicad" in formats:
-            d["kicad"] = p["kicad"]
-            d["kicadText"] = p["kicad_text"]
-        if "altium" in formats:
-            d["altium"] = p["altium"]
-            d["altiumText"] = p["altium_text"]
-        out.append(d)
-    return json.dumps(out)
-
-
-def _digikey_downloadfrom_js(formats: list[str]) -> str:
-    """The per-provider download sub-sequence: open the provider's download control; then
-    (direct-first, then picker) gate a KiCad tool-select step behind kicad in `formats` and an
-    Altium tool-select step behind altium in `formats` - each a guarded no-op when the provider is
-    single-tool (no picker); then click download for the needed assets in order, symbol+footprint
-    first then the 3D model. The Altium step is emitted ONLY when requested, so an un-requested
-    format's quoted name never appears in the script. Every step reports; a missing target degrades
-    to a guidance message and the machine continues to the next asset / provider."""
-    parts = [
-        "function downloadFrom(pr){",
-        "tryClick('open',pr.download,pr.downloadText,"
-        "'Opened '+pr.label+' download.','Open '+pr.label+' Download / Add To Library control.');",
-    ]
+def _digikey_format_specs_js(formats: list[str]) -> str:
+    """The requested formats as a JS array of {key,name,re} - `re` a real RegExp literal matching
+    the modal's stable data-original label. ONLY requested formats are emitted, so an un-requested
+    format's quoted name never appears in the generated script (the only-requested-formats contract).
+    """
+    specs = []
     if "kicad" in formats:
-        parts.append(
-            "if(pr.kicad){tryClick('kicad',pr.kicad,pr.kicadText,"
-            "'Selected KiCad on '+pr.label+'.',"
-            "'No KiCad picker on '+pr.label+' (single-tool provider).');}"
-        )
+        specs.append(("kicad", "KiCad", "/kicad\\s*v6/i"))
     if "altium" in formats:
-        parts.append(
-            "if(pr.altium){tryClick('altium',pr.altium,pr.altiumText,"
-            "'Selected Altium on '+pr.label+'.',"
-            "'No Altium picker on '+pr.label+' (single-tool provider).');}"
-        )
-    parts.append(
-        "tryClick('symbolFootprint',pr.symbolFootprint,pr.symbolFootprintText,"
-        "'Downloading the symbol and footprint from '+pr.label+'.',"
-        "'Download the symbol and footprint from '+pr.label+'.');"
-    )
-    parts.append(
-        "tryClick('model3d',pr.model3d,pr.model3dText,"
-        "'Downloading the 3D model from '+pr.label+'.',"
-        "'Download the 3D model from '+pr.label+'.');"
-    )
-    parts.append("}")
-    return "".join(parts)
-
-
-def _digikey_runproviders_js(formats: list[str]) -> str:
-    """runProviders: detect the present providers from `_DIGIKEY_PROVIDERS` in preference order
-    (report each present / skipped), then iterate the per-provider download sub-sequence
-    (`downloadFrom`) over EVERY present provider (multi-provider fill) - Ultra Librarian first, then
-    SnapEDA, then SamacSys - so a gap the preferred provider leaves is filled by the next one. The
-    host CaptureSession dedups + accumulates across the session, so re-attempting a satisfied asset
-    is harmless. Each provider attempt is guarded and reports which provider it is driving."""
+        specs.append(("altium", "Altium", "/^altium designer$/i"))
     return (
-        _digikey_downloadfrom_js(formats)
-        + "function runProviders(sec){"
-        "var provs=" + _digikey_providers_js(formats) + ";"
-        "var present=[];"
-        "for(var i=0;i<provs.length;i++){var pr=provs[i];var f=false;"
-        "try{f=hasSel(pr.present)||textPresent(pr.presentText,sec);}catch(e){}"
-        "if(f){present.push(pr);report('provider',true,'Found '+pr.label+' in the CAD Models section.');}"
-        "else{report('provider',false,pr.label+' is not offered for this part; skipping.');}}"
-        "if(!present.length){report('fill',false,"
-        "'No known CAD provider is offered; download the files from this section manually.');return;}"
-        "for(var k=0;k<present.length;k++){var pp=present[k];"
-        "report('fill',true,'Driving '+pp.label+' for the needed files.');"
-        "try{downloadFrom(pp);}catch(e){report('fill',false,'Continuing with the next provider.');}}"
-        "}"
+        "["
+        + ",".join(
+            "{key:" + json.dumps(k) + ",name:" + json.dumps(n) + ",re:" + r + "}"
+            for (k, n, r) in specs
+        )
+        + "]"
     )
 
 
 def _digikey_driver_js(formats: list[str]) -> str:
     fmts = [f for f in ("kicad", "altium") if f in (formats or [])]
+    names = [{"kicad": "KiCad", "altium": "Altium"}[f] for f in fmts]
+    start_msg = "Getting the " + (" and ".join(names) or "CAD") + " files from DigiKey."
     body = (
         _DIGIKEY_HELPERS
-        + "var formats=" + json.dumps(fmts) + ";"
-        + "report('start',true,'DigiKey lists the symbol, footprint and 3D model together; getting them now.');"
-        + _digikey_runproviders_js(fmts)
-        + _DIGIKEY_CONSENT
-        + _DIGIKEY_FINDCAD
+        + "var PROVS=" + json.dumps(_DIGIKEY_PROVIDER_KEYS) + ";"
+        + "var SPECS=" + _digikey_format_specs_js(fmts) + ";"
+        + "report('start',true," + json.dumps(start_msg) + ");"
+        + _DIGIKEY_GOTO_MODELS
+        + _DIGIKEY_RUN_MODELS
+        + _DIGIKEY_DOWNLOAD_FORMAT
+        + "try{if(location.pathname.indexOf('/models/')>=0){runModels();}else{gotoModels();}}"
+        "catch(e){report('driver',false,'Open the EDA / CAD Models section and download the files.');}"
     )
     return f"(function(){{{body}}})();"
 
