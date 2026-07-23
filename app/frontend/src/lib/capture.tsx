@@ -188,6 +188,15 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     if (!pid) throw new Error("No active part for the capture.");
     if (paths.length === 0) throw new Error("No Altium library files were captured.");
     await api.altiumAttach(pid, paths);
+    // The library must be placeable from Altium without a separate visit to the Altium
+    // window: refresh the DbLib data source right after the attach. Best-effort - a
+    // regenerate hiccup must not fail a capture whose files are already attached (the
+    // Altium window still offers a manual regenerate).
+    try {
+      await api.altiumRegenerate();
+    } catch {
+      // Attached fine; the DbLib refresh can be re-run from the Altium window.
+    }
   }, []);
 
   const markReceived = useCallback((reqs: Requirement[]) => {
