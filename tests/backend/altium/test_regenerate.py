@@ -1,6 +1,15 @@
-from openpyxl import load_workbook
+import sqlite3
 
 from stockroom.model.part import AltiumRef, PartRecord
+
+
+def _db_rows(db_path):
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = [r[1] for r in conn.execute('PRAGMA table_info("Parts")')]
+        return [dict(zip(cols, row)) for row in conn.execute('SELECT * FROM "Parts"')]
+    finally:
+        conn.close()
 
 
 def _place_ready(pid, mpn):
@@ -25,14 +34,18 @@ def test_regenerate_emits_only_place_ready(library_ops):
     assert result["emitted"] == 1
     assert "b" in result["skipped"]
     assert result["dblib"].exists()
-    assert result["xlsx"].exists()
-    ws = load_workbook(result["xlsx"])["Parts"]
-    mpns = [row[0].value for row in ws.iter_rows(min_row=2)]
-    assert mpns == ["AAA"]
+    assert result["db"].exists()
+    rows = _db_rows(result["db"])
+    assert [r["MPN"] for r in rows] == ["AAA"]
 
-    # the derived .xlsx is ignored by a local .gitignore that travels with the library
-    gi = result["dblib"].parent / ".gitignore"
-    assert gi.exists() and "stockroom-parts.xlsx" in gi.read_text(encoding="utf-8")
+    # The .db data source is COMMITTED with the .DbLib (owner decision 2026-07-23): a fresh
+    # clone is placeable with no regenerate step. No local .gitignore hides it.
+    ops = library_ops
+    tracked = ops.repo._run("ls-files", "--", str(result["db"].parent)).stdout.splitlines()
+    names = {p.rsplit("/", 1)[-1] for p in tracked}
+    assert "stockroom-parts.db" in names
+    assert "Stockroom.DbLib" in names
+    assert ".gitignore" not in names
 
 
 def test_place_ready_does_not_require_a_persisted_value(library_ops):
@@ -52,9 +65,7 @@ def test_place_ready_does_not_require_a_persisted_value(library_ops):
     result = ops.regenerate_altium_dblib()
 
     assert result["emitted"] == 1  # emitted despite value==""
-    from openpyxl import load_workbook
-    ws = load_workbook(result["xlsx"])["Parts"]
-    row = {ws.cell(row=1, column=c).value: ws.cell(row=2, column=c).value for c in range(1, ws.max_column + 1)}
+    row = _db_rows(result["db"])[0]
     assert row["Value"] == "CCC"  # derived (active -> MPN), not blank
 
 

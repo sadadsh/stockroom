@@ -1,17 +1,17 @@
-"""Emit the MPN-keyed .xlsx data source an Altium .DbLib reads. Pure openpyxl; a
-derived, gitignored artifact regenerated from the JSON records. Column headers are
-Altium's reserved names where one exists, so the DbLib auto-maps with no manual work."""
+"""Emit the MPN-keyed SQLite data source (stockroom-parts.db) an Altium .DbLib reads
+through the SQLite ODBC driver. Stdlib sqlite3, deterministic bytes, COMMITTED to the
+library repo with the .DbLib so a fresh clone is placeable with no regenerate step.
+Column names are Altium's reserved names where one exists, so the DbLib auto-maps."""
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
-
-from openpyxl import Workbook
 
 from stockroom.ingest.component_naming import derive_value
 
 ALTIUM_COLUMNS: list[str] = [
     "MPN", "Library Ref", "Library Path", "Footprint Ref", "Footprint Path",
-    "Value", "Manufacturer", "Description",
+    "Value", "Manufacturer", "Description", "Comment",
     "ComponentLink1Description", "ComponentLink1URL",
     "Supplier", "SupplierPartNumber", "SupplierURL",
     "Price", "Stock", "Lifecycle", "Category",
@@ -61,6 +61,9 @@ def row_for(record) -> dict[str, str]:
         "Value": record.value or derive_value(record),
         "Manufacturer": record.manufacturer or "",
         "Description": record.description or "",
+        # [Comment] is the placed symbol's display value: an active reads as its MPN, a
+        # passive as its parametric value - the same derivation as Value (spec 2026-07-23).
+        "Comment": record.value or derive_value(record),
         "ComponentLink1Description": "Datasheet" if _datasheet_url(record) else "",
         "ComponentLink1URL": _datasheet_url(record),
         "Supplier": (p.vendor if p else "") or "",
@@ -73,19 +76,28 @@ def row_for(record) -> dict[str, str]:
     }
 
 
-def emit_xlsx(records, out_path) -> int:
-    """Write one worksheet ("Parts"), header row = ALTIUM_COLUMNS, one row per record in
-    stable MPN order. Returns the number of data rows written. Deterministic."""
+def emit_db(records, out_path) -> int:
+    """Write one table ("Parts", all TEXT columns = ALTIUM_COLUMNS), one row per record in
+    stable MPN order. Returns the number of rows written. Deterministic BYTES: the file is
+    recreated from scratch each emit (same records -> identical file, so the committed .db
+    never churns and regenerate stays idempotent)."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Parts"
-    ws.append(ALTIUM_COLUMNS)
-    n = 0
-    for record in sorted(records, key=lambda r: (r.mpn or "").upper()):
-        row = row_for(record)
-        ws.append([row.get(col, "") for col in ALTIUM_COLUMNS])
-        n += 1
-    wb.save(out_path)
+    out_path.unlink(missing_ok=True)  # recreate from scratch: deterministic page layout
+    cols = ", ".join(f'"{c}" TEXT' for c in ALTIUM_COLUMNS)
+    placeholders = ", ".join("?" for _ in ALTIUM_COLUMNS)
+    conn = sqlite3.connect(out_path)
+    try:
+        conn.execute(f'CREATE TABLE "Parts" ({cols})')
+        n = 0
+        for record in sorted(records, key=lambda r: (r.mpn or "").upper()):
+            row = row_for(record)
+            conn.execute(
+                f'INSERT INTO "Parts" VALUES ({placeholders})',
+                [row.get(col, "") for col in ALTIUM_COLUMNS],
+            )
+            n += 1
+        conn.commit()
+    finally:
+        conn.close()
     return n

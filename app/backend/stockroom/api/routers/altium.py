@@ -15,7 +15,7 @@ from stockroom.api.errors import ApiError
 from stockroom.ingest.component_naming import derive_display_value
 from stockroom.model.part import PartRecord, altium_place_ready
 
-# regenerate + attach both commit to the one git repo and write the shared .xlsx/.DbLib, and
+# regenerate + attach both commit to the one git repo and write the shared .db/.DbLib, and
 # FastAPI runs these sync handlers in the threadpool, so two triggers (the Settings Regenerate,
 # the modal's attach-then-regenerate, two quick attaches) can overlap. Serialize every
 # library-mutating altium call so concurrent git commits can never collide on .git/index.lock.
