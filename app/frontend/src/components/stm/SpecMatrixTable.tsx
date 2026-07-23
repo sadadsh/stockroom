@@ -353,7 +353,7 @@ function ColumnFilter({
               (old?.[1] as number) ?? undefined,
             ])
           }
-          className="tnum w-full min-w-0 rounded-[5px] bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
+          className="tnum w-full min-w-0 rounded-control bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
         />
         <input
           type="number"
@@ -367,7 +367,7 @@ function ColumnFilter({
               e.target.value === "" ? undefined : Number(e.target.value),
             ])
           }
-          className="tnum w-full min-w-0 rounded-[5px] bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
+          className="tnum w-full min-w-0 rounded-control bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
         />
       </div>
     );
@@ -379,7 +379,7 @@ function ColumnFilter({
       placeholder="Filter"
       value={(value as string) ?? ""}
       onChange={(e) => column.setFilterValue(e.target.value)}
-      className="w-full min-w-0 rounded-[5px] bg-field px-1.5 py-0.5 text-2xs text-t1 outline-none placeholder:text-t3"
+      className="w-full min-w-0 rounded-control bg-field px-1.5 py-0.5 text-2xs text-t1 outline-none placeholder:text-t3"
     />
   );
 }
