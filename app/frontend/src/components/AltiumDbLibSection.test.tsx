@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
 import type { AltiumStatus } from "../api/types";
@@ -123,5 +123,53 @@ describe("AltiumDbLibSection", () => {
 
     expect(await screen.findByText(/cannot be verified/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
+  });
+
+  it("opens the setup guide with the numbered Altium steps and the live library path", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(true));
+    renderSection();
+
+    await screen.findByText("3");
+    await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Altium Setup" });
+    // the four steps, with the real mechanics named
+    expect(dialog).toHaveTextContent(/File-based Libraries Preferences/);
+    expect(dialog).toHaveTextContent(/Installed tab/);
+    expect(dialog).toHaveTextContent(/Update Parameters From Database/);
+    // the LIVE library path is in the guide (not a placeholder)
+    expect(dialog).toHaveTextContent(STATUS.dblib);
+    // driver installed: step 1 reports done, no download link inside the guide
+    expect(dialog).toHaveTextContent(/Installed on this machine/);
+    expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
+  });
+
+  it("the setup guide surfaces the missing driver with a working download link", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(false));
+    renderSection();
+
+    await screen.findByText("3");
+    await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Altium Setup" });
+    expect(dialog).toHaveTextContent(/Not installed/);
+    const links = within(dialog).getAllByRole("link", { name: /Download Driver/ });
+    expect(links[0]).toHaveAttribute("href", ODBC_URL);
+    expect(links[0]).toHaveAttribute("target", "_blank");
+  });
+
+  it("the setup guide closes on Escape", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(true));
+    renderSection();
+
+    await screen.findByText("3");
+    await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
+    await screen.findByRole("dialog", { name: "Altium Setup" });
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Altium Setup" })).toBeNull();
   });
 });
