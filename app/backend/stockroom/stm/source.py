@@ -82,17 +82,48 @@ def default_index_path() -> Path:
     return config_dir() / "stm" / "index.sqlite"
 
 
+def _is_device_xml(path: Path) -> bool:
+    """True when path's root element is <Mcu> - a real per-device pinout XML,
+    not an auxiliary CubeMX database file. The real all-families source tree
+    also carries non-device XML alongside the device files (confirmed this
+    session: compatibility.xml and rules.xml both have a <rules> root, not
+    <Mcu>) - excluding by filename alone (just "families.xml") is not enough;
+    a bare glob("*.xml") would otherwise feed these through parse_mcu_xml as if
+    they were devices, producing garbage zero-pin/blank-family mcu rows that
+    then trip the self-audit gate for the wrong reason. Uses iterparse (stops
+    after the first start event) so this is a cheap tag peek, not a full parse.
+    """
+    try:
+        for _, el in ET.iterparse(path, events=("start",)):
+            return el.tag.rsplit("}", 1)[-1] == "Mcu"
+    except ET.ParseError:
+        return False
+    return False
+
+
+def device_xml_files(source_dir: Path) -> list[Path]:
+    """Every real per-device CubeMX XML under source_dir, sorted: excludes
+    families.xml by name (mirrors Hardware's build_database family_prefix skip)
+    AND any other non-<Mcu>-root auxiliary XML (compatibility.xml, rules.xml,
+    ...). The single shared definition of "a device XML" - StmIndex.build,
+    check_availability, and source_sha256 all walk exactly this set, so
+    device_xml_count/source_sha256/the actual ingest loop can never silently
+    disagree about what counts as a device.
+    """
+    source_dir = Path(source_dir)
+    candidates = sorted(p for p in source_dir.glob("*.xml") if p.name != "families.xml")
+    return [p for p in candidates if _is_device_xml(p)]
+
+
 def source_sha256(source_dir: Path) -> str:
-    """Content identity of the CubeMX source: sha256 over sorted (name, bytes) of
-    every device *.xml (families.xml excluded - it is an index file, not a device).
+    """Content identity of the CubeMX source: sha256 over sorted (name, bytes)
+    of every device XML (see device_xml_files).
 
     Shared by StmIndex.build (skip-rebuild on an unchanged source) and
     check_availability, so both walk the exact same file set the same way.
     """
-    source_dir = Path(source_dir)
-    files = sorted(p for p in source_dir.glob("*.xml") if p.name != "families.xml")
     h = hashlib.sha256()
-    for f in files:
+    for f in device_xml_files(source_dir):
         h.update(f.name.encode("utf-8") + b"\0" + f.read_bytes() + b"\0")
     return h.hexdigest()
 
@@ -110,14 +141,14 @@ class AvailabilityReport:
 
 
 def check_availability(source: Path) -> AvailabilityReport:
-    """Count device XML (every *.xml except families.xml, mirroring Hardware's
-    build_database family_prefix skip) and distinct root Family attribute
-    values under ``source``. all_families is True only when the source spans
-    MORE than the F0-F7 six-family set - never presented as True for a source
-    that merely looks like the WSL F-only fixture, regardless of file count.
+    """Count device XML (see device_xml_files) and distinct root Family
+    attribute values under ``source``. all_families is True only when the
+    source spans MORE than the F0-F7 six-family set - never presented as True
+    for a source that merely looks like the WSL F-only fixture, regardless of
+    file count.
     """
     source = Path(source)
-    files = sorted(p for p in source.glob("*.xml") if p.name != "families.xml")
+    files = device_xml_files(source)
     families: set[str] = set()
     for f in files:
         try:
