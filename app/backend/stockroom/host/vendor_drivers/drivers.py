@@ -76,44 +76,45 @@ _DIGIKEY_PROVIDER_KEYS: list[list[str]] = [
     ["cadenas", "CADENAS"],
 ]
 
-# Guarded shared helpers: overlay report, a visibility test (a display:none provider row has
-# offsetParent===null), and the input a <label> controls. All guarded so a changed DOM degrades.
+# Guarded shared helpers: overlay report; a visibility test (a display:none provider row has
+# offsetParent===null); the input a <label> controls; and waitFor - poll a predicate every `step` ms
+# (fast) up to `max` ms, calling cb the INSTANT it returns truthy, else cb(null) on timeout. waitFor
+# is the SPEED lever: every UI step proceeds as soon as its element is ready instead of blocking on a
+# conservative fixed delay, so a part is bounded only by the vendor's own server-side generation.
 _DIGIKEY_HELPERS = (
     "function report(step,ok,msg){try{var o=window.__STOCKROOM_OVERLAY__;"
     "o&&o.report({step:step,ok:ok,message:msg});}catch(e){}}"
     "function vis(el){try{return !!(el&&el.offsetParent!==null);}catch(e){return false;}}"
     "function labelInput(l){try{return l.htmlFor?document.getElementById(l.htmlFor):"
     "(l.querySelector('input')||l.previousElementSibling);}catch(e){return null;}}"
+    "function waitFor(pred,cb,max,step){var t=0;step=step||150;max=max||9000;"
+    "(function tick(){var v=null;try{v=pred();}catch(e){v=null;}if(v){cb(v);return;}"
+    "t+=step;if(t<max){setTimeout(tick,step);}else{cb(null);}})();}"
 )
 
 # Phase 1 (product page): find the CAD models link and navigate to it in-place (the <a> may be
 # target=_blank; setting location.href keeps it in the cad window so the driver re-injects on the
 # models page). Bounded tick loop for DigiKey's async render, then degrade to guidance.
 _DIGIKEY_GOTO_MODELS = (
-    "function gotoModels(){var tries=0;function tick(){tries++;try{"
+    "function gotoModels(){waitFor(function(){"
     "var a=document.querySelector('[data-testid=\"eda-cad-model-link\"]');"
     "if(!a){var as=document.querySelectorAll('a[href]');for(var i=0;i<as.length;i++){"
     "if(/\\/models\\//.test(as[i].getAttribute('href')||'')){a=as[i];break;}}}"
-    "if(a&&a.getAttribute('href')){report('cad',true,'Opening the EDA / CAD Models page.');"
-    "var h=a.getAttribute('href');location.href=(h.charAt(0)==='/')?(location.origin+h):h;return;}"
-    "}catch(e){}"
-    "if(tries<14){setTimeout(tick,800);}else{report('cad',false,"
-    "'Open the EDA / CAD Models section on this page to download the files.');}}"
-    "setTimeout(tick,600);}"
+    "return (a&&a.getAttribute('href'))?a:null;},function(a){"
+    "if(!a){report('cad',false,'Open the EDA / CAD Models section on this page to download the files.');return;}"
+    "report('cad',true,'Opening the EDA / CAD Models page.');"
+    "var h=a.getAttribute('href');location.href=(h.charAt(0)==='/')?(location.origin+h):h;},12000,300);}"
 )
 
-# Phase 2 (models page): wait for the provider bar, enumerate the VISIBLE provider rows in
+# Phase 2 (models page): poll for the provider bar, enumerate the VISIBLE provider rows in
 # preference order, then drive each requested format sequentially through downloadFormat.
 _DIGIKEY_RUN_MODELS = (
-    "function runModels(){var tries=0;function tick(){tries++;try{"
-    "var present=[];for(var i=0;i<PROVS.length;i++){var k=PROVS[i][0];"
-    "var el=document.querySelector('#'+k+'-media-active');if(vis(el)){present.push(PROVS[i]);}}"
-    "if(present.length){report('provider',true,'Providers offered here: '"
-    "+present.map(function(p){return p[1];}).join(', ')+'.');driveFormats(present);return;}"
-    "}catch(e){}"
-    "if(tries<16){setTimeout(tick,800);}else{report('provider',false,"
-    "'No CAD provider is offered for this part; download the files from this page manually.');}}"
-    "setTimeout(tick,700);}"
+    "function runModels(){waitFor(function(){var present=[];"
+    "for(var i=0;i<PROVS.length;i++){var k=PROVS[i][0];var el=document.querySelector('#'+k+'-media-active');"
+    "if(vis(el)){present.push(PROVS[i]);}}return present.length?present:null;},function(present){"
+    "if(!present){report('provider',false,'No CAD provider is offered for this part; download the files from this page manually.');return;}"
+    "report('provider',true,'Providers offered here: '+present.map(function(p){return p[1];}).join(', ')+'.');"
+    "driveFormats(present);},13000,300);}"
     "function driveFormats(present){var qi=0;function nextFmt(){"
     "if(qi>=SPECS.length){report('done',true,'All requested downloads were triggered.');return;}"
     "var spec=SPECS[qi++];try{downloadFormat(present,spec,nextFmt);}"
@@ -133,41 +134,40 @@ _DIGIKEY_RUN_MODELS = (
 _DIGIKEY_DOWNLOAD_FORMAT = (
     "function fmtBtn(){var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
     "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){return cs[i];}}return null;}"
+    "function exportModal(){var m=document.querySelector('[id$=\"-export-options\"]');return (m&&m.querySelector('label'))?m:null;}"
+    "function dlBtn(){var m=document.querySelector('[id$=\"-export-options\"]');"
+    "var d=(m&&m.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');return (d&&!d.disabled)?d:null;}"
+    "function completeModal(){var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
+    "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/download complete/i.test(dlg[w].textContent||''))return dlg[w];}return null;}"
     "function closeModal(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
     "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}}"
     "function downloadFormat(present,spec,done){var pi=0;function tryProvider(){"
     "if(pi>=present.length){report(spec.key,false,'No visible source offers '+spec.name+' for this part; download it manually.');done();return;}"
     "var prov=present[pi++];"
     "try{if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}}catch(e){}"
-    "setTimeout(function(){try{var b=fmtBtn();if(b)b.click();}catch(e){}"
-    "setTimeout(function(){var picked=false,has=false;try{"
-    "var modal=document.querySelector('[id$=\"-export-options\"]');if(modal){var ls=modal.querySelectorAll('label');"
+    # poll for the Select Download Format control (proceeds the instant it renders), then click it
+    "waitFor(fmtBtn,function(btn){"
+    "if(!btn){report('provider',false,prov[1]+' did not open; trying the next source.');setTimeout(tryProvider,150);return;}"
+    "try{btn.click();}catch(e){}"
+    # poll for the export modal (with its format labels) to render
+    "waitFor(exportModal,function(modal){var picked=false,has=false;try{if(modal){var ls=modal.querySelectorAll('label');"
     "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
     "if(spec.re.test(t)){has=true;var inp=labelInput(ls[j]);try{(inp||ls[j]).click();picked=true;}catch(e){}break;}}"
     "if(picked){for(var m=0;m<ls.length;m++){var t2=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
-    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}}"
-    "}catch(e){}"
-    "if(!has){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();setTimeout(tryProvider,1300);return;}"
+    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}}}catch(e){}"
+    "if(!has){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();setTimeout(tryProvider,200);return;}"
     "report(spec.key,true,'Selected '+spec.name+' plus the 3D model from '+prov[1]+'; downloading.');"
-    "setTimeout(function(){var fired=false;try{"
-    "var modal2=document.querySelector('[id$=\"-export-options\"]');"
-    "var dl=(modal2&&modal2.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');"
-    "if(dl&&!dl.disabled){dl.click();fired=true;}}catch(e){}"
+    # poll for the download button to enable (toggleRadioButton enables it), then click it
+    "waitFor(dlBtn,function(dl){var fired=false;if(dl){try{dl.click();fired=true;}catch(e){}}"
     "report('download',fired,fired?('Downloading '+spec.name+' from '+prov[1]+'.'):('Select a format, then click Download.'));"
-    "var waited=0;function waitDl(){var busy=false;try{"
-    "var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
-    "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/downloading/i.test(dlg[w].textContent||'')){busy=true;break;}}"
-    "}catch(e){}waited+=1200;if(busy&&waited<90000){setTimeout(waitDl,1200);}"
-    # The download ends on a "Download complete" modal that stays up covering the next format's
-    # controls; CLOSE it (its X / Close button) before the next format, else the 2nd pass no-ops.
-    "else{try{var cm=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
-    "for(var c=0;c<cm.length;c++){if(vis(cm[c])&&/download complete/i.test(cm[c].textContent||'')){"
-    "var cb=cm[c].querySelector('.dk-modal__close,[data-modal-dismiss]')||"
-    "Array.from(cm[c].querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
-    "if(cb){try{cb.click();}catch(e){}}}}}catch(e){}"
-    "report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,2500);}}"
-    "setTimeout(waitDl,2500);"
-    "},900);},1600);},2400);}tryProvider();}"
+    # poll (up to 3 min - the vendor generates each export server-side on demand) for the "Download
+    # complete" modal, close it, then move to the next format the INSTANT it appears (no fixed gap).
+    "waitFor(completeModal,function(cm){if(cm){var cb=cm.querySelector('.dk-modal__close,[data-modal-dismiss]')||"
+    "Array.from(cm.querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
+    "if(cb){try{cb.click();}catch(e){}}}"
+    "report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,150);},180000,500);"
+    "},9000,150);},9000,150);},9000,150);}"
+    "tryProvider();}"
 )
 
 
