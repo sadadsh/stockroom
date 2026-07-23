@@ -397,6 +397,13 @@ CREATE INDEX ix_periph_name ON mcu_peripheral(peripheral_name);
 # structurally: a defective build never becomes a loadable index. AF-range
 # checks are explicitly OUT of Phase 1's gate scope (no AF join table exists yet).
 # ─────────────────────────────────────────────────────────────────────────────
+class StmSourceCoverageError(Exception):
+    """Raised by StmIndex.build(..., require_all_families=True) when
+    check_availability reports the source is F-only (DATA-01's build guard):
+    the build refuses to promise "all families" against a source that looks
+    F-only, unless the caller explicitly descopes by NOT requiring it."""
+
+
 class StmAuditFailure(Exception):
     """Raised when a freshly built index fails its structural self-audit. The
     build refuses to complete (no index is returned) - callers never receive a
@@ -497,8 +504,29 @@ class StmIndex:
         cubemx_source: Path,
         db_path: str | Path = ":memory:",
         progress=None,
+        require_all_families: bool = False,
     ) -> "StmIndex":
+        """
+        require_all_families: when True, refuses to build at all
+        (StmSourceCoverageError) if check_availability reports the source is
+        F-only. Defaults to False so fixture-scoped/dev builds (e.g. the
+        committed F0-F7-only test fixtures) keep working unchanged; Plan 04's
+        real all-families integration build passes True to make DATA-01's
+        "all families" claim an enforced gate, not just an honest stamp.
+        Regardless of this flag, the stamped meta.all_families value always
+        reflects check_availability's real verdict - it is never optimistically
+        set True for an F-only source.
+        """
         cubemx_source = Path(cubemx_source)
+        availability = source_mod.check_availability(cubemx_source)
+        if require_all_families and not availability.all_families:
+            raise StmSourceCoverageError(
+                f"source at {cubemx_source} looks F-only "
+                f"({availability.family_count} families, "
+                f"{availability.device_xml_count} device XML) - refusing to "
+                "build an all-families index. Pass require_all_families=False "
+                "to explicitly descope, or point at the real CubeMX mcu/ tree."
+            )
         is_file_backed = str(db_path) != ":memory:"
         sha = source_mod.source_sha256(cubemx_source)
 
@@ -536,14 +564,12 @@ class StmIndex:
 
         files = sorted(p for p in cubemx_source.glob("*.xml") if p.name != "families.xml")
         total = len(files)
-        families_seen: set[str] = set()
         power_pad_observed: dict[str, set[bool]] = {}
         n_mcu = 0
         for i, f in enumerate(files):
             if progress and i % 25 == 0:
                 progress({"pct": int(100 * i / total) if total else 0, "message": f.stem})
             mcu = parse_mcu_xml(f)
-            families_seen.add(mcu.family)
             power_pad_observed.setdefault(mcu.package, set()).add(mcu.has_power_pad)
             distinct_positions = sorted({p.position for p in mcu.pins})
             pin_count = len(distinct_positions)
@@ -658,11 +684,11 @@ class StmIndex:
             )
         power_pad_flags = geometry_mod.audit_has_power_pad(power_pad_observed)
 
-        family_count = len(families_seen)
-        # A naive placeholder: the honest, code-level "does this source really span
-        # every family" gate is check_availability + the build guard (Plan 02 Task 3).
-        # Until that guard is wired in, never optimistically claim all_families here.
-        all_families = False
+        # The honest, code-level "does this source really span every family"
+        # verdict - check_availability's own report, never re-derived from the
+        # naive families_seen-during-ingest tally (which would silently agree
+        # with whatever this one build happened to parse instead of the
+        # independently-computed, re-runnable availability check).
         for key, value in (
             ("classifier_rev", str(CLASSIFIER_REV)),
             ("geometry_rev", str(geometry_mod.GEOMETRY_REV)),
@@ -670,9 +696,9 @@ class StmIndex:
             ("source_file_count", str(total)),
             ("source_path", source_path),
             ("built_at", built_at),
-            ("all_families", "true" if all_families else "false"),
-            ("device_xml_count", str(total)),
-            ("family_count", str(family_count)),
+            ("all_families", "true" if availability.all_families else "false"),
+            ("device_xml_count", str(availability.device_xml_count)),
+            ("family_count", str(availability.family_count)),
             ("power_pad_flags", ",".join(power_pad_flags)),
         ):
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
