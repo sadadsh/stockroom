@@ -13,7 +13,7 @@
  * instead of a tall rail, and the spec sheet no longer dominates the page. Everything degrades
  * honestly when a field is absent, and no data is fabricated.
  */
-import { useState, type ReactNode } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
@@ -361,12 +361,12 @@ export function DetailPanel({
               {/* Sourcing surfaced inline, not hidden behind a tab: the stock, unit price, and
                   volume breaks the owner wants visible, plus each vendor product page as its own
                   row (a modular list - more than one distributor shows here at once). */}
-              <div className="mt-5 border-t border-line pt-4">
-                <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
-                  <Text id="detail.sourcing-head">Sourcing</Text>
-                </div>
+              <DetailSection
+                title={<Text id="detail.sourcing-head">Sourcing</Text>}
+                className="mt-6"
+              >
                 <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
-              </div>
+              </DetailSection>
               <TagsCard
                 tags={detail.tags}
                 onEditTags={onEditField ? (next) => onEditField("tags", next) : undefined}
@@ -629,6 +629,49 @@ function IdentityLine({
   );
 }
 
+// The ONE section wrapper for the whole opened component: an uppercase micro eyebrow, then the
+// content. Every data block (readiness, links, description, specifications, sourcing, tags) is a
+// DetailSection, so the sheet reads as one consistent system instead of a mix of boxed cards and
+// loose labels. Only genuinely-visual tiles (the asset previews) and the single call-to-action
+// (Complete) stay boxed; everything that is DATA is a borderless section.
+function DetailSection({
+  title,
+  action,
+  className,
+  children,
+  ...rest
+}: { title: ReactNode; action?: ReactNode } & Omit<HTMLAttributes<HTMLElement>, "title">) {
+  return (
+    <section className={className} {...rest}>
+      <div className="mb-1.5 flex h-4 items-center justify-between gap-2">
+        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">{title}</span>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// One label/value row, the canonical alignment used across every section (readiness, links,
+// specs, sourcing): the label left in quiet text, the value right. Everything lines up because
+// everything routes through this.
+function DataRow({
+  label,
+  children,
+  className,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-line/50 py-1.5 last:border-0">
+      <span className="min-w-0 flex-none text-xs text-t2">{label}</span>
+      <span className={"min-w-0 text-right text-xs text-t1 " + (className ?? "")}>{children}</span>
+    </div>
+  );
+}
+
 // The single readiness read: KiCad and Altium each as one row - a green check when the tool's
 // symbol + footprint are both present, else an amber dot and the exact assets it still needs.
 // The 3D model is optional (it never blocks readiness), so it is not in the needs line.
@@ -649,11 +692,10 @@ function ReadinessBlock({
       ? altiumNeeds.map((n) => n.replace(/^Altium /, ""))
       : altium.missing.filter((m) => m !== "3D Model");
   return (
-    <div data-dev-id="detail.readiness" className="rounded-card border border-line bg-surface">
+    <DetailSection title="Readiness" data-dev-id="detail.readiness">
       <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
-      <div className="border-t border-line" />
       <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
-    </div>
+    </DetailSection>
   );
 }
 
@@ -667,23 +709,29 @@ function ReadinessRow({
   needs: string[];
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-      {ready ? (
-        <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
-      ) : (
-        <span className="h-2 w-2 flex-none rounded-full" style={{ background: "var(--c-warn)" }} />
-      )}
-      <span className="text-sm font-semibold text-t1">{label}</span>
-      <span className="ml-auto text-2xs text-t3">
-        {ready ? (
-          <span className="text-ok">Ready</span>
-        ) : needs.length > 0 ? (
-          `Needs ${needs.map((n) => n.toLowerCase()).join(" + ")}`
-        ) : (
-          "Not ready"
-        )}
+    <DataRow
+      label={
+        <span className="flex items-center gap-2">
+          {ready ? (
+            <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
+          ) : (
+            <span
+              className="h-2 w-2 flex-none rounded-full"
+              style={{ background: "var(--c-warn)" }}
+            />
+          )}
+          <span className="font-medium text-t1">{label}</span>
+        </span>
+      }
+    >
+      <span className={ready ? "text-ok" : "text-t2"}>
+        {ready
+          ? "Ready"
+          : needs.length > 0
+            ? `Needs ${needs.map((n) => n.toLowerCase()).join(" + ")}`
+            : "Not ready"}
       </span>
-    </div>
+    </DataRow>
   );
 }
 
@@ -707,62 +755,54 @@ function RailReference({
   busy?: boolean;
 }) {
   return (
-    <div data-dev-id="detail.reference" className="mt-auto flex flex-col gap-3 border-t border-line pt-3">
-      <div>
-        <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          <Text id="detail.links">Links</Text>
+    <div data-dev-id="detail.reference" className="flex flex-col gap-4">
+      <DetailSection title={<Text id="detail.links">Links</Text>} data-dev-id="detail.datasheet-row">
+        <div className="flex items-baseline gap-2">
+          <span className="w-[64px] flex-none text-xs text-t2">
+            <Text id="detail.datasheet">Datasheet</Text>
+          </span>
+          <span className="flex min-w-0 flex-1 items-center gap-1">
+            {onEditDatasheet ? (
+              <EditableText
+                value={datasheetUrl}
+                onSave={onEditDatasheet}
+                label="Datasheet"
+                placeholder="Paste a datasheet link"
+                mono
+                truncate
+                disabled={busy}
+                displayClassName="text-xs"
+              />
+            ) : datasheetHref ? (
+              <a
+                href={datasheetHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-acc hover:underline"
+              >
+                <span className="truncate">Open datasheet</span>
+                <ExternalIcon className="flex-none" />
+              </a>
+            ) : datasheetUrl ? (
+              <span className="tnum truncate font-mono text-xs text-t1">{datasheetUrl}</span>
+            ) : (
+              <span className="text-xs italic text-t3">None on file</span>
+            )}
+            {onEditDatasheet && datasheetHref ? (
+              <a
+                href={datasheetHref}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open datasheet"
+                className="flex-none text-t3 transition-colors hover:text-t1"
+              >
+                <ExternalIcon />
+              </a>
+            ) : null}
+          </span>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
-            <span className="w-[58px] flex-none pt-0.5 text-xs text-t2">
-              <Text id="detail.datasheet">Datasheet</Text>
-            </span>
-            <span className="flex min-w-0 flex-1 items-center gap-1">
-              {onEditDatasheet ? (
-                <EditableText
-                  value={datasheetUrl}
-                  onSave={onEditDatasheet}
-                  label="Datasheet"
-                  placeholder="Paste a datasheet link"
-                  mono
-                  truncate
-                  disabled={busy}
-                  displayClassName="text-xs"
-                />
-              ) : datasheetHref ? (
-                <a
-                  href={datasheetHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-w-0 items-center gap-1 truncate px-1.5 text-xs text-acc hover:underline"
-                >
-                  <span className="truncate">Open datasheet</span>
-                  <ExternalIcon className="flex-none" />
-                </a>
-              ) : datasheetUrl ? (
-                <span className="tnum truncate px-1.5 font-mono text-xs text-t1">{datasheetUrl}</span>
-              ) : (
-                <span className="px-1.5 text-xs italic text-t3">None on file</span>
-              )}
-              {onEditDatasheet && datasheetHref ? (
-                <a
-                  href={datasheetHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Open datasheet"
-                  className="flex-none text-t3 transition-colors hover:text-t1"
-                >
-                  <ExternalIcon />
-                </a>
-              ) : null}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div data-dev-id="detail.notes-row">
-        <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          <Text id="detail.notes">Description</Text>
-        </div>
+      </DetailSection>
+      <DetailSection title={<Text id="detail.notes">Description</Text>} data-dev-id="detail.notes-row">
         {onEditDescription ? (
           <EditableText
             value={description}
@@ -779,7 +819,7 @@ function RailReference({
         ) : (
           <span className="text-xs italic text-t3">None</span>
         )}
-      </div>
+      </DetailSection>
     </div>
   );
 }
@@ -869,10 +909,11 @@ function TagsCard({
   if (chips.length === 0 && !onEditTags) return null;
 
   return (
-    <div data-dev-id="detail.attributes" className="mt-6 border-t border-line pt-4">
-      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t2">
-        <Text id="detail.attributes">Tags</Text>
-      </div>
+    <DetailSection
+      title={<Text id="detail.attributes">Tags</Text>}
+      className="mt-6"
+      data-dev-id="detail.attributes"
+    >
       <div className="flex flex-wrap items-center gap-2">
         {chips.map((label) => (
           <span key={label} className={chipCls}>
@@ -921,7 +962,7 @@ function TagsCard({
           )
         ) : null}
       </div>
-    </div>
+    </DetailSection>
   );
 }
 
