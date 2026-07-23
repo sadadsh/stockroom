@@ -3,7 +3,7 @@
  * three read the same four channels (CONTEXT decision 5). Exactly ONE channel runs saturated color
  * (fill = electrical-class category); the others are neutral, so the map stays disciplined.
  *
- * - Fill  = PinDTO.category (electrical_class): the one saturated hue, a --stm-cat-* token.
+ * - Fill  = PinDTO.category (electrical_class): the one saturated hue, a --stm-* token.
  * - Border = PinDTO.roles[].role_class: a restrained NEUTRAL stroke that strengthens for a
  *            special-purpose pin (debug, oscillator, boot, reset, power), never a second hue.
  * - Mark  = PinDTO.five_v.tolerant: a small neutral dot, present only on 5V-tolerant IO pins.
@@ -36,16 +36,16 @@ export interface CategorySpec {
 // Ordered gpio-first (the bucket most pins carry) through the quietest (nc), the order the
 // legend teaches them in.
 export const PIN_CATEGORIES: readonly CategorySpec[] = [
-  { key: "gpio", label: "GPIO", token: "--stm-cat-gpio" },
-  { key: "analog", label: "Analog", token: "--stm-cat-analog" },
-  { key: "debug", label: "Debug", token: "--stm-cat-debug" },
-  { key: "oscillator", label: "Oscillator", token: "--stm-cat-oscillator" },
-  { key: "power", label: "Power", token: "--stm-cat-power" },
-  { key: "ground", label: "Ground", token: "--stm-cat-ground" },
-  { key: "reset", label: "Reset", token: "--stm-cat-reset" },
-  { key: "boot", label: "Boot", token: "--stm-cat-boot" },
-  { key: "vcap", label: "Vcap", token: "--stm-cat-vcap" },
-  { key: "nc", label: "Not Connected", token: "--stm-cat-nc" },
+  { key: "gpio", label: "GPIO", token: "--stm-gpio" },
+  { key: "analog", label: "Analog", token: "--stm-analog" },
+  { key: "debug", label: "Debug", token: "--stm-debug" },
+  { key: "oscillator", label: "Oscillator", token: "--stm-oscillator" },
+  { key: "power", label: "Power", token: "--stm-power" },
+  { key: "ground", label: "Ground", token: "--stm-ground" },
+  { key: "reset", label: "Reset", token: "--stm-reset" },
+  { key: "boot", label: "Boot", token: "--stm-boot" },
+  { key: "vcap", label: "Vcap", token: "--stm-vcap" },
+  { key: "nc", label: "Not Connected", token: "--stm-nc" },
 ];
 
 const CATEGORY_BY_KEY: Record<string, CategorySpec> = Object.fromEntries(

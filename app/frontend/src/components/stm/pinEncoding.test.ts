@@ -18,15 +18,15 @@ describe("pinEncoding categories", () => {
   });
 
   it("maps each known category to its own token", () => {
-    expect(categoryFill("analog")).toBe("var(--stm-cat-analog)");
-    expect(categoryFill("gpio")).toBe("var(--stm-cat-gpio)");
-    expect(categoryFill("nc")).toBe("var(--stm-cat-nc)");
+    expect(categoryFill("analog")).toBe("var(--stm-analog)");
+    expect(categoryFill("gpio")).toBe("var(--stm-gpio)");
+    expect(categoryFill("nc")).toBe("var(--stm-nc)");
     expect(categoryLabel("oscillator")).toBe("Oscillator");
     expect(categoryLabel("nc")).toBe("Not Connected");
   });
 
   it("reads a raw io electrical class as plain gpio", () => {
-    expect(categoryFill("io")).toBe("var(--stm-cat-gpio)");
+    expect(categoryFill("io")).toBe("var(--stm-gpio)");
     expect(categoryLabel("io")).toBe("GPIO");
   });
 

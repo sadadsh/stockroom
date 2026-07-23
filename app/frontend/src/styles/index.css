@@ -38,26 +38,35 @@
     --cat-connector: #b58cf0;
     --cat-crystal: #4fc3dd;
     --cat-ic: #8a9cf0;
-    /* STM pin electrical-class hues (VIZ-02) — a SEPARATE taxonomy from the --cat-* component
-       families above; color is the data on the pinout map, so these run saturated on the pad fill
-       only (never a surface tint). One hue per electrical_class; each verified >=3:1 against the
-       card/stage background in BOTH themes (dark values here sit light for the near-black well).
-       io is the calmest (most pins carry it); power is hot; ground is a cool desaturated reference;
-       reset amber; boot violet; vcap teal; nc the quietest inert grey. */
-    --stm-cat-io: #5aa9f0;
-    --stm-cat-power: #ef7a86;
-    --stm-cat-ground: #8b93a3;
-    --stm-cat-reset: #e0a24a;
-    --stm-cat-boot: #b58cf0;
-    --stm-cat-vcap: #4fc9a8;
-    --stm-cat-nc: #9a8f99;
-    /* The io class splits into four visual categories (the API's _pin_category buckets):
-       plain gpio keeps the calm io blue; analog chartreuse; debug magenta; oscillator the
-       crystal cyan. Verified >=3:1 against stage + card in BOTH themes (measured 4.0-9.3). */
-    --stm-cat-gpio: #5aa9f0;
-    --stm-cat-analog: #9ecf63;
-    --stm-cat-debug: #e389cf;
-    --stm-cat-oscillator: #4fc3dd;
+    /* STM pin color-is-data family (VIZ-02) — the ONE token family for the pinout map's
+       electrical-class/category encoding axis (Phase 6 consolidation: this supersedes and renames
+       the Phase 4 per-bucket family; there is no longer a parallel set). A SEPARATE taxonomy from
+       the --cat-* BOM-component families above; color is the data on the pinout map, so these run
+       saturated on the pad fill only (never a surface tint). The ten API category buckets plus the
+       legacy io electrical_class (which the API only emits pre-split; it reads as plain gpio). Each
+       verified >=3:1 against the card/stage background in BOTH themes (dark values here sit light
+       for the near-black well). io/gpio is the calmest (most pins carry it); power is hot; ground a
+       cool desaturated reference; reset amber; boot violet; vcap teal; nc the quietest inert grey;
+       analog chartreuse; debug magenta; oscillator the crystal cyan. Measured 3.4-9.3 both themes. */
+    --stm-io: #5aa9f0;
+    --stm-gpio: #5aa9f0;
+    --stm-analog: #9ecf63;
+    --stm-debug: #e389cf;
+    --stm-oscillator: #4fc3dd;
+    --stm-power: #ef7a86;
+    --stm-ground: #8b93a3;
+    --stm-reset: #e0a24a;
+    --stm-boot: #b58cf0;
+    --stm-vcap: #4fc9a8;
+    --stm-nc: #9a8f99;
+    /* Socket-union classification (COMPAT-02/03) — a DISTINCT three-value token set from the
+       electrical-class hues above, because classification encodes a different fact (do a pin's
+       identities agree across a set). Tuned to the shipped compatEncoding semantic: shared reads
+       as the calm positive green, divergent the warm amber that asks for attention, partial the
+       quiet cool grey of an absent position. Each clears >=3:1 on the recessed dark tile. */
+    --stm-classify-shared: #5fd39a;
+    --stm-classify-divergent: #e0b354;
+    --stm-classify-partial: #7f8794;
     /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
        Near-white on dark, on the primary action, focus, active nav, selected row,
        section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
@@ -129,20 +138,24 @@
     --cat-connector: #7a45c2;
     --cat-crystal: #147d97;
     --cat-ic: #4a5bc0;
-    /* STM pin electrical-class hues (VIZ-02), darkened so each clears >=3:1 against the white
-       light card. Same taxonomy/order as the dark block above. */
-    --stm-cat-io: #1f6fc4;
-    --stm-cat-power: #c23b4a;
-    --stm-cat-ground: #59606c;
-    --stm-cat-reset: #b6710f;
-    --stm-cat-boot: #7a45c2;
-    --stm-cat-vcap: #12876a;
-    --stm-cat-nc: #6a5f68;
-    /* io-split categories, darkened for the light stage (same taxonomy as the dark block). */
-    --stm-cat-gpio: #1f6fc4;
-    --stm-cat-analog: #55801c;
-    --stm-cat-debug: #a2439b;
-    --stm-cat-oscillator: #147d97;
+    /* STM pin color-is-data family (VIZ-02), darkened so each clears >=3:1 against the white
+       light card. Same taxonomy/order as the dark block above (Phase 6 consolidated family). */
+    --stm-io: #1f6fc4;
+    --stm-gpio: #1f6fc4;
+    --stm-analog: #55801c;
+    --stm-debug: #a2439b;
+    --stm-oscillator: #147d97;
+    --stm-power: #c23b4a;
+    --stm-ground: #59606c;
+    --stm-reset: #b6710f;
+    --stm-boot: #7a45c2;
+    --stm-vcap: #12876a;
+    --stm-nc: #6a5f68;
+    /* Socket-union classification (COMPAT-02/03), darkened for the white light card. Same
+       shared/divergent/partial semantic as the dark block. */
+    --stm-classify-shared: #2f9e63;
+    --stm-classify-divergent: #a9761b;
+    --stm-classify-partial: #66606e;
     /* Neutral accent: near-black on light. */
     --c-acc: #1b1b1e;
     --c-acc-on: #f5f5f5;

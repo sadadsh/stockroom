@@ -249,7 +249,7 @@ const Pad = memo(function Pad({
   onSelect: (position: string) => void;
 }) {
   const { x, y, w, h } = pad.rect;
-  const fill = pin ? categoryFill(pin.category) : "var(--stm-cat-nc)";
+  const fill = pin ? categoryFill(pin.category) : "var(--stm-nc)";
   const stroke = pin ? roleStroke(pin) : { color: "var(--c-line2)", width: 1 };
   const fiveV = pin ? isFiveVoltTolerant(pin) : false;
   const markR = Math.min(w, h) * 0.22;
