@@ -2,8 +2,9 @@
  * CompatUnionMap (COMPAT-02/03): the live socket-union map. It lays the union's positions with the
  * SAME lib/pinMapGeometry path PinoutMap uses (CONTEXT decision 3 - reused, never reimplemented) and
  * paints each position by its classification (shared / divergent / partial) instead of by pin
- * category. Status color runs through a single small classification dot per pad, never a filled pad
- * background (VIZ-02 "color is data"); the per-part audit trail is click detail, never per-pad.
+ * category: the classification hue fills the pad itself, the same color-is-data doctrine as the
+ * explorer's category pads (owner amendment 2026-07-23, superseding the earlier dot-only rule);
+ * the per-part audit trail is click detail, never per-pad.
  *
  * A UnionDTO carries no PinoutGeometryDTO of its own, so the body shape is inferred from the
  * positions' geometry hints (a BGA row present -> ball grid, else perimeter) and handed to the same
@@ -213,8 +214,11 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
   );
 }
 
-// One union pad: a neutral body rect carrying a single classification dot (never a filled pad
-// background). Memoized on its position so a select elsewhere never re-renders it (Pitfall 11).
+// One union pad, filled with its classification hue - the same color-is-data doctrine the
+// explorer's category pads use, applied to the classification axis (owner amendment 2026-07-23:
+// supersedes the earlier dot-only rendering, which read washed next to the explorer map; the
+// per-part audit trail stays click detail, never per-pad). An unclassified pad stays neutral.
+// Memoized on its position so a select elsewhere never re-renders it (Pitfall 11).
 const UnionPad = memo(function UnionPad({
   pad,
   position,
@@ -228,8 +232,7 @@ const UnionPad = memo(function UnionPad({
 }) {
   const { x, y, w, h } = pad.rect;
   const classification = position?.classification;
-  const dotFill = classification ? unionClassificationHue(classification).stroke : "var(--c-t3)";
-  const dotR = Math.min(w, h) * 0.3;
+  const fill = classification ? unionClassificationHue(classification).stroke : "var(--c-raise2)";
 
   return (
     <g
@@ -262,11 +265,10 @@ const UnionPad = memo(function UnionPad({
         width={w}
         height={h}
         rx={1.5}
-        fill="var(--c-raise2)"
+        fill={fill}
         stroke="var(--c-line2)"
         strokeWidth={1}
       />
-      <circle cx={x + w / 2} cy={y + h / 2} r={dotR} fill={dotFill} />
     </g>
   );
 });
