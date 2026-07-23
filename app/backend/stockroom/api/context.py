@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from stockroom.api.jobs import JobRunner
 from stockroom.kicad.cli import KiCadCli
@@ -21,6 +21,9 @@ from stockroom.store.project_index import ProjectIndex
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
 from stockroom.vcs.sync import SyncEngine
+
+if TYPE_CHECKING:
+    from stockroom.stm.db import StmIndex
 
 
 @dataclass
@@ -44,6 +47,13 @@ class AppContext:
     project_store: ProjectStore
     project_index: ProjectIndex
     project_ops: ProjectOps
+    # The STM32 pinout/spec index (stm-viewer workstream, Phase 3). LAZY, unlike `index`
+    # above: no CubeMX source is synced at launch, so build_context only ATTEMPTS a load of
+    # whatever is already on disk (default_index_path()) and accepts None (first run, a
+    # stamp mismatch, or a missing/corrupt file are all legitimate, non-fatal outcomes).
+    # `switch_library` deliberately leaves this untouched - the CubeMX source is a
+    # machine-global setting, not library-scoped.
+    stm_index: "StmIndex | None" = None
     # The last ERC/DRC run per project id (M7b), cached in-memory (never committed to
     # the library repo: an external project's check results are not library records, and
     # a git commit per check run is churn). Read by the checks GET, Overview, and the
@@ -232,5 +242,16 @@ def build_context(
 
         github_auth.configure(repo, getattr(config, "github_token", ""))
     except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
+        pass
+    # Lazy STM index load: unlike `index`, no source is synced at launch, so this only picks
+    # up whatever derived index already sits on disk (default_index_path()). None is a
+    # legitimate result (first run, a stamp mismatch, or a missing/corrupt file) - never
+    # treated as an error, and never blocks the boot.
+    try:
+        from stockroom.stm.db import StmIndex
+        from stockroom.stm.source import default_index_path
+
+        ctx.stm_index = StmIndex.load(default_index_path())
+    except Exception:  # noqa: BLE001 - a missing/stale/corrupt STM index must never break the boot
         pass
     return ctx

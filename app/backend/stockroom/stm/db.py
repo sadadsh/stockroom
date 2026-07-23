@@ -1019,6 +1019,14 @@ class StmIndex:
         return cls(conn)
 
     # ---- queries ---------------------------------------------------------------
+    @property
+    def conn(self) -> sqlite3.Connection:
+        """The raw Layer A connection - every stm/authority.py (Layer B) function takes a
+        sqlite3.Connection as its first argument (INTERFACES.md section 2), and api/routers/
+        stm.py runs a few self-contained read SELECTs of its own (Phase 3, 03-01), so both
+        need a way to reach it. Read-only in spirit: callers never write through this."""
+        return self._conn
+
     def mcu_count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM mcu").fetchone()[0]
 

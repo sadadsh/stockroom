@@ -418,3 +418,87 @@ class ManualFillBody(BaseModel):
 
     ref: str
     part_id: str
+
+
+class StmStatusDTO(BaseModel):
+    """The STM index build/health probe (stm-viewer INTERFACES.md section 4). Never gated on
+    409 - this IS the "is it built" check a 409-gated read endpoint routes the frontend to."""
+
+    built: bool
+    building: bool
+    source_path: str
+    source_present: bool
+    all_families: bool
+    device_xml_count: int
+    family_count: int
+    families: list[str] = []
+    mcu_count: int
+    classifier_rev: int
+    af_schema_rev: int
+    geometry_rev: int
+    source_sha256: str
+    built_at: str
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "StmStatusDTO":
+        return cls(
+            built=bool(d.get("built", False)),
+            building=bool(d.get("building", False)),
+            source_path=d.get("source_path", "") or "",
+            source_present=bool(d.get("source_present", False)),
+            all_families=bool(d.get("all_families", False)),
+            device_xml_count=int(d.get("device_xml_count", 0) or 0),
+            family_count=int(d.get("family_count", 0) or 0),
+            families=list(d.get("families", []) or []),
+            mcu_count=int(d.get("mcu_count", 0) or 0),
+            classifier_rev=int(d.get("classifier_rev", 0) or 0),
+            af_schema_rev=int(d.get("af_schema_rev", 0) or 0),
+            geometry_rev=int(d.get("geometry_rev", 0) or 0),
+            source_sha256=d.get("source_sha256", "") or "",
+            built_at=d.get("built_at", "") or "",
+        )
+
+
+class McuSpecRow(BaseModel):
+    """One spec-matrix row (ST-MCU-FINDER-shaped columns), stm-viewer INTERFACES.md section 4.
+    `part` (ref_name) is the addressable id used as the `?part=` query param; `mpn_example` is a
+    display-only expanded real MPN (the exact-match MPN resolution lives in stm.authority.
+    resolve_part, Phase 3 plan 03-02 - this is purely a readable example string for the table)."""
+
+    part: str
+    mpn_example: str
+    series: str
+    line: str
+    core: str
+    package: str
+    pin_count: int
+    io_count: int
+    flash_kb: int | None = None
+    ram_kb: int | None = None
+    max_freq_mhz: int | None = None
+    vdd_min: float | None = None
+    vdd_max: float | None = None
+    temp_min_c: int | None = None
+    temp_max_c: int | None = None
+    peripherals: dict[str, int] = {}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "McuSpecRow":
+        return cls(
+            part=d["part"],
+            mpn_example=d.get("mpn_example", "") or "",
+            series=d.get("series", "") or "",
+            line=d.get("line", "") or "",
+            core=d.get("core", "") or "",
+            package=d.get("package", "") or "",
+            pin_count=int(d.get("pin_count", 0) or 0),
+            io_count=int(d.get("io_count", 0) or 0),
+            flash_kb=d.get("flash_kb"),
+            ram_kb=d.get("ram_kb"),
+            max_freq_mhz=d.get("max_freq_mhz"),
+            vdd_min=d.get("vdd_min"),
+            vdd_max=d.get("vdd_max"),
+            temp_min_c=d.get("temp_min_c"),
+            temp_max_c=d.get("temp_max_c"),
+            peripherals=dict(d.get("peripherals", {}) or {}),
+        )
