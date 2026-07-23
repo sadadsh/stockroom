@@ -294,6 +294,23 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
             )
             or "{}"
         )
+        # DigiKey's CURRENT sign-in link (the /en/login path 404s) + whether we are already signed in.
+        result["signin_link"] = (
+            cad.evaluate_js(
+                "(function(){var a=Array.from(document.querySelectorAll('a')).filter(function(e){"
+                "var t=((e.textContent||'')+' '+(e.getAttribute('href')||'')+' '+(e.getAttribute('aria-label')||'')).toLowerCase();"
+                "return /sign\\s?in|log\\s?in|\\/login|\\/account|mydigikey/.test(t);});"
+                "return JSON.stringify(a.slice(0,6).map(function(e){return e.tagName+'|'+((e.textContent||'').trim().slice(0,18))+'|'+((e.getAttribute('href')||'').slice(0,80));}));})()"
+            )
+            or "[]"
+        )
+        result["signed_in_hint"] = (
+            cad.evaluate_js(
+                "JSON.stringify({myaccount:/my account|sign out|log out|hi,|welcome back/i.test((document.body||{}).innerText||''),"
+                "acct_link:!!document.querySelector('a[href*=myaccount i],a[href*=logout i],a[href*=signout i]')})"
+            )
+            or "{}"
+        )
         # The real model-row markup: walk up from the "Altium Footprint" label to its section and dump it.
         result["models_region_html"] = (
             cad.evaluate_js(
