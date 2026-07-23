@@ -166,24 +166,28 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
                   strokeWidth={1}
                 />
               ) : null}
-              <text
-                x={layout.body.x + layout.body.w / 2}
-                y={layout.body.y + layout.body.h / 2 - 6}
-                textAnchor="middle"
-                className="fill-t3 font-mono"
-                fontSize={13}
-              >
-                {pinout.mpn_example}
-              </text>
-              <text
-                x={layout.body.x + layout.body.w / 2}
-                y={layout.body.y + layout.body.h / 2 + 12}
-                textAnchor="middle"
-                className="fill-t3 font-mono"
-                fontSize={11}
-              >
-                {pinout.package}
-              </text>
+              {/* Silkscreen label: centered in the body for a perimeter package (the die area
+                  is empty); BELOW the grid for an area-array package (the body IS the ball
+                  field, so a centered label would sit behind real pads). */}
+              {(() => {
+                const areaArray =
+                  pinout.geometry.body_shape === "bga" || pinout.geometry.body_shape === "wlcsp";
+                const cx = layout.body.x + layout.body.w / 2;
+                const y1 = areaArray
+                  ? layout.body.y + layout.body.h + 18
+                  : layout.body.y + layout.body.h / 2 - 6;
+                const y2 = y1 + 18;
+                return (
+                  <>
+                    <text x={cx} y={y1} textAnchor="middle" className="fill-t3 font-mono" fontSize={13}>
+                      {pinout.mpn_example}
+                    </text>
+                    <text x={cx} y={y2} textAnchor="middle" className="fill-t3 font-mono" fontSize={11}>
+                      {pinout.package}
+                    </text>
+                  </>
+                );
+              })()}
 
               {layout.pins.map((pad) => (
                 <Pad
@@ -198,8 +202,14 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
           </svg>
         )}
 
-        {!unavailable && (inferred || unplaced > 0) ? (
-          <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1">
+      </div>
+
+      {/* The chamber footer: honesty badges left, camera reset right. A footer strip, never an
+          overlay - a full-height ball grid owns the whole chamber, so anything floated over it
+          sat on top of real pads. */}
+      {!unavailable ? (
+        <div className="mt-2 flex flex-none items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {inferred ? (
               <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
                 Layout inferred from pin positions
@@ -211,17 +221,15 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
               </span>
             ) : null}
           </div>
-        ) : null}
-        {!unavailable ? (
           <button
             type="button"
             onClick={reset}
-            className="absolute bottom-3 right-3 rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
+            className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
           >
             Reset View
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
