@@ -684,10 +684,16 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
               f"{sorted(r.value for r in session.received)}", flush=True)
         if not session.is_complete() and _next_format() is not None:
             print(f"CAPTURE: navigating back to product for the next format ({_next_format()})", flush=True)
-            try:
-                win.evaluate_js("setTimeout(function(){location.href=" + json.dumps(url) + ";},600);")
-            except Exception:  # noqa: BLE001
-                pass
+
+            # Navigate on a Timer thread, not inline in this download event (re-entering the browser
+            # from its own event can hang it - "not responding").
+            def _nav_next() -> None:
+                try:
+                    win.evaluate_js("location.href=" + json.dumps(url) + ";")
+                except Exception:  # noqa: BLE001
+                    pass
+
+            threading.Timer(0.8, _nav_next).start()
 
     armed = W._install_cad_download_intercept(win, session.temp_dir, _on_captured)
     print(f"REALCAPTURE: tier-1 intercept armed={armed}; needs={sorted(needs_values)}", flush=True)
