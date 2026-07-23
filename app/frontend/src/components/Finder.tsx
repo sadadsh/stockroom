@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { Facets } from "../api/types";
 import { SearchIcon } from "./icons";
+import { Icon } from "./Icon";
 import { useText } from "../lib/copy";
 
 interface Props {
@@ -82,16 +83,7 @@ export function Finder({
           onClick={() => setOpen((v) => !v)}
           className="inline-flex items-center gap-1.5 rounded-control p-1.5 text-t3 hover:bg-raise2 hover:text-t1"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path d="M3 5h18M6 12h12M10 19h4" strokeLinecap="round" />
-          </svg>
+          <Icon id="finder.filter" />
           {activeFilters > 0 ? (
             <span className="rounded-full bg-acc px-1.5 text-2xs font-bold leading-[14px] text-acc-on">
               {activeFilters}
