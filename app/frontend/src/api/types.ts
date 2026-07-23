@@ -1429,20 +1429,38 @@ export interface AltiumRegenerateResult {
   dblib: string;
 }
 
-// POST /api/dev/save (dev mode, owner-only): persist the nudged design tokens and reworded UI
-// copy back to source (lib/token.overrides.ts + lib/copy.overrides.ts), so a saved change ships
-// for everyone. `tokens.root` carries the dark-theme colours + shared radii, `tokens.light` the
-// light-theme colours; `copy` maps a stable copy id to its new text.
+// A single icon override in the POST /api/dev/save request (dev-mode v2): either `body` (raw inner
+// SVG markup, sanitised by the backend before it is written) or `swapToId` (another registry icon
+// id to render instead). Both optional; an entry with neither is dropped server-side.
+export interface DevIconOverride {
+  body?: string;
+  swapToId?: string;
+}
+
+// POST /api/dev/save (dev mode, owner-only): persist the nudged design tokens, reworded UI copy,
+// re-drawn icons, and per-element overrides back to source (lib/token.overrides.ts +
+// lib/copy.overrides.ts + lib/icon.overrides.ts + lib/element.overrides.ts), so a saved change
+// ships for everyone. `tokens.root` carries the dark-theme colours + shared radii, `tokens.light`
+// the light-theme colours; `copy` maps a stable copy id to its new text. The v2 blocks are
+// optional (an omitted block regenerates its file empty, matching the token/copy behaviour):
+// `icons` maps an icon id to its override, `elements` maps a `data-dev-id` to a CSS prop -> value
+// map. Every icon body / CSS value is validated + re-serialised by the backend (the authority on
+// what may ship); a malicious value is a 400.
 export interface DevSaveBody {
   tokens: { root: Record<string, string>; light: Record<string, string> };
   copy: Record<string, string>;
+  icons?: Record<string, DevIconOverride>;
+  elements?: Record<string, Record<string, string>>;
 }
 
-// The write outcome: the relative source paths written, and how many token / copy overrides now
-// persist. ok is false with a message only on an honest refuse (no source tree in a frozen exe).
+// The write outcome: the relative source paths written, and how many token / copy / icon / element
+// overrides now persist. ok is false with a message only on an honest refuse (no source tree in a
+// frozen exe).
 export interface DevSaveResult {
   ok: boolean;
   written: string[];
   tokens: number;
   copy: number;
+  icons: number;
+  elements: number;
 }
