@@ -1,20 +1,23 @@
 /**
- * The STM Viewer: browse and filter every STM32 in a spec matrix, scope by family, and inspect
- * a chosen part's interactive pinout map. This first slice (04-01) proves the whole
- * frontend-to-API pipe: it lists MCUs by their real MPN and renders an honest "Build the index"
- * call to action when the backend reports the derived index is not built (HTTP 409). The full
- * faceted matrix (04-02) and the pinout map + inspector (04-03) expand out from this shell.
+ * The STM Viewer: browse and filter every STM32 in a virtualized spec matrix, scope by family,
+ * and inspect a chosen part's interactive pinout map. It renders an honest "Build the Index" call
+ * to action when the backend reports the derived index is not built (HTTP 409), never a raw error
+ * or an infinite spinner (CONTEXT decision 9).
  *
  * Two separately-named pieces of client state (CONTEXT decision 2): `scope` is the FamilyPicker
- * multi-select that narrows the matrix; `activePart` is the one part shown in the pinout map.
- * Both live here and pass down as props; no global store.
+ * multi-select that narrows the matrix; `activePart` is the one part shown in the pinout map. Both
+ * live here and pass down as props; no global store. The coarse family selection drives at most
+ * one useStmMcus fetch per scope change (a single selected family narrows server-side, otherwise
+ * the family/line multi-select and every column facet filter client-side over the fetched rows,
+ * decision 3); a matrix row click sets activePart, the seam the pinout map (04-03) consumes.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStmMcus, useStmStatus, useBuildStmIndex } from "../api/stmQueries";
 import { ApiError } from "../api/client";
 import type { StmMcusArgs } from "../api/client";
-import type { McuSpecRow } from "../api/types";
+import { FamilyPicker } from "../components/stm/FamilyPicker";
+import { SpecMatrixTable } from "../components/stm/SpecMatrixTable";
 import { Button, Card, Eyebrow } from "../components/primitives";
 
 export interface StmScope extends StmMcusArgs {
@@ -24,61 +27,78 @@ export interface StmScope extends StmMcusArgs {
 
 const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
 
-// The coarse server-side narrowing the matrix fetch honors: the first selected family and MCU
-// (one fetch per scope change; every finer facet is a client-side column filter, decision 3).
+// The coarse server-side narrowing (decision 3): exactly one selected family narrows server-side;
+// zero or multiple families fetch the wider matrix and are reconciled by the client filter below.
+// Sub-series lines never hit the server (a pure client filter), so adding one never refetches.
 function scopeToArgs(scope: StmScope): StmMcusArgs {
-  return {
-    family: scope.families[0],
-    q: scope.mcus[0],
-  };
+  return { family: scope.families.length === 1 ? scope.families[0] : undefined };
 }
 
 export function StmViewerPage() {
   const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
-  // Declared now (CONTEXT decision 2); the FamilyPicker (04-02) drives setScope, the spec matrix
-  // (04-02) sets activePart, the pinout map (04-03) reads it. Unused in this tracer slice beyond
-  // being the reserved seams the later plans wire in.
   const [activePart, setActivePart] = useState<string | null>(null);
-  void setScope;
-  void activePart;
-  void setActivePart;
 
   const status = useStmStatus();
-  const mcus = useStmMcus(scopeToArgs(scope));
+  const args = useMemo(() => scopeToArgs(scope), [scope]);
+  const mcus = useStmMcus(args);
 
-  // The index is not built when a read 409s, or the status endpoint reports built:false. Either
-  // path routes to the build call to action, never a raw error screen or an infinite spinner.
   const mcusError = mcus.error;
   const indexNotBuilt =
     (mcusError instanceof ApiError && mcusError.status === 409) ||
     (status.data ? !status.data.built : false);
 
+  // The family / line multi-select applied client-side over the fetched rows (the server narrowed
+  // to at most one family; everything finer is client-side, decision 3).
+  const rows = useMemo(() => {
+    let r = mcus.data?.mcus ?? [];
+    if (scope.families.length) r = r.filter((row) => scope.families.includes(row.series));
+    if (scope.mcus.length) r = r.filter((row) => scope.mcus.includes(row.line));
+    return r;
+  }, [mcus.data, scope.families, scope.mcus]);
+
   if (indexNotBuilt) {
     return (
-      <PageFrame>
+      <PageShell>
         <BuildIndexGate />
-      </PageFrame>
+      </PageShell>
     );
   }
 
-  const rows = mcus.data?.mcus ?? [];
-
   return (
-    <PageFrame status={status.data?.mcu_count} families={status.data?.family_count}>
-      {mcus.isLoading ? (
-        <div className="py-16 text-center text-sm text-t3">Loading the spec matrix...</div>
-      ) : mcusError ? (
-        <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
-      ) : (
-        <MinimalMcuList rows={rows} />
-      )}
-    </PageFrame>
+    <PageShell status={status.data?.mcu_count} families={status.data?.family_count}>
+      <div className="flex min-h-0 flex-1">
+        {/* scope */}
+        <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
+          <FamilyPicker scope={scope} onScopeChange={setScope} />
+        </div>
+
+        {/* matrix */}
+        <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
+          {mcus.isLoading ? (
+            <div className="py-16 text-center text-sm text-t3">Loading the spec matrix...</div>
+          ) : mcusError ? (
+            <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
+          ) : (
+            <SpecMatrixTable
+              rows={rows}
+              activePart={activePart}
+              onSelectPart={setActivePart}
+            />
+          )}
+        </div>
+
+        {/* pinout map + inspector (04-03 fills this reserved region) */}
+        <aside className="flex w-[384px] flex-none flex-col border-l border-line px-4 pt-1">
+          <PinoutRegionPlaceholder activePart={activePart} />
+        </aside>
+      </div>
+    </PageShell>
   );
 }
 
-// The page self-heading (the rail carries the active-surface highlight; the content states its
-// own name + a quiet live readout, matching the app's other page shells).
-function PageFrame({
+// The page frame: a self-heading header band (the rail carries the active-surface highlight) over
+// a full-height content area the columns fill.
+function PageShell({
   children,
   status,
   families,
@@ -88,8 +108,8 @@ function PageFrame({
   families?: number;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[30px] pt-[22px]">
-      <header className="mb-5 flex items-baseline gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="flex items-baseline gap-3 px-[30px] pb-4 pt-[22px]">
         <h1 className="text-title font-semibold text-t1">STM Viewer</h1>
         {status != null ? (
           <span className="tnum font-mono text-xs text-t3">
@@ -103,9 +123,26 @@ function PageFrame({
   );
 }
 
+// The reserved specimen region (04-03 renders the pinout map + legend + inspector here). Until a
+// part is picked it is the recessed "chamber" empty state, so the column is never dead space.
+function PinoutRegionPlaceholder({ activePart }: { activePart: string | null }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Eyebrow className="mb-2 px-1">Pinout</Eyebrow>
+      <div className="flex min-h-0 flex-1 items-center justify-center rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]">
+        <p className="text-sm text-t3">
+          {activePart
+            ? "The pinout map lands here."
+            : "Select a part to see its pinout."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // The honest "index not built" call to action, driven by the build job's live progress (mirrors
-// the RescanSection running/done/error flow). On success it re-queries the STM surface so the
-// gate clears to the real matrix.
+// the RescanSection running/done/error flow). On success it re-queries the STM surface so the gate
+// clears to the real matrix.
 function BuildIndexGate() {
   const build = useBuildStmIndex();
   const qc = useQueryClient();
@@ -123,7 +160,7 @@ function BuildIndexGate() {
     build.progress?.pct != null ? Math.min(100, Math.round(build.progress.pct)) : null;
 
   return (
-    <div className="flex flex-1 items-center justify-center py-10">
+    <div className="flex flex-1 items-center justify-center px-6 py-10">
       <Card className="w-full max-w-[440px] px-6 py-6">
         <Eyebrow className="mb-2">STM Index</Eyebrow>
         <h2 className="mb-1.5 text-lg font-semibold text-t1">Build the Index</h2>
@@ -141,9 +178,7 @@ function BuildIndexGate() {
                 style={{ width: pct != null ? `${pct}%` : "35%" }}
               />
             </div>
-            <p className="text-xs text-t3">
-              {build.progress?.message ?? "Starting the build..."}
-            </p>
+            <p className="text-xs text-t3">{build.progress?.message ?? "Starting the build..."}</p>
           </div>
         ) : null}
 
@@ -153,16 +188,8 @@ function BuildIndexGate() {
           </p>
         ) : null}
 
-        <Button
-          variant="accent"
-          onClick={() => build.start()}
-          disabled={running}
-        >
-          {running
-            ? "Building..."
-            : build.status === "error"
-              ? "Try Again"
-              : "Build the Index"}
+        <Button variant="accent" onClick={() => build.start()} disabled={running}>
+          {running ? "Building..." : build.status === "error" ? "Try Again" : "Build the Index"}
         </Button>
       </Card>
     </div>
@@ -185,35 +212,6 @@ function MatrixError({ error, onRetry }: { error: Error; onRetry: () => void }) 
       <Button small onClick={onRetry}>
         Try Again
       </Button>
-    </div>
-  );
-}
-
-// The tracer's minimal render: one row per MCU by its real MPN (never the ref_name wildcard).
-// 04-02 replaces this with the virtualized, faceted SpecMatrixTable.
-function MinimalMcuList({ rows }: { rows: McuSpecRow[] }) {
-  if (rows.length === 0) {
-    return (
-      <div className="py-16 text-center text-sm text-t3">
-        No MCUs match the current scope.
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-0.5" data-testid="stm-mcu-list">
-      {rows.map((row) => (
-        <div
-          key={row.part}
-          className="flex items-center gap-4 rounded-control px-3 py-2 hover:bg-[var(--c-hover)]"
-        >
-          <span className="tnum min-w-0 flex-1 truncate font-mono text-sm font-semibold text-t1">
-            {row.mpn_example}
-          </span>
-          <span className="w-20 flex-none font-mono text-xs text-t2">{row.core}</span>
-          <span className="w-20 flex-none font-mono text-xs text-t2">{row.series}</span>
-          <span className="w-28 flex-none font-mono text-xs text-t3">{row.package}</span>
-        </div>
-      ))}
     </div>
   );
 }
