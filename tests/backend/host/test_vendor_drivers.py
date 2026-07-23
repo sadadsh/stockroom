@@ -127,6 +127,11 @@ def test_digikey_driver_falls_through_providers_before_refreshing():
     # within the start watchdog, the attempt is already dead - fail 'nostart' at once and fall
     # through, never wait out the 150s completion backstop on it.
     assert "'started'" in js and "'nostart'" in js and "START_WD" in js
+    # ...but a heavy part's export can legitimately generate for 20-60s (live 2026-07-23, STM32:
+    # the POST was still in flight when a hard 20s nostart killed and canceled it). When the
+    # vendor's own downloading/generating indicator is visible (outside our overlay), the start
+    # watchdog extends - bounded - instead of aborting a live generation.
+    assert "senseBusy" in js and "slow generation" in js
     # A freshly (re)navigated models page can swallow the FIRST provider-row click (handler not
     # yet hydrated - live 2026-07-23, STM32 after a recovery re-navigation: the section never
     # opened and the provider fell through unused). One bounded second knock re-clicks the row
