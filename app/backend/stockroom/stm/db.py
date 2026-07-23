@@ -38,7 +38,12 @@ logger = logging.getLogger(__name__)
 #     from legacy/tools/stm32_db.py, unchanged; mcu_package_pin keyed by
 #     (mcu_id, physical_pin_number, raw_pin_name) so same-position PINREMAP
 #     identities are never collapsed.
-CLASSIFIER_REV = 1
+#   rev 2 (2026-07-23): _is_analog no longer counts the generic "GPIO"
+#     pseudo-signal's io_modes - its "Analog" entry is the analog-HiZ mode EVERY
+#     STM32 pin supports, which tagged 82 of an F407's 100 pins analog. A pin is
+#     analog only on real evidence: an ADC/DAC/COMP/OPAMP signal, or "Analog"
+#     io_modes on a NAMED (non-GPIO) signal.
+CLASSIFIER_REV = 2
 
 # Alternate-function (AF0-15 mux) revision, stamped into meta.af_schema_rev the
 # same way CLASSIFIER_REV/GEOMETRY_REV are - StmIndex.load() refuses a file
@@ -351,9 +356,17 @@ def electrical_class(pin: Pin) -> str:
 
 
 def _is_analog(pin: Pin) -> bool:
-    if any("ADC" in s.name or "DAC" in s.name for s in pin.signals):
+    """True only on real analog capability: an analog-peripheral signal (ADC/DAC/
+    COMP/OPAMP), or "Analog" io_modes on a NAMED signal. The generic "GPIO"
+    pseudo-signal is excluded - CubeMX lists Analog (the high-impedance mode)
+    among its io_modes for essentially every I/O pin, which is a power-state
+    fact, not an analog-function fact (classifier rev 2)."""
+    if any(
+        "ADC" in s.name or "DAC" in s.name or "COMP" in s.name or "OPAMP" in s.name
+        for s in pin.signals
+    ):
         return True
-    return any("Analog" in s.io_modes for s in pin.signals)
+    return any("Analog" in s.io_modes for s in pin.signals if s.name != "GPIO")
 
 
 def roles(pin: Pin) -> list[tuple[str, str]]:
