@@ -22,6 +22,7 @@ import {
   classificationTone,
   type Classification,
 } from "./compatEncoding";
+import { CompatReconcileDetail } from "./CompatReconcileDetail";
 
 const VIEW = 460;
 
@@ -99,6 +100,9 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
 
   const handleSelect = useCallback((position: string) => setSelectedPosition(position), []);
 
+  // The clicked position, looked up from the union data already in hand (no new fetch). Its per-part
+  // trail + reconcile swaps render below the map as click detail, never painted per-pad (decision 3).
+  const selected = selectedPosition != null ? (byPosition.get(selectedPosition) ?? null) : null;
   const unavailable = layout.pins.length === 0;
   // Positions the layout could not place (a perimeter position with no lqfp_side, or a ball row
   // outside the JEDEC alphabet). Surfaced as a count so a partial map never reads as the whole set.
@@ -208,6 +212,10 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
           ) : null}
         </div>
       </div>
+
+      {/* The per-part audit trail + reconcile swaps for the clicked position (COMPAT-03). Rendered
+          only on selection, never per-pad on the map (CONTEXT decision 3). */}
+      {selected ? <CompatReconcileDetail position={selected} /> : null}
     </div>
   );
 }
