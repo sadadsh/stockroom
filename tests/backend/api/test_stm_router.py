@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.stm.db import _SCHEMA, StmIndex
+from tests.backend.api.conftest import _drain_job
 
 
 def _seed_stm_index(app_ctx) -> StmIndex:
@@ -195,3 +196,52 @@ def test_rebuild_stm_index_propagates_build_errors(app_ctx, monkeypatch):
     monkeypatch.setattr(StmIndex, "build", _boom)
     with pytest.raises(RuntimeError, match="synthetic build failure"):
         app_ctx.rebuild_stm_index(_FIXTURE_CUBEMX_SOURCE)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/stm/build (03-03 task 3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_build_endpoint_runs_to_completion_and_status_reports_built(client, app_ctx):
+    app_ctx.config.stm_cubemx_source = str(_FIXTURE_CUBEMX_SOURCE)
+    r = client.post("/api/stm/build")
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+
+    out = _drain_job(client, job_id)
+    assert out["status"] == "done", out
+
+    status = client.get("/api/stm/status").json()
+    assert status["built"] is True
+    assert status["mcu_count"] > 0
+
+
+def test_build_is_single_flight_while_one_is_running(client, app_ctx):
+    import threading
+
+    event = threading.Event()
+    original_rebuild = app_ctx.rebuild_stm_index
+
+    def _blocking_rebuild(source=None, progress=None):
+        event.wait()  # blocks until the test releases it, keeping the job RUNNING
+        return original_rebuild(source, progress=progress)
+
+    app_ctx.config.stm_cubemx_source = str(_FIXTURE_CUBEMX_SOURCE)
+    app_ctx.rebuild_stm_index = _blocking_rebuild
+
+    r1 = client.post("/api/stm/build")
+    assert r1.status_code == 200
+    job_a = r1.json()["job_id"]
+
+    # job A is now blocked mid-build on the read lane; a second POST must NOT submit a new job
+    r2 = client.post("/api/stm/build")
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert body2["job_id"] == job_a
+    assert body2["already_running"] is True
+    assert len(app_ctx.jobs._jobs) == 1  # only job A was ever created
+
+    event.set()  # release the blocked build so job A can complete
+    out = _drain_job(client, job_a)
+    assert out["status"] == "done", out

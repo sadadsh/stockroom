@@ -244,4 +244,31 @@ def stm_router(require_token) -> APIRouter:
             "facets": facets,
         }
 
+    @r.post("/build")
+    def build_stm_index(request: Request) -> dict:
+        """Submit a single-flight, READ-lane background build (API-02): the build writes
+        its OWN derived sqlite, not the library git tree, so it must not occupy the single
+        write worker. Mirrors POST /api/library/rescan's check-and-submit-under-one-lock
+        shape exactly, with the STM names."""
+        ctx = request.app.state.ctx
+
+        def work(progress):
+            source = (ctx.config.stm_cubemx_source or "").strip() or stm_source.default_cubemx_source()
+            return ctx.rebuild_stm_index(source, progress=progress)
+
+        with _stm_build_lock:
+            existing = getattr(request.app.state, "stm_build_job_id", "")
+            if existing:
+                try:
+                    job = ctx.jobs.get(existing)
+                except KeyError:
+                    job = None
+                from stockroom.api.jobs import JobStatus
+
+                if job is not None and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                    return {"job_id": existing, "already_running": True}
+            job_id = ctx.jobs.submit(work, write=False)
+            request.app.state.stm_build_job_id = job_id
+            return {"job_id": job_id}
+
     return r
