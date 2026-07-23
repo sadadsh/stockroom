@@ -190,8 +190,13 @@ def test_rebuild_reparses_when_source_changes(tmp_path):
 
 _PINREMAP_XML = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <Mcu ClockTree="STM32F0" DBVersion="V3.0" Family="STM32F0" HasPowerPad="false" \
-IOType="" Line="STM32F0x0" Package="LQFP48" RefName="SYNTH_PINREMAP_Tx" \
+IOType="" Line="STM32F0x0" Package="SYNTH_PINREMAP_PKG" RefName="SYNTH_PINREMAP_Tx" \
 xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Core>Arm Cortex-M0</Core>
+    <Frequency>48</Frequency>
+    <Flash>64</Flash>
+    <Ram>8</Ram>
+    <IONb>2</IONb>
     <Voltage Max="3.6" Min="2"/>
     <Pin Name="PA9" Position="30" Type="I/O">
         <Signal Name="USART1_TX" IOModes="Alternate"/>
