@@ -25,14 +25,26 @@ import string
 #     parse_bga_position for alnum BGA/WLCSP balls (Hardware dropped these).
 #   rev 2 (2026-07-23): PACKAGE_GEOMETRY (hand-curated pitch/body/depopulation
 #     table) + audit_has_power_pad added.
-GEOMETRY_REV = 2
+#   rev 3 (2026-07-23): parse_bga_position widened to accept a leading numeric
+#     zone prefix ("1A2" -> row "1A", col 2) - discovered against the REAL
+#     all-families source (STM32MP1 SiP packages TFBGA361/257, VFBGA273/424:
+#     64 device XML use a secondary die/POP-memory ball zone labeled with a
+#     leading digit, distinct from the main perimeter grid's plain "A1" labels
+#     on the SAME device). Without this, StmIndex.build raised ValueError and
+#     refused to ingest any STM32MP1 device in these four packages - a real
+#     regression this phase's own Pitfall-2 discipline exists to catch. Never
+#     silently dropped; the zone digit is preserved IN the row identifier so
+#     "1A2" and "A2" resolve to distinct, non-colliding bga_row values.
+GEOMETRY_REV = 3
 
 # JEDEC ball-grid row letters skip 'I' (easily confused with '1'). Single letters
 # A..Z minus I (25 letters), then double letters continue the same convention
 # (AA, AB, ... skipping any second-letter I) for packages large enough to need them.
 _ROW_ALPHABET = [c for c in string.ascii_uppercase if c != "I"]
 
-_BGA_POSITION = re.compile(r"^([A-Za-z]+)(\d+)$")
+# Row group: an optional leading zone digit (STM32MP1 SiP secondary ball zones,
+# e.g. "1A2") followed by one or more row letters; column group: trailing digits.
+_BGA_POSITION = re.compile(r"^(\d*[A-Za-z]+)(\d+)$")
 
 
 def lqfp_side(pos: int, n: int) -> str | None:

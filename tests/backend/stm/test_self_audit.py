@@ -23,6 +23,26 @@ def test_clean_fixture_build_passes_the_gate():
     db_mod.run_self_audit(idx._conn)
 
 
+def test_pin_count_off_by_one_is_tolerated_but_bigger_gaps_still_raise():
+    """DELIBERATE +/-1 tolerance (see run_self_audit's docstring): a real
+    all-families build found 12 STM32WBA devices (UFQFPN32/48) where CubeMX
+    numbers the exposed thermal pad as its own distinct pin position ("33"/
+    "49"), one more than most other devices sharing that same package_name.
+    A genuine CubeMX per-device labeling quirk, not a parser regression - a
+    >=2-pin gap (the real Pitfall 2 failure mode) must still raise."""
+    idx = db_mod.StmIndex.build(FIXTURES)
+    idx._conn.execute(
+        "UPDATE mcu SET pin_count = 65 WHERE ref_name = 'STM32F030RCTx'"  # curated LQFP64: off by +1
+    )
+    db_mod.run_self_audit(idx._conn)  # must not raise
+
+    idx._conn.execute(
+        "UPDATE mcu SET pin_count = 62 WHERE ref_name = 'STM32F030RCTx'"  # off by -2
+    )
+    with pytest.raises(db_mod.StmAuditFailure):
+        db_mod.run_self_audit(idx._conn)
+
+
 def test_injected_pin_count_mismatch_raises():
     idx = db_mod.StmIndex.build(FIXTURES)
     idx._conn.execute(
@@ -55,6 +75,22 @@ def test_injected_null_spec_field_raises():
         db_mod.run_self_audit(idx._conn)
     assert "incomplete mcu_spec" in str(exc_info.value)
     assert "core" in str(exc_info.value)
+
+
+def test_null_flash_kb_or_max_freq_mhz_does_not_raise():
+    """DELIBERATE, empirically-grounded exception (see run_self_audit's
+    docstring): a real all-families build against the confirmed Windows-side
+    source (2026-07-23) found 11/2123 devices with no <Flash> element
+    (STM32H5E4/E5 external-flash variants) and 760/2123 with no <Frequency>
+    element (STM32C0/G4/H5/H7/U-series/WB/WBA/WB0/WL3/N6/MP1/MP2 among
+    others) - a genuine CubeMX data gap, not a parser defect. Only
+    core/ram_kb are hard-required (100% universal against the real source)."""
+    idx = db_mod.StmIndex.build(FIXTURES)
+    idx._conn.execute(
+        "UPDATE mcu_spec SET flash_kb = NULL, max_freq_mhz = NULL WHERE mcu_id = "
+        "(SELECT id FROM mcu WHERE ref_name = 'STM32F407V(E-G)Tx')"
+    )
+    db_mod.run_self_audit(idx._conn)  # must not raise
 
 
 def test_missing_mcu_spec_row_raises():
