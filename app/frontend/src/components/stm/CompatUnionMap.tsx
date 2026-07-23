@@ -1,6 +1,6 @@
 /**
  * CompatUnionMap (COMPAT-02/03): the live socket-union map. It lays the union's positions with the
- * SAME lib/pinMapGeometry path PinoutMap uses (CONTEXT decision 3 — reused, never reimplemented) and
+ * SAME lib/pinMapGeometry path PinoutMap uses (CONTEXT decision 3 - reused, never reimplemented) and
  * paints each position by its classification (shared / divergent / partial) instead of by pin
  * category. Status color runs through a single small classification dot per pad, never a filled pad
  * background (VIZ-02 "color is data"); the per-part audit trail is click detail, never per-pad.

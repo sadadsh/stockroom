@@ -105,7 +105,7 @@ export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null 
 /**
  * The pin's function lists, split the way the mux actually works (the defect this replaces
  * showed one undifferentiated signal list with no AF indices):
- * - "Alternate Functions": the AF0-15 muxed signals, each with its AF index — the fact the
+ * - "Alternate Functions": the AF0-15 muxed signals, each with its AF index - the fact the
  *   whole compatibility feature runs on.
  * - "Analog & System": signals that are NOT AF-muxed (ADC/DAC inputs, wakeup, RTC refs),
  *   separated so an analog input never reads as a muxable function.

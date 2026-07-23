@@ -31,7 +31,7 @@ export interface StmScope extends StmMcusArgs {
 
 const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
 
-// The STM Viewer's two co-equal sections (CONTEXT decision 10 — a tab of this page, never a new
+// The STM Viewer's two co-equal sections (CONTEXT decision 10 - a tab of this page, never a new
 // nav route): the Phase-4 explorer and the Phase-5 compatibility workbench.
 type StmTab = "explorer" | "compatibility";
 const STM_TABS: readonly TabItem<StmTab>[] = [
