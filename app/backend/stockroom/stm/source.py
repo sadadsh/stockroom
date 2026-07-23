@@ -15,11 +15,21 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from stockroom.store.machine_config import config_dir
 
 logger = logging.getLogger(__name__)
+
+# The F0-F7 families alone (Hardware's whole prior scope) are exactly six:
+# STM32F0, F1, F2, F3, F4, F7 (confirmed against legacy/tools/stm32_authority.py's
+# FAMILY_ELECTRICAL/BOOTLOADER_PINS keys). A source reporting strictly this set
+# (or fewer) is F-only by construction, never "all families" - the real
+# all-families source spans ~20+ family lines (confirmed 28 distinct root
+# Family values against the real Windows-side source this session).
+_F_ONLY_FAMILY_CEILING = 6
 
 # The two confirmed Windows-side all-families candidates (verified 2026-07-23: each
 # reports 2,136 device XML, spanning every STM32 family CubeMX ships). Order: the
@@ -85,3 +95,43 @@ def source_sha256(source_dir: Path) -> str:
     for f in files:
         h.update(f.name.encode("utf-8") + b"\0" + f.read_bytes() + b"\0")
     return h.hexdigest()
+
+
+@dataclass
+class AvailabilityReport:
+    """DATA-01 SC1's real, code-level, re-runnable "is this an all-families
+    source" check - the formal version of a one-off directory listing."""
+
+    source_path: str
+    device_xml_count: int
+    family_count: int
+    families: list[str] = field(default_factory=list)
+    all_families: bool = False
+
+
+def check_availability(source: Path) -> AvailabilityReport:
+    """Count device XML (every *.xml except families.xml, mirroring Hardware's
+    build_database family_prefix skip) and distinct root Family attribute
+    values under ``source``. all_families is True only when the source spans
+    MORE than the F0-F7 six-family set - never presented as True for a source
+    that merely looks like the WSL F-only fixture, regardless of file count.
+    """
+    source = Path(source)
+    files = sorted(p for p in source.glob("*.xml") if p.name != "families.xml")
+    families: set[str] = set()
+    for f in files:
+        try:
+            root = ET.parse(f).getroot()
+        except ET.ParseError:
+            continue
+        fam = root.get("Family", "")
+        if fam:
+            families.add(fam)
+    family_count = len(families)
+    return AvailabilityReport(
+        source_path=str(source),
+        device_xml_count=len(files),
+        family_count=family_count,
+        families=sorted(families),
+        all_families=family_count > _F_ONLY_FAMILY_CEILING,
+    )
