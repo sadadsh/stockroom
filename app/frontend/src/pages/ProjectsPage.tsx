@@ -473,6 +473,7 @@ function ProjectDetailView({
           {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
           {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
         </span>
+
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
         {/* sub-header: the project's path on the left, the view tabs on the right */}

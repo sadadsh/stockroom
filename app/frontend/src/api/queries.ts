@@ -361,6 +361,14 @@ export function useUpdateSettings() {
   });
 }
 
+export function useLoadDevCreds() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.loadDevCreds(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+  });
+}
+
 export function useProfiles() {
   return useQuery({ queryKey: ["profiles"], queryFn: () => api.listProfiles() });
 }

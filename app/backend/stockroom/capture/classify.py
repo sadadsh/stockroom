@@ -75,12 +75,26 @@ def _tool_for_reqs(reqs: set[Requirement]) -> str:
     return "mixed"
 
 
+def _is_zip(path: Path) -> bool:
+    """True if the file is a zip archive by CONTENT (magic bytes), regardless of its name."""
+    try:
+        return zipfile.is_zipfile(path)
+    except OSError:
+        return False
+
+
 def classify_asset(path: Path) -> ClassifiedAsset:
     p = Path(path)
     suffix = p.suffix.lower()
-    if suffix == ".zip":
-        return _classify_zip(p)
     reqs = _reqs_for_suffix(suffix)
+    # A vendor CAD download can arrive WITHOUT a useful suffix: WebView2 saves a download with no
+    # Content-Disposition filename as a GUID ".tmp" (live-observed 2026-07-23 for DigiKey / Ultra
+    # Librarian bundles). If the suffix carries no known requirement and is not an EDA extension, but
+    # the file is a zip by content, classify it by its members - never drop a valid bundle over its
+    # name. A recognized suffix (.kicad_sym, .schlib, ...) still wins so a stray zip-looking asset is
+    # not mis-scanned.
+    if suffix == ".zip" or (not reqs and suffix not in _KIND_FOR_SUFFIX and _is_zip(p)):
+        return _classify_zip(p)
     tool, kind = _KIND_FOR_SUFFIX.get(suffix, ("unknown", "unknown"))
     return ClassifiedAsset(tool=tool, kind=kind, requirements=reqs)
 

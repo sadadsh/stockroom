@@ -7,6 +7,7 @@ import type { PartDetail } from "../api/types";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
+import { CaptureProvider } from "../lib/capture";
 import { DetailPanel } from "./DetailPanel";
 
 // The Files cards fetch live SVG thumbnails; mock the previews so nothing hits network.
@@ -73,7 +74,9 @@ function wrap(ui: ReactNode) {
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <ToastProvider>{ui}</ToastProvider>
+        <CaptureProvider>
+          <ToastProvider>{ui}</ToastProvider>
+        </CaptureProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -228,7 +231,9 @@ describe("DetailPanel pinout (M6i)", () => {
     const view = (d: PartDetail) => (
       <QueryClientProvider client={qc}>
         <ThemeProvider>
-          <DetailPanel detail={d} {...BASE} />
+          <CaptureProvider>
+            <DetailPanel detail={d} {...BASE} />
+          </CaptureProvider>
         </ThemeProvider>
       </QueryClientProvider>
     );

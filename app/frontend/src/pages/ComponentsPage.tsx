@@ -24,6 +24,7 @@ import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
 import { useAddPart } from "../lib/addPart";
+import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
@@ -52,6 +53,13 @@ export function ComponentsPage() {
   const attachFootprint = useAttachFootprint();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
+  const { reopenPartId } = useCapture();
+
+  // The background capture pill asks to reopen its part: select it here so the detail (and its
+  // Complete-Part modal) come up. DetailPanel finishes the handoff by opening the modal.
+  useEffect(() => {
+    if (reopenPartId) setSelectedId(reopenPartId);
+  }, [reopenPartId]);
 
   // Ids that share an MPN with another part (a real accidental duplicate). Shared
   // footprints are normal and never counted. Drives the Duplicate badges and the

@@ -168,6 +168,10 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <Text id="modal.about.credit">Developed with love by </Text>
           <span className="font-medium text-t1">Sadad Haidari</span>.
         </p>
+        <p className="mt-2 text-xs text-t3">
+          <span className="font-medium">Version</span>{" "}
+          <span className="tnum font-mono">{__APP_VERSION__}</span>
+        </p>
         <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
           <a
             href="https://www.linkedin.com/in/sadadhaidari"

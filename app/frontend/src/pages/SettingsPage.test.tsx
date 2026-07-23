@@ -42,12 +42,21 @@ const BASE_SETTINGS: SettingsInfo = {
   mouser_api_key_hint: "",
   github_token_set: false,
   github_token_hint: "",
+  digikey_client_id: "",
+  digikey_client_secret_set: false,
+  digikey_client_secret_hint: "",
+  digikey_username: "",
+  digikey_password_set: false,
+  digikey_password_hint: "",
   ul_username: "",
   ul_password_set: false,
   ul_password_hint: "",
   snapeda_username: "",
   snapeda_password_set: false,
   snapeda_password_hint: "",
+  samacsys_username: "",
+  samacsys_password_set: false,
+  samacsys_password_hint: "",
   kicad_config_override: "",
   kicad_cli_override: "",
   kicad_config_dir: "/home/x/.config/kicad/10.0",
@@ -432,12 +441,12 @@ describe("SettingsPage — KiCad wiring", () => {
   });
 });
 
-describe("SettingsPage - vendor logins", () => {
+describe("SettingsPage - capture credentials", () => {
   it("saves the Ultra Librarian username and password", async () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
-    await screen.findByText("Vendor Logins");
+    await screen.findByText("Capture Credentials");
     await user.type(screen.getByLabelText("Ultra Librarian Username"), "me@x.com");
     await user.type(screen.getByLabelText("Ultra Librarian Password"), "secret");
     await user.click(
@@ -450,10 +459,73 @@ describe("SettingsPage - vendor logins", () => {
 
   it("renders the password input as type password", async () => {
     renderPage();
-    await screen.findByText("Vendor Logins");
+    await screen.findByText("Capture Credentials");
     expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute(
       "type",
       "password",
+    );
+  });
+
+  it("saves the SnapEDA username and password", async () => {
+    const user = userEvent.setup();
+    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
+    renderPage();
+    await screen.findByText("Capture Credentials");
+    await user.type(screen.getByLabelText("SnapEDA Username"), "sn@x.com");
+    await user.type(screen.getByLabelText("SnapEDA Password"), "snpw");
+    await user.click(screen.getByRole("button", { name: "Save SnapEDA Login" }));
+    expect(mockApi.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ snapeda_username: "sn@x.com", snapeda_password: "snpw" }),
+    );
+  });
+
+  it("saves the SamacSys username and password", async () => {
+    const user = userEvent.setup();
+    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
+    renderPage();
+    await screen.findByText("Capture Credentials");
+    await user.type(screen.getByLabelText("SamacSys Username"), "sam@x.com");
+    await user.type(screen.getByLabelText("SamacSys Password"), "sampw");
+    await user.click(screen.getByRole("button", { name: "Save SamacSys Login" }));
+    expect(mockApi.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ samacsys_username: "sam@x.com", samacsys_password: "sampw" }),
+    );
+  });
+
+  it("saves the DigiKey account login and masks the password input", async () => {
+    const user = userEvent.setup();
+    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
+    renderPage();
+    await screen.findByText("Capture Credentials");
+    const pass = screen.getByLabelText("DigiKey Account Password");
+    expect(pass).toHaveAttribute("type", "password");
+    await user.type(screen.getByLabelText("DigiKey Account Username"), "dk@x.com");
+    await user.type(pass, "acctpw");
+    await user.click(
+      screen.getByRole("button", { name: "Save DigiKey Account Login" }),
+    );
+    expect(mockApi.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ digikey_username: "dk@x.com", digikey_password: "acctpw" }),
+    );
+  });
+
+  it("saves the DigiKey API creds and masks the client secret input", async () => {
+    const user = userEvent.setup();
+    mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
+    renderPage();
+    await screen.findByText("Capture Credentials");
+    const secret = screen.getByLabelText("DigiKey API Client Secret");
+    expect(secret).toHaveAttribute("type", "password");
+    await user.type(screen.getByLabelText("DigiKey API Client ID"), "CLIENTID");
+    await user.type(secret, "APISECRET");
+    await user.click(
+      screen.getByRole("button", { name: "Save DigiKey API Creds" }),
+    );
+    expect(mockApi.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        digikey_client_id: "CLIENTID",
+        digikey_client_secret: "APISECRET",
+      }),
     );
   });
 });

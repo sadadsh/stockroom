@@ -16,12 +16,23 @@ import {
   isOptionOn,
   orderFacetsForRail,
   removeOption,
+  rowPrimaryValue,
+  rowMergedValue,
   sectionedRail,
   setRange,
   toSpecParams,
   toggleOption,
   type SearchFilters,
+  VALUE_COLUMN_KEY,
 } from "./searchFilters";
+
+const MIXED_FACETS: ParametricFacet[] = [
+  { key: "Resistance", label: "Resistance", kind: "range", count: 30, min: 100, max: 100000, unit: "Ω" },
+  { key: "Capacitance", label: "Capacitance", kind: "range", count: 25, min: 1e-12, max: 1e-3, unit: "F" },
+  { key: "Inductance", label: "Inductance", kind: "range", count: 12, min: 1e-9, max: 1e-3, unit: "H" },
+  { key: "Package", label: "Package", kind: "options", count: 60, options: [
+      { value: "0603", count: 30 }, { value: "0402", count: 20 }, { value: "0805", count: 10 }] },
+];
 
 const FACETS: ParametricFacet[] = [
   { key: "Resistance", label: "Resistance", kind: "range", count: 40, min: 100, max: 100000, unit: "Ω" },
@@ -150,6 +161,89 @@ describe("deriveColumns", () => {
       "Resistance",
       "Tolerance",
     ]);
+  });
+
+  it("collapses the primary-value columns into one adaptive Value column on a mixed list (FIX-05)", () => {
+    const cols = deriveColumns(MIXED_FACETS, null, 5);
+    const keys = cols.map((c) => c.key);
+    // the separate resistance/capacitance/inductance columns are gone (no more dash soup)
+    expect(keys).not.toContain("Resistance");
+    expect(keys).not.toContain("Capacitance");
+    expect(keys).not.toContain("Inductance");
+    // exactly one synthetic Value column, in the highest-ranked primary slot, non-numeric
+    const valueCols = cols.filter((c) => c.key === VALUE_COLUMN_KEY);
+    expect(valueCols).toHaveLength(1);
+    expect(valueCols[0]).toMatchObject({ label: "Value", numeric: false });
+    expect(keys[0]).toBe(VALUE_COLUMN_KEY);
+    // every OTHER ranked column is retained
+    expect(keys).toContain("Package");
+  });
+
+  it("collapses duplicate same-label columns into one adaptive column (FIX-09)", () => {
+    // Two distinct spec keys ("Voltage Rating" for resistors, "Voltage Rating DC" for caps) both
+    // resolve to the label "Voltage Rating" - pre-fix that produced two half-dashes columns.
+    const facets: ParametricFacet[] = [
+      { key: "Voltage Rating", label: "Voltage Rating", kind: "range", count: 40, min: 16, max: 200 },
+      { key: "Voltage Rating DC", label: "Voltage Rating DC", kind: "range", count: 30, min: 6.3, max: 100 },
+      { key: "Tolerance", label: "Tolerance", kind: "range", count: 50, min: 1, max: 10 },
+    ];
+    const cols = deriveColumns(facets, null, 5);
+    const voltage = cols.filter((c) => c.label === "Voltage Rating");
+    // exactly ONE "Voltage Rating" column (the two keys are merged, no more dash soup)
+    expect(voltage).toHaveLength(1);
+    // it carries both constituent keys so each row resolves its own value
+    expect(voltage[0].keys).toEqual(
+      expect.arrayContaining(["Voltage Rating", "Voltage Rating DC"]),
+    );
+    expect(voltage[0].numeric).toBe(false);
+  });
+
+  it("rowMergedValue resolves each row's value from whichever constituent key it carries (FIX-09)", () => {
+    const keys = ["Voltage Rating", "Voltage Rating DC"];
+    // a resistor row (plain key) and a cap row (DC key) each resolve their own value
+    expect(rowMergedValue({ "Voltage Rating": "75 V" }, keys)).not.toBe("—");
+    expect(rowMergedValue({ "Voltage Rating DC": "50 VDC" }, keys)).toBe(
+      cellValue({ "Voltage Rating DC": "50 VDC" }, "Voltage Rating DC"),
+    );
+    // a row with neither key falls back to the em dash
+    expect(rowMergedValue({ Package: "0603" }, keys)).toBe("—");
+  });
+
+  it("leaves a single-category list's columns unchanged (Resistance keeps its own column)", () => {
+    const keys = deriveColumns(FACETS, "Resistors", 5).map((c) => c.key);
+    expect(keys).toContain("Resistance");
+    expect(keys).not.toContain(VALUE_COLUMN_KEY);
+  });
+
+  it("does not collapse a mixed list with only ONE primary-value parameter", () => {
+    const onePrimary = MIXED_FACETS.filter(
+      (f) => f.key !== "Capacitance" && f.key !== "Inductance",
+    );
+    const keys = deriveColumns(onePrimary, null, 5).map((c) => c.key);
+    expect(keys).toContain("Resistance");
+    expect(keys).not.toContain(VALUE_COLUMN_KEY);
+  });
+});
+
+describe("rowPrimaryValue", () => {
+  it("resolves each row's own primary value from its category primary spec", () => {
+    expect(rowPrimaryValue("Resistors", { Resistance: "5.05 kOhms" })).toBe("5.05 kΩ");
+    // matches the same prettify path cellValue uses for that spec
+    expect(rowPrimaryValue("Capacitors", { Capacitance: "0.1 µF" })).toBe(
+      cellValue({ Capacitance: "0.1 µF" }, "Capacitance"),
+    );
+    expect(rowPrimaryValue("Inductors", { Inductance: "4.7 µH" })).toBe(
+      cellValue({ Inductance: "4.7 µH" }, "Inductance"),
+    );
+  });
+
+  it("falls back to a present primary-value key for a ferrite bead (impedance)", () => {
+    expect(rowPrimaryValue("Ferrite Beads", { Impedance: "600 Ohms" })).toBe("600 Ω");
+  });
+
+  it("is an em dash only when the row genuinely has no primary value", () => {
+    expect(rowPrimaryValue("ICs", { "Product Type": "MCU" })).toBe("—");
+    expect(rowPrimaryValue("Resistors", {})).toBe("—");
   });
 });
 

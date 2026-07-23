@@ -10,6 +10,7 @@ import { ThemeProvider } from "./lib/theme";
 import { DevModeProvider } from "./lib/devMode";
 import { DevPanel } from "./components/DevPanel";
 import { DevInspector } from "./components/DevInspector";
+import { CaptureProvider } from "./lib/capture";
 // The interface face, bundled offline (no CDN) so it renders identically inside
 // WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
 // carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
@@ -44,9 +45,11 @@ createRoot(rootEl).render(
           <DevModeProvider>
             <ToastProvider>
               <RouterProvider>
-                <AddPartProvider>
-                  <App />
-                </AddPartProvider>
+                <CaptureProvider>
+                  <AddPartProvider>
+                    <App />
+                  </AddPartProvider>
+                </CaptureProvider>
               </RouterProvider>
             </ToastProvider>
             <DevPanel />

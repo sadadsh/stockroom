@@ -7,6 +7,7 @@ import type { PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
+import { CaptureProvider } from "../lib/capture";
 import { CompletePartModal } from "./CompletePartModal";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -14,7 +15,7 @@ function wrapper({ children }: { children: ReactNode }) {
   return createElement(
     QueryClientProvider,
     { client: qc },
-    createElement(ToastProvider, null, children),
+    createElement(CaptureProvider, null, createElement(ToastProvider, null, children)),
   );
 }
 
@@ -28,7 +29,11 @@ function devWrapper({ children }: { children: ReactNode }) {
     createElement(
       ThemeProvider,
       null,
-      createElement(DevModeProvider, null, createElement(ToastProvider, null, children)),
+      createElement(
+        DevModeProvider,
+        null,
+        createElement(CaptureProvider, null, createElement(ToastProvider, null, children)),
+      ),
     ),
   );
 }
@@ -82,9 +87,9 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
 
 function mockCadSource(needs: string[]) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
-    url: "https://app.ultralibrarian.com/search?queryText=BQ24074",
+    url: "https://www.digikey.com/en/products/result?keywords=BQ24074",
     mpn: "BQ24074",
-    vendor: "UltraLibrarian",
+    vendor: "DigiKey",
     needs,
   } as never);
 }
@@ -98,23 +103,22 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
+const track = (tool: string) => document.querySelector(`[data-track='${tool}']`) as HTMLElement;
+
 describe("CompletePartModal - guided capture", () => {
-  it("renders the both-format checklist and the guided button", async () => {
+  it("lays out the FILES and DETAILS regions with the both-format checklist", async () => {
     mockCadSource(["kicad_symbol", "kicad_footprint", "altium_symbol"]);
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
 
-    expect(await screen.findByText("CAD Files")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Get CAD Files (KiCad + Altium)" }),
-    ).toBeInTheDocument();
-    const kicadGroup = screen.getByText("KiCad").parentElement as HTMLElement;
-    const altiumGroup = screen.getByText("Altium").parentElement as HTMLElement;
-    // Each needed row renders under its tool group.
-    expect(within(kicadGroup).getByText("Symbol")).toBeInTheDocument();
-    expect(within(kicadGroup).getByText("Footprint")).toBeInTheDocument();
-    expect(within(altiumGroup).getByText("Symbol")).toBeInTheDocument();
+    expect(await screen.findByText("Files")).toBeInTheDocument();
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Get Files" })).toBeInTheDocument();
+    // Each needed row renders under its tool track.
+    expect(within(track("KiCad")).getByText("Symbol")).toBeInTheDocument();
+    expect(within(track("KiCad")).getByText("Footprint")).toBeInTheDocument();
+    expect(within(track("Altium")).getByText("Symbol")).toBeInTheDocument();
     // KiCad 3D Model was not needed here, so it is not listed.
-    expect(within(kicadGroup).queryByText("3D Model")).toBeNull();
+    expect(within(track("KiCad")).queryByText("3D Model")).toBeNull();
   });
 
   it("marks a requirement received when a capture lands", async () => {
@@ -134,8 +138,8 @@ describe("CompletePartModal - guided capture", () => {
     vi.spyOn(api, "assetsCommit").mockResolvedValue({} as never);
 
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
-    await screen.findByText("CAD Files");
-    await user.click(screen.getByRole("button", { name: "Get CAD Files (KiCad + Altium)" }));
+    await screen.findByText("Files");
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
 
     await act(async () => {
       window.__STOCKROOM_CAD_DOWNLOAD__!({
@@ -146,11 +150,68 @@ describe("CompletePartModal - guided capture", () => {
       await Promise.resolve();
     });
 
-    // The KiCad Symbol row (the first "Symbol" row) flips to received.
     await waitFor(() => {
-      const kicadGroup = screen.getByText("KiCad").parentElement as HTMLElement;
-      expect(within(kicadGroup).getByText("Received")).toBeInTheDocument();
+      expect(within(track("KiCad")).getByText("Received")).toBeInTheDocument();
     });
+  });
+
+  it("names DigiKey in the guided-capture subline, never a placeholder vendor", async () => {
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+    await screen.findByText("Files");
+    expect(screen.getByText(/from DigiKey\.?$/)).toBeInTheDocument();
+    expect(screen.queryByText(/the vendor/)).toBeNull();
+  });
+
+  it("makes Get Files the accent primary and Browse For Files the quiet secondary", async () => {
+    mockCadSource(["kicad_symbol"]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+    const getFiles = await screen.findByRole("button", { name: "Get Files" });
+    const browse = screen.getByRole("button", { name: "Browse For Files" });
+    // the accent variant carries the solid accent background; the quiet fallback does not
+    expect(getFiles.className).toContain("bg-acc");
+    expect(browse.className).not.toContain("bg-acc");
+  });
+
+  it("never shows an asset word as both Added and Needed: DETAILS is metadata-only when FILES owns the assets", async () => {
+    // A part that already HAS a KiCad symbol but needs the Altium symbol + footprint. Before the
+    // fix, Symbol read "Added" in DETAILS and "Needed" in FILES at once.
+    const withSymbol = { ...DETAIL, symbol: { name: "BQ24074" } } as unknown as PartDetail;
+    mockCadSource(["altium_symbol", "altium_footprint"]);
+    render(<CompletePartModal detail={withSymbol} hasModel={true} onClose={() => {}} />, { wrapper });
+    await screen.findByText("Files");
+
+    // FILES owns the whole asset story: Symbol + Footprint live only under the Altium track, Needed.
+    expect(within(track("Altium")).getByText("Symbol")).toBeInTheDocument();
+    expect(within(track("Altium")).getByText("Footprint")).toBeInTheDocument();
+    expect(within(track("Altium")).getAllByText("Needed")).toHaveLength(2);
+
+    // DETAILS is metadata-only: no Symbol, Footprint, or 3D Model row survives when FILES owns them.
+    const details = screen.getByText("Details").closest("section") as HTMLElement;
+    expect(within(details).queryByText("Symbol")).toBeNull();
+    expect(within(details).queryByText("Footprint")).toBeNull();
+    expect(within(details).queryByText("3D Model")).toBeNull();
+
+    // So no asset word carries two conflicting statuses: Symbol appears exactly once, and not "Added".
+    expect(screen.getAllByText("Symbol")).toHaveLength(1);
+    expect(screen.getAllByText("Footprint")).toHaveLength(1);
+  });
+
+  it("hands the capture to the background and closes on Keep Working", async () => {
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    const open = vi.fn().mockResolvedValue("tok");
+    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
+      api: { open_cad_download: open },
+    };
+    const onClose = vi.fn();
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={onClose} />, { wrapper });
+    await screen.findByText("Files");
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+    // once capturing, Keep Working appears and hands off + closes
+    const keep = await screen.findByRole("button", { name: "Keep Working" });
+    await user.click(keep);
+    expect(onClose).toHaveBeenCalled();
   });
 });
 
@@ -169,9 +230,11 @@ describe("CompletePartModal - copy + icon adoption", () => {
       { wrapper: devWrapper },
     );
 
-    // Title + CAD section render their default text (no override).
-    expect(await screen.findByText("Complete This Part")).toBeInTheDocument();
-    expect(await screen.findByText("CAD Files")).toBeInTheDocument();
+    // Subtitle + CAD section render their default text (no override).
+    expect(
+      await screen.findByText("Add the files and data this part still needs."),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Guided Capture")).toBeInTheDocument();
     // The three glyphs (modal.check on rows, action.download on the CAD button, modal.close on the
     // header button) all draw as <svg> via <Icon>.
     expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(3);
@@ -193,13 +256,14 @@ describe("CompletePartModal - copy + icon adoption", () => {
       { wrapper: devWrapper },
     );
     // Wait for the CAD section (async cad-source query) so cad-title / row-symbol are mounted.
-    await screen.findByText("CAD Files");
+    await screen.findByText("Guided Capture");
 
     toggleDevMode();
 
-    // A cross-section of the wrapped surface: the title (inline), a row label sourced from an array
-    // (row-symbol), an array/helper-fed CAD title, and the requirement Add button (req-add).
-    expect(container.querySelector('[data-copy-id="modal.completePart.title"]')).not.toBeNull();
+    // A cross-section of the wrapped surface: the subtitle (inline; the header title is the
+    // part's own name, not copy), a row label sourced from an array (row-symbol), an
+    // array/helper-fed CAD title, and the requirement Add button (req-add).
+    expect(container.querySelector('[data-copy-id="modal.completePart.subtitle"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.completePart.cad-title"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.completePart.row-symbol"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="modal.completePart.req-add"]')).not.toBeNull();
@@ -210,7 +274,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
     render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
       wrapper: devWrapper,
     });
-    await screen.findByText("Complete This Part");
+    await screen.findByText("Add the files and data this part still needs.");
 
     expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
