@@ -12,6 +12,7 @@ import type {
   DevSaveBody,
   DevSaveResult,
   AltiumStatus,
+  OdbcStatus,
   AuditResult,
   BomDiffResult,
   BomExportKind,
@@ -999,6 +1000,12 @@ export const api = {
   // The Altium Database Library status for the active profile: place-ready count + per-part rows.
   altiumStatus(): Promise<AltiumStatus> {
     return apiGet<AltiumStatus>("/api/altium/status");
+  },
+
+  // Whether the 64-bit SQLite3 ODBC driver Altium needs to read the DbLib is registered on this
+  // machine (null off Windows), plus where to download it. Machine-level, not profile-scoped.
+  altiumOdbcStatus(): Promise<OdbcStatus> {
+    return apiGet<OdbcStatus>("/api/altium/odbc-status");
   },
 
   // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).

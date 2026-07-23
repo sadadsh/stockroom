@@ -906,6 +906,18 @@ export function useAltiumStatus() {
   return useQuery({ queryKey: ["altium-status"], queryFn: () => api.altiumStatus() });
 }
 
+// Whether the machine's 64-bit SQLite3 ODBC driver is registered. Machine-level (not per-profile),
+// and it changes out-of-band when the user runs the installer, so re-check on window focus: after
+// installing in the opened browser and returning to the app, the section reflects it without a
+// manual refresh.
+export function useOdbcStatus() {
+  return useQuery({
+    queryKey: ["altium-odbc-status"],
+    queryFn: () => api.altiumOdbcStatus(),
+    refetchOnWindowFocus: true,
+  });
+}
+
 // Regenerate the DbLib over every place-ready part. A write (commits + may push), so it refreshes
 // the status the count is read from.
 export function useAltiumRegenerate() {

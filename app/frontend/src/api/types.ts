@@ -1443,6 +1443,14 @@ export interface AltiumStatus {
   rows: AltiumStatusRow[];
 }
 
+// GET /api/altium/odbc-status -> whether the 64-bit SQLite3 ODBC driver Altium needs to read the
+// DbLib is registered on this machine. `installed` is null off Windows, where it cannot be checked.
+export interface OdbcStatus {
+  installed: boolean | null;
+  driver: string;
+  download_url: string;
+}
+
 export interface AltiumRegenerateResult {
   emitted: number;
   skipped: string[];

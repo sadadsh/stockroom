@@ -181,6 +181,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "altiumdb.section", label: "Altium DbLib settings section", area: "altiumdb" },
   { id: "altiumdb.section-progress", label: "DbLib ready meter", area: "altiumdb" },
   { id: "altiumdb.section-path", label: "DbLib install path row", area: "altiumdb" },
+  { id: "altiumdb.section-odbc", label: "ODBC driver status + download", area: "altiumdb" },
   { id: "altiumdb.section-actions", label: "Regenerate / View Library", area: "altiumdb" },
   { id: "altiumdb.modal", label: "Altium DbLib modal", area: "altiumdb" },
   { id: "altiumdb.modal-filter", label: "DbLib filter control", area: "altiumdb" },

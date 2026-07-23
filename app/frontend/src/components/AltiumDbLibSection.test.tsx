@@ -10,11 +10,23 @@ vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
   return {
     ...actual,
-    api: { altiumStatus: vi.fn(), altiumRegenerate: vi.fn(), altiumAttach: vi.fn() },
+    api: {
+      altiumStatus: vi.fn(),
+      altiumRegenerate: vi.fn(),
+      altiumAttach: vi.fn(),
+      altiumOdbcStatus: vi.fn(),
+    },
   };
 });
 
 const mockApi = vi.mocked(api);
+
+const ODBC_URL = "http://www.ch-werner.de/sqliteodbc/sqliteodbc_w64.exe";
+const odbc = (installed: boolean | null) => ({
+  installed,
+  driver: "SQLite3 ODBC Driver",
+  download_url: ODBC_URL,
+});
 
 const STATUS: AltiumStatus = {
   profile: "Main",
@@ -42,6 +54,12 @@ function renderSection() {
 }
 
 describe("AltiumDbLibSection", () => {
+  beforeEach(() => {
+    // default the machine-level ODBC probe so the existing status tests don't have to; each ODBC
+    // test overrides it. null = the honest off-Windows answer.
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(null));
+  });
+
   it("shows the place-ready ratio, active profile, and install path", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     renderSection();
@@ -75,5 +93,35 @@ describe("AltiumDbLibSection", () => {
     await userEvent.click(screen.getByRole("button", { name: /View Library/ }));
 
     expect(await screen.findByRole("dialog", { name: "Altium Database Library" })).toBeInTheDocument();
+  });
+
+  it("reports the ODBC driver as Not Installed and offers the official installer when it is absent", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(false));
+    renderSection();
+
+    expect(await screen.findByText("Not Installed")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /Download Driver/ });
+    expect(link).toHaveAttribute("href", ODBC_URL);
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  });
+
+  it("reports the ODBC driver as Installed and hides the download when it is present", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(true));
+    renderSection();
+
+    expect(await screen.findByText("Installed")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
+  });
+
+  it("stays honest off Windows, where the driver cannot be verified, and offers no download", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(null));
+    renderSection();
+
+    expect(await screen.findByText(/cannot be verified/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
   });
 });
