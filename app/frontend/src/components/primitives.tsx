@@ -508,7 +508,7 @@ export function Field({
   if (stacked) {
     return (
       <div className={cx("py-1.5", className)}>
-        <div className="text-2xs text-t3">{label}</div>
+        <div className="text-2xs text-t2">{label}</div>
         <div className={cx("mt-0.5 break-words text-sm text-t1", mono && "font-mono tnum")}>
           {content}
         </div>
@@ -517,7 +517,7 @@ export function Field({
   }
   return (
     <div className={cx("flex items-baseline justify-between gap-4 py-1.5", className)}>
-      <span className="flex-none text-sm text-t3">{label}</span>
+      <span className="flex-none text-sm text-t2">{label}</span>
       <span className={cx("min-w-0 text-right text-sm text-t1", mono && "font-mono tnum")}>
         {content}
       </span>

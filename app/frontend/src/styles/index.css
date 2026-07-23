@@ -29,8 +29,10 @@
        that carries panel title strips and the bottom status bar (sampled #404040). */
     --c-band: #3f4043;
     --c-t1: #d7d8da;
-    --c-t2: #9a9c9f;
-    --c-t3: #6d6f73;
+    /* muted tiers lightened for legibility on the medium charcoal: the shipped #9a9c9f/#6d6f73
+       measured ~2.6:1 for faint text (below the AA floor); these clear ~3.5-5:1. */
+    --c-t2: #a9adb2;
+    --c-t3: #878b90;
     --c-ok: #58a97f;
     --c-warn: #cf9a44;
     --c-err: #d0564e;
@@ -106,7 +108,7 @@
     --c-band: #e7e8ea;
     --c-t1: #202225;
     --c-t2: #56585d;
-    --c-t3: #85878c;
+    --c-t3: #767980;
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;

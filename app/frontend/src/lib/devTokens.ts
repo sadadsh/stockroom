@@ -92,7 +92,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#9a9c9f", light: "#56585d" },
+    default: { dark: "#a9adb2", light: "#56585d" },
   },
   {
     cssVar: "--c-t3",
@@ -100,7 +100,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#6d6f73", light: "#85878c" },
+    default: { dark: "#878b90", light: "#767980" },
   },
   // --- Status --------------------------------------------------------------
   {
