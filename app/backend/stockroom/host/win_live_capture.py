@@ -192,13 +192,19 @@ def _resolve_digikey_url(mpn: str):
 def _drive_live(webview, base: str, captured: list, result: dict) -> None:
     import os
 
+    import urllib.parse
+
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "2N7002")
     url = os.environ.get("STOCKROOM_LIVE_URL", "")
     if not url:
-        url = _resolve_digikey_url(os.environ.get("STOCKROOM_LIVE_MPN", "2N7002")) or ""
-    result["url"] = url
+        url = _resolve_digikey_url(mpn) or ""
     if not url:
-        result["error"] = "no DigiKey URL resolved (check DigiKey API creds in config)"
-        return
+        # No DigiKey API creds -> no exact product page. Still open the DigiKey SEARCH page so the
+        # HUD + adaptive driver run against a REAL DigiKey page. The CAD/EDA section lives on the
+        # product page, so this validates injection + page-open, not the CAD-section find itself.
+        url = "https://www.digikey.com/en/products/result?keywords=" + urllib.parse.quote_plus(mpn)
+        result["url_is_search_fallback"] = True
+    result["url"] = url
     time.sleep(1.5)
     W._HostApi().open_cad_download(url, ["kicad_symbol", "altium_symbol", "altium_footprint"])
     # The DigiKey driver polls + scrolls asynchronously in the page for ~11s to catch the
@@ -208,8 +214,13 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
     try:
         result["overlay_present"] = bool(cad.evaluate_js("!!document.getElementById('__stockroom_overlay__')"))
         result["page_title"] = cad.evaluate_js("document.title||''") or ""
-        result["status_text"] = (
-            cad.evaluate_js("(document.getElementById('__stockroom_overlay_status__')||{}).textContent||''") or ""
+        # The rebuilt HUD (Phase 3): the current auto-action line + the X / Y meter, not the old
+        # single status element. These say what the adaptive driver reported on the live page.
+        result["action_text"] = (
+            cad.evaluate_js("(document.getElementById('__stockroom_action__')||{}).textContent||''") or ""
+        )
+        result["meter_text"] = (
+            cad.evaluate_js("(document.getElementById('__stockroom_meter__')||{}).textContent||''") or ""
         )
         # did the page actually scroll? (a custom scroll container would leave window.scrollY at 0)
         result["scrollY"] = cad.evaluate_js("Math.round(window.scrollY||0)")
@@ -230,11 +241,39 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
             )
             or "[]"
         )
+        # OWNER-VALIDATE selector tuning: dump the download-ish controls in the CAD section so the
+        # real provider markup (Ultra Librarian / SnapEDA / SamacSys buttons/links) is visible.
+        result["cad_controls"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('a,button,img')).filter(function(e){"
+                "var t=((e.textContent||'')+' '+(e.getAttribute('href')||'')+' '+(e.getAttribute('aria-label')||'')"
+                "+' '+(e.getAttribute('alt')||'')+' '+(e.getAttribute('data-provider')||'')+' '+(e.className||'')).toLowerCase();"
+                "return /ultra|snapeda|samacsys|library.?loader|download|symbol|footprint|3d model|eda|cad model/.test(t);})"
+                ".map(function(e){return e.tagName+'|'+((e.textContent||'').trim().slice(0,30))+'|href='+((e.getAttribute('href')||'').slice(0,50))"
+                "+'|alt='+((e.getAttribute('alt')||'').slice(0,25))+'|cls='+((e.className||'').toString().slice(0,50));}).slice(0,30))"
+            )
+            or "[]"
+        )
+        # Confirm whether the CAD section is login-gated (does it prompt to sign in?)
+        result["cad_section_text"] = (
+            cad.evaluate_js(
+                "(function(){var ns=document.querySelectorAll('div,section');"
+                "for(var i=0;i<ns.length;i++){var t=(ns[i].textContent||'');"
+                "if(/eda\\s*\\/?\\s*cad models/i.test(t)&&ns[i].children.length<50&&t.length<1500){"
+                "return t.replace(/\\s+/g,' ').trim().slice(0,700);}}return '';})()"
+            )
+            or ""
+        )
     except Exception as e:  # noqa: BLE001
         result["error"] = repr(e)
-    # PASS = the page loaded, the overlay rendered, and the driver located + guided to the CAD
-    # section (its found-it message, distinct from the not-found guidance).
-    result["found_cad"] = "from this CAD Models section" in str(result.get("status_text", ""))
+    # PASS: the rebuilt HUD injected on the real page (overlay present) AND the DigiKey CAD/EDA
+    # section actually exists on the page (cad_text_hits) for the adaptive driver to act on. The
+    # live provider detection + multi-provider download are read from action_text + the screenshot.
+    try:
+        _hits = json.loads(str(result.get("cad_text_hits", "[]")))
+    except (ValueError, TypeError):
+        _hits = []
+    result["found_cad"] = len(_hits) > 0
     result["ok"] = bool(result.get("overlay_present")) and result["found_cad"]
     try:
         from PIL import ImageGrab
@@ -244,7 +283,6 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         result["screenshot"] = out
     except Exception as e:  # noqa: BLE001
         result["screenshot_error"] = repr(e)
-    result["ok"] = bool(result.get("overlay_present"))
 
 
 def main() -> int:
