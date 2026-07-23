@@ -47,13 +47,15 @@ function Section({
   title,
   hint,
   children,
+  "data-dev-id": devId,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
+  "data-dev-id"?: string;
 }) {
   return (
-    <section className="mb-7">
+    <section className="mb-7" data-dev-id={devId}>
       <Eyebrow className="mb-2">{title}</Eyebrow>
       {hint ? <p className="mb-2.5 text-xs text-t3">{hint}</p> : null}
       <Card className="px-4 py-3.5">{children}</Card>
@@ -72,9 +74,9 @@ function StatusRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function SettingsPage() {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]" data-dev-id="settings.root">
       <div className="mx-auto max-w-[860px] pb-12">
-        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1">Settings</h1>
+        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1" data-dev-id="settings.title">Settings</h1>
         <AppearanceSection />
           <ProfilesSection />
           <SyncSection />
@@ -98,10 +100,10 @@ function AppearanceSection() {
     { value: "light", label: "Light" },
   ];
   return (
-    <Section title="Appearance" hint="The theme is remembered the next time the window opens.">
+    <Section title="Appearance" hint="The theme is remembered the next time the window opens." data-dev-id="settings.appearance">
       <div className="flex items-center justify-between">
         <span className="text-sm text-t2">Theme</span>
-        <div className="inline-flex rounded-card border border-line2 p-0.5">
+        <div className="inline-flex rounded-card border border-line2 p-0.5" data-dev-id="settings.appearance-theme">
           {options.map((o) => (
             <button
               key={o.value}
@@ -178,6 +180,7 @@ function ProfilesSection() {
     <Section
       title="Component Profiles"
       hint="Each profile is a separate set of components on disk. Switching one reloads the whole component view."
+      data-dev-id="settings.profiles"
     >
       {profiles.isLoading ? (
         <p className="py-1 text-sm text-t3">Loading profiles...</p>
@@ -191,6 +194,7 @@ function ProfilesSection() {
               <div
                 key={name}
                 data-profile-row
+                data-dev-id="settings.profiles-row"
                 className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0"
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -221,7 +225,7 @@ function ProfilesSection() {
         </div>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.profiles-create">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -309,6 +313,7 @@ function SyncSection() {
     <Section
       title="Component Sync"
       hint="Sync your components with the remote. Offline and divergence are reported, never guessed."
+      data-dev-id="settings.sync"
     >
       {status.isLoading ? (
         <p className="py-1 text-sm text-t3">Checking sync status...</p>
@@ -335,7 +340,7 @@ function SyncSection() {
         </>
       ) : null}
       <div className="mt-3.5 flex items-center gap-3">
-        <Button variant="accent" onClick={onSync} disabled={sync.isPending}>
+        <Button variant="accent" onClick={onSync} disabled={sync.isPending} data-dev-id="settings.sync-action">
           {sync.isPending ? "Syncing..." : "Sync Now"}
         </Button>
         {sync.data ? (
@@ -410,6 +415,7 @@ function KiCadSection() {
     <Section
       title="KiCad"
       hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile switch. Leave the overrides blank to auto-detect."
+      data-dev-id="settings.kicad"
     >
       {sys.isLoading ? (
         <p className="py-1 text-sm text-t3">Reading KiCad status...</p>
@@ -450,7 +456,7 @@ function KiCadSection() {
       {sys.data ? (
         <div className="mt-3.5 flex flex-col gap-3">
           <div>
-            <Button onClick={onWire} disabled={wireBusy}>
+            <Button onClick={onWire} disabled={wireBusy} data-dev-id="settings.kicad-wire">
               {wireBusy ? "Wiring..." : "Wire KiCad"}
             </Button>
           </div>
@@ -484,7 +490,7 @@ function KiCadSection() {
         </div>
       ) : null}
 
-      <div className="mt-3.5 flex flex-col gap-2.5">
+      <div className="mt-3.5 flex flex-col gap-2.5" data-dev-id="settings.kicad-overrides">
         <div className="flex flex-wrap items-center gap-2.5">
           <label
             htmlFor="kicad-config-override"
@@ -566,6 +572,7 @@ function DistributorSection() {
     <Section
       title="Distributor"
       hint="An optional Mouser API key lets enrichment supplement scraping. Enrichment works without it; the key is stored per machine and never shown again."
+      data-dev-id="settings.distributor"
     >
       <StatusRow
         label="Mouser API Key"
@@ -577,7 +584,7 @@ function DistributorSection() {
               : "Not set"
         }
       />
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.distributor-key">
         <label htmlFor="mouser-key" className="sr-only">
           Mouser API Key
         </label>
@@ -636,7 +643,7 @@ function VendorLogin({
   }, [savedUsername, edited]);
   const slug = label.toLowerCase().replace(/\s+/g, "-");
   return (
-    <div className="border-b border-line py-3 last:border-b-0">
+    <div className="border-b border-line py-3 last:border-b-0" data-dev-id="settings.vendor-login-row">
       <div className="mb-2 flex items-center justify-between gap-4">
         <span className="text-sm font-medium text-t1">{label}</span>
         <span className="flex-none text-xs text-t3">
@@ -700,6 +707,7 @@ function VendorLoginsSection() {
     <Section
       title="Vendor Logins"
       hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window sign you in and stay logged in across parts. They are stored per machine and the password is never shown again."
+      data-dev-id="settings.vendor-logins"
     >
       <VendorLogin
         label="Ultra Librarian"
@@ -772,6 +780,7 @@ function GitHubSection() {
     <Section
       title="GitHub"
       hint="Connect a GitHub personal access token so adding or editing a part pushes it to your components repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
+      data-dev-id="settings.github"
     >
       <StatusRow
         label="Connection"
@@ -783,7 +792,7 @@ function GitHubSection() {
               : "Not connected"
         }
       />
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.github-token">
         <label htmlFor="github-token" className="sr-only">
           GitHub Personal Access Token
         </label>
@@ -838,6 +847,7 @@ function UpdateSection() {
     <Section
       title="App Update"
       hint="Pull the latest app from its repository. A non-fast-forward is surfaced, never force-applied."
+      data-dev-id="settings.update"
     >
       {check.isLoading ? (
         <p className="py-1 text-sm text-t3">Checking for updates...</p>
@@ -859,7 +869,7 @@ function UpdateSection() {
       )}
       <div className="mt-3.5 flex items-center gap-3">
         {available ? (
-          <Button variant="accent" onClick={onApply} disabled={apply.isPending}>
+          <Button variant="accent" onClick={onApply} disabled={apply.isPending} data-dev-id="settings.update-apply">
             {apply.isPending ? "Applying..." : "Apply Update"}
           </Button>
         ) : null}

@@ -107,6 +107,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label="Altium Database Library"
+        data-dev-id="altiumdb.modal"
         className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
@@ -127,7 +128,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-4 px-5 py-3">
+        <div className="flex items-center justify-between gap-4 px-5 py-3" data-dev-id="altiumdb.modal-filter">
           <SegmentedControl<Filter>
             aria-label="Filter parts"
             value={filter}
@@ -158,7 +159,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
               </span>
             </div>
           ) : (
-            <table className="w-full table-fixed border-collapse">
+            <table className="w-full table-fixed border-collapse" data-dev-id="altiumdb.modal-table">
               <thead>
                 <tr>
                   <th className={TH}>Part</th>
@@ -205,6 +206,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
                           onClick={() => onAttach(row)}
                           disabled={busy}
                           icon={<UploadIcon className="h-3.5 w-3.5" />}
+                          data-dev-id="altiumdb.modal-attach"
                         >
                           {attachingId === row.id ? "Attaching..." : "Attach Files"}
                         </Button>
