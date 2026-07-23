@@ -46,12 +46,19 @@ _FIXTURE_FALLBACK = Path.home() / "git" / "STMP" / "src" / "cubemx_db" / "mcu"
 def default_cubemx_source() -> Path | None:
     """Locate the CubeMX MCU XML directory, or None if nothing is found.
 
-    STM32_CUBEMX (or the legacy HWKIT_CUBEMX) wins outright when set and valid.
+    MachineConfig.stm_cubemx_source (the settings-page-less, PATCH /api/settings
+    -settable override, Phase 3 API-02) wins outright when set and valid.
+    Otherwise STM32_CUBEMX (or the legacy HWKIT_CUBEMX) wins when set and valid.
     Otherwise the confirmed Windows-side all-families candidates are tried first;
     only if neither exists does this fall back to the WSL F-only fixture, with a
     loud warning log line so the fallback is never silently mistaken for coverage
     of every family.
     """
+    from stockroom.store.machine_config import MachineConfig
+
+    configured = (MachineConfig.load().stm_cubemx_source or "").strip()
+    if configured and Path(configured).is_dir():
+        return Path(configured)
     env = os.environ.get("STM32_CUBEMX") or os.environ.get("HWKIT_CUBEMX")
     if env and Path(env).is_dir():
         return Path(env)
