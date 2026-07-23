@@ -202,3 +202,83 @@ describe("dev mode selection state", () => {
     }).not.toThrow();
   });
 });
+
+// --- Dev Mode v2 icon overrides (D-02 resolve through context / D-04 save writes the icons block) --
+
+describe("dev mode icon overrides", () => {
+  it("carries a working icon body into the icons block of the save payload", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    act(() => result.current.setIconBody("action.add", '<circle cx="12" cy="12" r="5"/>'));
+    await act(async () => {
+      await result.current.save();
+    });
+    const arg = mockApi.devSave.mock.calls[0][0];
+    expect(arg.icons?.["action.add"]?.body).toBe('<circle cx="12" cy="12" r="5"/>');
+  });
+
+  it("carries a working swapToId into the icons block of the save payload", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    act(() => result.current.setIconSwap("action.add", "action.trash"));
+    await act(async () => {
+      await result.current.save();
+    });
+    const arg = mockApi.devSave.mock.calls[0][0];
+    expect(arg.icons?.["action.add"]?.swapToId).toBe("action.trash");
+  });
+
+  it("resetIcon clears the override and drops the id from the next save's icons block", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    act(() => result.current.setIconBody("action.add", '<circle cx="12" cy="12" r="5"/>'));
+    expect(result.current.isIconOverridden("action.add")).toBe(true);
+
+    act(() => result.current.resetIcon("action.add"));
+    expect(result.current.isIconOverridden("action.add")).toBe(false);
+
+    await act(async () => {
+      await result.current.save();
+    });
+    const arg = mockApi.devSave.mock.calls[0][0];
+    expect(arg.icons?.["action.add"]).toBeUndefined();
+  });
+
+  it("dirty tracks an icon edit and resetAll clears icons alongside tokens/copy", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    expect(result.current.dirty).toBe(false);
+
+    act(() => result.current.setIconBody("action.add", '<circle cx="12" cy="12" r="5"/>'));
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.isIconOverridden("action.add")).toBe(true);
+
+    act(() => result.current.resetAll());
+    expect(result.current.isIconOverridden("action.add")).toBe(false);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("dirty returns to false after a save sets the icon baseline", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    act(() => result.current.setIconBody("action.add", '<circle cx="12" cy="12" r="5"/>'));
+    expect(result.current.dirty).toBe(true);
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("exposes committed icon overrides inertly on the DEFAULT no-op context", () => {
+    // No provider: resolveIconOverride / iconOverrideFor read the committed ICON_OVERRIDES, so an
+    // unprovided <Icon> resolves exactly as today; the setters are inert no-ops.
+    const { result } = renderHook(() => useDevMode());
+    expect(result.current.resolveIconOverride("action.add")).toBeUndefined();
+    expect(result.current.isIconOverridden("action.add")).toBe(false);
+    expect(() => {
+      result.current.setIconBody("action.add", "<circle/>");
+      result.current.setIconSwap("action.add", "action.trash");
+      result.current.resetIcon("action.add");
+    }).not.toThrow();
+  });
+});

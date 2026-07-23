@@ -1,6 +1,8 @@
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Icon, sanitizeIconBody } from "./Icon";
+import { ThemeProvider } from "../lib/theme";
+import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { ICON_BY_ID } from "../lib/iconRegistry";
 import { ICON_OVERRIDES } from "../lib/icon.overrides";
 
@@ -125,6 +127,109 @@ describe("Icon - safety", () => {
   it("keeps a local #fragment ref and inline theme-var style", () => {
     const body = '<rect fill="url(#grad)" style="stroke:var(--c-icon-line)"/>';
     expect(sanitizeIconBody(body)).toBe(body);
+  });
+});
+
+// --- Dev Mode v2: <Icon> resolves overrides through the context + advertises its id in dev mode ---
+
+// A control harness: renders <Icon id> inside real providers, with buttons that drive the working
+// override state and the dev-mode toggle, so a test can prove a working edit renders live (D-02).
+const OVERRIDE_BODY = '<circle cx="12" cy="12" r="5"/>';
+
+function Controls({ id }: { id: string }) {
+  const dm = useDevMode();
+  return (
+    <>
+      <button type="button" onClick={() => dm.setIconBody(id, OVERRIDE_BODY)}>
+        set-body
+      </button>
+      <button type="button" onClick={() => dm.setIconSwap(id, "action.trash")}>
+        set-swap
+      </button>
+      <button type="button" onClick={() => dm.toggle()}>
+        toggle-dev
+      </button>
+      <Icon id={id} />
+    </>
+  );
+}
+
+function renderProvided(id: string) {
+  const utils = render(
+    <ThemeProvider>
+      <DevModeProvider>
+        <Controls id={id} />
+      </DevModeProvider>
+    </ThemeProvider>,
+  );
+  return { ...utils, svg: () => utils.container.querySelector("svg") };
+}
+
+afterEach(() => {
+  // The provider's token effect writes inline CSS vars on <html>; clear them so cases stay isolated.
+  document.documentElement.removeAttribute("style");
+  document.documentElement.removeAttribute("data-theme");
+});
+
+describe("Icon - context-driven overrides (dev mode v2)", () => {
+  it("renders a working-state body override live under a provider (no committed module edit)", () => {
+    const { getByText, svg } = renderProvided("action.add");
+    // Before any edit the provider resolves the committed path: the registry default.
+    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+
+    fireEvent.click(getByText("set-body"));
+    // The working override now renders live: body replaced, frame (primary .ico preset) intact.
+    expect(svg()?.querySelector("circle")?.getAttribute("r")).toBe("5");
+    expect(svg()?.querySelector("path")).toBeNull();
+    expect(svg()?.classList.contains("ico")).toBe(true);
+    // ICON_OVERRIDES (the committed module) was never touched - this is working-state only.
+    expect(ICON_OVERRIDES["action.add"]).toBeUndefined();
+  });
+
+  it("renders a working-state swapToId target live under a provider", () => {
+    const { getByText, svg } = renderProvided("action.add");
+    fireEvent.click(getByText("set-swap"));
+    const trashBody = ICON_BY_ID.get("action.trash")?.body ?? "";
+    const trashD = /d="([^"]+)"/.exec(trashBody)?.[1];
+    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe(trashD);
+  });
+
+  it("with no provider renders the registry default unchanged (byte-identical to today)", () => {
+    const svg = renderIcon({ id: "action.add" });
+    expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(svg?.getAttribute("data-icon-id")).toBeNull();
+  });
+
+  it("an entry with neither body nor swap in working-state resolves exactly as committed", () => {
+    // A provider with an empty working-state resolves the same registry default as the module path.
+    const { svg } = renderProvided("action.add");
+    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+  });
+});
+
+describe("Icon - dev-mode identity (data-icon-id)", () => {
+  it("emits data-icon-id equal to the id only while dev mode is enabled", () => {
+    const { getByText, svg } = renderProvided("action.add");
+    // Dev mode off (provider mounted but not enabled): no data-icon-id, off-dev DOM untouched.
+    expect(svg()?.getAttribute("data-icon-id")).toBeNull();
+
+    fireEvent.click(getByText("toggle-dev"));
+    expect(svg()?.getAttribute("data-icon-id")).toBe("action.add");
+
+    fireEvent.click(getByText("toggle-dev"));
+    expect(svg()?.getAttribute("data-icon-id")).toBeNull();
+  });
+
+  it("carries data-icon-id on a bespoke glyph too when dev mode is enabled", () => {
+    const { getByText, svg } = renderProvided("action.search");
+    expect(svg()?.getAttribute("data-icon-id")).toBeNull();
+    fireEvent.click(getByText("toggle-dev"));
+    expect(svg()?.getAttribute("data-icon-id")).toBe("action.search");
+  });
+
+  it("emits no data-icon-id with no provider (off-dev output is byte-identical)", () => {
+    const svg = renderIcon({ id: "action.search" });
+    expect(svg?.getAttribute("data-icon-id")).toBeNull();
   });
 });
 
