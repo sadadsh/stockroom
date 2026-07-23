@@ -63,3 +63,15 @@ markers = [
     "windows_only: needs a real Windows machine (WebView2, KiCad config surgery); skipped elsewhere",
     "requires_browser: test launches a real headless Chromium; skipped when Playwright/Chromium cannot launch",
 ]
+
+[tool.ruff]
+# Tuned to the existing style so the formatter does not churn untouched code. Runs on the files
+# you touch via pre-commit; a repo-wide format is a separate deliberate task.
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Lenient on purpose: real issues (pyflakes) + import order, not style nits. Line length is left
+# to the formatter, and a couple of pragmatic ignores keep it out of the way.
+select = ["F", "I"]
+ignore = ["F401"]   # an unused import is often a deliberate re-export; ruff-format keeps it tidy

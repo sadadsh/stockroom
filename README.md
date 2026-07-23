@@ -14,6 +14,11 @@ with a SQLite index that is derived and never committed. Every write to a
 git-backed transaction, so an edit either lands as one clean commit or leaves no
 trace.
 
+> New here? [`CONTRIBUTING.md`](CONTRIBUTING.md) is the short path to a clean change.
+> [`docs/architecture.md`](docs/architecture.md) is the full module map and the patterns that keep
+> the codebase modular; [`docs/adding-a-feature.md`](docs/adding-a-feature.md) is step-by-step
+> recipes per extension point.
+
 ## Repository layout
 
     app/backend/stockroom/   Backend package (see "Backend layers" below)
@@ -21,7 +26,7 @@ trace.
     app/frontend-dist/       The built SPA the backend serves (committed)
     tests/backend/           Backend test suite, mirroring the package tree
     packaging/               Windows launcher build (PyInstaller)
-    docs/design/             UI design contract and north-star spec
+    docs/                    Architecture, the add-a-feature guide, and the design contract
     scripts/                 Local dev and benchmarking harnesses
 
 ### Backend layers
@@ -111,6 +116,8 @@ The grain of the codebase runs backend to frontend:
    source.
 
 That order keeps the seams testable and the layers honest.
+[`docs/adding-a-feature.md`](docs/adding-a-feature.md) turns each of those steps into a concrete
+recipe (a new endpoint, an API type, a page, a design token, editable copy, a spec rule).
 
 ## Conventions
 
