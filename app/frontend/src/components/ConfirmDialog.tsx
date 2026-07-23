@@ -49,15 +49,15 @@ export function ConfirmDialog({
     >
       <div
         data-dev-id="confirm.root"
-        className="w-full max-w-[380px] rounded-card border border-line bg-popover p-5 shadow-pop"
+        className="w-full max-w-[380px] overflow-hidden rounded-card border border-line bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
-        <div data-dev-id="confirm.title" className="text-base font-semibold text-t1">{title}</div>
-        <div data-dev-id="confirm.body" className="mt-2 text-sm text-t2">{body}</div>
-        <div data-dev-id="confirm.actions" className="mt-4 flex justify-end gap-2">
+        <div data-dev-id="confirm.title" className="flex h-[34px] flex-none items-center border-b border-line bg-band px-4 text-sm font-semibold text-t1">{title}</div>
+        <div data-dev-id="confirm.body" className="px-4 pt-3 text-sm text-t2">{body}</div>
+        <div data-dev-id="confirm.actions" className="flex justify-end gap-2 px-4 pb-4 pt-3.5">
           <Button data-dev-id="confirm.cancel" small onClick={onCancel} disabled={busy}>
             <Text id="modal.confirm.cancel">Cancel</Text>
           </Button>

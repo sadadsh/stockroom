@@ -290,10 +290,10 @@ export function CompletePartModal({
       >
         <div
           data-dev-id="complete.header"
-          className="flex items-start justify-between border-b border-line px-5 py-4"
+          className="flex items-start justify-between border-b border-line bg-band px-4 py-2.5"
         >
           <div>
-            <div className="text-base font-semibold text-t1">
+            <div className="text-sm font-semibold text-t1">
               <Text id="modal.completePart.title">Complete This Part</Text>
             </div>
             <div className="mt-0.5 text-xs text-t3">
