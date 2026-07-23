@@ -391,6 +391,93 @@ CREATE INDEX ix_periph_name ON mcu_peripheral(peripheral_name);
 """
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Self-audit — a build-time HARD GATE (DATA-07), not a warning. Pitfall 2
+# (dropped packages) and Pitfall 6 (trust with no ground truth) are locked out
+# structurally: a defective build never becomes a loadable index. AF-range
+# checks are explicitly OUT of Phase 1's gate scope (no AF join table exists yet).
+# ─────────────────────────────────────────────────────────────────────────────
+class StmAuditFailure(Exception):
+    """Raised when a freshly built index fails its structural self-audit. The
+    build refuses to complete (no index is returned) - callers never receive a
+    structurally defective StmIndex silently. Never names a raw wildcarded
+    ref_name as if it were an orderable part; issues are addressed by
+    mcu id + package_name only."""
+
+    def __init__(self, issues: list[str]):
+        self.issues = issues
+        super().__init__("STM index self-audit failed:\n- " + "\n- ".join(issues))
+
+
+def run_self_audit(conn: sqlite3.Connection) -> None:
+    """Run the Phase 1 structural self-audit over a freshly built connection.
+    Raises StmAuditFailure (never returns a partial pass/fail value) on any of:
+
+      1. Pin-count reconciliation: mcu.pin_count disagrees with the matching
+         package_geometry.pin_count, where a geometry entry exists for that
+         package.
+      2. Non-empty/zero-pin check: any mcu ends with zero parsed
+         mcu_package_pin rows (the Pitfall 2 regression lock).
+      3. Spec completeness: any mcu lacks a mcu_spec row, or that row has a
+         null core/flash_kb/ram_kb/max_freq_mhz.
+
+    AF-range checks are explicitly OUT of this gate's scope (Phase 2 extends
+    it once the AF-mux join table exists).
+    """
+    issues: list[str] = []
+
+    # 1. Pin-count reconciliation against the curated package_geometry table.
+    for row in conn.execute(
+        "SELECT m.id AS mcu_id, m.package_name, m.pin_count AS parsed_count, "
+        "g.pin_count AS geometry_count "
+        "FROM mcu m JOIN package_geometry g ON g.package_name = m.package_name "
+        "WHERE g.pin_count IS NOT NULL AND m.pin_count <> g.pin_count"
+    ):
+        issues.append(
+            f"pin-count mismatch: mcu id {row['mcu_id']} (package "
+            f"{row['package_name']}) parsed {row['parsed_count']} pins but "
+            f"package_geometry states {row['geometry_count']}"
+        )
+
+    # 2. Zero-pin check: every mcu must have at least one mcu_package_pin row.
+    for row in conn.execute(
+        "SELECT m.id AS mcu_id, m.package_name, "
+        "COUNT(p.id) AS n_pins "
+        "FROM mcu m LEFT JOIN mcu_package_pin p ON p.mcu_id = m.id "
+        "GROUP BY m.id HAVING n_pins = 0"
+    ):
+        issues.append(
+            f"zero-pin package: mcu id {row['mcu_id']} (package "
+            f"{row['package_name']}) parsed zero pins"
+        )
+
+    # 3. Spec completeness: every mcu needs a non-null mcu_spec row.
+    for row in conn.execute(
+        "SELECT m.id AS mcu_id, m.package_name, s.mcu_id AS spec_mcu_id, "
+        "s.core, s.flash_kb, s.ram_kb, s.max_freq_mhz "
+        "FROM mcu m LEFT JOIN mcu_spec s ON s.mcu_id = m.id"
+    ):
+        if row["spec_mcu_id"] is None:
+            issues.append(
+                f"missing mcu_spec row: mcu id {row['mcu_id']} (package "
+                f"{row['package_name']})"
+            )
+            continue
+        missing_fields = [
+            name
+            for name in ("core", "flash_kb", "ram_kb", "max_freq_mhz")
+            if row[name] is None
+        ]
+        if missing_fields:
+            issues.append(
+                f"incomplete mcu_spec: mcu id {row['mcu_id']} (package "
+                f"{row['package_name']}) missing {', '.join(missing_fields)}"
+            )
+
+    if issues:
+        raise StmAuditFailure(issues)
+
+
 class StmIndex:
     """A derived SQLite index over the CubeMX MCU XML tree.
 
@@ -589,6 +676,12 @@ class StmIndex:
             ("power_pad_flags", ",".join(power_pad_flags)),
         ):
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
+
+        try:
+            run_self_audit(conn)
+        except StmAuditFailure:
+            conn.close()
+            raise
 
         conn.commit()
         if progress:
