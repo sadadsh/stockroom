@@ -78,6 +78,7 @@ class McuData:
     family: str
     line: str
     package: str
+    has_power_pad: bool = False  # root <Mcu HasPowerPad="..">, build-time audit signal only
     vdd_min: str = ""
     vdd_max: str = ""
     pins: list[Pin] = field(default_factory=list)
@@ -134,6 +135,7 @@ def parse_mcu_xml(path: Path) -> McuData:
         family=root.get("Family", ""),
         line=root.get("Line", ""),
         package=root.get("Package", ""),
+        has_power_pad=(root.get("HasPowerPad", "") or "").strip().lower() == "true",
     )
     for el in root:
         tag = _tag(el)
@@ -448,12 +450,14 @@ class StmIndex:
         files = sorted(p for p in cubemx_source.glob("*.xml") if p.name != "families.xml")
         total = len(files)
         families_seen: set[str] = set()
+        power_pad_observed: dict[str, set[bool]] = {}
         n_mcu = 0
         for i, f in enumerate(files):
             if progress and i % 25 == 0:
                 progress({"pct": int(100 * i / total) if total else 0, "message": f.stem})
             mcu = parse_mcu_xml(f)
             families_seen.add(mcu.family)
+            power_pad_observed.setdefault(mcu.package, set()).add(mcu.has_power_pad)
             distinct_positions = sorted({p.position for p in mcu.pins})
             pin_count = len(distinct_positions)
             mcu_id = conn.execute(
@@ -542,6 +546,31 @@ class StmIndex:
                         (pin_id, rn, rc),
                     )
 
+        # package_geometry is a static, curated reference table (stm.geometry.
+        # PACKAGE_GEOMETRY) - populated in full regardless of which packages this
+        # particular build happened to ingest, since it documents package
+        # mechanical facts, not per-build ingest results.
+        for package_name, entry in geometry_mod.PACKAGE_GEOMETRY.items():
+            conn.execute(
+                "INSERT OR REPLACE INTO package_geometry (package_name, body_shape, "
+                "pin_count, rows, cols, pitch_mm, body_mm, has_center_pad, "
+                "depopulation, citation, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    package_name,
+                    entry["body_shape"],
+                    entry.get("pin_count"),
+                    entry.get("rows"),
+                    entry.get("cols"),
+                    entry.get("pitch_mm"),
+                    entry.get("body_mm"),
+                    int(entry.get("has_center_pad", 0)),
+                    entry.get("depopulation"),
+                    entry.get("citation"),
+                    entry.get("notes"),
+                ),
+            )
+        power_pad_flags = geometry_mod.audit_has_power_pad(power_pad_observed)
+
         family_count = len(families_seen)
         # A naive placeholder: the honest, code-level "does this source really span
         # every family" gate is check_availability + the build guard (Plan 02 Task 3).
@@ -557,6 +586,7 @@ class StmIndex:
             ("all_families", "true" if all_families else "false"),
             ("device_xml_count", str(total)),
             ("family_count", str(family_count)),
+            ("power_pad_flags", ",".join(power_pad_flags)),
         ):
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
 
