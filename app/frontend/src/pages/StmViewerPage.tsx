@@ -173,7 +173,7 @@ function PinoutRegion({
       <Eyebrow className="mb-2 px-1">Pinout</Eyebrow>
 
       {!activePart ? (
-        <ChamberMessage>Select a part to see its pinout.</ChamberMessage>
+        <GhostSpecimen />
       ) : isLoading ? (
         <ChamberMessage>Loading the pinout...</ChamberMessage>
       ) : error ? (
@@ -192,7 +192,7 @@ function PinoutRegion({
           {/* A definite-height COLUMN FLEX slot: PinoutMap's chamber shrinks inside it so the
               chamber footer (badges + Reset View) stays within the slot instead of spilling
               over the legend below. */}
-          <div className="flex h-[352px] flex-none flex-col">
+          <div className="flex h-[392px] flex-none flex-col">
             <PinoutMap
               pinout={pinout}
               selectedPosition={selectedPosition}
@@ -219,6 +219,41 @@ function ChamberMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]">
       <p className="text-sm text-t3">{children}</p>
+    </div>
+  );
+}
+
+// The no-part-selected chamber: a quiet neutral specimen sketch (an unlabeled LQFP outline in the
+// chamber's own line tints, no data hues) so the empty state teaches what the space is FOR instead
+// of sitting as a bare grey void. Purely decorative; the prompt line carries the instruction.
+function GhostSpecimen() {
+  const pads = Array.from({ length: 11 }, (_, i) => 34 + i * 12);
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]"
+      data-testid="pinout-ghost"
+    >
+      <svg viewBox="0 0 200 200" className="h-36 w-36 opacity-60" aria-hidden="true">
+        <rect
+          x={40}
+          y={40}
+          width={120}
+          height={120}
+          rx={8}
+          fill="var(--c-raise)"
+          stroke="var(--c-line2)"
+          strokeWidth={1}
+        />
+        {pads.map((p) => (
+          <g key={p} fill="var(--c-raise2)">
+            <rect x={26} y={p} width={12} height={6} rx={1.5} />
+            <rect x={162} y={p} width={12} height={6} rx={1.5} />
+            <rect x={p} y={26} width={6} height={12} rx={1.5} />
+            <rect x={p} y={162} width={6} height={12} rx={1.5} />
+          </g>
+        ))}
+      </svg>
+      <p className="text-sm text-t3">Select a part to see its pinout.</p>
     </div>
   );
 }

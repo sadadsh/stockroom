@@ -44,7 +44,7 @@ export function SuggestionGroupList({
             <li
               key={g.signature_id}
               data-testid="suggestion-group"
-              className="flex flex-col gap-1.5 rounded-card border border-line2 px-3 py-2"
+              className="flex flex-col gap-1.5 rounded-card bg-raise px-3 py-2 shadow-[inset_0_1px_0_var(--edge-hi)]"
             >
               <div className="flex items-center justify-between gap-2">
                 <Badge tone={g.tier === "baseline" ? "ok" : "warn"} size="sm">

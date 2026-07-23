@@ -241,7 +241,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
               className="sticky top-[33px] z-[1] border-b border-line bg-[var(--c-sticky)] backdrop-blur"
             >
               {table.getHeaderGroups()[0].headers.map((header) => (
-                <div key={header.id} className="px-1.5 py-1.5">
+                <div key={header.id} className="flex items-stretch px-1.5 py-1.5">
                   <ColumnFilter column={header.column} />
                 </div>
               ))}
@@ -305,6 +305,15 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
               )}
             </div>
           )}
+          {/* End-of-results line: the space after a narrow result set reads as a finished list,
+              not a dead void, and restates the match count where the eye already is. */}
+          {modelRows.length > 0 ? (
+            <div className="tnum border-t border-line px-2.5 py-2 text-center font-mono text-2xs text-t3">
+              {modelRows.length === rows.length
+                ? `All ${rows.length.toLocaleString()} parts shown`
+                : `${modelRows.length.toLocaleString()} of ${rows.length.toLocaleString()} parts match`}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -338,9 +347,10 @@ function ColumnFilter({
     const [min, max] = (column.getFacetedMinMaxValues() as [number, number] | undefined) ?? [];
     const range = (value as [number | "", number | ""]) ?? ["", ""];
     return (
-      // Stacked min-over-max: the narrow numeric columns (52px peripherals) cannot fit two
-      // side-by-side number inputs at a usable width.
-      <div className="flex flex-col gap-0.5">
+      // Stacked min-over-max inside ONE field container (a hairline divider between the halves),
+      // so every filter cell reads as a single control and the row keeps one rhythm. Side-by-side
+      // inputs cannot fit the 52px peripheral columns at a usable width.
+      <div className="flex w-full flex-col overflow-hidden rounded-control bg-field">
         <input
           type="number"
           inputMode="numeric"
@@ -353,7 +363,7 @@ function ColumnFilter({
               (old?.[1] as number) ?? undefined,
             ])
           }
-          className="tnum w-full min-w-0 rounded-control bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
+          className="tnum w-full min-w-0 bg-transparent px-1.5 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
         />
         <input
           type="number"
@@ -367,7 +377,7 @@ function ColumnFilter({
               e.target.value === "" ? undefined : Number(e.target.value),
             ])
           }
-          className="tnum w-full min-w-0 rounded-control bg-field px-1 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
+          className="tnum w-full min-w-0 border-t border-line bg-transparent px-1.5 py-0.5 text-2xs font-mono text-t1 outline-none placeholder:text-t3"
         />
       </div>
     );
@@ -379,7 +389,7 @@ function ColumnFilter({
       placeholder="Filter"
       value={(value as string) ?? ""}
       onChange={(e) => column.setFilterValue(e.target.value)}
-      className="w-full min-w-0 rounded-control bg-field px-1.5 py-0.5 text-2xs text-t1 outline-none placeholder:text-t3"
+      className="h-full w-full min-w-0 rounded-control bg-field px-1.5 py-0.5 text-2xs text-t1 outline-none placeholder:text-t3"
     />
   );
 }

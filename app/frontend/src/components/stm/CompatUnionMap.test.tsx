@@ -42,12 +42,12 @@ const TONE_FILL = {
   partial: "var(--stm-classify-partial)",
 };
 
-function dotFill(container: HTMLElement, position: string): string | null {
-  return container.querySelector(`[data-position="${position}"] circle`)?.getAttribute("fill") ?? null;
+function padFill(container: HTMLElement, position: string): string | null {
+  return container.querySelector(`[data-position="${position}"] rect.pad`)?.getAttribute("fill") ?? null;
 }
 
 describe("CompatUnionMap", () => {
-  it("paints each position's classification dot with its own --stm-classify token (shared/divergent/partial)", () => {
+  it("fills each pad with its own --stm-classify token (shared/divergent/partial)", () => {
     const { container } = render(
       <CompatUnionMap
         union={union([
@@ -57,9 +57,9 @@ describe("CompatUnionMap", () => {
         ])}
       />,
     );
-    expect(dotFill(container, "1")).toBe(TONE_FILL.shared);
-    expect(dotFill(container, "2")).toBe(TONE_FILL.divergent);
-    expect(dotFill(container, "3")).toBe(TONE_FILL.partial);
+    expect(padFill(container, "1")).toBe(TONE_FILL.shared);
+    expect(padFill(container, "2")).toBe(TONE_FILL.divergent);
+    expect(padFill(container, "3")).toBe(TONE_FILL.partial);
   });
 
   it("lays the union out on the reused pinout geometry as an SVG map, one pad per position, never a flat table", () => {
