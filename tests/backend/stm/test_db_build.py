@@ -233,3 +233,37 @@ def test_same_position_pinremap_identities_are_not_collapsed(tmp_path):
     assert len(rows) == 2
     raw_names = {r["raw_pin_name"] for r in rows}
     assert raw_names == {"PA9", "PA9_Remap"}
+
+
+def test_is_analog_ignores_the_generic_gpio_pseudo_signals_analog_mode():
+    """Classifier rev 2 regression lock: CubeMX lists "Analog" (the high-impedance
+    power state) in the generic GPIO pseudo-signal's io_modes for essentially every
+    I/O pin - that must NOT make the pin analog (it painted 82 of an F407's 100
+    pins analog). Real analog evidence still does."""
+    gpio_only = db_mod.Pin(
+        position="1", name="PD5", type="I/O",
+        signals=[
+            db_mod.Signal(name="USART2_TX"),
+            db_mod.Signal(name="GPIO", io_modes="Input,Output,Analog,EVENTOUT,EXTI"),
+        ],
+    )
+    assert db_mod._is_analog(gpio_only) is False
+    assert "analog" not in {r[0] for r in db_mod.roles(gpio_only)}
+
+    adc = db_mod.Pin(
+        position="2", name="PA1", type="I/O",
+        signals=[db_mod.Signal(name="ADC1_IN1"), db_mod.Signal(name="GPIO", io_modes="Analog")],
+    )
+    assert db_mod._is_analog(adc) is True
+
+    opamp = db_mod.Pin(
+        position="3", name="PA2", type="I/O",
+        signals=[db_mod.Signal(name="OPAMP1_VINP")],
+    )
+    assert db_mod._is_analog(opamp) is True
+
+    named_analog_mode = db_mod.Pin(
+        position="4", name="PB14", type="I/O",
+        signals=[db_mod.Signal(name="TSC_G1_IO1", io_modes="Analog")],
+    )
+    assert db_mod._is_analog(named_analog_mode) is True
