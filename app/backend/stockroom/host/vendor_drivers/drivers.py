@@ -121,45 +121,46 @@ _DIGIKEY_RUN_MODELS = (
     "nextFmt();}"
 )
 
-# The per-format download sub-sequence (async, since the row content + modal lazy-load): open the
-# preferred present provider, open its Select Download Format modal, pick the format radio by its
-# stable data-original label AND the STEP 3D radio (one download = symbol + footprint + 3D model),
-# then click the footer #btn-download-<Provider>. Each stage guarded + reported.
+# The per-format download sub-sequence (async: the row content + modal lazy-load). It tries each
+# VISIBLE provider IN ORDER until one actually OFFERS this format (its export modal has a matching
+# data-original label) - it does NOT hardcode Ultra Librarian; whatever source can deliver the format
+# (plus its STEP 3D) wins, so all three assets land from the best available source (owner 2026-07-23:
+# "whatever sources all three should be #1 priority in order"). For each candidate provider: expand
+# its row, open Select Download Format, and if the format is present pick it + the STEP 3D radio and
+# click #btn-download-<Provider>; if absent, close the modal and fall through to the next provider.
+# Then poll DigiKey's "Downloading... may take a few minutes" progress modal out before the next
+# format (a fixed gap raced the still-open modal and the 2nd pass no-op'd - live-observed 2026-07-23).
 _DIGIKEY_DOWNLOAD_FORMAT = (
     "function fmtBtn(){var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
     "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){return cs[i];}}return null;}"
-    "function downloadFormat(present,spec,done){var prov=present[0];"
-    # Expand the provider row ONLY if its Select Download Format control is not already visible -
-    # re-clicking an already-open accordion would TOGGLE it closed and break the 2nd (Altium) pass.
+    "function closeModal(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
+    "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}}"
+    "function downloadFormat(present,spec,done){var pi=0;function tryProvider(){"
+    "if(pi>=present.length){report(spec.key,false,'No visible source offers '+spec.name+' for this part; download it manually.');done();return;}"
+    "var prov=present[pi++];"
     "try{if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}}catch(e){}"
-    "setTimeout(function(){try{var btn=fmtBtn();if(btn)btn.click();}catch(e){}"
-    "setTimeout(function(){var picked=false;try{"
-    "var modal=document.querySelector('[id$=\"-export-options\"]');if(modal){"
-    "var ls=modal.querySelectorAll('label');"
+    "setTimeout(function(){try{var b=fmtBtn();if(b)b.click();}catch(e){}"
+    "setTimeout(function(){var picked=false,has=false;try{"
+    "var modal=document.querySelector('[id$=\"-export-options\"]');if(modal){var ls=modal.querySelectorAll('label');"
     "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
-    "if(spec.re.test(t)){var inp=labelInput(ls[j]);try{(inp||ls[j]).click();picked=true;}catch(e){}break;}}"
-    "for(var m=0;m<ls.length;m++){var t2=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
-    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}"
+    "if(spec.re.test(t)){has=true;var inp=labelInput(ls[j]);try{(inp||ls[j]).click();picked=true;}catch(e){}break;}}"
+    "if(picked){for(var m=0;m<ls.length;m++){var t2=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
+    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}}"
     "}catch(e){}"
-    "report(spec.key,picked,picked?('Selected '+spec.name+' plus the 3D model; downloading.'):"
-    "('Pick '+spec.name+' in the Choose Download Format dialog.'));"
+    "if(!has){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();setTimeout(tryProvider,1300);return;}"
+    "report(spec.key,true,'Selected '+spec.name+' plus the 3D model from '+prov[1]+'; downloading.');"
     "setTimeout(function(){var fired=false;try{"
     "var modal2=document.querySelector('[id$=\"-export-options\"]');"
     "var dl=(modal2&&modal2.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');"
     "if(dl&&!dl.disabled){dl.click();fired=true;}}catch(e){}"
-    "report('download',fired,fired?('Downloading the '+spec.name+' symbol, footprint and 3D model.'):"
-    "('Select a format, then click Download.'));"
-    # DigiKey shows a "Downloading... may take a few minutes" progress modal after Download; the NEXT
-    # format cannot open its picker until that clears (live-observed 2026-07-23: a fixed gap raced the
-    # still-open modal and the Altium pass no-op'd). Poll it OUT (up to 90s), then move to the next.
+    "report('download',fired,fired?('Downloading '+spec.name+' from '+prov[1]+'.'):('Select a format, then click Download.'));"
     "var waited=0;function waitDl(){var busy=false;try{"
     "var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
     "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/downloading/i.test(dlg[w].textContent||'')){busy=true;break;}}"
     "}catch(e){}waited+=1200;if(busy&&waited<90000){setTimeout(waitDl,1200);}"
-    "else{report('progress',true,busy?('Still downloading '+spec.name+'; continuing.'):"
-    "('Finished the '+spec.name+' download.'));setTimeout(done,2500);}}"
+    "else{report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,2500);}}"
     "setTimeout(waitDl,2500);"
-    "},900);},1600);},2400);}"
+    "},900);},1600);},2400);}tryProvider();}"
 )
 
 

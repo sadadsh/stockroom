@@ -90,3 +90,14 @@ def test_only_requested_formats_are_gated_in():
 def test_blank_or_empty_vendor_is_guidance_only():
     assert "__STOCKROOM_OVERLAY__" in build_driver_js("", ["kicad"])
     assert ".click()" not in build_driver_js("", ["kicad"])
+
+
+def test_digikey_driver_iterates_sources_not_hardcoding_ultra_librarian():
+    # Owner 2026-07-23: don't always use Ultra Librarian - try each visible source IN ORDER until one
+    # actually offers the requested format (+ its 3D). The generated machine falls through sources.
+    js = build_driver_js("digikey", ["kicad"])
+    low = js.lower()
+    assert "tryprovider" in low  # a per-source attempt iterated over the present providers
+    assert "trying the next source" in low  # a source lacking the format falls through to the next
+    # it still keys the format off the stable data-original label + selects the STEP 3D radio
+    assert "data-original" in js and "step" in low
