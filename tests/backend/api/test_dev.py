@@ -51,6 +51,39 @@ def test_dev_save_writes_validated_token_and_copy_overrides(client, tmp_path, mo
     assert "bad id!" not in copy_ts
 
 
+def test_dev_save_accepts_shadow_and_unitless_number_tokens(client, tmp_path, monkeypatch):
+    # v2 adds shadow strings (with var() references) and unitless numbers (icon stroke) to the
+    # editable set. They must survive the same validator that drops injection-ish values.
+    src = tmp_path / "frontend" / "src"
+    (src / "lib").mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+
+    shadow = (
+        "inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4), "
+        "0 28px 64px rgba(0, 0, 0, 0.62)"
+    )
+    body = {
+        "tokens": {
+            "root": {
+                "--icon-stroke": "2.6",  # unitless number
+                "--fs-sm": "13.5px",     # fractional length
+            },
+            "light": {
+                "--shadow-card": shadow,  # a full box-shadow string, including a var() reference
+            },
+        },
+        "copy": {},
+    }
+    res = client.post("/api/dev/save", json=body)
+    assert res.status_code == 200
+    assert res.json()["tokens"] == 3  # all three survived validation
+
+    tokens_ts = (src / "lib" / "token.overrides.ts").read_text(encoding="utf-8")
+    assert '"--icon-stroke": "2.6"' in tokens_ts
+    assert '"--fs-sm": "13.5px"' in tokens_ts
+    assert "var(--edge-hi)" in tokens_ts  # the shadow string round-trips intact
+
+
 def test_dev_save_refuses_without_a_source_tree(client, tmp_path, monkeypatch):
     # a packaged build has no frontend/src: refuse honestly (409), never a silent success
     monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", tmp_path / "nope")

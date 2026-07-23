@@ -187,9 +187,11 @@ export function CubeArt() {
 // inherit text color + retint per theme; default 14px, sized via className. Self-contained.
 
 function Svg({ className, children }: { className?: string; children: ReactNode }) {
+  // `.ico` routes stroke-width through --icon-stroke (dev mode's global icon-weight token); the
+  // strokeWidth attribute is the offline fallback if the stylesheet has not applied yet.
   return (
     <svg
-      className={className ?? "h-3.5 w-3.5"}
+      className={`ico ${className ?? "h-3.5 w-3.5"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

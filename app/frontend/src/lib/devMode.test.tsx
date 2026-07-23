@@ -105,4 +105,41 @@ describe("dev mode", () => {
     const arg = mockApi.devSave.mock.calls[0][0];
     expect(arg.tokens.root["--c-acc"]).toBe("#abcdef");
   });
+
+  it("nudges a type-scale size live (px unit) and resets it to the shipped default", () => {
+    render(<Harness />);
+    toggleDevMode();
+
+    const smValue = screen.getByLabelText("SM value");
+    fireEvent.change(smValue, { target: { value: "20" } });
+    expect(document.documentElement.style.getPropertyValue("--fs-sm")).toBe("20px");
+
+    fireEvent.click(screen.getByLabelText("Reset to default"));
+    expect(document.documentElement.style.getPropertyValue("--fs-sm")).toBe("");
+  });
+
+  it("nudges the unitless icon stroke live (no px unit appended)", () => {
+    render(<Harness />);
+    toggleDevMode();
+
+    fireEvent.change(screen.getByLabelText("Icon stroke value"), { target: { value: "2.6" } });
+    expect(document.documentElement.style.getPropertyValue("--icon-stroke")).toBe("2.6");
+  });
+
+  it("edits a shadow token as raw text and saves it under the active theme block", async () => {
+    render(<Harness />);
+    toggleDevMode();
+
+    const shadow = screen.getByLabelText("Card shadow");
+    fireEvent.change(shadow, { target: { value: "0 2px 4px rgba(0, 0, 0, 0.5)" } });
+    expect(document.documentElement.style.getPropertyValue("--shadow-card")).toBe(
+      "0 2px 4px rgba(0, 0, 0, 0.5)",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save to source" }));
+    await waitFor(() => expect(mockApi.devSave).toHaveBeenCalledTimes(1));
+    const arg = mockApi.devSave.mock.calls[0][0];
+    // dark is the default theme, so a themed shadow lands in the root (dark) block
+    expect(arg.tokens.root["--shadow-card"]).toBe("0 2px 4px rgba(0, 0, 0, 0.5)");
+  });
 });
