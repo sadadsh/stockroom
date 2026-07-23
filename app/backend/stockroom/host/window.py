@@ -220,6 +220,20 @@ def cad_overlay_received_js(requirements) -> str:
     return f"window.__STOCKROOM_OVERLAY__ && (function(){{try{{{calls}}}catch(e){{}}}})();"
 
 
+def cad_download_event_js(state: str, fmt: str | None = None) -> str:
+    """Push a REAL download-lifecycle event to the in-page reactor so it reacts to a file actually
+    landing, not a timer or a vendor UI modal. `state` is "completed" (a captured file for `fmt`,
+    "kicad"/"altium", finished + was classified) - relayed from _forward_cad_capture, the point where
+    BOTH capture tiers converge, so the reactor advances no matter which tier caught the file and the
+    download's own critical-path handlers stay pristine. The reactor advances to the next format only
+    on a real "completed" for the format it is awaiting, so there is no preemption and no phantom-modal
+    wait. Guarded, JSON-encoded, one-way (the cad window has no js_api)."""
+    payload: dict = {"state": state}
+    if fmt:
+        payload["format"] = fmt
+    return "window.__SR_DL__ && window.__SR_DL__(" + json.dumps(payload) + ");"
+
+
 def build_capture_payload(path=None, token=None, requirements=None, altium_paths=None) -> dict:
     """The JSON-safe CaptureForward dict the host forwards to the SPA. Only non-empty
     fields are included so the frontend's `p.altiumPaths ?? [p.path]` fallback stays
@@ -323,9 +337,14 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     # Tick the HUD checklist live: push the newly-satisfied requirements to the cad window host
     # to page (only for a real capture session, and only when this file satisfied something new -
     # the same non-empty gate that prevents a redundant SPA re-forward). Outside the lock, like the
-    # SPA emit.
+    # SPA emit. Then relay a "completed" download event PER captured format so the in-page reactor
+    # advances to the next format the instant a real file lands - whichever tier caught it. This is
+    # the safe convergence point (off the download's critical-path handlers).
     if session is not None and reqs:
         _emit_to_cad_window(cad_overlay_received_js(reqs))
+        _reqs_values = [r.value if isinstance(r, Requirement) else str(r) for r in reqs]
+        for fmt in _formats_for_needs(_reqs_values):
+            _emit_to_cad_window(cad_download_event_js("completed", fmt))
 
 
 def cad_overlay_complete_js() -> str:
@@ -489,6 +508,11 @@ def _install_cad_download_intercept(
             dest = target_dir / name
 
             def _on_state_changed(op_sender, op_args) -> None:
+                # KEEP THIS HANDLER PRISTINE: it runs on WebView2's download thread, in the critical
+                # path of the download itself. Calling evaluate_js here (to relay an event) stalled the
+                # download outright (live-observed 2026-07-23: the file froze mid-stream). So the ONLY
+                # thing this does is forward the completed file; the reactor's "a format landed" signal
+                # is relayed from _forward_cad_capture instead, off the download's critical path.
                 try:
                     from Microsoft.Web.WebView2.Core import CoreWebView2DownloadState
 
@@ -886,23 +910,20 @@ class _HostApi:
         # right scripts. All best-effort and guarded; injected ONLY on this remote window via
         # evaluate_js, never the SPA, and NEVER with the per-launch token or a js_api bridge.
         needs_values = [r.value for r in needs_set]
-        requested_formats = _formats_for_needs(needs_values)
 
-        def _next_format():
-            """The single next-unmet requested format (KiCad before Altium), or None when done. The
-            host drives ONE format per fresh page load; the driver is scoped to just this one."""
-            if "kicad" in requested_formats and not session.kicad_complete():
-                return "kicad"
-            if "altium" in requested_formats and not session.altium_complete():
-                return "altium"
-            return None
+        def _remaining_formats():
+            """The vendor formats (kicad/altium) still NOT captured, in order. On a FRESH page load
+            (initial, the product->models navigation, or a recovery reload) the reactor is injected
+            scoped to just these, so an already-captured format is never re-driven. The reactor itself
+            sequences them, gating each on the REAL browser download event - the host does not
+            orchestrate; it only scopes what to inject and relays the real events."""
+            return _formats_for_needs([r.value for r in session.remaining()])
 
         def _on_cad_loaded() -> None:
-            # Drive ALL requested formats in ONE session: DigiKey downloads each selected format as its
-            # OWN zip and supports CONCURRENT downloads (owner 2026-07-23: "click both step and the
-            # kicad/altium, it downloads separate zips at once"), and tier-1 catches each DownloadStarting
-            # independently - so the driver fires them back-to-back without navigating between formats.
-            _inject_cad_scripts(win, url, needs_values, name)
+            # Re-inject the reactor on each load, scoped to what is STILL needed. The reactor reacts to
+            # live page state + the real download events (window.__SR_DL__); the host stays a dumb
+            # collector + re-injector. The overlay still shows the FULL checklist (needs_values).
+            _inject_cad_scripts(win, url, needs_values, name, driver_formats=_remaining_formats())
 
         win.events.loaded += _on_cad_loaded
         # Best-effort popup / new-window re-injection when this pywebview backend exposes the

@@ -630,6 +630,156 @@ def _drive_production(webview, base: str, captured: list, result: dict) -> None:
     result["ok"] = True
 
 
+# A single compact DOM-state probe run over CDP every few seconds: exactly the questions that
+# were unanswerable while debugging blind - which providers are visible, is the export modal
+# open + what format labels it shows, is the download button enabled, is a "Download complete"
+# modal still up, and the tail of the HUD text. Returns a JSON string.
+_DK_STATE_JS = (
+    "(function(){function q(s){return document.querySelector(s);}"
+    "function vis(el){return !!(el&&el.offsetParent!==null);}"
+    "var provs={};['ultra','mfr','snapmagic','traceparts','cadenas'].forEach(function(k){"
+    "provs[k]=vis(q('#'+k+'-media-active'));});"
+    "var fmtBtns=[].slice.call(document.querySelectorAll('a.btn-download-model,a,button')).filter("
+    "function(e){return vis(e)&&/select download format/i.test(e.textContent||'');}).length;"
+    "var modal=q('[id$=\"-export-options\"]');var dl=q('[id^=\"btn-download-\"]');"
+    "var complete=[].slice.call(document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal')).filter("
+    "function(w){return vis(w)&&/download complete/i.test(w.textContent||'');}).length;"
+    "var body=(document.body&&document.body.innerText||'').toLowerCase();"
+    "var errToast='';var ts=document.querySelectorAll('[role=alert],.toast,.notification,[class*=error i],[class*=toast i]');"
+    "for(var e=0;e<ts.length;e++){if(vis(ts[e])){var tt=(ts[e].innerText||'').toLowerCase();"
+    "if(/download failed|failed to (generate|download)|unable to|something went wrong/.test(tt)){errToast=(ts[e].innerText||'').trim().slice(0,60);break;}}}"
+    "var wall=!!document.querySelector('iframe[src*=\"challenges.cloudflare.com\"],#challenge-running,.cf-turnstile')"
+    "||/verify you are (a )?human|checking your browser|complete the security check/.test(body);"
+    "return JSON.stringify({path:location.pathname,running:!!window.__SR_DK_RUNNING__,"
+    "refresh:(function(){try{return sessionStorage.getItem('__SR_REFRESH__');}catch(e){return null;}})(),"
+    "provs:provs,fmtBtns:fmtBtns,modalOpen:!!(modal&&vis(modal)),"
+    "modalLabels:modal?[].slice.call(modal.querySelectorAll('label')).map(function(l){"
+    "return (l.getAttribute('data-original')||l.textContent||'').trim();}).slice(0,12):[],"
+    "dlBtn:dl?{id:dl.id,disabled:!!dl.disabled,vis:vis(dl)}:null,completeModal:complete,"
+    "downloading:/downloading/i.test(body),errToast:errToast,wall:wall,"
+    "hud:(function(){var o=document.getElementById('__stockroom_overlay__');"
+    "return o?((o.innerText||'').replace(/\\s+/g,' ').slice(-140)):'';})()});})()"
+)
+
+
+def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
+    """The REAL two-format capture pipeline (like --realcapture) WITH live CDP visibility: a
+    remote-debugging-port is enabled on the WebView2 (main() sets REMOTE_DEBUGGING_PORT), a
+    CDPClient attaches to the cad window's page target, taps its console + exceptions to a log
+    file, and dumps a compact DOM-state snapshot every few seconds. This is the instrument that
+    ends blind two-format debugging: the driver's [SRDRV] breadcrumbs + swallowed JS exceptions +
+    the modal/provider/download-button state all land in one timeline the Linux side can Read.
+
+    Writes C:\\srverify\\cdp_trace.log (readable at /mnt/c/srverify/cdp_trace.log). Never lets a
+    probe error touch the capture it observes."""
+    import os
+    import threading
+    import time as _t
+
+    from stockroom.capture.requirements import Requirement
+    from stockroom.capture.session import CaptureSession
+    from stockroom.host.cdp_probe import CDPClient, ConsoleTap, wait_for_target
+    from stockroom.host.download_capture import DownloadsWatch, default_downloads_dir
+
+    port = int(os.environ.get("STOCKROOM_CDP_PORT", "9222"))
+    log_path = os.environ.get("STOCKROOM_CDP_LOG", r"C:\srverify\cdp_trace.log")
+    try:
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    log_f = open(log_path, "w", encoding="utf-8", buffering=1)  # line-buffered
+
+    def w(line: str) -> None:
+        try:
+            log_f.write(line + "\n")
+        except Exception:  # noqa: BLE001
+            pass
+
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
+    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
+        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    )
+    result["url"] = url
+    w(f"# CDP capture for {mpn}  url={url}")
+    formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
+    needs_map = {
+        "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
+        "altium": ["altium_symbol", "altium_footprint"],
+    }
+    needs_values = [n for f in formats for n in needs_map.get(f, [])]
+    needs_set = frozenset(Requirement(v) for v in needs_values)
+    session = CaptureSession.start(mpn, needs_set, now=_t.time())
+    session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
+    W._CAD_SESSION = session
+
+    win = webview.create_window("stockroom-cad", url=url, width=1340, height=980)
+    W._CAD_WINDOW = win
+
+    def _on_loaded() -> None:
+        # Mirror the real host: inject the reactor scoped to the STILL-needed formats (so a recovery
+        # reload never re-drives a captured format); the reactor sequences on the real download events.
+        rem = W._formats_for_needs([r.value for r in session.remaining()])
+        W._inject_cad_scripts(win, url, needs_values, mpn, driver_formats=rem)
+
+    win.events.loaded += _on_loaded
+
+    def _on_captured(path) -> None:
+        W._forward_cad_capture(path, session, extract_dir=session.temp_dir)
+        line = (f"CAPTURE {len(session.received)}/{len(session.needs)} -> "
+                f"{sorted(r.value for r in session.received)}  file={os.path.basename(str(path))}")
+        w("=== " + line)
+        print(line, flush=True)
+
+    armed = W._install_cad_download_intercept(win, session.temp_dir, _on_captured)
+    w(f"# tier-1 intercept armed={armed}; needs={sorted(needs_values)}")
+    watch = DownloadsWatch.start(default_downloads_dir())
+    thread = threading.Thread(
+        target=W._poll_downloads_watch, args=(watch, session),
+        kwargs={"extract_dir": session.temp_dir}, daemon=True,
+    )
+    thread.start()
+
+    # Attach CDP to the cad window's page target (poll: CoreWebView2 + its debug target come up async).
+    tap = ConsoleTap(w, now=_t.time)
+    target = wait_for_target(port, "digikey", tries=60, delay=0.5)
+    client = None
+    if target is None:
+        w("# CDP: no digikey page target found (is REMOTE_DEBUGGING_PORT set?) - console tap unavailable")
+    else:
+        w(f"# CDP target: {target.get('url','')[:80]}")
+        client = CDPClient(target["webSocketDebuggerUrl"], on_event=tap.on_event)
+        if client.connect():
+            client.enable()
+            w("# CDP connected; console + exceptions streaming")
+        else:
+            w("# CDP connect failed - console tap unavailable")
+            client = None
+
+    wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "220"))
+    print(f"CDPCAPTURE: running with CDP for up to {wait_s:.0f}s (log: {log_path})", flush=True)
+    deadline = _t.time() + wait_s
+    last_snap = 0.0
+    while _t.time() < deadline and not session.is_complete():
+        _t.sleep(1.0)
+        if client is not None and _t.time() - last_snap > 3.0:
+            last_snap = _t.time()
+            snap = client.evaluate(_DK_STATE_JS, timeout=6.0)
+            recv = sorted(r.value for r in session.received)
+            w(f"{tap._stamp()} STATE   recv={recv} {snap}")
+    w(f"# DONE complete={session.is_complete()} received={sorted(r.value for r in session.received)}")
+    if client is not None:
+        client.close()
+    try:
+        log_f.close()
+    except Exception:  # noqa: BLE001
+        pass
+    result["received"] = sorted(r.value for r in session.received)
+    result["remaining"] = sorted(r.value for r in session.remaining())
+    result["tier1_armed"] = armed
+    result["cdp_log"] = log_path
+    result["ok"] = session.is_complete()
+
+
 def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None:
     """Exercise the REAL capture pipeline end-to-end, exactly like _HostApi.open_cad_download: arm the
     tier-1 WebView2 download intercept + tier-2 DownloadsWatch + the real overlay/driver injection on
@@ -711,8 +861,9 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
 def main() -> int:
     import webview
 
-    realcapture = "--realcapture" in sys.argv
-    driver_mode = "--driver" in sys.argv and not realcapture
+    cdpcapture = "--cdpcapture" in sys.argv
+    realcapture = "--realcapture" in sys.argv and not cdpcapture
+    driver_mode = "--driver" in sys.argv and not realcapture and not cdpcapture
     signin = "--signin" in sys.argv and not driver_mode
     live = "--live" in sys.argv and not signin and not driver_mode
     digikey = "--digikey" in sys.argv and not live and not signin and not driver_mode
@@ -721,7 +872,8 @@ def main() -> int:
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
     mode = (
-        "realcapture" if realcapture
+        "cdpcapture" if cdpcapture
+        else "realcapture" if realcapture
         else "driver" if driver_mode
         else "signin" if signin
         else "live" if live
@@ -737,11 +889,22 @@ def main() -> int:
         webview.settings["ALLOW_DOWNLOADS"] = True
     except Exception:  # noqa: BLE001
         pass
+    # Enable WebView2 remote debugging (CDP) for the cdpcapture mode: pywebview wires
+    # --remote-debugging-port from this setting, giving live console + page-eval visibility.
+    if cdpcapture:
+        import os as _os
+
+        try:
+            webview.settings["REMOTE_DEBUGGING_PORT"] = int(_os.environ.get("STOCKROOM_CDP_PORT", "9222"))
+        except Exception:  # noqa: BLE001
+            pass
 
     def driver() -> None:
         try:
             drive = (
-                _drive_realcapture
+                _drive_cdpcapture
+                if cdpcapture
+                else _drive_realcapture
                 if realcapture
                 else _drive_production
                 if driver_mode
