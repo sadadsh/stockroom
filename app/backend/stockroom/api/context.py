@@ -86,6 +86,30 @@ class AppContext:
         self.index.close()
         self.index = LibraryIndex.build(self.profile.library.parts_dir)
 
+    def rebuild_stm_index(self, source: Path | None = None, progress=None) -> None:
+        """Build the STM index from `source` (falling back to the configured
+        stm_cubemx_source, then stm.source's own env-var/candidate-path discovery)
+        into the per-machine index path, closing any existing stm_index and
+        swapping the new one in. Mirrors rebuild_index/rebuild_project_index's
+        close-then-rebuild-then-swap shape. A build error propagates to the caller
+        (the JobRunner work closure surfaces it as an SSE error event) - never
+        swallowed here."""
+        from stockroom.stm.db import StmIndex
+        from stockroom.stm.source import default_cubemx_source, default_index_path
+
+        resolved_source = source or (
+            Path(self.config.stm_cubemx_source) if self.config.stm_cubemx_source else None
+        ) or default_cubemx_source()
+        if resolved_source is None:
+            raise ValueError(
+                "no STM32 CubeMX source configured or discoverable - set "
+                "stm_cubemx_source via PATCH /api/settings or STM32_CUBEMX"
+            )
+        old_stm_index = self.stm_index
+        self.stm_index = StmIndex.build(resolved_source, default_index_path(), progress=progress)
+        if old_stm_index is not None:
+            old_stm_index.close()
+
     def auto_push(self) -> None:
         """After a library write, push it to the remote when a GitHub token is configured and sync
         is enabled, first rebasing to pick up any collaborator changes. Non-fatal: an offline /

@@ -5,6 +5,7 @@ not-built 409 gate. Later plans (03-02/03-03/03-04) extend this same file as the
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -155,3 +156,42 @@ def test_mcus_filtered_by_family_keeps_full_facets(client, app_ctx):
     # facet counts reflect the FULL unfiltered set for the other facet dimensions
     assert set(body["facets"]["package"]) == {"LQFP64", "LQFP48"}
     assert set(body["facets"]["core"]) == {"Cortex-M4", "Cortex-M3"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AppContext.rebuild_stm_index (03-03 task 2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_FIXTURE_CUBEMX_SOURCE = Path(__file__).resolve().parent.parent / "fixtures" / "stm"
+
+
+def test_rebuild_stm_index_builds_a_queryable_index_and_forwards_progress(app_ctx):
+    assert app_ctx.stm_index is None
+    progress_events = []
+
+    app_ctx.rebuild_stm_index(_FIXTURE_CUBEMX_SOURCE, progress=progress_events.append)
+
+    assert app_ctx.stm_index is not None
+    assert app_ctx.stm_index.mcu_count() > 0
+    assert progress_events  # at least one progress callback fired
+
+
+def test_rebuild_stm_index_closes_the_old_index_and_swaps_in_the_new_one(app_ctx):
+    app_ctx.rebuild_stm_index(_FIXTURE_CUBEMX_SOURCE)
+    first = app_ctx.stm_index
+    first_count = first.mcu_count()
+
+    app_ctx.rebuild_stm_index(_FIXTURE_CUBEMX_SOURCE)
+    second = app_ctx.stm_index
+
+    assert second is not first
+    assert second.mcu_count() == first_count
+
+
+def test_rebuild_stm_index_propagates_build_errors(app_ctx, monkeypatch):
+    def _boom(*args, **kwargs):
+        raise RuntimeError("synthetic build failure")
+
+    monkeypatch.setattr(StmIndex, "build", _boom)
+    with pytest.raises(RuntimeError, match="synthetic build failure"):
+        app_ctx.rebuild_stm_index(_FIXTURE_CUBEMX_SOURCE)
