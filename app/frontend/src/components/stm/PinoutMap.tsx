@@ -18,6 +18,7 @@ import {
   pinMapGeometry,
   type PadLayout,
 } from "../../lib/pinMapGeometry";
+import { Button } from "../primitives";
 import { categoryFill, isFiveVoltTolerant, roleStroke } from "./pinEncoding";
 
 const VIEW = 460;
@@ -221,13 +222,9 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={reset}
-            className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
-          >
+          <Button type="button" small onClick={reset} className="flex-none">
             Reset View
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>
