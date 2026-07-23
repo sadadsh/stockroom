@@ -1,7 +1,8 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, renderHook, act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import { ThemeProvider } from "./theme";
-import { DevModeProvider } from "./devMode";
+import { DevModeProvider, useDevMode } from "./devMode";
 import { Text } from "./copy";
 import { DevPanel } from "../components/DevPanel";
 import { api } from "../api/client";
@@ -141,5 +142,63 @@ describe("dev mode", () => {
     const arg = mockApi.devSave.mock.calls[0][0];
     // dark is the default theme, so a themed shadow lands in the root (dark) block
     expect(arg.tokens.root["--shadow-card"]).toBe("0 2px 4px rgba(0, 0, 0, 0.5)");
+  });
+});
+
+// --- Dev Mode v2 selection model (the inspect-first shell's state contract) ------------------------
+
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider>
+      <DevModeProvider>{children}</DevModeProvider>
+    </ThemeProvider>
+  );
+}
+
+describe("dev mode selection state", () => {
+  it("flips the inspect and showIds toggles", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    expect(result.current.inspect).toBe(false);
+    expect(result.current.showIds).toBe(false);
+
+    act(() => result.current.toggleInspect());
+    expect(result.current.inspect).toBe(true);
+    act(() => result.current.toggleShowIds());
+    expect(result.current.showIds).toBe(true);
+
+    act(() => result.current.toggleInspect());
+    expect(result.current.inspect).toBe(false);
+  });
+
+  it("round-trips selectDevId and selectVars", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper });
+    expect(result.current.selectedDevId).toBeNull();
+    expect(result.current.highlightedVars).toEqual([]);
+
+    act(() => {
+      result.current.selectDevId("detail.complete-part");
+      result.current.selectVars(["--c-warn", "--c-t1"]);
+    });
+    expect(result.current.selectedDevId).toBe("detail.complete-part");
+    expect(result.current.highlightedVars).toEqual(["--c-warn", "--c-t1"]);
+
+    act(() => result.current.selectDevId(null));
+    expect(result.current.selectedDevId).toBeNull();
+  });
+
+  it("exposes the new selection fields inertly on the DEFAULT no-op context", () => {
+    // No provider mounted: useDevMode falls back to DEFAULT, which must expose the v2 fields inertly.
+    const { result } = renderHook(() => useDevMode());
+    expect(result.current.selectedDevId).toBeNull();
+    expect(result.current.inspect).toBe(false);
+    expect(result.current.showIds).toBe(false);
+    expect(result.current.highlightedVars).toEqual([]);
+    // The no-op setters must not throw.
+    expect(() => {
+      result.current.selectDevId("x");
+      result.current.toggleInspect();
+      result.current.toggleShowIds();
+      result.current.selectVars(["--c-acc"]);
+    }).not.toThrow();
   });
 });

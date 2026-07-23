@@ -63,6 +63,22 @@ interface DevModeContextValue {
   selectedCopyDefault: string;
   selectCopy: (id: string, defaultText: string) => void;
   clearSelectedCopy: () => void;
+  // --- inspect / selection (Dev Mode v2 inspect-first shell) ---
+  // The one element selection that drives the Selection pane, the Tokens tab, and the Copy tab. Set
+  // by an inspect-click, a catalogue click, or a Show IDs read; null means "no selection".
+  selectedDevId: string | null;
+  selectDevId: (id: string | null) => void;
+  // Pointing mode: while on, the Inspector hover-highlights the closest [data-dev-id] and a click
+  // selects it and is swallowed (never fires the app / copy layer). Off is zero behaviour change.
+  inspect: boolean;
+  toggleInspect: () => void;
+  // The all-at-once overlay: one static id badge over every [data-dev-id] node, in every window.
+  showIds: boolean;
+  toggleShowIds: () => void;
+  // The used design tokens of the current selection (cssVars), driving which Tokens rows show and a
+  // scroll-into-view of the first. Set alongside the selection via selectVars.
+  highlightedVars: string[];
+  selectVars: (vars: string[]) => void;
   // --- persistence ---
   dirty: boolean;
   saving: boolean;
@@ -94,6 +110,14 @@ const DEFAULT: DevModeContextValue = {
   selectedCopyDefault: "",
   selectCopy: noop,
   clearSelectedCopy: noop,
+  selectedDevId: null,
+  selectDevId: noop,
+  inspect: false,
+  toggleInspect: noop,
+  showIds: false,
+  toggleShowIds: noop,
+  highlightedVars: [],
+  selectVars: noop,
   dirty: false,
   saving: false,
   lastError: null,
@@ -113,6 +137,10 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const [tokens, setTokens] = useState<TokenOverrides>(() => cloneTokens(TOKEN_OVERRIDES));
   const [copy, setCopyState] = useState<Record<string, string>>(() => ({ ...COPY_OVERRIDES }));
   const [selectedCopy, setSelectedCopy] = useState<{ id: string; def: string } | null>(null);
+  const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
+  const [inspect, setInspect] = useState(false);
+  const [showIds, setShowIds] = useState(false);
+  const [highlightedVars, setHighlightedVars] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   // The last-saved baseline, so `dirty` reflects unsaved edits (the imported modules are frozen).
@@ -221,6 +249,11 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   }, []);
   const clearSelectedCopy = useCallback(() => setSelectedCopy(null), []);
 
+  const selectDevId = useCallback((id: string | null) => setSelectedDevId(id), []);
+  const toggleInspect = useCallback(() => setInspect((v) => !v), []);
+  const toggleShowIds = useCallback(() => setShowIds((v) => !v), []);
+  const selectVars = useCallback((vars: string[]) => setHighlightedVars(vars), []);
+
   const dirty =
     JSON.stringify(tokens) !== savedTokens || JSON.stringify(copy) !== savedCopy;
 
@@ -255,6 +288,14 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       selectedCopyDefault: selectedCopy?.def ?? "",
       selectCopy,
       clearSelectedCopy,
+      selectedDevId,
+      selectDevId,
+      inspect,
+      toggleInspect,
+      showIds,
+      toggleShowIds,
+      highlightedVars,
+      selectVars,
       dirty,
       saving,
       lastError,
@@ -275,6 +316,14 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       selectedCopy,
       selectCopy,
       clearSelectedCopy,
+      selectedDevId,
+      selectDevId,
+      inspect,
+      toggleInspect,
+      showIds,
+      toggleShowIds,
+      highlightedVars,
+      selectVars,
       dirty,
       saving,
       lastError,

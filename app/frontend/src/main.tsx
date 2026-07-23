@@ -9,6 +9,7 @@ import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 import { DevModeProvider } from "./lib/devMode";
 import { DevPanel } from "./components/DevPanel";
+import { DevInspector } from "./components/DevInspector";
 // The interface face, bundled offline (no CDN) so it renders identically inside
 // WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
 // carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
@@ -49,6 +50,7 @@ createRoot(rootEl).render(
               </RouterProvider>
             </ToastProvider>
             <DevPanel />
+            <DevInspector />
           </DevModeProvider>
         </ThemeProvider>
       </MotionConfig>
