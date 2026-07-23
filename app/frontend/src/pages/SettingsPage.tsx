@@ -609,76 +609,99 @@ function DistributorSection() {
   );
 }
 
-// One vendor's saved login: a username (echoed, not secret) plus a masked password.
-// The guided capture window uses these to auto-fill the first login and then keeps
-// the session, so the user signs in once.
+// One saved credential pair: a non-secret identifier (a username, or the DigiKey API
+// client_id) that is echoed, plus a masked secret that only ever shows a last-4 hint.
+// The guided capture window uses these to auto-fill each sign-in and then keeps the
+// session, so the user signs in once. The two field labels are configurable so the same
+// row can carry a username/password pair or a Client ID / Client Secret pair.
 function VendorLogin({
-  label,
-  savedUsername,
-  passwordSet,
-  passwordHint,
+  title,
+  identifierLabel,
+  secretLabel,
+  saveLabel,
+  identifierPlaceholder = "Username or email",
+  savedIdentifier,
+  secretSet,
+  secretHint,
   pending,
   onSave,
 }: {
-  label: string;
-  savedUsername: string;
-  passwordSet: boolean;
-  passwordHint: string;
+  title: string;
+  identifierLabel: string;
+  secretLabel: string;
+  saveLabel: string;
+  identifierPlaceholder?: string;
+  savedIdentifier: string;
+  secretSet: boolean;
+  secretHint: string;
   pending: boolean;
-  onSave: (username: string, password: string) => void;
+  onSave: (identifier: string, secret: string) => void;
 }) {
-  const [username, setUsername] = useState(savedUsername);
-  const [password, setPassword] = useState("");
+  const [identifier, setIdentifier] = useState(savedIdentifier);
+  const [secret, setSecret] = useState("");
   const [edited, setEdited] = useState(false);
-  // Prefill the saved username once it arrives, unless the user has started editing.
+  // Prefill the saved identifier once it arrives, unless the user has started editing.
   useEffect(() => {
-    if (!edited) setUsername(savedUsername);
-  }, [savedUsername, edited]);
-  const slug = label.toLowerCase().replace(/\s+/g, "-");
+    if (!edited) setIdentifier(savedIdentifier);
+  }, [savedIdentifier, edited]);
+  const slug = identifierLabel.toLowerCase().replace(/\s+/g, "-");
   return (
     <div className="border-b border-line py-3 last:border-b-0">
       <div className="mb-2 flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-t1">{label}</span>
+        <span className="text-sm font-medium text-t1">{title}</span>
         <span className="flex-none text-xs text-t3">
-          {passwordSet ? `Password set (ending ${passwordHint})` : "No password saved"}
+          {secretSet ? `Saved (ending ${secretHint})` : "Not saved"}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
-        <label htmlFor={`${slug}-user`} className="sr-only">
-          {label} Username
+        <label htmlFor={`${slug}-id`} className="sr-only">
+          {identifierLabel}
         </label>
         <input
-          id={`${slug}-user`}
+          id={`${slug}-id`}
           type="text"
           autoComplete="off"
-          value={username}
+          aria-label={identifierLabel}
+          value={identifier}
           onChange={(e) => {
             setEdited(true);
-            setUsername(e.target.value);
+            setIdentifier(e.target.value);
           }}
-          placeholder="Username or email"
+          placeholder={identifierPlaceholder}
           className={INPUT_CLS}
         />
-        <label htmlFor={`${slug}-pass`} className="sr-only">
-          {label} Password
+        <label htmlFor={`${slug}-secret`} className="sr-only">
+          {secretLabel}
         </label>
         <input
-          id={`${slug}-pass`}
+          id={`${slug}-secret`}
           type="password"
           autoComplete="off"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={passwordSet ? "Paste a new password to replace it" : "Password"}
+          aria-label={secretLabel}
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder={secretSet ? "Paste a new value to replace it" : secretLabel}
           className={INPUT_CLS}
         />
         <Button
-          className="min-w-[176px] justify-center"
-          onClick={() => onSave(username.trim(), password)}
-          disabled={pending || (!username.trim() && !password)}
+          className="min-w-[196px] justify-center"
+          onClick={() => onSave(identifier.trim(), secret)}
+          disabled={pending || (!identifier.trim() && !secret)}
         >
-          Save {label} Login
+          {saveLabel}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// A titled subgroup inside the credential section, so the DigiKey creds and the
+// in-DigiKey CAD provider logins read as two distinct tiers, not one flat list.
+function CredentialGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-4 first:mt-0">
+      <Eyebrow className="mb-0.5">{label}</Eyebrow>
+      {children}
     </div>
   );
 }
@@ -691,40 +714,96 @@ function VendorLoginsSection() {
 
   function saveLogin(patch: SettingsPatch, name: string) {
     save.mutate(patch, {
-      onSuccess: () => toast(`${name} login saved.`, "ok"),
+      onSuccess: () => toast(`${name} saved.`, "ok"),
       onError: (e) => toast(errMsg(e), "err"),
     });
   }
 
   return (
     <Section
-      title="Vendor Logins"
-      hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window sign you in and stay logged in across parts. They are stored per machine and the password is never shown again."
+      title="Capture Credentials"
+      hint="The DigiKey account login signs you into DigiKey, and the API creds resolve the exact product page for enrichment. The provider logins clear each provider's wall inside DigiKey's CAD Models section, so the guided capture window can pull files without stopping to log in. Everything is stored per machine and each secret is never shown again."
     >
-      <VendorLogin
-        label="Ultra Librarian"
-        savedUsername={d?.ul_username ?? ""}
-        passwordSet={d?.ul_password_set ?? false}
-        passwordHint={d?.ul_password_hint ?? ""}
-        pending={save.isPending}
-        onSave={(username, password) => {
-          const patch: SettingsPatch = { ul_username: username };
-          if (password) patch.ul_password = password;
-          saveLogin(patch, "Ultra Librarian");
-        }}
-      />
-      <VendorLogin
-        label="SnapEDA"
-        savedUsername={d?.snapeda_username ?? ""}
-        passwordSet={d?.snapeda_password_set ?? false}
-        passwordHint={d?.snapeda_password_hint ?? ""}
-        pending={save.isPending}
-        onSave={(username, password) => {
-          const patch: SettingsPatch = { snapeda_username: username };
-          if (password) patch.snapeda_password = password;
-          saveLogin(patch, "SnapEDA");
-        }}
-      />
+      <CredentialGroup label="DigiKey">
+        <VendorLogin
+          title="DigiKey API Creds"
+          identifierLabel="DigiKey API Client ID"
+          secretLabel="DigiKey API Client Secret"
+          saveLabel="Save DigiKey API Creds"
+          identifierPlaceholder="Client ID"
+          savedIdentifier={d?.digikey_client_id ?? ""}
+          secretSet={d?.digikey_client_secret_set ?? false}
+          secretHint={d?.digikey_client_secret_hint ?? ""}
+          pending={save.isPending}
+          onSave={(clientId, secret) => {
+            const patch: SettingsPatch = { digikey_client_id: clientId };
+            if (secret) patch.digikey_client_secret = secret;
+            saveLogin(patch, "DigiKey API creds");
+          }}
+        />
+        <VendorLogin
+          title="DigiKey Account Login"
+          identifierLabel="DigiKey Account Username"
+          secretLabel="DigiKey Account Password"
+          saveLabel="Save DigiKey Account Login"
+          savedIdentifier={d?.digikey_username ?? ""}
+          secretSet={d?.digikey_password_set ?? false}
+          secretHint={d?.digikey_password_hint ?? ""}
+          pending={save.isPending}
+          onSave={(username, password) => {
+            const patch: SettingsPatch = { digikey_username: username };
+            if (password) patch.digikey_password = password;
+            saveLogin(patch, "DigiKey account login");
+          }}
+        />
+      </CredentialGroup>
+      <CredentialGroup label="In-DigiKey CAD Providers">
+        <VendorLogin
+          title="Ultra Librarian"
+          identifierLabel="Ultra Librarian Username"
+          secretLabel="Ultra Librarian Password"
+          saveLabel="Save Ultra Librarian Login"
+          savedIdentifier={d?.ul_username ?? ""}
+          secretSet={d?.ul_password_set ?? false}
+          secretHint={d?.ul_password_hint ?? ""}
+          pending={save.isPending}
+          onSave={(username, password) => {
+            const patch: SettingsPatch = { ul_username: username };
+            if (password) patch.ul_password = password;
+            saveLogin(patch, "Ultra Librarian login");
+          }}
+        />
+        <VendorLogin
+          title="SnapEDA"
+          identifierLabel="SnapEDA Username"
+          secretLabel="SnapEDA Password"
+          saveLabel="Save SnapEDA Login"
+          savedIdentifier={d?.snapeda_username ?? ""}
+          secretSet={d?.snapeda_password_set ?? false}
+          secretHint={d?.snapeda_password_hint ?? ""}
+          pending={save.isPending}
+          onSave={(username, password) => {
+            const patch: SettingsPatch = { snapeda_username: username };
+            if (password) patch.snapeda_password = password;
+            saveLogin(patch, "SnapEDA login");
+          }}
+        />
+        <VendorLogin
+          title="SamacSys"
+          identifierLabel="SamacSys Username"
+          secretLabel="SamacSys Password"
+          saveLabel="Save SamacSys Login"
+          savedIdentifier={d?.samacsys_username ?? ""}
+          secretSet={d?.samacsys_password_set ?? false}
+          secretHint={d?.samacsys_password_hint ?? ""}
+          pending={save.isPending}
+          onSave={(username, password) => {
+            const patch: SettingsPatch = { samacsys_username: username };
+            if (password) patch.samacsys_password = password;
+            saveLogin(patch, "SamacSys login");
+          }}
+        />
+      </CredentialGroup>
     </Section>
   );
 }
