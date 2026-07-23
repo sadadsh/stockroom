@@ -51,6 +51,18 @@ def test_defaults_are_honest_empties():
     assert ProjectRecord.from_dict({"id": "x", "name": "X", "root": "/tmp/x"}) == p
 
 
+def test_eda_defaults_to_kicad_and_round_trips():
+    # EDA-neutral projects: the record says which EDA owns the files. A record written
+    # before the field existed reads as kicad (every registration then WAS KiCad).
+    p = ProjectRecord(id="x", name="X", root="/tmp/x")
+    assert p.eda == "kicad"
+    assert p.to_dict()["eda"] == "kicad"
+    assert ProjectRecord.from_dict({"id": "x", "name": "X", "root": "/tmp/x"}).eda == "kicad"
+    alt = ProjectRecord(id="y", name="Y", root="/tmp/y", eda="altium")
+    assert ProjectRecord.from_dict(alt.to_dict()).eda == "altium"
+    assert ProjectRecord.loads(alt.dumps()) == alt
+
+
 def test_from_dict_copies_mutable_containers():
     # A record built from a dict must not alias the caller's lists/dicts.
     src = {"id": "x", "name": "X", "root": "/tmp/x", "board_paths": ["a.kicad_pcb"], "audit_digest": {"n": 1}}

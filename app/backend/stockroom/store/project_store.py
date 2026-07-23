@@ -1,11 +1,12 @@
-"""Registered KiCad projects: one JSON ProjectRecord per project.
+"""Registered PCB projects (KiCad or Altium): one JSON ProjectRecord per project.
 
-A KiCad PCB project is external to Stockroom (M7): Stockroom registers it by path,
-never owns its files. The ProjectRecord (a registration plus a cached audit digest)
-is written under a `projects/` directory in the library repo and committed like every
-other record; the actual `.kicad_pro`/`.kicad_pcb`/`.kicad_sch` stay at their external
-`root`. Mirrors store/profile.py: each mutation is one scoped git commit (git is the
-undo system), and delete removes only the registration, never the external files.
+A PCB project is external to Stockroom (M7): Stockroom registers it by path, never
+owns its files. The ProjectRecord (a registration plus a cached audit digest) is
+written under a `projects/` directory in the library repo and committed like every
+other record; the actual `.kicad_pro`/`.kicad_pcb`/`.kicad_sch` (KiCad) or
+`.PrjPcb`/`.PcbDoc`/`.SchDoc` (Altium) stay at their external `root`. Mirrors
+store/profile.py: each mutation is one scoped git commit (git is the undo system),
+and delete removes only the registration, never the external files.
 
 No em dashes anywhere (standing owner rule).
 """
@@ -66,6 +67,55 @@ def _discover(root: Path) -> tuple[str, list[str], list[str], str]:
     return pro, [p.name for p in boards], [p.name for p in sheets], name
 
 
+# A .PrjPcb is INI-style text; each [DocumentN] section carries one DocumentPath. The
+# paths are Windows-relative (backslashes), so they normalize to posix for the record.
+_DOCUMENT_PATH = re.compile(r"^DocumentPath=(.+)$", re.MULTILINE)
+
+
+def _prjpcb_documents(prjpcb: Path) -> list[str]:
+    """Every DocumentPath the .PrjPcb lists, normalized to posix, order preserved. A
+    missing/unreadable project file lists nothing (the glob fallback still finds docs)."""
+    try:
+        text = prjpcb.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    docs = []
+    for m in _DOCUMENT_PATH.finditer(text):
+        rel = m.group(1).strip().replace("\\", "/")
+        if rel and rel not in docs:
+            docs.append(rel)
+    return docs
+
+
+def _discover_altium(root: Path) -> tuple[str, list[str], list[str], str]:
+    """Scan the project dir for its Altium files: documents come from the .PrjPcb's
+    DocumentPath entries (recorded even when missing on disk: registration records what
+    the project CLAIMS; a missing document is a health finding) plus any loose top-level
+    .SchDoc/.PcbDoc the project file does not list. Name mirrors the KiCad rule: the
+    .PrjPcb stem, else the first board/sheet stem, else the dir name."""
+    root = Path(root)
+    pros = sorted(root.glob("*.PrjPcb"))
+    pro = pros[0].name if pros else ""
+    listed = _prjpcb_documents(pros[0]) if pros else []
+    sheets = [d for d in listed if d.lower().endswith(".schdoc")]
+    boards = [d for d in listed if d.lower().endswith(".pcbdoc")]
+    for p in sorted(root.glob("*.SchDoc")):
+        if p.name not in sheets:
+            sheets.append(p.name)
+    for p in sorted(root.glob("*.PcbDoc")):
+        if p.name not in boards:
+            boards.append(p.name)
+    if pros:
+        name = pros[0].stem
+    elif boards:
+        name = Path(boards[0]).stem
+    elif sheets:
+        name = Path(sheets[0]).stem
+    else:
+        name = root.name
+    return pro, boards, sheets, name
+
+
 class ProjectStore:
     def __init__(self, projects_root: Path, repo: GitRepo):
         self.projects_root = Path(projects_root)
@@ -74,13 +124,33 @@ class ProjectStore:
     def _path(self, project_id: str) -> Path:
         return self.projects_root / f"{project_id}.json"
 
-    def register(self, root: Path) -> ProjectRecord:
+    def register(self, root: Path, eda: str | None = None) -> ProjectRecord:
         root = Path(root)
         if not root.is_dir():
             raise ValueError(f"not a directory: {root.as_posix()}")
-        pro, boards, sheets, name = _discover(root)
-        if not pro and not boards and not sheets:
-            raise ValueError(f"no KiCad project files found in {root.as_posix()}")
+        if eda not in (None, "kicad", "altium"):
+            raise ValueError(f"unknown eda: {eda!r} (expected 'kicad' or 'altium')")
+        kicad = _discover(root)
+        altium = _discover_altium(root)
+        has_kicad = any(kicad[:3])
+        has_altium = any(altium[:3])
+        if eda is None:
+            # Auto-detect by which EDA's files exist; a dir holding BOTH is ambiguous
+            # and needs an explicit choice rather than a silent guess.
+            if has_kicad and has_altium:
+                raise ValueError(
+                    f"{root.as_posix()} holds both KiCad and Altium project files; "
+                    "pass eda='kicad' or eda='altium' to choose"
+                )
+            eda = "altium" if has_altium else "kicad"
+        if eda == "altium":
+            if not has_altium:
+                raise ValueError(f"no Altium project files found in {root.as_posix()}")
+            pro, boards, sheets, name = altium
+        else:
+            if not has_kicad:
+                raise ValueError(f"no KiCad project files found in {root.as_posix()}")
+            pro, boards, sheets, name = kicad
         root_posix = root.as_posix()
         if any(rec.root == root_posix for rec in self.list()):
             raise ValueError(f"project already registered: {root_posix}")
@@ -93,6 +163,7 @@ class ProjectStore:
             pro_path=pro,
             board_paths=boards,
             sheet_paths=sheets,
+            eda=eda,
             git_root=_resolve_git_root(root),
             registered_at=_utc_now_iso(),
         )

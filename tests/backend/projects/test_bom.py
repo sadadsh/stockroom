@@ -84,6 +84,135 @@ def test_bom_from_project_merges_sheets(tmp_path):
     assert bom["component_count"] == 3
 
 
+def test_multi_unit_symbols_count_one_physical_component(tmp_path):
+    # A multi-unit symbol (an op-amp's A and B units) appears as SEPARATE (symbol)
+    # nodes sharing one Reference in the sheet. That is ONE physical part: qty 1,
+    # never qty-per-unit (a qty of 2 would double the order and the cost).
+    f = _write_sch(
+        tmp_path / "s.kicad_sch",
+        _sym("U1", "LM358", lib="Device:U", mfr="TI"),
+        _sym("U1", "LM358", lib="Device:U", mfr="TI"),
+    )
+    rows = bom_from_kicad_schematic(str(f))["rows"]
+    assert len(rows) == 1
+    assert rows[0]["qty"] == 1 and rows[0]["refs"] == ["U1"]
+
+
+def test_multi_unit_symbols_dedupe_across_sheets_too(tmp_path):
+    # Units of one component can live on DIFFERENT pages (the power unit on the power
+    # sheet). References are project-unique, so the same ref on two sheets is still
+    # ONE physical part.
+    a = _write_sch(tmp_path / "a.kicad_sch", _sym("U1", "LM358", lib="Device:U", mfr="TI"))
+    b = _write_sch(tmp_path / "b.kicad_sch", _sym("U1", "LM358", lib="Device:U", mfr="TI"))
+    bom = bom_from_project([str(a), str(b)])
+    assert bom["component_count"] == 1
+    assert bom["rows"][0]["qty"] == 1 and bom["rows"][0]["refs"] == ["U1"]
+
+
+# -- Altium sheets through the same pipeline (EDA-neutral BOM) -----------------
+
+
+def _write_schdoc(path, *component_blocks):
+    import struct
+
+    from tests.backend.altium.cfb_writer import write_cfb
+
+    def rec(*pairs):
+        payload = ("|" + "|".join(pairs)).encode("latin-1") + b"\x00"
+        return struct.pack("<I", len(payload)) + payload
+
+    stream = rec("HEADER=Protel for Windows - Schematic Capture Binary File Version 5.0")
+    idx = 0
+    for block in component_blocks:
+        comp_idx = idx
+        stream += rec("RECORD=1", f"LIBREFERENCE={block['lib_ref']}",
+                      f"DESIGNITEMID={block.get('design_item_id', '')}", "OWNERPARTID=-1")
+        idx += 1
+        stream += rec("RECORD=34", f"OWNERINDEX={comp_idx}", "NAME=Designator",
+                      f"TEXT={block['designator']}")
+        idx += 1
+        for name, text in block.get("params", {}).items():
+            stream += rec("RECORD=41", f"OWNERINDEX={comp_idx}", f"NAME={name}", f"TEXT={text}")
+            idx += 1
+        if block.get("footprint"):
+            stream += rec("RECORD=44", f"OWNERINDEX={comp_idx}")
+            stream += rec("RECORD=45", f"OWNERINDEX={idx}", f"MODELNAME={block['footprint']}",
+                          "MODELTYPE=PCBLIB", "ISCURRENT=T")
+            idx += 2
+    write_cfb(path, "FileHeader", stream)
+    return path
+
+
+def test_bom_from_project_reads_altium_sheets(tmp_path):
+    # The same pipeline serves both EDAs: a .SchDoc sheet feeds grouping, identity,
+    # and pricing exactly like a .kicad_sch. A DbLib-placed part carries the MPN and
+    # Manufacturer parameters, and its current PCBLIB implementation is the footprint.
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {
+            "designator": "U1",
+            "lib_ref": "LM358",
+            "design_item_id": "LM358DR",
+            "params": {"MPN": "LM358DR", "Manufacturer": "TI", "Value": "LM358DR"},
+            "footprint": "SOIC-8",
+        },
+        {
+            "designator": "R1",
+            "lib_ref": "RES",
+            "params": {"Value": "10k"},
+            "footprint": "RESC1005X40",
+        },
+    )
+    bom = bom_from_project([str(sheet)])
+    assert bom["component_count"] == 2
+    u1 = [r for r in bom["rows"] if r["refs"] == ["U1"]][0]
+    assert u1["mpn"] == "LM358DR"
+    assert u1["manufacturer"] == "TI"
+    assert u1["footprint"] == "SOIC-8"
+    assert u1["has_real_mpn"] is True
+    r1 = [r for r in bom["rows"] if r["refs"] == ["R1"]][0]
+    assert r1["value"] == "10k"
+    assert r1["mpn"] == ""  # a passive's Value is a value, never promoted to MPN
+
+
+def test_altium_design_item_id_backfills_a_missing_mpn_param(tmp_path):
+    # A DbLib placement's DesignItemId IS the Stockroom MPN; a part whose parameter
+    # set lacks an explicit MPN still identifies by it.
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {
+            "designator": "U2",
+            "lib_ref": "TPS2121",
+            "design_item_id": "TPS2121RUXR",
+            "params": {"Manufacturer": "TI"},
+        },
+    )
+    u2 = bom_from_project([str(sheet)])["rows"][0]
+    assert u2["mpn"] == "TPS2121RUXR"
+
+
+def test_altium_sheets_respect_the_kibom_exclusions(tmp_path):
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "TP1", "lib_ref": "TESTPOINT", "params": {"Value": "TP"}},
+        {"designator": "R1", "lib_ref": "RES", "params": {"Value": "10k", "Config": "DNF"}},
+        {"designator": "C1", "lib_ref": "CAP", "params": {"Value": "1uF"}},
+    )
+    bom = bom_from_project([str(sheet)])
+    assert [r["refs"] for r in bom["rows"]] == [["C1"]]
+
+
+def test_a_mixed_project_merges_kicad_and_altium_sheets(tmp_path):
+    a = _write_sch(tmp_path / "a.kicad_sch", _sym("R1", "10k"))
+    b = _write_schdoc(
+        tmp_path / "b.SchDoc",
+        {"designator": "R2", "lib_ref": "RES", "params": {"Value": "10k"}},
+    )
+    bom = bom_from_project([str(a), str(b)])
+    tenk = [r for r in bom["rows"] if r["value"] == "10k"][0]
+    assert tenk["qty"] == 2 and set(tenk["refs"]) == {"R1", "R2"}
+
+
 def test_bom_does_not_merge_different_manufacturers(tmp_path):
     f = _write_sch(tmp_path / "s.kicad_sch",
                    _sym("R1", "10k", mfr="Yageo"), _sym("R2", "10k", mfr="Vishay"))

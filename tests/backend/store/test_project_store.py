@@ -126,3 +126,98 @@ def test_delete_missing_raises(tmp_path):
     store = _store(tmp_path)
     with pytest.raises(FileNotFoundError):
         store.delete("nope")
+
+
+# ---- Altium registration (EDA-neutral projects) -----------------------------
+
+
+def _make_altium_project(dir_path, name="Amp", *, listed=None, extra=()):
+    """An Altium project dir: a .PrjPcb (INI text) listing `listed` documents, plus
+    the actual document files for `listed` + `extra` (extras exist on disk but are
+    not in the .PrjPcb)."""
+    dir_path.mkdir(parents=True, exist_ok=True)
+    listed = list(listed if listed is not None else (f"{name}.SchDoc", f"{name}.PcbDoc"))
+    sections = ["[Design]", "Version=1.0", ""]
+    for i, doc in enumerate(listed, start=1):
+        sections += [f"[Document{i}]", f"DocumentPath={doc}", ""]
+    (dir_path / f"{name}.PrjPcb").write_text("\n".join(sections), encoding="utf-8")
+    for doc in list(listed) + list(extra):
+        p = dir_path / doc.replace("\\", "/")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("altium-binary-stand-in", encoding="utf-8")
+    return dir_path
+
+
+def test_register_discovers_an_altium_project(tmp_path):
+    store = _store(tmp_path)
+    proj_dir = _make_altium_project(tmp_path / "ext" / "amp", name="Amp")
+    rec = store.register(proj_dir)
+    assert rec.eda == "altium"
+    assert rec.name == "Amp"
+    assert rec.pro_path == "Amp.PrjPcb"
+    assert rec.sheet_paths == ["Amp.SchDoc"]
+    assert rec.board_paths == ["Amp.PcbDoc"]
+
+
+def test_altium_documents_come_from_the_prjpcb_with_backslashes_normalized(tmp_path):
+    store = _store(tmp_path)
+    proj_dir = _make_altium_project(
+        tmp_path / "ext" / "amp",
+        name="Amp",
+        listed=["Sheets\\Power.SchDoc", "Amp.PcbDoc"],
+    )
+    rec = store.register(proj_dir)
+    # a Windows-style DocumentPath is stored as_posix so the record reads the same on any OS
+    assert rec.sheet_paths == ["Sheets/Power.SchDoc"]
+    assert rec.board_paths == ["Amp.PcbDoc"]
+
+
+def test_altium_document_listed_but_missing_is_still_recorded(tmp_path):
+    # Registration records what the project CLAIMS; a missing document is a health
+    # finding, never silently dropped at registration.
+    store = _store(tmp_path)
+    proj_dir = _make_altium_project(tmp_path / "ext" / "amp", name="Amp")
+    (proj_dir / "Amp.SchDoc").unlink()
+    rec = store.register(proj_dir)
+    assert rec.sheet_paths == ["Amp.SchDoc"]
+
+
+def test_altium_documents_on_disk_but_unlisted_are_included(tmp_path):
+    store = _store(tmp_path)
+    proj_dir = _make_altium_project(
+        tmp_path / "ext" / "amp", name="Amp", extra=["Loose.SchDoc"]
+    )
+    rec = store.register(proj_dir)
+    assert rec.sheet_paths == ["Amp.SchDoc", "Loose.SchDoc"]
+
+
+def test_a_dir_with_both_edas_requires_an_explicit_choice(tmp_path):
+    store = _store(tmp_path)
+    proj_dir = _make_project(tmp_path / "ext" / "board")
+    _make_altium_project(proj_dir, name="board")
+    with pytest.raises(ValueError, match="both"):
+        store.register(proj_dir)
+    rec = store.register(proj_dir, eda="altium")
+    assert rec.eda == "altium"
+    assert rec.pro_path == "board.PrjPcb"
+
+
+def test_explicit_eda_requires_that_edas_files(tmp_path):
+    store = _store(tmp_path)
+    proj_dir = _make_project(tmp_path / "ext" / "board")  # KiCad files only
+    with pytest.raises(ValueError):
+        store.register(proj_dir, eda="altium")
+
+
+def test_loose_altium_documents_register_without_a_prjpcb(tmp_path):
+    # Mirrors the KiCad rule (any project file suffices): loose SchDoc/PcbDoc with no
+    # .PrjPcb still register, with an empty pro_path.
+    store = _store(tmp_path)
+    proj_dir = tmp_path / "ext" / "loose"
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "Amp.SchDoc").write_text("x", encoding="utf-8")
+    rec = store.register(proj_dir)
+    assert rec.eda == "altium"
+    assert rec.pro_path == ""
+    assert rec.sheet_paths == ["Amp.SchDoc"]
+    assert rec.name == "Amp"
