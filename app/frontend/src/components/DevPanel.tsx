@@ -6,7 +6,7 @@
  */
 import { useTheme } from "../lib/theme";
 import { useDevMode } from "../lib/devMode";
-import { DEV_TOKENS, DEV_TOKEN_GROUPS, type DevToken } from "../lib/devTokens";
+import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../lib/devTokens";
 import { Button } from "./primitives";
 
 // A best-effort hex for the native colour picker. A hex passes through; an rgb/rgba collapses to
@@ -77,11 +77,17 @@ function ColorRow({ token }: { token: DevToken }) {
   );
 }
 
-function LengthRow({ token }: { token: DevToken }) {
+// A slider + number for the length and number tokens (radii, type sizes, icon stroke). The unit
+// (`px` for a length, none for a unitless number) and the slider bounds come from the token, so one
+// row serves every scalar knob and a fractional step (type / stroke) works as well as an integer.
+function ScaleRow({ token }: { token: DevToken }) {
   const dev = useDevMode();
   const value = dev.tokenValue(token.cssVar);
   const n = parseFloat(value) || 0;
   const overridden = dev.isTokenOverridden(token.cssVar);
+  const { min, max, step } = token.range ?? DEFAULT_RANGE;
+  const unit = token.kind === "length" ? "px" : "";
+  const set = (raw: string) => dev.setToken(token.cssVar, `${raw}${unit}`);
   return (
     <div className="flex items-center gap-2 py-1">
       <span className="min-w-0 flex-1 truncate text-xs text-t2">{token.label}</span>
@@ -89,19 +95,46 @@ function LengthRow({ token }: { token: DevToken }) {
       <input
         type="range"
         aria-label={`${token.label} slider`}
-        min={0}
-        max={28}
-        step={1}
+        min={min}
+        max={max}
+        step={step}
         value={n}
-        onChange={(e) => dev.setToken(token.cssVar, `${e.target.value}px`)}
+        onChange={(e) => set(e.target.value)}
         className="w-[104px] flex-none accent-acc"
       />
       <input
         type="number"
         aria-label={`${token.label} value`}
+        min={min}
+        max={max}
+        step={step}
         value={n}
-        onChange={(e) => dev.setToken(token.cssVar, `${e.target.value}px`)}
-        className="tnum w-[52px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+        onChange={(e) => set(e.target.value)}
+        className="nospin tnum w-[52px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+      />
+    </div>
+  );
+}
+
+// A raw text field for a shadow token (the box-shadow string is long and free-form, so a slider
+// cannot serve it). Full width under the label; the aria-label carries a `shadow` suffix so an
+// Elevation token named like a Surfaces colour (both "Card") stays uniquely addressable.
+function ShadowRow({ token }: { token: DevToken }) {
+  const dev = useDevMode();
+  const value = dev.tokenValue(token.cssVar);
+  const overridden = dev.isTokenOverridden(token.cssVar);
+  return (
+    <div className="py-1">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-xs text-t2">{token.label}</span>
+        {overridden ? <ResetDot onClick={() => dev.resetToken(token.cssVar)} /> : null}
+      </div>
+      <textarea
+        aria-label={`${token.label} shadow`}
+        value={value}
+        rows={2}
+        onChange={(e) => dev.setToken(token.cssVar, e.target.value)}
+        className="mt-1 w-full resize-y rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono leading-snug text-t1 outline-none focus:border-acc"
       />
     </div>
   );
@@ -202,8 +235,10 @@ export function DevPanel() {
                 {tokens.map((token) =>
                   token.kind === "color" ? (
                     <ColorRow key={token.cssVar} token={token} />
+                  ) : token.kind === "shadow" ? (
+                    <ShadowRow key={token.cssVar} token={token} />
                   ) : (
-                    <LengthRow key={token.cssVar} token={token} />
+                    <ScaleRow key={token.cssVar} token={token} />
                   ),
                 )}
               </section>
