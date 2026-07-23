@@ -368,7 +368,7 @@ describe("DetailPanel sourcing vendor label", () => {
 describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
   it("carries the panel + workbench data-dev-id anchors, each a known catalog id", () => {
     const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
-    for (const id of ["detail.root", "detail.workbench"]) {
+    for (const id of ["detail.root", "detail.identity"]) {
       const el = container.querySelector(`[data-dev-id="${id}"]`);
       expect(el).not.toBeNull();
       expect(DEV_ID_BY_ID.has(id)).toBe(true);

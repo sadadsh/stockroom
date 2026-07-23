@@ -206,7 +206,7 @@ export function DetailPanel({
   // falls back to Specs when the current id is not in the set (a part switch).
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
-    { id: "specs", label: "Specifications" },
+    { id: "specs", label: "Details" },
     ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
     ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
     { id: "history", label: "History" },
@@ -232,11 +232,13 @@ export function DetailPanel({
           {detail.category}
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-4">
-        <div className="flex min-h-0 w-full max-w-[1360px] flex-1 gap-7">
-        {/* LEFT rail: the specimen card - identity, the physical object + its embodiments,
-            and the single readiness read with the one Complete Part action. */}
-        <aside data-dev-id="detail.identity" className="flex w-[344px] flex-none flex-col gap-4 overflow-y-auto pr-1">
+      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+        {/* sub-header: the part number + maker lead on the left, the view tabs on the right, on
+            one bordered band - the sheet gets a real head instead of a flat wall of sections. */}
+        <div
+          data-dev-id="detail.identity"
+          className="flex flex-none items-center justify-between gap-4 border-b border-line pb-2.5"
+        >
           <IdentityLine
             mpn={detail.mpn}
             manufacturer={detail.manufacturer}
@@ -246,7 +248,25 @@ export function DetailPanel({
             }
             busy={busy}
           />
+          <TabStrip
+            tabs={tabs}
+            active={activeTab}
+            onSelect={setTab}
+            idBase="workbench"
+            devIdBase="detail"
+            aria-label="Part views"
+          />
+        </div>
 
+        {/* The default view is a three-pane sheet, bordered like docked panels: the PART (its
+            embodiments + CAD readiness), the SPECIFICATIONS (one clean column), and the COMMERCIAL
+            + reference pane. Sized to fit the window with no scrolling. */}
+        <WorkbenchPanel
+          id="specs"
+          active={activeTab}
+          className="mt-3 grid min-h-0 flex-1 grid-cols-[288px_minmax(0,1fr)_320px]"
+        >
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments */}
           <div data-dev-id="detail.canvas" className="flex flex-col gap-2.5">
             <AssetTile
@@ -330,85 +350,78 @@ export function DetailPanel({
               />
             </button>
           ) : null}
-
-          <RailReference
-            datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
-            datasheetHref={detail.datasheet?.source_url || undefined}
-            description={detail.description}
-            onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
-            onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
-            busy={busy}
-          />
-        </aside>
-
-        {/* RIGHT workbench: the reference depth in one tabbed panel, so it never grows the page. */}
-        <section data-dev-id="detail.workbench" className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TabStrip
-            tabs={tabs}
-            active={activeTab}
-            onSelect={setTab}
-            idBase="workbench"
-            devIdBase="detail"
-            aria-label="Part details"
-            className="self-start"
-          />
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-            <WorkbenchPanel id="specs" active={activeTab}>
-              {/* The specifications ARE the component - they lead the tab, fully visible (never
-                  collapsed). The old derived-attribute chips duplicated these rows, so they were
-                  removed; user tags follow as a quiet footer. */}
-              <SpecificationsSection groups={specGroups} />
-              {/* Sourcing surfaced inline, not hidden behind a tab: the stock, unit price, and
-                  volume breaks the owner wants visible, plus each vendor product page as its own
-                  row (a modular list - more than one distributor shows here at once). */}
-              <DetailSection
-                title={<Text id="detail.sourcing-head">Sourcing</Text>}
-                className="mt-6"
-              >
-                <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
-              </DetailSection>
-              <TagsCard
-                tags={detail.tags}
-                onEditTags={onEditField ? (next) => onEditField("tags", next) : undefined}
-                busy={busy}
-              />
-            </WorkbenchPanel>
-
-            {pinout.length > 0 ? (
-              <WorkbenchPanel id="pinout" devId="detail.pinout" active={activeTab}>
-                <PinoutViewer
-                  key={detail.id}
-                  pins={pinout}
-                  source={pinoutProvenance?.source}
-                  confidence={pinoutProvenance?.confidence}
-                />
-              </WorkbenchPanel>
-            ) : null}
-
-            {hasEnrich ? (
-              <WorkbenchPanel id="enrich" devId="detail.enrich" active={activeTab}>
-                <EnrichPanel
-                  key={detail.mpn}
-                  mpn={detail.mpn}
-                  category={detail.category}
-                  current={{
-                    manufacturer: detail.manufacturer,
-                    description: detail.description,
-                  }}
-                  onApply={onEditField!}
-                  onApplyPinout={onApplyPinout}
-                  hasPinout={pinout.length > 0}
-                  busy={busy}
-                />
-              </WorkbenchPanel>
-            ) : null}
-
-            <WorkbenchPanel id="history" devId="detail.history" active={activeTab}>
-              <PartTimeline key={detail.id} partId={detail.id} />
-            </WorkbenchPanel>
           </div>
-        </section>
-      </div>
+
+          {/* COLUMN 2 - the specifications, the technical heart, in one clean single column. */}
+          <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-5">
+            <DetailSection title={<Text id="detail.specifications">Specifications</Text>}>
+              <SpecificationsSection groups={specGroups} />
+            </DetailSection>
+          </div>
+
+          {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note. */}
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto border-l border-line pl-5">
+            <DetailSection title={<Text id="detail.sourcing-head">Sourcing</Text>}>
+              <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+            </DetailSection>
+            <RailReference
+              datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
+              datasheetHref={detail.datasheet?.source_url || undefined}
+              description={detail.description}
+              onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
+              onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
+              busy={busy}
+            />
+          </div>
+        </WorkbenchPanel>
+
+        {pinout.length > 0 ? (
+          <WorkbenchPanel
+            id="pinout"
+            devId="detail.pinout"
+            active={activeTab}
+            className="mt-3 min-h-0 flex-1 overflow-y-auto"
+          >
+            <PinoutViewer
+              key={detail.id}
+              pins={pinout}
+              source={pinoutProvenance?.source}
+              confidence={pinoutProvenance?.confidence}
+            />
+          </WorkbenchPanel>
+        ) : null}
+
+        {hasEnrich ? (
+          <WorkbenchPanel
+            id="enrich"
+            devId="detail.enrich"
+            active={activeTab}
+            className="mt-3 min-h-0 flex-1 overflow-y-auto"
+          >
+            <EnrichPanel
+              key={detail.mpn}
+              mpn={detail.mpn}
+              category={detail.category}
+              current={{
+                manufacturer: detail.manufacturer,
+                description: detail.description,
+              }}
+              onApply={onEditField!}
+              onApplyPinout={onApplyPinout}
+              hasPinout={pinout.length > 0}
+              busy={busy}
+            />
+          </WorkbenchPanel>
+        ) : null}
+
+        <WorkbenchPanel
+          id="history"
+          devId="detail.history"
+          active={activeTab}
+          className="mt-3 min-h-0 flex-1 overflow-y-auto"
+        >
+          <PartTimeline key={detail.id} partId={detail.id} />
+        </WorkbenchPanel>
 
       {/* footer: filing (category) is organization, not identity, so it lives here, quiet; a
           destructive action never earns prime real estate, so Delete is the quiet text link
@@ -493,6 +506,7 @@ function WorkbenchPanel({
   id,
   active,
   devId,
+  className,
   children,
 }: {
   id: WorkbenchTab;
@@ -500,6 +514,7 @@ function WorkbenchPanel({
   // When set, the panel carries a stable `data-dev-id` for the dev-mode inspector
   // (the panels whose region is not already named by an inner component's id).
   devId?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -509,6 +524,7 @@ function WorkbenchPanel({
       id={tabPanelId("workbench", id)}
       aria-labelledby={tabButtonId("workbench", id)}
       hidden={active !== id}
+      className={className}
     >
       {children}
     </div>
@@ -872,99 +888,6 @@ function Filing({
   );
 }
 
-// The Tags footer: user-added labels for the part, persisted in the record's `tags` field. This
-// used to be the "Attributes" band, which ALSO rendered chips derived from the specs - a
-// duplicate of the spec sheet right below it. Those derived chips were removed (the specifications
-// are the component's parameters and now lead the tab); what remains is the genuinely additive
-// part: the labels the user pins by hand. Renders as a quiet footer under the specs with an inline
-// add and per-tag remove, and hides entirely when there is nothing to show and no editor.
-function TagsCard({
-  tags,
-  onEditTags,
-  busy,
-}: {
-  tags: string[];
-  onEditTags?: (next: string[]) => void;
-  busy?: boolean;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState("");
-  const chips = tags.filter((t) => t.trim() !== "");
-
-  const chipCls =
-    "inline-flex flex-none items-center gap-1.5 rounded-full border border-line2 bg-raise2 px-3 py-[5px] text-xs font-medium text-t1";
-
-  function commitAdd() {
-    const value = draft.trim();
-    setDraft("");
-    setAdding(false);
-    if (!value || !onEditTags) return;
-    if (!tags.some((t) => t.toLowerCase() === value.toLowerCase())) onEditTags([...tags, value]);
-  }
-
-  function removeTag(tag: string) {
-    onEditTags?.(tags.filter((t) => t !== tag));
-  }
-
-  if (chips.length === 0 && !onEditTags) return null;
-
-  return (
-    <DetailSection
-      title={<Text id="detail.attributes">Tags</Text>}
-      className="mt-6"
-      data-dev-id="detail.attributes"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        {chips.map((label) => (
-          <span key={label} className={chipCls}>
-            {label}
-            {onEditTags ? (
-              <button
-                type="button"
-                onClick={() => removeTag(label)}
-                disabled={busy}
-                aria-label={`Remove ${label}`}
-                className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
-              >
-                <Icon id="detail.tag-remove" className="h-2.5 w-2.5" />
-              </button>
-            ) : null}
-          </span>
-        ))}
-        {onEditTags ? (
-          adding ? (
-            <input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitAdd}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commitAdd();
-                else if (e.key === "Escape") {
-                  setDraft("");
-                  setAdding(false);
-                }
-              }}
-              placeholder="Add tag"
-              aria-label="Add tag"
-              className="h-[29px] w-36 flex-none rounded-full border border-line2 bg-field px-3 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              disabled={busy}
-              className="inline-flex flex-none items-center gap-1 rounded-full border border-dashed border-line2 px-3 py-[5px] text-xs font-medium text-t3 hover:border-acc hover:text-t1 disabled:opacity-50"
-            >
-              <Icon id="detail.tag-add" className="h-3 w-3" />
-              Add
-            </button>
-          )
-        ) : null}
-      </div>
-    </DetailSection>
-  );
-}
 
 // One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
 // embodiment (symbol / footprint). Present -> the whole tile is a button that expands
@@ -1116,13 +1039,13 @@ function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
       <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
     );
   }
-  // Two balanced columns (Altium's property-grid density) so every parameter is visible without
-  // scrolling: the four groups flow into two columns, each group kept whole (break-inside-avoid).
-  // The tab header already names the sheet, so no redundant "Specifications" title here.
+  // One clean column inside its own pane (the middle of the three-pane sheet). Groups stack in a
+  // consistent rhythm; the pane owns its scroll, so however many rows a part carries, the page
+  // never grows.
   return (
-    <div data-dev-id="detail.specs" className="columns-2 gap-x-9">
+    <div data-dev-id="detail.specs" className="flex flex-col">
       {groups.map((group) => (
-        <section key={group.title} data-dev-id="detail.spec-group" className="mb-4 break-inside-avoid">
+        <section key={group.title} data-dev-id="detail.spec-group" className="mb-4 last:mb-0">
           <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
             {group.title}
           </div>
