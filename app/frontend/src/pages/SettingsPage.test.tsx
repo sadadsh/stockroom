@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
 import type { ProfilesResponse, SettingsInfo, WiringReport } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
+import { DevModeProvider } from "../lib/devMode";
 import { SettingsPage } from "./SettingsPage";
 
 vi.mock("../api/client", async (importActual) => {
@@ -68,6 +69,29 @@ function renderPage() {
       </ThemeProvider>
     </QueryClientProvider>,
   );
+}
+
+// The dev-mode harness wraps the page in a DevModeProvider so a <Text> becomes a
+// click-to-edit span carrying its data-copy-id. Ctrl/Shift+D is the only way in.
+function renderDevPage() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <ThemeProvider>
+        <DevModeProvider>
+          <ToastProvider>
+            <SettingsPage />
+          </ToastProvider>
+        </DevModeProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function toggleDevMode() {
+  fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
 }
 
 beforeEach(() => {
@@ -431,5 +455,54 @@ describe("SettingsPage - vendor logins", () => {
       "type",
       "password",
     );
+  });
+});
+
+describe("SettingsPage - copy adoption", () => {
+  it("exposes settings.* copy ids on its labels once dev mode is on", async () => {
+    const { container } = renderDevPage();
+    // Let the section queries settle so every section (and its labels) is mounted.
+    await screen.findByText("Archive");
+    await screen.findByRole("button", { name: /^connect$/i });
+
+    // Outside dev mode a <Text> is a bare string with no wrapper: no copy targets yet.
+    expect(container.querySelector("[data-copy-id]")).toBeNull();
+
+    toggleDevMode();
+
+    // A representative spread across sections: the page H1, a static section title, a
+    // primary action whose static caption is wrapped, and a button label.
+    await waitFor(() =>
+      expect(container.querySelector('[data-copy-id="settings.title"]')).not.toBeNull(),
+    );
+    expect(container.querySelector('[data-copy-id="settings.appearance.title"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="settings.sync.action"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="settings.github.connect"]')).not.toBeNull();
+  });
+
+  it("keeps the visible labels and behaviour unchanged outside dev mode", async () => {
+    renderPage();
+    // The wrapped labels still render their default text verbatim (no wrapper leaks
+    // into the accessible name) and the sync action still fires its mutation.
+    await screen.findByText("Archive");
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^connect$/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
+    expect(mockApi.doSync).toHaveBeenCalled();
+  });
+
+  it("still shows the delete ConfirmDialog title and confirm action through the copy layer", async () => {
+    renderPage();
+    await screen.findByText("Archive");
+    await userEvent.click(
+      within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }),
+    );
+    const dialog = screen.getByRole("dialog");
+    // The call-site-wrapped props resolve to their defaults: the title and the
+    // danger confirm label both read through useText.
+    expect(within(dialog).getByText("Delete Profile")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: /^delete$/i }),
+    ).toBeInTheDocument();
   });
 });
