@@ -672,8 +672,22 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
             return "altium"
         return None
 
+    cad_state = {"cleaned": False}
+
     def _on_loaded() -> None:
         nxt = _next_format()
+        try:
+            cur = win.get_current_url()
+        except Exception:  # noqa: BLE001
+            cur = None
+        if nxt and "/models/" in (cur or "") and not cad_state["cleaned"]:
+            cad_state["cleaned"] = True
+            print("REALCAPTURE: one-time clean reload before the first download", flush=True)
+            try:
+                win.evaluate_js("setTimeout(function(){location.reload();},400);")
+            except Exception:  # noqa: BLE001
+                pass
+            return
         W._inject_cad_scripts(win, url, needs_values, mpn, driver_formats=([nxt] if nxt else []))
 
     win.events.loaded += _on_loaded
