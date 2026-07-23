@@ -24,6 +24,8 @@ export default {
         line2: "var(--c-line2)",
         // an opaque popover surface (menus/pops must not let content bleed through)
         popover: "var(--c-popover)",
+        // the Altium chrome band: panel title strips + the bottom status bar
+        band: "var(--c-band)",
         // text tiers
         t1: "var(--c-t1)",
         t2: "var(--c-t2)",

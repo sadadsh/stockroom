@@ -135,6 +135,35 @@ export function IconButton({
   );
 }
 
+// An Altium-style panel title strip: the thin uppercase bar that sits atop a docked pane
+// (the parts list, a detail region) and, with the pane's border, gives the "docked panel"
+// read. Sits on the chrome band with a bottom hairline. `right` is an optional trailing slot
+// (a count, a small action). Callers pass their own `data-dev-id` via `...rest`, matching the
+// convention that reusable surfaces (Card, Panel) never hardcode an id.
+export function PanelTitle({
+  right,
+  className,
+  children,
+  ...rest
+}: { right?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cx(
+        "flex h-[26px] flex-none items-center justify-between gap-2 border-b border-line bg-band px-3",
+        className,
+      )}
+      {...rest}
+    >
+      <span className="truncate text-2xs font-semibold uppercase tracking-[0.09em] text-t2">
+        {children}
+      </span>
+      {right != null ? (
+        <span className="flex-none text-2xs tabular-nums text-t3">{right}</span>
+      ) : null}
+    </div>
+  );
+}
+
 // A small uppercase section eyebrow: the mockup's .sec / .srcsub label.
 export function Eyebrow({
   className,
