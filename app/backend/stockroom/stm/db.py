@@ -66,6 +66,13 @@ class Pin:
 
 
 @dataclass
+class Peripheral:
+    name: str  # <IP Name="..."> e.g. USART, SPI, TIM, ADC, USB, CAN
+    instance_name: str
+    version: str
+
+
+@dataclass
 class McuData:
     ref_name: str
     family: str
@@ -74,6 +81,35 @@ class McuData:
     vdd_min: str = ""
     vdd_max: str = ""
     pins: list[Pin] = field(default_factory=list)
+    # Spec-matrix fields (mcu_spec, 1:1 with mcu). Populated from the per-MCU XML's
+    # top-level <Core>/<Frequency>/<Flash>/<Ram>/<CCMRam>/<IONb>/<Die>/<Voltage>/
+    # <Current>/<Temperature> children.
+    core: str = ""
+    frequency_mhz: int | None = None
+    flash_kb: int | None = None
+    ram_kb: int | None = None
+    ccm_ram_kb: int | None = None
+    io_count: int | None = None
+    die: str = ""
+    current_run_ma: int | None = None  # <Current Run="..">, datasheet mA scale
+    current_lowest_ua: int | None = None  # <Current Lowest="..">, datasheet uA scale
+    temp_min_c: int | None = None
+    temp_max_c: int | None = None
+    peripherals: list[Peripheral] = field(default_factory=list)
+
+
+def _to_int(text: str | None) -> int | None:
+    """Parse a CubeMX numeric string (may carry a decimal point) to an int, or
+    None when absent/unparseable - never raises."""
+    if text is None:
+        return None
+    text = text.strip()
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
 
 
 def parse_mcu_xml(path: Path) -> McuData:
@@ -82,7 +118,16 @@ def parse_mcu_xml(path: Path) -> McuData:
     dropped any Position that failed int() (Pitfall 2). The raw Position string is
     always captured as-is; typed geometry (numeric side vs. alnum row/col) is
     derived downstream in the build loop via stm.geometry.per_pin_geometry, not
-    here (this function stays a pure structural parse)."""
+    here (this function stays a pure structural parse).
+
+    Also walks the spec-matrix elements. Text-content elements (Core, Frequency,
+    Flash, Ram, CCMRam, IONb, Die) are read via el.text; attribute-valued elements
+    (Voltage Min/Max, Current Lowest/Run, Temperature Min/Max) are read via
+    el.get(...) - mixing these up is an easy, real parsing bug (verified against a
+    real sample: <Core>Arm Cortex-M4</Core> is text, <Voltage Max=".." Min=".."/>
+    is attributes). Flash/Ram may repeat per suffix group; the MAX across repeats
+    is kept, since a device XML can carry more than one flash/RAM size option.
+    """
     root = ET.parse(path).getroot()
     mcu = McuData(
         ref_name=root.get("RefName", path.stem),
@@ -95,6 +140,48 @@ def parse_mcu_xml(path: Path) -> McuData:
         if tag == "Voltage":
             mcu.vdd_min = el.get("Min", "") or mcu.vdd_min
             mcu.vdd_max = el.get("Max", "") or mcu.vdd_max
+            continue
+        if tag == "Current":
+            mcu.current_run_ma = _to_int(el.get("Run")) or mcu.current_run_ma
+            mcu.current_lowest_ua = _to_int(el.get("Lowest")) or mcu.current_lowest_ua
+            continue
+        if tag == "Temperature":
+            mcu.temp_min_c = _to_int(el.get("Min"))
+            mcu.temp_max_c = _to_int(el.get("Max"))
+            continue
+        if tag == "Core":
+            mcu.core = (el.text or "").strip() or mcu.core
+            continue
+        if tag == "Frequency":
+            mcu.frequency_mhz = _to_int(el.text) or mcu.frequency_mhz
+            continue
+        if tag == "Flash":
+            v = _to_int(el.text)
+            if v is not None:
+                mcu.flash_kb = v if mcu.flash_kb is None else max(mcu.flash_kb, v)
+            continue
+        if tag == "Ram":
+            v = _to_int(el.text)
+            if v is not None:
+                mcu.ram_kb = v if mcu.ram_kb is None else max(mcu.ram_kb, v)
+            continue
+        if tag == "CCMRam":
+            mcu.ccm_ram_kb = _to_int(el.text)
+            continue
+        if tag == "IONb":
+            mcu.io_count = _to_int(el.text)
+            continue
+        if tag == "Die":
+            mcu.die = (el.text or "").strip() or mcu.die
+            continue
+        if tag == "IP":
+            mcu.peripherals.append(
+                Peripheral(
+                    name=el.get("Name", ""),
+                    instance_name=el.get("InstanceName", ""),
+                    version=el.get("Version", ""),
+                )
+            )
             continue
         if tag != "Pin":
             continue
@@ -233,6 +320,12 @@ CREATE TABLE mcu (
     vdd_min TEXT, vdd_max TEXT, imported_at TEXT NOT NULL);
 
 -- 1:1 with mcu. Spec-matrix fields (Task 2 populates this).
+-- current_run_ua stores the raw <Current Run=".."> value AS CubeMX reports it
+-- (datasheet-scale, typically mA for the run/active current) - the column name is
+-- the frozen INTERFACES.md contract name; it is NOT rescaled to true microamps.
+-- current_lowest_ua stores <Current Lowest=".."> (typically already uA-scale,
+-- e.g. standby/deep-sleep current). Column names kept exactly as INTERFACES.md
+-- section 1 specifies them.
 CREATE TABLE mcu_spec (
     mcu_id INTEGER PRIMARY KEY,
     core TEXT,
@@ -380,6 +473,35 @@ class StmIndex:
                 ),
             ).lastrowid
             n_mcu += 1
+
+            conn.execute(
+                "INSERT INTO mcu_spec (mcu_id, core, flash_kb, ram_kb, ccm_ram_kb, "
+                "max_freq_mhz, io_count, vdd_min, vdd_max, temp_min_c, temp_max_c, "
+                "current_run_ua, current_lowest_ua, die) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    mcu_id,
+                    mcu.core,
+                    mcu.flash_kb,
+                    mcu.ram_kb,
+                    mcu.ccm_ram_kb,
+                    mcu.frequency_mhz,
+                    mcu.io_count,
+                    float(mcu.vdd_min) if mcu.vdd_min else None,
+                    float(mcu.vdd_max) if mcu.vdd_max else None,
+                    mcu.temp_min_c,
+                    mcu.temp_max_c,
+                    mcu.current_run_ma,
+                    mcu.current_lowest_ua,
+                    mcu.die,
+                ),
+            )
+            for periph in mcu.peripherals:
+                conn.execute(
+                    "INSERT INTO mcu_peripheral (mcu_id, peripheral_name, "
+                    "instance_name, version) VALUES (?,?,?,?)",
+                    (mcu_id, periph.name, periph.instance_name, periph.version),
+                )
 
             for pin in mcu.pins:
                 ec = electrical_class(pin)
