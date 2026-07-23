@@ -1,24 +1,15 @@
-def test_cad_source_is_ultralibrarian_when_ul_login_set(client, app_ctx):
+def test_cad_source_vendor_is_always_digikey_even_with_ul_login(client, app_ctx):
+    # A saved Ultra Librarian login no longer selects a vendor: the source is always DigiKey.
     app_ctx.config.ul_username = "me@x.com"
     r = client.get("/api/library/parts/tps62130/cad-source")
     assert r.status_code == 200
     body = r.json()
-    assert body["vendor"] == "UltraLibrarian"
-    assert "ultralibrarian.com" in body["url"]
+    assert body["vendor"] == "DigiKey"
+    assert "digikey.com" in body["url"]
     assert "needs" in body
 
 
-def test_cad_source_defaults_to_digikey_when_no_vendor_login(client, app_ctx):
-    # No UL/SnapEDA login: DigiKey's page gathers every CAD download in one place, no login needed.
-    app_ctx.config.ul_username = ""
-    app_ctx.config.ul_password = ""
-    app_ctx.config.snapeda_username = ""
-    app_ctx.config.snapeda_password = ""
-    body = client.get("/api/library/parts/tps62130/cad-source").json()
-    assert body["vendor"] == "DigiKey"
-
-
-def test_cad_source_falls_back_to_digikey_when_primary_unresolvable(client, app_ctx, monkeypatch):
+def test_cad_source_exact_product_page_from_digikey_adapter(client, app_ctx, monkeypatch):
     from stockroom.enrich.schema import EnrichmentResult, Sourced
     import stockroom.api.routers.library as lib_router
 
@@ -31,11 +22,7 @@ def test_cad_source_falls_back_to_digikey_when_primary_unresolvable(client, app_
             r.product_url = Sourced(f"https://www.digikey.com/detail/{mpn}", "digikey", "high")
             return r
 
-    # Force the UL/SnapEDA primary to yield nothing so the DigiKey fallback runs.
     monkeypatch.setattr(lib_router, "build_refresh_adapters", lambda ctx: [FakeDK()])
-    import stockroom.enrich.asset_source as asset_source
-    monkeypatch.setattr(asset_source, "resolve_asset_page", lambda *a, **k: None)
-
     r = client.get("/api/library/parts/tps62130/cad-source")
     assert r.status_code == 200
     body = r.json()
@@ -43,20 +30,16 @@ def test_cad_source_falls_back_to_digikey_when_primary_unresolvable(client, app_
     assert body["url"].startswith("https://www.digikey.com/detail/")
 
 
-def test_cad_source_prefers_snapeda_when_only_snapeda_login_is_set(client, app_ctx):
-    # A SnapEDA user (saved SnapEDA login, no Ultra Librarian login) gets SnapEDA as the source.
-    app_ctx.config.snapeda_username = "me@x.com"
-    app_ctx.config.ul_username = ""
-    app_ctx.config.ul_password = ""
-    body = client.get("/api/library/parts/tps62130/cad-source").json()
-    assert body["vendor"] == "SnapEDA"
-    assert "snapeda.com" in body["url"]
+def test_cad_source_search_fallback_when_no_digikey_adapter(client, app_ctx, monkeypatch):
+    import stockroom.api.routers.library as lib_router
 
-
-def test_cad_source_stays_ultralibrarian_when_both_logins_set(client, app_ctx):
-    app_ctx.config.snapeda_username = "s"
-    app_ctx.config.ul_username = "u"
-    assert client.get("/api/library/parts/tps62130/cad-source").json()["vendor"] == "UltraLibrarian"
+    # No DigiKey adapter available (no creds): the part still opens a real DigiKey search page.
+    monkeypatch.setattr(lib_router, "build_refresh_adapters", lambda ctx: [])
+    r = client.get("/api/library/parts/tps62130/cad-source")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["vendor"] == "DigiKey"
+    assert body["url"] == "https://www.digikey.com/en/products/result?keywords=TPS62130"
 
 
 def test_cad_source_unknown_part_404(client):
