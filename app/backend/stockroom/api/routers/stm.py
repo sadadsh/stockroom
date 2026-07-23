@@ -16,7 +16,17 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.errors import ApiError
-from stockroom.api.schemas import McuSpecRow, StmStatusDTO
+from stockroom.api.schemas import (
+    AfOptionDTO,
+    FamilyDTO,
+    McuSpecRow,
+    PinDTO,
+    PinoutDTO,
+    StmStatusDTO,
+    SuggestionGroupDTO,
+    UnionDTO,
+)
+from stockroom.stm import authority as stm_authority
 from stockroom.stm import source as stm_source
 
 # Single-flight guard for POST /build, mirroring library.py's _rescan_lock: a second POST
@@ -134,6 +144,136 @@ def _facet_counts(rows: list[dict], key: str) -> dict[str, int]:
     return counts
 
 
+def _families_rollup(ctx) -> list[dict]:
+    """One row per distinct mcu.family: its distinct lines, packages, and mcu_count -
+    a simple Layer A rollup, no Layer B computation needed."""
+    conn = ctx.stm_index.conn
+    out: dict[str, dict] = {}
+    for row in conn.execute(
+        "SELECT family, line, package_name FROM mcu WHERE family IS NOT NULL AND family <> ''"
+    ):
+        entry = out.setdefault(
+            row["family"], {"family": row["family"], "lines": set(), "packages": set(), "mcu_count": 0}
+        )
+        entry["mcu_count"] += 1
+        if row["line"]:
+            entry["lines"].add(row["line"])
+        if row["package_name"]:
+            entry["packages"].add(row["package_name"])
+    return [
+        {
+            "family": entry["family"],
+            "lines": sorted(entry["lines"]),
+            "packages": sorted(entry["packages"]),
+            "mcu_count": entry["mcu_count"],
+        }
+        for entry in sorted(out.values(), key=lambda e: e["family"])
+    ]
+
+
+def _pin_category(electrical_class: str, role_names: list[str]) -> str:
+    """The visual-encoding category (color-is-data, VIZ-02/03): a coarser bucket than
+    electrical_class for the io case, distinguishing analog/debug/oscillator/plain-gpio."""
+    if electrical_class != "io":
+        return electrical_class
+    if "analog" in role_names:
+        return "analog"
+    if any(r in ("swdio", "swclk", "swo", "jtag_extra") for r in role_names):
+        return "debug"
+    if any(r.startswith("oscillator") for r in role_names):
+        return "oscillator"
+    return "gpio"
+
+
+def _pin_supply(role_names: list[str]) -> str | None:
+    """The VDD/VDDA/VBAT/VREF domain, when a power pin (role_name "power_<domain>",
+    stm/db.py's roles() convention) - None for every non-power pin."""
+    for name in role_names:
+        if name.startswith("power_"):
+            return name[len("power_") :].upper()
+    return None
+
+
+def _build_pinout_dto(ctx, part: str) -> dict | None:
+    """The full PinoutDTO-shaped dict for one resolved part: resolve_part's per-pin
+    roles/functions/five_v, enriched here with geometry, alternate_functions, category,
+    and supply (facts resolve_part's leaner Layer B contract does not carry). Returns
+    None on a resolve_part miss."""
+    conn = ctx.stm_index.conn
+    resolved = stm_authority.resolve_part(conn, part)
+    if resolved is None:
+        return None
+
+    mcu_row = conn.execute(
+        "SELECT id FROM mcu WHERE ref_name = ?", (resolved["part"],)
+    ).fetchone()
+    mcu_id = mcu_row["id"]
+
+    facts_by_position = {p["position"]: p for p in resolved["pins"]}
+    pins: list[dict] = []
+    for pin_row in conn.execute(
+        "SELECT id, physical_pin_number, position_kind, lqfp_side, bga_row, bga_col, "
+        "canonical_pin_name, raw_pin_name, pin_type, electrical_class "
+        "FROM mcu_package_pin WHERE mcu_id = ? ORDER BY physical_pin_number",
+        (mcu_id,),
+    ):
+        position = pin_row["physical_pin_number"]
+        base = facts_by_position.get(position, {})
+        roles = base.get("roles", [])
+        functions = base.get("functions", [])
+        five_v = base.get("five_v")
+        role_names = [r["role_name"] for r in roles]
+        af_rows = [
+            {"af_index": r["af_index"], "signal": r["signal"], "peripheral": r["peripheral"]}
+            for r in conn.execute(
+                "SELECT af_index, signal, peripheral FROM pin_alternate_function "
+                "WHERE mcu_package_pin_id = ? ORDER BY af_index",
+                (pin_row["id"],),
+            )
+        ]
+        pins.append(
+            {
+                "position": position,
+                "position_kind": pin_row["position_kind"],
+                "lqfp_side": pin_row["lqfp_side"],
+                "bga_row": pin_row["bga_row"],
+                "bga_col": pin_row["bga_col"],
+                "canonical_pin_name": pin_row["canonical_pin_name"],
+                "raw_pin_name": pin_row["raw_pin_name"],
+                "pin_type": pin_row["pin_type"],
+                "electrical_class": pin_row["electrical_class"],
+                "category": _pin_category(pin_row["electrical_class"], role_names),
+                "roles": roles,
+                "functions": functions,
+                "alternate_functions": af_rows,
+                "five_v": five_v,
+                "supply": _pin_supply(role_names),
+            }
+        )
+
+    geometry_row = conn.execute(
+        "SELECT body_shape, pin_count, rows, cols, pitch_mm, has_center_pad "
+        "FROM package_geometry WHERE package_name = ?",
+        (resolved["package"],),
+    ).fetchone()
+    geometry = {
+        "body_shape": geometry_row["body_shape"] if geometry_row else "qfp",
+        "pin_count": geometry_row["pin_count"] if geometry_row else len(pins),
+        "rows": geometry_row["rows"] if geometry_row else None,
+        "cols": geometry_row["cols"] if geometry_row else None,
+        "pitch_mm": geometry_row["pitch_mm"] if geometry_row else None,
+        "has_center_pad": bool(geometry_row["has_center_pad"]) if geometry_row else False,
+    }
+
+    return {
+        "part": resolved["part"],
+        "mpn_example": _mpn_example_from_ref(resolved["part"]),
+        "package": resolved["package"],
+        "geometry": geometry,
+        "pins": pins,
+    }
+
+
 def stm_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/stm", dependencies=[Depends(require_token)])
 
@@ -243,6 +383,128 @@ def stm_router(require_token) -> APIRouter:
             "count": len(rows),
             "facets": facets,
         }
+
+    @r.get("/families")
+    def list_families(request: Request) -> dict:
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        return {"families": [FamilyDTO.from_dict(f).model_dump() for f in _families_rollup(ctx)]}
+
+    @r.get("/pinout")
+    def get_pinout(request: Request, part: str) -> dict:
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        dto_dict = _build_pinout_dto(ctx, part)
+        if dto_dict is None:
+            raise ApiError(404, f"no such part: {part}")
+        return PinoutDTO.from_dict(dto_dict).model_dump()
+
+    @r.get("/pin")
+    def get_pin(request: Request, part: str, position: str) -> dict:
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        dto_dict = _build_pinout_dto(ctx, part)
+        if dto_dict is None:
+            raise ApiError(404, f"no such part: {part}")
+        pin = next((p for p in dto_dict["pins"] if p["position"] == position), None)
+        if pin is None:
+            raise ApiError(404, f"no such position {position!r} on {part}")
+        return PinDTO.from_dict(pin).model_dump()
+
+    @r.get("/pin/af")
+    def get_pin_af(request: Request, part: str, position: str) -> dict:
+        """The complete AF set for one pin (SWAP-01); 404 if the position is absent, but an
+        EMPTY alternate_functions list (not 404) when the pin simply has no AF-mux entries."""
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        dto_dict = _build_pinout_dto(ctx, part)
+        if dto_dict is None:
+            raise ApiError(404, f"no such part: {part}")
+        pin = next((p for p in dto_dict["pins"] if p["position"] == position), None)
+        if pin is None:
+            raise ApiError(404, f"no such position {position!r} on {part}")
+        return {
+            "position": position,
+            "alternate_functions": [
+                AfOptionDTO.from_dict(a).model_dump() for a in pin["alternate_functions"]
+            ],
+        }
+
+    @r.get("/signal/candidates")
+    def get_signal_candidates(request: Request, part: str, signal: str) -> dict:
+        """Every pin the signal can route to across the part (SWAP-02); an EMPTY candidates
+        list (not 404) when the part does not carry the signal at all."""
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        conn = ctx.stm_index.conn
+        resolved = stm_authority.resolve_part(conn, part)
+        if resolved is None:
+            raise ApiError(404, f"no such part: {part}")
+        mcu_row = conn.execute(
+            "SELECT id FROM mcu WHERE ref_name = ?", (resolved["part"],)
+        ).fetchone()
+        candidates = [
+            {
+                "position": row["physical_pin_number"],
+                "canonical_pin_name": row["canonical_pin_name"],
+                "af_index": row["af_index"],
+            }
+            for row in conn.execute(
+                "SELECT p.physical_pin_number, p.canonical_pin_name, af.af_index "
+                "FROM pin_alternate_function af "
+                "JOIN mcu_package_pin p ON p.id = af.mcu_package_pin_id "
+                "WHERE p.mcu_id = ? AND af.signal = ? ORDER BY p.physical_pin_number",
+                (mcu_row["id"], signal),
+            )
+        ]
+        return {"signal": signal, "candidates": candidates}
+
+    @r.post("/compat/union")
+    def compat_union(request: Request, body: dict) -> dict:
+        """socket_union's UnionDTO (COMPAT-01/02/03/05): an explicit {"parts": [...]} set OR
+        a {"family", "package"} group. A mixed-scope ValueError from socket_union surfaces as
+        400 via the app's existing ValueError -> 400 mapping (errors.status_for)."""
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        parts = body.get("parts")
+        family = body.get("family")
+        package = body.get("package")
+        result = stm_authority.socket_union(
+            ctx.stm_index.conn, refs=parts, family=family, package=package
+        )
+        result = dict(result)
+        result["resolved"] = [
+            {"ref": ref, "mpn": _mpn_example_from_ref(ref)} for ref in result["parts"]
+        ]
+        return UnionDTO.from_dict(result).model_dump()
+
+    @r.get("/compat/suggestions")
+    def compat_suggestions(
+        request: Request, package: str, family: str, tolerance: int = 0
+    ) -> dict:
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        groups = stm_authority.compatibility_suggestions(
+            ctx.stm_index.conn, package, family, tolerance=tolerance
+        )
+        return {"groups": [SuggestionGroupDTO.from_dict(g).model_dump() for g in groups]}
+
+    @r.post("/af-check")
+    def af_check(request: Request, body: dict) -> dict:
+        ctx = request.app.state.ctx
+        if ctx.stm_index is None:
+            raise ApiError(409, "STM index not built")
+        part = body.get("part")
+        assignment = body.get("assignment") or {}
+        conflicts = stm_authority.af_conflicts(ctx.stm_index.conn, part, assignment)
+        return {"conflicts": conflicts}
 
     @r.post("/build")
     def build_stm_index(request: Request) -> dict:

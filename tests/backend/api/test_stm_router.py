@@ -4,6 +4,7 @@ not-built 409 gate. Later plans (03-02/03-03/03-04) extend this same file as the
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -52,7 +53,7 @@ def _seed_stm_index(app_ctx) -> StmIndex:
             )
         return mcu_id
 
-    _insert_mcu(
+    mcu1_id = _insert_mcu(
         "STM32F407V(E-G)Tx", "STM32F4", "STM32F407", "LQFP64", 64, "Cortex-M4",
         1024, 192, 168, 51,
         [("USART", "USART1", "1"), ("USART", "USART2", "1"), ("SPI", "SPI1", "1")],
@@ -61,6 +62,70 @@ def _seed_stm_index(app_ctx) -> StmIndex:
         "STM32F103C(8-B)Tx", "STM32F1", "STM32F103", "LQFP48", 48, "Cortex-M3",
         128, 20, 72, 37,
         [("USART", "USART1", "1")],
+    )
+
+    def _insert_pin(
+        mcu_id, package, position, canonical, raw, pin_type, electrical_class,
+        roles=(), functions=(), afs=(), lqfp_side="left",
+    ) -> int:
+        pin_id = conn.execute(
+            "INSERT INTO mcu_package_pin (mcu_id, package_name, physical_pin_number, "
+            "position_kind, bga_row, bga_col, canonical_pin_name, raw_pin_name, pin_type, "
+            "electrical_class, gpio_port, gpio_pin_index, lqfp_side) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (mcu_id, package, position, "numeric", None, None, canonical, raw, pin_type,
+             electrical_class, None, None, lqfp_side),
+        ).lastrowid
+        for role_name, role_class in roles:
+            conn.execute(
+                "INSERT INTO pin_role (mcu_package_pin_id, role_name, role_class) "
+                "VALUES (?,?,?)",
+                (pin_id, role_name, role_class),
+            )
+        for signal, io_modes in functions:
+            conn.execute(
+                "INSERT INTO pin_function (mcu_package_pin_id, function_name, signal, "
+                "io_modes) VALUES (?,?,?,?)",
+                (pin_id, signal, signal, io_modes),
+            )
+        for af_index, signal, peripheral in afs:
+            conn.execute(
+                "INSERT INTO pin_alternate_function (mcu_package_pin_id, af_index, signal, "
+                "peripheral) VALUES (?,?,?,?)",
+                (pin_id, af_index, signal, peripheral),
+            )
+        return pin_id
+
+    # MCU1 (STM32F407V(E-G)Tx) pins, for the 03-04 pinout/pin/AF/signal-candidates tests:
+    _insert_pin(
+        mcu1_id, "LQFP64", "1", "VDD", "VDD", "Power", "power",
+        roles=[("power_vdd", "power")],
+    )
+    _insert_pin(
+        mcu1_id, "LQFP64", "12", "PA9", "PA9", "I/O", "io",
+        roles=[("gpio", "io")],
+        functions=[("USART1_TX", "In/Out")],
+        afs=[(7, "USART1_TX", "USART1")],
+    )
+    _insert_pin(
+        mcu1_id, "LQFP64", "13", "PA10", "PA10", "I/O", "io",
+        roles=[("gpio", "io")],
+        functions=[("USART1_RX", "In/Out")],
+        afs=[(7, "USART1_RX", "USART1")],
+    )
+    # PB6 ALSO offers USART1_TX via a different AF index - a real remap alternative,
+    # giving GET /signal/candidates?signal=USART1_TX two candidate positions.
+    _insert_pin(
+        mcu1_id, "LQFP64", "34", "PB6", "PB6", "I/O", "io",
+        roles=[("gpio", "io")],
+        functions=[("I2C1_SCL", "In/Out")],
+        afs=[(4, "I2C1_SCL", "I2C1"), (7, "USART1_TX", "USART1")],
+    )
+    conn.execute(
+        "INSERT INTO package_geometry (package_name, body_shape, pin_count, rows, cols, "
+        "pitch_mm, body_mm, has_center_pad, depopulation, citation, notes) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        ("LQFP64", "qfp", 64, None, None, 0.5, 10.0, 0, None, "fixture", None),
     )
 
     for key, value in (
@@ -245,3 +310,196 @@ def test_build_is_single_flight_while_one_is_running(client, app_ctx):
     event.set()  # release the blocked build so job A can complete
     out = _drain_job(client, job_a)
     assert out["status"] == "done", out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# families / pinout / pin (03-04 task 1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_families_returns_409_when_index_absent(client, app_ctx):
+    assert app_ctx.stm_index is None
+    r = client.get("/api/stm/families")
+    assert r.status_code == 409
+
+
+def test_families_returns_family_rollup(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get("/api/stm/families")
+    assert r.status_code == 200
+    families = {f["family"]: f for f in r.json()["families"]}
+    assert families["STM32F4"]["lines"] == ["STM32F407"]
+    assert families["STM32F4"]["packages"] == ["LQFP64"]
+    assert families["STM32F4"]["mcu_count"] == 1
+    assert families["STM32F1"]["mcu_count"] == 1
+
+
+def test_pinout_returns_409_when_index_absent(client, app_ctx):
+    assert app_ctx.stm_index is None
+    r = client.get("/api/stm/pinout", params={"part": "STM32F407V(E-G)Tx"})
+    assert r.status_code == 409
+
+
+def test_pinout_404_on_resolve_miss(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get("/api/stm/pinout", params={"part": "NONEXISTENT999"})
+    assert r.status_code == 404
+
+
+def test_pinout_resolves_by_ref_or_mpn_and_inlines_pin_facts(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    by_ref = client.get("/api/stm/pinout", params={"part": "STM32F407V(E-G)Tx"})
+    assert by_ref.status_code == 200
+    body = by_ref.json()
+    assert body["part"] == "STM32F407V(E-G)Tx"
+    assert body["package"] == "LQFP64"
+    assert body["geometry"]["body_shape"] == "qfp"
+    assert body["geometry"]["pin_count"] == 64
+
+    by_mpn = client.get("/api/stm/pinout", params={"part": "STM32F407VGT6"})
+    assert by_mpn.status_code == 200
+    assert by_mpn.json()["part"] == "STM32F407V(E-G)Tx"
+
+    pins_by_position = {p["position"]: p for p in body["pins"]}
+    assert pins_by_position["12"]["canonical_pin_name"] == "PA9"
+    assert pins_by_position["12"]["category"] == "gpio"
+    assert pins_by_position["12"]["alternate_functions"] == [
+        {"af_index": 7, "signal": "USART1_TX", "peripheral": "USART1"}
+    ]
+    assert pins_by_position["1"]["electrical_class"] == "power"
+    assert pins_by_position["1"]["supply"] == "VDD"
+
+    assert "<svg" not in json.dumps(body).lower()
+
+
+def test_pin_returns_one_pin_with_every_derived_fact(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get("/api/stm/pin", params={"part": "STM32F407V(E-G)Tx", "position": "12"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["position"] == "12"
+    assert body["canonical_pin_name"] == "PA9"
+    assert body["five_v"]["tolerant"] is True
+    assert body["roles"] == [{"role_name": "gpio", "role_class": "io"}]
+
+
+def test_pin_404_when_position_absent(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/pin", params={"part": "STM32F407V(E-G)Tx", "position": "999"}
+    )
+    assert r.status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# pin/af + signal/candidates (03-04 task 2, SWAP-01/02)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_pin_af_returns_the_complete_af_set(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "34"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["position"] == "34"
+    signals = {a["signal"] for a in body["alternate_functions"]}
+    assert signals == {"I2C1_SCL", "USART1_TX"}
+
+
+def test_pin_af_404_when_position_absent(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/pin/af", params={"part": "STM32F407V(E-G)Tx", "position": "999"}
+    )
+    assert r.status_code == 404
+
+
+def test_signal_candidates_returns_every_candidate_pin(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/signal/candidates",
+        params={"part": "STM32F407V(E-G)Tx", "signal": "USART1_TX"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["signal"] == "USART1_TX"
+    positions = {c["position"] for c in body["candidates"]}
+    assert positions == {"12", "34"}
+
+
+def test_signal_candidates_empty_list_for_unused_signal_not_404(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/signal/candidates",
+        params={"part": "STM32F407V(E-G)Tx", "signal": "NEVER_USED_SIGNAL"},
+    )
+    assert r.status_code == 200
+    assert r.json()["candidates"] == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# compat/union, compat/suggestions, af-check (03-04 task 3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_compat_union_returns_shared_and_verdict(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post("/api/stm/compat/union", json={"family": "STM32F4", "package": "LQFP64"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["package"] == "LQFP64"
+    assert body["family"] == "STM32F4"
+    assert body["grain"] == "per-part"
+    assert "interchangeable" in body["verdict"]
+
+
+def test_compat_union_mixed_scope_is_400(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/compat/union",
+        json={"parts": ["STM32F407V(E-G)Tx", "STM32F103C(8-B)Tx"]},
+    )
+    assert r.status_code == 400
+
+
+def test_compat_suggestions_returns_groups(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/compat/suggestions",
+        params={"package": "LQFP64", "family": "STM32F4", "tolerance": 0},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["groups"]) == 1
+    assert body["groups"][0]["tier"] == "baseline"
+    assert body["groups"][0]["refs"] == ["STM32F407V(E-G)Tx"]
+
+
+def test_af_check_returns_a_known_conflict(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/af-check",
+        json={
+            "part": "STM32F407V(E-G)Tx",
+            "assignment": {"12": {"signal": "USART1_TX", "af_index": 99}},
+        },
+    )
+    assert r.status_code == 200
+    conflicts = r.json()["conflicts"]
+    assert len(conflicts) == 1
+    assert conflicts[0]["kind"] == "unavailable_af"
+
+
+def test_af_check_conflict_free_returns_empty_list(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/af-check",
+        json={
+            "part": "STM32F407V(E-G)Tx",
+            "assignment": {"12": {"signal": "USART1_TX", "af_index": 7}},
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["conflicts"] == []
