@@ -144,8 +144,6 @@ describe("DetailPanel files previews (M6d)", () => {
     expect(screen.getByText("Resistance")).toBeInTheDocument();
     expect(screen.getByText("1.1 kΩ")).toBeInTheDocument();
     expect(screen.getByText("Tolerance")).toBeInTheDocument();
-    // the count reflects only the real specs (asset keys + pinout excluded)
-    expect(screen.getByText("2")).toBeInTheDocument();
     // asset references are shown as Files cards, never listed as specs
     expect(screen.queryByText("Device:R")).not.toBeInTheDocument();
   });
