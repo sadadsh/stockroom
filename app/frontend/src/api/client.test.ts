@@ -195,6 +195,17 @@ describe("api client", () => {
     });
   });
 
+  it("POSTs the per-part sourcing refresh and returns the job ref", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job789" }));
+
+    const res = await api.refreshSourcing("lm358");
+
+    expect(res).toEqual({ job_id: "job789" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/library/parts/lm358/refresh");
+    expect((init as RequestInit).method).toBe("POST");
+  });
+
   it("POSTs a symbol reference with lib, name and the default kicad tool", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson({ id: "r1", symbol: { lib: "Device", name: "R", tool: "kicad" } }),

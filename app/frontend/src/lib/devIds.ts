@@ -80,6 +80,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.specs", label: "Specifications sheet", area: "detail" },
   { id: "detail.spec-group", label: "Spec group block", area: "detail" },
   { id: "detail.sourcing", label: "Sourcing panel", area: "detail" },
+  { id: "detail.sourcing-refresh", label: "Refresh Sourcing button", area: "detail" },
   { id: "detail.pinout", label: "Pinout panel", area: "detail" },
   { id: "detail.enrich", label: "Enrich panel", area: "detail" },
   { id: "detail.history", label: "History timeline", area: "detail" },

@@ -454,6 +454,16 @@ export const api = {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
   },
 
+  // Refresh one part's volatile procurement data (price/stock/lifecycle/lead/dist P/N)
+  // from the distributor APIs. A write-lane job: the record commits server-side and the
+  // job's terminal SSE result carries the updated record.
+  refreshSourcing(id: string): Promise<JobRef> {
+    return request<JobRef>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/refresh`,
+    );
+  },
+
   // Look up a part by its MPN through the enrichment pipeline (scrape-first, spec
   // section 6.1). Returns the sourced candidate fields; the caller applies the ones
   // it wants through editField. A scrape miss returns null fields, never an error,

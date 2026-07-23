@@ -25,6 +25,9 @@ vi.mock("../api/client", async (importActual) => {
       partDiff: vi.fn(),
       // the capture-needs query behind the Complete Part trigger (Altium gaps).
       partCadSource: vi.fn(),
+      // the per-part sourcing refresh job (POST .../refresh + its SSE stream).
+      refreshSourcing: vi.fn(),
+      openJobStream: vi.fn(),
     },
   };
 });
@@ -232,7 +235,9 @@ describe("DetailPanel pinout (M6i)", () => {
       <QueryClientProvider client={qc}>
         <ThemeProvider>
           <CaptureProvider>
-            <DetailPanel detail={d} {...BASE} />
+            <ToastProvider>
+              <DetailPanel detail={d} {...BASE} />
+            </ToastProvider>
           </CaptureProvider>
         </ThemeProvider>
       </QueryClientProvider>
@@ -370,6 +375,38 @@ describe("DetailPanel sourcing vendor label", () => {
     // known-vendor map misses, so it Title Cases the stored name's first letter (present in both
     // the Links row and the Sourcing tab)
     expect(screen.getAllByText("Acme parts").length).toBeGreaterThan(0);
+  });
+});
+
+describe("DetailPanel sourcing refresh", () => {
+  // POST /api/library/parts/{id}/refresh existed since M6 with no way to reach it from the
+  // UI (the 2026-07-23 wiring audit). The Sourcing section header now carries the trigger:
+  // one click re-pulls price/stock/lifecycle from the distributor APIs as a write-lane job.
+  it("offers Refresh Sourcing when the part has an MPN and starts the job on click", async () => {
+    mockApi.refreshSourcing.mockResolvedValue({ job_id: "j1" });
+    mockApi.openJobStream.mockResolvedValue(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode("event: done\ndata: {}\n\n"),
+          );
+          controller.close();
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+
+    const btn = container.querySelector('[data-dev-id="detail.sourcing-refresh"]');
+    expect(btn).not.toBeNull();
+    await user.click(btn as HTMLElement);
+
+    expect(mockApi.refreshSourcing).toHaveBeenCalledWith("lm358");
+  });
+
+  it("offers no refresh without an MPN (nothing to look up by)", () => {
+    const { container } = wrap(<DetailPanel detail={detail({ mpn: "" })} {...BASE} />);
+    expect(container.querySelector('[data-dev-id="detail.sourcing-refresh"]')).toBeNull();
   });
 });
 
