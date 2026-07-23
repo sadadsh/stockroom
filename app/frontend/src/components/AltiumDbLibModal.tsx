@@ -11,7 +11,8 @@ import type { AltiumStatusRow } from "../api/types";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Dot, SegmentedControl } from "./primitives";
-import { CloseIcon, UploadIcon } from "./icons";
+import { Icon } from "./Icon";
+import { Text, useText } from "../lib/copy";
 
 type Filter = "all" | "ready" | "needs";
 
@@ -49,17 +50,33 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
     [rows, filter],
   );
 
+  // Copy layer: the filter words carry a live count, so only the word is overridable while the count
+  // stays dynamic; the aria strings and the two toast strings resolve here so onAttach and the a11y
+  // names fire the override, not the literal.
+  const filterAll = useText("modal.altium.filter-all", "All");
+  const filterReady = useText("modal.altium.filter-ready", "Ready");
+  const filterNeeds = useText("modal.altium.filter-needs", "Needs Files");
+  const dialogLabel = useText("modal.altium.title", "Altium Database Library");
+  const closeLabel = useText("modal.altium.close", "Close");
+  const filterLabel = useText("modal.altium.filter", "Filter parts");
+  const attachColLabel = useText("modal.altium.attach-col", "Attach");
+  const toastNoHost = useText(
+    "modal.altium.toast-no-host",
+    "Open Stockroom as the app to attach files. A web browser cannot read file paths.",
+  );
+  const toastPickerFailed = useText("modal.altium.toast-picker-failed", "Could not open the file picker.");
+
   async function onAttach(row: AltiumStatusRow) {
     const picker = pickAltiumFiles();
     if (!picker) {
-      toast("Open Stockroom as the app to attach files. A web browser cannot read file paths.", "neutral");
+      toast(toastNoHost, "neutral");
       return;
     }
     let paths: string[];
     try {
       paths = await picker;
     } catch {
-      toast("Could not open the file picker.", "err");
+      toast(toastPickerFailed, "err");
       return;
     }
     if (!paths.length) return; // cancelled
@@ -106,13 +123,15 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         transition={{ type: "spring", stiffness: 420, damping: 32 }}
         role="dialog"
         aria-modal="true"
-        aria-label="Altium Database Library"
+        aria-label={dialogLabel}
         data-dev-id="altiumdb.modal"
         className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
           <div className="flex items-baseline gap-2.5">
-            <h2 className="text-lg font-semibold text-t1">Altium Database Library</h2>
+            <h2 className="text-lg font-semibold text-t1">
+              <Text id="modal.altium.title">Altium Database Library</Text>
+            </h2>
             <span className="text-xs text-t3">
               {readyCount} of {rows.length} ready
               {status.data ? ` · ${status.data.profile}` : ""}
@@ -120,55 +139,75 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
           </div>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={closeLabel}
             onClick={onClose}
             className="flex h-8 w-8 flex-none items-center justify-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
           >
-            <CloseIcon className="h-4 w-4" />
+            <Icon id="action.close" className="h-4 w-4" />
           </button>
         </div>
 
         <div className="flex items-center justify-between gap-4 px-5 py-3" data-dev-id="altiumdb.modal-filter">
           <SegmentedControl<Filter>
-            aria-label="Filter parts"
+            aria-label={filterLabel}
             value={filter}
             onChange={setFilter}
             size="small"
             options={[
-              { id: "all", label: `All (${rows.length})` },
-              { id: "ready", label: `Ready (${readyCount})` },
-              { id: "needs", label: `Needs Files (${rows.length - readyCount})` },
+              { id: "all", label: `${filterAll} (${rows.length})` },
+              { id: "ready", label: `${filterReady} (${readyCount})` },
+              { id: "needs", label: `${filterNeeds} (${rows.length - readyCount})` },
             ]}
           />
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
           {status.isLoading ? (
-            <p className="py-6 text-center text-sm text-t3">Reading the library...</p>
+            <p className="py-6 text-center text-sm text-t3">
+              <Text id="modal.altium.loading">Reading the library...</Text>
+            </p>
           ) : status.isError ? (
-            <p className="py-6 text-center text-sm text-err">Could not read the Altium library.</p>
+            <p className="py-6 text-center text-sm text-err">
+              <Text id="modal.altium.error">Could not read the Altium library.</Text>
+            </p>
           ) : shown.length === 0 ? (
             <div className="flex items-center justify-center gap-2.5 py-10">
               <Dot tone="neutral" />
               <span className="text-sm text-t3">
-                {rows.length === 0
-                  ? "This profile has no parts yet."
-                  : filter === "ready"
-                    ? "No parts are ready to place yet. Attach a part's Altium assets to get started."
-                    : "Every part has its Altium assets."}
+                {rows.length === 0 ? (
+                  <Text id="modal.altium.empty-no-parts">This profile has no parts yet.</Text>
+                ) : filter === "ready" ? (
+                  <Text id="modal.altium.empty-none-ready">
+                    No parts are ready to place yet. Attach a part's Altium assets to get started.
+                  </Text>
+                ) : (
+                  <Text id="modal.altium.empty-all-ready">Every part has its Altium assets.</Text>
+                )}
               </span>
             </div>
           ) : (
             <table className="w-full table-fixed border-collapse" data-dev-id="altiumdb.modal-table">
               <thead>
                 <tr>
-                  <th className={TH}>Part</th>
-                  <th className={`${TH} w-[164px]`}>MPN</th>
-                  <th className={`${TH} w-[76px]`}>Value</th>
-                  <th className={`${TH} w-[108px]`}>Symbol</th>
-                  <th className={`${TH} w-[120px]`}>Footprint</th>
-                  <th className={`${TH} w-[104px]`}>Status</th>
-                  <th className={`${TH} w-[132px]`} aria-label="Attach" />
+                  <th className={TH}>
+                    <Text id="modal.altium.th-part">Part</Text>
+                  </th>
+                  <th className={`${TH} w-[164px]`}>
+                    <Text id="modal.altium.th-mpn">MPN</Text>
+                  </th>
+                  <th className={`${TH} w-[76px]`}>
+                    <Text id="modal.altium.th-value">Value</Text>
+                  </th>
+                  <th className={`${TH} w-[108px]`}>
+                    <Text id="modal.altium.th-symbol">Symbol</Text>
+                  </th>
+                  <th className={`${TH} w-[120px]`}>
+                    <Text id="modal.altium.th-footprint">Footprint</Text>
+                  </th>
+                  <th className={`${TH} w-[104px]`}>
+                    <Text id="modal.altium.th-status">Status</Text>
+                  </th>
+                  <th className={`${TH} w-[132px]`} aria-label={attachColLabel} />
                 </tr>
               </thead>
               <tbody>
@@ -191,11 +230,13 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
                       {row.ready ? (
                         <span className="inline-flex items-center gap-1.5">
                           <Dot tone="ok" />
-                          <span className="text-t2">Ready</span>
+                          <span className="text-t2">
+                            <Text id="modal.altium.status-ready">Ready</Text>
+                          </span>
                         </span>
                       ) : (
                         <Badge tone="warn" size="sm">
-                          Needs Files
+                          <Text id="modal.altium.status-needs">Needs Files</Text>
                         </Badge>
                       )}
                     </td>
@@ -205,10 +246,14 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
                           small
                           onClick={() => onAttach(row)}
                           disabled={busy}
-                          icon={<UploadIcon className="h-3.5 w-3.5" />}
+                          icon={<Icon id="action.upload" className="h-3.5 w-3.5" />}
                           data-dev-id="altiumdb.modal-attach"
                         >
-                          {attachingId === row.id ? "Attaching..." : "Attach Files"}
+                          {attachingId === row.id ? (
+                            <Text id="modal.altium.attaching">Attaching...</Text>
+                          ) : (
+                            <Text id="modal.altium.attach-files">Attach Files</Text>
+                          )}
                         </Button>
                       )}
                     </td>
