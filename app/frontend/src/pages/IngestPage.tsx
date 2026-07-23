@@ -77,7 +77,7 @@ export function IngestPage() {
         r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
       if (!gotAnything) {
         toast(
-          "Nothing came back. The page may have blocked the fetch, or the link is not a product page.",
+          "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
           "neutral",
         );
       }
@@ -233,14 +233,14 @@ export function IngestPage() {
             }}
             placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
             disabled={looking}
-            className="h-11 min-w-0 flex-1 rounded-control border border-line2 bg-field px-3.5 text-base text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
+            className="h-[31px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
           />
           <Button
             data-dev-id="ingest.lookup"
             variant="accent"
             onClick={lookUp}
             disabled={looking || !input.trim()}
-            className="h-11 flex-none px-5"
+            className="flex-none px-4"
           >
             {looking ? "Looking Up..." : "Look Up"}
           </Button>
@@ -306,8 +306,8 @@ export function IngestPage() {
                 Browse for ZIP
               </Button>
               <span className="text-xs text-t3">
-                Drop its vendor ZIP (SnapEDA, Ultra Librarian) anywhere, or browse. The
-                pulled details are kept, so all that is left is the files.
+                Drop its vendor ZIP (SnapEDA, Ultra Librarian) into the window, or browse.
+                The pulled details are kept, so all that is left is the files.
               </span>
             </div>
           </div>
@@ -354,7 +354,7 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
   if (rows.length === 0 && specCount === 0) {
     return (
       <span className="text-sm text-warn">
-        Nothing was pulled. The page may have blocked the fetch, or the link is not a product page.
+        Nothing was pulled. The page might have blocked the fetch, or the link is not a product page.
       </span>
     );
   }
@@ -387,10 +387,10 @@ function Progress({ progress }: { progress: JobProgress | null }) {
     <div className="mt-4">
       <div
         data-dev-id="ingest.progress"
-        className="h-1.5 w-full overflow-hidden rounded-full bg-raise2"
+        className="h-1.5 w-full overflow-hidden bg-raise2"
       >
         <div
-          className="h-full rounded-full bg-acc transition-[width]"
+          className="h-full bg-acc transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>

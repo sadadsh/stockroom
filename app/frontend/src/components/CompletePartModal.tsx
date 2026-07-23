@@ -39,9 +39,9 @@ function CaptureMeter({ received, total }: { received: number; total: number }) 
       aria-valuemax={total}
       aria-valuetext={`${received} of ${total} files received`}
     >
-      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-raise2">
+      <div className="h-1.5 w-16 overflow-hidden bg-raise2">
         <motion.div
-          className="h-full rounded-full bg-ok"
+          className="h-full bg-ok"
           initial={false}
           animate={{ width: `${pct}%` }}
           transition={{ type: "spring", stiffness: 220, damping: 28 }}
@@ -276,7 +276,7 @@ export function CompletePartModal({
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[95] flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
       role="presentation"
       onClick={onClose}
     >

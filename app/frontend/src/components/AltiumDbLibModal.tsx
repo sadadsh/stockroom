@@ -110,7 +110,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[7vh] backdrop-blur-sm"
+      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

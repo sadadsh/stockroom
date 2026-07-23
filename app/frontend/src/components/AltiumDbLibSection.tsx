@@ -76,9 +76,9 @@ export function AltiumDbLibSection() {
               </span>
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2" data-dev-id="altiumdb.section-progress">
+            <div className="h-1.5 w-full overflow-hidden bg-raise2" data-dev-id="altiumdb.section-progress">
               <div
-                className="h-full rounded-full bg-acc transition-[width]"
+                className="h-full bg-acc transition-[width]"
                 style={{ width: `${pct}%` }}
               />
             </div>
