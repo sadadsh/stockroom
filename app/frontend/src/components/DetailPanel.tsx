@@ -267,15 +267,18 @@ export function DetailPanel({
           className="mt-3 grid min-h-0 flex-1 grid-cols-[288px_minmax(0,1fr)_320px]"
         >
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
-          {/* the physical object as the hero, its symbol + footprint as supporting embodiments */}
-          <div data-dev-id="detail.canvas" className="flex flex-col gap-2.5">
+          {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
+              flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
+              the column beside a tall specs pane, and still scrolls when content genuinely
+              overflows (min-height:auto keeps it from compressing below its content). */}
+          <div data-dev-id="detail.canvas" className="flex flex-1 flex-col gap-2.5">
             <AssetTile
               devId="detail.asset-hero"
               stageDevId="detail.asset-stage"
               variant="hero"
               name="3D Model"
               present={hasModel}
-              className="h-[300px]"
+              className="min-h-[300px] flex-1"
               art={<CubeArt />}
               thumb={
                 hasModel ? (
