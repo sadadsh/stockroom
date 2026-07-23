@@ -506,6 +506,10 @@ def _install_cad_download_intercept(
         return False
 
     def _on_download_starting(sender, args) -> None:
+        # A download IS starting - relay the real 'started' event to the reactor from a worker
+        # thread (this handler runs on the COM thread and must stay pristine). Fires on both
+        # branches below: even when completion can't be observed, the start happened.
+        threading.Thread(target=_emit_download_started, daemon=True).start()
         try:
             operation = args.DownloadOperation
         except Exception:  # noqa: BLE001 - can't observe completion; let it save to the
@@ -648,6 +652,14 @@ def _unique_dest(target_dir, name: str) -> Path:
         dest = Path(target_dir) / f"{base}-{n}{suffix}"
         n += 1
     return dest
+
+
+def _emit_download_started() -> None:
+    """Relay the browser's REAL download-started event to the in-page reactor. Owner heuristic
+    (2026-07-23): a successful run's download STARTS within ~5s of the click, so the reactor
+    fails 'nostart' fast - on to the next source - when nothing begins. Called on a worker
+    thread, never on the download's COM-critical path."""
+    _emit_to_cad_window(cad_download_event_js("started"))
 
 
 def _dispatch_captured(on_captured, dest) -> None:

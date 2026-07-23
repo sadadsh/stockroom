@@ -583,6 +583,20 @@ def test_unique_dest_never_overwrites_an_earlier_capture(tmp_path):
     assert _unique_dest(tmp_path, "") == tmp_path / "cad-download.zip"
 
 
+def test_emit_download_started_relays_to_the_cad_window(monkeypatch):
+    # Owner heuristic (2026-07-23): a successful run's download STARTS within ~5s of the click.
+    # Tier 1's DownloadStarting relays a real 'started' event (off the COM thread) so the reactor
+    # can fail 'nostart' fast - to the next source - when nothing begins.
+    from stockroom.host import window as W
+
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    W._emit_download_started()
+    [js] = cad.scripts
+    assert js.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "started"}) in js
+
+
 def test_dispatch_captured_runs_off_the_calling_thread_and_returns_immediately():
     # Tier 1's StateChanged fires on WebView2's download COM thread. Running the forward pipeline
     # (classify + extract + blocking evaluate_js) on that thread hung it mid-relay (live-observed
