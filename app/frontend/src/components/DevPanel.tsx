@@ -20,6 +20,8 @@ import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../l
 import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { Button } from "./primitives";
+import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
+import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
 
 // A best-effort hex for the native colour picker. A hex passes through; an rgb/rgba collapses to
 // its opaque hex (the picker cannot show alpha, but the text field below stays authoritative).
@@ -50,10 +52,9 @@ function ResetDot({ onClick }: { onClick: () => void }) {
       title="Reset to default"
       className="grid h-4 w-4 flex-none place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1"
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-        <path d="M3 3v5h5" />
-      </svg>
+      {/* D-06: DevPanel's own reset dot draws through <Icon> (the exact h-3 w-3 the inline svg carried,
+          the weight/caps live on the dev.reset registry entry), so the panel's icons are inspectable. */}
+      <Icon id="dev.reset" className="h-3 w-3" />
     </button>
   );
 }
@@ -397,6 +398,140 @@ function CopyTab() {
   return <CopyEditor />;
 }
 
+// The Icon facet (D-04): mirrors CopyTab. From the selection it derives the icon id (its
+// `data-icon-id`, emitted by <Icon> in dev mode per plan 01 - the icon analog of CopyTab's
+// data-copy-id), and edits what the glyph IS: (a) a same-category glyph PICKER that writes a
+// swapToId, and (b) a raw-SVG EDITOR whose textarea drives a live preview through the same
+// sanitizeIconBody the <Icon> uses (D-05: the frontend sanitises before preview; the backend is the
+// authority on what ships). Per D-03 raw editing is offered only for the line-icon categories
+// (primary + bespoke); art + brand are swap-only (their multi-group / fill markup is riskier to hand
+// -edit). With no icon in the selection it shows an empty state, mirroring the Copy tab.
+function IconTab() {
+  const dev = useDevMode();
+  const { selectedDevId } = dev;
+
+  const iconId = useMemo(() => {
+    if (!selectedDevId) return null;
+    const el = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    if (!el) return null;
+    const i =
+      (el.matches("[data-icon-id]") ? el : null) ??
+      el.querySelector("[data-icon-id]") ??
+      el.closest("[data-icon-id]");
+    return i?.getAttribute("data-icon-id") ?? null;
+  }, [selectedDevId]);
+
+  if (!iconId) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        Select an element that is or contains an icon to swap its glyph or edit its SVG.
+      </div>
+    );
+  }
+
+  const entry = ICON_BY_ID.get(iconId);
+  if (!entry) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        No registry glyph for <span className="font-mono">{iconId}</span>.
+      </div>
+    );
+  }
+
+  const overridden = dev.isIconOverridden(iconId);
+  // The glyph this id currently resolves to after any swap chain, so the picker can mark it (D-04).
+  const resolvedTarget = resolveIcon(iconId, dev.resolveIconOverride)?.entry.id ?? iconId;
+  // The working body the raw editor edits (an override body if set, else the registry default).
+  const draftBody = dev.iconOverrideFor(iconId)?.body ?? entry.body;
+  // D-03: raw SVG editing is offered only for the line-icon categories; art/brand stay swap-only.
+  const rawEditable = entry.category === "primary" || entry.category === "bespoke";
+  const pickerIds = ICON_IDS_BY_CATEGORY[entry.category];
+
+  return (
+    <div className="px-3.5 py-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Icon</span>
+        {overridden ? (
+          <button
+            type="button"
+            onClick={() => dev.resetIcon(iconId)}
+            className="text-2xs text-t3 hover:text-t1"
+          >
+            Reset to default
+          </button>
+        ) : null}
+      </div>
+      <div className="mb-2 truncate font-mono text-2xs text-t3" title={iconId}>
+        {iconId}
+      </div>
+
+      {/* (a) the glyph PICKER: swap to another same-category registry glyph (D-04). */}
+      <div className="mb-1 text-2xs font-semibold text-t2">Swap Glyph</div>
+      <div className="mb-3 grid grid-cols-6 gap-1">
+        {pickerIds.map((pid) => {
+          const active = pid === resolvedTarget;
+          return (
+            <button
+              key={pid}
+              type="button"
+              aria-label={`Swap to ${pid}`}
+              aria-pressed={active}
+              title={pid}
+              onClick={() => dev.setIconSwap(iconId, pid)}
+              className={
+                "grid aspect-square place-items-center rounded-control border text-t2 transition-colors hover:text-t1 " +
+                (active ? "border-acc bg-acc/[0.08] text-t1" : "border-line hover:bg-raise2")
+              }
+            >
+              <Icon id={pid} className="h-4 w-4" />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* (b) the raw-SVG EDITOR: the icon body + a live, sanitiser-vetted preview (D-04 / D-05). The
+          preview renders sanitizeIconBody(draft) through the entry's own frame, so what the owner
+          sees is exactly what the sanitiser will keep. Restricted to line icons (D-03). */}
+      {rawEditable ? (
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-2xs font-semibold text-t2">Edit SVG</span>
+            <span
+              className="grid h-7 w-7 flex-none place-items-center rounded-control border border-line2 bg-field text-t1"
+              title="Live preview (sanitised)"
+            >
+              <svg
+                data-testid="icon-preview"
+                viewBox={entry.viewBox}
+                className="h-5 w-5"
+                fill={entry.fill ?? "none"}
+                stroke={entry.stroke ?? "currentColor"}
+                strokeWidth={entry.strokeWidth}
+                strokeLinecap={entry.strokeLinecap ?? "round"}
+                strokeLinejoin={entry.strokeLinejoin ?? "round"}
+                style={entry.style}
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: sanitizeIconBody(draftBody) }}
+              />
+            </span>
+          </div>
+          <textarea
+            aria-label="Edit icon SVG body"
+            value={draftBody}
+            rows={4}
+            onChange={(e) => dev.setIconBody(iconId, e.target.value)}
+            className="w-full resize-y rounded-control border border-line2 bg-field px-2 py-1.5 text-2xs font-mono leading-snug text-t1 outline-none focus:border-acc"
+          />
+        </div>
+      ) : (
+        <div className="text-2xs text-t3">
+          This glyph is swap only. Its SVG is edited in the registry, not here.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The collapsible Catalogue: the 196 ids filtered by the toolbar search and grouped by area. Clicking
 // an entry selects it and locates the live element (scrollIntoView + a transient flash outline).
 function Catalogue({
@@ -546,7 +681,7 @@ function SelectionPane({
         <FacetTab id="copy" active={facet} onSelect={setFacet}>
           Copy
         </FacetTab>
-        <FacetTab id="icon" active={facet} onSelect={setFacet} disabled>
+        <FacetTab id="icon" active={facet} onSelect={setFacet}>
           Icon
         </FacetTab>
         <FacetTab id="box" active={facet} onSelect={setFacet} disabled>
@@ -556,6 +691,7 @@ function SelectionPane({
 
       {facet === "tokens" ? <TokensTab showAll={showAll} setShowAll={setShowAll} /> : null}
       {facet === "copy" ? <CopyTab /> : null}
+      {facet === "icon" ? <IconTab /> : null}
     </div>
   );
 }
@@ -581,6 +717,24 @@ export function DevPanel() {
   // A new element selection lands the Tokens tab scoped (used view), not stuck on "Show All".
   useEffect(() => {
     setShowAll(false);
+  }, [dev.selectedDevId]);
+
+  // A new element selection that resolves to an icon (and carries no copy competing for the surface)
+  // lands the owner on the Icon tab, so an inspect-click on a glyph opens its editor directly -
+  // mirroring the Copy-tab surface above. Copy wins the tie (its tab is checked first, by the effect
+  // above), so a labelled control with both never yanks away from its text.
+  useEffect(() => {
+    const id = dev.selectedDevId;
+    if (!id) return;
+    const el = document.querySelector(`[data-dev-id="${id}"]`);
+    if (!el) return;
+    const hasCopy = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
+    if (hasCopy) return;
+    const icon =
+      (el.matches("[data-icon-id]") ? el : null) ??
+      el.querySelector("[data-icon-id]") ??
+      el.closest("[data-icon-id]");
+    if (icon) setFacet("icon");
   }, [dev.selectedDevId]);
 
   if (!dev.enabled) return null;
@@ -609,9 +763,9 @@ export function DevPanel() {
           aria-label="Close dev mode"
           className="grid h-6 w-6 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-4 w-4">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          {/* D-06: the header close glyph draws through <Icon> (the exact h-4 w-4 the inline svg carried),
+              so this call site is itself inspectable/editable via the Icon tab. */}
+          <Icon id="dev.close" className="h-4 w-4" />
         </button>
       </header>
 
