@@ -546,8 +546,10 @@ def test_poll_loop_forwards_a_capture_then_returns_on_completion(tmp_path, monke
         interval=0.0, timeout=300.0, sleep=lambda *_: None, now=lambda: 0.0,
     )
     payloads = _capture_payloads(win)
-    assert len(payloads) == 1 and s.is_complete()
-    assert all("signal" not in p for p in payloads)  # completed, no timeout signal
+    assert s.is_complete()
+    # the file-capture forward plus a distinct done signal on completion (never a timeout)
+    assert {"signal": "done", "token": s.token} in payloads
+    assert all(p.get("signal") != "timeout" for p in payloads)
 
 
 def test_session_complete_matches_is_complete_under_the_lock():
@@ -592,6 +594,87 @@ def test_poll_loop_stops_silently_when_the_session_is_stopped(tmp_path, monkeypa
         interval=0.0, timeout=300.0, sleep=lambda *_: None, now=lambda: 0.0,
     )
     assert win.scripts == []  # no forward, and crucially no timeout signal onto a new part
+
+
+# -- finish-and-close on completion (DONE-01): Complete flash + done signal + window destroy --
+
+
+def test_cad_overlay_complete_js_is_guarded_and_calls_complete():
+    from stockroom.host.window import cad_overlay_complete_js
+
+    js = cad_overlay_complete_js()
+    assert js.startswith("window.__STOCKROOM_OVERLAY__ &&")  # guarded no-op without the bridge
+    assert ".complete()" in js
+
+
+def test_forward_done_signal_emits_a_done_with_the_session_token(monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    s = _session({R.KICAD_SYMBOL}, token="tokD")
+    W._forward_done_signal(s)
+    [p] = _capture_payloads(spa)
+    assert p == {"signal": "done", "token": "tokD"}
+
+
+def test_poll_loop_finishes_and_closes_on_completion(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+
+    class _DestroyWindow(_RecordingWindow):
+        def __init__(self):
+            super().__init__()
+            self.destroyed = 0
+
+        def destroy(self):
+            self.destroyed += 1
+
+    cad = _DestroyWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT, R.KICAD_MODEL})
+    slept: list = []
+    W._poll_downloads_watch(
+        _FakeWatch([z]), s, extract_dir=tmp_path / "x",
+        interval=0.0, timeout=300.0, close_delay=1.0,
+        sleep=lambda d=0.0: slept.append(d), now=lambda: 0.0,
+    )
+    # the SPA got a distinct done signal, and never a timeout on completion
+    payloads = _capture_payloads(spa)
+    assert {"signal": "done", "token": "tok"} in payloads
+    assert all(p.get("signal") != "timeout" for p in payloads)
+    # the HUD got the file received tick AND the Complete flash push
+    assert any("received(" in js for js in cad.scripts)
+    assert any(".complete()" in js for js in cad.scripts)
+    # the cad window was closed exactly once, after a brief visible close delay
+    assert cad.destroyed == 1
+    assert 1.0 in slept
+    assert s.is_complete()
+
+
+def test_finish_and_close_leaves_the_temp_dir_intact(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", None)  # no window to destroy; the temp path is the focus
+    s = _session({R.KICAD_SYMBOL})
+    temp = tmp_path / "keep"
+    temp.mkdir()
+    (temp / "part.SchLib").write_bytes(b"x")
+    s.temp_dir = temp
+    W._finish_and_close(s, sleep=lambda *_: None, close_delay=0.0)
+    # the async Altium attach still needs the dir; the NEXT capture cleans it, never the finish path
+    assert temp.exists()
+    assert (temp / "part.SchLib").exists()
 
 
 # -- _stop_active_capture (B4 stop/replace + B8 temp cleanup) --
