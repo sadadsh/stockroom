@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" IPType="service" Name="GPIO" Version="PINREMAP_gpio_v1_0" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <GPIO_Pin PortName="PA" Name="PA9">
+        <PinSignal Name="USART1_TX">
+            <SpecificParameter Name="GPIO_AF">
+                <PossibleValue>GPIO_AF1_USART1</PossibleValue>
+            </SpecificParameter>
+        </PinSignal>
+    </GPIO_Pin>
+    <GPIO_Pin PortName="PA" Name="PA9_Remap">
+        <PinSignal Name="USART2_TX">
+            <SpecificParameter Name="GPIO_AF">
+                <PossibleValue>GPIO_AF4_USART2</PossibleValue>
+            </SpecificParameter>
+        </PinSignal>
+    </GPIO_Pin>
+</IP>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" IPType="service" Name="GPIO" Version="C_SUFFIX_gpio_v1_0" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <GPIO_Pin PortName="PC" Name="PC2">
+        <PinSignal Name="SPI2_MISO">
+            <SpecificParameter Name="GPIO_AF">
+                <PossibleValue>GPIO_AF5_SPI2</PossibleValue>
+            </SpecificParameter>
+        </PinSignal>
+    </GPIO_Pin>
+    <GPIO_Pin PortName="PC" Name="PC2_C">
+        <PinSignal Name="COMP1_INM">
+            <SpecificParameter Name="GPIO_AF">
+                <PossibleValue>GPIO_AF9_COMP1</PossibleValue>
+            </SpecificParameter>
+        </PinSignal>
+    </GPIO_Pin>
+</IP>

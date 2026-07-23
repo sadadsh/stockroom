@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" IPType="service" Name="GPIO" Version="F1LEGACY_gpio_v1_0" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <GPIO_Pin PortName="PA" Name="PA0-WKUP">
+        <SpecificParameter Name="GPIO_Pin">
+            <PossibleValue>GPIO_PIN_0</PossibleValue>
+        </SpecificParameter>
+        <SpecificParameter Name="GPIO_PinSource">
+            <PossibleValue>AFIO_EVENTOUT_PIN_0</PossibleValue>
+        </SpecificParameter>
+        <PinSignal Name="TIM2_CH1">
+            <RemapBlock Name="TIM2_REMAP0" DefaultRemap="true"/>
+            <RemapBlock Name="TIM2_REMAP2">
+                <SpecificParameter Name="GPIO_AF">
+                    <PossibleValue>__HAL_AFIO_REMAP_TIM2_PARTIAL_2</PossibleValue>
+                </SpecificParameter>
+            </RemapBlock>
+        </PinSignal>
+        <PinSignal Name="USART2_CTS">
+            <RemapBlock Name="USART2_REMAP0" DefaultRemap="true"/>
+        </PinSignal>
+    </GPIO_Pin>
+    <GPIO_Pin PortName="PA" Name="PA1">
+        <SpecificParameter Name="GPIO_Pin">
+            <PossibleValue>GPIO_PIN_1</PossibleValue>
+        </SpecificParameter>
+        <PinSignal Name="TIM2_CH2">
+            <RemapBlock Name="TIM2_REMAP0" DefaultRemap="true"/>
+            <RemapBlock Name="TIM2_REMAP2">
+                <SpecificParameter Name="GPIO_AF">
+                    <PossibleValue>__HAL_AFIO_REMAP_TIM2_PARTIAL_2</PossibleValue>
+                </SpecificParameter>
+            </RemapBlock>
+        </PinSignal>
+        <PinSignal Name="USART2_RTS">
+            <RemapBlock Name="USART2_REMAP0" DefaultRemap="true"/>
+        </PinSignal>
+    </GPIO_Pin>
+</IP>

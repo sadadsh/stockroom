@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Mcu ClockTree="STM32F0" DBVersion="V3.0" Family="STM32F0" HasPowerPad="false" IOType="" Line="STM32F0x0" Package="SYNTH_GATE_MISSING_PKG" RefName="SYNTH_GATE_MISSING_Tx" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Core>Arm Cortex-M0</Core>
+    <Frequency>48</Frequency>
+    <Flash>64</Flash>
+    <Ram>8</Ram>
+    <IONb>1</IONb>
+    <Voltage Max="3.6" Min="2"/>
+    <IP ConfigFile="GPIO-SYN" InstanceName="GPIO" Name="GPIO" Version="NO_SUCH_VERSION_v9_9"/>
+    <Pin Name="PA0" Position="1" Type="I/O"/>
+</Mcu>
