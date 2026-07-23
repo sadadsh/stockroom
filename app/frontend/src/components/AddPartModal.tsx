@@ -9,10 +9,16 @@ import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { useAddPart } from "../lib/addPart";
 import { IngestPage } from "../pages/IngestPage";
-import { CloseIcon } from "./icons";
+import { Text, useText } from "../lib/copy";
+import { Icon } from "./Icon";
 
 export function AddPartModal() {
   const { isOpen, close } = useAddPart();
+  // Copy layer: the dialog and Close accessible names live in attributes, so they resolve through
+  // useText; the visible title is a <Text> below. Resolved unconditionally (before the early return)
+  // to keep hook order stable.
+  const dialogLabel = useText("modal.addPart.aria", "Add a Part");
+  const closeLabel = useText("modal.addPart.close", "Close");
   // Where focus was when we opened, so closing never strands focus on the scrim.
   const restoreRef = useRef<HTMLElement | null>(null);
 
@@ -41,32 +47,40 @@ export function AddPartModal() {
 
   return (
     <div
+      data-dev-id="addpart.scrim"
       className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[8vh] backdrop-blur-sm"
       role="presentation"
       onClick={close}
     >
       <motion.div
+        data-dev-id="addpart.root"
         initial={{ opacity: 0, scale: 0.965, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 32 }}
         className="flex max-h-[84vh] w-full max-w-[640px] flex-col overflow-hidden rounded-card border border-line bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
-        aria-label="Add a Part"
+        aria-label={dialogLabel}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-14 flex-none items-center justify-between border-b border-line px-5">
-          <div className="text-base font-semibold text-t1">Add a Part</div>
+        <div
+          data-dev-id="addpart.header"
+          className="flex h-14 flex-none items-center justify-between border-b border-line px-5"
+        >
+          <div className="text-base font-semibold text-t1">
+            <Text id="modal.addPart.title">Add a Part</Text>
+          </div>
           <button
             type="button"
-            aria-label="Close"
+            data-dev-id="addpart.close"
+            aria-label={closeLabel}
             onClick={close}
             className="flex h-8 w-8 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
           >
-            <CloseIcon />
+            <Icon id="action.close" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <IngestPage />
         </div>
       </motion.div>

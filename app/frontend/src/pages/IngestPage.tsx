@@ -214,9 +214,9 @@ export function IngestPage() {
   const blockedFetch = result !== null && plan === null && !pulledSomething;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div data-dev-id="ingest.root" className="flex flex-col gap-4">
       {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
-      <div>
+      <div data-dev-id="ingest.hero">
         <p className="mb-2.5 text-xs text-t3">
           Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls
           it all. A passive is complete with no files; a non-passive needs its symbol,
@@ -224,6 +224,7 @@ export function IngestPage() {
         </p>
         <div className="flex items-center gap-2.5">
           <input
+            data-dev-id="ingest.input"
             aria-label="Product link or part number"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -235,6 +236,7 @@ export function IngestPage() {
             className="h-11 min-w-0 flex-1 rounded-control border border-line2 bg-field px-3.5 text-base text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
           />
           <Button
+            data-dev-id="ingest.lookup"
             variant="accent"
             onClick={lookUp}
             disabled={looking || !input.trim()}
@@ -244,10 +246,12 @@ export function IngestPage() {
           </Button>
         </div>
         {looking ? (
-          <EnrichStages progress={enrich.progress} className="mt-3.5" />
+          <div data-dev-id="ingest.stages" className="mt-3.5">
+            <EnrichStages progress={enrich.progress} />
+          </div>
         ) : !result ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
+            <Button data-dev-id="ingest.browse" onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
               Browse for ZIP
             </Button>
             <span className="text-xs text-t3">
@@ -258,7 +262,7 @@ export function IngestPage() {
       </div>
 
       {result && plan ? (
-        <Card className="px-4 py-4">
+        <Card data-dev-id="ingest.passive" className="px-4 py-4">
           <PassiveAddSection
             key={lookedUpInput}
             result={result}
@@ -274,7 +278,7 @@ export function IngestPage() {
       ) : null}
 
       {blockedFetch ? (
-        <Card className="px-4 py-4">
+        <Card data-dev-id="ingest.blocked" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <span className="text-sm text-warn">
               Nothing was pulled. The page might have blocked the fetch, or the link is not a
@@ -290,7 +294,7 @@ export function IngestPage() {
       ) : null}
 
       {nonPassive ? (
-        <Card className="px-4 py-4">
+        <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-t2">
               <Badge tone="warn">Needs Files</Badge>
@@ -316,7 +320,7 @@ export function IngestPage() {
       ) : null}
 
       {staged && staged.length > 0 ? (
-        <div className="flex flex-col gap-4">
+        <div data-dev-id="ingest.staged" className="flex flex-col gap-4">
           <Eyebrow>Review and Add</Eyebrow>
           {staged.map(({ id, candidate, datasheetUrl }) => (
             <CandidateCard
@@ -355,7 +359,10 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
     );
   }
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-line2 bg-raise2 p-4">
+    <div
+      data-dev-id="ingest.pulled-summary"
+      className="flex flex-col gap-2 rounded-card border border-line2 bg-raise2 p-4"
+    >
       {rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
           {rows.map(([k, v]) => (
@@ -378,7 +385,10 @@ function Progress({ progress }: { progress: JobProgress | null }) {
   const pct = Math.max(0, Math.min(100, progress?.pct ?? 0));
   return (
     <div className="mt-4">
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2">
+      <div
+        data-dev-id="ingest.progress"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-raise2"
+      >
         <div
           className="h-full rounded-full bg-acc transition-[width]"
           style={{ width: `${pct}%` }}

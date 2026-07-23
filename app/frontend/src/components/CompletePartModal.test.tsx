@@ -1,10 +1,12 @@
 import { createElement, type ReactNode } from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { PartDetail, StagingCandidate } from "../api/types";
 import { ToastProvider } from "../lib/toast";
+import { ThemeProvider } from "../lib/theme";
+import { DevModeProvider } from "../lib/devMode";
 import { CompletePartModal } from "./CompletePartModal";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -14,6 +16,25 @@ function wrapper({ children }: { children: ReactNode }) {
     { client: qc },
     createElement(ToastProvider, null, children),
   );
+}
+
+// The copy/icon block needs the dev-mode surface, so it wraps the same query + toast harness in
+// ThemeProvider + DevModeProvider (DevModeProvider reads useTheme).
+function devWrapper({ children }: { children: ReactNode }) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return createElement(
+    QueryClientProvider,
+    { client: qc },
+    createElement(
+      ThemeProvider,
+      null,
+      createElement(DevModeProvider, null, createElement(ToastProvider, null, children)),
+    ),
+  );
+}
+
+function toggleDevMode() {
+  fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
 }
 
 const DETAIL = {
@@ -72,6 +93,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   delete (window as { pywebview?: unknown }).pywebview;
   delete window.__STOCKROOM_CAD_DOWNLOAD__;
+  // Token edits set inline CSS vars on <html>; clear them so tests do not leak into each other.
+  document.documentElement.removeAttribute("style");
+  document.documentElement.removeAttribute("data-theme");
 });
 
 describe("CompletePartModal - guided capture", () => {
@@ -127,5 +151,70 @@ describe("CompletePartModal - guided capture", () => {
       const kicadGroup = screen.getByText("KiCad").parentElement as HTMLElement;
       expect(within(kicadGroup).getByText("Received")).toBeInTheDocument();
     });
+  });
+});
+
+describe("CompletePartModal - copy + icon adoption", () => {
+  it("renders identical text and its three glyphs, with no copy wrappers outside dev mode", async () => {
+    mockCadSource(["kicad_symbol", "kicad_footprint"]);
+    const { container } = render(
+      <CompletePartModal
+        detail={DETAIL}
+        hasModel={false}
+        onClose={() => {}}
+        onEditField={() => {}}
+        onAttachSymbol={() => {}}
+        onAttachFootprint={() => {}}
+      />,
+      { wrapper: devWrapper },
+    );
+
+    // Title + CAD section render their default text (no override).
+    expect(await screen.findByText("Complete This Part")).toBeInTheDocument();
+    expect(await screen.findByText("CAD Files")).toBeInTheDocument();
+    // The three glyphs (modal.check on rows, action.download on the CAD button, modal.close on the
+    // header button) all draw as <svg> via <Icon>.
+    expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(3);
+    // Off dev mode a <Text> is a bare string: no editable copy targets exist.
+    expect(container.querySelector("[data-copy-id]")).toBeNull();
+  });
+
+  it("wraps a representative set of labels as data-copy-id targets in dev mode", async () => {
+    mockCadSource(["kicad_symbol", "kicad_footprint"]);
+    const { container } = render(
+      <CompletePartModal
+        detail={DETAIL}
+        hasModel={false}
+        onClose={() => {}}
+        onEditField={() => {}}
+        onAttachSymbol={() => {}}
+        onAttachFootprint={() => {}}
+      />,
+      { wrapper: devWrapper },
+    );
+    // Wait for the CAD section (async cad-source query) so cad-title / row-symbol are mounted.
+    await screen.findByText("CAD Files");
+
+    toggleDevMode();
+
+    // A cross-section of the wrapped surface: the title (inline), a row label sourced from an array
+    // (row-symbol), an array/helper-fed CAD title, and the requirement Add button (req-add).
+    expect(container.querySelector('[data-copy-id="modal.completePart.title"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.completePart.cad-title"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.completePart.row-symbol"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.completePart.req-add"]')).not.toBeNull();
+  });
+
+  it("keeps the dialog and Close accessible names resolved through useText", async () => {
+    mockCadSource([]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, {
+      wrapper: devWrapper,
+    });
+    await screen.findByText("Complete This Part");
+
+    expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    toggleDevMode();
+    expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
   });
 });

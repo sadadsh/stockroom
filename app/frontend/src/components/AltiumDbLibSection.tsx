@@ -48,7 +48,7 @@ export function AltiumDbLibSection() {
   }
 
   return (
-    <section className="mb-7">
+    <section className="mb-7" data-dev-id="altiumdb.section">
       <Eyebrow className="mb-2">Altium Database Library</Eyebrow>
       <p className="mb-2.5 text-xs text-t3">
         One git-synced library Altium reads, regenerated from this profile&rsquo;s records. Install
@@ -76,14 +76,14 @@ export function AltiumDbLibSection() {
               </span>
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2" data-dev-id="altiumdb.section-progress">
               <div
                 className="h-full rounded-full bg-acc transition-[width]"
                 style={{ width: `${pct}%` }}
               />
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-line pt-2.5">
+            <div className="flex items-center justify-between gap-3 border-t border-line pt-2.5" data-dev-id="altiumdb.section-path">
               <span className="min-w-0 truncate font-mono text-xs text-t3" title={data.dblib}>
                 {data.dblib}
               </span>
@@ -98,7 +98,7 @@ export function AltiumDbLibSection() {
           </div>
         ) : null}
 
-        <div className="mt-3.5 flex flex-wrap items-center gap-3">
+        <div className="mt-3.5 flex flex-wrap items-center gap-3" data-dev-id="altiumdb.section-actions">
           <Button
             variant="accent"
             onClick={onRegenerate}

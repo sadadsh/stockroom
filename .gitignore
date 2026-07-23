@@ -74,3 +74,6 @@ docs/FINALE_SAUCE_SOURCE.md
 /launcher/
 tests/backend/api/test_launcher.py
 tests/backend/api/test_gitshim.py
+
+.planning/
+.gsd/

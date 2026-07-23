@@ -210,12 +210,13 @@ export function ComponentsPage() {
   // north-star .app: rail | list | detail, each column self-heading - no full-width page
   // header band (the active rail item + the rail's library readout carry that).
   return (
-    <div className="flex min-h-0 flex-1">
+    <div data-dev-id="components.root" className="flex min-h-0 flex-1">
         {/* picker */}
-        <div className="flex w-[320px] flex-none flex-col px-3.5 pt-4">
+        <div data-dev-id="components.picker" className="flex w-[320px] flex-none flex-col px-3.5 pt-4">
           <div className="px-2 pt-2">
             <Button
               variant="soft"
+              data-dev-id="components.add-parts"
               icon={<AddPartIcon />}
               onClick={openAddPart}
               className="mb-2.5 h-9 w-full justify-center"
@@ -236,7 +237,7 @@ export function ComponentsPage() {
               onOpenSearch={() => setSearchOpen(true)}
             />
           </div>
-          <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          <div data-dev-id="components.list-scroll" className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             <PickerBody
               isLoading={partsQuery.isLoading}
               error={partsQuery.error}
@@ -258,7 +259,7 @@ export function ComponentsPage() {
 
         {/* detail: the panel owns its own height, padding, and internal scroll (a fixed
             rail + a tabbed workbench), so this column is a non-scrolling viewport. */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
+        <div data-dev-id="components.detail-pane" className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
           {selectedId ? (
             <DetailPanel
               detail={detailQuery.data}
@@ -276,7 +277,7 @@ export function ComponentsPage() {
               busy={detailBusy}
             />
           ) : (
-            <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
+            <div data-dev-id="components.select-prompt" className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
               {partsQuery.isLoading ? (
                 <Text id="components.loading">Loading components...</Text>
               ) : (
@@ -354,7 +355,7 @@ function PickerBody({
       );
     }
     return (
-      <div className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
+      <div data-dev-id="components.empty" className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
         <span className="text-t3">
           <AddPartIcon />
         </span>

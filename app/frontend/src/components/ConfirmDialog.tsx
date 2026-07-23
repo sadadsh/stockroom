@@ -5,6 +5,7 @@
  * or Escape cancels; the confirm button carries the danger tone when destructive.
  */
 import { useEffect, type ReactNode } from "react";
+import { Text } from "../lib/copy";
 import { Button } from "./primitives";
 
 interface Props {
@@ -41,24 +42,27 @@ export function ConfirmDialog({
 
   return (
     <div
+      data-dev-id="confirm.scrim"
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
       role="presentation"
       onClick={onCancel}
     >
       <div
+        data-dev-id="confirm.root"
         className="w-full max-w-[380px] rounded-card border border-line bg-popover p-5 shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-base font-semibold text-t1">{title}</div>
-        <div className="mt-2 text-sm text-t2">{body}</div>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button small onClick={onCancel} disabled={busy}>
-            Cancel
+        <div data-dev-id="confirm.title" className="text-base font-semibold text-t1">{title}</div>
+        <div data-dev-id="confirm.body" className="mt-2 text-sm text-t2">{body}</div>
+        <div data-dev-id="confirm.actions" className="mt-4 flex justify-end gap-2">
+          <Button data-dev-id="confirm.cancel" small onClick={onCancel} disabled={busy}>
+            <Text id="modal.confirm.cancel">Cancel</Text>
           </Button>
           <Button
+            data-dev-id="confirm.confirm"
             small
             variant={danger ? "danger" : "accent"}
             onClick={onConfirm}

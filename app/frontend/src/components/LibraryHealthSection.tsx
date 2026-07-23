@@ -53,7 +53,7 @@ export function LibraryHealthSection() {
   }
 
   return (
-    <section className="mb-7">
+    <section className="mb-7" data-dev-id="settings.health">
       <Eyebrow className="mb-2">Library Health</Eyebrow>
       <p className="mb-2.5 text-xs text-t3">
         Reconcile every part with its record and every file with the repository. Repair heals
@@ -114,7 +114,7 @@ function HealthBody({
 
       {fixableCount > 0 ? (
         <div>
-          <Button variant="accent" onClick={onRepair} disabled={repairing}>
+          <Button variant="accent" onClick={onRepair} disabled={repairing} data-dev-id="settings.health-repair">
             {repairing ? "Repairing..." : "Repair Components"}
           </Button>
         </div>
