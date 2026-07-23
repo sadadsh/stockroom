@@ -167,6 +167,9 @@ describe("useGuidedCapture", () => {
     mockHost("tok");
     mockCadSourceUrl();
     const altiumSpy = vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
+    const regenSpy = vi
+      .spyOn(api, "altiumRegenerate")
+      .mockResolvedValue({ emitted: 1, skipped: [] } as never);
     const { result } = render(["altium_symbol", "altium_footprint"]);
 
     await act(async () => {
@@ -187,6 +190,35 @@ describe("useGuidedCapture", () => {
       "C:\\tmp\\BQ24074.SchLib",
       "C:\\tmp\\BQ24074.PcbLib",
     ]);
+    // The library must be placeable from Altium without a separate visit to the Altium
+    // window: a capture that attached Altium assets refreshes the DbLib data source itself.
+    expect(regenSpy).toHaveBeenCalled();
+    expect(result.current.altiumComplete).toBe(true);
+  });
+
+  it("still completes the capture when the DbLib regenerate fails after the attach", async () => {
+    mockHost("tok");
+    mockCadSourceUrl();
+    vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
+    vi.spyOn(api, "altiumRegenerate").mockRejectedValue(new Error("busy"));
+    const { result } = render(["altium_symbol", "altium_footprint"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({
+        path: "C:\\Downloads\\BQ24074.zip",
+        token: "tok",
+        requirements: ["altium_symbol", "altium_footprint"],
+        altiumPaths: ["C:\\tmp\\BQ24074.SchLib", "C:\\tmp\\BQ24074.PcbLib"],
+      });
+      await Promise.resolve();
+    });
+
+    // The files are attached; a regenerate hiccup must not fail the capture (the Altium
+    // window still offers a manual regenerate).
+    await waitFor(() => expect(result.current.status).toBe("done"));
     expect(result.current.altiumComplete).toBe(true);
   });
 
