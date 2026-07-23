@@ -247,7 +247,7 @@ export function DetailPanel({
               variant="hero"
               name="3D Model"
               present={hasModel}
-              className="h-[208px]"
+              className="h-[264px]"
               art={<CubeArt />}
               thumb={
                 hasModel ? (
@@ -269,7 +269,7 @@ export function DetailPanel({
                 variant="tile"
                 name="Symbol"
                 present={!!detail.symbol?.name}
-                className="h-[118px]"
+                className="h-[142px]"
                 art={<SymbolArt />}
                 thumb={
                   detail.symbol?.name ? (
@@ -283,7 +283,7 @@ export function DetailPanel({
                 variant="tile"
                 name="Footprint"
                 present={!!detail.footprint?.name}
-                className="h-[118px]"
+                className="h-[142px]"
                 art={<FootprintArt />}
                 thumb={
                   detail.footprint?.name ? (
@@ -573,7 +573,6 @@ function IdentityLine({
 }) {
   return (
     <div data-dev-id="detail.identity-line" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-      <span className="h-1.5 w-1.5 flex-none rounded-full bg-t3" aria-hidden="true" />
       {onEditMpn ? (
         <EditableText
           value={mpn}
@@ -687,7 +686,7 @@ function RailReference({
   return (
     <div data-dev-id="detail.reference" className="flex flex-col gap-1 border-t border-line pt-3">
       <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
-        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
+        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t2">
           <Text id="detail.datasheet">Datasheet</Text>
         </span>
         <span className="flex min-w-0 flex-1 items-center gap-1">
@@ -721,7 +720,7 @@ function RailReference({
         </span>
       </div>
       <div data-dev-id="detail.notes-row" className="flex items-baseline gap-2">
-        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
+        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t2">
           <Text id="detail.notes">Notes</Text>
         </span>
         <span className="min-w-0 flex-1">
@@ -986,8 +985,7 @@ function AssetTile({
     </div>
   );
   const base =
-    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border bg-raise " +
-    (variant === "hero" ? "border-line shadow-raise " : "border-line shadow-file ") +
+    "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise " +
     (className ?? "");
   const buttonCls =
     base +
@@ -1042,7 +1040,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
   return (
     <div data-dev-id="detail.specs">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t2">
           <Text id="detail.specifications">Specifications</Text>
         </span>
         <span className="tnum font-mono text-2xs text-t3">{count}</span>
