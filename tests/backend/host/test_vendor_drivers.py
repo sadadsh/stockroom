@@ -37,14 +37,46 @@ def test_digikey_driver_navigates_to_the_models_page_and_drives_a_provider_downl
     assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")
 
 
-def test_digikey_driver_enumerates_visible_providers_preferring_ultra_librarian():
-    # Per-part coverage varies (owner: "DigiKey shows which suppliers have what"), so the driver
+def test_digikey_driver_enumerates_visible_providers_preferring_snapmagic():
+    # Per-part coverage varies (owner: "DigiKey shows which suppliers have what"), so the reactor
     # enumerates only the VISIBLE provider rows (a display:none row has offsetParent===null), in
-    # preference order Ultra Librarian first. The preference order is encoded in the machine.
+    # preference order SnapMagic first - the owner's proven, reliable two-format source (Ultra
+    # Librarian errors on the 2nd file). The preference order is encoded in the reactor.
     low = build_driver_js("digikey", ["kicad"]).lower()
     assert "offsetparent" in low  # visibility gate = adaptive coverage, not a fixed provider
-    ul = low.find("ultra librarian")
-    assert 0 <= ul < low.find("snapmagic") < low.find("cadenas")
+    sm = low.find("snapmagic")
+    assert 0 <= sm < low.find("ultra librarian") < low.find("cadenas")
+
+
+def test_digikey_reactor_advances_on_the_real_browser_download_event():
+    # The reactor advances to the next format ONLY on the browser's REAL download-completed event
+    # (relayed to window.__SR_DL__), not a timer or a phantom vendor modal - this is what avoids the
+    # preemption + phantom-modal hang. So the driver installs the __SR_DL__ bridge and awaits it.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "window.__SR_DL__" in js  # the real-download-event bridge the host relays into
+    # advances only on a real per-format 'completed' (the host relays it when a file is captured)
+    assert "awaitDownload" in js and "'completed'" in js and "evt.format===spec.key" in js
+    # It must NOT gate the next format on a timer/poll or the old capture-flag: those were the bugs.
+    assert "__SR_FMT_DONE__" not in js
+    assert "waitFor" not in js  # no fixed-interval polling
+
+
+def test_digikey_reactor_is_event_driven_not_timed():
+    # "React to what's happening live, no timers": stepping is MutationObserver-driven (until reacts
+    # the instant the DOM satisfies a predicate); timers appear ONLY as never-hang watchdogs.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "MutationObserver" in js and "requestAnimationFrame" in js  # event-driven, debounced
+    assert "elementFromPoint" in js  # a real hit-test at the click moment, not a blind click
+    assert "GEN_WD" in js  # the single watchdog is the only timer (a never-hang backstop)
+
+
+def test_digikey_reactor_recovers_like_a_human_refresh_and_your_turn():
+    # It never gets left on a hang: a stall/error refreshes the page (the owner's move), bounded so it
+    # can't loop; a Cloudflare / login wall hands off to the user via the overlay "Your Turn".
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "location.reload" in js and "MAX_REFRESH" in js  # bounded refresh recovery
+    assert "senseError" in js and "senseWall" in js  # watches for the error toast + the wall
+    assert ".action({needsUser:true" in js  # Cloudflare/login -> "Your Turn" hand-off
 
 
 def test_digikey_driver_is_resilient_via_a_text_and_label_match():

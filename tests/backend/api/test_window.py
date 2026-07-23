@@ -289,6 +289,21 @@ def test_cad_forward_js_encodes_the_payload_and_is_guarded():
     assert json.dumps(payload) in js
 
 
+# -- cad_download_event_js: the REAL browser download lifecycle relayed to the in-page reactor --
+
+
+def test_cad_download_event_js_relays_a_captured_format_guarded():
+    from stockroom.host.window import cad_download_event_js
+
+    js = cad_download_event_js("completed", "kicad")
+    # Guarded (a page without the reactor bridge is a silent no-op) + JSON-encoded {state, format}
+    # so the reactor advances only for the format it is awaiting.
+    assert js.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "kicad"}) in js
+    # A format is optional; without one it is a bare state payload.
+    assert json.dumps({"state": "completed"}) in cad_download_event_js("completed")
+
+
 # -- _extract_altium_members (pure) --
 
 
@@ -471,16 +486,20 @@ def test_forward_cad_capture_pushes_a_received_tick_to_the_cad_window(tmp_path, 
     # the SPA still received the capture payload (unchanged behavior)
     [p] = _capture_payloads(spa)
     assert set(p["requirements"]) == {"kicad_symbol", "kicad_footprint", "kicad_model"}
-    # the CAD window got a single guarded received push for the newly-satisfied requirements
-    assert len(cad.scripts) == 1
-    push = cad.scripts[0]
-    assert push.startswith("window.__STOCKROOM_OVERLAY__ &&")
+    # the CAD window got: (1) a guarded received push for the newly-satisfied requirements, and
+    # (2) a real "completed" download event for the captured format so the reactor advances.
+    assert len(cad.scripts) == 2
+    tick = cad.scripts[0]
+    assert tick.startswith("window.__STOCKROOM_OVERLAY__ &&")
     for v in ("kicad_symbol", "kicad_footprint", "kicad_model"):
-        assert json.dumps({"requirement": v}) in push
+        assert json.dumps({"requirement": v}) in tick
+    dl = cad.scripts[1]
+    assert dl.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "kicad"}) in dl
 
     # a dedup re-fire satisfies nothing new -> nothing new pushed to the CAD window
     W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
-    assert len(cad.scripts) == 1
+    assert len(cad.scripts) == 2
 
 
 def test_forward_cad_capture_no_cad_window_still_forwards_to_the_spa(tmp_path, monkeypatch):
