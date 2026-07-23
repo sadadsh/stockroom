@@ -401,4 +401,52 @@ describe("DevPanel inspect-first shell", () => {
       }),
     );
   });
+
+  it("Move Up / Move Down walk one step across three siblings without jumping to an end", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const first = selectNavAndOpenBox("rail.nav-components", "Nav Components");
+    const last = document.querySelector('[data-dev-id="rail.nav-settings"]') as HTMLElement;
+
+    // From visual index 0, one Move Down lands at 1 (swaps with projects), not at the back.
+    fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
+    expect(first.style.order).toBe("1");
+    // A second Move Down lands at 2 (swaps with settings), and settings falls back to 1.
+    fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
+    expect(first.style.order).toBe("2");
+    expect(last.style.order).toBe("1");
+  });
+
+  it("Reset Order clears every sibling's order and drops it from the save `elements` block", async () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectNavAndOpenBox("rail.nav-components", "Nav Components");
+    const projects = document.querySelector('[data-dev-id="rail.nav-projects"]') as HTMLElement;
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
+    expect(node.style.order).toBe("1");
+    expect(projects.style.order).toBe("0");
+
+    // Commit the reorder so the saved baseline carries the order values.
+    const devSave = vi.mocked(api.devSave);
+    fireEvent.click(screen.getByRole("button", { name: /Save to source/ }));
+    expect(devSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elements: expect.objectContaining({ "rail.nav-components": { order: "1" } }),
+      }),
+    );
+    // Let the async save settle so the footer button returns from "Saving..." to "Save to source".
+    await screen.findByRole("button", { name: /Save to source/ });
+
+    // Reset Order strips `order` from every sibling, restoring the original DOM order.
+    fireEvent.click(screen.getByRole("button", { name: "Reset Order" }));
+    expect(node.style.order).toBe("");
+    expect(projects.style.order).toBe("");
+    expect(screen.queryByRole("button", { name: "Reset Order" })).not.toBeInTheDocument();
+
+    // Saving again carries an empty `elements` block - the reorder reverted with no leftover overrides.
+    devSave.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Save to source/ }));
+    expect(devSave).toHaveBeenCalledWith(expect.objectContaining({ elements: {} }));
+  });
 });

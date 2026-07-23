@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { containerLayoutOf, reorderSiblings, reorderSiblingsOf } from "./elementLayout";
+import {
+  containerLayoutOf,
+  isValidOrder,
+  reorderSiblings,
+  reorderSiblingsOf,
+} from "./elementLayout";
 
 // A tiny DOM builder: a container with the given class holding N buttons carrying data-dev-id=id.
 function makeContainer(className: string, ids: string[]): HTMLElement {
@@ -85,5 +90,46 @@ describe("reorderSiblings", () => {
 
   it("returns every sibling explicitly even for a two-element container", () => {
     expect(reorderSiblings(["one", "two"], "one", "down")).toEqual({ two: "0", one: "1" });
+  });
+
+  it("moves exactly one step across three-plus siblings, preserving the others' relative order", () => {
+    // [a,b,c,d,e], move c down -> [a,b,d,c,e]: c and d swap, everyone else keeps their place.
+    expect(reorderSiblings(["a", "b", "c", "d", "e"], "c", "down")).toEqual({
+      a: "0",
+      b: "1",
+      d: "2",
+      c: "3",
+      e: "4",
+    });
+  });
+
+  it("is stable when applied repeatedly: walking down halts at the last position", () => {
+    // Simulate the panel re-deriving the visual sequence before each click (sort by order value).
+    const seqFrom = (map: Record<string, string>) =>
+      Object.entries(map)
+        .sort((a, b) => Number(a[1]) - Number(b[1]))
+        .map(([id]) => id);
+
+    let seq = ["a", "b", "c"];
+    seq = seqFrom(reorderSiblings(seq, "a", "down")); // -> [b,a,c]
+    expect(seq).toEqual(["b", "a", "c"]);
+    seq = seqFrom(reorderSiblings(seq, "a", "down")); // -> [b,c,a]
+    expect(seq).toEqual(["b", "c", "a"]);
+    seq = seqFrom(reorderSiblings(seq, "a", "down")); // at the end: no change
+    expect(seq).toEqual(["b", "c", "a"]);
+  });
+});
+
+describe("isValidOrder", () => {
+  it("accepts a signed 1-3 digit integer (the backend `order` grammar)", () => {
+    for (const v of ["0", "2", "-1", "120", "-120", "99"]) {
+      expect(isValidOrder(v)).toBe(true);
+    }
+  });
+
+  it("rejects empty, four-plus digits, slot syntax, and non-numeric text", () => {
+    for (const v of ["", "1 / 2", "1200", "abc", "99999", "1.5", " 2", "12px"]) {
+      expect(isValidOrder(v)).toBe(false);
+    }
   });
 });
