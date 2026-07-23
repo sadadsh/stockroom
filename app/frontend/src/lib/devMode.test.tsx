@@ -20,10 +20,18 @@ vi.mock("../api/client", async (importActual) => {
 
 const mockApi = vi.mocked(api);
 
+// A mutable stand-in for the committed lib/element.overrides.ts (empty on disk). Tests seed it to
+// prove committed boot-apply, then afterEach empties it so no committed override leaks between tests
+// (which would flip `dirty` after a resetAll that clears elements to {}).
+const MOCK_ELEMENT_OVERRIDES: Record<string, Record<string, string>> = vi.hoisted(() => ({}));
+vi.mock("./element.overrides", () => ({ ELEMENT_OVERRIDES: MOCK_ELEMENT_OVERRIDES }));
+
 afterEach(() => {
   // token edits set inline CSS vars on <html>; clear them so tests don't leak into each other
   document.documentElement.removeAttribute("style");
   document.documentElement.removeAttribute("data-theme");
+  // drop any committed element override a test seeded (mutate in place: the module binding is live)
+  for (const key of Object.keys(MOCK_ELEMENT_OVERRIDES)) delete MOCK_ELEMENT_OVERRIDES[key];
 });
 
 function Harness() {
@@ -279,6 +287,128 @@ describe("dev mode icon overrides", () => {
       result.current.setIconBody("action.add", "<circle/>");
       result.current.setIconSwap("action.add", "action.trash");
       result.current.resetIcon("action.add");
+    }).not.toThrow();
+  });
+});
+
+// --- Dev Mode v2 per-element overrides (ELEM-01: apply-by-id on boot + working-state + save block) --
+
+// A provider whose subtree carries a real [data-dev-id] node, so a boot/edit apply has a live target.
+function elementWrapper({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider>
+      <DevModeProvider>
+        <div data-dev-id="detail.spec-sheet">spec sheet</div>
+        {children}
+      </DevModeProvider>
+    </ThemeProvider>
+  );
+}
+
+function specNode(): HTMLElement {
+  const el = document.querySelector<HTMLElement>('[data-dev-id="detail.spec-sheet"]');
+  if (!el) throw new Error("spec-sheet node not rendered");
+  return el;
+}
+
+describe("dev mode element overrides", () => {
+  it("applies a committed element override as an inline style on boot with dev mode off", () => {
+    // Seed the committed map BEFORE mount: the provider clones it into working-state and the boot
+    // effect (which runs regardless of `enabled`) applies it for everyone.
+    MOCK_ELEMENT_OVERRIDES["detail.spec-sheet"] = { width: "240px" };
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    expect(result.current.enabled).toBe(false);
+    expect(specNode().style.getPropertyValue("width")).toBe("240px");
+  });
+
+  it("setElementProp updates the live node's inline style and marks dirty", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    expect(result.current.dirty).toBe(false);
+
+    act(() => result.current.setElementProp("detail.spec-sheet", "width", "300px"));
+    expect(specNode().style.getPropertyValue("width")).toBe("300px");
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.isElementPropOverridden("detail.spec-sheet", "width")).toBe(true);
+  });
+
+  it("resetElementProp clears exactly that inline style and drops an emptied id", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    act(() => {
+      result.current.setElementProp("detail.spec-sheet", "width", "300px");
+      result.current.setElementProp("detail.spec-sheet", "height", "80px");
+    });
+    expect(specNode().style.getPropertyValue("width")).toBe("300px");
+
+    // Removing width leaves height (and the id) intact.
+    act(() => result.current.resetElementProp("detail.spec-sheet", "width"));
+    expect(specNode().style.getPropertyValue("width")).toBe("");
+    expect(specNode().style.getPropertyValue("height")).toBe("80px");
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toEqual({ height: "80px" });
+
+    // Removing the last prop drops the id from the working map entirely.
+    act(() => result.current.resetElementProp("detail.spec-sheet", "height"));
+    expect(specNode().style.getPropertyValue("height")).toBe("");
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined();
+  });
+
+  it("clearElement removes every prop for that id from the live node", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    act(() => {
+      result.current.setElementProp("detail.spec-sheet", "width", "300px");
+      result.current.setElementProp("detail.spec-sheet", "padding", "8px");
+    });
+    act(() => result.current.clearElement("detail.spec-sheet"));
+    expect(specNode().style.getPropertyValue("width")).toBe("");
+    expect(specNode().style.getPropertyValue("padding")).toBe("");
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined();
+  });
+
+  it("carries the working element map as the elements block of the save payload and clears dirty", async () => {
+    mockApi.devSave.mockClear();
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    act(() => result.current.setElementProp("detail.spec-sheet", "width", "300px"));
+    expect(result.current.dirty).toBe(true);
+
+    await act(async () => {
+      await result.current.save();
+    });
+    const arg = mockApi.devSave.mock.calls[0][0];
+    expect(arg.elements).toEqual({ "detail.spec-sheet": { width: "300px" } });
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it("resetAll empties the element working-state", () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+    act(() => result.current.setElementProp("detail.spec-sheet", "width", "300px"));
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toEqual({ width: "300px" });
+
+    act(() => result.current.resetAll());
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined();
+    expect(specNode().style.getPropertyValue("width")).toBe("");
+  });
+
+  it("applies a committed override to a node that mounts AFTER boot via the observer", async () => {
+    MOCK_ELEMENT_OVERRIDES["late.node"] = { width: "300px" };
+    renderHook(() => useDevMode(), { wrapper });
+
+    const late = document.createElement("div");
+    late.setAttribute("data-dev-id", "late.node");
+    document.body.appendChild(late);
+    // Not applied synchronously on insert; the MutationObserver re-applies on its next flush.
+    expect(late.style.getPropertyValue("width")).toBe("");
+    await waitFor(() => expect(late.style.getPropertyValue("width")).toBe("300px"));
+    late.remove();
+  });
+
+  it("exposes committed element overrides inertly on the DEFAULT no-op context", () => {
+    MOCK_ELEMENT_OVERRIDES["detail.spec-sheet"] = { width: "240px" };
+    const { result } = renderHook(() => useDevMode());
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toEqual({ width: "240px" });
+    expect(result.current.isElementPropOverridden("detail.spec-sheet", "width")).toBe(false);
+    expect(() => {
+      result.current.setElementProp("detail.spec-sheet", "width", "1px");
+      result.current.resetElementProp("detail.spec-sheet", "width");
+      result.current.clearElement("detail.spec-sheet");
     }).not.toThrow();
   });
 });

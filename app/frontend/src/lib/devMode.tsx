@@ -17,6 +17,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -27,6 +28,8 @@ import { DEV_TOKENS, DEV_TOKEN_BY_VAR } from "./devTokens";
 import { TOKEN_OVERRIDES } from "./token.overrides";
 import { COPY_OVERRIDES } from "./copy.overrides";
 import { ICON_OVERRIDES, type IconOverride } from "./icon.overrides";
+import { ELEMENT_OVERRIDES } from "./element.overrides";
+import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
 
 // The two override blocks: dark colours + shared radii on :root ("root"), light colours on
 // :root[data-theme="light"] ("light"). Defined here (not in the regenerated overrides file) so the
@@ -70,6 +73,17 @@ interface DevModeContextValue {
   setIconBody: (id: string, body: string) => void;
   setIconSwap: (id: string, swapToId: string) => void;
   resetIcon: (id: string) => void;
+  // --- per-element overrides (ELEM-01: a data-dev-id -> CSS-prop map applied as inline style) ---
+  // The working prop map held for an id (the Box tab's read), or undefined when none. Reads the
+  // working-state under a provider; on the DEFAULT no-op context it reads the committed ELEMENT_OVERRIDES.
+  elementOverridesFor: (id: string) => Record<string, string> | undefined;
+  // True when the working map holds a value for this id + prop (drives the per-property Reset).
+  isElementPropOverridden: (id: string, prop: string) => boolean;
+  setElementProp: (id: string, prop: string, value: string) => void;
+  // Remove one property; when it was the id's last property the id drops from the working map.
+  resetElementProp: (id: string, prop: string) => void;
+  // Remove every property for an id (the Box tab's clear-all-for-this-element).
+  clearElement: (id: string) => void;
   // The label the panel is currently editing (clicked in dev mode), with its default text so the
   // panel can show + reset to it, or null.
   selectedCopyId: string | null;
@@ -127,6 +141,13 @@ const DEFAULT: DevModeContextValue = {
   setIconBody: noop,
   setIconSwap: noop,
   resetIcon: noop,
+  // No provider: committed element overrides still resolve (so the Box tab reads what shipped), and
+  // the setters are inert - mirrors iconOverrideFor -> ICON_OVERRIDES[id].
+  elementOverridesFor: (id) => ELEMENT_OVERRIDES[id],
+  isElementPropOverridden: () => false,
+  setElementProp: noop,
+  resetElementProp: noop,
+  clearElement: noop,
   selectedCopyId: null,
   selectedCopyDefault: "",
   selectCopy: noop,
@@ -160,12 +181,25 @@ function cloneIcons(src: Record<string, IconOverride>): Record<string, IconOverr
   return out;
 }
 
+// A shallow clone of the committed element overrides for the working-state (each per-id prop map
+// copied so an edit never mutates the frozen imported module).
+function cloneElements(
+  src: Record<string, Record<string, string>>,
+): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [id, props] of Object.entries(src)) out[id] = { ...props };
+  return out;
+}
+
 export function DevModeProvider({ children }: { children: ReactNode }) {
   const { theme } = useTheme();
   const [enabled, setEnabled] = useState(false);
   const [tokens, setTokens] = useState<TokenOverrides>(() => cloneTokens(TOKEN_OVERRIDES));
   const [copy, setCopyState] = useState<Record<string, string>>(() => ({ ...COPY_OVERRIDES }));
   const [icons, setIcons] = useState<Record<string, IconOverride>>(() => cloneIcons(ICON_OVERRIDES));
+  const [elements, setElements] = useState<Record<string, Record<string, string>>>(() =>
+    cloneElements(ELEMENT_OVERRIDES),
+  );
   const [selectedCopy, setSelectedCopy] = useState<{ id: string; def: string } | null>(null);
   const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
   const [inspect, setInspect] = useState(false);
@@ -177,6 +211,14 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const [savedTokens, setSavedTokens] = useState(() => JSON.stringify(TOKEN_OVERRIDES));
   const [savedCopy, setSavedCopy] = useState(() => JSON.stringify(COPY_OVERRIDES));
   const [savedIcons, setSavedIcons] = useState(() => JSON.stringify(ICON_OVERRIDES));
+  const [savedElements, setSavedElements] = useState(() => JSON.stringify(ELEMENT_OVERRIDES));
+
+  // Two refs drive the element-override apply: prevElementsRef holds the previously-applied map so a
+  // re-apply can compute exactly which props to clear; elementsRef always holds the latest map so the
+  // observer's getter re-applies the current overrides to late-mounted nodes.
+  const prevElementsRef = useRef<Record<string, Record<string, string>>>(elements);
+  const elementsRef = useRef(elements);
+  elementsRef.current = elements;
 
   // Ctrl/Cmd+Shift+D toggles the whole surface. It is the only way in, so dev mode is hidden.
   useEffect(() => {
@@ -202,6 +244,16 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       else root.style.removeProperty(token.cssVar);
     }
   }, [tokens, theme]);
+
+  // Apply the committed + edited per-element overrides as inline styles on every matching
+  // [data-dev-id] node. Runs regardless of `enabled` (like the token effect) so a saved tweak ships
+  // for everyone. Diffs against the previously-applied map to clear exactly the props that were
+  // removed, then starts an observer so a node that mounts later still receives its override.
+  useEffect(() => {
+    applyElementOverrides(elements, prevElementsRef.current);
+    prevElementsRef.current = elements;
+    return startElementOverrideObserver(() => elementsRef.current);
+  }, [elements]);
 
   const activeSelector: TokenSelector = theme === "light" ? "light" : "root";
 
@@ -301,10 +353,43 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // --- per-element overrides (ELEM-01) --- the working map mirrors the icon state one-for-one:
+  // read (elementOverridesFor), edit (setElementProp), clear (resetElementProp / clearElement).
+  const elementOverridesFor = useCallback(
+    (id: string): Record<string, string> | undefined => elements[id],
+    [elements],
+  );
+  const isElementPropOverridden = useCallback(
+    (id: string, prop: string): boolean => elements[id] != null && prop in elements[id],
+    [elements],
+  );
+  const setElementProp = useCallback((id: string, prop: string, value: string) => {
+    setElements((prev) => ({ ...prev, [id]: { ...prev[id], [prop]: value } }));
+  }, []);
+  const resetElementProp = useCallback((id: string, prop: string) => {
+    setElements((prev) => {
+      const props = { ...prev[id] };
+      delete props[prop];
+      const next = { ...prev };
+      // Drop the id entirely once its last property is gone, so the map never holds an empty entry.
+      if (Object.keys(props).length === 0) delete next[id];
+      else next[id] = props;
+      return next;
+    });
+  }, []);
+  const clearElement = useCallback((id: string) => {
+    setElements((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setTokens({ root: {}, light: {} });
     setCopyState({});
     setIcons({});
+    setElements({});
     setSelectedCopy(null);
   }, []);
 
@@ -321,24 +406,27 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const dirty =
     JSON.stringify(tokens) !== savedTokens ||
     JSON.stringify(copy) !== savedCopy ||
-    JSON.stringify(icons) !== savedIcons;
+    JSON.stringify(icons) !== savedIcons ||
+    JSON.stringify(elements) !== savedElements;
 
   const save = useCallback(async () => {
     setSaving(true);
     setLastError(null);
     try {
-      // D-04: carry the working icon overrides as the `icons` block; the backend (already wired)
-      // validates them and writes lib/icon.overrides.ts alongside the token/copy files.
-      await api.devSave({ tokens, copy, icons });
+      // D-04 / ELEM-01: carry the working icon + element overrides as the `icons` / `elements`
+      // blocks; the backend (already wired) validates them and writes lib/icon.overrides.ts +
+      // lib/element.overrides.ts alongside the token/copy files.
+      await api.devSave({ tokens, copy, icons, elements });
       setSavedTokens(JSON.stringify(tokens));
       setSavedCopy(JSON.stringify(copy));
       setSavedIcons(JSON.stringify(icons));
+      setSavedElements(JSON.stringify(elements));
     } catch (err) {
       setLastError(err instanceof ApiError ? err.message : "Could not save to source");
     } finally {
       setSaving(false);
     }
-  }, [tokens, copy, icons]);
+  }, [tokens, copy, icons, elements]);
 
   const value = useMemo<DevModeContextValue>(
     () => ({
@@ -359,6 +447,11 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       setIconBody,
       setIconSwap,
       resetIcon,
+      elementOverridesFor,
+      isElementPropOverridden,
+      setElementProp,
+      resetElementProp,
+      clearElement,
       selectedCopyId: selectedCopy?.id ?? null,
       selectedCopyDefault: selectedCopy?.def ?? "",
       selectCopy,
@@ -394,6 +487,11 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       setIconBody,
       setIconSwap,
       resetIcon,
+      elementOverridesFor,
+      isElementPropOverridden,
+      setElementProp,
+      resetElementProp,
+      clearElement,
       selectedCopy,
       selectCopy,
       clearSelectedCopy,
