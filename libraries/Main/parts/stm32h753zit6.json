@@ -1,6 +1,14 @@
 {
-  "altium_footprint": null,
-  "altium_symbol": null,
+  "altium_footprint": {
+    "lib": "stm32h753zit6.PcbLib",
+    "name": "LQFP144-20x20mm",
+    "tool": "altium"
+  },
+  "altium_symbol": {
+    "lib": "stm32h753zit6.SchLib",
+    "name": "STM32H753ZIT6",
+    "tool": "altium"
+  },
   "category": "ICs",
   "datasheet": {
     "fetched_at": "",
