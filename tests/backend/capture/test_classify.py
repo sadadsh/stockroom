@@ -92,3 +92,34 @@ def test_loose_legacy_lib_symbol_and_wrl_model():
     assert classify_asset(Path("x.lib")).tool == "kicad"
     assert classify_asset(Path("x.lib")).requirements == frozenset({Requirement.KICAD_SYMBOL})
     assert classify_asset(Path("x.wrl")).requirements == frozenset({Requirement.KICAD_MODEL})
+
+
+def test_classify_zip_by_content_without_zip_suffix(tmp_path):
+    # A vendor download can land without a .zip name (WebView2 saves a Content-Disposition-less
+    # download as a GUID .tmp). Classify it by CONTENT so a valid bundle is never dropped.
+    import zipfile
+
+    from stockroom.capture.classify import classify_asset
+    from stockroom.capture.requirements import Requirement
+
+    p = tmp_path / "b3b67b52-c43c-49f0-bae3-8a70f0582572.tmp"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("KiCADv6/x.kicad_sym", "sym")
+        z.writestr("KiCADv6/footprints.pretty/x.kicad_mod", "mod")
+        z.writestr("RC0603N_YAG.step", "3d")
+    c = classify_asset(p)
+    assert c.kind == "zip"
+    assert Requirement.KICAD_SYMBOL in c.requirements
+    assert Requirement.KICAD_FOOTPRINT in c.requirements
+    assert Requirement.KICAD_MODEL in c.requirements
+
+
+def test_classify_prefers_known_suffix_over_content_sniff(tmp_path):
+    # A recognized EDA suffix still wins - a real .kicad_sym is scanned as a symbol, never zip-sniffed.
+    from stockroom.capture.classify import classify_asset
+    from stockroom.capture.requirements import Requirement
+
+    p = tmp_path / "x.kicad_sym"
+    p.write_text("(kicad_symbol_lib)")
+    c = classify_asset(p)
+    assert c.requirements == frozenset({Requirement.KICAD_SYMBOL})
