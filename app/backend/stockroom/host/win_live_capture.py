@@ -343,16 +343,251 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
         result["screenshot_error"] = repr(e)
 
 
+def _drive_signin(webview, base: str, captured: list, result: dict) -> None:
+    """Interactive one-time DigiKey sign-in: open a real product page, keep the window open long
+    enough for the OWNER to complete the Ping OIDC sign-in by hand, poll for the signed-in state,
+    then dump the SIGNED-IN CAD download widget markup so the driver's download selectors can be
+    tuned against real data. The persistent WebView2 profile keeps the session for later captures."""
+    import os
+    import time as _t
+
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
+    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
+        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    )
+    result["url"] = url
+    # Open on the product page in a PLAIN window (no HUD - it would cover DigiKey's account/Login menu),
+    # then jump to the dedicated CAD models page (digikey.com/en/models/<productId>) where the provider
+    # tabs (Ultra Librarian / SnapMagic / TraceParts / CADENAS / Manufacturer Provided) and the whole
+    # download UI live. The owner signs in via the on-page Login link; we detect signed-in by the login
+    # gate clearing, then dump the signed-in format selector so the download driver can be tuned.
+    cad = webview.create_window("stockroom-signin", url=url, width=1340, height=980)
+    _t.sleep(4.5)
+    href = cad.evaluate_js(
+        "(function(){var m=document.querySelector('[data-testid=\"eda-cad-model-link\"]');"
+        "if(!m){var c=Array.from(document.querySelectorAll('a[href]'));"
+        "m=c.find(function(e){return /\\/models\\//.test(e.getAttribute('href')||'');});}"
+        "return m?(m.getAttribute('href')||''):'';})()"
+    ) or ""
+    models_url = (("https://www.digikey.com" + href) if href and not href.startswith("http") else href)
+    result["models_url"] = models_url
+    if models_url:
+        cad.load_url(models_url)
+        _t.sleep(6.0)
+    timeout_s = float(os.environ.get("STOCKROOM_SIGNIN_WAIT", "220"))
+    # Fast path: STOCKROOM_SIGNIN_WAIT=0 trusts the persistent profile's saved session (owner already
+    # signed in on a prior run) and captures the signed-in download UI immediately - also the exact
+    # test that the WebView2 profile really persists the DigiKey session across launches.
+    if timeout_s <= 0:
+        print("SIGNIN: fast path - trusting the persistent profile session, capturing now.", flush=True)
+        signed = True
+    else:
+        print(
+            f"SIGNIN: CAD models page OPEN (no HUD). Sign in via the account menu (top-right) - I capture "
+            f"the signed-in download UI automatically once you are in (watching up to {timeout_s:.0f}s). "
+            f"Tell me if the account menu already shows Logout.",
+            flush=True,
+        )
+    # Signal-based: on the models page, treat signed-in as "the account menu shows a Sign Out/Logout /
+    # a member name" rather than the presence of any Login href (DigiKey keeps a stale Login link in the
+    # account dropdown markup even when signed in). Cross-origin auth pages return null (skip).
+    signed = signed or False
+    deadline = _t.time() + timeout_s
+    while _t.time() < deadline:
+        _t.sleep(5.0)
+        try:
+            state = json.loads(cad.evaluate_js(
+                "JSON.stringify({url:location.href.slice(0,90),"
+                "gate:!!Array.from(document.querySelectorAll('a')).find(function(e){return /MyDigiKey\\/Login/.test(e.getAttribute('href')||'');}),"
+                "fmt:!!Array.from(document.querySelectorAll('a,button')).find(function(e){return /select download format/i.test(e.textContent||'');})})"
+            ) or "null")
+        except Exception:  # noqa: BLE001
+            state = None
+        if not isinstance(state, dict):
+            print("SIGNIN: (auth page / loading - sign-in in progress)", flush=True)
+            continue
+        cur = str(state.get("url", ""))
+        on_models = "/models/" in cur
+        acct = bool(state.get("acct"))
+        print(f"SIGNIN: url={cur[:55]} account_signed_in={acct} format_btn={state.get('fmt')}", flush=True)
+        # If the owner drifted back to the product page after auth, steer them to the models page.
+        if not on_models and "/products/detail/" in cur and models_url:
+            cad.load_url(models_url)
+            _t.sleep(3.0)
+            continue
+        # Signed in: on the models page and the account menu reports a signed-in member.
+        if on_models and acct:
+            signed = True
+            print("SIGNIN: account shows signed-in on the models page -> capturing the download UI.", flush=True)
+            break
+    result["signed_in"] = signed
+    _t.sleep(1.0)
+    try:
+        result["final_url"] = cad.evaluate_js("location.href.slice(0,110)") or ""
+        # Definitive signed-in probe: the account control's text/aria + any "sign out"/"hello, <name>".
+        result["account"] = cad.evaluate_js(
+            "JSON.stringify({"
+            "acct:Array.from(document.querySelectorAll('[data-testid*=\"account\" i],[aria-label*=\"account\" i],"
+            "[aria-label*=\"my digikey\" i],[class*=\"account\" i],header a,header button')).map(function(e){"
+            "return ((e.getAttribute('aria-label')||'')+' '+(e.textContent||'').trim()).replace(/\\s+/g,' ').trim().slice(0,45);})"
+            ".filter(function(t){return t.length>0;}).slice(0,12),"
+            "signOut:/sign out|log out|logout/i.test(document.body.innerText||''),"
+            "loginLinks:Array.from(document.querySelectorAll('a')).filter(function(e){"
+            "return /MyDigiKey\\/Login/.test(e.getAttribute('href')||'')&&e.offsetParent;}).length})"
+        ) or "{}"
+        # Provider tabs present on the signed-in models page.
+        result["tabs"] = cad.evaluate_js(
+            "JSON.stringify(Array.from(document.querySelectorAll('[role=tab],button,a,h2,h3')).map(function(e){"
+            "return (e.textContent||'').trim();}).filter(function(t){"
+            "return /^(ultra librarian|snapmagic|traceparts|cadenas|manufacturer provided|3d model)$/i.test(t);})"
+            ".filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,20))"
+        ) or "[]"
+        # Activate the Ultra Librarian provider row (lazy-loads its .submenu download content).
+        result["expanded"] = cad.evaluate_js(
+            "(function(){var u=document.querySelector('#ultra-media-active');"
+            "if(u){try{u.scrollIntoView({block:'center'});u.click();return 'clicked #ultra-media-active';}catch(e){return 'ERR '+e;}}"
+            "return 'NO_ULTRA';})()"
+        ) or ""
+        _t.sleep(3.5)
+        # Click the VISIBLE 'Select Download Format' (a.btn-download-model, onclick=displayExportModal)
+        # -> opens the export-format picker modal.
+        result["clicked_fmt"] = cad.evaluate_js(
+            "(function(){var b=Array.from(document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a')).find(function(e){"
+            "return e.offsetParent&&/select download format/i.test(e.textContent||'');});"
+            "if(b){try{b.scrollIntoView({block:'center'});b.click();return 'clicked onclick='+((b.getAttribute('onclick')||b.className||'')).slice(0,70);}catch(e){return 'ERR '+e;}}"
+            "return 'NO_FMT_BTN';})()"
+        ) or ""
+        _t.sleep(2.5)
+        # Dump the export-options modal markup (the exact format rows + their triggers).
+        result["export_modal"] = cad.evaluate_js(
+            "(function(){var m=Array.from(document.querySelectorAll('[id*=\"export-options\"],[class*=\"export-options\"],[class*=\"export-modal\"],[role=\"dialog\"],.modal,.dk-modal')).find(function(e){"
+            "return (e.offsetParent!=null)&&(e.innerHTML||'').length>120;});"
+            "if(!m){m=Array.from(document.querySelectorAll('[id*=\"export-options\"]')).find(function(e){return (e.innerHTML||'').length>120;});}"
+            "if(!m)return 'NO_MODAL';return (m.outerHTML||'').replace(/\\s+/g,' ').slice(0,3800);})()"
+        ) or ""
+        # The format options presented (KiCad, Altium, Eagle, OrCAD, PADS, 3D STEP, ...).
+        result["formats"] = cad.evaluate_js(
+            "JSON.stringify(Array.from(document.querySelectorAll('a,button,li,option,label,span,div,h3,h4')).filter(function(e){"
+            "return e.offsetParent&&(e.textContent||'').trim().length<45&&"
+            "/kicad|altium|eagle|orcad|pads|allegro|cadence|dxf|3d step|\\.step|pcb design|library loader|proteus|zuken|pulsonix|design blocks|gerber/i.test(e.textContent||'');})"
+            ".map(function(e){return (e.textContent||'').trim();}).filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,45))"
+        ) or "[]"
+        # The KiCad v6+ and Altium radio inputs (id + value), and the modal's action buttons (the
+        # actual Download trigger) - everything the driver needs to select a format and fire the download.
+        result["kicad_radio"] = cad.evaluate_js(
+            "(function(){var l=Array.from(document.querySelectorAll('#ultralib-export-options label')).find(function(e){"
+            "return /kicad\\s*v6/i.test(e.getAttribute('data-original')||e.textContent||'');});"
+            "if(!l)return 'NO_KICAD';var inp=l.htmlFor?document.getElementById(l.htmlFor):l.previousElementSibling;"
+            "return l.textContent.trim()+' => input#'+(inp?inp.id:'?')+' value='+(inp?inp.value:'?');})()"
+        ) or ""
+        result["altium_radio"] = cad.evaluate_js(
+            "(function(){var l=Array.from(document.querySelectorAll('#ultralib-export-options label')).find(function(e){"
+            "return /^altium designer$/i.test((e.getAttribute('data-original')||e.textContent||'').trim());});"
+            "if(!l)return 'NO_ALTIUM';var inp=l.htmlFor?document.getElementById(l.htmlFor):l.previousElementSibling;"
+            "return l.textContent.trim()+' => input#'+(inp?inp.id:'?')+' value='+(inp?inp.value:'?');})()"
+        ) or ""
+        result["modal_actions"] = cad.evaluate_js(
+            "(function(){var m=document.querySelector('#ultralib-export-options');if(!m)return 'NO_MODAL';"
+            "return JSON.stringify(Array.from(m.querySelectorAll('button,a,input[type=submit],[onclick]')).map(function(e){"
+            "return e.tagName+'|'+((e.textContent||e.value||'').trim().slice(0,22))+'|onclick='+((e.getAttribute('onclick')||'').slice(0,55))+'|cls='+((e.className||'').slice(0,28));})"
+            ".filter(function(t){return !/toggleRadioButton/.test(t);}).slice(0,20));})()"
+        ) or ""
+        result["modal_footer"] = cad.evaluate_js(
+            "(function(){var m=document.querySelector('#ultralib-export-options');if(!m)return '';"
+            "var h=(m.innerHTML||'');return h.slice(Math.max(0,h.length-1400)).replace(/\\s+/g,' ');})()"
+        ) or ""
+        # End-to-end download proof (STOCKROOM_DO_DOWNLOAD=1): inject the guided-capture HUD (now
+        # bottom-right so it clears DigiKey's account menu), then download KiCad and Altium SEPARATELY
+        # - each a fresh modal open -> pick the format (toggleRadioButton enables Download) -> click
+        # #btn-download-Ultra (exportUltraFile fires the real WebView2 download, intercepted by the
+        # host tier-1 intercept / tier-2 DownloadsWatch on Downloads).
+        if os.environ.get("STOCKROOM_DO_DOWNLOAD") == "1":
+            from stockroom.host.overlay import build_overlay_js
+
+            try:
+                cad.evaluate_js(build_overlay_js(
+                    ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"],
+                    "DigiKey", mpn,
+                ))
+                result["hud"] = "injected"
+            except Exception as e:  # noqa: BLE001
+                result["hud"] = "ERR " + repr(e)
+            _t.sleep(1.0)
+
+            def _download_format(fmt_re: str) -> dict:
+                # (Re)open the Ultra Librarian export modal (it dismisses after each download).
+                cad.evaluate_js(
+                    "(function(){var b=Array.from(document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a')).find(function(e){"
+                    "return e.offsetParent&&/select download format/i.test(e.textContent||'');});if(b){try{b.click();}catch(e){}}})()"
+                )
+                _t.sleep(2.0)
+                sel = cad.evaluate_js(
+                    "(function(){var l=Array.from(document.querySelectorAll('#ultralib-export-options label')).find(function(e){"
+                    "return " + fmt_re + ".test((e.getAttribute('data-original')||e.textContent||'').trim());});"
+                    "if(!l)return 'NO_FMT';var inp=l.htmlFor?document.getElementById(l.htmlFor):null;"
+                    "try{if(inp){inp.click();}else{l.click();}return 'selected '+(inp?inp.id:'label');}catch(e){return 'ERR '+e;}})()"
+                ) or ""
+                _t.sleep(1.3)
+                fire = cad.evaluate_js(
+                    "(function(){var b=document.querySelector('#btn-download-Ultra');if(!b)return 'NO_BTN';"
+                    "if(b.disabled)return 'DISABLED';try{b.click();return 'fired';}catch(e){return 'ERR '+e;}})()"
+                ) or ""
+                _t.sleep(9.0)
+                return {"select": sel, "fire": fire}
+
+            result["dl_kicad"] = _download_format("/kicad\\s*v6/i")
+            _t.sleep(2.0)
+            result["dl_altium"] = _download_format("/^altium designer$/i")
+            result["dl_final_url"] = cad.evaluate_js("location.href.slice(0,110)") or ""
+        # All download-ish controls on the signed-in models page.
+        result["dl_controls"] = cad.evaluate_js(
+            "JSON.stringify(Array.from(document.querySelectorAll('a,button,input,[data-testid],[role=button]')).filter(function(e){"
+            "var t=((e.textContent||'')+' '+(e.getAttribute('href')||'')+' '+(e.getAttribute('data-testid')||'')+' '+(e.className||'')).toLowerCase();"
+            "return /ultra|snapmagic|traceparts|cadenas|download|kicad|altium|eagle|orcad|symbol|footprint|3d model|format|agreement/.test(t);})"
+            ".map(function(e){return e.tagName+'|testid='+((e.getAttribute('data-testid')||'').slice(0,22))+'|'+((e.textContent||'').trim().slice(0,30))+'|href='+((e.getAttribute('href')||'').slice(0,40));}).slice(0,45))"
+        ) or "[]"
+        result["headings"] = cad.evaluate_js(
+            "JSON.stringify(Array.from(document.querySelectorAll('h1,h2,h3,h4')).map(function(e){"
+            "return (e.textContent||'').trim().slice(0,55);}).filter(Boolean).slice(0,60))"
+        ) or "[]"
+        # Full body text of the signed-in CAD models page (the download UI as text).
+        result["models_body"] = cad.evaluate_js(
+            "(document.body.innerText||'').replace(/\\n+/g,' | ').replace(/ +/g,' ').slice(0,2200)"
+        ) or ""
+        # Raw HTML of the download widget: anchor on the "Select Download Format" control (present in
+        # the DOM even while the accordion is collapsed) and walk UP to its container - the exact
+        # format-selector + download-button + login-gate markup the driver must target.
+        result["fmt_html"] = cad.evaluate_js(
+            "(function(){var a=Array.from(document.querySelectorAll('a,button')).find(function(e){"
+            "return /select download format/i.test(e.textContent||'');});if(!a)return 'NO_FMT';"
+            "var p=a;for(var i=0;i<7&&p;i++){if((p.outerHTML||'').length>700)"
+            "return (p.outerHTML||'').replace(/\\s+/g,' ').slice(0,3800);p=p.parentElement;}"
+            "return (a.outerHTML||'').replace(/\\s+/g,' ').slice(0,3800);})()"
+        ) or ""
+        # The Ultra Librarian accordion header's own markup: how the toggle is wired (aria-expanded,
+        # onclick, the real clickable element) so the driver can reliably expand it.
+        result["ul_head_html"] = cad.evaluate_js(
+            "(function(){var h=Array.from(document.querySelectorAll('button,a,div,h2,h3')).find(function(e){"
+            "return e.offsetParent&&/^\\s*ultra librarian\\s*$/i.test((e.textContent||'').trim());});"
+            "if(!h)return 'NO_UL_HEAD';var p=h.parentElement||h;"
+            "return (p.outerHTML||'').replace(/\\s+/g,' ').slice(0,1400);})()"
+        ) or ""
+    except Exception as e:  # noqa: BLE001
+        result["error"] = repr(e)
+    result["ok"] = signed
+
+
 def main() -> int:
     import webview
 
-    live = "--live" in sys.argv
-    digikey = "--digikey" in sys.argv and not live
-    fixture = "--fixture" in sys.argv and not digikey and not live
+    signin = "--signin" in sys.argv
+    live = "--live" in sys.argv and not signin
+    digikey = "--digikey" in sys.argv and not live and not signin
+    fixture = "--fixture" in sys.argv and not digikey and not live and not signin
     captured: list[dict] = []
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
-    mode = "live" if live else "digikey" if digikey else "fixture" if fixture else "download"
+    mode = "signin" if signin else "live" if live else "digikey" if digikey else "fixture" if fixture else "download"
     result: dict = {"mode": mode, "ok": False, "error": None}
 
     main_win = webview.create_window("stockroom-live", html="<html><body>host</body></html>", hidden=True)
@@ -365,7 +600,9 @@ def main() -> int:
     def driver() -> None:
         try:
             drive = (
-                _drive_live
+                _drive_signin
+                if signin
+                else _drive_live
                 if live
                 else _drive_digikey
                 if digikey

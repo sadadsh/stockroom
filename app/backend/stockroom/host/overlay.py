@@ -38,7 +38,7 @@ _LABELS = {
 # reduced-motion rule that removes the panel transition and the Complete flash animation. Received
 # green is 3:1+ on both surfaces (#1a7f37 on white, #3fb950 on slate). Card 14px / inner 8px radius.
 _STYLE = (
-    "#__stockroom_overlay__{position:fixed;top:16px;right:16px;z-index:2147483647;width:300px;"
+    "#__stockroom_overlay__{position:fixed;bottom:16px;right:16px;z-index:2147483647;width:300px;"
     "box-sizing:border-box;font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',"
     "system-ui,sans-serif;color:#1f2328;background:linear-gradient(180deg,#ffffff,#f4f6f8);"
     "border:1px solid #d0d7de;border-radius:14px;"
