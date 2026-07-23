@@ -69,6 +69,9 @@ _STYLE = (
     ".sk-row.sk-rec{color:#1f2328;background:rgba(26,127,55,.08);}"
     ".sk-row.sk-rec .sk-mark{background:#1a7f37;border-color:#1a7f37;}"
     ".sk-lbl{font-size:13px;}"
+    ".sk-tag{margin-left:auto;font-size:10.5px;font-weight:600;letter-spacing:.02em;"
+    "color:#1a7f37;opacity:0;transition:opacity .2s ease;}"
+    ".sk-row.sk-rec .sk-tag{opacity:1;}"
     ".sk-action{font-size:12px;color:#656d76;margin-top:13px;padding-top:11px;"
     "border-top:1px solid #d8dee4;line-height:1.4;}"
     ".sk-turn{display:none;margin-top:10px;padding:10px 11px;border-radius:8px;"
@@ -97,6 +100,7 @@ _STYLE = (
     ".sk-mark{border-color:#484f58;}"
     ".sk-row{color:#8b949e;}.sk-row.sk-rec{color:#e6edf3;background:rgba(63,185,80,.12);}"
     ".sk-row.sk-rec .sk-mark{background:#238636;border-color:#2ea043;}"
+    ".sk-tag{color:#3fb950;}"
     ".sk-action{color:#8b949e;border-top-color:#21262d;}"
     ".sk-turn{background:rgba(187,128,9,.12);border-color:rgba(187,128,9,.45);}"
     ".sk-turn-h{color:#e3a008;}.sk-turn-m{color:#f0d999;}"
@@ -106,6 +110,7 @@ _STYLE = (
     "#__stockroom_overlay__{transition:none;}"
     ".sk-seg{transition:none;}"
     ".sk-row{transition:none;}"
+    ".sk-tag{transition:none;}"
     ".sk-complete.sk-show{animation:none;}"
     ".sk-check{animation:none;}"
     "}"
@@ -123,7 +128,8 @@ def _rows_html(needs: list[str]) -> tuple[str, int]:
         rows.append(
             f'<div id="__stockroom_row_{n}__" class="sk-row">'
             '<span class="sk-mark"></span>'
-            f'<span class="sk-lbl">{label}</span></div>'
+            f'<span class="sk-lbl">{label}</span>'
+            '<span class="sk-tag">Received</span></div>'
         )
     return "".join(rows), len(rows)
 
