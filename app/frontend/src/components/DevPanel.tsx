@@ -1,13 +1,35 @@
 /**
  * The dev-mode Design panel: a right-docked surface, shown only while dev mode is on
- * (Ctrl/Cmd+Shift+D). It nudges the registered design tokens live for the active theme, edits the
- * copy label most recently clicked, and Saves everything back to source so it ships for everyone.
- * It renders nothing when dev mode is off, so it never touches the normal app.
+ * (Ctrl/Cmd+Shift+D). Rebuilt (Dev Mode v2) into the inspect-first CONTEXTUAL editor per
+ * .planning/DEVMODE-UI.md: you select an element and the panel becomes the editor for exactly that
+ * element. Top -> bottom it is Header (badge / theme / close) · Toolbar (Inspect · Show IDs · search)
+ * · Selection pane (Selected id + used-token chips + scoped facet tabs) · Catalogue (collapsible) ·
+ * Footer (Save / Reset / dirty). It renders nothing when dev mode is off, so it never touches the app.
+ *
+ * CRITICAL invariant (tested): no capability regresses. With NO selection the Tokens tab shows the
+ * FULL grouped token list (every global token editable, today's behaviour) and the Copy tab still
+ * edits every copy id; a selection merely SCOPES the Tokens tab to the element's used tokens (with a
+ * "Show All" fallback) and points the Copy tab at the element's data-copy-id. Editing a token still
+ * edits the GLOBAL token (setToken) and editing copy still edits the global copy (setCopy). The
+ * token-row helpers (ColorRow/ScaleRow/ShadowRow) and CopyEditor are reused as-is, not rewritten.
  */
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "../lib/theme";
 import { useDevMode } from "../lib/devMode";
 import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../lib/devTokens";
+import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
+import { usedVarsForElement } from "../lib/inspectVars";
+import {
+  containerLayoutOf,
+  gridColumnsOf,
+  isValidGridSlot,
+  isValidOrder,
+  reorderSiblings,
+  reorderSiblingsOf,
+} from "../lib/elementLayout";
 import { Button } from "./primitives";
+import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
+import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
 
 // A best-effort hex for the native colour picker. A hex passes through; an rgb/rgba collapses to
 // its opaque hex (the picker cannot show alpha, but the text field below stays authoritative).
@@ -38,10 +60,9 @@ function ResetDot({ onClick }: { onClick: () => void }) {
       title="Reset to default"
       className="grid h-4 w-4 flex-none place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1"
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-        <path d="M3 3v5h5" />
-      </svg>
+      {/* D-06: DevPanel's own reset dot draws through <Icon> (the exact h-3 w-3 the inline svg carried,
+          the weight/caps live on the dev.reset registry entry), so the panel's icons are inspectable. */}
+      <Icon id="dev.reset" className="h-3 w-3" />
     </button>
   );
 }
@@ -140,19 +161,38 @@ function ShadowRow({ token }: { token: DevToken }) {
   );
 }
 
+// One token row for the Tokens tab, wrapping the kind-specific editor with a `data-var` handle (so
+// the tab can scroll the first used row into view) and a highlighted style when it is a used token.
+function TokenRow({ token, highlighted = false }: { token: DevToken; highlighted?: boolean }) {
+  return (
+    <div
+      data-var={token.cssVar}
+      className={highlighted ? "-mx-1.5 rounded-control bg-acc/[0.06] px-1.5" : undefined}
+    >
+      {token.kind === "color" ? (
+        <ColorRow token={token} />
+      ) : token.kind === "shadow" ? (
+        <ShadowRow token={token} />
+      ) : (
+        <ScaleRow token={token} />
+      )}
+    </div>
+  );
+}
+
 function CopyEditor() {
   const dev = useDevMode();
   if (!dev.selectedCopyId) {
     return (
-      <div className="border-b border-line px-3.5 py-3 text-2xs text-t3">
-        Click any underlined label in the app to edit its text.
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        Click any underlined label in the app, or select an element with copy, to edit its text.
       </div>
     );
   }
   const id = dev.selectedCopyId;
   const current = dev.resolveCopy(id, dev.selectedCopyDefault);
   return (
-    <div className="border-b border-line px-3.5 py-3">
+    <div className="px-3.5 py-3">
       <div className="mb-1.5 flex items-center justify-between">
         <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Copy</span>
         <button
@@ -186,9 +226,826 @@ function CopyEditor() {
   );
 }
 
+type Facet = "tokens" | "copy" | "icon" | "box";
+
+// A small pressed-state toolbar toggle (Inspect / Show IDs).
+function ToggleButton({
+  pressed,
+  onClick,
+  label,
+}: {
+  pressed: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={
+        "rounded-control border px-2 py-1 text-2xs font-semibold transition-colors " +
+        (pressed
+          ? "border-transparent bg-acc text-acc-on"
+          : "border-line text-t2 hover:text-t1")
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string) => void }) {
+  const dev = useDevMode();
+  return (
+    <div className="flex items-center gap-1.5 border-b border-line px-3.5 py-2">
+      <ToggleButton pressed={dev.inspect} onClick={dev.toggleInspect} label="Inspect" />
+      <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
+      <input
+        type="search"
+        aria-label="Search ids"
+        placeholder="Search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="ml-auto w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1 outline-none focus:border-acc"
+      />
+    </div>
+  );
+}
+
+function FacetTab({
+  id,
+  active,
+  onSelect,
+  disabled = false,
+  children,
+}: {
+  id: Facet;
+  active: Facet;
+  onSelect: (f: Facet) => void;
+  disabled?: boolean;
+  children: string;
+}) {
+  const selected = active === id;
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      disabled={disabled}
+      onClick={() => onSelect(id)}
+      className={
+        "rounded-control px-2.5 py-1 text-2xs font-semibold transition-colors " +
+        (disabled
+          ? "cursor-not-allowed text-t3 opacity-40"
+          : selected
+            ? "bg-raise2 text-t1"
+            : "text-t3 hover:text-t2")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+// The Tokens facet: with a selection it shows only the used token rows (with a "Show All" fallback
+// to the full grouped list); with no selection it shows the full grouped list, so global token
+// editing is ALWAYS reachable (the no-capability-regress invariant).
+function TokensTab({ showAll, setShowAll }: { showAll: boolean; setShowAll: (v: boolean) => void }) {
+  const dev = useDevMode();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasSelection = dev.selectedDevId != null;
+  const used = dev.highlightedVars;
+  const first = used[0];
+  const scoped = hasSelection && !showAll;
+
+  // Scroll the first used row into view when the selection's used tokens change.
+  useEffect(() => {
+    if (!scoped || !first) return;
+    const row = containerRef.current?.querySelector(`[data-var="${first}"]`);
+    (row as HTMLElement | null)?.scrollIntoView?.({ block: "nearest" });
+  }, [scoped, first]);
+
+  if (scoped) {
+    const rows = DEV_TOKENS.filter((t) => used.includes(t.cssVar));
+    return (
+      <div ref={containerRef} className="px-3.5 py-2">
+        {rows.length === 0 ? (
+          <div className="py-2 text-2xs text-t3">This element uses no editable tokens.</div>
+        ) : (
+          rows.map((t) => <TokenRow key={t.cssVar} token={t} highlighted />)
+        )}
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="mt-2 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Show All
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="px-3.5 py-2">
+      {hasSelection ? (
+        <button
+          type="button"
+          onClick={() => setShowAll(false)}
+          className="mb-1 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Show Used
+        </button>
+      ) : null}
+      {DEV_TOKEN_GROUPS.map((group) => {
+        const tokens = DEV_TOKENS.filter((t) => t.group === group);
+        if (tokens.length === 0) return null;
+        return (
+          <section key={group} className="py-1.5">
+            <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+              {group}
+            </div>
+            {tokens.map((t) => (
+              <TokenRow
+                key={t.cssVar}
+                token={t}
+                highlighted={hasSelection && used.includes(t.cssVar)}
+              />
+            ))}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+// The Copy facet: derives the selected element's data-copy-id and drives the shared CopyEditor. The
+// direct <Text> click path (which sets selectedCopyId with no selectedDevId) still works untouched.
+function CopyTab() {
+  const dev = useDevMode();
+  const { selectedDevId, selectedCopyId, selectCopy, clearSelectedCopy } = dev;
+
+  const copyId = useMemo(() => {
+    if (!selectedDevId) return null;
+    const el = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    if (!el) return null;
+    const c = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
+    return c?.getAttribute("data-copy-id") ?? null;
+  }, [selectedDevId]);
+
+  useEffect(() => {
+    if (!selectedDevId) return; // the direct <Text> click owns selectedCopyId; leave it alone
+    if (copyId && copyId !== selectedCopyId) {
+      const el = document.querySelector(`[data-copy-id="${copyId}"]`);
+      selectCopy(copyId, el?.textContent ?? "");
+    } else if (!copyId && selectedCopyId) {
+      clearSelectedCopy();
+    }
+  }, [selectedDevId, copyId, selectedCopyId, selectCopy, clearSelectedCopy]);
+
+  return <CopyEditor />;
+}
+
+// The Icon facet (D-04): mirrors CopyTab. From the selection it derives the icon id (its
+// `data-icon-id`, emitted by <Icon> in dev mode per plan 01 - the icon analog of CopyTab's
+// data-copy-id), and edits what the glyph IS: (a) a same-category glyph PICKER that writes a
+// swapToId, and (b) a raw-SVG EDITOR whose textarea drives a live preview through the same
+// sanitizeIconBody the <Icon> uses (D-05: the frontend sanitises before preview; the backend is the
+// authority on what ships). Per D-03 raw editing is offered only for the line-icon categories
+// (primary + bespoke); art + brand are swap-only (their multi-group / fill markup is riskier to hand
+// -edit). With no icon in the selection it shows an empty state, mirroring the Copy tab.
+function IconTab() {
+  const dev = useDevMode();
+  const { selectedDevId } = dev;
+
+  const iconId = useMemo(() => {
+    if (!selectedDevId) return null;
+    const el = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    if (!el) return null;
+    const i =
+      (el.matches("[data-icon-id]") ? el : null) ??
+      el.querySelector("[data-icon-id]") ??
+      el.closest("[data-icon-id]");
+    return i?.getAttribute("data-icon-id") ?? null;
+  }, [selectedDevId]);
+
+  if (!iconId) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        Select an element that is or contains an icon to swap its glyph or edit its SVG.
+      </div>
+    );
+  }
+
+  const entry = ICON_BY_ID.get(iconId);
+  if (!entry) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        No registry glyph for <span className="font-mono">{iconId}</span>.
+      </div>
+    );
+  }
+
+  const overridden = dev.isIconOverridden(iconId);
+  // The glyph this id currently resolves to after any swap chain, so the picker can mark it (D-04).
+  const resolvedTarget = resolveIcon(iconId, dev.resolveIconOverride)?.entry.id ?? iconId;
+  // The working body the raw editor edits (an override body if set, else the registry default).
+  const draftBody = dev.iconOverrideFor(iconId)?.body ?? entry.body;
+  // D-03: raw SVG editing is offered only for the line-icon categories; art/brand stay swap-only.
+  const rawEditable = entry.category === "primary" || entry.category === "bespoke";
+  const pickerIds = ICON_IDS_BY_CATEGORY[entry.category];
+
+  return (
+    <div className="px-3.5 py-3">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Icon</span>
+        {overridden ? (
+          <button
+            type="button"
+            onClick={() => dev.resetIcon(iconId)}
+            className="text-2xs text-t3 hover:text-t1"
+          >
+            Reset to default
+          </button>
+        ) : null}
+      </div>
+      <div className="mb-2 truncate font-mono text-2xs text-t3" title={iconId}>
+        {iconId}
+      </div>
+
+      {/* (a) the glyph PICKER: swap to another same-category registry glyph (D-04). */}
+      <div className="mb-1 text-2xs font-semibold text-t2">Swap Glyph</div>
+      <div className="mb-3 grid grid-cols-6 gap-1">
+        {pickerIds.map((pid) => {
+          const active = pid === resolvedTarget;
+          return (
+            <button
+              key={pid}
+              type="button"
+              aria-label={`Swap to ${pid}`}
+              aria-pressed={active}
+              title={pid}
+              onClick={() => dev.setIconSwap(iconId, pid)}
+              className={
+                "grid aspect-square place-items-center rounded-control border text-t2 transition-colors hover:text-t1 " +
+                (active ? "border-acc bg-acc/[0.08] text-t1" : "border-line hover:bg-raise2")
+              }
+            >
+              <Icon id={pid} className="h-4 w-4" />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* (b) the raw-SVG EDITOR: the icon body + a live, sanitiser-vetted preview (D-04 / D-05). The
+          preview renders sanitizeIconBody(draft) through the entry's own frame, so what the owner
+          sees is exactly what the sanitiser will keep. Restricted to line icons (D-03). */}
+      {rawEditable ? (
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-2xs font-semibold text-t2">Edit SVG</span>
+            <span
+              className="grid h-7 w-7 flex-none place-items-center rounded-control border border-line2 bg-field text-t1"
+              title="Live preview (sanitised)"
+            >
+              <svg
+                data-testid="icon-preview"
+                viewBox={entry.viewBox}
+                className="h-5 w-5"
+                fill={entry.fill ?? "none"}
+                stroke={entry.stroke ?? "currentColor"}
+                strokeWidth={entry.strokeWidth}
+                strokeLinecap={entry.strokeLinecap ?? "round"}
+                strokeLinejoin={entry.strokeLinejoin ?? "round"}
+                style={entry.style}
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: sanitizeIconBody(draftBody) }}
+              />
+            </span>
+          </div>
+          <textarea
+            aria-label="Edit icon SVG body"
+            value={draftBody}
+            rows={4}
+            onChange={(e) => dev.setIconBody(iconId, e.target.value)}
+            className="w-full resize-y rounded-control border border-line2 bg-field px-2 py-1.5 text-2xs font-mono leading-snug text-t1 outline-none focus:border-acc"
+          />
+        </div>
+      ) : (
+        <div className="text-2xs text-t3">
+          This glyph is swap only. Its SVG is edited in the registry, not here.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The ELEM-02 first-cut whitelist (D-03): the box properties the [Box] tab exposes as labelled rows.
+// ORDER / GRID-COLUMN / GRID-ROW are deliberately EXCLUDED here (Phase F / layout), even though the
+// backend already accepts them. Labels are Title Case per the design contract; each `prop` is the raw
+// kebab CSS property the runtime applies via `el.style.setProperty(prop, value)` (min-width -> minWidth).
+const BOX_RESIZE_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "width", label: "Width" },
+  { prop: "height", label: "Height" },
+  { prop: "min-width", label: "Min Width" },
+  { prop: "min-height", label: "Min Height" },
+  { prop: "max-width", label: "Max Width" },
+  { prop: "max-height", label: "Max Height" },
+];
+const BOX_SPACING_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "margin", label: "Margin" },
+  { prop: "margin-top", label: "Margin Top" },
+  { prop: "margin-right", label: "Margin Right" },
+  { prop: "margin-bottom", label: "Margin Bottom" },
+  { prop: "margin-left", label: "Margin Left" },
+  { prop: "padding", label: "Padding" },
+  { prop: "padding-top", label: "Padding Top" },
+  { prop: "padding-right", label: "Padding Right" },
+  { prop: "padding-bottom", label: "Padding Bottom" },
+  { prop: "padding-left", label: "Padding Left" },
+  { prop: "gap", label: "Gap" },
+];
+
+// One box-property row (D-04): reuses the ColorRow/ScaleRow shape - a truncating label, an optional
+// ResetDot, and the mono value field styled like the token fields. The field's value is the working
+// override (empty when none), its placeholder is the element's live computed value for the property,
+// and editing writes the override live (an emptied field removes the override, mirroring per-prop reset).
+function BoxRow({
+  id,
+  prop,
+  label,
+  placeholder,
+}: {
+  id: string;
+  prop: string;
+  label: string;
+  placeholder: string;
+}) {
+  const dev = useDevMode();
+  const value = dev.elementOverridesFor(id)?.[prop] ?? "";
+  const overridden = dev.isElementPropOverridden(id, prop);
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="min-w-0 flex-1 truncate text-xs text-t2">{label}</span>
+      {overridden ? <ResetDot onClick={() => dev.resetElementProp(id, prop)} /> : null}
+      <input
+        type="text"
+        aria-label={`${label} value`}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const next = e.target.value;
+          // Clearing the text removes the override, so the token/class styling underneath re-emerges.
+          if (next === "") dev.resetElementProp(id, prop);
+          else dev.setElementProp(id, prop, next);
+        }}
+        className="tnum w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+      />
+    </div>
+  );
+}
+
+// The slot values the grid picker offers for a container with `cols` column tracks: `auto` (the
+// default, which clears the override), each 1-based line position 1..cols, and a `span N` for 2..cols.
+// Every option passes isValidGridSlot, so the picker can never emit a value the backend writer rejects.
+function gridSlotOptions(cols: number): string[] {
+  const opts = ["auto"];
+  for (let i = 1; i <= cols; i++) opts.push(String(i));
+  for (let s = 2; s <= cols; s++) opts.push(`span ${s}`);
+  return opts;
+}
+
+// One grid-slot control (Phase F / LAYOUT-01): a select of derived line / span positions for a single
+// grid property (grid-column or grid-row) on the selected element. Choosing `auto` clears the override
+// (the grid's own flow re-emerges); any other choice writes the validated slot value live through Phase
+// E's per-element setter (the same map that applies inline by id and ships in the save `elements` block).
+// The current committed / working value is preselected, and shown as an option even if it is outside the
+// derived set (a hand-committed value stays visible rather than silently snapping to auto).
+function GridSlotControl({
+  id,
+  prop,
+  label,
+  cols,
+}: {
+  id: string;
+  prop: string;
+  label: string;
+  cols: number;
+}) {
+  const dev = useDevMode();
+  const current = dev.elementOverridesFor(id)?.[prop] ?? "auto";
+  const options = gridSlotOptions(cols);
+  const opts = options.includes(current) ? options : [current, ...options];
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="min-w-0 flex-1 truncate text-xs text-t2">{label}</span>
+      <select
+        aria-label={label}
+        value={current}
+        onChange={(e) => {
+          const v = e.target.value;
+          // `auto` is the grid default: clear the override so the container's own flow returns.
+          if (v === "auto") dev.resetElementProp(id, prop);
+          else if (isValidGridSlot(v)) dev.setElementProp(id, prop, v);
+        }}
+        className="w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+      >
+        {opts.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// The Layout section (Phase F / LAYOUT-01): reorder the selected element among its container siblings
+// via CSS `order`, keyed by data-dev-id. Renders only when the selection sits in a flex/grid container
+// (className-detected) with at least two dev-id siblings - otherwise there is nothing to reorder and it
+// renders null, so the Box tab is unchanged for elements outside a layout container. The current VISUAL
+// sequence is derived by sorting the DOM-order siblings by their live `order` override (ties by DOM
+// index), so each Move Up / Move Down walks the element exactly one step; the recomputed order values
+// are written through Phase E's per-element setter (the same map that applies inline by id and ships in
+// the save `elements` block) - no new persistence path, no reparenting.
+function LayoutSection({ id }: { id: string }) {
+  const dev = useDevMode();
+  const node = document.querySelector(`[data-dev-id="${id}"]`);
+  if (!node) return null;
+  const layout = containerLayoutOf(node.parentElement);
+  if (layout === "none") return null;
+  const siblings = reorderSiblingsOf(node);
+  if (siblings.length < 2) return null;
+
+  // Current visual sequence: DOM-order siblings sorted by their effective `order` (unset = 0), ties by
+  // DOM index. Reads the live working override so a prior reorder is reflected before the next step.
+  const orderedIds = siblings
+    .map((el, domIndex) => {
+      const sid = el.getAttribute("data-dev-id") ?? "";
+      const ov = dev.elementOverridesFor(sid)?.order;
+      const order = ov != null ? parseInt(ov, 10) : 0;
+      return { sid, order, domIndex };
+    })
+    .sort((a, b) => a.order - b.order || a.domIndex - b.domIndex)
+    .map((o) => o.sid);
+
+  const move = (direction: "up" | "down") => {
+    const next = reorderSiblings(orderedIds, id, direction);
+    // Only write values that pass the backend `order` grammar, so the panel never emits a doomed value.
+    for (const [sid, order] of Object.entries(next)) {
+      if (isValidOrder(order)) dev.setElementProp(sid, "order", order);
+    }
+  };
+
+  // Reset order clears ONLY the `order` override on every sibling (leaving size/spacing intact), so the
+  // container returns to its original DOM order with no order entries left in the map.
+  const resetOrder = () => {
+    for (const sid of orderedIds) dev.resetElementProp(sid, "order");
+  };
+  const anyOrder = orderedIds.some((sid) => dev.isElementPropOverridden(sid, "order"));
+
+  // Grid child (decision 1b): the selection sits in a grid container, so it may also be reassigned to a
+  // grid slot. The column / row controls derive their positions from the container's grid-cols-N count;
+  // Reset slot clears ONLY grid-column / grid-row for THIS element (order / size / spacing untouched).
+  const isGridChild = layout === "grid";
+  const cols = isGridChild ? gridColumnsOf(node.parentElement) : 0;
+  const resetSlot = () => {
+    dev.resetElementProp(id, "grid-column");
+    dev.resetElementProp(id, "grid-row");
+  };
+  const anySlot =
+    dev.isElementPropOverridden(id, "grid-column") || dev.isElementPropOverridden(id, "grid-row");
+
+  return (
+    <section className="py-1.5">
+      <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Layout</div>
+      <div className="flex items-center gap-2 py-1">
+        <button
+          type="button"
+          onClick={() => move("up")}
+          className="rounded-control border border-line px-2 py-1 text-2xs font-semibold text-t2 transition-colors hover:text-t1"
+        >
+          Move Up
+        </button>
+        <button
+          type="button"
+          onClick={() => move("down")}
+          className="rounded-control border border-line px-2 py-1 text-2xs font-semibold text-t2 transition-colors hover:text-t1"
+        >
+          Move Down
+        </button>
+      </div>
+      {anyOrder ? (
+        <button
+          type="button"
+          onClick={resetOrder}
+          className="mt-1 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Reset Order
+        </button>
+      ) : null}
+      {isGridChild ? (
+        <div className="mt-1.5">
+          <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+            Grid Slot
+          </div>
+          <GridSlotControl id={id} prop="grid-column" label="Grid Column" cols={cols} />
+          <GridSlotControl id={id} prop="grid-row" label="Grid Row" cols={cols} />
+          {anySlot ? (
+            <button
+              type="button"
+              onClick={resetSlot}
+              className="mt-1 text-2xs font-semibold text-t2 hover:text-t1"
+            >
+              Reset Slot
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+// The Box facet (D-04, ELEM-02): the owner-facing editing surface for the per-element escape hatch.
+// For the selected element it renders a labelled RESIZE + SPACING control per whitelisted property,
+// each editing the element's override live through the Plan 01 dev-mode API, with a per-property reset,
+// a clear-all-for-this-element, and the element's current computed value as each field's placeholder.
+// With no selection it shows an empty state, mirroring the Copy / Icon tabs.
+function BoxTab() {
+  const dev = useDevMode();
+  const { selectedDevId } = dev;
+
+  // Resolve the live node once and read its computed style for the placeholders. A catalogue id with
+  // no mounted element (a null node) falls back to empty placeholders. getComputedStyle is a live view,
+  // so a placeholder reflects the element's current value even after an override is cleared.
+  const computed = useMemo(() => {
+    if (!selectedDevId) return null;
+    const node = document.querySelector(`[data-dev-id="${selectedDevId}"]`);
+    return node ? getComputedStyle(node) : null;
+  }, [selectedDevId]);
+
+  if (!selectedDevId) {
+    return (
+      <div className="px-3.5 py-3 text-2xs text-t3">
+        Select an element to override its box size and spacing.
+      </div>
+    );
+  }
+
+  const overrides = dev.elementOverridesFor(selectedDevId);
+  const hasAny = overrides != null && Object.keys(overrides).length > 0;
+  const placeholderFor = (prop: string) => computed?.getPropertyValue(prop) ?? "";
+
+  return (
+    <div className="px-3.5 py-2">
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Resize
+        </div>
+        {BOX_RESIZE_PROPS.map((p) => (
+          <BoxRow
+            key={p.prop}
+            id={selectedDevId}
+            prop={p.prop}
+            label={p.label}
+            placeholder={placeholderFor(p.prop)}
+          />
+        ))}
+      </section>
+      <section className="py-1.5">
+        <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          Spacing
+        </div>
+        {BOX_SPACING_PROPS.map((p) => (
+          <BoxRow
+            key={p.prop}
+            id={selectedDevId}
+            prop={p.prop}
+            label={p.label}
+            placeholder={placeholderFor(p.prop)}
+          />
+        ))}
+      </section>
+      <LayoutSection id={selectedDevId} />
+      {hasAny ? (
+        <button
+          type="button"
+          onClick={() => dev.clearElement(selectedDevId)}
+          className="mt-2 text-2xs font-semibold text-t2 hover:text-t1"
+        >
+          Clear All
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// The collapsible Catalogue: the 196 ids filtered by the toolbar search and grouped by area. Clicking
+// an entry selects it and locates the live element (scrollIntoView + a transient flash outline).
+function Catalogue({
+  search,
+  open,
+  setOpen,
+}: {
+  search: string;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}) {
+  const dev = useDevMode();
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      q === ""
+        ? DEV_IDS
+        : DEV_IDS.filter(
+            (e) =>
+              e.id.toLowerCase().includes(q) ||
+              e.label.toLowerCase().includes(q) ||
+              e.area.toLowerCase().includes(q),
+          ),
+    [q],
+  );
+
+  function locate(id: string) {
+    dev.selectDevId(id);
+    const el = document.querySelector(`[data-dev-id="${id}"]`);
+    if (!el) {
+      dev.selectVars([]);
+      return;
+    }
+    dev.selectVars(usedVarsForElement(el));
+    const node = el as HTMLElement;
+    node.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    const prevOutline = node.style.outline;
+    const prevOffset = node.style.outlineOffset;
+    node.style.outline = "2px solid var(--c-acc)";
+    node.style.outlineOffset = "2px";
+    window.setTimeout(() => {
+      node.style.outline = prevOutline;
+      node.style.outlineOffset = prevOffset;
+    }, 700);
+  }
+
+  return (
+    <div className="border-t border-line">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-1.5 px-3.5 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 hover:text-t2"
+      >
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        Catalogue
+        <span className="ml-auto font-mono text-t3">{filtered.length}</span>
+      </button>
+      {open ? (
+        <div className="px-3.5 pb-2">
+          {DEV_ID_AREAS.map((area) => {
+            const entries = filtered.filter((e) => e.area === area);
+            if (entries.length === 0) return null;
+            return (
+              <section key={area} className="py-1">
+                <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+                  {area}
+                </div>
+                {entries.map((e) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => locate(e.id)}
+                    className={
+                      "flex w-full items-baseline gap-1.5 rounded-control px-1.5 py-1 text-left transition-colors hover:bg-raise2 " +
+                      (dev.selectedDevId === e.id ? "bg-raise2" : "")
+                    }
+                  >
+                    <span className="flex-none font-mono text-[10px] text-t2">{e.id}</span>
+                    <span className="ml-auto truncate text-2xs text-t3">{e.label}</span>
+                  </button>
+                ))}
+              </section>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SelectionPane({
+  facet,
+  setFacet,
+  showAll,
+  setShowAll,
+}: {
+  facet: Facet;
+  setFacet: (f: Facet) => void;
+  showAll: boolean;
+  setShowAll: (v: boolean) => void;
+}) {
+  const dev = useDevMode();
+  const entry = dev.selectedDevId ? DEV_ID_BY_ID.get(dev.selectedDevId) : undefined;
+  return (
+    <div>
+      <div className="border-b border-line px-3.5 py-2.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+            Selected
+          </span>
+          {dev.selectedDevId ? (
+            <span className="min-w-0 truncate font-mono text-2xs text-t1">
+              {"▸"} {dev.selectedDevId}
+            </span>
+          ) : (
+            <span className="text-2xs text-t3">Nothing selected</span>
+          )}
+        </div>
+        {entry ? (
+          <div className="mt-0.5 text-2xs text-t2">
+            {entry.label} <span className="text-t3">{"·"} {entry.area}</span>
+          </div>
+        ) : null}
+        {dev.highlightedVars.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {dev.highlightedVars.map((v) => (
+              <span
+                key={v}
+                className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-[9px] text-t2"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="Selection facets"
+        className="flex items-center gap-1 border-b border-line px-3.5 py-1.5"
+      >
+        <FacetTab id="tokens" active={facet} onSelect={setFacet}>
+          Tokens
+        </FacetTab>
+        <FacetTab id="copy" active={facet} onSelect={setFacet}>
+          Copy
+        </FacetTab>
+        <FacetTab id="icon" active={facet} onSelect={setFacet}>
+          Icon
+        </FacetTab>
+        <FacetTab id="box" active={facet} onSelect={setFacet}>
+          Box
+        </FacetTab>
+      </div>
+
+      {facet === "tokens" ? <TokensTab showAll={showAll} setShowAll={setShowAll} /> : null}
+      {facet === "copy" ? <CopyTab /> : null}
+      {facet === "icon" ? <IconTab /> : null}
+      {facet === "box" ? <BoxTab /> : null}
+    </div>
+  );
+}
+
 export function DevPanel() {
   const dev = useDevMode();
   const { theme, setTheme } = useTheme();
+  const [facet, setFacet] = useState<Facet>("tokens");
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
+
+  // A NEW copy selection (a direct <Text> click) surfaces the Copy tab, preserving the one-click-to
+  // -edit-copy shortcut inside the new shell.
+  const lastCopy = useRef<string | null>(dev.selectedCopyId);
+  useEffect(() => {
+    if (dev.selectedCopyId && dev.selectedCopyId !== lastCopy.current) {
+      setFacet("copy");
+    }
+    lastCopy.current = dev.selectedCopyId;
+  }, [dev.selectedCopyId]);
+
+  // A new element selection lands the Tokens tab scoped (used view), not stuck on "Show All".
+  useEffect(() => {
+    setShowAll(false);
+  }, [dev.selectedDevId]);
+
+  // A new element selection that resolves to an icon (and carries no copy competing for the surface)
+  // lands the owner on the Icon tab, so an inspect-click on a glyph opens its editor directly -
+  // mirroring the Copy-tab surface above. Copy wins the tie (its tab is checked first, by the effect
+  // above), so a labelled control with both never yanks away from its text.
+  useEffect(() => {
+    const id = dev.selectedDevId;
+    if (!id) return;
+    const el = document.querySelector(`[data-dev-id="${id}"]`);
+    if (!el) return;
+    const hasCopy = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
+    if (hasCopy) return;
+    const icon =
+      (el.matches("[data-icon-id]") ? el : null) ??
+      el.querySelector("[data-icon-id]") ??
+      el.closest("[data-icon-id]");
+    if (icon) setFacet("icon");
+  }, [dev.selectedDevId]);
+
   if (!dev.enabled) return null;
 
   return (
@@ -215,36 +1072,22 @@ export function DevPanel() {
           aria-label="Close dev mode"
           className="grid h-6 w-6 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-4 w-4">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          {/* D-06: the header close glyph draws through <Icon> (the exact h-4 w-4 the inline svg carried),
+              so this call site is itself inspectable/editable via the Icon tab. */}
+          <Icon id="dev.close" className="h-4 w-4" />
         </button>
       </header>
 
+      <Toolbar search={search} setSearch={setSearch} />
+
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <CopyEditor />
-        <div className="px-3.5 py-2">
-          {DEV_TOKEN_GROUPS.map((group) => {
-            const tokens = DEV_TOKENS.filter((t) => t.group === group);
-            if (tokens.length === 0) return null;
-            return (
-              <section key={group} className="py-1.5">
-                <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-                  {group}
-                </div>
-                {tokens.map((token) =>
-                  token.kind === "color" ? (
-                    <ColorRow key={token.cssVar} token={token} />
-                  ) : token.kind === "shadow" ? (
-                    <ShadowRow key={token.cssVar} token={token} />
-                  ) : (
-                    <ScaleRow key={token.cssVar} token={token} />
-                  ),
-                )}
-              </section>
-            );
-          })}
-        </div>
+        <SelectionPane
+          facet={facet}
+          setFacet={setFacet}
+          showAll={showAll}
+          setShowAll={setShowAll}
+        />
+        <Catalogue search={search} open={catalogueOpen} setOpen={setCatalogueOpen} />
       </div>
 
       <footer className="border-t border-line px-3.5 py-3">

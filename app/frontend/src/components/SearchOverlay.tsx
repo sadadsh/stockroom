@@ -35,35 +35,20 @@ import {
 } from "../lib/searchFilters";
 import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
+import { Icon } from "./Icon";
 import { RowThumbnail } from "./PartsList";
 
 // --- small inline glyphs (the artifact's own set) ---------------------------
-const stroke = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+// Each helper keeps its wrapper + className passthrough so every call site is unchanged, but now
+// draws through <Icon id> so the glyph is inspectable / editable in dev mode. The weight / caps
+// live in the registry entry; the sizes still come from the call sites via className.
 const Chevron = ({ className = "" }: { className?: string }) => (
-  <svg {...stroke} strokeWidth={2} className={className}>
-    <path d="m6 9 6 6 6-6" />
-  </svg>
+  <Icon id="overlay.chevron" className={className} />
 );
-const Check = () => (
-  <svg {...stroke} strokeWidth={3.4} className="h-2.5 w-2.5">
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
-);
-const XSmall = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
+const Check = () => <Icon id="overlay.check" className="h-2.5 w-2.5" />;
+const XSmall = () => <Icon id="overlay.close" className="h-2.5 w-2.5" />;
 const Spark = ({ className = "" }: { className?: string }) => (
-  <svg {...stroke} strokeWidth={2} className={className}>
-    <path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z" />
-  </svg>
+  <Icon id="overlay.spark" className={className} />
 );
 
 interface Props {
@@ -142,11 +127,11 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const shown = rows.length;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-canvas">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-canvas" data-dev-id="search.root">
       {/* top: the query field + a close affordance */}
       <div className="flex-none px-6 pt-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-control border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
+          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-control border border-line bg-raise px-[18px] shadow-card focus-within:border-line2" data-dev-id="search.query">
             <SearchIcon className="h-5 w-5 flex-none text-t3" />
             <input
               ref={inputRef}
@@ -154,6 +139,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search components using a name, MPN, value, or specification..."
               aria-label="Search components"
+              data-dev-id="search.query-input"
               className="min-w-0 flex-1 bg-transparent text-xl font-medium text-t1 outline-none placeholder:font-normal placeholder:text-t3"
             />
             {q ? (
@@ -171,6 +157,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             type="button"
             onClick={onClose}
             className="flex h-[52px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-4 text-sm font-semibold text-t2 shadow-card hover:border-line2 hover:text-t1"
+            data-dev-id="search.close"
           >
             Close
             <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-2xs font-medium text-t2">
@@ -180,14 +167,14 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         </div>
 
         {/* sub-bar: result count, the active-filter chips, and the sort control */}
-        <div className="flex items-center gap-3 py-4">
-          <span className="flex-none text-sm font-bold text-t1">
+        <div className="flex items-center gap-3 py-4" data-dev-id="search.subbar">
+          <span className="flex-none text-sm font-bold text-t1" data-dev-id="search.result-count">
             {searchResults.isLoading ? "…" : shown}
             <span className="ml-1.5 text-xs font-medium text-t3">
               {shown === 1 ? "result" : "results"}
             </span>
           </span>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
             {chips.map((chip) => (
               <span
                 key={chip.id}
@@ -233,7 +220,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         />
 
         <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-auto rounded-t-card border border-b-0 border-line bg-raise shadow-card">
+          <div className="min-h-0 flex-1 overflow-auto rounded-t-card border border-b-0 border-line bg-raise shadow-card" data-dev-id="search.results">
             <ResultsTable
               rows={rows}
               columns={columns}
@@ -243,7 +230,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               loading={searchResults.isLoading}
             />
           </div>
-          <div className="flex flex-none items-center gap-4 rounded-b-card border border-line bg-raise px-[18px] py-2.5 text-xs text-t3 shadow-card">
+          <div className="flex flex-none items-center gap-4 rounded-b-card border border-line bg-raise px-[18px] py-2.5 text-xs text-t3 shadow-card" data-dev-id="search.footer">
             <KbdHint keys={["↑", "↓"]} label="Navigate" />
             <KbdHint keys={["↵"]} label="Open Part" />
             <KbdHint keys={["Esc"]} label="Close" />
@@ -362,6 +349,7 @@ function SortControl({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex h-[34px] items-center gap-2 rounded-control border border-line bg-raise px-3 text-sm font-medium text-t2 shadow-card hover:border-line2 hover:text-t1"
+        data-dev-id="search.sort"
       >
         Sort <b className="font-semibold text-t1">{current}</b>
         <Chevron className="h-3 w-3 text-t3" />
@@ -427,10 +415,10 @@ function FacetRail({
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
 }) {
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
       <div className="min-h-0 flex-1 overflow-y-auto pr-2">
         <RailSection label="Category" />
-        <FacetGroup title="Category" first>
+        <FacetGroup title="Category" first data-dev-id="search.rail-category">
           {categories.map(([name, count]) => (
             <OptionRow
               key={name}
@@ -454,7 +442,7 @@ function FacetRail({
           </>
         ) : (
           sections.map((sec) => (
-            <div key={sec.title}>
+            <div key={sec.title} data-dev-id="search.rail-facet">
               <RailSection label={sec.title} fromSpecs={sec.fromSpecs} />
               {sec.facets.map((facet, idx) =>
                 facet.kind === "range" ? (
@@ -493,6 +481,7 @@ function FacetRail({
           type="button"
           onClick={() => setFilters((f) => ({ ...f, inStock: !f.inStock }))}
           className="flex w-full items-center justify-between text-sm font-medium text-t1"
+          data-dev-id="search.rail-instock"
         >
           In Stock
           <span
@@ -537,15 +526,17 @@ function FacetGroup({
   unit,
   first,
   children,
+  "data-dev-id": devId,
 }: {
   title: string;
   unit?: string | null;
   first?: boolean;
   children: React.ReactNode;
+  "data-dev-id"?: string;
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className={"px-0.5 pb-1 pt-2.5 " + (first ? "" : "border-t border-line")}>
+    <div className={"px-0.5 pb-1 pt-2.5 " + (first ? "" : "border-t border-line")} data-dev-id={devId}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -789,7 +780,7 @@ function ResultsTable({
   const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-2xs font-bold uppercase tracking-[0.06em] text-t3";
   const td = "whitespace-nowrap px-3 py-2.5 text-sm";
   return (
-    <table className="w-max min-w-full border-collapse">
+    <table className="w-max min-w-full border-collapse" data-dev-id="search.results-table">
       <thead>
         <tr>
           <th className={th + " w-[204px]"}>Part</th>
@@ -808,6 +799,7 @@ function ResultsTable({
         {rows.map((row, i) => (
           <tr
             key={row.id}
+            data-dev-id="search.results-row"
             aria-selected={i === active}
             onMouseEnter={() => onHover(i)}
             onClick={() => onOpen(row.id, row.category)}

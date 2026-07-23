@@ -69,7 +69,7 @@ export function RescanSection() {
   }
 
   return (
-    <section className="mb-7">
+    <section className="mb-7" data-dev-id="settings.rescan">
       <Eyebrow className="mb-2">Procurement Rescan</Eyebrow>
       <p className="mb-2.5 text-xs text-t3">
         Refresh every part&rsquo;s price, stock and lifecycle status from Mouser and DigiKey.
@@ -99,7 +99,7 @@ export function RescanSection() {
         ) : null}
 
         <div className="mt-3.5 flex flex-wrap items-center gap-3">
-          <Button variant="accent" onClick={onTrigger} disabled={busy} icon={<RefreshIcon className="h-3.5 w-3.5" />}>
+          <Button variant="accent" onClick={onTrigger} disabled={busy} icon={<RefreshIcon className="h-3.5 w-3.5" />} data-dev-id="settings.rescan-action">
             {busy
               ? "Refreshing..."
               : rescan.status === "done" || rescan.status === "error"

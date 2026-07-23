@@ -98,7 +98,7 @@ export function CandidateCard({
   });
 
   return (
-    <Card data-candidate className="px-4 py-4">
+    <Card data-dev-id="ingest.candidate" data-candidate className="px-4 py-4">
       <div className="grid gap-2.5">
         <Field label="Name" value={c.display_name} onChange={(v) => set("display_name", v)} />
         <Field label="Part Number" value={c.mpn} onChange={(v) => set("mpn", v)} mono />

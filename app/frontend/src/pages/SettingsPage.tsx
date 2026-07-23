@@ -30,6 +30,7 @@ import { useTheme, type Theme } from "../lib/theme";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Text, useText } from "../lib/copy";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -45,26 +46,44 @@ const INPUT_CLS =
 
 function Section({
   title,
+  titleId,
   hint,
+  hintId,
   children,
+  "data-dev-id": devId,
 }: {
   title: string;
+  titleId?: string;
   hint?: string;
+  hintId?: string;
   children: ReactNode;
+  "data-dev-id"?: string;
 }) {
   return (
-    <section className="mb-7">
-      <Eyebrow className="mb-2">{title}</Eyebrow>
-      {hint ? <p className="mb-2.5 text-xs text-t3">{hint}</p> : null}
+    <section className="mb-7" data-dev-id={devId}>
+      <Eyebrow className="mb-2">{titleId ? <Text id={titleId}>{title}</Text> : title}</Eyebrow>
+      {hint ? (
+        <p className="mb-2.5 text-xs text-t3">{hintId ? <Text id={hintId}>{hint}</Text> : hint}</p>
+      ) : null}
       <Card className="px-4 py-3.5">{children}</Card>
     </section>
   );
 }
 
-function StatusRow({ label, value }: { label: string; value: ReactNode }) {
+function StatusRow({
+  label,
+  labelId,
+  value,
+}: {
+  label: string;
+  labelId?: string;
+  value: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-line py-2 last:border-b-0">
-      <span className="flex-none text-xs text-t3">{label}</span>
+      <span className="flex-none text-xs text-t3">
+        {labelId ? <Text id={labelId}>{label}</Text> : label}
+      </span>
       <span className="min-w-0 truncate text-right text-sm text-t2">{value}</span>
     </div>
   );
@@ -72,9 +91,9 @@ function StatusRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function SettingsPage() {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]" data-dev-id="settings.root">
       <div className="mx-auto max-w-[860px] pb-12">
-        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1">Settings</h1>
+        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1" data-dev-id="settings.title"><Text id="settings.title">Settings</Text></h1>
         <AppearanceSection />
           <ProfilesSection />
           <SyncSection />
@@ -93,15 +112,21 @@ export function SettingsPage() {
 
 function AppearanceSection() {
   const { theme, setTheme } = useTheme();
-  const options: { value: Theme; label: string }[] = [
-    { value: "dark", label: "Dark" },
-    { value: "light", label: "Light" },
+  const options: { value: Theme; label: string; id: string }[] = [
+    { value: "dark", label: "Dark", id: "settings.appearance.dark" },
+    { value: "light", label: "Light", id: "settings.appearance.light" },
   ];
   return (
-    <Section title="Appearance" hint="The theme is remembered the next time the window opens.">
+    <Section
+      title="Appearance"
+      titleId="settings.appearance.title"
+      hint="The theme is remembered the next time the window opens."
+      hintId="settings.appearance.hint"
+      data-dev-id="settings.appearance"
+    >
       <div className="flex items-center justify-between">
-        <span className="text-sm text-t2">Theme</span>
-        <div className="inline-flex rounded-card border border-line2 p-0.5">
+        <span className="text-sm text-t2"><Text id="settings.appearance.theme-label">Theme</Text></span>
+        <div className="inline-flex rounded-card border border-line2 p-0.5" data-dev-id="settings.appearance-theme">
           {options.map((o) => (
             <button
               key={o.value}
@@ -115,7 +140,7 @@ function AppearanceSection() {
                   : "text-t3 hover:text-t2",
               )}
             >
-              {o.label}
+              <Text id={o.id}>{o.label}</Text>
             </button>
           ))}
         </div>
@@ -133,6 +158,9 @@ function ProfilesSection() {
   const [newName, setNewName] = useState("");
   const [archive, setArchive] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const namePlaceholder = useText("settings.profiles.name-placeholder", "New Profile Name");
+  const deleteTitle = useText("settings.profiles.delete-title", "Delete Profile");
+  const deleteConfirm = useText("settings.profiles.delete-confirm", "Delete");
 
   function onActivate(name: string) {
     activate.mutate(name, {
@@ -177,7 +205,10 @@ function ProfilesSection() {
   return (
     <Section
       title="Component Profiles"
+      titleId="settings.profiles.title"
       hint="Each profile is a separate set of components on disk. Switching one reloads the whole component view."
+      hintId="settings.profiles.hint"
+      data-dev-id="settings.profiles"
     >
       {profiles.isLoading ? (
         <p className="py-1 text-sm text-t3">Loading profiles...</p>
@@ -191,6 +222,7 @@ function ProfilesSection() {
               <div
                 key={name}
                 data-profile-row
+                data-dev-id="settings.profiles-row"
                 className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0"
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -204,14 +236,14 @@ function ProfilesSection() {
                       onClick={() => onActivate(name)}
                       disabled={activate.isPending}
                     >
-                      Activate
+                      <Text id="settings.profiles.activate">Activate</Text>
                     </Button>
                     <Button
                       small
                       variant="danger"
                       onClick={() => setPendingDelete(name)}
                     >
-                      Delete
+                      <Text id="settings.profiles.delete">Delete</Text>
                     </Button>
                   </div>
                 ) : null}
@@ -221,14 +253,14 @@ function ProfilesSection() {
         </div>
       )}
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.profiles-create">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") onCreate();
           }}
-          placeholder="New Profile Name"
+          placeholder={namePlaceholder}
           className={INPUT_CLS}
         />
         <label className="flex flex-none cursor-pointer select-none items-center gap-1.5 text-xs text-t2">
@@ -237,26 +269,26 @@ function ProfilesSection() {
             checked={archive}
             onChange={(e) => setArchive(e.target.checked)}
           />
-          Archive Profile
+          <Text id="settings.profiles.archive">Archive Profile</Text>
         </label>
         <Button
           onClick={onCreate}
           disabled={!newName.trim() || create.isPending}
         >
-          Create
+          <Text id="settings.profiles.create">Create</Text>
         </Button>
       </div>
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete Profile"
+        title={deleteTitle}
         body={
           <>
             Delete the profile <b>{pendingDelete}</b>? Its parts stay on disk; only
             the profile entry is removed.
           </>
         }
-        confirmLabel="Delete"
+        confirmLabel={deleteConfirm}
         danger
         busy={del.isPending}
         onConfirm={onConfirmDelete}
@@ -308,7 +340,10 @@ function SyncSection() {
   return (
     <Section
       title="Component Sync"
+      titleId="settings.sync.title"
       hint="Sync your components with the remote. Offline and divergence are reported, never guessed."
+      hintId="settings.sync.hint"
+      data-dev-id="settings.sync"
     >
       {status.isLoading ? (
         <p className="py-1 text-sm text-t3">Checking sync status...</p>
@@ -318,10 +353,12 @@ function SyncSection() {
         <>
           <StatusRow
             label="Branch"
+            labelId="settings.sync.branch"
             value={<span className="tnum font-mono">{status.data.current_branch}</span>}
           />
           <StatusRow
             label="Remote"
+            labelId="settings.sync.remote"
             value={
               status.data.has_remote ? (
                 <span className="tnum font-mono">
@@ -335,8 +372,8 @@ function SyncSection() {
         </>
       ) : null}
       <div className="mt-3.5 flex items-center gap-3">
-        <Button variant="accent" onClick={onSync} disabled={sync.isPending}>
-          {sync.isPending ? "Syncing..." : "Sync Now"}
+        <Button variant="accent" onClick={onSync} disabled={sync.isPending} data-dev-id="settings.sync-action">
+          {sync.isPending ? "Syncing..." : <Text id="settings.sync.action">Sync Now</Text>}
         </Button>
         {sync.data ? (
           <span className="text-xs text-t3">
@@ -357,6 +394,13 @@ function KiCadSection() {
   // automatically on launch and profile switch, and this button re-runs it on demand.
   const wireJob = useJob<WiringReport>();
   const [wiring, setWiring] = useState(false);
+  const configPlaceholder = useText("settings.kicad.config-placeholder", "Auto-detected");
+  const cliPlaceholder = useText("settings.kicad.cli-placeholder", "Auto-discovered");
+  const toastAppliedWired = useText(
+    "settings.kicad.toast-applied-wired",
+    "KiCad settings applied. Your components are wired.",
+  );
+  const toastApplied = useText("settings.kicad.toast-applied", "KiCad settings applied.");
 
   async function onWire() {
     setWiring(true);
@@ -394,12 +438,7 @@ function KiCadSection() {
         onSuccess: (r) => {
           setCfgDraft(null);
           setCliDraft(null);
-          toast(
-            r.kicad_wired
-              ? "KiCad settings applied. Your components are wired."
-              : "KiCad settings applied.",
-            "ok",
-          );
+          toast(r.kicad_wired ? toastAppliedWired : toastApplied, "ok");
         },
         onError: (e) => toast(errMsg(e), "err"),
       },
@@ -409,7 +448,10 @@ function KiCadSection() {
   return (
     <Section
       title="KiCad"
+      titleId="settings.kicad.title"
       hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile switch. Leave the overrides blank to auto-detect."
+      hintId="settings.kicad.hint"
+      data-dev-id="settings.kicad"
     >
       {sys.isLoading ? (
         <p className="py-1 text-sm text-t3">Reading KiCad status...</p>
@@ -417,9 +459,14 @@ function KiCadSection() {
         <p className="py-1 text-sm text-err">Could not read KiCad status.</p>
       ) : sys.data ? (
         <>
-          <StatusRow label="Config Directory" value={sys.data.kicad_config_dir} />
+          <StatusRow
+            label="Config Directory"
+            labelId="settings.kicad.config-dir"
+            value={sys.data.kicad_config_dir}
+          />
           <StatusRow
             label="KiCad CLI"
+            labelId="settings.kicad.cli"
             value={
               sys.data.kicad_cli_available ? (
                 sys.data.kicad_cli_path
@@ -430,10 +477,12 @@ function KiCadSection() {
           />
           <StatusRow
             label="KiCad Running"
+            labelId="settings.kicad.running"
             value={sys.data.kicad_running ? "Yes" : "No"}
           />
           <StatusRow
             label="KiCad Wiring"
+            labelId="settings.kicad.wiring"
             value={
               settings.isLoading ? (
                 "Loading..."
@@ -450,8 +499,8 @@ function KiCadSection() {
       {sys.data ? (
         <div className="mt-3.5 flex flex-col gap-3">
           <div>
-            <Button onClick={onWire} disabled={wireBusy}>
-              {wireBusy ? "Wiring..." : "Wire KiCad"}
+            <Button onClick={onWire} disabled={wireBusy} data-dev-id="settings.kicad-wire">
+              {wireBusy ? "Wiring..." : <Text id="settings.kicad.wire">Wire KiCad</Text>}
             </Button>
           </div>
           {wireJob.status === "running" && wireJob.progress?.message ? (
@@ -484,19 +533,19 @@ function KiCadSection() {
         </div>
       ) : null}
 
-      <div className="mt-3.5 flex flex-col gap-2.5">
+      <div className="mt-3.5 flex flex-col gap-2.5" data-dev-id="settings.kicad-overrides">
         <div className="flex flex-wrap items-center gap-2.5">
           <label
             htmlFor="kicad-config-override"
             className="w-52 flex-none text-xs text-t3"
           >
-            Config Directory Override
+            <Text id="settings.kicad.config-label">Config Directory Override</Text>
           </label>
           <input
             id="kicad-config-override"
             value={cfgValue}
             onChange={(e) => setCfgDraft(e.target.value)}
-            placeholder="Auto-detected"
+            placeholder={configPlaceholder}
             className={INPUT_CLS}
           />
         </div>
@@ -505,19 +554,19 @@ function KiCadSection() {
             htmlFor="kicad-cli-override"
             className="w-52 flex-none text-xs text-t3"
           >
-            KiCad CLI Override
+            <Text id="settings.kicad.cli-label">KiCad CLI Override</Text>
           </label>
           <input
             id="kicad-cli-override"
             value={cliValue}
             onChange={(e) => setCliDraft(e.target.value)}
-            placeholder="Auto-discovered"
+            placeholder={cliPlaceholder}
             className={INPUT_CLS}
           />
         </div>
         <div>
           <Button onClick={onSave} disabled={!dirty || save.isPending}>
-            {save.isPending ? "Applying..." : "Save Overrides"}
+            {save.isPending ? "Applying..." : <Text id="settings.kicad.save-overrides">Save Overrides</Text>}
           </Button>
         </div>
       </div>
@@ -531,6 +580,13 @@ function DistributorSection() {
   const { toast } = useToast();
   const [keyInput, setKeyInput] = useState("");
   const isSet = settings.data?.mouser_api_key_set ?? false;
+  const keyPlaceholderNew = useText("settings.distributor.key-placeholder", "Paste a key");
+  const keyPlaceholderReplace = useText(
+    "settings.distributor.key-placeholder-replace",
+    "Paste a new key to replace it",
+  );
+  const toastSaved = useText("settings.distributor.toast-saved", "Mouser key saved.");
+  const toastCleared = useText("settings.distributor.toast-cleared", "Mouser key cleared.");
 
   function onSave() {
     const key = keyInput.trim();
@@ -542,7 +598,7 @@ function DistributorSection() {
       {
         onSuccess: () => {
           setKeyInput("");
-          toast("Mouser key saved.", "ok");
+          toast(toastSaved, "ok");
         },
         onError: (e) => toast(errMsg(e), "err"),
       },
@@ -555,7 +611,7 @@ function DistributorSection() {
       {
         onSuccess: () => {
           setKeyInput("");
-          toast("Mouser key cleared.", "ok");
+          toast(toastCleared, "ok");
         },
         onError: (e) => toast(errMsg(e), "err"),
       },
@@ -565,10 +621,14 @@ function DistributorSection() {
   return (
     <Section
       title="Distributor"
+      titleId="settings.distributor.title"
       hint="An optional Mouser API key lets enrichment supplement scraping. Enrichment works without it; the key is stored per machine and never shown again."
+      hintId="settings.distributor.hint"
+      data-dev-id="settings.distributor"
     >
       <StatusRow
         label="Mouser API Key"
+        labelId="settings.distributor.key-label"
         value={
           settings.isLoading
             ? "Loading..."
@@ -577,7 +637,7 @@ function DistributorSection() {
               : "Not set"
         }
       />
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.distributor-key">
         <label htmlFor="mouser-key" className="sr-only">
           Mouser API Key
         </label>
@@ -590,18 +650,18 @@ function DistributorSection() {
           onKeyDown={(e) => {
             if (e.key === "Enter") onSave();
           }}
-          placeholder={isSet ? "Paste a new key to replace it" : "Paste a key"}
+          placeholder={isSet ? keyPlaceholderReplace : keyPlaceholderNew}
           className={INPUT_CLS}
         />
         <Button
           onClick={onSave}
           disabled={!keyInput.trim() || save.isPending}
         >
-          Save Key
+          <Text id="settings.distributor.save-key">Save Key</Text>
         </Button>
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            Clear
+            <Text id="settings.distributor.clear">Clear</Text>
           </Button>
         ) : null}
       </div>
@@ -630,13 +690,19 @@ function VendorLogin({
   const [username, setUsername] = useState(savedUsername);
   const [password, setPassword] = useState("");
   const [edited, setEdited] = useState(false);
+  const usernamePlaceholder = useText("settings.vendor-logins.username-placeholder", "Username or email");
+  const passwordPlaceholderNew = useText("settings.vendor-logins.password-placeholder", "Password");
+  const passwordPlaceholderReplace = useText(
+    "settings.vendor-logins.password-placeholder-replace",
+    "Paste a new password to replace it",
+  );
   // Prefill the saved username once it arrives, unless the user has started editing.
   useEffect(() => {
     if (!edited) setUsername(savedUsername);
   }, [savedUsername, edited]);
   const slug = label.toLowerCase().replace(/\s+/g, "-");
   return (
-    <div className="border-b border-line py-3 last:border-b-0">
+    <div className="border-b border-line py-3 last:border-b-0" data-dev-id="settings.vendor-login-row">
       <div className="mb-2 flex items-center justify-between gap-4">
         <span className="text-sm font-medium text-t1">{label}</span>
         <span className="flex-none text-xs text-t3">
@@ -656,7 +722,7 @@ function VendorLogin({
             setEdited(true);
             setUsername(e.target.value);
           }}
-          placeholder="Username or email"
+          placeholder={usernamePlaceholder}
           className={INPUT_CLS}
         />
         <label htmlFor={`${slug}-pass`} className="sr-only">
@@ -668,7 +734,7 @@ function VendorLogin({
           autoComplete="off"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder={passwordSet ? "Paste a new password to replace it" : "Password"}
+          placeholder={passwordSet ? passwordPlaceholderReplace : passwordPlaceholderNew}
           className={INPUT_CLS}
         />
         <Button
@@ -676,7 +742,7 @@ function VendorLogin({
           onClick={() => onSave(username.trim(), password)}
           disabled={pending || (!username.trim() && !password)}
         >
-          Save {label} Login
+          <Text id="settings.vendor-logins.save">Save</Text> {label} Login
         </Button>
       </div>
     </div>
@@ -699,7 +765,10 @@ function VendorLoginsSection() {
   return (
     <Section
       title="Vendor Logins"
+      titleId="settings.vendor-logins.title"
       hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window sign you in and stay logged in across parts. They are stored per machine and the password is never shown again."
+      hintId="settings.vendor-logins.hint"
+      data-dev-id="settings.vendor-logins"
     >
       <VendorLogin
         label="Ultra Librarian"
@@ -739,6 +808,16 @@ function GitHubSection() {
   const { toast } = useToast();
   const [tokenInput, setTokenInput] = useState("");
   const isSet = settings.data?.github_token_set ?? false;
+  const tokenPlaceholderNew = useText("settings.github.token-placeholder", "Paste a token to connect");
+  const tokenPlaceholderReplace = useText(
+    "settings.github.token-placeholder-replace",
+    "Paste a new token to replace it",
+  );
+  const toastConnected = useText(
+    "settings.github.toast-connected",
+    "Connected to GitHub. Your part changes will push automatically.",
+  );
+  const toastDisconnected = useText("settings.github.toast-disconnected", "Disconnected from GitHub.");
 
   function onSave() {
     const token = tokenInput.trim();
@@ -748,7 +827,7 @@ function GitHubSection() {
       {
         onSuccess: () => {
           setTokenInput("");
-          toast("Connected to GitHub. Your part changes will push automatically.", "ok");
+          toast(toastConnected, "ok");
         },
         onError: (e) => toast(errMsg(e), "err"),
       },
@@ -761,7 +840,7 @@ function GitHubSection() {
       {
         onSuccess: () => {
           setTokenInput("");
-          toast("Disconnected from GitHub.", "ok");
+          toast(toastDisconnected, "ok");
         },
         onError: (e) => toast(errMsg(e), "err"),
       },
@@ -771,10 +850,14 @@ function GitHubSection() {
   return (
     <Section
       title="GitHub"
+      titleId="settings.github.title"
       hint="Connect a GitHub personal access token so adding or editing a part pushes it to your components repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
+      hintId="settings.github.hint"
+      data-dev-id="settings.github"
     >
       <StatusRow
         label="Connection"
+        labelId="settings.github.connection"
         value={
           settings.isLoading
             ? "Loading..."
@@ -783,7 +866,7 @@ function GitHubSection() {
               : "Not connected"
         }
       />
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5" data-dev-id="settings.github-token">
         <label htmlFor="github-token" className="sr-only">
           GitHub Personal Access Token
         </label>
@@ -796,15 +879,15 @@ function GitHubSection() {
           onKeyDown={(e) => {
             if (e.key === "Enter") onSave();
           }}
-          placeholder={isSet ? "Paste a new token to replace it" : "Paste a token to connect"}
+          placeholder={isSet ? tokenPlaceholderReplace : tokenPlaceholderNew}
           className={INPUT_CLS}
         />
         <Button onClick={onSave} disabled={!tokenInput.trim() || save.isPending}>
-          Connect
+          <Text id="settings.github.connect">Connect</Text>
         </Button>
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            Disconnect
+            <Text id="settings.github.disconnect">Disconnect</Text>
           </Button>
         ) : null}
       </div>
@@ -816,14 +899,16 @@ function UpdateSection() {
   const check = useUpdateCheck();
   const apply = useApplyUpdate();
   const { toast } = useToast();
+  const toastRestart = useText("settings.update.toast-restart", "Update applied. Restart to finish.");
+  const toastApplied = useText("settings.update.toast-applied", "Update applied.");
 
   function onApply() {
     apply.mutate(undefined, {
       onSuccess: (r) => {
         if (r.restart_requested) {
-          toast("Update applied. Restart to finish.", "neutral");
+          toast(toastRestart, "neutral");
         } else if (r.updated) {
-          toast("Update applied.", "ok");
+          toast(toastApplied, "ok");
         } else {
           toast(r.detail || r.state, "neutral");
         }
@@ -837,7 +922,10 @@ function UpdateSection() {
   return (
     <Section
       title="App Update"
+      titleId="settings.update.title"
       hint="Pull the latest app from its repository. A non-fast-forward is surfaced, never force-applied."
+      hintId="settings.update.hint"
+      data-dev-id="settings.update"
     >
       {check.isLoading ? (
         <p className="py-1 text-sm text-t3">Checking for updates...</p>
@@ -846,6 +934,7 @@ function UpdateSection() {
       ) : (
         <StatusRow
           label="Status"
+          labelId="settings.update.status"
           value={
             check.data?.state === "offline" ? (
               <span className="text-warn">Could not reach the update server</span>
@@ -859,8 +948,8 @@ function UpdateSection() {
       )}
       <div className="mt-3.5 flex items-center gap-3">
         {available ? (
-          <Button variant="accent" onClick={onApply} disabled={apply.isPending}>
-            {apply.isPending ? "Applying..." : "Apply Update"}
+          <Button variant="accent" onClick={onApply} disabled={apply.isPending} data-dev-id="settings.update-apply">
+            {apply.isPending ? "Applying..." : <Text id="settings.update.apply">Apply Update</Text>}
           </Button>
         ) : null}
         <Button
@@ -868,7 +957,7 @@ function UpdateSection() {
           onClick={() => check.refetch()}
           disabled={check.isFetching}
         >
-          Check Again
+          <Text id="settings.update.check-again">Check Again</Text>
         </Button>
       </div>
     </Section>

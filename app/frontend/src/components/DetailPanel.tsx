@@ -21,6 +21,7 @@ import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { useInlineEdit } from "../lib/useInlineEdit";
 import { Text } from "../lib/copy";
 import { EditableText } from "./EditableText";
+import { Icon } from "./Icon";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
@@ -218,11 +219,11 @@ export function DetailPanel({
   const activeTab = tabs.some((t) => t.id === tab) ? tab : "specs";
 
   return (
-    <div className="flex h-full flex-col px-[30px] pb-4 pt-[22px]">
+    <div data-dev-id="detail.root" className="flex h-full flex-col px-[30px] pb-4 pt-[22px]">
       <div className="flex min-h-0 w-full max-w-[1360px] flex-1 gap-7">
         {/* LEFT rail: the specimen card - identity, the physical object + its embodiments,
             and the single readiness read with the one Complete Part action. */}
-        <aside className="flex w-[344px] flex-none flex-col gap-4 overflow-y-auto pr-1">
+        <aside data-dev-id="detail.identity" className="flex w-[344px] flex-none flex-col gap-4 overflow-y-auto pr-1">
           <div>
             <TitleBlock
               headline={headline}
@@ -242,8 +243,10 @@ export function DetailPanel({
           </div>
 
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments */}
-          <div className="flex flex-col gap-2.5">
+          <div data-dev-id="detail.canvas" className="flex flex-col gap-2.5">
             <AssetTile
+              devId="detail.asset-hero"
+              stageDevId="detail.asset-stage"
               variant="hero"
               name="3D Model"
               present={hasModel}
@@ -265,6 +268,7 @@ export function DetailPanel({
             />
             <div className="grid grid-cols-2 gap-2.5">
               <AssetTile
+                devId="detail.asset-symbol"
                 variant="tile"
                 name="Symbol"
                 present={!!detail.symbol?.name}
@@ -278,6 +282,7 @@ export function DetailPanel({
                 onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
               />
               <AssetTile
+                devId="detail.asset-footprint"
                 variant="tile"
                 name="Footprint"
                 present={!!detail.footprint?.name}
@@ -297,6 +302,7 @@ export function DetailPanel({
 
           {canComplete && needsList.length > 0 ? (
             <button
+              data-dev-id="detail.complete-part"
               type="button"
               onClick={() => setCompleteOpen(true)}
               className="flex w-full items-center gap-2.5 rounded-card border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-left transition hover:border-warn/70"
@@ -308,9 +314,7 @@ export function DetailPanel({
               <span className="min-w-0 flex-1 truncate text-2xs text-t3">
                 Needs {needsList.join(", ")}
               </span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 flex-none text-t3">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
+              <Icon id="detail.chevron-right" className="h-3.5 w-3.5 flex-none text-t3" />
             </button>
           ) : null}
 
@@ -325,12 +329,13 @@ export function DetailPanel({
         </aside>
 
         {/* RIGHT workbench: the reference depth in one tabbed panel, so it never grows the page. */}
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <section data-dev-id="detail.workbench" className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TabStrip
             tabs={tabs}
             active={activeTab}
             onSelect={setTab}
             idBase="workbench"
+            devIdBase="detail"
             aria-label="Part details"
             className="self-start"
           />
@@ -350,7 +355,7 @@ export function DetailPanel({
             </WorkbenchPanel>
 
             {pinout.length > 0 ? (
-              <WorkbenchPanel id="pinout" active={activeTab}>
+              <WorkbenchPanel id="pinout" devId="detail.pinout" active={activeTab}>
                 <PinoutViewer
                   key={detail.id}
                   pins={pinout}
@@ -361,7 +366,7 @@ export function DetailPanel({
             ) : null}
 
             {hasEnrich ? (
-              <WorkbenchPanel id="enrich" active={activeTab}>
+              <WorkbenchPanel id="enrich" devId="detail.enrich" active={activeTab}>
                 <EnrichPanel
                   key={detail.mpn}
                   mpn={detail.mpn}
@@ -378,7 +383,7 @@ export function DetailPanel({
               </WorkbenchPanel>
             ) : null}
 
-            <WorkbenchPanel id="history" active={activeTab}>
+            <WorkbenchPanel id="history" devId="detail.history" active={activeTab}>
               <PartTimeline key={detail.id} partId={detail.id} />
             </WorkbenchPanel>
           </div>
@@ -388,7 +393,7 @@ export function DetailPanel({
       {/* footer: filing (category) is organization, not identity, so it lives here, quiet; a
           destructive action never earns prime real estate, so Delete is the quiet text link
           opposite it. */}
-      <footer className="mt-3 flex flex-none items-center justify-between border-t border-line pt-3">
+      <footer data-dev-id="detail.footer" className="mt-3 flex flex-none items-center justify-between border-t border-line pt-3">
         <Filing
           category={detail.category}
           categories={categories}
@@ -397,6 +402,7 @@ export function DetailPanel({
         />
         {onDelete ? (
           <button
+            data-dev-id="detail.delete"
             type="button"
             onClick={() => setConfirmDelete(true)}
             disabled={busy}
@@ -465,15 +471,20 @@ export function DetailPanel({
 function WorkbenchPanel({
   id,
   active,
+  devId,
   children,
 }: {
   id: WorkbenchTab;
   active: WorkbenchTab;
+  // When set, the panel carries a stable `data-dev-id` for the dev-mode inspector
+  // (the panels whose region is not already named by an inner component's id).
+  devId?: string;
   children: ReactNode;
 }) {
   return (
     <div
       role="tabpanel"
+      data-dev-id={devId}
       id={tabPanelId("workbench", id)}
       aria-labelledby={tabButtonId("workbench", id)}
       hidden={active !== id}
@@ -527,7 +538,7 @@ function TitleBlock({
 
   return (
     <div className="group flex items-start gap-1.5">
-      <h1 className="min-w-0 break-words text-2xl font-bold leading-[1.06] tracking-[-0.022em] text-t1">
+      <h1 data-dev-id="detail.title" className="min-w-0 break-words text-2xl font-bold leading-[1.06] tracking-[-0.022em] text-t1">
         {headline}
       </h1>
       {onRename ? (
@@ -538,10 +549,7 @@ function TitleBlock({
           aria-label="Rename Part"
           className="mt-1 grid h-6 w-6 flex-none place-items-center rounded-control text-t3 opacity-0 transition hover:bg-raise2 hover:text-t1 focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-0"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
+          <Icon id="detail.rename" className="h-3.5 w-3.5" />
         </button>
       ) : null}
     </div>
@@ -565,7 +573,7 @@ function IdentityLine({
   busy?: boolean;
 }) {
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <div data-dev-id="detail.identity-line" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
       <span className="h-1.5 w-1.5 flex-none rounded-full bg-t3" aria-hidden="true" />
       {onEditMpn ? (
         <EditableText
@@ -621,7 +629,7 @@ function ReadinessBlock({
       ? altiumNeeds.map((n) => n.replace(/^Altium /, ""))
       : altium.missing.filter((m) => m !== "3D Model");
   return (
-    <div className="rounded-card border border-line bg-surface">
+    <div data-dev-id="detail.readiness" className="rounded-card border border-line bg-surface">
       <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
       <div className="border-t border-line" />
       <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
@@ -641,9 +649,7 @@ function ReadinessRow({
   return (
     <div className="flex items-center gap-2.5 px-3.5 py-2.5">
       {ready ? (
-        <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-ok)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 flex-none">
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+        <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
       ) : (
         <span className="h-2 w-2 flex-none rounded-full" style={{ background: "var(--c-warn)" }} />
       )}
@@ -680,8 +686,8 @@ function RailReference({
   busy?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1 border-t border-line pt-3">
-      <div className="flex items-baseline gap-2">
+    <div data-dev-id="detail.reference" className="flex flex-col gap-1 border-t border-line pt-3">
+      <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
         <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
           <Text id="detail.datasheet">Datasheet</Text>
         </span>
@@ -715,7 +721,7 @@ function RailReference({
           ) : null}
         </span>
       </div>
-      <div className="flex items-baseline gap-2">
+      <div data-dev-id="detail.notes-row" className="flex items-baseline gap-2">
         <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
           <Text id="detail.notes">Notes</Text>
         </span>
@@ -757,13 +763,13 @@ function Filing({
 }) {
   if (!onMoveCategory || !categories || categories.length === 0) {
     return (
-      <div className="text-xs text-t3">
+      <div data-dev-id="detail.filing" className="text-xs text-t3">
         <Text id="detail.filing">Filing</Text> <span className="ml-1 text-t2">{category}</span>
       </div>
     );
   }
   return (
-    <label className="flex items-center gap-1.5 text-xs text-t3">
+    <label data-dev-id="detail.filing" className="flex items-center gap-1.5 text-xs text-t3">
       <Text id="detail.filing">Filing</Text>
       <span className="relative inline-block">
         <select
@@ -781,16 +787,10 @@ function Filing({
             </option>
           ))}
         </select>
-        <svg
-          className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        {/* Decorative select caret. Its source svg was aria-hidden; per the registry note (D-03)
+            dropping aria-hidden is acceptable for a bespoke <Icon> without a title, so no title is
+            passed here. */}
+        <Icon id="detail.select-chevron" className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3" />
       </span>
     </label>
   );
@@ -849,7 +849,7 @@ function AttributesCard({
   if (chips.length === 0 && !onEditTags) return null;
 
   return (
-    <div className="mb-5">
+    <div data-dev-id="detail.attributes" className="mb-5">
       <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
         <Text id="detail.attributes">Attributes</Text>
       </div>
@@ -866,9 +866,7 @@ function AttributesCard({
                   aria-label={`Remove ${c.label}`}
                   className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <Icon id="detail.tag-remove" className="h-2.5 w-2.5" />
                 </button>
               ) : null}
             </span>
@@ -903,9 +901,7 @@ function AttributesCard({
               disabled={busy}
               className="inline-flex flex-none items-center gap-1 rounded-full border border-dashed border-line2 px-3 py-[5px] text-xs font-medium text-t3 hover:border-acc hover:text-t1 disabled:opacity-50"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3 w-3">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <Icon id="detail.tag-add" className="h-3 w-3" />
               Add
             </button>
           )
@@ -929,6 +925,8 @@ function AssetTile({
   onAttach,
   variant,
   className,
+  devId,
+  stageDevId,
 }: {
   name: string;
   present: boolean;
@@ -944,9 +942,15 @@ function AssetTile({
   variant: "hero" | "tile";
   // Height / extra classes for the tile shell (the caller sizes it in its layout).
   className?: string;
+  // The stable dev-mode id for the tile shell; each of the three call sites passes a
+  // distinct value (hero / symbol / footprint) so inspect can name them apart.
+  devId?: string;
+  // The stable dev-mode id for the inner stage chamber (the hero copper-glow stage).
+  stageDevId?: string;
 }) {
   const stage = (
     <div
+      data-dev-id={stageDevId}
       className={
         "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden " +
         (present ? "bg-stage" : "flex-col gap-2 bg-stage text-t3")
@@ -1014,6 +1018,7 @@ function AssetTile({
   if (onOpen && present) {
     return (
       <button
+        data-dev-id={devId}
         type="button"
         onClick={onOpen}
         aria-label={`Open ${name} Preview`}
@@ -1027,6 +1032,7 @@ function AssetTile({
   if (onAttach && !present) {
     return (
       <button
+        data-dev-id={devId}
         type="button"
         onClick={onAttach}
         aria-label={`Attach ${name}`}
@@ -1038,7 +1044,7 @@ function AssetTile({
     );
   }
   return (
-    <div className={base}>
+    <div data-dev-id={devId} className={base}>
       {stage}
       {footer}
     </div>
@@ -1053,11 +1059,11 @@ function AssetTile({
 function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: number }) {
   if (groups.length === 0) {
     return (
-      <div className="text-sm text-t3">No parametric specs on record for this part.</div>
+      <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
     );
   }
   return (
-    <div>
+    <div data-dev-id="detail.specs">
       <div className="mb-3 flex items-center gap-2">
         <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
           <Text id="detail.specifications">Specifications</Text>
@@ -1070,7 +1076,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
           The tab owns the scroll, so however many rows a part carries never grow the page. */}
       <div className="flex max-w-[460px] flex-col gap-5">
         {groups.map((group) => (
-          <section key={group.title}>
+          <section key={group.title} data-dev-id="detail.spec-group">
             <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.05em] text-t2">
               {group.title}
             </div>
@@ -1109,7 +1115,7 @@ function Sourcing({
   const orderable = purchase.filter((p) => p.url);
   if (orderable.length === 0) {
     return (
-      <div className="text-sm text-t2">
+      <div data-dev-id="detail.sourcing" className="text-sm text-t2">
         {hasMpn
           ? "No purchase link on record yet."
           : "Not orderable yet, this component has no part number."}
@@ -1121,7 +1127,7 @@ function Sourcing({
   const units = orderable.map((p) => normalizePriceBreaks(p.price_breaks)[0]?.price ?? null);
   const cheapest = Math.min(...units.filter((v): v is number => v != null));
   return (
-    <div className="flex flex-col">
+    <div data-dev-id="detail.sourcing" className="flex flex-col">
       {orderable.map((p, i) => {
         const breaks = normalizePriceBreaks(p.price_breaks);
         const unit = breaks[0] ?? null;
