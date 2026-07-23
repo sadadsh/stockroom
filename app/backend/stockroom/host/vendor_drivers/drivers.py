@@ -165,7 +165,9 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     # before deciding to retry (never re-click a satisfied outcome -> safe for toggles); bounded backoff. ---
     "function act(getEl,verify,cb,max){max=max||12;var tries=0,ivs=[200,400,700,1000];"
     "(function tick(){if(verify()){cb(true);return;}killModals();var el=getEl();"
-    "if(el&&hitOk(el)){try{el.click();}catch(e){}}"
+    # scrollIntoView BEFORE the hit-test - document.elementFromPoint returns null outside the viewport,
+    # so an off-screen (below-the-fold) target would never pass hitOk and never get clicked (research).
+    "if(el){try{el.scrollIntoView({block:'center'});}catch(e){}if(hitOk(el)){try{el.click();}catch(e){}}}"
     "var s=0;(function chk(){if(verify()){cb(true);return;}s+=120;if(s<1000){setTimeout(chk,120);return;}"
     "tries++;if(tries<max){setTimeout(tick,ivs[Math.min(tries,ivs.length-1)]);}else{cb(verify());}})();})();}"
     # --- downloadFormat: SAME session per format. Open the picker -> select the 2D format + STEP ->
