@@ -36,6 +36,7 @@ import {
 import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
+import { PanelTitle } from "./primitives";
 import { RowThumbnail } from "./PartsList";
 
 // --- small inline glyphs (the artifact's own set) ---------------------------
@@ -127,87 +128,94 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const shown = rows.length;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-canvas" data-dev-id="search.root">
-      {/* top: the query field + a close affordance */}
-      <div className="flex-none px-6 pt-6">
-        <div className="flex items-center gap-4">
-          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-control border border-line bg-raise px-[18px] shadow-card focus-within:border-line2" data-dev-id="search.query">
-            <SearchIcon className="h-5 w-5 flex-none text-t3" />
-            <input
-              ref={inputRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search components using a name, MPN, value, or specification..."
-              aria-label="Search components"
-              data-dev-id="search.query-input"
-              className="min-w-0 flex-1 bg-transparent text-xl font-medium text-t1 outline-none placeholder:font-normal placeholder:text-t3"
-            />
-            {q ? (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-surface" data-dev-id="search.root">
+      {/* top band: the overlay's title strip with the docked query field + the close affordance,
+          the same band + hairline family as every other panel header so the overlay reads as a
+          docked workspace, not a floating spotlight */}
+      <div className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-3.5">
+        <span className="flex-none text-xs font-semibold text-t2">Parametric Search</span>
+        <div
+          className="flex h-[26px] min-w-0 max-w-[620px] flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
+          data-dev-id="search.query"
+        >
+          <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search components using a name, MPN, value, or specification..."
+            aria-label="Search components"
+            data-dev-id="search.query-input"
+            className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              aria-label="Clear search"
+              className="grid h-[18px] w-[18px] flex-none place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
+            >
+              <XSmall />
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto flex h-[26px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t2 hover:bg-raise2 hover:text-t1"
+          data-dev-id="search.close"
+        >
+          Close
+          <kbd className="inline-flex h-[16px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1 font-mono text-2xs font-medium text-t2">
+            Esc
+          </kbd>
+        </button>
+      </div>
+
+      {/* sub-strip: result count, the active-filter chips, and the sort control */}
+      <div
+        className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3.5 py-1"
+        data-dev-id="search.subbar"
+      >
+        <span className="flex-none text-sm font-bold text-t1" data-dev-id="search.result-count">
+          {searchResults.isLoading ? "…" : shown}
+          <span className="ml-1.5 text-xs font-medium text-t3">
+            {shown === 1 ? "result" : "results"}
+          </span>
+        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
+          {chips.map((chip) => (
+            <span
+              key={chip.id}
+              className="inline-flex items-center gap-1.5 rounded-control border border-line bg-raise2 py-0.5 pl-2 pr-1 text-xs font-semibold text-t1"
+            >
+              <span className="font-medium text-t3">{chip.keyLabel}:</span>
+              {chip.value}
               <button
                 type="button"
-                onClick={() => setQ("")}
-                aria-label="Clear search"
-                className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-t3 hover:bg-raise2 hover:text-t1"
+                onClick={() => setFilters(chip.remove)}
+                aria-label={`Remove ${chip.keyLabel} filter`}
+                className="grid h-4 w-4 place-items-center rounded-control text-t3 hover:bg-line2 hover:text-t1"
               >
                 <XSmall />
               </button>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-[52px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-4 text-sm font-semibold text-t2 shadow-card hover:border-line2 hover:text-t1"
-            data-dev-id="search.close"
-          >
-            Close
-            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-2xs font-medium text-t2">
-              Esc
-            </kbd>
-          </button>
-        </div>
-
-        {/* sub-bar: result count, the active-filter chips, and the sort control */}
-        <div className="flex items-center gap-3 py-4" data-dev-id="search.subbar">
-          <span className="flex-none text-sm font-bold text-t1" data-dev-id="search.result-count">
-            {searchResults.isLoading ? "…" : shown}
-            <span className="ml-1.5 text-xs font-medium text-t3">
-              {shown === 1 ? "result" : "results"}
             </span>
-          </span>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
-            {chips.map((chip) => (
-              <span
-                key={chip.id}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-raise2 py-1 pl-2.5 pr-1.5 text-xs font-semibold text-t1"
-              >
-                <span className="font-medium text-t3">{chip.keyLabel}:</span>
-                {chip.value}
-                <button
-                  type="button"
-                  onClick={() => setFilters(chip.remove)}
-                  aria-label={`Remove ${chip.keyLabel} filter`}
-                  className="grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1"
-                >
-                  <XSmall />
-                </button>
-              </span>
-            ))}
-            {hasAnyFilter(filters) ? (
-              <button
-                type="button"
-                onClick={() => setFilters(clearAll(filters))}
-                className="text-xs font-semibold text-t2 hover:text-t1"
-              >
-                Clear All
-              </button>
-            ) : null}
-          </div>
-          <SortControl sort={sort} setSort={setSort} columns={columns} />
+          ))}
+          {hasAnyFilter(filters) ? (
+            <button
+              type="button"
+              onClick={() => setFilters(clearAll(filters))}
+              className="text-xs font-semibold text-t2 hover:text-t1"
+            >
+              Clear All
+            </button>
+          ) : null}
         </div>
+        <SortControl sort={sort} setSort={setSort} columns={columns} />
       </div>
 
-      {/* main: the schema-driven facet rail + the results table */}
-      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr] gap-5 px-6 pb-6">
+      {/* main: the schema-driven facet rail + the results grid, border-split docked panes */}
+      <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr]">
         <FacetRail
           categories={categories}
           category={category}
@@ -217,10 +225,14 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
           sections={sections}
           filters={filters}
           setFilters={setFilters}
+          activeCount={chips.length}
         />
 
-        <div className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-auto rounded-t-card border border-b-0 border-line bg-raise shadow-card" data-dev-id="search.results">
+        <div className="flex min-h-0 min-w-0 flex-col border-l border-line">
+          <PanelTitle right={shown === total ? `${total}` : `${shown} of ${total}`}>
+            Results
+          </PanelTitle>
+          <div className="min-h-0 flex-1 overflow-auto" data-dev-id="search.results">
             <ResultsTable
               rows={rows}
               columns={columns}
@@ -230,15 +242,20 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               loading={searchResults.isLoading}
             />
           </div>
-          <div className="flex flex-none items-center gap-4 rounded-b-card border border-line bg-raise px-[18px] py-2.5 text-xs text-t3 shadow-card" data-dev-id="search.footer">
-            <KbdHint keys={["↑", "↓"]} label="Navigate" />
-            <KbdHint keys={["↵"]} label="Open Part" />
-            <KbdHint keys={["Esc"]} label="Close" />
-            <span className="ml-auto">
-              {shown === total ? `${total} shown` : `Showing ${shown} of ${total}`}
-            </span>
-          </div>
         </div>
+      </div>
+
+      {/* bottom: the overlay's own status-bar band, full width like the shell's */}
+      <div
+        className="flex h-[24px] flex-none items-center gap-4 border-t border-line bg-band px-3 text-2xs text-t3"
+        data-dev-id="search.footer"
+      >
+        <KbdHint keys={["↑", "↓"]} label="Navigate" />
+        <KbdHint keys={["↵"]} label="Open Part" />
+        <KbdHint keys={["Esc"]} label="Close" />
+        <span className="ml-auto tabular-nums">
+          {shown === total ? `${total} shown` : `Showing ${shown} of ${total}`}
+        </span>
       </div>
     </div>
   );
@@ -348,7 +365,7 @@ function SortControl({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[34px] items-center gap-2 rounded-control border border-line bg-raise px-3 text-sm font-medium text-t2 shadow-card hover:border-line2 hover:text-t1"
+        className="flex h-[26px] items-center gap-1.5 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
         data-dev-id="search.sort"
       >
         Sort <b className="font-semibold text-t1">{current}</b>
@@ -406,6 +423,7 @@ function FacetRail({
   sections,
   filters,
   setFilters,
+  activeCount,
 }: {
   categories: [string, number][];
   category: string | null;
@@ -413,11 +431,14 @@ function FacetRail({
   sections: RailSectionData[];
   filters: SearchFilters;
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
+  activeCount: number;
 }) {
   return (
     <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
-      <div className="min-h-0 flex-1 overflow-y-auto pr-2">
-        <RailSection label="Category" />
+      <PanelTitle right={activeCount > 0 ? `${activeCount} active` : undefined}>
+        Filters
+      </PanelTitle>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-1">
         <FacetGroup title="Category" first data-dev-id="search.rail-category">
           {categories.map(([name, count]) => (
             <OptionRow
@@ -429,7 +450,7 @@ function FacetRail({
             />
           ))}
           {categories.length === 0 ? (
-            <div className="py-2 text-xs text-t3">No categories yet.</div>
+            <div className="py-2 text-xs text-t3">No categories so far.</div>
           ) : null}
         </FacetGroup>
 
@@ -437,7 +458,7 @@ function FacetRail({
           <>
             <RailSection label={category ? `${category} Parameters` : "Parameters"} fromSpecs />
             <div className="px-0.5 py-3 text-xs text-t3">
-              No parametric specs to filter on yet.
+              No parametric specs to filter on so far.
             </div>
           </>
         ) : (
@@ -476,27 +497,27 @@ function FacetRail({
         </div>
       </div>
 
-      <div className="flex-none border-t border-line pt-3.5">
+      <div className="flex-none border-t border-line px-3 py-2">
         <button
           type="button"
           onClick={() => setFilters((f) => ({ ...f, inStock: !f.inStock }))}
-          className="flex w-full items-center justify-between text-sm font-medium text-t1"
+          className={
+            "flex w-full items-center gap-2.5 py-[3px] text-left text-sm font-medium " +
+            (filters.inStock ? "text-t1" : "text-t2 hover:text-t1")
+          }
           data-dev-id="search.rail-instock"
         >
-          In Stock
           <span
             className={
-              "relative h-[21px] w-9 flex-none rounded-full transition-colors " +
-              (filters.inStock ? "bg-ok" : "bg-field")
+              "grid h-4 w-4 flex-none place-items-center rounded-control border-[1.5px] " +
+              (filters.inStock
+                ? "border-acc bg-acc text-acc-on"
+                : "border-line2 bg-field text-transparent")
             }
           >
-            <span
-              className={
-                "absolute top-[2.5px] h-4 w-4 rounded-full bg-white shadow transition-all " +
-                (filters.inStock ? "left-[17.5px]" : "left-[2.5px]")
-              }
-            />
+            <Check />
           </span>
+          In Stock
         </button>
       </div>
     </div>
@@ -509,7 +530,7 @@ function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean 
       {label}
       {fromSpecs ? (
         <span
-          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-acc-soft px-1.5 py-0.5 text-2xs font-semibold normal-case tracking-normal text-t2"
+          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-control bg-acc-soft px-1.5 py-0.5 text-2xs font-semibold normal-case tracking-normal text-t2"
           title="These filters are generated from the category's part specs"
         >
           <Spark className="h-2.5 w-2.5" />
@@ -690,7 +711,7 @@ function RangeInput({
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === "Enter" && commit()}
-      className="h-[30px] w-full min-w-0 rounded-control border border-line bg-field px-2.5 text-center font-mono text-xs text-t1 outline-none focus:border-line2"
+      className="h-[26px] w-full min-w-0 rounded-control border border-line bg-field px-2.5 text-center font-mono text-xs text-t1 outline-none focus:border-line2"
     />
   );
 }
@@ -731,9 +752,9 @@ function RangeSlider({
   };
 
   return (
-    <div ref={trackRef} className="relative mx-2 h-1 rounded-full bg-field shadow-[inset_0_1px_2px_rgba(0,0,0,.3)]">
+    <div ref={trackRef} className="relative mx-2 h-[3px] bg-line">
       <div
-        className="absolute h-full rounded-full bg-t2"
+        className="absolute h-full bg-t2"
         style={{ left: `${loPct}%`, right: `${100 - hiPct}%` }}
       />
       {(["lo", "hi"] as const).map((which) => (
@@ -742,7 +763,7 @@ function RangeSlider({
           type="button"
           aria-label={which === "lo" ? "Minimum" : "Maximum"}
           onPointerDown={drag(which)}
-          className="absolute top-1/2 h-[15px] w-[15px] -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line2 bg-raise shadow-raise active:cursor-grabbing"
+          className="absolute top-1/2 h-[13px] w-[13px] -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-control border border-line2 bg-raise2 hover:bg-raise active:cursor-grabbing"
           style={{ left: `${which === "lo" ? loPct : hiPct}%` }}
         />
       ))}
@@ -777,7 +798,7 @@ function ResultsTable({
       </div>
     );
   }
-  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-2xs font-bold uppercase tracking-[0.06em] text-t3";
+  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-band px-3 py-2 text-left text-2xs font-bold uppercase tracking-[0.06em] text-t3";
   const td = "whitespace-nowrap px-3 py-2.5 text-sm";
   return (
     <table className="w-max min-w-full border-collapse" data-dev-id="search.results-table">
@@ -806,7 +827,7 @@ function ResultsTable({
             className={
               "cursor-pointer border-t border-line first:border-t-0 " +
               (i === active
-                ? "bg-[color-mix(in_srgb,var(--c-acc)_8%,var(--c-raise))] shadow-[inset_2.5px_0_0_var(--c-acc)]"
+                ? "bg-[color-mix(in_srgb,var(--c-acc)_8%,var(--c-surface))] shadow-[inset_2.5px_0_0_var(--c-acc)]"
                 : "hover:bg-raise2")
             }
           >
