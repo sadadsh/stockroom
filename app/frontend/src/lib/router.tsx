@@ -5,7 +5,7 @@
  */
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
-export type Route = "components" | "projects" | "settings";
+export type Route = "components" | "projects" | "stm" | "settings";
 
 interface RouterValue {
   route: Route;
