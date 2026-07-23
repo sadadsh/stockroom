@@ -47,7 +47,7 @@ describe("Icon - default rendering", () => {
     expect(svg?.getAttribute("width")).toBe("14");
     expect(svg?.getAttribute("height")).toBe("14");
     expect(svg?.getAttribute("stroke-width")).toBe("2");
-    expect(svg?.querySelector("circle")?.getAttribute("r")).toBe("7");
+    expect(svg?.querySelector("circle")?.getAttribute("r")).toBe("8");
   });
 
   it("renders an art glyph with its rectangular size and theme-var markup", () => {

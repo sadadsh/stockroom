@@ -71,26 +71,26 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
       />
     ),
     svg:
-      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3">' +
-      '<path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3">' +
+      '<path d="m6 9 6 6 6-6"/></svg>',
   },
   {
-    // ProjectsPage: the project-card thumbnail (the windowed-grid glyph).
+    // ProjectsPage: the project-card thumbnail (lucide circuit-board, echoing the Projects nav glyph).
     name: "glyph.project",
     el: <Icon id="glyph.project" className="h-[18px] w-[18px]" />,
     svg:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]">' +
-      '<rect x="3" y="3" width="18" height="18" rx="2"/>' +
-      '<path d="M9 3v18M15 3v18M3 9h18M3 15h18" opacity="0.55"/></svg>',
+      '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M11 9h4a2 2 0 0 0 2-2V3"/><circle cx="9" cy="9" r="2"/>' +
+      '<path d="M7 21v-4a2 2 0 0 1 2-2h4"/><circle cx="15" cy="15" r="2"/></svg>',
   },
   {
-    // Finder: the filter toggle (the stacked-sliders glyph). Its size 15 comes from the registry entry,
+    // Finder: the filter toggle (lucide list-filter). Its size 15 comes from the registry entry,
     // matching the source width/height 15; no size className is passed.
     name: "finder.filter",
     el: <Icon id="finder.filter" />,
     svg:
-      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M3 5h18M6 12h12M10 19h4" stroke-linecap="round"/></svg>',
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg>',
   },
 ];
 
