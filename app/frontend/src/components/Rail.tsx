@@ -10,20 +10,8 @@ import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
 import { useUpdateCheck } from "../api/queries";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
-
-// The rail's own line-icon preset, kept for the AboutModal's non-adopted glyphs (the modal is a
-// later adoption phase). The non-modal glyphs below now draw through <Icon id> so each is
-// inspectable / editable in dev mode, while rendering byte-identically to this preset.
-const svgProps = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
 
 // The primary nav destinations. Each glyph was a sizeless `.ico` svg taking its 17px box from the
 // parent span; <Icon>'s primary branch would inject its default h-3.5 box, so we pass h-full w-full
@@ -147,6 +135,7 @@ export function Rail() {
 // The About window: what this is + who made it, with links out. Opaque bg-popover over a scrim,
 // same idiom as the app's other modals; Esc / a scrim click closes it.
 function AboutModal({ onClose }: { onClose: () => void }) {
+  const aboutLabel = useText("modal.about.aria", "About Stockroom");
   return (
     <div
       data-dev-id="about.scrim"
@@ -157,7 +146,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="About Stockroom"
+        aria-label={aboutLabel}
         data-dev-id="about.root"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop"
@@ -166,16 +155,16 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           data-dev-id="about.icon"
           className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card"
         >
-          <svg {...svgProps} className="ico h-6 w-6 text-t1">
-            <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
-            <path d="M12 22V12" />
-            <polyline points="3.29 7 12 12 20.71 7" />
-            <path d="m7.5 4.27 9 5.15" />
-          </svg>
+          {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
+              ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
+          <Icon id="brand.wordmark" className="ico h-6 w-6 text-t1" />
         </div>
-        <div data-dev-id="about.title" className="text-lg font-semibold tracking-[-0.02em] text-t1">Stockroom</div>
+        <div data-dev-id="about.title" className="text-lg font-semibold tracking-[-0.02em] text-t1">
+          <Text id="modal.about.title">Stockroom</Text>
+        </div>
         <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
-          Developed with love by <span className="font-medium text-t1">Sadad Haidari</span>.
+          <Text id="modal.about.credit">Developed with love by </Text>
+          <span className="font-medium text-t1">Sadad Haidari</span>.
         </p>
         <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
           <a
@@ -184,10 +173,8 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-110"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-              <path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.22.79 24 1.77 24h20.45c.98 0 1.78-.78 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z" />
-            </svg>
-            LinkedIn
+            <Icon id="brand.linkedin" className="h-4 w-4" />
+            <Text id="modal.about.linkedin">LinkedIn</Text>
           </a>
           <a
             href="https://github.com/sadadsh"
@@ -195,10 +182,8 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-110"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-              <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58l-.02-2.05c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.96 0-1.32.47-2.39 1.24-3.23-.13-.31-.54-1.53.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.25 2.87.12 3.18.77.84 1.24 1.91 1.24 3.23 0 4.63-2.8 5.65-5.48 5.95.43.37.81 1.1.81 2.22l-.01 3.29c0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z" />
-            </svg>
-            GitHub
+            <Icon id="brand.github" className="h-4 w-4" />
+            <Text id="modal.about.github">GitHub</Text>
           </a>
         </div>
       </div>

@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
+import { DevModeProvider } from "../lib/devMode";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 
 // A controllable router stand-in so the rail can be tested in isolation.
@@ -64,4 +65,71 @@ describe("Rail", () => {
     }
   });
 
+});
+
+// The AboutModal is the only Rail region this phase adopts (its nav glyphs + nav.* labels belong to
+// Phase 2 and are untouched here). `../lib/theme` is module-mocked above, so DevModeProvider's
+// useTheme() resolves the same dark stub and no ThemeProvider is needed.
+describe("Rail AboutModal - copy + brand icon adoption", () => {
+  beforeEach(() => {
+    state.route = "components";
+  });
+
+  function toggleDevMode() {
+    fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
+  }
+
+  it("keeps the non-dev About behaviour: opens, exposes the two links, and closes on the scrim", async () => {
+    const { container } = render(
+      <DevModeProvider>
+        <Rail />
+      </DevModeProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /About/ }));
+
+    // The dialog opens with its accessible name and both social links resolve their hrefs.
+    expect(screen.getByRole("dialog", { name: "About Stockroom" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "LinkedIn" })).toHaveAttribute(
+      "href",
+      "https://www.linkedin.com/in/sadadhaidari",
+    );
+    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/sadadsh",
+    );
+
+    // Off dev mode a <Text> is a bare string: no editable copy targets exist in the modal.
+    expect(container.querySelector("[data-copy-id]")).toBeNull();
+
+    // A scrim click closes it.
+    fireEvent.click(container.querySelector('[data-dev-id="about.scrim"]')!);
+    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
+  });
+
+  it("wraps the title and link labels as copy ids and draws each brand glyph through <Icon> in dev mode", async () => {
+    const { container } = render(
+      <DevModeProvider>
+        <Rail />
+      </DevModeProvider>,
+    );
+    // Open the modal first, then toggle dev mode: in dev mode the About button's own <Text> label
+    // intercepts the click (click-to-edit), so opening must happen while dev mode is off.
+    await userEvent.click(screen.getByRole("button", { name: /About/ }));
+    toggleDevMode();
+
+    // The visible AboutModal labels carry their modals.json ids.
+    expect(container.querySelector('[data-copy-id="modal.about.title"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.about.credit"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.about.linkedin"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="modal.about.github"]')).not.toBeNull();
+
+    // "Sadad Haidari" stays a literal proper noun inside its emphasized span (not a copy target).
+    expect(screen.getByText("Sadad Haidari")).toBeInTheDocument();
+
+    // Each of the three brand glyphs renders through <Icon>, which advertises its id in dev mode.
+    const about = container.querySelector('[data-dev-id="about.root"]')!;
+    expect(about.querySelector('svg[data-icon-id="brand.wordmark"]')).not.toBeNull();
+    expect(about.querySelector('svg[data-icon-id="brand.linkedin"]')).not.toBeNull();
+    expect(about.querySelector('svg[data-icon-id="brand.github"]')).not.toBeNull();
+  });
 });

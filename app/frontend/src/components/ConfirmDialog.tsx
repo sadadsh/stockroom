@@ -5,6 +5,7 @@
  * or Escape cancels; the confirm button carries the danger tone when destructive.
  */
 import { useEffect, type ReactNode } from "react";
+import { Text } from "../lib/copy";
 import { Button } from "./primitives";
 
 interface Props {
@@ -58,7 +59,7 @@ export function ConfirmDialog({
         <div data-dev-id="confirm.body" className="mt-2 text-sm text-t2">{body}</div>
         <div data-dev-id="confirm.actions" className="mt-4 flex justify-end gap-2">
           <Button data-dev-id="confirm.cancel" small onClick={onCancel} disabled={busy}>
-            Cancel
+            <Text id="modal.confirm.cancel">Cancel</Text>
           </Button>
           <Button
             data-dev-id="confirm.confirm"
