@@ -54,7 +54,7 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
       >
         <div
           data-dev-id="diff.header"
-          className="flex items-center gap-3 border-b border-line px-4 py-3"
+          className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-4"
         >
           <span className="min-w-0 flex-none truncate text-sm font-semibold text-t1">
             {partName}
@@ -73,7 +73,7 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
                     className={
                       "rounded-control px-2.5 py-1 text-xs font-medium transition-colors " +
                       (active
-                        ? "bg-raise2 text-t1"
+                        ? "bg-acc-soft text-t1"
                         : "text-t2 hover:bg-raise hover:text-t1")
                     }
                   >

@@ -127,13 +127,13 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         data-dev-id="altiumdb.modal"
         className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
+        <div className="flex h-[38px] flex-none items-center justify-between gap-4 border-b border-line bg-band px-4">
           <div className="flex items-baseline gap-2.5">
-            <h2 className="text-lg font-semibold text-t1">
+            <h2 className="text-sm font-semibold text-t1">
               <Text id="modal.altium.title">Altium Database Library</Text>
             </h2>
             <span className="text-xs text-t3">
-              {readyCount} of {rows.length} ready
+              {readyCount} of {rows.length} mapped
               {status.data ? ` · ${status.data.profile}` : ""}
             </span>
           </div>
@@ -141,7 +141,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
             type="button"
             aria-label={closeLabel}
             onClick={onClose}
-            className="flex h-8 w-8 flex-none items-center justify-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
+            className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
           >
             <Icon id="action.close" className="h-4 w-4" />
           </button>
