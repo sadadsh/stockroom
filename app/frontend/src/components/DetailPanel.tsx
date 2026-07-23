@@ -791,6 +791,82 @@ function ReadinessRow({
   );
 }
 
+// The datasheet as a real BUTTON carrying a human label (owner's call - not a raw URL): it opens
+// the datasheet in a new tab, with a quiet pencil that swaps in an inline field to paste a new
+// link. Falls back to an honest "None on file" when there is no datasheet.
+function DatasheetField({
+  url,
+  href,
+  onEdit,
+  busy,
+}: {
+  url: string;
+  href?: string;
+  onEdit?: (value: string) => void;
+  busy?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(url);
+  if (editing && onEdit) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        disabled={busy}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          onEdit(draft.trim());
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onEdit(draft.trim());
+            setEditing(false);
+          } else if (e.key === "Escape") {
+            setDraft(url);
+            setEditing(false);
+          }
+        }}
+        placeholder="Paste a datasheet link"
+        aria-label="Datasheet link"
+        className="w-full rounded-control border border-line2 bg-field px-2.5 py-1.5 font-mono text-xs text-t1 outline-none focus:border-acc"
+      />
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-control border border-line bg-field px-2.5 py-1.5 text-xs font-medium text-t1 transition hover:border-line2 hover:bg-raise2"
+        >
+          <Text id="detail.datasheet">Datasheet</Text>
+          <ExternalIcon className="text-t3" />
+        </a>
+      ) : (
+        <span className="text-xs italic text-t3">None on file</span>
+      )}
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(url);
+            setEditing(true);
+          }}
+          disabled={busy}
+          aria-label="Edit datasheet link"
+          title="Edit datasheet link"
+          className="grid h-6 w-6 flex-none place-items-center rounded-control text-t3 transition hover:bg-raise2 hover:text-t1 disabled:opacity-50"
+        >
+          <Icon id="detail.rename" className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 // The outbound links + free-form notes, as the foot of the identity rail. "Links" gathers the
 // datasheet and the vendor product page into one obvious place (the owner asked for a clear home
 // for links); both the datasheet and the note stay editable so a part is completed here. All
@@ -813,50 +889,12 @@ function RailReference({
   return (
     <div data-dev-id="detail.reference" className="flex flex-col gap-4">
       <DetailSection title={<Text id="detail.links">Links</Text>} data-dev-id="detail.datasheet-row">
-        <div className="flex items-baseline gap-2">
-          <span className="w-[64px] flex-none text-xs text-t2">
-            <Text id="detail.datasheet">Datasheet</Text>
-          </span>
-          <span className="flex min-w-0 flex-1 items-center gap-1">
-            {onEditDatasheet ? (
-              <EditableText
-                value={datasheetUrl}
-                onSave={onEditDatasheet}
-                label="Datasheet"
-                placeholder="Paste a datasheet link"
-                mono
-                truncate
-                disabled={busy}
-                displayClassName="text-xs"
-              />
-            ) : datasheetHref ? (
-              <a
-                href={datasheetHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-acc hover:underline"
-              >
-                <span className="truncate">Open datasheet</span>
-                <ExternalIcon className="flex-none" />
-              </a>
-            ) : datasheetUrl ? (
-              <span className="tnum truncate font-mono text-xs text-t1">{datasheetUrl}</span>
-            ) : (
-              <span className="text-xs italic text-t3">None on file</span>
-            )}
-            {onEditDatasheet && datasheetHref ? (
-              <a
-                href={datasheetHref}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Open datasheet"
-                className="flex-none text-t3 transition-colors hover:text-t1"
-              >
-                <ExternalIcon />
-              </a>
-            ) : null}
-          </span>
-        </div>
+        <DatasheetField
+          url={datasheetUrl}
+          href={datasheetHref}
+          onEdit={onEditDatasheet}
+          busy={busy}
+        />
       </DetailSection>
       <DetailSection title={<Text id="detail.notes">Description</Text>} data-dev-id="detail.notes-row">
         {onEditDescription ? (
@@ -1084,8 +1122,9 @@ function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
         <section key={group.title} data-dev-id="detail.spec-group">
           {/* Altium property-grid feel: the group name sits on a divider band, then clean rows with
               no per-row hairline (that ledger look is gone) - separation is the divider + a live
-              row hover, and the value reads in the mono data face. */}
-          <div className="mb-1 flex items-center gap-2 border-b border-line pb-1">
+              row hover, and the value reads in the mono data face. The header is STICKY, so a part
+              with far more specs than fit scrolls the pane while the group name stays in view. */}
+          <div className="sticky top-0 z-[1] mb-1 flex items-center gap-2 border-b border-line bg-surface pb-1 pt-0.5">
             <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-t3">
               {group.title}
             </span>
