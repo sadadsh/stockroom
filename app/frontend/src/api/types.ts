@@ -1428,3 +1428,21 @@ export interface AltiumRegenerateResult {
   skipped: string[];
   dblib: string;
 }
+
+// POST /api/dev/save (dev mode, owner-only): persist the nudged design tokens and reworded UI
+// copy back to source (lib/token.overrides.ts + lib/copy.overrides.ts), so a saved change ships
+// for everyone. `tokens.root` carries the dark-theme colours + shared radii, `tokens.light` the
+// light-theme colours; `copy` maps a stable copy id to its new text.
+export interface DevSaveBody {
+  tokens: { root: Record<string, string>; light: Record<string, string> };
+  copy: Record<string, string>;
+}
+
+// The write outcome: the relative source paths written, and how many token / copy overrides now
+// persist. ok is false with a message only on an honest refuse (no source tree in a frozen exe).
+export interface DevSaveResult {
+  ok: boolean;
+  written: string[];
+  tokens: number;
+  copy: number;
+}

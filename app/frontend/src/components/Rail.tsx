@@ -10,6 +10,7 @@ import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
 import { useUpdateCheck } from "../api/queries";
+import { Text } from "../lib/copy";
 
 const svgProps = {
   viewBox: "0 0 24 24",
@@ -81,7 +82,9 @@ export function Rail() {
           <polyline points="3.29 7 12 12 20.71 7" />
           <path d="m7.5 4.27 9 5.15" />
         </svg>
-        <span className="text-lg font-semibold tracking-[-0.02em] text-t1">Stockroom</span>
+        <span className="text-lg font-semibold tracking-[-0.02em] text-t1">
+          <Text id="nav.brand">Stockroom</Text>
+        </span>
       </div>
 
       <div className="flex flex-col gap-0.5">
@@ -117,7 +120,7 @@ export function Rail() {
               <path d="M12 16v-4M12 8h.01" />
             </svg>
           </span>
-          About
+          <Text id="nav.about">About</Text>
         </button>
         <div className="mt-1.5 flex items-center gap-1.5">
           {hasUpdate ? (
@@ -131,7 +134,7 @@ export function Rail() {
                 <path d="m6 11 6 6 6-6" />
                 <path d="M19 21H5" />
               </svg>
-              Update
+              <Text id="nav.update">Update</Text>
             </button>
           ) : (
             <div
@@ -141,7 +144,7 @@ export function Rail() {
               <svg {...svgProps} className="h-4 w-4 flex-none" style={{ color: "var(--c-ok)" }}>
                 <path d="M20 6 9 17l-5-5" />
               </svg>
-              Up to Date!
+              <Text id="nav.up-to-date">Up to Date!</Text>
             </div>
           )}
           <button
@@ -251,7 +254,7 @@ function RailItem({
       <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
         {NAV_ICONS[item.route] ?? null}
       </span>
-      {item.title}
+      <Text id={`nav.${item.route}`}>{item.title}</Text>
     </button>
   );
 }

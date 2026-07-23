@@ -41,9 +41,10 @@ export default {
       },
       borderRadius: {
         // North-star direction (owner decision 2026-07-17): the rounder card + control.
-        // Supersedes the earlier 8/6 lock; see docs/design/design-rules.md.
-        card: "14px",
-        control: "8px",
+        // Supersedes the earlier 8/6 lock; see docs/design/design-rules.md. Routed through CSS
+        // variables (defaults in styles/index.css) so dev mode can nudge them live.
+        card: "var(--r-card)",
+        control: "var(--r-control)",
       },
       fontFamily: {
         // Work Sans (bundled offline via @fontsource-variable) is the interface

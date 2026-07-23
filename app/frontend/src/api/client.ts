@@ -9,6 +9,8 @@ import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
   AltiumRegenerateResult,
+  DevSaveBody,
+  DevSaveResult,
   AltiumStatus,
   AuditResult,
   BomDiffResult,
@@ -247,6 +249,12 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Dev mode (owner-only): persist the nudged design tokens + reworded copy to source so a
+  // saved change ships for everyone. Honest error when there is no source tree (a frozen exe).
+  devSave(body: DevSaveBody): Promise<DevSaveResult> {
+    return request<DevSaveResult>("POST", "/api/dev/save", { body });
   },
 
   // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by the

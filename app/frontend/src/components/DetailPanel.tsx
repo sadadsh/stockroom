@@ -19,6 +19,7 @@ import { deriveTitle, deriveAttributes, isReferenceOnlySpecKey } from "../lib/de
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { useInlineEdit } from "../lib/useInlineEdit";
+import { Text } from "../lib/copy";
 import { EditableText } from "./EditableText";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
@@ -301,7 +302,9 @@ export function DetailPanel({
               className="flex w-full items-center gap-2.5 rounded-card border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-left transition hover:border-warn/70"
             >
               <WarnIcon className="h-4 w-4 flex-none text-warn" />
-              <span className="flex-none text-sm font-semibold text-t1">Complete Part</span>
+              <span className="flex-none text-sm font-semibold text-t1">
+                <Text id="detail.complete-part">Complete Part</Text>
+              </span>
               <span className="min-w-0 flex-1 truncate text-2xs text-t3">
                 Needs {needsList.join(", ")}
               </span>
@@ -399,7 +402,7 @@ export function DetailPanel({
             disabled={busy}
             className="text-xs text-t3 transition-colors hover:text-err disabled:opacity-50"
           >
-            Delete Part
+            <Text id="detail.delete">Delete Part</Text>
           </button>
         ) : null}
       </footer>
@@ -680,7 +683,7 @@ function RailReference({
     <div className="flex flex-col gap-1 border-t border-line pt-3">
       <div className="flex items-baseline gap-2">
         <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
-          Datasheet
+          <Text id="detail.datasheet">Datasheet</Text>
         </span>
         <span className="flex min-w-0 flex-1 items-center gap-1">
           {onEditDatasheet ? (
@@ -714,7 +717,7 @@ function RailReference({
       </div>
       <div className="flex items-baseline gap-2">
         <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t3">
-          Notes
+          <Text id="detail.notes">Notes</Text>
         </span>
         <span className="min-w-0 flex-1">
           {onEditDescription ? (
@@ -755,13 +758,13 @@ function Filing({
   if (!onMoveCategory || !categories || categories.length === 0) {
     return (
       <div className="text-xs text-t3">
-        Filing <span className="ml-1 text-t2">{category}</span>
+        <Text id="detail.filing">Filing</Text> <span className="ml-1 text-t2">{category}</span>
       </div>
     );
   }
   return (
     <label className="flex items-center gap-1.5 text-xs text-t3">
-      Filing
+      <Text id="detail.filing">Filing</Text>
       <span className="relative inline-block">
         <select
           aria-label="Category"
@@ -848,7 +851,7 @@ function AttributesCard({
   return (
     <div className="mb-5">
       <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-        Attributes
+        <Text id="detail.attributes">Attributes</Text>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {chips.map((c) =>
@@ -1057,7 +1060,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
     <div>
       <div className="mb-3 flex items-center gap-2">
         <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-          Specifications
+          <Text id="detail.specifications">Specifications</Text>
         </span>
         <span className="tnum font-mono text-2xs text-t3">{count}</span>
       </div>
