@@ -126,12 +126,13 @@ _DIGIKEY_RUN_MODELS = (
 # stable data-original label AND the STEP 3D radio (one download = symbol + footprint + 3D model),
 # then click the footer #btn-download-<Provider>. Each stage guarded + reported.
 _DIGIKEY_DOWNLOAD_FORMAT = (
+    "function fmtBtn(){var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
+    "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){return cs[i];}}return null;}"
     "function downloadFormat(present,spec,done){var prov=present[0];"
-    "try{var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}catch(e){}"
-    "setTimeout(function(){try{var btn=null;"
-    "var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
-    "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){btn=cs[i];break;}}"
-    "if(btn)btn.click();}catch(e){}"
+    # Expand the provider row ONLY if its Select Download Format control is not already visible -
+    # re-clicking an already-open accordion would TOGGLE it closed and break the 2nd (Altium) pass.
+    "try{if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}}catch(e){}"
+    "setTimeout(function(){try{var btn=fmtBtn();if(btn)btn.click();}catch(e){}"
     "setTimeout(function(){var picked=false;try{"
     "var modal=document.querySelector('[id$=\"-export-options\"]');if(modal){"
     "var ls=modal.querySelectorAll('label');"
@@ -148,7 +149,17 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     "if(dl&&!dl.disabled){dl.click();fired=true;}}catch(e){}"
     "report('download',fired,fired?('Downloading the '+spec.name+' symbol, footprint and 3D model.'):"
     "('Select a format, then click Download.'));"
-    "setTimeout(done,3800);},900);},1600);},2400);}"
+    # DigiKey shows a "Downloading... may take a few minutes" progress modal after Download; the NEXT
+    # format cannot open its picker until that clears (live-observed 2026-07-23: a fixed gap raced the
+    # still-open modal and the Altium pass no-op'd). Poll it OUT (up to 90s), then move to the next.
+    "var waited=0;function waitDl(){var busy=false;try{"
+    "var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
+    "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/downloading/i.test(dlg[w].textContent||'')){busy=true;break;}}"
+    "}catch(e){}waited+=1200;if(busy&&waited<90000){setTimeout(waitDl,1200);}"
+    "else{report('progress',true,busy?('Still downloading '+spec.name+'; continuing.'):"
+    "('Finished the '+spec.name+' download.'));setTimeout(done,2500);}}"
+    "setTimeout(waitDl,2500);"
+    "},900);},1600);},2400);}"
 )
 
 
