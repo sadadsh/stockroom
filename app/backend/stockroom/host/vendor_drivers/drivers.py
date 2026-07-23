@@ -139,6 +139,23 @@ _DIGIKEY_HELPERS = (
 _DIGIKEY_REACTOR = (
     "window.__SR_DL_CB__=null;"
     "window.__SR_DL__=function(evt){trace('dl',evt&&evt.state);var cb=window.__SR_DL_CB__;if(cb)cb(evt);};"
+    # Ground truth for "the vendor is still working": count the page's own in-flight export
+    # requests (XHR + fetch). A heavy part's export POST can be live for 20-60s with no visible
+    # download (live 2026-07-23, STM32) - the start watchdog must not kill it. Guarded, counted,
+    # decremented on loadend/settle; never throws into the vendor's code.
+    "try{var _xo=XMLHttpRequest.prototype.open,_xs=XMLHttpRequest.prototype.send;"
+    "XMLHttpRequest.prototype.open=function(m,u){this.__sr_export=/export/i.test(String(u||''));"
+    "return _xo.apply(this,arguments);};"
+    "XMLHttpRequest.prototype.send=function(){if(this.__sr_export){"
+    "window.__SR_XHR__=(window.__SR_XHR__||0)+1;"
+    "this.addEventListener('loadend',function(){window.__SR_XHR__=Math.max(0,(window.__SR_XHR__||1)-1);});}"
+    "return _xs.apply(this,arguments);};}catch(e){}"
+    "try{var _sf=window.fetch;window.fetch=function(u,o){"
+    "var e=/export/i.test(String((u&&u.url)||u||''));"
+    "if(!e)return _sf.apply(this,arguments);"
+    "window.__SR_XHR__=(window.__SR_XHR__||0)+1;"
+    "var dec=function(){window.__SR_XHR__=Math.max(0,(window.__SR_XHR__||1)-1);};"
+    "return _sf.apply(this,arguments).then(function(r){dec();return r;},function(err){dec();throw err;});};}catch(e){}"
     "function awaitDownload(spec,onDone,onFail){var settled=false,iv=null,wd=null,sw=null;"
     "function settle(fn,why){if(settled)return;settled=true;window.__SR_DL_CB__=null;"
     "clearInterval(iv);clearTimeout(wd);clearTimeout(sw);trace('await',spec.key,why);fn(why);}"
@@ -153,7 +170,14 @@ _DIGIKEY_REACTOR = (
     "if(evt.state!=='completed')return;"
     "if(!evt.format||evt.format===spec.key){settle(onDone,'completed');}"
     "else{settle(onFail,'wrongfile');}};"
-    "sw=setTimeout(function(){settle(onFail,'nostart');},START_WD);"
+    # A heavy part's export can legitimately generate server-side for 20-60s (live 2026-07-23,
+    # STM32: the export POST was still in flight when a hard nostart killed it and the recovery
+    # canceled the request). While the vendor VISIBLY works (its downloading/generating indicator,
+    # not our overlay), extend the start watchdog - bounded - before calling the attempt dead.
+    "var swx=0;function swFire(){if(senseBusy()&&swx<2){swx++;"
+    "trace('await',spec.key,'slow generation; waiting');sw=setTimeout(swFire,START_WD);return;}"
+    "settle(onFail,'nostart');}"
+    "sw=setTimeout(swFire,START_WD);"
     # While the vendor generates the file server-side (up to a minute+), watch for a failure with a
     # LIGHT periodic health-check (a wall/error toast), NOT a per-frame MutationObserver: the download
     # phase mutates the DOM constantly (the spinner), so an every-frame observer that read innerText
@@ -262,6 +286,16 @@ _DIGIKEY_DOWNLOAD = (
     "var as=region.querySelectorAll('a[href]');"
     "for(var i=0;i<as.length;i++){var h=as[i].getAttribute('href')||'';"
     "if(vis(as[i])&&/^https?:/i.test(h)&&h.indexOf('digikey.com')<0)return true;}return false;}"
+    # "The vendor is still working": primary signal is the page's own in-flight export request
+    # count (__SR_XHR__, instrumented at reactor init - precise); fallback is its visible
+    # downloading/generating indicator (never our overlay). Fixed-position elements need
+    # modalShown (offsetParent is null on them).
+    "function senseBusy(){try{if((window.__SR_XHR__||0)>0)return true;"
+    "var ns=document.querySelectorAll("
+    "'[id*=downloading i],[class*=downloading i],[id*=generating i],[class*=generating i]');"
+    "for(var i=0;i<ns.length;i++){var n=ns[i];"
+    "if(n.closest&&n.closest('#__stockroom_overlay__'))continue;"
+    "if(modalShown(n)||vis(n))return true;}return false;}catch(e){return false;}}"
     "function findLabel(m,re){var ls=m.querySelectorAll('label');"
     "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
     "if(re.test(t))return ls[j];}return null;}"
