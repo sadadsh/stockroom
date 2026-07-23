@@ -132,11 +132,13 @@ def test_digikey_driver_falls_through_providers_before_refreshing():
     # vendor's own downloading/generating indicator is visible (outside our overlay), the start
     # watchdog extends - bounded - instead of aborting a live generation.
     assert "senseBusy" in js and "slow generation" in js
-    # A freshly (re)navigated models page can swallow the FIRST provider-row click (handler not
-    # yet hydrated - live 2026-07-23, STM32 after a recovery re-navigation: the section never
-    # opened and the provider fell through unused). One bounded second knock re-clicks the row
-    # before giving up on the source.
+    # A reloaded/renavigated models page comes up as an active-but-empty skeleton whose row
+    # handlers bind late (live-dissected 2026-07-23): early clicks do nothing, a settled-page
+    # click populates the section in ~3s. The driver knocks repeatedly (bounded), and on the
+    # last knock calls the vendor's own displayExportModal directly; the control seek also
+    # accepts an already-open provider modal.
     assert "__knock" in js
+    assert "window.displayExportModal" in js  # the vendor-opener last-resort fallback
 
 
 def test_digikey_reactor_is_event_driven_not_timed():

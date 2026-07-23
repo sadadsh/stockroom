@@ -350,20 +350,32 @@ _DIGIKEY_DOWNLOAD = (
     "report(spec.key,false,'No visible source offers '+spec.name+'; download it by hand.');done();return;}"
     "var prov=present[pi++];trace('tryProvider',spec.key,prov[1]);"
     "if(!fmtBtnFor(prov)){var row=document.querySelector('#'+prov[0]+'-media-active');if(row){try{row.click();}catch(e){}}}"
-    "until(function(){var b=fmtBtnFor(prov);if(b&&actionable(b))return {b:b};"
+    # The seek reacts to WHICHEVER appears first: the provider's format control, its export modal
+    # ALREADY open (the vendor-opener fallback below lands here), or a link-out-only row.
+    "until(function(){var m0=exportModalFor(prov);if(m0)return {m:m0};"
+    "var b=fmtBtnFor(prov);if(b&&actionable(b))return {b:b};"
     "if(externalOnly(prov))return {skip:1};return null;},function(v){"
-    # A freshly (re)navigated page can swallow the FIRST row click (handler not hydrated yet -
-    # live 2026-07-23, STM32 post-recovery). Knock once more on the same source before moving on.
-    "if(!v&&!spec['__knock_'+prov[0]]){spec['__knock_'+prov[0]]=1;"
-    "trace('knock',spec.key,prov[1]);"
-    "report('provider',false,prov[1]+' is slow to open; trying it once more.');"
+    # A reloaded/renavigated models page comes up as an ACTIVE-but-empty skeleton whose row
+    # handlers bind late (live-dissected 2026-07-23: early clicks do nothing; a click once the
+    # page settles populates the section in ~3s). So KNOCK repeatedly - each retry re-clicks the
+    # row - and on the last knock call the vendor's own displayExportModal directly if its modal
+    # markup exists. Only then give up on the source.
+    "if(!v){var kn=spec['__knock_'+prov[0]]||0;"
+    "if(kn<4){spec['__knock_'+prov[0]]=kn+1;trace('knock',spec.key,prov[1],kn+1);"
+    "if(kn===3){try{var dm=document.getElementById(prov[2]);"
+    "if(dm&&dm.querySelector('label')&&typeof window.displayExportModal==='function'){"
+    "trace('dem',prov[1]);window.displayExportModal('#'+prov[2],'');}}catch(e){}}"
+    "report('provider',false,prov[1]+' is slow to open; trying it again.');"
     "pi=Math.max(0,pi-1);tryProvider();return;}"
-    "if(!v){report('provider',false,prov[1]+' did not open; trying the next source.');tryProvider();return;}"
+    "report('provider',false,prov[1]+' did not open; trying the next source.');tryProvider();return;}"
     "if(v.skip){trace('skip',prov[1],'external only');"
     "report('provider',false,prov[1]+' opens the manufacturer site; trying the next source.');tryProvider();return;}"
+    "if(v.m){proceedModal(v.m);return;}"
     "try{v.b.click();}catch(e){}"
     "until(function(){return exportModalFor(prov);},function(modal){"
     "if(!modal){report('provider',false,prov[1]+' showed no formats; trying the next source.');tryProvider();return;}"
+    "proceedModal(modal);},12000);"
+    "function proceedModal(modal){"
     "pickVerified(modal,prov,spec,function(ok,sel){"
     "if(!ok){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModalFor(prov);tryProvider();return;}"
     "report(spec.key,true,'Selected '+spec.name+' plus the 3D model from '+prov[1]+'.');"
@@ -392,7 +404,7 @@ _DIGIKEY_DOWNLOAD = (
     "pi=Math.max(0,pi-1);tryProvider();return;}"
     "trace('fallthrough',spec.key,why);"
     "report(spec.key,false,'That did not work ('+why+'); trying the next source for '+spec.name+'.');"
-    "tryProvider();});},12000);}seekDl();});},12000);},12000);}tryProvider();}"
+    "tryProvider();});},12000);}seekDl();});}},8000);}tryProvider();}"
 )
 
 
