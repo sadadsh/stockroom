@@ -208,7 +208,7 @@ function ProfilesSection() {
                     </Button>
                     <Button
                       small
-                      variant="danger"
+                      variant="ghost-danger"
                       onClick={() => setPendingDelete(name)}
                     >
                       Delete
@@ -600,7 +600,7 @@ function DistributorSection() {
           Save Key
         </Button>
         {isSet ? (
-          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
+          <Button variant="ghost-danger" onClick={onClear} disabled={save.isPending}>
             Clear
           </Button>
         ) : null}
@@ -803,7 +803,7 @@ function GitHubSection() {
           Connect
         </Button>
         {isSet ? (
-          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
+          <Button variant="ghost-danger" onClick={onClear} disabled={save.isPending}>
             Disconnect
           </Button>
         ) : null}
