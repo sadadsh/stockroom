@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { DiffAssets } from "../api/types";
 import { usePreviewSvg } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
+import { Text, useText } from "../lib/copy";
 import { SvgDiffViewport } from "./SvgDiffViewport";
 
 type DiffKind = "symbol" | "footprint";
@@ -28,6 +29,9 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
   const changed = (["symbol", "footprint"] as const).filter((k) => assets[k]);
   const [kind, setKind] = useState<DiffKind>(changed[0] ?? "symbol");
   const dialogRef = useModalDismiss(open, onClose);
+  const tablistLabel = useText("modal.diff.tablist", "Diff Type");
+  const closeLabel = useText("modal.diff.close", "Close");
+  const soleKind: DiffKind = changed[0] ?? "symbol";
 
   if (!open) return null;
 
@@ -56,7 +60,7 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
             {partName}
           </span>
           {changed.length > 1 ? (
-            <div data-dev-id="diff.tabs" className="flex gap-1" role="tablist" aria-label="Diff Type">
+            <div data-dev-id="diff.tabs" className="flex gap-1" role="tablist" aria-label={tablistLabel}>
               {changed.map((k) => {
                 const active = kind === k;
                 return (
@@ -73,21 +77,23 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
                         : "text-t2 hover:bg-raise hover:text-t1")
                     }
                   >
-                    {KIND_LABEL[k]}
+                    <Text id={`modal.diff.kind-${k}`}>{KIND_LABEL[k]}</Text>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <span className="text-xs text-t3">{KIND_LABEL[changed[0] ?? "symbol"]}</span>
+            <span className="text-xs text-t3">
+              <Text id={`modal.diff.kind-${soleKind}`}>{KIND_LABEL[soleKind]}</Text>
+            </span>
           )}
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={closeLabel}
             className="ml-auto flex-none rounded-control border border-line2 bg-raise px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
           >
-            Close
+            <Text id="modal.diff.close-btn">Close</Text>
           </button>
         </div>
 
@@ -113,7 +119,11 @@ function DiffBody({
   const beforeQ = usePreviewSvg(kind, partId, { rev: a });
   const afterQ = usePreviewSvg(kind, partId, { rev: b });
   if (beforeQ.isLoading || afterQ.isLoading) {
-    return <Centered>Loading diff...</Centered>;
+    return (
+      <Centered>
+        <Text id="modal.diff.loading">Loading diff...</Text>
+      </Centered>
+    );
   }
   if (beforeQ.isError || afterQ.isError || !beforeQ.data || !afterQ.data) {
     return <Centered>Could not render this {kind} diff.</Centered>;
