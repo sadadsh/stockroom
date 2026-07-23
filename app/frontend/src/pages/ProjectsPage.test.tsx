@@ -857,14 +857,14 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
 
     const section = await screen.findByTestId("buildability-section");
-    expect(within(section).getByText("Not Ready")).toBeInTheDocument();
+    expect(within(section).getByText("Not Buildable")).toBeInTheDocument();
     // cold caches are surfaced as their honest states, never fabricated passes
     expect(within(section).getByText("Not Run")).toBeInTheDocument();
     expect(within(section).getByText("Not Built")).toBeInTheDocument();
     expect(within(section).getByText(/2 reference\(s\) are not annotated/)).toBeInTheDocument();
   });
 
-  it("shows Ready to Build when every signal passes (M7g)", async () => {
+  it("shows Buildable when every signal passes (M7g)", async () => {
     mockApi.getBuildability.mockResolvedValue({
       ...BUILDABILITY_NOT_READY,
       ready: true,
@@ -882,7 +882,7 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
 
     const section = await screen.findByTestId("buildability-section");
-    expect(within(section).getByText("Ready to Build")).toBeInTheDocument();
+    expect(within(section).getByText("Buildable")).toBeInTheDocument();
   });
 
   it("renders the findings-table headers without letterspaced uppercase (design contract)", async () => {
