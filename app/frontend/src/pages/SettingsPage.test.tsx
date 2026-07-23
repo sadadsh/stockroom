@@ -335,7 +335,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows an honest not-wired status", async () => {
     mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS, kicad_wired: false });
     renderPage();
-    expect(await screen.findByText(/not wired yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/not wired so far/i)).toBeInTheDocument();
   });
 
   it("prefills the kicad overrides and saves both together", async () => {
@@ -483,9 +483,12 @@ describe("SettingsPage - copy adoption", () => {
   it("keeps the visible labels and behaviour unchanged outside dev mode", async () => {
     renderPage();
     // The wrapped labels still render their default text verbatim (no wrapper leaks
-    // into the accessible name) and the sync action still fires its mutation.
+    // into the accessible name) and the sync action still fires its mutation. The page
+    // header is the shared PanelTitle strip (no page-level heading, same as the other panes).
     await screen.findByText("Archive");
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-dev-id="settings.title"]')?.textContent,
+    ).toBe("Settings");
     expect(screen.getByRole("button", { name: /^connect$/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
