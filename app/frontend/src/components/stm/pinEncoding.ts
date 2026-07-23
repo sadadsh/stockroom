@@ -3,68 +3,34 @@
  * three read the same four channels (CONTEXT decision 5). Exactly ONE channel runs saturated color
  * (fill = electrical-class category); the others are neutral, so the map stays disciplined.
  *
- * - Fill  = PinDTO.category (electrical_class): the one saturated hue, a --stm-* token.
+ * - Fill  = PinDTO.category (electrical_class): the one saturated hue, a --stm-* token. The hue
+ *           table itself lives in lib/stmPinHue.ts (the single color-is-data source); this module
+ *           only adapts it to the map's neutral fallback and adds the map-specific role/5V channels.
  * - Border = PinDTO.roles[].role_class: a restrained NEUTRAL stroke that strengthens for a
  *            special-purpose pin (debug, oscillator, boot, reset, power), never a second hue.
  * - Mark  = PinDTO.five_v.tolerant: a small neutral dot, present only on 5V-tolerant IO pins.
  * - Ring  = selection: the neutral accent ring, not a fifth hue.
  */
 import type { PinDTO } from "../../api/types";
+import { PIN_CATEGORY_HUES, pinElectricalHue, type PinCategory } from "../../lib/stmPinHue";
 
-// The API's PinDTO.category vocabulary (_pin_category in api/routers/stm.py): the io
-// electrical class splits into four visual buckets (gpio/analog/debug/oscillator); every other
-// class passes through as itself. The two vocabularies MUST stay in lockstep — an unknown
-// category renders neutral and labels itself verbatim, never masquerading as another category.
-export type PinCategory =
-  | "gpio"
-  | "analog"
-  | "debug"
-  | "oscillator"
-  | "power"
-  | "ground"
-  | "reset"
-  | "boot"
-  | "vcap"
-  | "nc";
+export type { PinCategory };
 
-export interface CategorySpec {
-  key: PinCategory;
-  label: string;
-  token: string;
-}
+// The legend teaches the ten category buckets in stmPinHue's order (gpio-first through nc). Each
+// entry is a full hue descriptor (key / label / token / stroke / tileClass) from the single source.
+export const PIN_CATEGORIES = PIN_CATEGORY_HUES;
 
-// Ordered gpio-first (the bucket most pins carry) through the quietest (nc), the order the
-// legend teaches them in.
-export const PIN_CATEGORIES: readonly CategorySpec[] = [
-  { key: "gpio", label: "GPIO", token: "--stm-gpio" },
-  { key: "analog", label: "Analog", token: "--stm-analog" },
-  { key: "debug", label: "Debug", token: "--stm-debug" },
-  { key: "oscillator", label: "Oscillator", token: "--stm-oscillator" },
-  { key: "power", label: "Power", token: "--stm-power" },
-  { key: "ground", label: "Ground", token: "--stm-ground" },
-  { key: "reset", label: "Reset", token: "--stm-reset" },
-  { key: "boot", label: "Boot", token: "--stm-boot" },
-  { key: "vcap", label: "Vcap", token: "--stm-vcap" },
-  { key: "nc", label: "Not Connected", token: "--stm-nc" },
-];
-
-const CATEGORY_BY_KEY: Record<string, CategorySpec> = Object.fromEntries(
-  PIN_CATEGORIES.map((c) => [c.key, c]),
-);
-// A raw electrical_class "io" (a category the API only emits pre-split) reads as plain gpio.
-CATEGORY_BY_KEY.io = CATEGORY_BY_KEY.gpio;
-
-// The category fill as a token reference (never a raw hex). An UNKNOWN category renders as a
-// neutral line tint — visibly un-categorized, never silently painted as Not Connected (that
-// exact fallback masked a real vocabulary mismatch as a "Not Connected" I/O pin).
+// The category fill as a token reference (never a raw hex). An UNKNOWN category renders as a neutral
+// line tint on the map (--c-line2) — visibly un-categorized, never silently painted as another
+// category (that exact fallback once masked a real vocabulary mismatch as a "Not Connected" pin).
 export function categoryFill(category: string): string {
-  const spec = CATEGORY_BY_KEY[category];
-  return spec ? `var(${spec.token})` : "var(--c-line2)";
+  const hue = pinElectricalHue(category);
+  return hue.key === "neutral" ? "var(--c-line2)" : hue.stroke;
 }
 
 export function categoryLabel(category: string): string {
-  const spec = CATEGORY_BY_KEY[category];
-  if (spec) return spec.label;
+  const hue = pinElectricalHue(category);
+  if (hue.key !== "neutral") return hue.label;
   return category ? category.charAt(0).toUpperCase() + category.slice(1) : "Unknown";
 }
 
