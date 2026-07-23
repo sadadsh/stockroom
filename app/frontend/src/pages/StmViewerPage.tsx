@@ -163,7 +163,10 @@ function PinoutRegion({
         </div>
       ) : pinout ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="h-[320px] flex-none">
+          {/* A definite-height COLUMN FLEX slot: PinoutMap's chamber shrinks inside it so the
+              chamber footer (badges + Reset View) stays within the slot instead of spilling
+              over the legend below. */}
+          <div className="flex h-[352px] flex-none flex-col">
             <PinoutMap
               pinout={pinout}
               selectedPosition={selectedPosition}
