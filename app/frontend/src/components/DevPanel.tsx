@@ -19,6 +19,7 @@ import { useDevMode } from "../lib/devMode";
 import { DEV_TOKENS, DEV_TOKEN_GROUPS, DEFAULT_RANGE, type DevToken } from "../lib/devTokens";
 import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
+import { containerLayoutOf, reorderSiblings, reorderSiblingsOf } from "../lib/elementLayout";
 import { Button } from "./primitives";
 import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
@@ -597,6 +598,63 @@ function BoxRow({
   );
 }
 
+// The Layout section (Phase F / LAYOUT-01): reorder the selected element among its container siblings
+// via CSS `order`, keyed by data-dev-id. Renders only when the selection sits in a flex/grid container
+// (className-detected) with at least two dev-id siblings - otherwise there is nothing to reorder and it
+// renders null, so the Box tab is unchanged for elements outside a layout container. The current VISUAL
+// sequence is derived by sorting the DOM-order siblings by their live `order` override (ties by DOM
+// index), so each Move Up / Move Down walks the element exactly one step; the recomputed order values
+// are written through Phase E's per-element setter (the same map that applies inline by id and ships in
+// the save `elements` block) - no new persistence path, no reparenting.
+function LayoutSection({ id }: { id: string }) {
+  const dev = useDevMode();
+  const node = document.querySelector(`[data-dev-id="${id}"]`);
+  if (!node) return null;
+  const layout = containerLayoutOf(node.parentElement);
+  if (layout === "none") return null;
+  const siblings = reorderSiblingsOf(node);
+  if (siblings.length < 2) return null;
+
+  // Current visual sequence: DOM-order siblings sorted by their effective `order` (unset = 0), ties by
+  // DOM index. Reads the live working override so a prior reorder is reflected before the next step.
+  const orderedIds = siblings
+    .map((el, domIndex) => {
+      const sid = el.getAttribute("data-dev-id") ?? "";
+      const ov = dev.elementOverridesFor(sid)?.order;
+      const order = ov != null ? parseInt(ov, 10) : 0;
+      return { sid, order, domIndex };
+    })
+    .sort((a, b) => a.order - b.order || a.domIndex - b.domIndex)
+    .map((o) => o.sid);
+
+  const move = (direction: "up" | "down") => {
+    const next = reorderSiblings(orderedIds, id, direction);
+    for (const [sid, order] of Object.entries(next)) dev.setElementProp(sid, "order", order);
+  };
+
+  return (
+    <section className="py-1.5">
+      <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">Layout</div>
+      <div className="flex items-center gap-2 py-1">
+        <button
+          type="button"
+          onClick={() => move("up")}
+          className="rounded-control border border-line px-2 py-1 text-2xs font-semibold text-t2 transition-colors hover:text-t1"
+        >
+          Move Up
+        </button>
+        <button
+          type="button"
+          onClick={() => move("down")}
+          className="rounded-control border border-line px-2 py-1 text-2xs font-semibold text-t2 transition-colors hover:text-t1"
+        >
+          Move Down
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // The Box facet (D-04, ELEM-02): the owner-facing editing surface for the per-element escape hatch.
 // For the selected element it renders a labelled RESIZE + SPACING control per whitelisted property,
 // each editing the element's override live through the Plan 01 dev-mode API, with a per-property reset,
@@ -657,6 +715,7 @@ function BoxTab() {
           />
         ))}
       </section>
+      <LayoutSection id={selectedDevId} />
       {hasAny ? (
         <button
           type="button"

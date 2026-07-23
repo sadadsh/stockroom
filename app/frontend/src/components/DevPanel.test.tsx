@@ -46,6 +46,18 @@ function Harness() {
         <button type="button" data-dev-id="rail.tab.components" aria-label="Components tab" className="text-t1">
           <Icon id="nav.components" />
         </button>
+        {/* A real flex container with dev-id children, so the Layout reorder path has genuine siblings. */}
+        <div data-dev-id="rail.nav" className="flex flex-col">
+          <button type="button" data-dev-id="rail.nav-components" className="text-t1">
+            Nav Components
+          </button>
+          <button type="button" data-dev-id="rail.nav-projects" className="text-t1">
+            Nav Projects
+          </button>
+          <button type="button" data-dev-id="rail.nav-settings" className="text-t1">
+            Nav Settings
+          </button>
+        </div>
         <DevPanel />
         <DevInspector />
       </DevModeProvider>
@@ -343,5 +355,50 @@ describe("DevPanel inspect-first shell", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Box" }));
     expect(screen.getByText(/select an element to override its box/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Width value")).not.toBeInTheDocument();
+  });
+
+  // --- the Layout section (Phase F / LAYOUT-01): reorder within a flex/grid container via `order` ---
+
+  // Select the given nav child and open the Box tab; returns its live [data-dev-id] node.
+  function selectNavAndOpenBox(devId: string, label: string): HTMLElement {
+    inspectClick(screen.getByRole("button", { name: label }));
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+    return document.querySelector(`[data-dev-id="${devId}"]`) as HTMLElement;
+  }
+
+  it("shows Move Up / Move Down only for an element inside a flex/grid container with siblings", () => {
+    render(<Harness />);
+    toggleDevMode();
+    // A flex-container child: the Layout controls appear.
+    selectNavAndOpenBox("rail.nav-components", "Nav Components");
+    expect(screen.getByRole("button", { name: "Move Up" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move Down" })).toBeInTheDocument();
+
+    // A non-container element (its parent has no flex/grid class): no Layout controls. Inspect is
+    // already on from the call above, so a bare click reselects (a second inspectClick would toggle off).
+    fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+    expect(screen.queryByRole("button", { name: "Move Up" })).not.toBeInTheDocument();
+  });
+
+  it("Move Down writes the recomputed `order` live and carries it in the save `elements` block", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const node = selectNavAndOpenBox("rail.nav-components", "Nav Components");
+
+    // Move the first child down one step: it swaps with its next sibling, landing at visual index 1.
+    fireEvent.click(screen.getByRole("button", { name: "Move Down" }));
+    // The Phase E apply effect sets the inline style live from the `order` override.
+    expect(node.style.order).toBe("1");
+
+    // Save carries the reorder purely as an `order` entry in the `elements` block for the backend writer.
+    const devSave = vi.mocked(api.devSave);
+    devSave.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /Save to source/ }));
+    expect(devSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        elements: expect.objectContaining({ "rail.nav-components": { order: "1" } }),
+      }),
+    );
   });
 });
