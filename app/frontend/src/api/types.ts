@@ -1568,3 +1568,61 @@ export interface PinoutDTO {
   geometry: PinoutGeometryDTO;
   pins: PinDTO[];
 }
+
+// --- Compatibility Workbench DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4).
+// POST /api/stm/compat/union returns UnionDTO; every field mirrors the frozen Pydantic shape. The
+// classification vocabulary is exactly shared | divergent | partial (never the retired switch-fabric
+// identity), and reconcile is a read-only description of the alternate-function remap, never applied.
+
+// One union position at (mcu, package, position) grain, classified from the per-part facts so the
+// classification is auditable (never a silent package-majority collapse). lqfp_side / bga_row /
+// bga_col carry the same geometry hint PinDTO does, so lib/pinMapGeometry lays these out unchanged.
+export interface UnionPositionDTO {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  classification: "shared" | "divergent" | "partial";
+  present_on: number;
+  total: number;
+  // the raw per-part trail behind the classification (inspector detail on click, never per-pad).
+  per_part: {
+    ref: string;
+    canonical_pin_name: string;
+    roles: string[];
+    functions: string[];
+  }[];
+  // for a divergent position (COMPAT-03): the AF remap that makes each part carry the union's
+  // required signal here, or swappable:false + a reason. Read-only, never applied. null when the
+  // position needs no reconcile (a shared / partial position).
+  reconcile: {
+    swappable: boolean;
+    swaps: { ref: string; target_signal: string; via_af_index: number }[];
+    reason: string | null;
+  } | null;
+}
+
+// POST /api/stm/compat/union -> the socket-union of a set + its set-level verdict (COMPAT-01/02/03/05).
+export interface UnionDTO {
+  parts: string[];
+  resolved: { ref: string; mpn: string }[];
+  package: string;
+  family: string;
+  grain: "per-part";
+  positions: UnionPositionDTO[];
+  // the one dominant verdict (COMPAT-05): interchangeable with N swaps, or incompatible with the
+  // blocking signal(s) that cannot be placed listed beneath.
+  verdict: {
+    interchangeable: boolean;
+    swaps_required: number;
+    blocking: { position: string; signal: string; reason: string }[];
+  };
+}
+
+// The body POST /api/stm/compat/union accepts: an explicit set of refs OR a (family, package) group.
+export interface CompatUnionBody {
+  parts?: string[];
+  family?: string;
+  package?: string;
+}

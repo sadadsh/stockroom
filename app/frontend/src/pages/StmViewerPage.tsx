@@ -12,8 +12,7 @@
  * decision 3); a matrix row click sets activePart, the seam the pinout map (04-03) consumes.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useStmMcus, useStmStatus, useStmPinout, useBuildStmIndex } from "../api/stmQueries";
+import { useStmMcus, useStmStatus, useStmPinout } from "../api/stmQueries";
 import { ApiError } from "../api/client";
 import type { StmMcusArgs } from "../api/client";
 import { FamilyPicker } from "../components/stm/FamilyPicker";
@@ -21,7 +20,9 @@ import { SpecMatrixTable } from "../components/stm/SpecMatrixTable";
 import { PinoutMap } from "../components/stm/PinoutMap";
 import { PinoutLegend } from "../components/stm/PinoutLegend";
 import { PinInspector } from "../components/stm/PinInspector";
-import { Button, Card, Eyebrow } from "../components/primitives";
+import { BuildIndexGate } from "../components/stm/BuildIndexGate";
+import { CompatibilityWorkbench } from "../components/stm/CompatibilityWorkbench";
+import { Button, Eyebrow, TabPanel, TabStrip, type TabItem } from "../components/primitives";
 
 export interface StmScope extends StmMcusArgs {
   families: string[];
@@ -29,6 +30,14 @@ export interface StmScope extends StmMcusArgs {
 }
 
 const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
+
+// The STM Viewer's two co-equal sections (CONTEXT decision 10 — a tab of this page, never a new
+// nav route): the Phase-4 explorer and the Phase-5 compatibility workbench.
+type StmTab = "explorer" | "compatibility";
+const STM_TABS: readonly TabItem<StmTab>[] = [
+  { id: "explorer", label: "Explorer" },
+  { id: "compatibility", label: "Compatibility" },
+];
 
 // The coarse server-side narrowing (decision 3): exactly one selected family narrows server-side;
 // zero or multiple families fetch the wider matrix and are reconciled by the client filter below.
@@ -38,6 +47,7 @@ function scopeToArgs(scope: StmScope): StmMcusArgs {
 }
 
 export function StmViewerPage() {
+  const [tab, setTab] = useState<StmTab>("explorer");
   const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
   const [activePart, setActivePart] = useState<string | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
@@ -82,41 +92,57 @@ export function StmViewerPage() {
 
   return (
     <PageShell status={status.data?.mcu_count} families={status.data?.family_count}>
-      <div className="flex min-h-0 flex-1">
-        {/* scope */}
-        <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
-          <FamilyPicker scope={scope} onScopeChange={setScope} />
-        </div>
-
-        {/* matrix */}
-        <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
-          {mcus.isLoading ? (
-            <div className="py-16 text-center text-sm text-t3">Loading the spec matrix...</div>
-          ) : mcusError ? (
-            <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
-          ) : (
-            <SpecMatrixTable
-              rows={rows}
-              activePart={activePart}
-              onSelectPart={setActivePart}
-            />
-          )}
-        </div>
-
-        {/* pinout map + legend + inspector */}
-        <aside className="flex w-[384px] flex-none flex-col overflow-hidden border-l border-line px-4 pt-1">
-          <PinoutRegion
-            activePart={activePart}
-            pinout={pinout.data ?? null}
-            isLoading={pinout.isLoading && !!activePart}
-            error={pinout.error}
-            selectedPosition={selectedPosition}
-            onSelectPosition={setSelectedPosition}
-            inspectedPin={inspectedPin}
-            onRetry={() => pinout.refetch()}
-          />
-        </aside>
+      <div className="flex-none px-[30px] pb-3">
+        <TabStrip
+          tabs={STM_TABS}
+          active={tab}
+          onSelect={setTab}
+          idBase="stm-view"
+          aria-label="STM Viewer sections"
+        />
       </div>
+
+      {tab === "explorer" ? (
+        <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 flex-1">
+          {/* scope */}
+          <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
+            <FamilyPicker scope={scope} onScopeChange={setScope} />
+          </div>
+
+          {/* matrix */}
+          <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
+            {mcus.isLoading ? (
+              <div className="py-16 text-center text-sm text-t3">Loading the spec matrix...</div>
+            ) : mcusError ? (
+              <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
+            ) : (
+              <SpecMatrixTable
+                rows={rows}
+                activePart={activePart}
+                onSelectPart={setActivePart}
+              />
+            )}
+          </div>
+
+          {/* pinout map + legend + inspector */}
+          <aside className="flex w-[384px] flex-none flex-col overflow-hidden border-l border-line px-4 pt-1">
+            <PinoutRegion
+              activePart={activePart}
+              pinout={pinout.data ?? null}
+              isLoading={pinout.isLoading && !!activePart}
+              error={pinout.error}
+              selectedPosition={selectedPosition}
+              onSelectPosition={setSelectedPosition}
+              inspectedPin={inspectedPin}
+              onRetry={() => pinout.refetch()}
+            />
+          </aside>
+        </TabPanel>
+      ) : (
+        <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 flex-1">
+          <CompatibilityWorkbench />
+        </TabPanel>
+      )}
     </PageShell>
   );
 }
@@ -220,62 +246,6 @@ function PageShell({
         ) : null}
       </header>
       {children}
-    </div>
-  );
-}
-
-// The honest "index not built" call to action, driven by the build job's live progress (mirrors
-// the RescanSection running/done/error flow). On success it re-queries the STM surface so the gate
-// clears to the real matrix.
-function BuildIndexGate() {
-  const build = useBuildStmIndex();
-  const qc = useQueryClient();
-
-  useEffect(() => {
-    if (build.status === "done") {
-      qc.invalidateQueries({ queryKey: ["stm-status"] });
-      qc.invalidateQueries({ queryKey: ["stm-mcus"] });
-      qc.invalidateQueries({ queryKey: ["stm-families"] });
-    }
-  }, [build.status, qc]);
-
-  const running = build.status === "running";
-  const pct =
-    build.progress?.pct != null ? Math.min(100, Math.round(build.progress.pct)) : null;
-
-  return (
-    <div className="flex flex-1 items-center justify-center px-6 py-10">
-      <Card className="w-full max-w-[440px] px-6 py-6">
-        <Eyebrow className="mb-2">STM Index</Eyebrow>
-        <h2 className="mb-1.5 text-lg font-semibold text-t1">Build the Index</h2>
-        <p className="mb-4 text-sm text-t2">
-          The STM32 spec matrix and pinout maps are served from a derived index built from your
-          CubeMX source. It has not been built yet on this machine. Building runs once and takes a
-          moment.
-        </p>
-
-        {running ? (
-          <div className="mb-4 flex flex-col gap-2" data-testid="stm-build-running">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-raise2">
-              <div
-                className="h-full rounded-full bg-acc transition-[width]"
-                style={{ width: pct != null ? `${pct}%` : "35%" }}
-              />
-            </div>
-            <p className="text-xs text-t3">{build.progress?.message ?? "Starting the build..."}</p>
-          </div>
-        ) : null}
-
-        {build.status === "error" ? (
-          <p className="mb-4 text-sm text-err" data-testid="stm-build-error">
-            {build.error}
-          </p>
-        ) : null}
-
-        <Button variant="accent" onClick={() => build.start()} disabled={running}>
-          {running ? "Building..." : build.status === "error" ? "Try Again" : "Build the Index"}
-        </Button>
-      </Card>
     </div>
   );
 }

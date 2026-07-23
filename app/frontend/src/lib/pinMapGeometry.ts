@@ -12,7 +12,19 @@
  *   mapped skipping the CubeMX-omitted 'I'. An absent ball is simply no pad at that cell; the grid
  *   is never a guessed square root of the pin count.
  */
-import type { PinDTO, PinoutGeometryDTO } from "../api/types";
+import type { PinoutGeometryDTO } from "../api/types";
+
+// The minimal per-pad geometry input the layout reads: a position label plus its placement hint
+// (perimeter lqfp_side, or a BGA row/col cell). Both PinDTO (Phase 4's pinout) and UnionPositionDTO
+// (Phase 5's socket-union) satisfy this structurally, so the SAME geometry path lays out both the
+// pinout map and the compatibility union map (INTERFACES.md section 5, CONTEXT decision 3) with no
+// reimplementation. The layout never reads any per-pin fact beyond these four fields.
+export interface PinGeometryInput {
+  position: string;
+  lqfp_side?: string | null;
+  bga_row?: string | null;
+  bga_col?: number | null;
+}
 
 export interface PadRect {
   x: number;
@@ -68,7 +80,7 @@ function roundRect(r: PadRect): PadRect {
 // numeric position, at a per-side even pitch (so an unequal/depopulated side still lays out
 // correctly). Mirrors the Python body/pad proportions (body 0.66 of span, pad length 0.095).
 function perimeterLayout(
-  pins: PinDTO[],
+  pins: PinGeometryInput[],
   geometry: PinoutGeometryDTO,
   w: number,
   h: number,
@@ -84,11 +96,11 @@ function perimeterLayout(
   const br = cx + body / 2;
   const bb = cy + body / 2;
 
-  const bySide: Record<PadSide, PinDTO[]> = { left: [], bottom: [], right: [], top: [] };
+  const bySide: Record<PadSide, PinGeometryInput[]> = { left: [], bottom: [], right: [], top: [] };
   for (const p of pins) {
     if (p.lqfp_side && p.lqfp_side in bySide) bySide[p.lqfp_side as PadSide].push(p);
   }
-  const byPosition = (a: PinDTO, b: PinDTO) =>
+  const byPosition = (a: PinGeometryInput, b: PinGeometryInput) =>
     (parseInt(a.position, 10) || 0) - (parseInt(b.position, 10) || 0);
 
   const out: PadLayout[] = [];
@@ -128,7 +140,7 @@ function perimeterLayout(
 // from the geometry when present, else from the real ball maxima (never a guessed sqrt grid). An
 // absent ball leaves an empty cell.
 function ballGridLayout(
-  pins: PinDTO[],
+  pins: PinGeometryInput[],
   geometry: PinoutGeometryDTO,
   w: number,
   h: number,
@@ -171,7 +183,7 @@ function ballGridLayout(
  * algorithm: qfp/qfn -> perimeter (by real lqfp_side); bga/wlcsp -> ball grid.
  */
 export function pinMapGeometry(
-  pins: PinDTO[],
+  pins: PinGeometryInput[],
   geometry: PinoutGeometryDTO,
   w: number,
   h: number,
