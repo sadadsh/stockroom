@@ -582,14 +582,19 @@ def _vendor_from_url(url: str) -> tuple[str, str]:
     """(driver_key, display_label) for a resolved CAD-source URL. The key drives which vendor
     driver runs (empty = no automation, guidance only); the label is what the overlay shows."""
     u = (url or "").lower()
+    # DigiKey is checked FIRST: the guided capture happens ON DigiKey, and its CAD models page URL
+    # carries a `?tab=ultralibrarian` (or traceparts/cadenas/snapmagic) query, so a naive provider
+    # substring match would mis-route a DigiKey page to a legacy provider driver whose selectors never
+    # fire (live-observed 2026-07-23: the models page injected the Ultra Librarian driver, 0 captures).
+    # The provider drivers below apply only to a window opened DIRECTLY on a provider site.
+    if "digikey" in u:
+        return ("digikey", "DigiKey")
     if "ultralibrarian" in u:
         return ("ultralibrarian", "Ultra Librarian")
-    if "snapeda" in u:
+    if "snapeda" in u or "snapmagic" in u:
         return ("snapeda", "SnapEDA")
     if "componentsearchengine" in u or "samacsys" in u:
         return ("samacsys", "SamacSys")
-    if "digikey" in u:
-        return ("digikey", "DigiKey")
     return ("", "the vendor")
 
 
