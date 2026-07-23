@@ -938,12 +938,17 @@ class _HostApi:
             # format's download reached Completed, so the in-flight DownloadOperation is never orphaned
             # (WebView2Feedback #4435). `loaded` then injects the next-format driver.
             if not session.is_complete() and _next_format() is not None:
-                try:
-                    win.evaluate_js(
-                        "setTimeout(function(){location.href=" + json.dumps(url) + ";},600);"
-                    )
-                except Exception:  # noqa: BLE001 - best-effort; the loaded handler still re-injects
-                    pass
+                # Navigate on a Timer thread, NOT inline here: this runs inside the WebView2 download
+                # StateChanged event, and calling evaluate_js to navigate from within that event can
+                # re-enter the browser and hang it ("not responding"). The short delay also lets the
+                # just-completed download settle before the page tears down.
+                def _nav_next() -> None:
+                    try:
+                        win.evaluate_js("location.href=" + json.dumps(url) + ";")
+                    except Exception:  # noqa: BLE001 - best-effort; the loaded handler still re-injects
+                        pass
+
+                threading.Timer(0.8, _nav_next).start()
 
         _install_cad_download_intercept(win, session.temp_dir, _on_captured)
 
