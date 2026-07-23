@@ -10,10 +10,11 @@ import { AddPartModal } from "./AddPartModal";
 import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
 import { useRouter } from "../lib/router";
+import { NAV } from "../lib/nav";
+import { Text } from "../lib/copy";
 import {
   useFacetsQuery,
   useProfiles,
-  useSettings,
   useUpdateCheck,
 } from "../api/queries";
 
@@ -61,44 +62,44 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 // The bottom status bar: an Altium signature, and honest about the app's real state. Left:
-// the components load state (Title Case, no status dot) and the active section. Right: the
-// working context that actually matters day to day - the active profile, whether KiCad is
-// wired to it, and an update notice when one exists. All read from queries the app already
-// caches, so the bar costs nothing extra.
+// the components load state (Title Case, no status dot) and the active section, named from
+// the nav registry so "stm" reads "STM Viewer", never a capitalized route slug. Right: the
+// working context that matters day to day - the active profile and an update notice when one
+// exists. All read from queries the app already caches, so the bar costs nothing extra.
 function ShellStatusBar() {
   const { route } = useRouter();
   const facets = useFacetsQuery();
-  const settings = useSettings();
   const profiles = useProfiles();
   const update = useUpdateCheck();
-  const section = route.charAt(0).toUpperCase() + route.slice(1);
-  const label = facets.isError
-    ? "Component Load Failed"
-    : facets.isLoading
-      ? "Loading Components"
-      : "Components Loaded";
+  const section = NAV.find((entry) => entry.route === route)?.title ?? route;
   return (
     <footer
       data-dev-id="shell.statusbar"
       className="flex h-[24px] flex-none items-center gap-2.5 border-t border-line bg-band px-3 text-2xs text-t2"
     >
-      <span className={facets.isError ? "text-err" : undefined}>{label}</span>
+      <span className={facets.isError ? "text-err" : undefined}>
+        {facets.isError ? (
+          <Text id="shell.status.load-failed">Component Load Failed</Text>
+        ) : facets.isLoading ? (
+          <Text id="shell.status.loading">Loading Components</Text>
+        ) : (
+          <Text id="shell.status.loaded">Components Loaded</Text>
+        )}
+      </span>
       <span className="text-t3">/</span>
       <span className="text-t3">{section}</span>
       <span className="ml-auto flex items-center gap-2.5 text-t3">
-        {profiles.data?.active ? <span>Profile {profiles.data.active}</span> : null}
-        {settings.data ? (
-          <>
-            <span className="text-line2">|</span>
-            <span className={settings.data.kicad_wired ? undefined : "text-warn"}>
-              {settings.data.kicad_wired ? "KiCad Wired" : "KiCad Not Wired"}
-            </span>
-          </>
+        {profiles.data?.active ? (
+          <span>
+            <Text id="shell.status.profile">Profile</Text> {profiles.data.active}
+          </span>
         ) : null}
         {update.data?.update_available ? (
           <>
             <span className="text-line2">|</span>
-            <span className="text-t2">Update Available</span>
+            <span className="text-t2">
+              <Text id="shell.status.update">Update Available</Text>
+            </span>
           </>
         ) : null}
       </span>

@@ -11,6 +11,7 @@ import { ApiError, api } from "../api/client";
 import { useFacetsQuery, usePassiveAdd } from "../api/queries";
 import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
+import { Text, useText } from "../lib/copy";
 import { applySign, prettifyValue } from "../lib/specSchema";
 import { Badge, Button } from "./primitives";
 import { PulledDepth } from "./PulledDepth";
@@ -62,6 +63,19 @@ export function PassiveAddSection({
   const facets = useFacetsQuery();
   const add = usePassiveAdd();
   const ran = useRef(false);
+  // Copy layer: attribute/callback strings resolve here; the visible copy below is <Text>.
+  const toastNoResolve = useText("ingest.toast-no-resolve", "Could not resolve that passive.");
+  const toastAddFailed = useText("ingest.toast-add-failed", "Add failed.");
+  const kindPlaceholder = useText("ingest.kind-placeholder", "Select kind...");
+  const pkgPlaceholder = useText("ingest.package-placeholder", "Select package...");
+  const valuePlaceholder = useText("ingest.value-placeholder", "e.g. 10 k\u03a9");
+  const tolerancePlaceholder = useText("ingest.tolerance-placeholder", "e.g. 1%");
+  const datasheetHint = useText(
+    "ingest.datasheet-hint",
+    "Required. Paste the datasheet link if it was not pulled.",
+  );
+  const distPnPlaceholder = useText("ingest.distpn-placeholder", "Optional");
+  const distPnHint = useText("ingest.distpn-hint", "The order number, if you have it.");
 
   const categories = Object.keys(facets.data?.by_category ?? {}).sort();
   const manufacturers = Object.keys(facets.data?.by_manufacturer ?? {}).sort();
@@ -117,7 +131,7 @@ export function PassiveAddSection({
       }
     } catch (err) {
       setPreview(null);
-      toast(err instanceof ApiError ? err.message : "Could not resolve that passive.", "err");
+      toast(err instanceof ApiError ? err.message : toastNoResolve, "err");
     } finally {
       setPreviewing(false);
     }
@@ -143,7 +157,7 @@ export function PassiveAddSection({
       {
         onSuccess: (rec) => onAdded(rec.display_name),
         onError: (err) =>
-          toast(err instanceof ApiError ? err.message : "Add failed.", "err"),
+          toast(err instanceof ApiError ? err.message : toastAddFailed, "err"),
       },
     );
   }
@@ -163,39 +177,52 @@ export function PassiveAddSection({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-sm text-t2">
-        <Badge tone="ok">Passive</Badge>
-        <span>No files needed. It uses KiCad's built-in symbol, footprint and 3D model.</span>
+        <Badge tone="ok">
+          <Text id="ingest.passive-badge">Passive</Text>
+        </Badge>
+        <span>
+          <Text id="ingest.passive-msg">
+            No files needed. It uses KiCad's built-in symbol, footprint and 3D model.
+          </Text>
+        </span>
       </div>
 
       {manual ? (
         <div className="flex flex-col gap-3 rounded-card border border-line2 bg-raise2 p-4">
           <p className="text-xs text-t3">
-            We could not match a stock footprint automatically. Choose the kind and
-            package and it still adds with no files. Then preview again.
+            <Text id="ingest.manual-hint">
+              We could not match a stock footprint automatically. Choose the kind and package and it still adds with no files. Then preview again.
+            </Text>
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <SelectField
               label="Kind"
+              copyId="ingest.field-kind"
               value={kind}
               onChange={setKind}
-              placeholder="Select kind..."
+              placeholder={kindPlaceholder}
               options={KIND_OPTIONS}
             />
             <SelectField
               label="Package"
+              copyId="ingest.field-package"
               value={pkg}
               onChange={setPkg}
-              placeholder="Select package..."
+              placeholder={pkgPlaceholder}
               options={packages.map((p) => [p, p] as [string, string])}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextField label="Value" value={value} onChange={setValue} placeholder="e.g. 10 kΩ" />
-            <TextField label="Tolerance" value={tolerance} onChange={setTolerance} placeholder="e.g. 1%" />
+            <TextField label="Value" copyId="ingest.field-value" value={value} onChange={setValue} placeholder={valuePlaceholder} />
+            <TextField label="Tolerance" copyId="ingest.field-tolerance" value={tolerance} onChange={setTolerance} placeholder={tolerancePlaceholder} />
           </div>
           <div>
             <Button variant="accent" onClick={doPreview} disabled={previewing || !kind || !pkg}>
-              {previewing ? "Resolving..." : "Preview"}
+              {previewing ? (
+                <Text id="ingest.preview-busy">Resolving...</Text>
+              ) : (
+                <Text id="ingest.preview">Preview</Text>
+              )}
             </Button>
           </div>
         </div>
@@ -225,6 +252,7 @@ export function PassiveAddSection({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComboField
               label="Category"
+              copyId="ingest.field-category"
               value={category}
               onChange={setCategory}
               options={categories}
@@ -232,6 +260,7 @@ export function PassiveAddSection({
             />
             <ComboField
               label="Manufacturer"
+              copyId="ingest.field-manufacturer"
               value={manufacturer}
               onChange={setManufacturer}
               options={manufacturers}
@@ -241,28 +270,34 @@ export function PassiveAddSection({
 
           <TextField
             label="Datasheet URL"
+            copyId="ingest.field-datasheet-url"
             value={datasheetUrl}
             onChange={setDatasheetUrl}
             placeholder="https://..."
-            hint="Required. Paste the datasheet link if it was not pulled."
+            hint={datasheetHint}
           />
           <TextField
             label="Distributor Part Number"
+            copyId="ingest.field-distpn"
             value={distributorPn}
             onChange={setDistributorPn}
-            placeholder="Optional"
-            hint="The order number, if you have it."
+            placeholder={distPnPlaceholder}
+            hint={distPnHint}
           />
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-t3">Buy Link</span>
+            <span className="text-xs text-t3">
+              <Text id="ingest.buy-link">Buy Link</Text>
+            </span>
             <span className="truncate rounded-control border border-line2 bg-field px-3 py-2 text-sm text-t2">
               {rec.purchase[0]?.url}
             </span>
           </div>
 
           {remaining.length > 0 ? (
-            <div className="text-xs text-warn">Still needed to add: {remaining.join(", ")}.</div>
+            <div className="text-xs text-warn">
+              <Text id="ingest.still-needed">Still needed to add:</Text> {remaining.join(", ")}.
+            </div>
           ) : null}
 
           <div>
@@ -271,12 +306,18 @@ export function PassiveAddSection({
               onClick={doAdd}
               disabled={add.isPending || remaining.length > 0}
             >
-              {add.isPending ? "Adding..." : "Add to Components"}
+              {add.isPending ? (
+                <Text id="ingest.commit-busy">Adding...</Text>
+              ) : (
+                <Text id="ingest.commit">Add to Components</Text>
+              )}
             </Button>
           </div>
         </div>
       ) : previewing && !manual ? (
-        <div className="text-sm text-t3">Resolving the stock footprint and model...</div>
+        <div className="text-sm text-t3">
+          <Text id="ingest.resolving">Resolving the stock footprint and model...</Text>
+        </div>
       ) : null}
     </div>
   );

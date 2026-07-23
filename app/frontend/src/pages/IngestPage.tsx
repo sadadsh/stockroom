@@ -12,6 +12,7 @@ import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
 import { useEnrichLookup } from "../api/queries";
 import { useToast } from "../lib/toast";
+import { Text, useText } from "../lib/copy";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
 import { sv } from "../lib/sourced";
@@ -49,6 +50,24 @@ export function IngestPage() {
   const enrich = useEnrichLookup();
   const looking = enrich.status === "running";
   const { toast } = useToast();
+  // Copy layer: strings that fire from callbacks/attributes resolve here (stable hook order);
+  // everything visible below is a <Text> so the whole window is dev-mode editable.
+  const inputAria = useText("ingest.input-aria", "Product link or part number");
+  const inputPlaceholder = useText(
+    "ingest.input-placeholder",
+    "https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V",
+  );
+  const toastNothing = useText(
+    "ingest.toast-nothing",
+    "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
+  );
+  const toastLookupFailed = useText("ingest.toast-lookup-failed", "Look up failed.");
+  const toastInspectFailed = useText("ingest.toast-inspect-failed", "Inspect failed");
+  const toastNoHost = useText(
+    "ingest.toast-no-host",
+    "Open Stockroom as the app to browse for a ZIP (a web browser cannot read file paths).",
+  );
+  const toastAdded = useText("ingest.toast-added", "Added");
 
   const lookUp = useCallback(() => {
     const v = input.trim();
@@ -76,13 +95,10 @@ export function IngestPage() {
       const gotAnything =
         r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
       if (!gotAnything) {
-        toast(
-          "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
-          "neutral",
-        );
+        toast(toastNothing, "neutral");
       }
     } else if (enrich.status === "error") {
-      toast(enrich.error ?? "Look up failed.", "err");
+      toast(enrich.error ?? toastLookupFailed, "err");
     }
     // toast is stable; re-running only on the lookup settling is intended.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,7 +112,7 @@ export function IngestPage() {
         const { job_id } = await api.ingestInspect(paths, lcscIds);
         await job.run(job_id);
       } catch (err) {
-        toast(err instanceof ApiError ? err.message : "Inspect failed", "err");
+        toast(err instanceof ApiError ? err.message : toastInspectFailed, "err");
       }
     },
     [job, toast],
@@ -113,10 +129,7 @@ export function IngestPage() {
       }
     ).pywebview?.api;
     if (!hostApi?.pick_ingest_files) {
-      toast(
-        "Open Stockroom as the app to browse for a ZIP (a web browser cannot read file paths).",
-        "neutral",
-      );
+      toast(toastNoHost, "neutral");
       return;
     }
     try {
@@ -218,20 +231,20 @@ export function IngestPage() {
       {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
       <div data-dev-id="ingest.hero">
         <p className="mb-2.5 text-xs text-t3">
-          Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls
-          it all. A passive is complete with no files; a non-passive needs its symbol,
-          footprint and 3D model.
+          <Text id="ingest.hero-hint">
+            Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls it all. A passive is complete with no files; a non-passive needs its symbol, footprint and 3D model.
+          </Text>
         </p>
         <div className="flex items-center gap-2.5">
           <input
             data-dev-id="ingest.input"
-            aria-label="Product link or part number"
+            aria-label={inputAria}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") lookUp();
             }}
-            placeholder="https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V"
+            placeholder={inputPlaceholder}
             disabled={looking}
             className="h-[31px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
           />
@@ -242,7 +255,11 @@ export function IngestPage() {
             disabled={looking || !input.trim()}
             className="flex-none px-4"
           >
-            {looking ? "Looking Up..." : "Look Up"}
+            {looking ? (
+              <Text id="ingest.lookup-busy">Looking Up...</Text>
+            ) : (
+              <Text id="ingest.lookup-label">Look Up</Text>
+            )}
           </Button>
         </div>
         {looking ? (
@@ -252,10 +269,12 @@ export function IngestPage() {
         ) : !result ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button data-dev-id="ingest.browse" onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-              Browse for ZIP
+              <Text id="ingest.browse-label">Browse for ZIP</Text>
             </Button>
             <span className="text-xs text-t3">
-              Or add a part straight from a vendor ZIP (SnapEDA, Ultra Librarian).
+              <Text id="ingest.browse-hint">
+                Or add a part straight from a vendor ZIP (SnapEDA, Ultra Librarian).
+              </Text>
             </span>
           </div>
         ) : null}
@@ -269,7 +288,7 @@ export function IngestPage() {
             plan={plan}
             input={lookedUpInput}
             onAdded={(name) => {
-              toast(`Added ${name}`, "ok");
+              toast(`${toastAdded} ${name}`, "ok");
               reset();
             }}
             toast={toast}
@@ -281,12 +300,13 @@ export function IngestPage() {
         <Card data-dev-id="ingest.blocked" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <span className="text-sm text-warn">
-              Nothing was pulled. The page might have blocked the fetch, or the link is not a
-              product page. Use a different link, or drop a vendor ZIP.
+              <Text id="ingest.blocked-msg">
+                Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
+              </Text>
             </span>
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                Browse for ZIP
+                <Text id="ingest.browse-label">Browse for ZIP</Text>
               </Button>
             </div>
           </div>
@@ -297,17 +317,22 @@ export function IngestPage() {
         <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-t2">
-              <Badge tone="warn">Needs Files</Badge>
-              <span>This part needs a symbol, footprint and 3D model.</span>
+              <Badge tone="warn">
+                <Text id="ingest.needs-files">Needs Files</Text>
+              </Badge>
+              <span>
+                <Text id="ingest.needs-msg">This part needs a symbol, footprint and 3D model.</Text>
+              </span>
             </div>
             <PulledSummary result={result} />
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-                Browse for ZIP
+                <Text id="ingest.browse-label">Browse for ZIP</Text>
               </Button>
               <span className="text-xs text-t3">
-                Drop its vendor ZIP (SnapEDA, Ultra Librarian) into the window, or browse.
-                The pulled details are kept, so all that is left is the files.
+                <Text id="ingest.drop-hint">
+                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) into the window, or browse. The pulled details are kept, so all that is left is the files.
+                </Text>
               </span>
             </div>
           </div>
@@ -316,12 +341,16 @@ export function IngestPage() {
 
       {busy ? <Progress progress={job.progress} /> : null}
       {job.status === "error" ? (
-        <div className="text-sm text-err">Inspect failed. {job.error}</div>
+        <div className="text-sm text-err">
+          <Text id="ingest.inspect-failed">Inspect failed.</Text> {job.error}
+        </div>
       ) : null}
 
       {staged && staged.length > 0 ? (
         <div data-dev-id="ingest.staged" className="flex flex-col gap-4">
-          <Eyebrow>Review and Add</Eyebrow>
+          <Eyebrow>
+            <Text id="ingest.review-eyebrow">Review and Add</Text>
+          </Eyebrow>
           {staged.map(({ id, candidate, datasheetUrl }) => (
             <CandidateCard
               key={id}
@@ -334,7 +363,7 @@ export function IngestPage() {
         </div>
       ) : staged && staged.length === 0 ? (
         <div className="py-4 text-center text-sm text-t3">
-          No parts found in what was dropped.
+          <Text id="ingest.no-parts">No parts found in what was dropped.</Text>
         </div>
       ) : null}
     </div>
@@ -344,17 +373,19 @@ export function IngestPage() {
 function PulledSummary({ result }: { result: EnrichmentResult }) {
   const rows = (
     [
-      ["MPN", sv(result.mpn)],
-      ["Manufacturer", sv(result.manufacturer)],
-      ["Description", sv(result.description)],
-      ["Package", sv(result.package)],
-    ] as [string, string][]
-  ).filter(([, v]) => v);
+      ["ingest.pulled-mpn", "MPN", sv(result.mpn)],
+      ["ingest.pulled-manufacturer", "Manufacturer", sv(result.manufacturer)],
+      ["ingest.pulled-description", "Description", sv(result.description)],
+      ["ingest.pulled-package", "Package", sv(result.package)],
+    ] as [string, string, string][]
+  ).filter(([, , v]) => v);
   const specCount = Object.keys(result.specs).filter((k) => k !== "product_url").length;
   if (rows.length === 0 && specCount === 0) {
     return (
       <span className="text-sm text-warn">
-        Nothing was pulled. The page might have blocked the fetch, or the link is not a product page.
+        <Text id="ingest.nothing-pulled">
+          Nothing was pulled. The page might have blocked the fetch, or the link is not a product page.
+        </Text>
       </span>
     );
   }
@@ -365,16 +396,20 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
     >
       {rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
-          {rows.map(([k, v]) => (
+          {rows.map(([copyId, k, v]) => (
             <div key={k} className="contents">
-              <span className="text-t3">{k}</span>
+              <span className="text-t3">
+                <Text id={copyId}>{k}</Text>
+              </span>
               <span className="truncate text-t1">{v}</span>
             </div>
           ))}
         </div>
       ) : null}
       {specCount > 0 ? (
-        <span className="text-xs text-t3">{specCount} specs pulled and kept.</span>
+        <span className="text-xs text-t3">
+          {specCount} <Text id="ingest.specs-kept">specs pulled and kept.</Text>
+        </span>
       ) : null}
       <PulledDepth result={result} />
     </div>
@@ -395,7 +430,7 @@ function Progress({ progress }: { progress: JobProgress | null }) {
         />
       </div>
       <div className="mt-2 text-xs text-t3">
-        {progress?.message ? progress.message : "Working..."}
+        {progress?.message ? progress.message : <Text id="ingest.working">Working...</Text>}
       </div>
     </div>
   );

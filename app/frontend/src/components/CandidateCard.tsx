@@ -11,6 +11,7 @@ import { ApiError } from "../api/client";
 import { useIngestCommit } from "../api/queries";
 import type { StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
+import { Text, useText } from "../lib/copy";
 import { Badge, Button, Card, Dot } from "./primitives";
 
 const EMPTY_PROVENANCE = {
@@ -51,6 +52,10 @@ export function CandidateCard({
   );
   const [missing, setMissing] = useState<string[]>([]);
   const commit = useIngestCommit();
+  // Copy layer: toast strings resolve here so the callbacks fire the override, not the literal.
+  const toastAdded = useText("ingest.toast-added", "Added");
+  const toastIncomplete = useText("ingest.toast-incomplete", "Still incomplete");
+  const toastCouldNotAdd = useText("ingest.toast-could-not-add", "Could not add");
 
   function set<K extends keyof StagingCandidate>(key: K, value: StagingCandidate[K]) {
     setC((prev) => ({ ...prev, [key]: value }));
@@ -67,15 +72,15 @@ export function CandidateCard({
     setMissing([]);
     commit.mutate(c, {
       onSuccess: () => {
-        toast(`Added ${c.display_name || "part"}`, "ok");
+        toast(`${toastAdded} ${c.display_name || "part"}`, "ok");
         onCommitted();
       },
       onError: (err) => {
         if (err instanceof ApiError && err.missing && err.missing.length > 0) {
           setMissing(err.missing);
-          toast("Still incomplete", "err");
+          toast(toastIncomplete, "err");
         } else {
-          toast(err instanceof ApiError ? err.message : "Could not add", "err");
+          toast(err instanceof ApiError ? err.message : toastCouldNotAdd, "err");
         }
       },
     });
@@ -100,31 +105,36 @@ export function CandidateCard({
   return (
     <Card data-dev-id="ingest.candidate" data-candidate className="px-4 py-4">
       <div className="grid gap-2.5">
-        <Field label="Name" value={c.display_name} onChange={(v) => set("display_name", v)} />
-        <Field label="Part Number" value={c.mpn} onChange={(v) => set("mpn", v)} mono />
+        <Field label="Name" copyId="ingest.field-name" value={c.display_name} onChange={(v) => set("display_name", v)} />
+        <Field label="Part Number" copyId="ingest.field-mpn" value={c.mpn} onChange={(v) => set("mpn", v)} mono />
         <Field
           label="Manufacturer"
+          copyId="ingest.field-manufacturer"
           value={c.manufacturer}
           onChange={(v) => set("manufacturer", v)}
         />
-        <Field label="Category" value={c.category} onChange={(v) => set("category", v)} />
+        <Field label="Category" copyId="ingest.field-category" value={c.category} onChange={(v) => set("category", v)} />
         <Field
           label="Description"
+          copyId="ingest.field-description"
           value={c.description}
           onChange={(v) => set("description", v)}
         />
         <Field
           label="Purchase URL"
+          copyId="ingest.field-purchase-url"
           value={purchaseUrl}
           mono
           onChange={(v) =>
             set("purchase", v.trim() ? [{ vendor: "manual", url: v.trim() }] : [])
           }
         />
-        <Field label="Datasheet URL" value={datasheetUrl} mono onChange={setDatasheetUrl} />
+        <Field label="Datasheet URL" copyId="ingest.field-datasheet-url" value={datasheetUrl} mono onChange={setDatasheetUrl} />
         {c.footprint_variants.length > 1 ? (
           <div className="flex items-center gap-3">
-            <span className="w-[116px] flex-none text-xs text-t3">Footprint</span>
+            <span className="w-[116px] flex-none text-xs text-t3">
+              <Text id="ingest.field-footprint">Footprint</Text>
+            </span>
             <select
               aria-label="Footprint"
               value={c.chosen_footprint_index}
@@ -143,10 +153,10 @@ export function CandidateCard({
 
       {/* asset presence */}
       <div className="mt-3.5 flex flex-wrap gap-2">
-        <Asset label="Symbol" present={!!c.symbol_name} />
-        <Asset label="Footprint" present={!!chosenFootprint} />
-        <Asset label="3D Model" present={!!c.model_path} />
-        <Asset label="Datasheet" present={datasheetPresent} />
+        <Asset label="Symbol" copyId="ingest.asset-symbol" present={!!c.symbol_name} />
+        <Asset label="Footprint" copyId="ingest.asset-footprint" present={!!chosenFootprint} />
+        <Asset label="3D Model" copyId="ingest.asset-model" present={!!c.model_path} />
+        <Asset label="Datasheet" copyId="ingest.asset-datasheet" present={datasheetPresent} />
       </div>
 
       {shownGaps.length > 0 ? (
@@ -162,7 +172,7 @@ export function CandidateCard({
       {missing.length > 0 ? (
         <div className="mt-3">
           <div className="mb-1.5 text-xs text-err">
-            This part still needs:
+            <Text id="ingest.still-needs">This part still needs:</Text>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {missing.map((m) => (
@@ -180,7 +190,11 @@ export function CandidateCard({
           onClick={handleCommit}
           disabled={commit.isPending}
         >
-          {commit.isPending ? "Adding..." : "Add to Components"}
+          {commit.isPending ? (
+            <Text id="ingest.commit-busy">Adding...</Text>
+          ) : (
+            <Text id="ingest.commit">Add to Components</Text>
+          )}
         </Button>
       </div>
     </Card>
@@ -189,18 +203,22 @@ export function CandidateCard({
 
 function Field({
   label,
+  copyId,
   value,
   onChange,
   mono,
 }: {
   label: string;
+  copyId: string;
   value: string;
   onChange: (value: string) => void;
   mono?: boolean;
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-[116px] flex-none text-xs text-t3">{label}</span>
+      <span className="w-[116px] flex-none text-xs text-t3">
+        <Text id={copyId}>{label}</Text>
+      </span>
       <input
         aria-label={label}
         value={value}
@@ -214,11 +232,11 @@ function Field({
   );
 }
 
-function Asset({ label, present }: { label: string; present: boolean }) {
+function Asset({ label, copyId, present }: { label: string; copyId: string; present: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-control bg-raise px-2.5 py-1 text-2xs text-t2">
       <Dot tone={present ? "ok" : "warn"} />
-      {label}
+      <Text id={copyId}>{label}</Text>
     </span>
   );
 }
