@@ -23,7 +23,7 @@ const svgProps = {
 
 const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   components: (
-    <svg {...svgProps}>
+    <svg {...svgProps} className="ico">
       <path d="M12 20v2" />
       <path d="M12 2v2" />
       <path d="M17 20v2" />
@@ -41,7 +41,7 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
     </svg>
   ),
   projects: (
-    <svg {...svgProps}>
+    <svg {...svgProps} className="ico">
       <rect width="18" height="18" x="3" y="3" rx="2" />
       <path d="M11 9h4a2 2 0 0 0 2-2V3" />
       <circle cx="9" cy="9" r="2" />
@@ -50,7 +50,7 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
     </svg>
   ),
   settings: (
-    <svg {...svgProps}>
+    <svg {...svgProps} className="ico">
       <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -76,7 +76,7 @@ export function Rail() {
     >
       {/* wordmark card (north-star .wm): the stockroom, in miniature, set in a raised tile */}
       <div className="mb-3.5 flex items-center gap-2.5 rounded-control bg-raise2 px-[11px] py-[9px] shadow-card">
-        <svg {...svgProps} className="h-5 w-5 flex-none text-t1">
+        <svg {...svgProps} className="ico h-5 w-5 flex-none text-t1">
           <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
           <path d="M12 22V12" />
           <polyline points="3.29 7 12 12 20.71 7" />
@@ -115,7 +115,7 @@ export function Rail() {
           className="flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
         >
           <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
-            <svg {...svgProps}>
+            <svg {...svgProps} className="ico">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4M12 8h.01" />
             </svg>
@@ -129,7 +129,7 @@ export function Rail() {
               title="A new version is available"
               className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line2 bg-raise2 px-2.5 text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
             >
-              <svg {...svgProps} className="h-4 w-4 flex-none">
+              <svg {...svgProps} className="ico h-4 w-4 flex-none">
                 <path d="M12 17V3" />
                 <path d="m6 11 6 6 6-6" />
                 <path d="M19 21H5" />
@@ -141,7 +141,7 @@ export function Rail() {
               className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2"
               title="You have the latest version"
             >
-              <svg {...svgProps} className="h-4 w-4 flex-none" style={{ color: "var(--c-ok)" }}>
+              <svg {...svgProps} className="ico h-4 w-4 flex-none" style={{ color: "var(--c-ok)" }}>
                 <path d="M20 6 9 17l-5-5" />
               </svg>
               <Text id="nav.up-to-date">Up to Date!</Text>
@@ -154,7 +154,7 @@ export function Rail() {
             title="Toggle light or dark theme"
             className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-control border border-line2 bg-raise2 text-t2 shadow-card transition hover:brightness-110 hover:text-t1"
           >
-            <svg {...svgProps} className="h-4 w-4 flex-none">
+            <svg {...svgProps} className="ico h-4 w-4 flex-none">
               <circle cx="12" cy="12" r="4" />
               <path d="M12 2v2" />
               <path d="M12 20v2" />
@@ -190,7 +190,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         className="w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop"
       >
         <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card">
-          <svg {...svgProps} className="h-6 w-6 text-t1">
+          <svg {...svgProps} className="ico h-6 w-6 text-t1">
             <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
             <path d="M12 22V12" />
             <polyline points="3.29 7 12 12 20.71 7" />

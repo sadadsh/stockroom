@@ -39,6 +39,21 @@
        both themes). tailwind.config.js maps rounded-card / rounded-control onto these. */
     --r-card: 14px;
     --r-control: 8px;
+    /* The type scale as variables so dev mode can nudge each size live (theme-agnostic).
+       tailwind.config.js maps text-2xs .. text-title onto these; the line-heights stay bundled
+       in tailwind (the type scale bundles them). `body` uses --fs-base for its resting size. */
+    --fs-2xs: 10.5px;
+    --fs-xs: 11.5px;
+    --fs-sm: 12.5px;
+    --fs-base: 13px;
+    --fs-lg: 15px;
+    --fs-xl: 16px;
+    --fs-title: 22px;
+    /* One weight for the primary UI icon set (nav + action line icons). The .ico utility routes
+       those svgs' stroke-width through it so dev mode can nudge the whole set at once (theme-
+       agnostic). Bespoke icons (Upload/Close/Search/...) and the art glyphs keep their own
+       crafted weights and are tuned per-icon in the icon editor, not here. */
+    --icon-stroke: 1.9;
     /* the soft studio glow under a lit hero specimen */
     --c-hero-glow: rgba(255, 255, 255, 0.09);
     /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
@@ -142,7 +157,7 @@
     background: var(--body-bg);
     color: var(--c-t1);
     font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
-    font-size: 13px;
+    font-size: var(--fs-base);
     line-height: 1.5;
     letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
@@ -186,4 +201,19 @@
 /* tabular figures for stock counts and prices */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* The primary UI icon weight, as one token. A class (not the presentation attribute, which cannot
+   read a CSS var) so it overrides the svg's hardcoded stroke-width fallback; carried by the
+   icons.tsx Svg helper and the rail's nav svgs so dev mode nudges the whole set at once. */
+.ico {
+  stroke-width: var(--icon-stroke);
+}
+
+/* The dev panel's scalar fields lean on their slider, so hide the number spinner: it is redundant
+   and its buttons eat the width a fractional value (10.5) needs, clipping it to "10." otherwise. */
+.nospin::-webkit-inner-spin-button,
+.nospin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
