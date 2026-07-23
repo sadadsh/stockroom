@@ -389,25 +389,27 @@ class LibraryOps:
         return record
 
     def regenerate_altium_dblib(self) -> dict:
-        """Regenerate the Altium data source (.xlsx, gitignored) for every place-ready part
-        and the .DbLib (committed) in one atomic commit. Parts missing Altium assets or the
-        required data fields are excluded and reported (never half-placed)."""
-        from stockroom.altium.datasource import emit_xlsx
+        """Regenerate the SQLite data source (stockroom-parts.db) for every place-ready part
+        and the .DbLib, BOTH committed in one atomic commit (owner decision 2026-07-23: a
+        fresh clone is placeable with no regenerate step). Parts missing Altium assets or the
+        required data fields are excluded and reported (never half-placed). The emitter is
+        byte-deterministic, so an unchanged library produces no commit."""
+        from stockroom.altium.datasource import emit_db
         from stockroom.altium.dblib import emit_dblib
         from stockroom.model.part import altium_place_ready
 
         altium_dir = self.lib.parts_dir.parent / "altium"
         altium_dir.mkdir(parents=True, exist_ok=True)
-        xlsx_path = altium_dir / "stockroom-parts.xlsx"
+        db_path = altium_dir / "stockroom-parts.db"
         dblib_path = altium_dir / "Stockroom.DbLib"
+        # Retire the Excel-era artifacts: the derived .xlsx (was untracked) and the local
+        # .gitignore that hid it (was committed; `git add -A` in commit() stages its deletion).
+        # A fresh library never had them, so the ignore file only joins the commit when git
+        # actually tracks it (a pathspec for a never-known file aborts `commit --only`).
         gitignore_path = altium_dir / ".gitignore"
-        # A local .gitignore travels with the library, so the derived .xlsx stays ignored even if
-        # the library lives in a repo without the app repo's root rule (the private-repo fallback).
-        gitignore_path.write_text(
-            "# Derived Altium data source (regenerated from records; the .DbLib IS committed).\n"
-            "stockroom-parts.xlsx\n",
-            encoding="utf-8",
-        )
+        retire_ignore = self.repo._is_tracked(gitignore_path)
+        gitignore_path.unlink(missing_ok=True)
+        (altium_dir / "stockroom-parts.xlsx").unlink(missing_ok=True)
 
         ready, skipped = [], []
         for json_path in sorted(self.lib.parts_dir.glob("*.json")):
@@ -419,13 +421,15 @@ class LibraryOps:
             else:
                 skipped.append(record.id)
 
-        emit_xlsx(ready, xlsx_path)  # derived + gitignored: written, NOT tracked
+        emit_db(ready, db_path)
         with Transaction(self.repo) as txn:
-            emit_dblib("Parts$", xlsx_path.name, dblib_path)
+            emit_dblib("Parts", db_path.name, dblib_path)
             txn.track(dblib_path)
-            txn.track(gitignore_path)
+            txn.track(db_path)
+            if retire_ignore:
+                txn.track(gitignore_path)  # tracked-but-deleted: stages the removal
             txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")
-        return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "xlsx": xlsx_path}
+        return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "db": db_path}
 
     def attach_altium_assets(self, part_id: str, *sources) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set

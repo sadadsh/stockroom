@@ -1,8 +1,8 @@
 """Render the Altium Database Library (.DbLib) as deterministic INI text. Committed +
-stable; points at the derived .xlsx by a repo-relative path so the folder is portable.
-
-The exact Excel connection string + table addressing (Parts$) are confirmed against real
-Altium during the proof; if Altium rejects them the fix is a one-line change here."""
+stable; points at the committed stockroom-parts.db by a repo-relative path so the folder
+is portable. The connection reaches the SQLite ODBC driver through the OLE DB -> ODBC
+bridge (MSDASQL); if real Altium rejects the string the fix is a one-line change here
+(fallbacks: a raw ODBC driver string, or a user DSN - see the 2026-07-23 migration spec)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +18,7 @@ FIELD_MAP: list[tuple[str, str, bool]] = [
     ("Value", "Value", True),
     ("Manufacturer", "Manufacturer", True),
     ("Description", "[Description]", True),
+    ("Comment", "[Comment]", True),
     ("ComponentLink1Description", "ComponentLink1Description", False),
     ("ComponentLink1URL", "ComponentLink1URL", False),
     ("Supplier", "Supplier", False),
@@ -32,9 +33,10 @@ FIELD_MAP: list[tuple[str, str, bool]] = [
 
 def _connection_string(data_filename: str) -> str:
     return (
-        "Provider=Microsoft.ACE.OLEDB.12.0;"
-        f"Data Source=.\\{data_filename};"
-        'Extended Properties="Excel 12.0 Xml;HDR=YES;IMEX=1";'
+        "Provider=MSDASQL.1;Persist Security Info=False;"
+        'Extended Properties="DRIVER=SQLite3 ODBC Driver;'
+        f"Database=.\\{data_filename};"
+        'LongNames=0;Timeout=1000;NoTXN=0;SyncPragma=NORMAL;StepAPI=0;"'
     )
 
 
@@ -47,7 +49,7 @@ def render_dblib(table_name: str, data_filename: str) -> str:
         "AddMode=3", "RemoveMode=1", "UpdateMode=2", "ViewMode=0",
         "LeftQuote=[", "RightQuote=]", "QuoteTableNames=1",
         "UseTableSchemaName=0", "DefaultColumnType=VARCHAR(255)",
-        "LibraryDatabaseType=Excel",
+        "LibraryDatabaseType=",
         f"LibraryDatabasePath=.\\{data_filename}",
         "DatabasePathRelative=1",
         "LibrarySearchPath=.",

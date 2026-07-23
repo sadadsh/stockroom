@@ -93,7 +93,8 @@ export function AltiumDbLibSection() {
             </div>
             <p className="text-xs text-t3">
               Install it into Altium once as an Installed library, not in the project folder. Reading
-              the data needs the 64-bit Access Database Engine on Windows.
+              the data needs the 64-bit SQLite3 ODBC driver on Windows (a small one-time install
+              from ch-werner.de/sqliteodbc).
             </p>
           </div>
         ) : null}
