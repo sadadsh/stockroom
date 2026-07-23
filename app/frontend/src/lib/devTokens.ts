@@ -7,6 +7,9 @@
  * Colours are curated to the tokens that actually change the app's character; the deep structural
  * greys stay out so a nudge can't quietly break contrast. Shadows are included as their own
  * Elevation group (a raw text field) since they carry the app's whole sense of depth.
+ *
+ * Defaults are grounded on Altium's "Altium Dark Gray" / "Altium Light Gray" themes (2026-07-23
+ * restyle) and MUST stay in sync with styles/index.css; there is no automated parity test.
  */
 
 export type TokenKind = "color" | "length" | "number" | "shadow";
@@ -39,7 +42,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "#f4f4f5", light: "#1b1b1e" },
+    default: { dark: "#6183a1", light: "#4f7fab" },
   },
   // --- Surfaces ------------------------------------------------------------
   {
@@ -48,7 +51,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#242427", light: "#e9eaee" },
+    default: { dark: "#2b2b2c", light: "#d7d8db" },
   },
   {
     cssVar: "--c-raise",
@@ -56,7 +59,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(255, 255, 255, 0.07)", light: "#ffffff" },
+    default: { dark: "#3a3b3d", light: "#eeeeef" },
   },
   {
     cssVar: "--c-field",
@@ -64,7 +67,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(0, 0, 0, 0.28)", light: "rgba(0, 0, 0, 0.05)" },
+    default: { dark: "#2c2c2e", light: "#ffffff" },
   },
   {
     cssVar: "--c-line",
@@ -72,7 +75,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(255, 255, 255, 0.07)", light: "rgba(0, 0, 0, 0.1)" },
+    default: { dark: "#4b4c4f", light: "#bcbdc1" },
   },
   // --- Text ----------------------------------------------------------------
   {
@@ -81,7 +84,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#f4f4f4", light: "#17181b" },
+    default: { dark: "#d7d8da", light: "#202225" },
   },
   {
     cssVar: "--c-t2",
@@ -89,7 +92,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(244, 244, 244, 0.66)", light: "rgba(23, 24, 27, 0.68)" },
+    default: { dark: "#9a9c9f", light: "#56585d" },
   },
   {
     cssVar: "--c-t3",
@@ -97,7 +100,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(244, 244, 244, 0.4)", light: "rgba(23, 24, 27, 0.46)" },
+    default: { dark: "#6d6f73", light: "#85878c" },
   },
   // --- Status --------------------------------------------------------------
   {
@@ -106,7 +109,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Status",
     kind: "color",
     themed: true,
-    default: { dark: "#5fd39a", light: "#2f9e63" },
+    default: { dark: "#58a97f", light: "#2f9e63" },
   },
   {
     cssVar: "--c-warn",
@@ -114,7 +117,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Status",
     kind: "color",
     themed: true,
-    default: { dark: "#e0b354", light: "#a9761b" },
+    default: { dark: "#cf9a44", light: "#a9761b" },
   },
   {
     cssVar: "--c-err",
@@ -122,7 +125,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Status",
     kind: "color",
     themed: true,
-    default: { dark: "#e8756c", light: "#cf4a40" },
+    default: { dark: "#d0564e", light: "#cf4a40" },
   },
   // --- Shape (theme-agnostic radii) ---------------------------------------
   {
@@ -131,7 +134,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    default: { dark: "14px" },
+    default: { dark: "3px" },
   },
   {
     cssVar: "--r-control",
@@ -139,7 +142,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    default: { dark: "8px" },
+    default: { dark: "2px" },
   },
   // --- Type (theme-agnostic type scale; px size only, line-heights stay bundled in tailwind) ---
   {
@@ -148,7 +151,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "10.5px" },
+    default: { dark: "10px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -157,7 +160,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "11.5px" },
+    default: { dark: "11px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -166,7 +169,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "12.5px" },
+    default: { dark: "11.5px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -175,7 +178,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "13px" },
+    default: { dark: "12px" },
     range: { min: 8, max: 26, step: 0.5 },
   },
   {
@@ -184,7 +187,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "15px" },
+    default: { dark: "13.5px" },
     range: { min: 10, max: 30, step: 0.5 },
   },
   {
@@ -193,7 +196,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "16px" },
+    default: { dark: "15px" },
     range: { min: 10, max: 32, step: 0.5 },
   },
   {
@@ -202,7 +205,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Type",
     kind: "length",
     themed: false,
-    default: { dark: "22px" },
+    default: { dark: "18px" },
     range: { min: 14, max: 40, step: 0.5 },
   },
   // --- Elevation (shadows; theme-specific raw CSS box-shadow strings) ----------------------------
@@ -213,8 +216,8 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "shadow",
     themed: true,
     default: {
-      dark: "inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.32), 0 3px 10px rgba(0, 0, 0, 0.22)",
-      light: "inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.05), 0 3px 9px rgba(17, 18, 20, 0.05)",
+      dark: "0 1px 2px rgba(0, 0, 0, 0.28)",
+      light: "0 1px 2px rgba(20, 22, 26, 0.1)",
     },
   },
   {
@@ -224,8 +227,8 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "shadow",
     themed: true,
     default: {
-      dark: "inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 38px rgba(0, 0, 0, 0.44)",
-      light: "inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09), 0 14px 30px rgba(17, 18, 20, 0.11)",
+      dark: "0 3px 10px rgba(0, 0, 0, 0.42)",
+      light: "0 3px 10px rgba(20, 22, 26, 0.14)",
     },
   },
   {
@@ -235,8 +238,8 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "shadow",
     themed: true,
     default: {
-      dark: "inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4), 0 28px 64px rgba(0, 0, 0, 0.62)",
-      light: "inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1), 0 28px 64px rgba(17, 18, 20, 0.2)",
+      dark: "0 6px 20px rgba(0, 0, 0, 0.5)",
+      light: "0 6px 20px rgba(20, 22, 26, 0.2)",
     },
   },
   {
@@ -246,8 +249,8 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "shadow",
     themed: true,
     default: {
-      dark: "0 6px 20px rgba(0, 0, 0, 0.16)",
-      light: "0 6px 20px rgba(0, 0, 0, 0.08)",
+      dark: "0 2px 8px rgba(0, 0, 0, 0.28)",
+      light: "0 2px 8px rgba(20, 22, 26, 0.12)",
     },
   },
   // --- Icons (theme-agnostic; the primary UI icon weight as a unitless stroke-width) ------------
@@ -257,7 +260,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Icons",
     kind: "number",
     themed: false,
-    default: { dark: "1.9" },
+    default: { dark: "1.8" },
     range: { min: 0.5, max: 3, step: 0.1 },
   },
 ];
