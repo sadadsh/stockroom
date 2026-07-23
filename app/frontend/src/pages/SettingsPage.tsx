@@ -27,6 +27,7 @@ import {
   useUpdateSettings,
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
+import { statusTone } from "../lib/statusTone";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -208,7 +209,7 @@ function ProfilesSection() {
                     </Button>
                     <Button
                       small
-                      variant="danger"
+                      variant="ghost-danger"
                       onClick={() => setPendingDelete(name)}
                     >
                       Delete
@@ -325,7 +326,13 @@ function SyncSection() {
             value={
               status.data.has_remote ? (
                 <span className="tnum font-mono">
-                  {status.data.ahead} ahead, {status.data.behind} behind
+                  <span className={status.data.ahead > 0 ? statusTone("ahead").text : undefined}>
+                    {status.data.ahead} ahead
+                  </span>
+                  {", "}
+                  <span className={status.data.behind > 0 ? statusTone("behind").text : undefined}>
+                    {status.data.behind} behind
+                  </span>
                 </span>
               ) : (
                 "No remote configured"
@@ -600,7 +607,7 @@ function DistributorSection() {
           Save Key
         </Button>
         {isSet ? (
-          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
+          <Button variant="ghost-danger" onClick={onClear} disabled={save.isPending}>
             Clear
           </Button>
         ) : null}
@@ -882,7 +889,7 @@ function GitHubSection() {
           Connect
         </Button>
         {isSet ? (
-          <Button variant="danger" onClick={onClear} disabled={save.isPending}>
+          <Button variant="ghost-danger" onClick={onClear} disabled={save.isPending}>
             Disconnect
           </Button>
         ) : null}
