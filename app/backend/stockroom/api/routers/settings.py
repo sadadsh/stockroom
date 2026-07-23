@@ -20,6 +20,53 @@ def _hint(key: str) -> str:
     return key[-4:] if len(key) >= 4 else ""
 
 
+# The credential fields a dev-creds.json may carry (identifiers + secrets alike). Loading is a
+# local-only convenience: the file lives in the OS config dir, NEVER the (public) repo, so no
+# secret is ever committed. Only these known fields are read; anything else in the file is ignored.
+_DEV_CRED_FIELDS = (
+    "mouser_api_key",
+    "github_token",
+    "digikey_client_id",
+    "digikey_client_secret",
+    "digikey_username",
+    "digikey_password",
+    "ul_username",
+    "ul_password",
+    "snapeda_username",
+    "snapeda_password",
+    "samacsys_username",
+    "samacsys_password",
+)
+
+
+def _load_dev_creds(ctx) -> list[str]:
+    """Apply any credentials present in the per-machine dev-creds.json (in the OS config dir, never
+    the repo) to the running config and persist. A missing or unreadable file is a no-op. Returns
+    the field NAMES that were loaded (never the values), so the UI can confirm what landed."""
+    import json
+
+    from stockroom.store.machine_config import config_dir
+
+    path = config_dir() / "dev-creds.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    loaded: list[str] = []
+    for field in _DEV_CRED_FIELDS:
+        value = data.get(field)
+        if value:
+            setattr(ctx.config, field, str(value))
+            loaded.append(field)
+    if loaded:
+        ctx.config.save()
+    return loaded
+
+
 def _settings_dto(ctx) -> dict:
     config = ctx.config
     return {
@@ -77,6 +124,15 @@ def settings_router(require_token) -> APIRouter:
     def get_settings(request: Request) -> dict:
         ctx = request.app.state.ctx
         return _settings_dto(ctx)
+
+    @r.post("/load-dev-creds")
+    def load_dev_creds(request: Request) -> dict:
+        # The hidden "secret combo" target: pull any API keys / logins from the per-machine
+        # dev-creds.json (OS config dir, never the repo) into the config so live validation is not
+        # blocked on retyping them. Absent file -> empty loaded list, DTO unchanged.
+        ctx = request.app.state.ctx
+        loaded = _load_dev_creds(ctx)
+        return {"loaded": loaded, **_settings_dto(ctx)}
 
     @r.patch("")
     def update_settings(request: Request, body: dict) -> dict:

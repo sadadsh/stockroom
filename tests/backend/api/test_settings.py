@@ -66,6 +66,44 @@ def test_patch_without_the_key_leaves_it_unchanged(client):
     assert client.get("/api/settings").json()["mouser_api_key_hint"] == "1111"
 
 
+def test_load_dev_creds_applies_the_config_dir_file(client, app_ctx):
+    config_dir().mkdir(parents=True, exist_ok=True)
+    (config_dir() / "dev-creds.json").write_text(
+        json.dumps(
+            {
+                "digikey_client_id": "DKID1234",
+                "digikey_client_secret": "DKSECRET9",
+                "mouser_api_key": "MOUSER77",
+                "ignored_field": "nope",
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = client.post("/api/settings/load-dev-creds")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body["loaded"]) >= {"digikey_client_id", "digikey_client_secret", "mouser_api_key"}
+    assert "ignored_field" not in body["loaded"]
+    # applied live on the context; identifier echoed, secret masked to presence
+    assert app_ctx.config.digikey_client_id == "DKID1234"
+    assert body["digikey_client_id"] == "DKID1234"
+    assert body["digikey_client_secret_set"] is True
+    assert body["mouser_api_key_set"] is True
+    # persisted to config.json
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["digikey_client_secret"] == "DKSECRET9"
+
+
+def test_load_dev_creds_missing_file_is_a_noop(client):
+    r = client.post("/api/settings/load-dev-creds")
+    assert r.status_code == 200
+    assert r.json()["loaded"] == []
+
+
+def test_load_dev_creds_is_token_guarded(anon_client):
+    assert anon_client.post("/api/settings/load-dev-creds").status_code in (401, 403)
+
+
 def test_settings_is_token_guarded(anon_client):
     assert anon_client.get("/api/settings").status_code in (401, 403)
     assert anon_client.patch(
