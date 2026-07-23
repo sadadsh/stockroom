@@ -431,6 +431,103 @@ def test_forward_cad_capture_no_active_window_is_a_noop(tmp_path, monkeypatch):
     assert s.remaining() == frozenset()
 
 
+# ============================================================================
+# Phase 3 (HUD-02, DONE-01): the host to page received channel that ticks the
+# HUD checklist live as files land, the part-name pass-through to the overlay,
+# and finish-and-close (Complete flash + done signal + window destroy) on
+# session completion. The CAD window stays js_api-free: every HUD update is a
+# one-way host to page evaluate_js.
+# ============================================================================
+
+
+def test_cad_overlay_received_js_is_guarded_and_encodes_the_values():
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host.window import cad_overlay_received_js
+
+    js = cad_overlay_received_js([R.KICAD_SYMBOL, R.ALTIUM_FOOTPRINT])
+    # guarded: a page without the overlay bridge is a no-op, never an error
+    assert js.startswith("window.__STOCKROOM_OVERLAY__ &&")
+    # each requirement value is JSON-encoded (a value cannot break out of the script)
+    assert json.dumps({"requirement": "kicad_symbol"}) in js
+    assert json.dumps({"requirement": "altium_footprint"}) in js
+    # it drives the overlay's received method
+    assert "received(" in js
+
+
+def test_forward_cad_capture_pushes_a_received_tick_to_the_cad_window(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT, R.KICAD_MODEL})
+
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+
+    # the SPA still received the capture payload (unchanged behavior)
+    [p] = _capture_payloads(spa)
+    assert set(p["requirements"]) == {"kicad_symbol", "kicad_footprint", "kicad_model"}
+    # the CAD window got a single guarded received push for the newly-satisfied requirements
+    assert len(cad.scripts) == 1
+    push = cad.scripts[0]
+    assert push.startswith("window.__STOCKROOM_OVERLAY__ &&")
+    for v in ("kicad_symbol", "kicad_footprint", "kicad_model"):
+        assert json.dumps({"requirement": v}) in push
+
+    # a dedup re-fire satisfies nothing new -> nothing new pushed to the CAD window
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    assert len(cad.scripts) == 1
+
+
+def test_forward_cad_capture_no_cad_window_still_forwards_to_the_spa(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", None)  # window mid-close / never opened
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL})
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")  # must not raise
+    assert len(_capture_payloads(spa)) == 1  # the SPA forward is untouched
+
+
+def test_forward_cad_capture_without_a_session_does_not_touch_the_cad_window(tmp_path, monkeypatch):
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    W._forward_cad_capture(z, None, extract_dir=tmp_path / "x")  # no session -> no HUD push
+    assert cad.scripts == []
+
+
+def test_cad_loaded_scripts_threads_the_part_name_into_the_overlay():
+    from stockroom.host.window import cad_loaded_scripts
+
+    scripts = cad_loaded_scripts(
+        ["kicad_symbol"], "digikey", "DigiKey", ["kicad"], {}, "BQ24074"
+    )
+    assert "__STOCKROOM_OVERLAY__" in scripts[0]  # overlay first
+    assert "BQ24074" in scripts[0]  # the part name reached build_overlay_js
+
+
+def test_cad_scripts_for_url_threads_the_part_name(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch)
+    scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"], "BQ24074")
+    assert "BQ24074" in scripts[0]  # part name flows through cad_scripts_for_url
+
+
 # -- _poll_downloads_watch (session-driven) --
 
 
