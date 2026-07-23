@@ -35,35 +35,20 @@ import {
 } from "../lib/searchFilters";
 import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
+import { Icon } from "./Icon";
 import { RowThumbnail } from "./PartsList";
 
 // --- small inline glyphs (the artifact's own set) ---------------------------
-const stroke = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+// Each helper keeps its wrapper + className passthrough so every call site is unchanged, but now
+// draws through <Icon id> so the glyph is inspectable / editable in dev mode. The weight / caps
+// live in the registry entry; the sizes still come from the call sites via className.
 const Chevron = ({ className = "" }: { className?: string }) => (
-  <svg {...stroke} strokeWidth={2} className={className}>
-    <path d="m6 9 6 6 6-6" />
-  </svg>
+  <Icon id="overlay.chevron" className={className} />
 );
-const Check = () => (
-  <svg {...stroke} strokeWidth={3.4} className="h-2.5 w-2.5">
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
-);
-const XSmall = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className="h-2.5 w-2.5">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
+const Check = () => <Icon id="overlay.check" className="h-2.5 w-2.5" />;
+const XSmall = () => <Icon id="overlay.close" className="h-2.5 w-2.5" />;
 const Spark = ({ className = "" }: { className?: string }) => (
-  <svg {...stroke} strokeWidth={2} className={className}>
-    <path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z" />
-  </svg>
+  <Icon id="overlay.spark" className={className} />
 );
 
 interface Props {
