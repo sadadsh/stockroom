@@ -46,19 +46,29 @@ class MachineConfig:
     # live DigiKeyAdapter; either blank keeps DigiKey out of the enrichment source registry.
     digikey_client_id: str = ""
     digikey_client_secret: str = ""
+    # DigiKey ACCOUNT web login (distinct from the OAuth API creds above). The capture driver
+    # autofills this to sign into DigiKey.com and prepare a logged-in session for everything,
+    # so a saved account clears the sign-in wall before the in-DigiKey CAD providers are reached.
+    digikey_username: str = ""
+    digikey_password: str = ""
     # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
     # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
     # collaborator's changes pull. Per-machine, stored in config.json (in the OS config dir, never
     # the repo), so it is a local secret and never committed. Blank = no auto-push, sign in later.
     github_token: str = ""
-    # Saved vendor logins for the guided capture window (Ultra Librarian / SnapEDA). The
-    # username is not a secret; the password is. Per-machine, stored in config.json (in the
-    # OS config dir, never the repo), so they are local and never committed. Blank = log in
-    # by hand in the capture window (session persistence keeps you signed in thereafter).
+    # Saved logins for the in-DigiKey CAD providers the guided capture window drives:
+    # Ultra Librarian, SnapEDA, and SamacSys. DigiKey's EDA/CAD Models section aggregates
+    # downloads from all three, and the driver prefers Ultra Librarian (it often bundles the
+    # complete KiCad + Altium + 3D set). The username is not a secret; the password is.
+    # Per-machine, stored in config.json (in the OS config dir, never the repo), so they are
+    # local and never committed. Blank = log in by hand in the capture window (session
+    # persistence keeps you signed in thereafter).
     ul_username: str = ""
     ul_password: str = ""
     snapeda_username: str = ""
     snapeda_password: str = ""
+    samacsys_username: str = ""
+    samacsys_password: str = ""
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.

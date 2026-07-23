@@ -94,3 +94,27 @@ def test_vendor_login_defaults_empty():
     cfg = MachineConfig()
     assert cfg.ul_username == "" and cfg.ul_password == ""
     assert cfg.snapeda_username == "" and cfg.snapeda_password == ""
+
+
+def test_samacsys_and_digikey_account_fields_round_trip(tmp_path):
+    # SamacSys is a kept in-DigiKey CAD provider; the DigiKey account login is the
+    # web sign-in the capture driver autofills (distinct from the OAuth API creds).
+    path = tmp_path / "config.json"
+    cfg = MachineConfig(
+        samacsys_username="sam@x.com",
+        samacsys_password="sp",
+        digikey_username="dk@x.com",
+        digikey_password="dp",
+    )
+    cfg.save(path)
+    loaded = MachineConfig.load(path)
+    assert loaded.samacsys_username == "sam@x.com"
+    assert loaded.samacsys_password == "sp"
+    assert loaded.digikey_username == "dk@x.com"
+    assert loaded.digikey_password == "dp"
+
+
+def test_samacsys_and_digikey_account_defaults_empty():
+    cfg = MachineConfig()
+    assert cfg.samacsys_username == "" and cfg.samacsys_password == ""
+    assert cfg.digikey_username == "" and cfg.digikey_password == ""
