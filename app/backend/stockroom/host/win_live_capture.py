@@ -630,10 +630,75 @@ def _drive_production(webview, base: str, captured: list, result: dict) -> None:
     result["ok"] = True
 
 
+def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None:
+    """Exercise the REAL capture pipeline end-to-end, exactly like _HostApi.open_cad_download: arm the
+    tier-1 WebView2 download intercept + tier-2 DownloadsWatch + the real overlay/driver injection on
+    each `loaded`, against a LIVE DigiKey part, and report the CaptureSession's captured Requirements
+    (0/N -> N/N) + the number of forward payloads. This proves download -> tier-1 intercept -> classify
+    -> session.record -> forward for real (the forward's SPA attach is a separate, already-tested path;
+    here _emit_to_spa is captured into `captured`). The persistent profile keeps the signed-in session."""
+    import os
+    import threading
+    import time as _t
+
+    from stockroom.capture.requirements import Requirement
+    from stockroom.capture.session import CaptureSession
+    from stockroom.host.download_capture import DownloadsWatch, default_downloads_dir
+
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
+    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
+        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    )
+    result["url"] = url
+    formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
+    needs_map = {
+        "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
+        "altium": ["altium_symbol", "altium_footprint"],
+    }
+    needs_values = [n for f in formats for n in needs_map.get(f, [])]
+    needs_set = frozenset(Requirement(v) for v in needs_values)
+    session = CaptureSession.start(mpn, needs_set, now=_t.time())
+    session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
+    W._CAD_SESSION = session
+
+    win = webview.create_window("stockroom-cad", url=url, width=1340, height=980)
+
+    def _on_loaded() -> None:
+        W._inject_cad_scripts(win, url, needs_values, mpn)
+
+    win.events.loaded += _on_loaded
+
+    def _on_captured(path) -> None:
+        W._forward_cad_capture(path, session, extract_dir=session.temp_dir)
+        print(f"CAPTURE: {len(session.received)}/{len(session.needs)} -> "
+              f"{sorted(r.value for r in session.received)}", flush=True)
+
+    armed = W._install_cad_download_intercept(win, session.temp_dir, _on_captured)
+    print(f"REALCAPTURE: tier-1 intercept armed={armed}; needs={sorted(needs_values)}", flush=True)
+    watch = DownloadsWatch.start(default_downloads_dir())
+    thread = threading.Thread(
+        target=W._poll_downloads_watch, args=(watch, session),
+        kwargs={"extract_dir": session.temp_dir}, daemon=True,
+    )
+    thread.start()
+
+    wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "220"))
+    print(f"REALCAPTURE: running the real capture pipeline for up to {wait_s:.0f}s...", flush=True)
+    deadline = _t.time() + wait_s
+    while _t.time() < deadline and not session.is_complete():
+        _t.sleep(2.0)
+    result["received"] = sorted(r.value for r in session.received)
+    result["remaining"] = sorted(r.value for r in session.remaining())
+    result["forwards"] = len(captured)
+    result["tier1_armed"] = armed
+    result["ok"] = session.is_complete()
+
+
 def main() -> int:
     import webview
 
-    driver_mode = "--driver" in sys.argv
+    realcapture = "--realcapture" in sys.argv
+    driver_mode = "--driver" in sys.argv and not realcapture
     signin = "--signin" in sys.argv and not driver_mode
     live = "--live" in sys.argv and not signin and not driver_mode
     digikey = "--digikey" in sys.argv and not live and not signin and not driver_mode
@@ -642,7 +707,8 @@ def main() -> int:
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
     mode = (
-        "driver" if driver_mode
+        "realcapture" if realcapture
+        else "driver" if driver_mode
         else "signin" if signin
         else "live" if live
         else "digikey" if digikey
@@ -661,7 +727,9 @@ def main() -> int:
     def driver() -> None:
         try:
             drive = (
-                _drive_production
+                _drive_realcapture
+                if realcapture
+                else _drive_production
                 if driver_mode
                 else _drive_signin
                 if signin
