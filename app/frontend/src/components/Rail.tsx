@@ -198,6 +198,10 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         <p className="mt-1 text-sm text-t2">
           Developed with love by <span className="font-medium text-t1">Sadad Haidari</span>.
         </p>
+        <p className="mt-2 text-xs text-t3">
+          <span className="font-medium">Version</span>{" "}
+          <span className="tnum font-mono">{__APP_VERSION__}</span>
+        </p>
         <div className="mt-4 flex justify-center gap-2.5">
           <a
             href="https://www.linkedin.com/in/sadadhaidari"
