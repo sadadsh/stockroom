@@ -260,7 +260,58 @@ def _bom_components(sch_path) -> list:
         if kibom.is_do_not_fit(props):
             continue
         out.append((ref, lib_id, props))
+    # A multi-unit symbol (an op-amp's A and B units) appears as SEPARATE (symbol)
+    # nodes sharing one Reference. That is ONE physical part: keep the first node per
+    # ref so qty counts components, never units (units carry identical properties).
+    seen_refs: set = set()
+    deduped = []
+    for ref, lib_id, props in out:
+        if ref in seen_refs:
+            continue
+        seen_refs.add(ref)
+        deduped.append((ref, lib_id, props))
+    return deduped
+
+
+def _altium_bom_components(sch_path) -> list:
+    """Every real BOM component (ref, lib_id, props) in one Altium .SchDoc, through the
+    same exclusion rules as the KiCad reader. The schdoc reader already collapses
+    multi-part unit placements to one physical component. Props carry the placed
+    parameter set (a DbLib placement carries every Stockroom column: MPN,
+    Manufacturer, Description, ...) plus Reference and the current PCBLIB footprint;
+    DesignItemId (the DbLib item, i.e. the Stockroom MPN) backfills a missing MPN.
+    lib_id is `altium:<LibReference>` so grouping and library matching read the symbol
+    name exactly like a KiCad lib_id."""
+    from stockroom.altium.schdoc import read_schdoc_components
+
+    out = []
+    for c in read_schdoc_components(sch_path):
+        ref = c["designator"]
+        if not ref:
+            continue
+        props = dict(c["params"])
+        props["Reference"] = ref
+        if not (props.get("Footprint") or "").strip():
+            props["Footprint"] = c["footprint"]
+        if not (props.get("MPN") or "").strip() and (c["design_item_id"] or "").strip():
+            props["MPN"] = c["design_item_id"]
+        lib_id = f"altium:{c['lib_ref']}" if c["lib_ref"] else ""
+        part_name = lib_id.split(":")[-1]
+        if kibom.is_excluded(ref, part_name, props.get("Footprint", "")):
+            continue
+        if kibom.is_do_not_fit(props):
+            continue
+        out.append((ref, lib_id, props))
     return out
+
+
+def _components_for_sheet(sch_path) -> list:
+    """Dispatch a sheet to its EDA's reader by extension: .SchDoc reads through the
+    Altium binary reader, everything else through the KiCad sexp reader (which
+    honestly returns [] for a non-schematic)."""
+    if str(sch_path).lower().endswith(".schdoc"):
+        return _altium_bom_components(sch_path)
+    return _bom_components(sch_path)
 
 
 # -- grouping (the app's MPN-primary logic + KiBoM value-normalization) --------
@@ -520,9 +571,13 @@ def bom_from_project(sch_paths, lookup=None,
     comps = []
     for p in (sch_paths or []):
         try:
-            comps.extend(_bom_components(p))
+            comps.extend(_components_for_sheet(p))
         except Exception:  # noqa: BLE001 - an unreadable sheet drops out, never crashes the build
             continue
+    # Units of one multi-unit component can live on DIFFERENT pages; references are
+    # project-unique, so a ref seen again on a later sheet is the same physical part.
+    seen_refs: set = set()
+    comps = [c for c in comps if not (c[0] in seen_refs or seen_refs.add(c[0]))]
     if library_index:
         comps = library_enrich(comps, library_index)
     return _bom_from_components(comps, lookup, enrich_fields, price_lookup=price_lookup)
