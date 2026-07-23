@@ -157,6 +157,16 @@ def propose_component_name_from_record(record) -> str:
     )
 
 
+def _resistor_value(record, *, keep_ohm: bool) -> str:
+    """The tightened Resistance for a resistor record. The schematic/BOM convention strips a
+    trailing Ω ("5.05kΩ" -> "5.05k"); the human display keeps it ("5.05kΩ")."""
+    f = _flat(getattr(record, "specs", {}) or {})
+    r = _tight(f.get("Resistance", ""))
+    if keep_ohm:
+        return r
+    return r[:-1] if r.endswith("Ω") else r
+
+
 def derive_value(record) -> str:
     """The schematic/BOM Value for a part: a passive's parametric value ("5.05k", "1µF",
     "4.7µH") from its normalized specs; an active's MPN. Blank for a passive whose defining
@@ -165,10 +175,20 @@ def derive_value(record) -> str:
     f = _flat(getattr(record, "specs", {}) or {})
     g = f.get
     if category == "Resistors":
-        r = _tight(g("Resistance", ""))
-        return r[:-1] if r.endswith("Ω") else r  # "5.05kΩ" -> "5.05k" (schematic convention)
+        return _resistor_value(record, keep_ohm=False)  # schematic convention: strip the Ω
     if category == "Capacitors":
         return _tight(g("Capacitance", ""))
     if category == "Inductors":
         return _tight(g("Impedance", "")) or _tight(g("Inductance", ""))
     return getattr(record, "mpn", "") or ""
+
+
+def derive_display_value(record) -> str:
+    """The HUMAN-FACING value for a part (the Altium status modal, any UI): identical to
+    derive_value EXCEPT a resistor keeps its Ω unit ("5.05kΩ", not "5.05k"). One source of
+    truth: only the resistor branch differs; every other category delegates to derive_value.
+    Pure + deterministic."""
+    category = getattr(record, "category", "") or ""
+    if category == "Resistors":
+        return _resistor_value(record, keep_ohm=True)
+    return derive_value(record)

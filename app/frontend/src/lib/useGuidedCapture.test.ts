@@ -4,10 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { Requirement, StagingCandidate } from "../api/types";
 import { useGuidedCapture } from "./useGuidedCapture";
+import { CaptureProvider } from "./capture";
 
 function wrapperWith(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
-    createElement(QueryClientProvider, { client: qc }, children);
+    createElement(
+      QueryClientProvider,
+      { client: qc },
+      createElement(CaptureProvider, null, children),
+    );
 }
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
@@ -105,7 +110,9 @@ describe("useGuidedCapture", () => {
     });
 
     expect(api.partCadSource).toHaveBeenCalledWith("part1");
-    expect(open).toHaveBeenCalledWith(UL_URL, KICAD_NEEDS);
+    // start() now threads the part name (empty here, since this adapter render passes none) as the
+    // third arg so the HUD can display part name + DigiKey (HUD-01).
+    expect(open).toHaveBeenCalledWith(UL_URL, KICAD_NEEDS, "");
     expect(result.current.status).toBe("receiving");
     expect(result.current.needs).toEqual(KICAD_NEEDS);
     expect(typeof window.__STOCKROOM_CAD_DOWNLOAD__).toBe("function");
@@ -160,6 +167,9 @@ describe("useGuidedCapture", () => {
     mockHost("tok");
     mockCadSourceUrl();
     const altiumSpy = vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
+    const regenSpy = vi
+      .spyOn(api, "altiumRegenerate")
+      .mockResolvedValue({ emitted: 1, skipped: [] } as never);
     const { result } = render(["altium_symbol", "altium_footprint"]);
 
     await act(async () => {
@@ -180,6 +190,35 @@ describe("useGuidedCapture", () => {
       "C:\\tmp\\BQ24074.SchLib",
       "C:\\tmp\\BQ24074.PcbLib",
     ]);
+    // The library must be placeable from Altium without a separate visit to the Altium
+    // window: a capture that attached Altium assets refreshes the DbLib data source itself.
+    expect(regenSpy).toHaveBeenCalled();
+    expect(result.current.altiumComplete).toBe(true);
+  });
+
+  it("still completes the capture when the DbLib regenerate fails after the attach", async () => {
+    mockHost("tok");
+    mockCadSourceUrl();
+    vi.spyOn(api, "altiumAttach").mockResolvedValue(undefined);
+    vi.spyOn(api, "altiumRegenerate").mockRejectedValue(new Error("busy"));
+    const { result } = render(["altium_symbol", "altium_footprint"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({
+        path: "C:\\Downloads\\BQ24074.zip",
+        token: "tok",
+        requirements: ["altium_symbol", "altium_footprint"],
+        altiumPaths: ["C:\\tmp\\BQ24074.SchLib", "C:\\tmp\\BQ24074.PcbLib"],
+      });
+      await Promise.resolve();
+    });
+
+    // The files are attached; a regenerate hiccup must not fail the capture (the Altium
+    // window still offers a manual regenerate).
+    await waitFor(() => expect(result.current.status).toBe("done"));
     expect(result.current.altiumComplete).toBe(true);
   });
 
@@ -220,6 +259,22 @@ describe("useGuidedCapture", () => {
     });
 
     expect(result.current.status).toBe("timed-out");
+  });
+
+  it("projects the terminal done state when the host forwards a done signal (DONE-02)", async () => {
+    mockHost("tok");
+    mockCadSourceUrl();
+    const { result } = render(["kicad_symbol"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe("done");
   });
 
   it("accepts a legacy bare-path forward and runs the KiCad pipeline", async () => {

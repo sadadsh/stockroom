@@ -289,6 +289,21 @@ def test_cad_forward_js_encodes_the_payload_and_is_guarded():
     assert json.dumps(payload) in js
 
 
+# -- cad_download_event_js: the REAL browser download lifecycle relayed to the in-page reactor --
+
+
+def test_cad_download_event_js_relays_a_captured_format_guarded():
+    from stockroom.host.window import cad_download_event_js
+
+    js = cad_download_event_js("completed", "kicad")
+    # Guarded (a page without the reactor bridge is a silent no-op) + JSON-encoded {state, format}
+    # so the reactor advances only for the format it is awaiting.
+    assert js.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "kicad"}) in js
+    # A format is optional; without one it is a bare state payload.
+    assert json.dumps({"state": "completed"}) in cad_download_event_js("completed")
+
+
 # -- _extract_altium_members (pure) --
 
 
@@ -431,6 +446,227 @@ def test_forward_cad_capture_no_active_window_is_a_noop(tmp_path, monkeypatch):
     assert s.remaining() == frozenset()
 
 
+# ============================================================================
+# Phase 3 (HUD-02, DONE-01): the host to page received channel that ticks the
+# HUD checklist live as files land, the part-name pass-through to the overlay,
+# and finish-and-close (Complete flash + done signal + window destroy) on
+# session completion. The CAD window stays js_api-free: every HUD update is a
+# one-way host to page evaluate_js.
+# ============================================================================
+
+
+def test_cad_overlay_received_js_is_guarded_and_encodes_the_values():
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host.window import cad_overlay_received_js
+
+    js = cad_overlay_received_js([R.KICAD_SYMBOL, R.ALTIUM_FOOTPRINT])
+    # guarded: a page without the overlay bridge is a no-op, never an error
+    assert js.startswith("window.__STOCKROOM_OVERLAY__ &&")
+    # each requirement value is JSON-encoded (a value cannot break out of the script)
+    assert json.dumps({"requirement": "kicad_symbol"}) in js
+    assert json.dumps({"requirement": "altium_footprint"}) in js
+    # it drives the overlay's received method
+    assert "received(" in js
+
+
+def test_forward_cad_capture_pushes_a_received_tick_to_the_cad_window(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT, R.KICAD_MODEL})
+
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+
+    # the SPA still received the capture payload (unchanged behavior)
+    [p] = _capture_payloads(spa)
+    assert set(p["requirements"]) == {"kicad_symbol", "kicad_footprint", "kicad_model"}
+    # the CAD window got: (1) a guarded received push for the newly-satisfied requirements, and
+    # (2) a real "completed" download event for the captured format so the reactor advances.
+    assert len(cad.scripts) == 2
+    tick = cad.scripts[0]
+    assert tick.startswith("window.__STOCKROOM_OVERLAY__ &&")
+    for v in ("kicad_symbol", "kicad_footprint", "kicad_model"):
+        assert json.dumps({"requirement": v}) in tick
+    dl = cad.scripts[1]
+    assert dl.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "kicad"}) in dl
+
+    # A dedup re-fire satisfies nothing new -> no HUD tick and no SPA re-forward, but the
+    # completed relay STILL fires: the reactor is the decider (its settled/format matching makes a
+    # stray relay harmless), while a swallowed relay left the reactor waiting out a 150s watchdog
+    # on a file that had already landed (live-observed 2026-07-23).
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    assert len(cad.scripts) == 3
+    assert json.dumps({"state": "completed", "format": "kicad"}) in cad.scripts[2]
+    assert len(_capture_payloads(spa)) == 1  # the SPA is still forwarded exactly once
+
+
+def test_capture_formats_require_the_core_symbol_footprint_pair():
+    # The relay names a format ONLY when the captured file carries that format's symbol+footprint
+    # pair. A stray STEP (classifies as kicad_model alone) must not masquerade as the KiCad
+    # delivery: live 2026-07-23, UL served an Altium+STEP bundle against a KiCad request, and a
+    # kicad_model-implies-kicad relay would have falsely advanced the reactor past KiCad.
+    from stockroom.host.window import _capture_formats
+
+    assert _capture_formats(["kicad_symbol", "kicad_footprint", "kicad_model"]) == ["kicad"]
+    assert _capture_formats(["kicad_model"]) == []
+    assert _capture_formats(["altium_symbol", "altium_footprint", "kicad_model"]) == ["altium"]
+    assert _capture_formats(
+        ["kicad_symbol", "kicad_footprint", "altium_symbol", "altium_footprint"]
+    ) == ["kicad", "altium"]
+    assert _capture_formats([]) == []
+
+
+def test_forward_cad_capture_relays_a_wrong_format_completion(tmp_path, monkeypatch):
+    # The vendor can deliver the WRONG format outright (live 2026-07-23: a sticky prior selection
+    # made UL serve its Altium+STEP bundle against a KiCad request). The file satisfies nothing the
+    # session needs -> no HUD tick, no SPA forward - but the reactor MUST still hear a completed
+    # event naming what actually arrived, so it reacts (wrongfile -> reselect) instead of waiting
+    # out its watchdog on a download that already finished.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "a.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("Altium/part.SchLib", "SCHDATA")
+        zf.writestr("Altium/part.PcbLib", "PCBDATA")
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT})  # a KiCad-only session
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    assert _capture_payloads(spa) == []  # nothing needed was satisfied
+    [dl] = cad.scripts  # no HUD tick - only the completed relay
+    assert dl.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "completed", "format": "altium"}) in dl
+
+
+def test_forward_cad_capture_relays_unknown_for_a_file_with_no_cad_content(tmp_path, monkeypatch):
+    # A completed download that classifies as nothing (a junk/empty archive) still completed - the
+    # reactor hears "unknown", treats it as a wrong file, and reacts instead of hanging.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", _RecordingWindow())
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "junk.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("readme.txt", "nothing useful")
+    s = _session({R.KICAD_SYMBOL})
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    [dl] = cad.scripts
+    assert json.dumps({"state": "completed", "format": "unknown"}) in dl
+
+
+def test_unique_dest_never_overwrites_an_earlier_capture(tmp_path):
+    # The vendor names EVERY export the same (<MPN>.zip), so a second format's download would
+    # OVERWRITE the first zip while its async SPA attach may still be reading it (live
+    # 2026-07-23: the Altium zip replaced the just-captured KiCad zip on disk seconds after the
+    # KiCad forward). The save path must be collision-free.
+    from stockroom.host.window import _unique_dest
+
+    first = _unique_dest(tmp_path, "part.zip")
+    assert first == tmp_path / "part.zip"
+    first.write_bytes(b"a")
+    second = _unique_dest(tmp_path, "part.zip")
+    assert second == tmp_path / "part-2.zip"
+    second.write_bytes(b"b")
+    assert _unique_dest(tmp_path, "part.zip") == tmp_path / "part-3.zip"
+    assert _unique_dest(tmp_path, "") == tmp_path / "cad-download.zip"
+
+
+def test_emit_download_started_relays_to_the_cad_window(monkeypatch):
+    # Owner heuristic (2026-07-23): a successful run's download STARTS within ~5s of the click.
+    # Tier 1's DownloadStarting relays a real 'started' event (off the COM thread) so the reactor
+    # can fail 'nostart' fast - to the next source - when nothing begins.
+    from stockroom.host import window as W
+
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    W._emit_download_started()
+    [js] = cad.scripts
+    assert js.startswith("window.__SR_DL__ &&")
+    assert json.dumps({"state": "started"}) in js
+
+
+def test_dispatch_captured_runs_off_the_calling_thread_and_returns_immediately():
+    # Tier 1's StateChanged fires on WebView2's download COM thread. Running the forward pipeline
+    # (classify + extract + blocking evaluate_js) on that thread hung it mid-relay (live-observed
+    # 2026-07-23: the HUD ticked, then the completed relay never reached the page and the harness
+    # line after the forward never ran). The dispatch helper must hand the callback to a worker
+    # thread and return without waiting for it.
+    from stockroom.host.window import _dispatch_captured
+
+    started = threading.Event()
+    release = threading.Event()
+    seen: dict = {}
+
+    def _blocked_capture(path):
+        seen["thread"] = threading.current_thread()
+        seen["path"] = path
+        started.set()
+        release.wait(timeout=5.0)
+
+    _dispatch_captured(_blocked_capture, "dest.zip")  # must NOT block on the callback
+    assert started.wait(timeout=5.0)  # the callback did run...
+    assert seen["thread"] is not threading.current_thread()  # ...on a different thread
+    release.set()
+    assert seen["path"] == "dest.zip"
+
+
+def test_forward_cad_capture_no_cad_window_still_forwards_to_the_spa(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", None)  # window mid-close / never opened
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL})
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")  # must not raise
+    assert len(_capture_payloads(spa)) == 1  # the SPA forward is untouched
+
+
+def test_forward_cad_capture_without_a_session_does_not_touch_the_cad_window(tmp_path, monkeypatch):
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    cad = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    W._forward_cad_capture(z, None, extract_dir=tmp_path / "x")  # no session -> no HUD push
+    assert cad.scripts == []
+
+
+def test_cad_loaded_scripts_threads_the_part_name_into_the_overlay():
+    from stockroom.host.window import cad_loaded_scripts
+
+    scripts = cad_loaded_scripts(
+        ["kicad_symbol"], "digikey", "DigiKey", ["kicad"], {}, "BQ24074"
+    )
+    assert "__STOCKROOM_OVERLAY__" in scripts[0]  # overlay first
+    assert "BQ24074" in scripts[0]  # the part name reached build_overlay_js
+
+
+def test_cad_scripts_for_url_threads_the_part_name(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch)
+    scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"], "BQ24074")
+    assert "BQ24074" in scripts[0]  # part name flows through cad_scripts_for_url
+
+
 # -- _poll_downloads_watch (session-driven) --
 
 
@@ -449,8 +685,10 @@ def test_poll_loop_forwards_a_capture_then_returns_on_completion(tmp_path, monke
         interval=0.0, timeout=300.0, sleep=lambda *_: None, now=lambda: 0.0,
     )
     payloads = _capture_payloads(win)
-    assert len(payloads) == 1 and s.is_complete()
-    assert all("signal" not in p for p in payloads)  # completed, no timeout signal
+    assert s.is_complete()
+    # the file-capture forward plus a distinct done signal on completion (never a timeout)
+    assert {"signal": "done", "token": s.token} in payloads
+    assert all(p.get("signal") != "timeout" for p in payloads)
 
 
 def test_session_complete_matches_is_complete_under_the_lock():
@@ -497,6 +735,87 @@ def test_poll_loop_stops_silently_when_the_session_is_stopped(tmp_path, monkeypa
     assert win.scripts == []  # no forward, and crucially no timeout signal onto a new part
 
 
+# -- finish-and-close on completion (DONE-01): Complete flash + done signal + window destroy --
+
+
+def test_cad_overlay_complete_js_is_guarded_and_calls_complete():
+    from stockroom.host.window import cad_overlay_complete_js
+
+    js = cad_overlay_complete_js()
+    assert js.startswith("window.__STOCKROOM_OVERLAY__ &&")  # guarded no-op without the bridge
+    assert ".complete()" in js
+
+
+def test_forward_done_signal_emits_a_done_with_the_session_token(monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    s = _session({R.KICAD_SYMBOL}, token="tokD")
+    W._forward_done_signal(s)
+    [p] = _capture_payloads(spa)
+    assert p == {"signal": "done", "token": "tokD"}
+
+
+def test_poll_loop_finishes_and_closes_on_completion(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+
+    class _DestroyWindow(_RecordingWindow):
+        def __init__(self):
+            super().__init__()
+            self.destroyed = 0
+
+        def destroy(self):
+            self.destroyed += 1
+
+    cad = _DestroyWindow()
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+
+    z = tmp_path / "k.zip"
+    _make_kicad_zip(z)
+    s = _session({R.KICAD_SYMBOL, R.KICAD_FOOTPRINT, R.KICAD_MODEL})
+    slept: list = []
+    W._poll_downloads_watch(
+        _FakeWatch([z]), s, extract_dir=tmp_path / "x",
+        interval=0.0, timeout=300.0, close_delay=1.0,
+        sleep=lambda d=0.0: slept.append(d), now=lambda: 0.0,
+    )
+    # the SPA got a distinct done signal, and never a timeout on completion
+    payloads = _capture_payloads(spa)
+    assert {"signal": "done", "token": "tok"} in payloads
+    assert all(p.get("signal") != "timeout" for p in payloads)
+    # the HUD got the file received tick AND the Complete flash push
+    assert any("received(" in js for js in cad.scripts)
+    assert any(".complete()" in js for js in cad.scripts)
+    # the cad window was closed exactly once, after a brief visible close delay
+    assert cad.destroyed == 1
+    assert 1.0 in slept
+    assert s.is_complete()
+
+
+def test_finish_and_close_leaves_the_temp_dir_intact(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    monkeypatch.setattr(W, "_CAD_WINDOW", None)  # no window to destroy; the temp path is the focus
+    s = _session({R.KICAD_SYMBOL})
+    temp = tmp_path / "keep"
+    temp.mkdir()
+    (temp / "part.SchLib").write_bytes(b"x")
+    s.temp_dir = temp
+    W._finish_and_close(s, sleep=lambda *_: None, close_delay=0.0)
+    # the async Altium attach still needs the dir; the NEXT capture cleans it, never the finish path
+    assert temp.exists()
+    assert (temp / "part.SchLib").exists()
+
+
 # -- _stop_active_capture (B4 stop/replace + B8 temp cleanup) --
 
 
@@ -528,6 +847,296 @@ def test_stop_active_capture_stops_prior_session_joins_thread_and_cleans_temp(tm
     assert finished.wait(2.0)  # the prior poll thread actually exited
     assert not tmp.exists()  # its temp dir was cleaned (B8)
     assert W._CAD_SESSION is None and W._CAD_POLL_THREAD is None
+
+
+# -- login auto-fill + loaded-injection order (Phase 3 A3) --
+
+
+def test_login_autofill_blank_creds_is_empty():
+    from stockroom.host.window import build_login_autofill_js
+
+    assert build_login_autofill_js("ultralibrarian", "", "") == ""
+
+
+def test_login_autofill_json_encodes_creds_and_is_guarded():
+    from stockroom.host.window import build_login_autofill_js
+
+    js = build_login_autofill_js("ultralibrarian", "me@x.com", "s3cr3t")
+    assert js.strip().startswith("(") and "try" in js and "catch" in js
+    # creds are JSON-encoded, never string-concatenated into the script
+    assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
+    assert "password" in js  # fills a password field
+
+
+def test_login_autofill_fills_every_supported_vendor_and_is_empty_when_blank():
+    # DigiKey account (primary) + Ultra Librarian + SnapEDA + SamacSys each auto-fill their own
+    # login DOM, JSON-encoded + guarded; blank creds inject nothing (the LGN-02 "log in once" path).
+    from stockroom.host.window import build_login_autofill_js
+
+    for vk in ("digikey", "ultralibrarian", "snapeda", "samacsys"):
+        js = build_login_autofill_js(vk, "me@x.com", "s3cr3t")
+        assert js.strip().startswith("(") and "try" in js and "catch" in js
+        assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
+        assert "password" in js
+        assert build_login_autofill_js(vk, "", "") == ""
+
+
+def test_load_vendor_creds_digikey_and_samacsys_degrade_before_phase4(monkeypatch):
+    # digikey + samacsys creds are read via getattr, so before Phase 4 SET-01 adds those config
+    # fields they degrade to blank (nothing injected -> LGN-02); ul/snapeda read their real fields.
+    from stockroom.host import window as W
+    from stockroom.store import machine_config as MC
+
+    class _Cfg:
+        ul_username = "ulu"
+        ul_password = "ulp"
+        snapeda_username = "snu"
+        snapeda_password = "snp"
+        # deliberately NO digikey_username / samacsys_username (Phase 4 SET-01 adds them)
+
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: _Cfg()))
+    assert W._load_vendor_creds("digikey") == {"username": "", "password": ""}
+    assert W._load_vendor_creds("samacsys") == {"username": "", "password": ""}
+    assert W._load_vendor_creds("ultralibrarian") == {"username": "ulu", "password": "ulp"}
+    assert W._load_vendor_creds("snapeda") == {"username": "snu", "password": "snp"}
+
+
+def test_load_vendor_creds_reads_digikey_and_samacsys_when_present(monkeypatch):
+    # once the Phase 4 fields exist, the DigiKey ACCOUNT web login + SamacSys creds are read.
+    from stockroom.host import window as W
+    from stockroom.store import machine_config as MC
+
+    class _Cfg:
+        digikey_username = "dku"
+        digikey_password = "dkp"
+        samacsys_username = "smu"
+        samacsys_password = "smp"
+        ul_username = ""
+        ul_password = ""
+        snapeda_username = ""
+        snapeda_password = ""
+
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: _Cfg()))
+    assert W._load_vendor_creds("digikey") == {"username": "dku", "password": "dkp"}
+    assert W._load_vendor_creds("samacsys") == {"username": "smu", "password": "smp"}
+
+
+def test_formats_for_needs_maps_kicad_and_altium():
+    from stockroom.host.window import _formats_for_needs
+
+    assert _formats_for_needs(["kicad_symbol", "kicad_model"]) == ["kicad"]
+    assert _formats_for_needs(["kicad_symbol", "altium_footprint"]) == ["kicad", "altium"]
+    assert _formats_for_needs(["altium_symbol"]) == ["altium"]
+    assert _formats_for_needs([]) == []
+
+
+def test_vendor_from_url_maps_key_and_label():
+    from stockroom.host.window import _vendor_from_url
+
+    assert _vendor_from_url("https://app.ultralibrarian.com/search?q=x") == (
+        "ultralibrarian",
+        "Ultra Librarian",
+    )
+    assert _vendor_from_url("https://www.snapeda.com/parts/x") == ("snapeda", "SnapEDA")
+    assert _vendor_from_url("https://www.digikey.com/x") == ("digikey", "DigiKey")
+    # SamacSys is served from componentsearchengine / samacsys; ul/snapeda/digikey are KEPT
+    assert _vendor_from_url("https://componentsearchengine.com/part/x") == ("samacsys", "SamacSys")
+    assert _vendor_from_url("https://www.samacsys.com/x") == ("samacsys", "SamacSys")
+    assert _vendor_from_url("")[0] == ""
+    # A DigiKey CAD models page carries a ?tab=<provider> query; it MUST route to the DigiKey driver,
+    # not the legacy provider driver (the guided capture happens on DigiKey). Regression 2026-07-23.
+    assert _vendor_from_url("https://www.digikey.com/en/models/726880?tab=ultralibrarian") == (
+        "digikey",
+        "DigiKey",
+    )
+
+
+def test_cad_loaded_scripts_order_and_omission():
+    from stockroom.host.window import cad_loaded_scripts
+
+    with_creds = cad_loaded_scripts(
+        ["kicad_symbol", "altium_symbol"],
+        "ultralibrarian",
+        "Ultra Librarian",
+        ["kicad", "altium"],
+        {"username": "u", "password": "p"},
+    )
+    assert len(with_creds) == 3  # overlay, autofill, driver in order
+    assert "__STOCKROOM_OVERLAY__" in with_creds[0]  # overlay first
+    assert "password" in with_creds[1]  # autofill second
+    assert "KiCad" in with_creds[2] and "Altium" in with_creds[2]  # driver last
+
+    no_creds = cad_loaded_scripts(
+        ["kicad_symbol"], "ultralibrarian", "Ultra Librarian", ["kicad"], {}
+    )
+    assert len(no_creds) == 2  # overlay, driver (autofill omitted when no creds)
+    assert "__STOCKROOM_OVERLAY__" in no_creds[0]
+    assert "KiCad" in no_creds[1]
+
+
+# -- light defensive re-injection (Phase 2 LGN-03): cad_scripts_for_url + current-url
+#    re-derivation + best-effort popup subscribe + the no-token / no-js_api security lock --
+
+
+def _stub_creds(monkeypatch, **fields):
+    from stockroom.store import machine_config as MC
+
+    defaults = {
+        "digikey_username": "",
+        "digikey_password": "",
+        "ul_username": "",
+        "ul_password": "",
+        "snapeda_username": "",
+        "snapeda_password": "",
+        "samacsys_username": "",
+        "samacsys_password": "",
+    }
+    defaults.update(fields)
+    cfg = type("_Cfg", (), defaults)()
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: cfg))
+
+
+def test_cad_scripts_for_url_digikey_includes_the_digikey_autofill(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
+    scripts = W.cad_scripts_for_url(
+        "https://www.digikey.com/en/products/x", ["kicad_symbol", "kicad_model"]
+    )
+    assert len(scripts) == 3  # overlay, DigiKey autofill, driver
+    assert "__STOCKROOM_OVERLAY__" in scripts[0]
+    assert json.dumps("dku") in scripts[1] and "password" in scripts[1]  # digikey autofill second
+    assert "eda-cad-model-link" in scripts[2]  # the digikey models-page driver last
+
+
+def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        snapeda_username="snu",
+        snapeda_password="snp",
+        samacsys_username="smu",
+        samacsys_password="smp",
+    )
+    snap = W.cad_scripts_for_url("https://www.snapeda.com/parts/x", ["kicad_symbol"])
+    assert len(snap) == 3 and json.dumps("snu") in snap[1]
+    sam = W.cad_scripts_for_url("https://componentsearchengine.com/part/x", ["kicad_symbol"])
+    assert len(sam) == 3 and json.dumps("smu") in sam[1]
+
+
+def test_cad_scripts_for_url_without_creds_is_overlay_and_driver_only(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch)  # nothing saved
+    scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(scripts) == 2  # overlay + driver, autofill omitted
+    assert "__STOCKROOM_OVERLAY__" in scripts[0] and "eda-cad-model-link" in scripts[1]
+
+
+def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
+    # after a simulated in-site nav the CURRENT url's scripts are injected, not the original.
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        digikey_username="dku",
+        digikey_password="dkp",
+        snapeda_username="snu",
+        snapeda_password="snp",
+    )
+
+    class NavWindow(_RecordingWindow):
+        def __init__(self, url):
+            super().__init__()
+            self._url = url
+
+        def get_current_url(self):
+            return self._url
+
+    win = NavWindow("https://www.snapeda.com/parts/x")
+    W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(win.scripts) == 3
+    assert json.dumps("snu") in win.scripts[1]  # the CURRENT (snapeda) url's autofill
+
+
+def test_inject_cad_scripts_falls_back_when_current_url_unavailable(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
+
+    class BadWindow(_RecordingWindow):
+        def get_current_url(self):
+            raise RuntimeError("this backend has no get_current_url")
+
+    win = BadWindow()
+    W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(win.scripts) == 3
+    assert json.dumps("dku") in win.scripts[1]  # fell back to the original digikey url
+
+
+def test_wire_cad_reinjection_subscribes_when_the_event_exists():
+    from stockroom.host.window import _wire_cad_reinjection
+
+    class Events:
+        def __init__(self):
+            self.new_window = _Slot()
+
+    class Window:
+        def __init__(self):
+            self.events = Events()
+
+    win = Window()
+    ok = _wire_cad_reinjection(win, ["kicad_symbol"], candidate_events=("new_window",))
+    assert ok is True
+    assert len(win.events.new_window) == 1  # a re-inject handler subscribed to the popup slot
+
+
+def test_wire_cad_reinjection_degrades_when_no_event_slot():
+    from stockroom.host.window import _wire_cad_reinjection
+
+    class Events:
+        pass  # this pywebview backend exposes no popup / new-window event
+
+    class Window:
+        def __init__(self):
+            self.events = Events()
+
+    assert (
+        _wire_cad_reinjection(Window(), ["kicad_symbol"], candidate_events=("new_window", "popup"))
+        is False
+    )
+
+
+def test_cad_scripts_never_leak_token(monkeypatch):
+    # SECURITY INVARIANT: no cad script (overlay / autofill / driver) for any vendor url references
+    # the SPA token global or a pywebview.api / js_api bridge - injection is one-way host->page.
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        digikey_username="dku",
+        digikey_password="dkp",
+        ul_username="ulu",
+        ul_password="ulp",
+        snapeda_username="snu",
+        snapeda_password="snp",
+        samacsys_username="smu",
+        samacsys_password="smp",
+    )
+    urls = [
+        "https://www.digikey.com/en/products/x",
+        "https://www.snapeda.com/parts/x",
+        "https://componentsearchengine.com/part/x",
+        "https://app.ultralibrarian.com/x",
+    ]
+    for u in urls:
+        for script in W.cad_scripts_for_url(u, ["kicad_symbol", "altium_symbol"]):
+            low = script.lower()
+            assert "__stockroom_token__" not in low
+            assert "__api_base__" not in low
+            assert "pywebview.api" not in low
+            assert "js_api" not in low
 
 
 # -- persistent vendor WebView2 profile (B5): the storage kwargs for webview.start --

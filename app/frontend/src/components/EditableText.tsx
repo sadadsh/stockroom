@@ -23,6 +23,9 @@ interface Props {
   // Clamp the resting display to N lines with an ellipsis (for a verbose note that should
   // not sprawl the rail); editing still opens the full field. Ignored when `truncate` is set.
   clampLines?: number;
+  // A clean label to SHOW when not editing (e.g. a datasheet's host instead of the
+  // raw URL). Editing still operates on `value`, so nothing about save changes.
+  display?: string;
 }
 
 export function EditableText({
@@ -36,6 +39,7 @@ export function EditableText({
   displayClassName,
   truncate = false,
   clampLines,
+  display,
 }: Props) {
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
@@ -109,7 +113,7 @@ export function EditableText({
             : undefined
         }
       >
-        {empty ? placeholder : value}
+        {empty ? placeholder : (display ?? value)}
       </span>
     </button>
   );

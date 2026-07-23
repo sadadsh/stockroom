@@ -123,8 +123,10 @@ def _run_capture(needs, drop, *, token, timeout=8.0):
     deadline = time.time() + timeout + 2.0
     while thread.is_alive() and time.time() < deadline and not session.is_complete():
         time.sleep(0.05)
-    session.stop()
+    # Let the poll loop run its own completion path (which fires the done signal + closes) rather
+    # than racing it with an external stop; only stop as a fallback if it never completed.
     thread.join(timeout=2.0)
+    session.stop()
     W._ACTIVE_WINDOW = None
     shutil.rmtree(watch_dir, ignore_errors=True)
     return recorder.payloads(), session, extract_dir
@@ -148,8 +150,10 @@ def _scenario_kicad_zip(c: _Checks) -> None:
         lambda d: _make_kicad_zip(d / "part-cad.zip"),
         token="tok-kicad",
     )
-    c.ok(len(payloads) == 1, "exactly one forward")
-    p = payloads[0] if payloads else {}
+    forwards = [x for x in payloads if "path" in x]
+    c.ok(len(forwards) == 1, "exactly one forward")
+    c.ok({"signal": "done", "token": "tok-kicad"} in payloads, "a done signal fired on completion")
+    p = forwards[0] if forwards else {}
     c.ok(p.get("path", "").endswith("part-cad.zip"), "forward carries the zip path")
     c.ok(p.get("token") == "tok-kicad", "forward carries the live session token")
     c.ok(
@@ -168,8 +172,10 @@ def _scenario_loose_altium(c: _Checks) -> None:
         _atomic(d / "part.SchLib", lambda t: t.write_bytes(b"SCHDATA"))
 
     payloads, _session, temp = _run_capture({R.ALTIUM_SYMBOL}, drop, token="tok-altium")
-    c.ok(len(payloads) == 1, "exactly one forward")
-    p = payloads[0] if payloads else {}
+    forwards = [x for x in payloads if "path" in x]
+    c.ok(len(forwards) == 1, "exactly one forward")
+    c.ok({"signal": "done", "token": "tok-altium"} in payloads, "a done signal fired on completion")
+    p = forwards[0] if forwards else {}
     c.ok(set(p.get("requirements", [])) == {"altium_symbol"}, "classifies altium_symbol")
     c.ok(
         [Path(a).name for a in p.get("altiumPaths", [])] == ["part.SchLib"],
@@ -185,8 +191,10 @@ def _scenario_mixed_zip(c: _Checks) -> None:
         lambda d: _make_mixed_zip(d / "bundle.zip"),
         token="tok-mixed",
     )
-    c.ok(len(payloads) == 1, "exactly one forward")
-    p = payloads[0] if payloads else {}
+    forwards = [x for x in payloads if "path" in x]
+    c.ok(len(forwards) == 1, "exactly one forward")
+    c.ok({"signal": "done", "token": "tok-mixed"} in payloads, "a done signal fired on completion")
+    p = forwards[0] if forwards else {}
     c.ok(
         set(p.get("requirements", [])) == {"kicad_symbol", "altium_symbol", "altium_footprint"},
         "classifies the needed KiCad + Altium requirements together",

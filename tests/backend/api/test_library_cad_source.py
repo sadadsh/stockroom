@@ -20,13 +20,13 @@ def _land_bare_part(app_ctx) -> str:
     return landed.id
 
 
-def test_cad_source_resolves_ultralibrarian_and_reports_needs(client, app_ctx):
+def test_cad_source_resolves_digikey_and_reports_needs(client, app_ctx):
     part_id = _land_bare_part(app_ctx)
     resp = client.get(f"/api/library/parts/{part_id}/cad-source")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["vendor"] == "UltraLibrarian"
-    assert "ultralibrarian.com" in body["url"]
+    assert body["vendor"] == "DigiKey"
+    assert "digikey.com" in body["url"]
     assert body["mpn"] == "BQ24074RGWR"
     needs = body["needs"]
     assert "kicad_symbol" in needs

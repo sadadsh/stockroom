@@ -66,6 +66,16 @@
     --shadow-raise: 0 3px 10px rgba(0, 0, 0, 0.42);
     --shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.5);
     --shadow-file: 0 2px 8px rgba(0, 0, 0, 0.28);
+    /* Category hues (FIX-03): a subtle, distinct tint per component family so the list-row
+       fallback thumbnails read apart at a glance. Dark-theme values sit light enough (L ~62-70%)
+       to clear >=3:1 against the recessed dark stage tile; the light theme darkens them below. */
+    --cat-resistor: #e0a24a;
+    --cat-capacitor: #5aa9f0;
+    --cat-inductor: #4fc9a8;
+    --cat-diode: #ef7a86;
+    --cat-connector: #b58cf0;
+    --cat-crystal: #4fc3dd;
+    --cat-ic: #8a9cf0;
     /* the springy easing used for tactile press + hover lift across controls */
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     /* page backdrop + chrome that lives outside the token classes: flat graphite. */
@@ -110,6 +120,14 @@
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;
+    /* Category hues (FIX-03), darkened (L ~34-45%) so they clear >=3:1 against the light tile. */
+    --cat-resistor: #b6710f;
+    --cat-capacitor: #1f6fc4;
+    --cat-inductor: #12876a;
+    --cat-diode: #c23b4a;
+    --cat-connector: #7a45c2;
+    --cat-crystal: #147d97;
+    --cat-ic: #4a5bc0;
     --c-acc: #4f7fab;
     --c-acc-on: #ffffff;
     --c-acc-strong: #3f6f9c;

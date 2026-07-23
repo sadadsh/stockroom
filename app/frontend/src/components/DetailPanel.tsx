@@ -13,9 +13,10 @@
  * instead of a tall rail, and the spec sheet no longer dominates the page. Everything degrades
  * honestly when a field is absent, and no data is fabricated.
  */
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useState, type HTMLAttributes, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
+import { useCapture } from "../lib/capture";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { useInlineEdit } from "../lib/useInlineEdit";
@@ -129,6 +130,15 @@ export function DetailPanel({
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   // The one Complete-Part window (adds every missing file + data field in one place) - open flag.
   const [completeOpen, setCompleteOpen] = useState(false);
+  // Finish the background-pill reopen handoff: when the pill asked to reopen THIS part (the page
+  // already selected it), open the Complete-Part window and clear the intent.
+  const { reopenPartId, clearReopen } = useCapture();
+  useEffect(() => {
+    if (reopenPartId && detail?.id === reopenPartId) {
+      setCompleteOpen(true);
+      clearReopen();
+    }
+  }, [reopenPartId, detail?.id, clearReopen]);
   // Which workbench tab is showing. It resets to Specs whenever the active id falls out
   // of the available set (a part switch that drops the Pinout / Enrich tab).
   const [tab, setTab] = useState<WorkbenchTab>("specs");
@@ -1306,7 +1316,14 @@ function normalizePriceBreaks(raw: unknown[]): NormalizedBreak[] {
 function formatPrice(value: number, currency: string): string {
   const symbol = currency === "USD" || !currency ? "$" : "";
   const suffix = symbol ? "" : ` ${currency}`;
-  return `${symbol}${value.toFixed(2)}${suffix}`;
+  // Sub-cent unit prices are common on passives at volume; two decimals collapse them
+  // to "$0.00", which reads as free/broken. Show real precision (trim trailing zeros)
+  // so a fraction of a cent reads as an actual price.
+  const body =
+    value > 0 && value < 0.01
+      ? value.toFixed(4).replace(/0+$/, "")
+      : value.toFixed(2);
+  return `${symbol}${body}${suffix}`;
 }
 
 function PanelMessage({

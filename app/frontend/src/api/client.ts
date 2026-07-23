@@ -555,6 +555,16 @@ export const api = {
     return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
   },
 
+  // Dev convenience (the hidden Settings combo): load any API keys / logins from the per-machine
+  // dev-creds.json (in the OS config dir, never the public repo) into the config. Returns the
+  // redacted settings plus `loaded`, the field names that were applied.
+  loadDevCreds(): Promise<SettingsInfo & { loaded: string[] }> {
+    return request<SettingsInfo & { loaded: string[] }>(
+      "POST",
+      "/api/settings/load-dev-creds",
+    );
+  },
+
   // Library profiles (spec section 5.3). Activating one rebuilds the index, so
   // the caller invalidates the parts list and facets after it resolves.
   listProfiles(): Promise<ProfilesResponse> {

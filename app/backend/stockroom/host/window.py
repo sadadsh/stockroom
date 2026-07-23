@@ -31,6 +31,8 @@ from urllib.parse import urlsplit
 
 from stockroom.capture.classify import classify_asset
 from stockroom.capture.requirements import Requirement
+from stockroom.host.overlay import build_overlay_js
+from stockroom.host.vendor_drivers.drivers import build_driver_js
 
 _log = logging.getLogger("stockroom.host.cad")
 
@@ -203,6 +205,35 @@ def cad_forward_js(payload: dict) -> str:
     )
 
 
+def cad_overlay_received_js(requirements) -> str:
+    """The host to page push that ticks the HUD checklist: one
+    window.__STOCKROOM_OVERLAY__.received({requirement}) call per newly-satisfied requirement,
+    guarded so a remote page without the overlay bridge is a silent no-op, and JSON-encoded so a
+    requirement value can never break out of the script. Requirement enums are emitted as their
+    wire .value strings (the same contract as build_capture_payload). One-way host to page: the
+    CAD window has no js_api, so this only mutates the overlay DOM."""
+    calls = "".join(
+        "window.__STOCKROOM_OVERLAY__.received("
+        f"{json.dumps({'requirement': r.value if isinstance(r, Requirement) else str(r)})});"
+        for r in requirements
+    )
+    return f"window.__STOCKROOM_OVERLAY__ && (function(){{try{{{calls}}}catch(e){{}}}})();"
+
+
+def cad_download_event_js(state: str, fmt: str | None = None) -> str:
+    """Push a REAL download-lifecycle event to the in-page reactor so it reacts to a file actually
+    landing, not a timer or a vendor UI modal. `state` is "completed" (a captured file for `fmt`,
+    "kicad"/"altium", finished + was classified) - relayed from _forward_cad_capture, the point where
+    BOTH capture tiers converge, so the reactor advances no matter which tier caught the file and the
+    download's own critical-path handlers stay pristine. The reactor advances to the next format only
+    on a real "completed" for the format it is awaiting, so there is no preemption and no phantom-modal
+    wait. Guarded, JSON-encoded, one-way (the cad window has no js_api)."""
+    payload: dict = {"state": state}
+    if fmt:
+        payload["format"] = fmt
+    return "window.__SR_DL__ && window.__SR_DL__(" + json.dumps(payload) + ");"
+
+
 def build_capture_payload(path=None, token=None, requirements=None, altium_paths=None) -> dict:
     """The JSON-safe CaptureForward dict the host forwards to the SPA. Only non-empty
     fields are included so the frontend's `p.altiumPaths ?? [p.path]` fallback stays
@@ -266,6 +297,20 @@ def _emit_to_spa(payload: dict) -> None:
         spa.evaluate_js(cad_forward_js(payload))
 
 
+def _emit_to_cad_window(js: str) -> None:
+    """Push a host to page script (a received tick or the Complete flash) into the REMOTE cad
+    window ONLY - never the SPA. Reads the module global _CAD_WINDOW and best-effort evaluate_js on
+    it; a None window (never opened / mid-close) or a destroyed handle is a silent no-op, so a HUD
+    update from the poll thread can never crash the capture. One-way: the cad window has no js_api."""
+    win = _CAD_WINDOW
+    if win is None:
+        return
+    try:
+        win.evaluate_js(js)
+    except Exception:  # noqa: BLE001 - a window mid-close must never crash the poll thread
+        pass
+
+
 def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     """Classify a captured file, record the requirements it satisfies into `session`, and
     forward the rich CaptureForward payload (path + live token + classified requirements +
@@ -279,16 +324,70 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     with _CAD_CAPTURE_LOCK:
         classified = classify_asset(Path(path))
         if session is not None:
+            # reqs may be EMPTY (a duplicate re-fire, or a wrong-format download): the SPA forward
+            # and HUD tick are gated on it below, but the completed relay still fires - the reactor
+            # must hear about every file that landed, or it waits out a watchdog on a done download.
             reqs = session.record(classified.requirements, path)
-            if not reqs:
-                return  # nothing new this capture satisfies - do not re-forward
             token = session.token
         else:
             reqs = sorted(classified.requirements, key=lambda r: r.value)
             token = None
         altium_paths = _altium_paths_from_capture(path, classified, reqs, extract_dir)
         payload = build_capture_payload(path, token, reqs, altium_paths)
-    _emit_to_spa(payload)
+    if payload.get("requirements"):
+        _emit_to_spa(payload)
+    # Tick the HUD checklist live: push the newly-satisfied requirements to the cad window host
+    # to page (only for a real capture session, and only when this file satisfied something new -
+    # the same non-empty gate that prevents a redundant SPA re-forward). Outside the lock, like the
+    # SPA emit.
+    if session is not None and reqs:
+        _emit_to_cad_window(cad_overlay_received_js(reqs))
+    # Relay a "completed" download event for EVERY captured file - including one that satisfied
+    # nothing new (a duplicate) or the WRONG format outright (live 2026-07-23: a sticky prior
+    # selection made UL serve its Altium+STEP bundle against a KiCad request). The format names
+    # what the FILE actually contains (classified), not what the session needed, so the reactor
+    # can tell "my format landed" from "something else landed" and react at once (wrongfile ->
+    # reselect) instead of waiting out its watchdog on a download that already finished.
+    if session is not None:
+        _classified_values = [
+            r.value if isinstance(r, Requirement) else str(r) for r in classified.requirements
+        ]
+        for fmt in _capture_formats(_classified_values) or ["unknown"]:
+            _emit_to_cad_window(cad_download_event_js("completed", fmt))
+
+
+def cad_overlay_complete_js() -> str:
+    """The host to page push that reveals the HUD Complete flash on session completion, guarded so a
+    remote page without the overlay bridge is a silent no-op. One-way: the cad window has no js_api."""
+    return "window.__STOCKROOM_OVERLAY__ && window.__STOCKROOM_OVERLAY__.complete();"
+
+
+def _forward_done_signal(session) -> None:
+    """Forward a distinct {signal:'done'} to the SPA on completion (DONE-01), mirroring
+    _forward_timeout_signal: the SPA lands in a clean terminal done state the instant the browser
+    finishes, token-scoped so a stale done from a replaced capture cannot mark a new part done."""
+    _emit_to_spa({"signal": "done", "token": session.token})
+
+
+def _finish_and_close(session, *, sleep=time.sleep, close_delay: float = 1.0) -> None:
+    """The ordered finish-and-close on session completion (DONE-01): flash Complete on the HUD, tell
+    the SPA the capture is done, hold briefly (close_delay, via the injectable sleep) so the flash is
+    visible, then close the cad window best-effort (read the _CAD_WINDOW global, guarded destroy).
+
+    Closing from the poll thread is safe: _on_cad_closed guards its poll-thread join with a
+    current-thread check, so there is no self-join deadlock. The temp dir is DELIBERATELY left intact
+    - the async Altium attach still reads the loose paths pulled into it, and the NEXT capture cleans
+    it; double-cleaning here would yank files from an in-flight attach (documented invariant)."""
+    _emit_to_cad_window(cad_overlay_complete_js())
+    _forward_done_signal(session)
+    if close_delay:
+        sleep(close_delay)
+    win = _CAD_WINDOW
+    if win is not None:
+        try:
+            win.destroy()
+        except Exception:  # noqa: BLE001 - the window may already be gone; closing is best-effort
+            pass
 
 
 def _forward_timeout_signal(session) -> None:
@@ -315,6 +414,7 @@ def _poll_downloads_watch(
     extract_dir=None,
     interval: float = 1.5,
     timeout: float = 300.0,
+    close_delay: float = 1.0,
     sleep=time.sleep,
     now=time.time,
 ) -> None:
@@ -331,7 +431,11 @@ def _poll_downloads_watch(
     deadline = now() + timeout
     while not session.stop_flag["stop"] and now() < deadline:
         if _session_complete(session):
-            return  # all needs met; the temp dir is cleaned on the next capture (see below)
+            # all needs met: flash Complete on the HUD, tell the SPA it is done, and auto-close the
+            # cad window (DONE-01). The temp dir is left for the async Altium attach (cleaned on the
+            # next capture); no double-clean here.
+            _finish_and_close(session, sleep=sleep, close_delay=close_delay)
+            return
         found = watch.poll()
         if found is not None:
             _forward_cad_capture(found, session, extract_dir=extract_dir)
@@ -402,6 +506,10 @@ def _install_cad_download_intercept(
         return False
 
     def _on_download_starting(sender, args) -> None:
+        # A download IS starting - relay the real 'started' event to the reactor from a worker
+        # thread (this handler runs on the COM thread and must stay pristine). Fires on both
+        # branches below: even when completion can't be observed, the start happened.
+        threading.Thread(target=_emit_download_started, daemon=True).start()
         try:
             operation = args.DownloadOperation
         except Exception:  # noqa: BLE001 - can't observe completion; let it save to the
@@ -410,17 +518,29 @@ def _install_cad_download_intercept(
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
             name = os.path.basename(str(args.ResultFilePath)) or "cad-download.zip"
-            dest = target_dir / name
+            dest = _unique_dest(target_dir, name)
+
+            fired = {"done": False}
 
             def _on_state_changed(op_sender, op_args) -> None:
+                # KEEP THIS HANDLER PRISTINE: it runs on WebView2's download COM thread, in the
+                # critical path of the download itself. Calling evaluate_js here stalled the download
+                # mid-stream (live-observed 2026-07-23), and running the forward pipeline (classify +
+                # extract + blocking evaluate_js pushes) synchronously here hung the thread mid-relay
+                # (live-observed 2026-07-23, second finding: the HUD ticked, then the completed relay
+                # never reached the page). So this reads the state and DISPATCHES the completed file
+                # to a worker thread - nothing else - and fires exactly once per download operation
+                # (a repeated Completed re-fire would relay a duplicate event the reactor could
+                # misread as a wrong-format delivery for the NEXT format).
                 try:
                     from Microsoft.Web.WebView2.Core import CoreWebView2DownloadState
 
                     done = operation.State == CoreWebView2DownloadState.Completed
                 except Exception:  # noqa: BLE001 - best-effort: treat an unreadable state as done
                     done = True
-                if done:
-                    on_captured(dest)  # idempotent: the session dedups a repeated Completed
+                if done and not fired["done"]:
+                    fired["done"] = True
+                    _dispatch_captured(on_captured, dest)
 
             operation.StateChanged += _on_state_changed
             args.ResultFilePath = str(dest)
@@ -435,6 +555,284 @@ def _install_cad_download_intercept(
         _log.warning("cad tier-1: could not patch this window's download handler; tier 2 covers it")
         return False
     return True
+
+
+# Per-vendor login DOM selector sets (username-or-email + password). The download happens ON
+# DigiKey (owner correction 2026-07-22), so the DigiKey ACCOUNT web login is the PRIMARY autofill -
+# signing into DigiKey prepares login for everything - with Ultra Librarian / SnapEDA / SamacSys
+# KEPT as backups in case one is prompted in-page. Selectors are OWNER-VALIDATE first-guesses
+# against the live login DOMs (which change); the generic set is the unknown-vendor fallback.
+_LOGIN_SELECTORS: dict[str, dict[str, str]] = {
+    "digikey": {
+        "user": "input#username,input[name='username'],input[type='email'],input[name*='user' i]",
+        "pass": "input#password,input[type='password'],input[name='password']",
+    },
+    "ultralibrarian": {
+        "user": "input[name='Email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='Password'],input[type='password']",
+    },
+    "snapeda": {
+        "user": "input[name='email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='password'],input[type='password']",
+    },
+    "samacsys": {
+        "user": "input[name='email'],input[type='email'],input[name*='user' i]",
+        "pass": "input[name='password'],input[type='password']",
+    },
+}
+_GENERIC_LOGIN_SELECTORS = {
+    "user": "input[type='email'],input[name='username'],input[name='email'],input[name*='user']",
+    "pass": "input[type='password']",
+}
+
+
+def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
+    """A best-effort login auto-fill for the vendor window, from the per-machine saved creds
+    (Settings). Pure string builder. Empty when there is nothing to fill (so nothing is
+    injected - the LGN-02 "log in once" path). Creds are JSON-encoded (never string-concatenated)
+    and every field fill is guarded, so a page without a matching field is a silent no-op. Injected
+    ONLY into the remote cad window on its `loaded` event - never the SPA. `vendor` selects the
+    per-vendor login DOM (digikey account primary / ultralibrarian / snapeda / samacsys), falling
+    back to a generic email/username + password fill for an unknown vendor."""
+    if not (username or password):
+        return ""
+    sels = _LOGIN_SELECTORS.get((vendor or "").strip().lower(), _GENERIC_LOGIN_SELECTORS)
+    j = json.dumps
+    return (
+        "(function(){try{"
+        f"var u={j(username)},p={j(password)};"
+        "function set(sel,val){if(!val)return false;var el=document.querySelector(sel);"
+        "if(el){el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));"
+        "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;}"
+        f"set({j(sels['user'])},u);"
+        f"set({j(sels['pass'])},p);"
+        "}catch(e){}})();"
+    )
+
+
+def _formats_for_needs(needs) -> list[str]:
+    """The vendor download formats (`kicad`/`altium`) a set of Requirement values implies,
+    KiCad before Altium."""
+    values = {str(n) for n in (needs or [])}
+    formats: list[str] = []
+    if any(v.startswith("kicad_") for v in values):
+        formats.append("kicad")
+    if any(v.startswith("altium_") for v in values):
+        formats.append("altium")
+    return formats
+
+
+def _capture_formats(requirement_values) -> list[str]:
+    """The formats a CAPTURED file actually DELIVERS, for the reactor's completed relay: a format
+    counts only when its core symbol+footprint pair is present. This is deliberately stricter than
+    _formats_for_needs (which maps NEEDS, where any missing kicad_* must re-drive kicad): a stray
+    STEP classifies as kicad_model alone, and naming that a "kicad" delivery would falsely advance
+    the reactor past a format it never received (live 2026-07-23: UL's Altium+STEP bundle against a
+    KiCad request)."""
+    values = {str(n) for n in (requirement_values or [])}
+    formats: list[str] = []
+    if {"kicad_symbol", "kicad_footprint"} <= values:
+        formats.append("kicad")
+    if {"altium_symbol", "altium_footprint"} <= values:
+        formats.append("altium")
+    return formats
+
+
+def _unique_dest(target_dir, name: str) -> Path:
+    """A collision-free save path inside target_dir. The vendor names EVERY export the same
+    (<MPN>.zip), so a second format's download would OVERWRITE the first zip while its async SPA
+    attach may still be reading that path (live 2026-07-23: the Altium zip replaced the
+    just-captured KiCad zip on disk seconds after the KiCad forward). Appends -2, -3, ... before
+    the suffix until the name is free."""
+    base = Path(name).stem or "cad-download"
+    suffix = Path(name).suffix or (".zip" if not name else "")
+    dest = Path(target_dir) / f"{base}{suffix}"
+    n = 2
+    while dest.exists():
+        dest = Path(target_dir) / f"{base}-{n}{suffix}"
+        n += 1
+    return dest
+
+
+def _emit_download_started() -> None:
+    """Relay the browser's REAL download-started event to the in-page reactor. Owner heuristic
+    (2026-07-23): a successful run's download STARTS within ~5s of the click, so the reactor
+    fails 'nostart' fast - on to the next source - when nothing begins. Called on a worker
+    thread, never on the download's COM-critical path."""
+    _emit_to_cad_window(cad_download_event_js("started"))
+
+
+def _dispatch_captured(on_captured, dest) -> None:
+    """Hand a completed download to `on_captured` on a WORKER thread and return immediately.
+    Tier 1's StateChanged fires on WebView2's download COM thread; running the forward pipeline
+    (classify + extract + blocking evaluate_js pushes) on that thread hung it mid-relay
+    (live-observed 2026-07-23: the HUD ticked, then the completed relay never reached the page),
+    so the COM callback must never wait on the forward."""
+    threading.Thread(target=on_captured, args=(dest,), daemon=True).start()
+
+
+def _vendor_from_url(url: str) -> tuple[str, str]:
+    """(driver_key, display_label) for a resolved CAD-source URL. The key drives which vendor
+    driver runs (empty = no automation, guidance only); the label is what the overlay shows."""
+    u = (url or "").lower()
+    # DigiKey is checked FIRST: the guided capture happens ON DigiKey, and its CAD models page URL
+    # carries a `?tab=ultralibrarian` (or traceparts/cadenas/snapmagic) query, so a naive provider
+    # substring match would mis-route a DigiKey page to a legacy provider driver whose selectors never
+    # fire (live-observed 2026-07-23: the models page injected the Ultra Librarian driver, 0 captures).
+    # The provider drivers below apply only to a window opened DIRECTLY on a provider site.
+    if "digikey" in u:
+        return ("digikey", "DigiKey")
+    if "ultralibrarian" in u:
+        return ("ultralibrarian", "Ultra Librarian")
+    if "snapeda" in u or "snapmagic" in u:
+        return ("snapeda", "SnapEDA")
+    if "componentsearchengine" in u or "samacsys" in u:
+        return ("samacsys", "SamacSys")
+    return ("", "the vendor")
+
+
+def cad_loaded_scripts(
+    needs, vendor_key: str, vendor_label: str, formats, creds, part_name: str = ""
+) -> list[str]:
+    """The scripts to inject into the cad window on each `loaded`, in order: the overlay (so
+    the panel + `window.__STOCKROOM_OVERLAY__` bridge exist first), then a best-effort login
+    auto-fill (omitted when there are no creds), then the vendor driver (which reports into the
+    overlay). `part_name` is shown as the HUD header focal point when non-empty."""
+    scripts = [build_overlay_js(list(needs), vendor_label, part_name)]
+    autofill = build_login_autofill_js(
+        vendor_key, (creds or {}).get("username", ""), (creds or {}).get("password", "")
+    )
+    if autofill:
+        scripts.append(autofill)
+    scripts.append(build_driver_js(vendor_key, list(formats)))
+    return scripts
+
+
+def _load_vendor_creds(vendor_key: str) -> dict:
+    """The saved login for a vendor from the per-machine config, or {} (best-effort - a missing
+    or unreadable config never blocks the capture). Handles digikey + ultralibrarian + snapeda +
+    samacsys. The digikey ACCOUNT web login (digikey_username/password - NOT the API
+    client_id/secret) and samacsys_* fields are read via getattr so they degrade to blank before
+    Phase 4 SET-01 adds them (nothing injected -> the LGN-02 "log in once" path); ul/snapeda read
+    their existing fields."""
+    if vendor_key not in ("digikey", "ultralibrarian", "snapeda", "samacsys"):
+        return {}
+    try:
+        from stockroom.store.machine_config import MachineConfig
+
+        cfg = MachineConfig.load()
+    except Exception:  # noqa: BLE001 - no config / unreadable: just skip the auto-fill
+        return {}
+    if vendor_key == "digikey":
+        return {
+            "username": getattr(cfg, "digikey_username", ""),
+            "password": getattr(cfg, "digikey_password", ""),
+        }
+    if vendor_key == "ultralibrarian":
+        return {"username": cfg.ul_username, "password": cfg.ul_password}
+    if vendor_key == "snapeda":
+        return {"username": cfg.snapeda_username, "password": cfg.snapeda_password}
+    return {
+        "username": getattr(cfg, "samacsys_username", ""),
+        "password": getattr(cfg, "samacsys_password", ""),
+    }
+
+
+def cad_scripts_for_url(
+    url: str, needs_values, part_name: str = "", driver_formats=None
+) -> list[str]:
+    """The cad scripts (overlay + optional per-vendor login autofill + driver) re-derived from a
+    url: vendor/label via `_vendor_from_url`, formats via `_formats_for_needs`, creds via
+    `_load_vendor_creds`. So a DigiKey url yields the DigiKey-account autofill (when creds are
+    saved), an in-page provider url (snapeda / samacsys / ultralibrarian) yields that provider's
+    autofill, and a url with no saved creds yields overlay + driver only. The single DRY path for
+    both the initial injection and every re-injection - all host->page evaluate_js, never the token
+    or a js_api bridge.
+
+    `driver_formats` overrides which formats the DRIVER attempts while the OVERLAY still shows the
+    full `needs_values` checklist. The host drives ONE format per fresh page load (DigiKey's stateful
+    export + Download-complete modals cannot be reliably reused for a 2nd format in one session), so it
+    passes the single next-unmet format here; None (the default) means all requested formats."""
+    vendor_key, vendor_label = _vendor_from_url(url)
+    formats = _formats_for_needs(needs_values) if driver_formats is None else list(driver_formats)
+    creds = _load_vendor_creds(vendor_key)
+    return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds, part_name)
+
+
+def _inject_cad_scripts(
+    win, fallback_url: str, needs_values, part_name: str = "", driver_formats=None
+) -> None:
+    """Re-derive the cad scripts from the window's CURRENT url (guarded `get_current_url`, falling
+    back to `fallback_url`) and inject them via `evaluate_js` - the light in-site re-injection, so
+    after an in-site DigiKey nav or an in-page modal the current url's overlay + autofill + driver
+    are re-injected. `driver_formats` scopes the driver to the next-unmet format (one per page load).
+    Injection is host->page `evaluate_js` only; never `inject_script`, never the token or a js_api."""
+    try:
+        current = win.get_current_url()
+    except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
+        current = None
+    url = current or fallback_url
+    for script in cad_scripts_for_url(url, needs_values, part_name, driver_formats):
+        try:
+            win.evaluate_js(script)
+        except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
+            _log.warning("cad guided-overlay/driver injection failed on load")
+
+
+# Candidate pywebview event slots for a popup / new-window / navigation, tried in order. The
+# surface is backend + version specific, so the wiring probes for whichever the installed
+# pywebview exposes and degrades silently when none is present (owner correction: cross-site is
+# DE-SCOPED, so this is a LIGHT backstop, not the architecture).
+_CAD_REINJECT_EVENTS = (
+    "new_window",
+    "new_window_request",
+    "window_open",
+    "popup",
+    "navigated",
+    "before_navigate",
+)
+
+
+def _reinject_popup(win, target, needs_values, part_name: str = "") -> None:
+    """Inject the cad scripts onto a popped / navigated window (or back onto `win` when the event
+    carried no window object), re-derived from that window's current url. Host->page `evaluate_js`
+    only - a popup NEVER receives the token or a js_api bridge."""
+    tw = target if (target is not None and hasattr(target, "evaluate_js")) else win
+    _inject_cad_scripts(tw, "", needs_values, part_name)
+
+
+def _wire_cad_reinjection(
+    win, needs_values, part_name: str = "", *, candidate_events=_CAD_REINJECT_EVENTS
+) -> bool:
+    """LIGHT defensive backstop: best-effort subscribe to the installed pywebview's popup /
+    new-window / navigation event IF it exposes one, re-injecting the cad scripts onto that window
+    via `evaluate_js`. Returns True once a slot is subscribed; logs a warning and returns False
+    when the backend exposes none - the same silent-degrade discipline as
+    `_install_cad_download_intercept` on an older backend. NEVER calls `inject_script` and NEVER
+    wires js_api / the token onto the popup."""
+    try:
+        events = win.events
+    except Exception:  # noqa: BLE001 - no events surface; in-site re-injection still covers it
+        _log.warning("cad re-injection unavailable: window exposes no events; in-site re-inject covers it")
+        return False
+
+    def _on_popup(target=None, *args, **kwargs):
+        try:
+            _reinject_popup(win, target, needs_values, part_name)
+        except Exception:  # noqa: BLE001 - best-effort backstop; never crash the app
+            _log.warning("cad popup re-injection failed")
+
+    for name in candidate_events:
+        slot = getattr(events, name, None)
+        if slot is None:
+            continue
+        try:
+            slot += _on_popup
+            return True
+        except Exception:  # noqa: BLE001 - this slot did not accept a handler; try the next
+            continue
+    _log.warning("cad re-injection: no popup/new-window event on this pywebview backend; in-site re-inject covers it")
+    return False
 
 
 def _parse_needs(needs) -> frozenset:
@@ -526,7 +924,7 @@ class _HostApi:
         )
         return list(result) if result else []
 
-    def open_cad_download(self, url, needs=None) -> str:
+    def open_cad_download(self, url, needs=None, part_name=None) -> str:
         """Open a vendor CAD-download page (Ultra Librarian / SnapEDA, or a DigiKey product
         page) in a SECOND, VISIBLE window dedicated to this one guided capture, and return a
         per-capture session TOKEN the SPA gates every forward on (B4). `needs` is the list of
@@ -564,12 +962,42 @@ class _HostApi:
                 pass
             _CAD_WINDOW = None
 
-        session = CaptureSession.start("", _parse_needs(needs), now=time.time())
+        needs_set = _parse_needs(needs)
+        name = part_name or ""
+        session = CaptureSession.start(name, needs_set, now=time.time())
         session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
         _CAD_SESSION = session
 
         win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
         _CAD_WINDOW = win
+
+        # Guide the capture INSIDE the vendor window: on each load, re-derive from the window's
+        # CURRENT url and inject the overlay (the checklist + the __STOCKROOM_OVERLAY__ bridge),
+        # then a best-effort login auto-fill from the saved creds, then the vendor driver
+        # (auto-click, reporting into the overlay). Re-deriving from the current url is the light
+        # in-site re-injection (LGN-03): an in-site DigiKey nav or an in-page modal re-injects the
+        # right scripts. All best-effort and guarded; injected ONLY on this remote window via
+        # evaluate_js, never the SPA, and NEVER with the per-launch token or a js_api bridge.
+        needs_values = [r.value for r in needs_set]
+
+        def _remaining_formats():
+            """The vendor formats (kicad/altium) still NOT captured, in order. On a FRESH page load
+            (initial, the product->models navigation, or a recovery reload) the reactor is injected
+            scoped to just these, so an already-captured format is never re-driven. The reactor itself
+            sequences them, gating each on the REAL browser download event - the host does not
+            orchestrate; it only scopes what to inject and relays the real events."""
+            return _formats_for_needs([r.value for r in session.remaining()])
+
+        def _on_cad_loaded() -> None:
+            # Re-inject the reactor on each load, scoped to what is STILL needed. The reactor reacts to
+            # live page state + the real download events (window.__SR_DL__); the host stays a dumb
+            # collector + re-injector. The overlay still shows the FULL checklist (needs_values).
+            _inject_cad_scripts(win, url, needs_values, name, driver_formats=_remaining_formats())
+
+        win.events.loaded += _on_cad_loaded
+        # Best-effort popup / new-window re-injection when this pywebview backend exposes the
+        # event; degrades silently otherwise (cross-site is DE-SCOPED - a LIGHT backstop only).
+        _wire_cad_reinjection(win, needs_values, name)
 
         thread_box: dict = {"t": None}
 
@@ -651,6 +1079,15 @@ def run_window(base_url: str, token: str) -> None:
         webview.settings["ALLOW_DOWNLOADS"] = True
     except Exception:  # noqa: BLE001 - an older pywebview without settings still runs
         pass
+    # Dev-only observability: STOCKROOM_CDP_PORT exposes WebView2's remote-debugging port so the
+    # REAL app can be driven and verified over CDP in live end-to-end tests (capture -> attach ->
+    # library placement). Never set in normal use; a pywebview without the setting ignores it.
+    cdp_port = os.environ.get("STOCKROOM_CDP_PORT")
+    if cdp_port:
+        try:
+            webview.settings["REMOTE_DEBUGGING_PORT"] = int(cdp_port)
+        except Exception:  # noqa: BLE001 - a bad value/old pywebview must never block launch
+            pass
 
     window = webview.create_window(
         "Stockroom", url=base_url, width=1400, height=900, js_api=_HostApi()

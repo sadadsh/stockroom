@@ -8,6 +8,7 @@ import type { EnrichmentResult, PartDetail, PartSummary } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
+import { CaptureProvider } from "../lib/capture";
 import { ComponentsPage } from "./ComponentsPage";
 
 // Mock the typed client so the page renders against fixtures, not a live server.
@@ -102,10 +103,12 @@ function wrap(ui: ReactNode) {
     <QueryClientProvider client={qc}>
       <ToastProvider>
         <RouterProvider initial="components">
+          <CaptureProvider>
           <AddPartProvider>
             <Probe />
             {ui}
           </AddPartProvider>
+          </CaptureProvider>
         </RouterProvider>
       </ToastProvider>
     </QueryClientProvider>,

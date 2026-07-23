@@ -32,6 +32,7 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 # is reachable.
 _HISTORY_MAX = 100
 
+
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
 # AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
 # last-writer-wins), so a second POST while one is QUEUED/RUNNING must return the SAME
@@ -388,19 +389,15 @@ def library_router(require_token) -> APIRouter:
 
         record = ctx.ops.load_record(part_id)
         needs = [req.value for req in capture_needs(record)]
-        # Primary source: an Ultra Librarian / SnapEDA page (both KiCad + Altium
-        # downloads behind a real control the guided window can click).
-        from stockroom.enrich.asset_source import resolve_asset_page
-
-        page = resolve_asset_page(record.mpn)
-        if page is not None:
-            return {"url": page.url, "mpn": record.mpn, "vendor": page.vendor, "needs": needs}
-        # Fallback: open the DigiKey product page.
+        # DigiKey is the single CAD source: a part's DigiKey page gathers the SnapEDA / Ultra
+        # Librarian / SamacSys CAD downloads in ONE place. When the API resolves an exact product
+        # page we open that; otherwise the resolver falls back to a DigiKey keyword search, so a
+        # part with an mpn ALWAYS opens a real DigiKey page even with no DigiKey creds.
         from stockroom.enrich.cad_source import resolve_digikey_cad_source
 
         digikey = next((a for a in build_refresh_adapters(ctx)
                         if getattr(a, "vendor", "") == "DigiKey"), None)
-        url = resolve_digikey_cad_source(record.mpn, digikey) if digikey is not None else None
+        url = resolve_digikey_cad_source(record.mpn, digikey)
         return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
 
     @r.post("/rescan")

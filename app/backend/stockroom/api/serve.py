@@ -45,6 +45,20 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
         from stockroom.store.onboarding import bootstrap_library
 
         libraries_root = bootstrap_library(config)
+    else:
+        # A provided library may not carry this machine's active-profile name (a config from
+        # another machine, or a retired/renamed profile - e.g. the old "Main" after it is
+        # deleted). Repair it to a profile that actually exists here so the immediately-following
+        # _build_context never 404s the profile - the same drift repair bootstrap_library does.
+        from stockroom.store.profile import ProfileStore
+        from stockroom.vcs.repo import GitError, GitRepo
+
+        try:
+            names = ProfileStore(Path(libraries_root), GitRepo(Path(libraries_root))).list()
+            if names and config.active_profile not in names:
+                config.active_profile = names[0]
+        except GitError:
+            pass
     ctx = _build_context(libraries_root, kicad_dir=kicad_dir, config=config, token=mint_token())
     # Attach the app-repo GitRepo + a real uv_sync runner for the self-updater. The
     # app repo (this file's repo) is distinct from the library repo the context

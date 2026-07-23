@@ -1,5 +1,6 @@
 import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
+import { CaptureStatusPill } from "./components/CaptureStatusPill";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -18,7 +19,13 @@ export default function App() {
   if (onboarding.data?.first_run) {
     return <OnboardingGate status={onboarding.data} />;
   }
-  return <AppShell>{renderRoute(route)}</AppShell>;
+  return (
+    <>
+      <AppShell>{renderRoute(route)}</AppShell>
+      {/* The guided capture keeps running when the modal is closed; the pill is its handle. */}
+      <CaptureStatusPill />
+    </>
+  );
 }
 
 function renderRoute(route: Route) {
