@@ -173,13 +173,32 @@ class GitRepo:
         # nothing staged among these paths => no-op, return current head.
         if self._run("diff", "--cached", "--quiet", check=False).returncode == 0:
             return self.head()
-        self._run("commit", "-m", message, "--only", "--", *[str(p) for p in paths])
+        # After staging, a path can have vanished from git's knowledge entirely: a file STAGED by
+        # an interrupted earlier run (in the index, never in HEAD) then deleted from disk - `add
+        # -A` above erases its index entry, leaving it in neither HEAD, index, nor working tree.
+        # Its net change is nothing, but `commit --only` ABORTS on a pathspec git does not know
+        # (the winverify regenerate failure, 2026-07-23), so carry only the paths git still knows.
+        committable = [
+            p for p in paths if Path(p).exists() or self._is_tracked(p) or self._in_head(p)
+        ]
+        if not committable:
+            # every path was a ghost; the staged diff seen above belongs to FOREIGN work outside
+            # these paths, which a bare `commit --only --` must never sweep into a scoped commit.
+            return self.head()
+        self._run("commit", "-m", message, "--only", "--", *[str(p) for p in committable])
         return self.head()
 
     def _is_tracked(self, path: Path) -> bool:
         return (
             self._run("ls-files", "--error-unmatch", "--", str(path), check=False).returncode == 0
         )
+
+    def _in_head(self, path: Path) -> bool:
+        """Whether HEAD holds this path (unlike _is_tracked, which reads the INDEX - a
+        staged-but-never-committed file is tracked there yet unknown to HEAD). check=False
+        also covers the empty repo, where there is no HEAD to read."""
+        out = self._run("ls-tree", "--name-only", "HEAD", "--", str(path), check=False)
+        return out.returncode == 0 and out.stdout.strip() != ""
 
     def log_paths(self, paths: list[Path], max_count: int = 50) -> list[Commit]:
         fmt = "%H%x1f%s%x1f%an%x1f%aI"
