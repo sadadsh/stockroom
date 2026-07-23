@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<IP DBVersion="V3.0" IPType="service" Name="GPIO" Version="ANOMALY_gpio_v1_0" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <GPIO_Pin PortName="PA" Name="PA0">
+        <PinSignal Name="WEIRD_SIGNAL">
+            <SpecificParameter Name="GPIO_AF">
+                <PossibleValue>NOT_A_RECOGNIZED_SHAPE_AT_ALL</PossibleValue>
+            </SpecificParameter>
+        </PinSignal>
+    </GPIO_Pin>
+</IP>
