@@ -6,7 +6,7 @@
  * and a missing kicad-cli are surfaced verbatim, never faked green, and the Mouser
  * key is only ever shown as a last-4 hint.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
@@ -25,6 +25,7 @@ import {
   useSystemInfo,
   useUpdateCheck,
   useUpdateSettings,
+  useLoadDevCreds,
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
@@ -716,6 +717,7 @@ function CredentialGroup({ label, children }: { label: string; children: ReactNo
 function VendorLoginsSection() {
   const settings = useSettings();
   const save = useUpdateSettings();
+  const loadDev = useLoadDevCreds();
   const { toast } = useToast();
   const d = settings.data;
 
@@ -725,6 +727,34 @@ function VendorLoginsSection() {
       onError: (e) => toast(errMsg(e), "err"),
     });
   }
+
+  // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine dev-creds.json
+  // so live validation is not blocked on retyping them. A ref keeps the listener subscribed once
+  // while always firing the latest handler.
+  const fireDevLoad = useRef<() => void>(() => {});
+  fireDevLoad.current = () => {
+    if (loadDev.isPending) return;
+    loadDev.mutate(undefined, {
+      onSuccess: (res) =>
+        toast(
+          res.loaded.length
+            ? `Loaded dev creds: ${res.loaded.join(", ")}.`
+            : "No dev-creds.json found in the config directory.",
+          res.loaded.length ? "ok" : "neutral",
+        ),
+      onError: (e) => toast(errMsg(e), "err"),
+    });
+  };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.altKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        fireDevLoad.current();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <Section
