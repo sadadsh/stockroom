@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTitle, deriveAttributes } from "./derive";
+import { deriveTitle, deriveAttributes, isReferenceOnlySpecKey } from "./derive";
 import type { PartDetail } from "../api/types";
 
 // A minimal PartDetail factory: only the fields the derivers read carry meaning; the rest
@@ -180,7 +180,7 @@ describe("deriveAttributes", () => {
       },
     });
     const attrs = deriveAttributes(part);
-    expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the card shows a few + Show All
+    expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the detail band shows a capped highlight glance
     expect(attrs[0]).toBe("±1%"); // the electrical parameter leads
   });
 
@@ -239,5 +239,48 @@ describe("deriveAttributes", () => {
       },
     });
     expect(deriveAttributes(part)).toEqual(["0603"]);
+  });
+});
+
+describe("isReferenceOnlySpecKey", () => {
+  it("flags catalog / provenance / logistics keys so the spec sheet can drop them", () => {
+    for (const key of [
+      "Manufacturer",
+      "Brand",
+      "Series",
+      "Country of Origin",
+      "Assembly Country of Origin",
+      "Base Product Number",
+      "Packaging",
+      "Factory Pack Quantity",
+      "Standard Pack Quantity",
+      "Product Category",
+      "Subcategory",
+      "US Tariff %",
+      "Unit Weight",
+      "ECCN",
+    ]) {
+      expect(isReferenceOnlySpecKey(key)).toBe(true);
+    }
+  });
+
+  it("keeps real physical / electrical / ratings specs (casing + punctuation insensitive)", () => {
+    for (const key of [
+      "Resistance",
+      "Capacitance",
+      "Voltage Rating",
+      "Package",
+      "Case Code",
+      "Contact Material",
+      "Contact Plating",
+      "Color",
+      "Dielectric",
+      "Operating Temperature",
+      "RoHS",
+      "Propagation Delay Time",
+      "package", // a real spec key never becomes reference-only through casing
+    ]) {
+      expect(isReferenceOnlySpecKey(key)).toBe(false);
+    }
   });
 });

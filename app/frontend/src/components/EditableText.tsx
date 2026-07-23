@@ -17,6 +17,12 @@ interface Props {
   mono?: boolean;
   disabled?: boolean;
   displayClassName?: string;
+  // Clamp the resting display to a single line with an ellipsis (for a long value like a
+  // datasheet URL that must not wrap the row); editing still opens the full field.
+  truncate?: boolean;
+  // Clamp the resting display to N lines with an ellipsis (for a verbose note that should
+  // not sprawl the rail); editing still opens the full field. Ignored when `truncate` is set.
+  clampLines?: number;
 }
 
 export function EditableText({
@@ -28,6 +34,8 @@ export function EditableText({
   mono = false,
   disabled = false,
   displayClassName,
+  truncate = false,
+  clampLines,
 }: Props) {
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
@@ -88,7 +96,21 @@ export function EditableText({
         (displayClassName ?? "text-base")
       }
     >
-      <span className="min-w-0 break-words">{empty ? placeholder : value}</span>
+      <span
+        className={"min-w-0 " + (truncate ? "truncate" : "break-words")}
+        style={
+          !truncate && clampLines
+            ? {
+                display: "-webkit-box",
+                WebkitLineClamp: clampLines,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }
+            : undefined
+        }
+      >
+        {empty ? placeholder : value}
+      </span>
     </button>
   );
 }
