@@ -27,6 +27,7 @@ from stockroom.api.schemas import (
     UnionDTO,
 )
 from stockroom.stm import authority as stm_authority
+from stockroom.stm import geometry as stm_geometry
 from stockroom.stm import source as stm_source
 
 # Single-flight guard for POST /build, mirroring library.py's _rescan_lock: a second POST
@@ -256,14 +257,43 @@ def _build_pinout_dto(ctx, part: str) -> dict | None:
         "FROM package_geometry WHERE package_name = ?",
         (resolved["package"],),
     ).fetchone()
-    geometry = {
-        "body_shape": geometry_row["body_shape"] if geometry_row else "qfp",
-        "pin_count": geometry_row["pin_count"] if geometry_row else len(pins),
-        "rows": geometry_row["rows"] if geometry_row else None,
-        "cols": geometry_row["cols"] if geometry_row else None,
-        "pitch_mm": geometry_row["pitch_mm"] if geometry_row else None,
-        "has_center_pad": bool(geometry_row["has_center_pad"]) if geometry_row else False,
-    }
+    if geometry_row:
+        geometry = {
+            "body_shape": geometry_row["body_shape"],
+            "pin_count": geometry_row["pin_count"],
+            "rows": geometry_row["rows"],
+            "cols": geometry_row["cols"],
+            "pitch_mm": geometry_row["pitch_mm"],
+            "has_center_pad": bool(geometry_row["has_center_pad"]),
+            "source": "curated",
+        }
+    else:
+        # No curated row: infer an honest geometry from the pins themselves, so every
+        # package renders (never the old perimeter-qfp default, which a ball-grid
+        # package cannot satisfy: its pins carry no lqfp_side, so the map laid out
+        # zero pads). Grid span = the real ball maxima; balls whose row label the
+        # JEDEC letter alphabet cannot order (the STM32MP1 SiP secondary zones, e.g.
+        # "1A2") are skipped for the span, exactly as the frontend skips laying them.
+        alnum = [p for p in pins if p["position_kind"] == "alnum"]
+        rows = cols = None
+        if alnum:
+            row_indexes = []
+            for p in alnum:
+                try:
+                    row_indexes.append(stm_geometry.bga_row_index(p["bga_row"]))
+                except ValueError:
+                    continue
+            rows = max(row_indexes) + 1 if row_indexes else None
+            cols = max(p["bga_col"] for p in alnum if p["bga_col"] is not None) or None
+        geometry = {
+            "body_shape": stm_geometry.infer_body_shape(resolved["package"], bool(alnum)),
+            "pin_count": len({p["position"] for p in pins}),
+            "rows": rows,
+            "cols": cols,
+            "pitch_mm": None,
+            "has_center_pad": False,
+            "source": "inferred",
+        }
 
     return {
         "part": resolved["part"],

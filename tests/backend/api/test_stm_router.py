@@ -128,6 +128,28 @@ def _seed_stm_index(app_ctx) -> StmIndex:
         ("LQFP64", "qfp", 64, None, None, 0.5, 10.0, 0, None, "fixture", None),
     )
 
+    # MCU3: a ball-grid package with NO curated package_geometry row, for the
+    # inferred-geometry pinout tests (defect: an uncurated BGA must never fall back
+    # to a perimeter "qfp" shape the frontend cannot lay out).
+    mcu3_id = _insert_mcu(
+        "STM32H747X(G-I)Hx", "STM32H7", "STM32H747", "TFBGA240", 240, "Arm Cortex-M7",
+        2048, 1024, 480, 168,
+        [("USART", "USART1", "1")],
+    )
+    for position, row, col, canonical, pin_type, ec in (
+        ("A1", "A", 1, "VDD", "Power", "power"),
+        ("A2", "A", 2, "PA0", "I/O", "io"),
+        ("C5", "C", 5, "PB3", "I/O", "io"),
+    ):
+        conn.execute(
+            "INSERT INTO mcu_package_pin (mcu_id, package_name, physical_pin_number, "
+            "position_kind, bga_row, bga_col, canonical_pin_name, raw_pin_name, pin_type, "
+            "electrical_class, gpio_port, gpio_pin_index, lqfp_side) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (mcu3_id, "TFBGA240", position, "alnum", row, col, canonical, canonical,
+             pin_type, ec, None, None, None),
+        )
+
     for key, value in (
         ("classifier_rev", "1"),
         ("af_schema_rev", "1"),
@@ -164,7 +186,7 @@ def test_status_reports_built_and_echoes_stamp(client, app_ctx):
     assert r.status_code == 200
     body = r.json()
     assert body["built"] is True
-    assert body["mcu_count"] == 2
+    assert body["mcu_count"] == 3
     assert body["classifier_rev"] == 1
     assert body["af_schema_rev"] == 1
     assert body["geometry_rev"] == 3
@@ -173,7 +195,7 @@ def test_status_reports_built_and_echoes_stamp(client, app_ctx):
     assert body["all_families"] is True
     assert body["device_xml_count"] == 2
     assert body["family_count"] == 2
-    assert set(body["families"]) == {"STM32F4", "STM32F1"}
+    assert set(body["families"]) == {"STM32F4", "STM32F1", "STM32H7"}
 
 
 def test_mcus_returns_409_when_index_absent(client, app_ctx):
@@ -188,8 +210,8 @@ def test_mcus_returns_spec_matrix_rows_and_facets(client, app_ctx):
     r = client.get("/api/stm/mcus")
     assert r.status_code == 200
     body = r.json()
-    assert body["count"] == 2
-    assert len(body["mcus"]) == 2
+    assert body["count"] == 3
+    assert len(body["mcus"]) == 3
 
     row = next(m for m in body["mcus"] if m["part"] == "STM32F407V(E-G)Tx")
     assert row["series"] == "STM32F4"
@@ -206,10 +228,10 @@ def test_mcus_returns_spec_matrix_rows_and_facets(client, app_ctx):
     assert row["mpn_example"]  # a non-empty display expansion of the ref name
 
     facets = body["facets"]
-    assert set(facets["family"]) == {"STM32F4", "STM32F1"}
-    assert set(facets["core"]) == {"Cortex-M4", "Cortex-M3"}
-    assert set(facets["package"]) == {"LQFP64", "LQFP48"}
-    assert set(facets["series"]) == {"STM32F4", "STM32F1"}
+    assert set(facets["family"]) == {"STM32F4", "STM32F1", "STM32H7"}
+    assert set(facets["core"]) == {"Cortex-M4", "Cortex-M3", "Arm Cortex-M7"}
+    assert set(facets["package"]) == {"LQFP64", "LQFP48", "TFBGA240"}
+    assert set(facets["series"]) == {"STM32F4", "STM32F1", "STM32H7"}
 
 
 def test_mcus_filtered_by_family_keeps_full_facets(client, app_ctx):
@@ -220,8 +242,8 @@ def test_mcus_filtered_by_family_keeps_full_facets(client, app_ctx):
     assert body["count"] == 1
     assert body["mcus"][0]["series"] == "STM32F4"
     # facet counts reflect the FULL unfiltered set for the other facet dimensions
-    assert set(body["facets"]["package"]) == {"LQFP64", "LQFP48"}
-    assert set(body["facets"]["core"]) == {"Cortex-M4", "Cortex-M3"}
+    assert set(body["facets"]["package"]) == {"LQFP64", "LQFP48", "TFBGA240"}
+    assert set(body["facets"]["core"]) == {"Cortex-M4", "Cortex-M3", "Arm Cortex-M7"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -370,6 +392,30 @@ def test_pinout_resolves_by_ref_or_mpn_and_inlines_pin_facts(client, app_ctx):
     assert pins_by_position["1"]["supply"] == "VDD"
 
     assert "<svg" not in json.dumps(body).lower()
+
+
+def test_pinout_geometry_carries_curated_source_for_a_curated_package(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get("/api/stm/pinout", params={"part": "STM32F407V(E-G)Tx"})
+    assert r.status_code == 200
+    assert r.json()["geometry"]["source"] == "curated"
+
+
+def test_pinout_geometry_is_inferred_for_an_uncurated_bga_package(client, app_ctx):
+    """An uncurated area-array package must resolve to an honest inferred ball-grid
+    geometry (body shape from the name + ball evidence, grid span from the real ball
+    maxima), never the perimeter-qfp default the map cannot lay out."""
+    _seed_stm_index(app_ctx)
+    r = client.get("/api/stm/pinout", params={"part": "STM32H747X(G-I)Hx"})
+    assert r.status_code == 200
+    geometry = r.json()["geometry"]
+    assert geometry["source"] == "inferred"
+    assert geometry["body_shape"] == "bga"
+    assert geometry["rows"] == 3  # rows A..C observed -> row index 2 -> 3 rows
+    assert geometry["cols"] == 5  # max observed ball column
+    assert geometry["pin_count"] == 3
+    assert geometry["pitch_mm"] is None
+    assert geometry["has_center_pad"] is False
 
 
 def test_pin_returns_one_pin_with_every_derived_fact(client, app_ctx):
