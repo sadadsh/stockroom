@@ -25,8 +25,8 @@ describe("pinEncoding categories", () => {
     expect(categoryLabel("nc")).toBe("Not Connected");
   });
 
-  it("reads a raw io electrical class as plain gpio", () => {
-    expect(categoryFill("io")).toBe("var(--stm-gpio)");
+  it("reads a raw io electrical class as GPIO (its own live io token)", () => {
+    expect(categoryFill("io")).toBe("var(--stm-io)");
     expect(categoryLabel("io")).toBe("GPIO");
   });
 
