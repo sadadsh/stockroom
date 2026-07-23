@@ -247,8 +247,8 @@ class ProjectOps:
         if not has_sch:
             comp_state = "fail"
             blockers.append({"kind": "no_schematic",
-                             "detail": "this project has no schematic to build from",
-                             "next_step": "register a project that has a .kicad_sch"})
+                             "detail": "This project has no schematic to build from.",
+                             "next_step": "Register a project that has a .kicad_sch."})
         else:
             if cr["unannotated"]:
                 comp_state = "fail"
@@ -256,18 +256,18 @@ class ProjectOps:
                 # ones to KiCad (fill.annotate_document), so the count is a superset of what
                 # Prepare can fix; the remedy must name KiCad too, never a Prepare-only dead-end.
                 blockers.append({"kind": "unannotated",
-                                 "detail": f"{cr['unannotated']} reference(s) are not annotated",
-                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad"})
+                                 "detail": f"{cr['unannotated']} reference(s) are not annotated.",
+                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad."})
             if cr["missing_footprint"]:
                 comp_state = "fail"
                 blockers.append({"kind": "missing_footprint",
-                                 "detail": f"{cr['missing_footprint']} component(s) have no footprint",
-                                 "next_step": "assign footprints (Prepare, or in KiCad)"})
+                                 "detail": f"{cr['missing_footprint']} component(s) have no footprint.",
+                                 "next_step": "Assign footprints (Prepare, or in KiCad)."})
             incomplete = cr["total"] - cr["complete"]
             if incomplete:
                 warnings.append({"kind": "identity_incomplete",
-                                 "detail": f"{incomplete} component(s) have incomplete library identity",
-                                 "next_step": "Prepare the project (Prepare section)"})
+                                 "detail": f"{incomplete} component(s) have incomplete library identity.",
+                                 "next_step": "Prepare the project (Prepare section)."})
                 # A warning-only completeness must read amber "warn", agreeing with the Prepare
                 # section, not green "pass" (mirrors the BOM signal's soft-issue downgrade).
                 if comp_state == "pass":
@@ -282,8 +282,8 @@ class ProjectOps:
             checks_signal = {"state": "not_run", "ran_at": None, "errors": 0,
                              "warnings": 0, "checked": 0, "ok": False}
             blockers.append({"kind": "checks_not_run",
-                             "detail": "ERC and DRC have not been run",
-                             "next_step": "run the checks (Checks section)"})
+                             "detail": "ERC and DRC have not been run.",
+                             "next_step": "Run the checks (Checks section)."})
         else:
             summ = checks.get("summary") or {}
             errors, warns = summ.get("errors", 0), summ.get("warnings", 0)
@@ -292,24 +292,24 @@ class ProjectOps:
                              "warnings": warns, "checked": checked, "ok": ok}
             if errors > 0 or not ok:
                 checks_signal["state"] = "fail"
-                detail = (f"{errors} ERC/DRC error(s)" if errors > 0
-                          else "the last ERC/DRC run did not complete cleanly")
+                detail = (f"{errors} ERC/DRC error(s)." if errors > 0
+                          else "The last ERC/DRC run did not complete cleanly.")
                 blockers.append({"kind": "checks_failed", "detail": detail,
-                                 "next_step": "fix the errors and re-run (Checks section)"})
+                                 "next_step": "Fix the errors and re-run (Checks section)."})
             elif warns > 0:
                 # Amber "warn", agreeing with the Checks section's warning badge, not green "pass".
                 checks_signal["state"] = "warn"
                 warnings.append({"kind": "checks_warnings",
-                                 "detail": f"{warns} ERC/DRC warning(s)",
-                                 "next_step": "review the warnings (Checks section)"})
+                                 "detail": f"{warns} ERC/DRC warning(s).",
+                                 "next_step": "Review the warnings (Checks section)."})
 
         # -- BOM (cached; cold cache = not built = HARD blocker, never a fabricated cost) --
         if not bom or bom.get("ran_at") is None:
             bom_signal = {"state": "not_built", "ran_at": None, "priced": False,
                           "line_count": 0, "unpriced_lines": 0, "risks": None}
             blockers.append({"kind": "bom_not_built",
-                             "detail": "the BOM has not been built",
-                             "next_step": "build the BOM (BOM section)"})
+                             "detail": "The BOM has not been built.",
+                             "next_step": "Build the BOM (BOM section)."})
         else:
             from stockroom.projects.procurement import project_procurement
 
@@ -322,19 +322,19 @@ class ProjectOps:
             if unpriced:
                 soft = True
                 warnings.append({"kind": "bom_unpriced",
-                                 "detail": f"{unpriced} BOM line(s) are unpriced",
-                                 "next_step": "price the BOM (BOM section)"})
+                                 "detail": f"{unpriced} BOM line(s) are unpriced.",
+                                 "next_step": "Price the BOM (BOM section)."})
             short = risks.get("no_stock", 0) + risks.get("insufficient_stock", 0)
             if short:
                 soft = True
                 warnings.append({"kind": "bom_stock",
-                                 "detail": f"{short} BOM line(s) are out of or short on stock",
-                                 "next_step": "review sourcing (Procurement)"})
+                                 "detail": f"{short} BOM line(s) are out of or short on stock.",
+                                 "next_step": "Review sourcing (Procurement)."})
             if risks.get("not_active"):
                 soft = True
                 warnings.append({"kind": "bom_lifecycle",
-                                 "detail": f"{risks['not_active']} BOM line(s) are NRND or EOL",
-                                 "next_step": "review sourcing (Procurement)"})
+                                 "detail": f"{risks['not_active']} BOM line(s) are NRND or EOL.",
+                                 "next_step": "Review sourcing (Procurement)."})
             if soft:
                 bom_signal["state"] = "warn"
 
@@ -342,8 +342,8 @@ class ProjectOps:
         if not rec.git_root:
             git_signal = {"state": "not_git", "under_git": False, "dirty": False}
             warnings.append({"kind": "not_git",
-                             "detail": "this project is not under version control",
-                             "next_step": "initialize a git repo for it"})
+                             "detail": "This project is not under version control.",
+                             "next_step": "Initialize a git repo for it."})
         else:
             root = Path(rec.root)
             proj_files = [root / rel for rel in
@@ -354,8 +354,8 @@ class ProjectOps:
             git_signal = {"state": "clean" if clean else "dirty", "under_git": True, "dirty": not clean}
             if not clean:
                 warnings.append({"kind": "dirty_tree",
-                                 "detail": "there are uncommitted changes; this build will not match a commit",
-                                 "next_step": "commit or discard your changes"})
+                                 "detail": "There are uncommitted changes; this build will not match a commit.",
+                                 "next_step": "Commit or discard your changes."})
 
         return {
             "project": rec.name,
