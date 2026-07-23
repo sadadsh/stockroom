@@ -63,14 +63,16 @@ export default {
         ],
       },
       fontSize: {
-        // the mockup's compact desktop scale
-        "2xs": ["10.5px", { lineHeight: "1.5" }],
-        xs: ["11.5px", { lineHeight: "1.5" }],
-        sm: ["12.5px", { lineHeight: "1.5" }],
-        base: ["13px", { lineHeight: "1.5" }],
-        lg: ["15px", { lineHeight: "1.4" }],
-        xl: ["16px", { lineHeight: "1.3" }],
-        title: ["22px", { lineHeight: "1.12", letterSpacing: "-0.02em" }],
+        // The mockup's compact desktop scale, routed through CSS variables (defaults in
+        // styles/index.css) so dev mode can nudge each size live. The line-heights stay bundled
+        // here (the type scale bundles them); only the px size is a token.
+        "2xs": ["var(--fs-2xs)", { lineHeight: "1.5" }],
+        xs: ["var(--fs-xs)", { lineHeight: "1.5" }],
+        sm: ["var(--fs-sm)", { lineHeight: "1.5" }],
+        base: ["var(--fs-base)", { lineHeight: "1.5" }],
+        lg: ["var(--fs-lg)", { lineHeight: "1.4" }],
+        xl: ["var(--fs-xl)", { lineHeight: "1.3" }],
+        title: ["var(--fs-title)", { lineHeight: "1.12", letterSpacing: "-0.02em" }],
       },
       letterSpacing: {
         tightui: "-0.008em",
