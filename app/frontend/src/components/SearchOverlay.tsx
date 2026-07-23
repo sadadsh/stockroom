@@ -23,6 +23,7 @@ import {
   makeScale,
   normalizeUnit,
   parseMagnitude,
+  rowPrimaryValue,
   sectionedRail,
   setRange,
   type RailSection as RailSectionData,
@@ -32,6 +33,7 @@ import {
   type RangeSel,
   type SearchFilters,
   type SpecColumn,
+  VALUE_COLUMN_KEY,
 } from "../lib/searchFilters";
 import { prettifyValue } from "../lib/specSchema";
 import { SearchIcon } from "./icons";
@@ -312,6 +314,16 @@ function sortRows(
         return num(a.unit_price, b.unit_price) * sign;
       case "spec": {
         const { key, numeric } = sort.key;
+        // The synthetic Value column has no real spec key: resolve each row's own primary value
+        // and compare as text (its units are mixed across categories, so a magnitude sort is
+        // meaningless). Keeps Value a first-class, sortable spec-style column.
+        if (key === VALUE_COLUMN_KEY) {
+          return (
+            rowPrimaryValue(a.category, a.specs).localeCompare(
+              rowPrimaryValue(b.category, b.specs),
+            ) * sign
+          );
+        }
         const av = a.specs[key];
         const bv = b.specs[key];
         if (numeric) {
@@ -835,7 +847,9 @@ function ResultsTable({
                   (c.numeric ? " text-right font-mono text-t1" : " font-mono text-[11.5px] text-t2")
                 }
               >
-                {cellValue(row.specs, c.key)}
+                {c.key === VALUE_COLUMN_KEY
+                  ? rowPrimaryValue(row.category, row.specs)
+                  : cellValue(row.specs, c.key)}
               </td>
             ))}
             <td className={td + " text-t2"}>{row.manufacturer || "—"}</td>

@@ -12,7 +12,57 @@
  * not a spec token.
  */
 import type { ParametricFacet } from "../api/types";
+import { categoryPrimarySpecKey, PRIMARY_VALUE_KEYS } from "./derive";
 import { normalizeSpecKey, prettifyValue, resolveSpec, type SpecGroupName } from "./specSchema";
+
+// The synthetic column key for the mixed-list adaptive Value column (FIX-05). A sentinel, not a
+// real spec key, so cellValue / the sort control can recognize it and resolve each row's own value.
+export const VALUE_COLUMN_KEY = "__value__";
+
+// The primary-value parameters that collapse into the one Value column on a mixed list: the
+// shared passive keys (resistance/capacitance/inductance) plus impedance (a ferrite bead's primary
+// value). Built from the shared PRIMARY_VALUE_KEYS so the mapping is never forked.
+const _VALUE_COLLAPSE_KEYS = new Set<string>([
+  ...PRIMARY_VALUE_KEYS,
+  normalizeSpecKey("impedance"),
+]);
+
+// The order a row's own primary value is resolved when its category has no registered primary spec.
+const _VALUE_FALLBACK_ORDER = ["resistance", "capacitance", "inductance", "impedance"].map(
+  normalizeSpecKey,
+);
+
+function _isPrimaryValueKey(key: string): boolean {
+  return _VALUE_COLLAPSE_KEYS.has(normalizeSpecKey(key));
+}
+
+/** A row's OWN primary value for the adaptive Value column: its category's primary spec (a resistor
+ * -> its resistance, a cap -> its capacitance), prettified with units, resolved from the same
+ * registry the detail title uses. An em dash only when the row genuinely carries no primary value
+ * (an IC). Pure. */
+export function rowPrimaryValue(
+  category: string,
+  specs: Record<string, string | number | boolean>,
+): string {
+  const norm = new Map<string, string>();
+  for (const [k, v] of Object.entries(specs)) {
+    if (v == null || v === "") continue;
+    const nk = normalizeSpecKey(k);
+    if (!norm.has(nk)) norm.set(nk, String(v));
+  }
+  const primaryKey = categoryPrimarySpecKey(category);
+  let raw = primaryKey ? norm.get(normalizeSpecKey(primaryKey)) : undefined;
+  if (raw == null) {
+    for (const nk of _VALUE_FALLBACK_ORDER) {
+      const hit = norm.get(nk);
+      if (hit != null) {
+        raw = hit;
+        break;
+      }
+    }
+  }
+  return raw == null || raw === "" ? "—" : prettifyValue(String(raw));
+}
 
 export interface RangeSel {
   min: number | null;
@@ -365,7 +415,7 @@ export function deriveColumns(
     .map((f) => ({ f, score: _columnScore(f, cat) }))
     .filter((s) => s.score > -Infinity)
     .sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
-  return scored.slice(0, maxCols).map(({ f }) => {
+  let cols: SpecColumn[] = scored.map(({ f }) => {
     const r = resolveSpec(f.key, cat);
     return {
       key: f.key,
@@ -374,6 +424,25 @@ export function deriveColumns(
       unit: f.unit ?? r.unit ?? null,
     };
   });
+  // On a MIXED list (no single category) two or more primary-value parameters (resistance /
+  // capacitance / inductance / impedance) would each be their own column, each an em dash for
+  // every part outside that category (the "dash soup"). Collapse them into ONE adaptive Value
+  // column in the highest-ranked primary column's slot, keeping every other ranked column; the
+  // table then resolves each row's own value via rowPrimaryValue. Single-category lists are left
+  // exactly as before (Resistance stays its own column). This implements FIX-05.
+  if (!cat) {
+    const primaryCount = cols.filter((c) => _isPrimaryValueKey(c.key)).length;
+    if (primaryCount >= 2) {
+      let inserted = false;
+      cols = cols.flatMap((c) => {
+        if (!_isPrimaryValueKey(c.key)) return [c];
+        if (inserted) return [];
+        inserted = true;
+        return [{ key: VALUE_COLUMN_KEY, label: "Value", numeric: false, unit: null }];
+      });
+    }
+  }
+  return cols.slice(0, maxCols);
 }
 
 // Where a facet sits in the rail: the same parameter-importance signal the columns use, but

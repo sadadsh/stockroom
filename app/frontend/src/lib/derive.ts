@@ -133,6 +133,15 @@ const _TITLE_INDEX: Map<string, TitleRule> = (() => {
   return index;
 })();
 
+/** The primary (defining) spec key for a category, from the title registry's leading spec
+ * (Resistors -> "Resistance", Capacitors -> "Capacitance", Ferrite Beads -> "Impedance"), or null
+ * for a category with no registered primary spec (ICs). Shared with the search table's adaptive
+ * Value column (FIX-05) so a row resolves its own value from the same registry the title uses. */
+export function categoryPrimarySpecKey(category: string): string | null {
+  const rule = _TITLE_INDEX.get(normalizeSpecKey(category));
+  return rule && rule.specs.length > 0 ? rule.specs[0] : null;
+}
+
 // A naive singular form of a category, used as the masthead noun for a category the
 // registry does not name (Thermistors -> Thermistor, Batteries -> Battery). Category nouns
 // are domain terms, so the result is kept as-is even where it carries an unusual letter.
@@ -300,7 +309,9 @@ const _ATTR_GROUP_SCORE: Record<SpecGroupName, number> = {
 };
 
 // The part's HEADLINE value already leads the title (deriveTitle), so it is redundant as a chip.
-const _PRIMARY_VALUE_KEYS = new Set(
+// Exported as the single source of truth for "a passive's primary parametric value", reused by
+// the search table's adaptive Value column (FIX-05) so the two never fork the mapping.
+export const PRIMARY_VALUE_KEYS = new Set(
   ["resistance", "capacitance", "inductance"].map(normalizeSpecKey),
 );
 
@@ -338,7 +349,7 @@ export function deriveAttributes(part: PartDetail): string[] {
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
     if (!isPresentable(value)) continue;
     const nk = normalizeSpecKey(key);
-    if (_PRIMARY_VALUE_KEYS.has(nk) || _COMMERCIAL_ATTR.test(nk)) continue;
+    if (PRIMARY_VALUE_KEYS.has(nk) || _COMMERCIAL_ATTR.test(nk)) continue;
     const text = String(value).trim();
     if (isNegative(text)) continue;
     const rule = _ATTR_INDEX.get(nk);
