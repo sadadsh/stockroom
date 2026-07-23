@@ -812,7 +812,7 @@ function ResultsTable({
           >
             <td className={td}>
               <div className="flex items-center gap-2.5">
-                <RowThumbnail id={row.id} category={row.category} />
+                <RowThumbnail category={row.category} />
                 <div className="min-w-0 max-w-[152px]">
                   <div className="truncate font-semibold text-t1">{row.display_name}</div>
                   <div className="tnum truncate font-mono text-xs text-t2">{row.mpn}</div>

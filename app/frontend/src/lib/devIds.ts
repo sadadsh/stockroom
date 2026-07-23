@@ -70,6 +70,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.complete-part", label: "Complete Part action", area: "detail" },
   { id: "detail.reference", label: "Datasheet + notes block", area: "detail" },
   { id: "detail.datasheet-row", label: "Datasheet row", area: "detail" },
+  { id: "detail.buy-row", label: "Vendor product link row", area: "detail" },
   { id: "detail.notes-row", label: "Notes row", area: "detail" },
   { id: "detail.workbench", label: "Workbench panel", area: "detail" },
   { id: "detail.tabs", label: "Workbench tab bar", area: "detail" },

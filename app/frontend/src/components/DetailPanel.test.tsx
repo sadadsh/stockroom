@@ -337,7 +337,9 @@ describe("DetailPanel sourcing vendor label", () => {
         {...BASE}
       />,
     );
-    expect(screen.getByText("Mouser")).toBeInTheDocument();
+    // the vendor now shows in two legitimate places: the Links row (a quick product link) and
+    // the Sourcing tab (the pricing detail), so assert it is present, not that it is unique.
+    expect(screen.getAllByText("Mouser").length).toBeGreaterThan(0);
     expect(screen.queryByText("manual")).toBeNull();
   });
 
@@ -359,8 +361,9 @@ describe("DetailPanel sourcing vendor label", () => {
         {...BASE}
       />,
     );
-    // known-vendor map misses, so it Title Cases the stored name's first letter
-    expect(screen.getByText("Acme parts")).toBeInTheDocument();
+    // known-vendor map misses, so it Title Cases the stored name's first letter (present in both
+    // the Links row and the Sourcing tab)
+    expect(screen.getAllByText("Acme parts").length).toBeGreaterThan(0);
   });
 });
 

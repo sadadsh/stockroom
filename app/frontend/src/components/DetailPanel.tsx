@@ -312,22 +312,31 @@ export function DetailPanel({
               data-dev-id="detail.complete-part"
               type="button"
               onClick={() => setCompleteOpen(true)}
-              className="flex w-full items-center gap-2.5 rounded-card border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-left transition hover:border-warn/70"
+              className="group flex w-full items-start gap-3 rounded-card border border-warn/40 bg-warn/[0.08] px-3.5 py-3 text-left transition hover:border-warn/70 hover:bg-warn/[0.12]"
             >
-              <WarnIcon className="h-4 w-4 flex-none text-warn" />
-              <span className="flex-none text-sm font-semibold text-t1">
-                <Text id="detail.complete-part">Complete Part</Text>
+              <WarnIcon className="mt-0.5 h-4 w-4 flex-none text-warn" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-t1">
+                  <Text id="detail.complete-part">Complete Part</Text>
+                </span>
+                {/* plain-English: what completing does + exactly what is missing, so the action
+                    explains itself instead of leaving the user to guess what "complete" means.
+                    (User-facing prose avoids the lowercase letter y, per owner rule.) */}
+                <span className="mt-0.5 block text-2xs leading-snug text-t2">
+                  Add {needsList.join(", ")} to make this part usable.
+                </span>
               </span>
-              <span className="min-w-0 flex-1 truncate text-2xs text-t3">
-                Needs {needsList.join(", ")}
-              </span>
-              <Icon id="detail.chevron-right" className="h-3.5 w-3.5 flex-none text-t3" />
+              <Icon
+                id="detail.chevron-right"
+                className="mt-0.5 h-4 w-4 flex-none text-t3 transition group-hover:translate-x-0.5 group-hover:text-t1"
+              />
             </button>
           ) : null}
 
           <RailReference
             datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
             datasheetHref={detail.datasheet?.source_url || undefined}
+            purchase={detail.purchase}
             description={detail.description}
             onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
             onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
@@ -676,12 +685,14 @@ function ReadinessRow({
   );
 }
 
-// The two remaining reference fields that are not part of the identity read: the datasheet
-// (a link when it resolves) and the free-form description. Both stay editable so a part is
-// completed here, and both read as quiet, labelled rows at the foot of the rail.
+// The outbound links + free-form notes, as the foot of the identity rail. "Links" gathers the
+// datasheet and the vendor product page into one obvious place (the owner asked for a clear home
+// for links); both the datasheet and the note stay editable so a part is completed here. All
+// microcopy avoids the lowercase letter y (owner rule).
 function RailReference({
   datasheetUrl,
   datasheetHref,
+  purchase,
   description,
   onEditDatasheet,
   onEditDescription,
@@ -689,69 +700,105 @@ function RailReference({
 }: {
   datasheetUrl: string;
   datasheetHref?: string;
+  purchase: PurchaseRef[];
   description: string;
   onEditDatasheet?: (value: string) => void;
   onEditDescription?: (value: string) => void;
   busy?: boolean;
 }) {
+  const buy = purchase.find((p) => p.url);
   return (
-    <div data-dev-id="detail.reference" className="mt-auto flex flex-col gap-1 border-t border-line pt-3">
-      <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
-        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t2">
-          <Text id="detail.datasheet">Datasheet</Text>
-        </span>
-        <span className="flex min-w-0 flex-1 items-center gap-1">
-          {onEditDatasheet ? (
-            <EditableText
-              value={datasheetUrl}
-              onSave={onEditDatasheet}
-              label="Datasheet"
-              placeholder="Add datasheet"
-              mono
-              truncate
-              disabled={busy}
-              displayClassName="text-xs"
-            />
-          ) : datasheetUrl ? (
-            <span className="tnum truncate px-1.5 font-mono text-xs text-t1">{datasheetUrl}</span>
-          ) : (
-            <span className="px-1.5 text-xs italic text-t3">None</span>
-          )}
-          {datasheetHref ? (
-            <a
-              href={datasheetHref}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Open datasheet"
-              className="flex-none text-t3 transition-colors hover:text-t1"
-            >
-              <ExternalIcon />
-            </a>
+    <div data-dev-id="detail.reference" className="mt-auto flex flex-col gap-3 border-t border-line pt-3">
+      <div>
+        <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          <Text id="detail.links">Links</Text>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div data-dev-id="detail.datasheet-row" className="flex items-baseline gap-2">
+            <span className="w-[58px] flex-none pt-0.5 text-xs text-t2">
+              <Text id="detail.datasheet">Datasheet</Text>
+            </span>
+            <span className="flex min-w-0 flex-1 items-center gap-1">
+              {onEditDatasheet ? (
+                <EditableText
+                  value={datasheetUrl}
+                  onSave={onEditDatasheet}
+                  label="Datasheet"
+                  placeholder="Paste a datasheet link"
+                  mono
+                  truncate
+                  disabled={busy}
+                  displayClassName="text-xs"
+                />
+              ) : datasheetHref ? (
+                <a
+                  href={datasheetHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-w-0 items-center gap-1 truncate px-1.5 text-xs text-acc hover:underline"
+                >
+                  <span className="truncate">Open datasheet</span>
+                  <ExternalIcon className="flex-none" />
+                </a>
+              ) : datasheetUrl ? (
+                <span className="tnum truncate px-1.5 font-mono text-xs text-t1">{datasheetUrl}</span>
+              ) : (
+                <span className="px-1.5 text-xs italic text-t3">None on file</span>
+              )}
+              {onEditDatasheet && datasheetHref ? (
+                <a
+                  href={datasheetHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open datasheet"
+                  className="flex-none text-t3 transition-colors hover:text-t1"
+                >
+                  <ExternalIcon />
+                </a>
+              ) : null}
+            </span>
+          </div>
+          {buy ? (
+            <div data-dev-id="detail.buy-row" className="flex items-baseline gap-2">
+              <span className="w-[58px] flex-none pt-0.5 text-xs text-t2">
+                <Text id="detail.buy">Product</Text>
+              </span>
+              <a
+                href={buy.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-w-0 items-center gap-1 px-1.5 text-xs text-acc hover:underline"
+              >
+                <span className="truncate">
+                  {vendorLabel(buy.vendor, buy.url)}
+                  {buy.part_number ? ` · ${buy.part_number}` : ""}
+                </span>
+                <ExternalIcon className="flex-none" />
+              </a>
+            </div>
           ) : null}
-        </span>
+        </div>
       </div>
-      <div data-dev-id="detail.notes-row" className="flex items-baseline gap-2">
-        <span className="w-[68px] flex-none pt-1 text-2xs uppercase tracking-[0.05em] text-t2">
+      <div data-dev-id="detail.notes-row">
+        <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
           <Text id="detail.notes">Notes</Text>
-        </span>
-        <span className="min-w-0 flex-1">
-          {onEditDescription ? (
-            <EditableText
-              value={description}
-              onSave={onEditDescription}
-              label="Description"
-              placeholder="Add a note"
-              multiline
-              clampLines={2}
-              disabled={busy}
-              displayClassName="text-xs"
-            />
-          ) : description ? (
-            <span className="px-1.5 text-xs text-t2">{description}</span>
-          ) : (
-            <span className="px-1.5 text-xs italic text-t3">None</span>
-          )}
-        </span>
+        </div>
+        {onEditDescription ? (
+          <EditableText
+            value={description}
+            onSave={onEditDescription}
+            label="Description"
+            placeholder="Add a note"
+            multiline
+            clampLines={3}
+            disabled={busy}
+            displayClassName="text-xs"
+          />
+        ) : description ? (
+          <span className="text-xs text-t2">{description}</span>
+        ) : (
+          <span className="text-xs italic text-t3">None</span>
+        )}
       </div>
     </div>
   );
