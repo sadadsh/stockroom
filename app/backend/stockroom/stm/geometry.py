@@ -23,7 +23,9 @@ import string
 # whose stamped geometry_rev does not match this constant.
 #   rev 1 (2026-07-23): initial port - lqfp_side unchanged from Hardware; NEW
 #     parse_bga_position for alnum BGA/WLCSP balls (Hardware dropped these).
-GEOMETRY_REV = 1
+#   rev 2 (2026-07-23): PACKAGE_GEOMETRY (hand-curated pitch/body/depopulation
+#     table) + audit_has_power_pad added.
+GEOMETRY_REV = 2
 
 # JEDEC ball-grid row letters skip 'I' (easily confused with '1'). Single letters
 # A..Z minus I (25 letters), then double letters continue the same convention
@@ -101,3 +103,190 @@ def per_pin_geometry(package_name: str, raw_position: str, pin_count: int) -> di
         "bga_row": None,
         "bga_col": None,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PACKAGE_GEOMETRY - hand-curated package mechanical facts CubeMX never states
+# (Plan 02 / DATA-03). Keyed by CubeMX Package name.
+#
+# COVERAGE DEFINITION OF DONE (recorded per this phase's CONTEXT.md open
+# question): this is a PRIORITIZED SUBSET, not 100% of the 134 distinct
+# packages the real all-families source (2,125 device XML) was found to
+# contain this session. It covers the phase's three committed test fixtures
+# (LQFP64, UFQFPN48, UFBGA64 - REQUIRED) plus the next highest-MCU-count
+# packages from a real census run against the confirmed Windows-side source at
+# "/mnt/c/Users/Sadad Haidari/STMP/cubemx_db/mcu" (2026-07-23): LQFP100 (205
+# MCUs), LQFP64 (192), LQFP48 (148), UFQFPN48 (140), LQFP144 (137), UFQFPN32
+# (68), LQFP176 (65), UFBGA100 (55), UFBGA169 (55), UFBGA64 (50) - roughly 52%
+# of all ingested MCUs by this subset alone. Per PITFALLS.md's own recovery
+# strategy ("don't block all BGA rendering on 100% automated geometry
+# coverage"), this is a legitimate, explicitly-recorded choice, not silence.
+# A package NOT in this dict has NO package_geometry row after StmIndex.build
+# (never a fabricated default) - that absence IS the "geometry unavailable"
+# state; any consumer must treat a missing lookup as unavailable, not guess.
+#
+# PROVENANCE, read carefully (an honest, logged gap per the owner's standing
+# ledger directive - not hidden):
+#   - pin_count, rows, cols, and depopulation below ARE empirically verified
+#     this session by parsing one real device XML per package from the
+#     confirmed all-families source (not guessed): distinct <Pin Position=...>
+#     counts and, for BGA, the actual observed row-letter/column-number span.
+#     UFBGA100's 12x12 canvas holding only 100 populated balls (44 corner
+#     positions depopulated) and UFBGA169's fully-populated 13x13 grid were
+#     both confirmed this way.
+#   - pitch_mm and body_mm are standard JEDEC package-outline values (LQFP =
+#     JEDEC MS-026, QFN = JEDEC MO-220/MO-248-family, UFBGA = ST's own
+#     ultra-fine-pitch BGA family drawings) that are consistent across
+#     virtually the entire ST portfolio for a given package name - these are
+#     NOT independently re-verified against a freshly fetched datasheet PDF
+#     this session (no live datasheet fetch tool was available in this
+#     execution environment). The DS citation per entry is a REAL, already
+#     in-repo datasheet reference (the same DS numbers cited in
+#     legacy/tools/stm32_authority.py's FAMILY_ELECTRICAL/FAMILY_POWER
+#     tables), pointed at that datasheet's package-mechanical-data section,
+#     not a page-number-verified fetch. This is flagged explicitly in the
+#     01-02-SUMMARY.md as an open follow-up item (a DATA-07-style hand-check
+#     of pitch_mm/body_mm against a real mechanical drawing PDF), same spirit
+#     as the phase's own stratified hand-check for pin data.
+#   - has_center_pad reflects the MAJORITY HasPowerPad value observed across
+#     every real device in that package this session (UFQFPN48: 138 false /
+#     2 true; UFQFPN32: 54 false / 14 true) - the minority is a genuine
+#     per-device fact PACKAGE_GEOMETRY intentionally does NOT average away;
+#     audit_has_power_pad below surfaces it instead of swallowing it.
+PACKAGE_GEOMETRY: dict[str, dict] = {
+    "LQFP64": {
+        "body_shape": "qfp", "pin_count": 64, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 10.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS9826 Rev 6 (STM32F0 package-mechanical-data section); "
+                     "JEDEC MS-026 LQFP64 outline, 10x10mm body, 0.5mm pitch",
+        "notes": "Phase 1 fixture package (STM32F030RCTx). Grid/pin-count "
+                 "confirmed against a real device XML this session; "
+                 "pitch/body are standard JEDEC values, not independently "
+                 "re-verified against a fetched PDF - see module docstring.",
+    },
+    "UFQFPN48": {
+        "body_shape": "qfn", "pin_count": 48, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 7.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS9826 Rev 6 (STM32F0 package-mechanical-data section); "
+                     "JEDEC MO-220 UFQFPN48 outline, 7x7mm body, 0.5mm pitch",
+        "notes": "Phase 1 fixture package (STM32F048C6Ux). HasPowerPad "
+                 "observed 138 false / 2 true across the real all-families "
+                 "source this session - majority (no exposed pad) recorded "
+                 "here; the minority is surfaced by audit_has_power_pad, "
+                 "never averaged away.",
+    },
+    "UFBGA64": {
+        "body_shape": "bga", "pin_count": 64, "rows": 8, "cols": 8,
+        "pitch_mm": 0.4, "body_mm": 5.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS9826 Rev 6 (STM32F0 package-mechanical-data section); "
+                     "ST UFBGA64 outline, 5x5mm body, 0.4mm pitch, "
+                     "fully-populated 8x8 ball grid (A1..H8)",
+        "notes": "Phase 1 fixture package (STM32F072RBIx). Fully-populated "
+                 "8x8 grid (rows A-H, cols 1-8) confirmed against the real "
+                 "device XML this session.",
+    },
+    "LQFP48": {
+        "body_shape": "qfp", "pin_count": 48, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 7.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS9826 Rev 6 (STM32F0 package-mechanical-data section); "
+                     "JEDEC MS-026 LQFP48 outline, 7x7mm body, 0.5mm pitch",
+        "notes": "148 MCUs in the real all-families census (2026-07-23). "
+                 "Pin count confirmed against a real device XML this session.",
+    },
+    "LQFP100": {
+        "body_shape": "qfp", "pin_count": 100, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 14.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS8626 (DocID022152) Rev 5 (STM32F4 package-mechanical-"
+                     "data section); JEDEC MS-026 LQFP100 outline, 14x14mm "
+                     "body, 0.5mm pitch",
+        "notes": "Highest-MCU-count package in the real census (205 MCUs, "
+                 "2026-07-23). The phase's rich F407 fixture uses this "
+                 "package. Pin count confirmed against a real device XML.",
+    },
+    "LQFP144": {
+        "body_shape": "qfp", "pin_count": 144, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 20.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS8626 (DocID022152) Rev 5 (STM32F4 package-mechanical-"
+                     "data section); JEDEC MS-026 LQFP144 outline, 20x20mm "
+                     "body, 0.5mm pitch",
+        "notes": "137 MCUs in the real all-families census. Pin count "
+                 "confirmed against a real device XML this session.",
+    },
+    "LQFP176": {
+        "body_shape": "qfp", "pin_count": 176, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 24.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS10916 Rev 5 (STM32F7 package-mechanical-data "
+                     "section); JEDEC MS-026 LQFP176 outline, 24x24mm body, "
+                     "0.5mm pitch",
+        "notes": "65 MCUs in the real all-families census. Pin count "
+                 "confirmed against a real device XML this session.",
+    },
+    "UFQFPN32": {
+        "body_shape": "qfn", "pin_count": 32, "rows": None, "cols": None,
+        "pitch_mm": 0.5, "body_mm": 5.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS9826 Rev 6 (STM32F0 package-mechanical-data section); "
+                     "JEDEC MO-220 UFQFPN32 outline, 5x5mm body, 0.5mm pitch",
+        "notes": "68 MCUs in the real all-families census. HasPowerPad "
+                 "observed 54 false / 14 true (a notable ~20% minority) "
+                 "across the real source this session - majority recorded "
+                 "here; audit_has_power_pad surfaces the minority.",
+    },
+    "UFBGA100": {
+        "body_shape": "bga", "rows": 12, "cols": 12, "pin_count": 100,
+        "pitch_mm": 0.5, "body_mm": 7.0, "has_center_pad": 0,
+        "depopulation": "corner-depopulated: 100 of 144 canvas positions "
+                        "populated (12x12 grid, corners omitted)",
+        "citation": "DS8626 (DocID022152) Rev 5 (STM32F4 package-mechanical-"
+                     "data section); ST UFBGA100 outline, 7x7mm body, "
+                     "0.5mm pitch",
+        "notes": "55 MCUs in the real all-families census. Grid span (rows "
+                 "A-H,J-M; cols 1-12) and the 100-of-144 depopulation "
+                 "confirmed against a real device XML this session.",
+    },
+    "UFBGA169": {
+        "body_shape": "bga", "rows": 13, "cols": 13, "pin_count": 169,
+        "pitch_mm": 0.4, "body_mm": 7.0, "has_center_pad": 0,
+        "depopulation": None,
+        "citation": "DS8626 (DocID022152) Rev 5 (STM32F4 package-mechanical-"
+                     "data section); ST UFBGA169 outline, 7x7mm body, "
+                     "0.4mm pitch, fully-populated 13x13 ball grid",
+        "notes": "55 MCUs in the real all-families census. Fully-populated "
+                 "13x13 grid (rows A-H,J-N; cols 1-13) confirmed against a "
+                 "real device XML this session.",
+    },
+}
+
+
+def audit_has_power_pad(observed: dict[str, set[bool]]) -> list[str]:
+    """Cross-check CubeMX's per-device root HasPowerPad attribute against the
+    curated PACKAGE_GEOMETRY.has_center_pad fact for that package.
+
+    ``observed`` is package_name -> the set of HasPowerPad boolean values seen
+    across every device ingested this build. Returns the sorted list of
+    package names to SURFACE (never silently swallow): either the sampled
+    devices disagree among themselves (a package-mechanical fact should not
+    vary within one true package - itself a real signal something is off), or
+    they agree but disagree with the curated table's has_center_pad value.
+    A package absent from PACKAGE_GEOMETRY is skipped here (nothing curated
+    to cross-check against).
+    """
+    flagged: set[str] = set()
+    for package, values in observed.items():
+        entry = PACKAGE_GEOMETRY.get(package)
+        if entry is None:
+            continue  # nothing curated to cross-check against
+        if len(values) > 1:
+            flagged.add(package)
+            continue
+        observed_value = next(iter(values))
+        if bool(entry["has_center_pad"]) != observed_value:
+            flagged.add(package)
+    return sorted(flagged)
