@@ -264,6 +264,47 @@ def _drive_live(webview, base: str, captured: list, result: dict) -> None:
             )
             or ""
         )
+        # Click the CAD "Models" affordance to reveal the provider download controls (or a login wall).
+        result["clicked_models"] = (
+            cad.evaluate_js(
+                "(function(){var els=document.querySelectorAll('a,button,div,span,[role=button]');"
+                "for(var i=0;i<els.length;i++){var e=els[i];var t=(e.textContent||'').trim();"
+                "if(t.length<45&&/models/i.test(t)&&e.offsetParent){"
+                "try{e.scrollIntoView({block:'center'});e.click();return t;}catch(x){}}}return '';})()"
+            )
+            or ""
+        )
+        time.sleep(4.5)
+        result["after_click_url"] = cad.evaluate_js("location.href") or ""
+        result["after_click_controls"] = (
+            cad.evaluate_js(
+                "JSON.stringify(Array.from(document.querySelectorAll('a,button,img,input')).filter(function(e){"
+                "var t=((e.textContent||'')+' '+(e.getAttribute('href')||'')+' '+(e.getAttribute('alt')||'')"
+                "+' '+(e.getAttribute('data-provider')||'')+' '+(e.className||'')).toLowerCase();"
+                "return /ultra|snapeda|samacsys|library.?loader|download|kicad|altium|eagle/.test(t);})"
+                ".map(function(e){return e.tagName+'|'+((e.textContent||'').trim().slice(0,28))+'|'+((e.getAttribute('href')||'').slice(0,45));}).slice(0,30))"
+            )
+            or "[]"
+        )
+        result["login_present"] = (
+            cad.evaluate_js(
+                "JSON.stringify({pass:!!document.querySelector('input[type=password]'),"
+                "email:!!document.querySelector('input[type=email],input[name*=user i],input[name*=email i]'),"
+                "signin:/sign in to|please sign in|log in to download|sign in to download/i.test((document.body||{}).innerText||'')})"
+            )
+            or "{}"
+        )
+        # The real model-row markup: walk up from the "Altium Footprint" label to its section and dump it.
+        result["models_region_html"] = (
+            cad.evaluate_js(
+                "(function(){var all=Array.from(document.querySelectorAll('span,div,a,button,h2,h3'));"
+                "var sp=all.find(function(e){return (e.textContent||'').trim()==='Altium Footprint';})"
+                "||all.find(function(e){return /eda\\/?cad models/i.test((e.textContent||'').trim())&&(e.textContent||'').length<25;});"
+                "if(!sp)return '';var p=sp;for(var i=0;i<6&&p.parentElement;i++){p=p.parentElement;if((p.innerHTML||'').length>600)break;}"
+                "return (p.outerHTML||'').replace(/\\s+/g,' ').slice(0,2400);})()"
+            )
+            or ""
+        )
     except Exception as e:  # noqa: BLE001
         result["error"] = repr(e)
     # PASS: the rebuilt HUD injected on the real page (overlay present) AND the DigiKey CAD/EDA
