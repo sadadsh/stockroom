@@ -205,6 +205,21 @@ def cad_forward_js(payload: dict) -> str:
     )
 
 
+def cad_overlay_received_js(requirements) -> str:
+    """The host to page push that ticks the HUD checklist: one
+    window.__STOCKROOM_OVERLAY__.received({requirement}) call per newly-satisfied requirement,
+    guarded so a remote page without the overlay bridge is a silent no-op, and JSON-encoded so a
+    requirement value can never break out of the script. Requirement enums are emitted as their
+    wire .value strings (the same contract as build_capture_payload). One-way host to page: the
+    CAD window has no js_api, so this only mutates the overlay DOM."""
+    calls = "".join(
+        "window.__STOCKROOM_OVERLAY__.received("
+        f"{json.dumps({'requirement': r.value if isinstance(r, Requirement) else str(r)})});"
+        for r in requirements
+    )
+    return f"window.__STOCKROOM_OVERLAY__ && (function(){{try{{{calls}}}catch(e){{}}}})();"
+
+
 def build_capture_payload(path=None, token=None, requirements=None, altium_paths=None) -> dict:
     """The JSON-safe CaptureForward dict the host forwards to the SPA. Only non-empty
     fields are included so the frontend's `p.altiumPaths ?? [p.path]` fallback stays
@@ -268,6 +283,20 @@ def _emit_to_spa(payload: dict) -> None:
         spa.evaluate_js(cad_forward_js(payload))
 
 
+def _emit_to_cad_window(js: str) -> None:
+    """Push a host to page script (a received tick or the Complete flash) into the REMOTE cad
+    window ONLY - never the SPA. Reads the module global _CAD_WINDOW and best-effort evaluate_js on
+    it; a None window (never opened / mid-close) or a destroyed handle is a silent no-op, so a HUD
+    update from the poll thread can never crash the capture. One-way: the cad window has no js_api."""
+    win = _CAD_WINDOW
+    if win is None:
+        return
+    try:
+        win.evaluate_js(js)
+    except Exception:  # noqa: BLE001 - a window mid-close must never crash the poll thread
+        pass
+
+
 def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     """Classify a captured file, record the requirements it satisfies into `session`, and
     forward the rich CaptureForward payload (path + live token + classified requirements +
@@ -291,6 +320,46 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
         altium_paths = _altium_paths_from_capture(path, classified, reqs, extract_dir)
         payload = build_capture_payload(path, token, reqs, altium_paths)
     _emit_to_spa(payload)
+    # Tick the HUD checklist live: push the newly-satisfied requirements to the cad window host
+    # to page (only for a real capture session, and only when this file satisfied something new -
+    # the same non-empty gate that prevents a redundant SPA re-forward). Outside the lock, like the
+    # SPA emit.
+    if session is not None and reqs:
+        _emit_to_cad_window(cad_overlay_received_js(reqs))
+
+
+def cad_overlay_complete_js() -> str:
+    """The host to page push that reveals the HUD Complete flash on session completion, guarded so a
+    remote page without the overlay bridge is a silent no-op. One-way: the cad window has no js_api."""
+    return "window.__STOCKROOM_OVERLAY__ && window.__STOCKROOM_OVERLAY__.complete();"
+
+
+def _forward_done_signal(session) -> None:
+    """Forward a distinct {signal:'done'} to the SPA on completion (DONE-01), mirroring
+    _forward_timeout_signal: the SPA lands in a clean terminal done state the instant the browser
+    finishes, token-scoped so a stale done from a replaced capture cannot mark a new part done."""
+    _emit_to_spa({"signal": "done", "token": session.token})
+
+
+def _finish_and_close(session, *, sleep=time.sleep, close_delay: float = 1.0) -> None:
+    """The ordered finish-and-close on session completion (DONE-01): flash Complete on the HUD, tell
+    the SPA the capture is done, hold briefly (close_delay, via the injectable sleep) so the flash is
+    visible, then close the cad window best-effort (read the _CAD_WINDOW global, guarded destroy).
+
+    Closing from the poll thread is safe: _on_cad_closed guards its poll-thread join with a
+    current-thread check, so there is no self-join deadlock. The temp dir is DELIBERATELY left intact
+    - the async Altium attach still reads the loose paths pulled into it, and the NEXT capture cleans
+    it; double-cleaning here would yank files from an in-flight attach (documented invariant)."""
+    _emit_to_cad_window(cad_overlay_complete_js())
+    _forward_done_signal(session)
+    if close_delay:
+        sleep(close_delay)
+    win = _CAD_WINDOW
+    if win is not None:
+        try:
+            win.destroy()
+        except Exception:  # noqa: BLE001 - the window may already be gone; closing is best-effort
+            pass
 
 
 def _forward_timeout_signal(session) -> None:
@@ -317,6 +386,7 @@ def _poll_downloads_watch(
     extract_dir=None,
     interval: float = 1.5,
     timeout: float = 300.0,
+    close_delay: float = 1.0,
     sleep=time.sleep,
     now=time.time,
 ) -> None:
@@ -333,7 +403,11 @@ def _poll_downloads_watch(
     deadline = now() + timeout
     while not session.stop_flag["stop"] and now() < deadline:
         if _session_complete(session):
-            return  # all needs met; the temp dir is cleaned on the next capture (see below)
+            # all needs met: flash Complete on the HUD, tell the SPA it is done, and auto-close the
+            # cad window (DONE-01). The temp dir is left for the async Altium attach (cleaned on the
+            # next capture); no double-clean here.
+            _finish_and_close(session, sleep=sleep, close_delay=close_delay)
+            return
         found = watch.poll()
         if found is not None:
             _forward_cad_capture(found, session, extract_dir=extract_dir)
@@ -519,12 +593,14 @@ def _vendor_from_url(url: str) -> tuple[str, str]:
     return ("", "the vendor")
 
 
-def cad_loaded_scripts(needs, vendor_key: str, vendor_label: str, formats, creds) -> list[str]:
+def cad_loaded_scripts(
+    needs, vendor_key: str, vendor_label: str, formats, creds, part_name: str = ""
+) -> list[str]:
     """The scripts to inject into the cad window on each `loaded`, in order: the overlay (so
     the panel + `window.__STOCKROOM_OVERLAY__` bridge exist first), then a best-effort login
     auto-fill (omitted when there are no creds), then the vendor driver (which reports into the
-    overlay)."""
-    scripts = [build_overlay_js(list(needs), vendor_label)]
+    overlay). `part_name` is shown as the HUD header focal point when non-empty."""
+    scripts = [build_overlay_js(list(needs), vendor_label, part_name)]
     autofill = build_login_autofill_js(
         vendor_key, (creds or {}).get("username", ""), (creds or {}).get("password", "")
     )
@@ -564,7 +640,7 @@ def _load_vendor_creds(vendor_key: str) -> dict:
     }
 
 
-def cad_scripts_for_url(url: str, needs_values) -> list[str]:
+def cad_scripts_for_url(url: str, needs_values, part_name: str = "") -> list[str]:
     """The cad scripts (overlay + optional per-vendor login autofill + driver) re-derived from a
     url: vendor/label via `_vendor_from_url`, formats via `_formats_for_needs`, creds via
     `_load_vendor_creds`. So a DigiKey url yields the DigiKey-account autofill (when creds are
@@ -575,10 +651,10 @@ def cad_scripts_for_url(url: str, needs_values) -> list[str]:
     vendor_key, vendor_label = _vendor_from_url(url)
     formats = _formats_for_needs(needs_values)
     creds = _load_vendor_creds(vendor_key)
-    return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds)
+    return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds, part_name)
 
 
-def _inject_cad_scripts(win, fallback_url: str, needs_values) -> None:
+def _inject_cad_scripts(win, fallback_url: str, needs_values, part_name: str = "") -> None:
     """Re-derive the cad scripts from the window's CURRENT url (guarded `get_current_url`, falling
     back to `fallback_url`) and inject them via `evaluate_js` - the light in-site re-injection, so
     after an in-site DigiKey nav or an in-page modal the current url's overlay + autofill + driver
@@ -589,7 +665,7 @@ def _inject_cad_scripts(win, fallback_url: str, needs_values) -> None:
     except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
         current = None
     url = current or fallback_url
-    for script in cad_scripts_for_url(url, needs_values):
+    for script in cad_scripts_for_url(url, needs_values, part_name):
         try:
             win.evaluate_js(script)
         except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
@@ -610,15 +686,17 @@ _CAD_REINJECT_EVENTS = (
 )
 
 
-def _reinject_popup(win, target, needs_values) -> None:
+def _reinject_popup(win, target, needs_values, part_name: str = "") -> None:
     """Inject the cad scripts onto a popped / navigated window (or back onto `win` when the event
     carried no window object), re-derived from that window's current url. Host->page `evaluate_js`
     only - a popup NEVER receives the token or a js_api bridge."""
     tw = target if (target is not None and hasattr(target, "evaluate_js")) else win
-    _inject_cad_scripts(tw, "", needs_values)
+    _inject_cad_scripts(tw, "", needs_values, part_name)
 
 
-def _wire_cad_reinjection(win, needs_values, *, candidate_events=_CAD_REINJECT_EVENTS) -> bool:
+def _wire_cad_reinjection(
+    win, needs_values, part_name: str = "", *, candidate_events=_CAD_REINJECT_EVENTS
+) -> bool:
     """LIGHT defensive backstop: best-effort subscribe to the installed pywebview's popup /
     new-window / navigation event IF it exposes one, re-injecting the cad scripts onto that window
     via `evaluate_js`. Returns True once a slot is subscribed; logs a warning and returns False
@@ -633,7 +711,7 @@ def _wire_cad_reinjection(win, needs_values, *, candidate_events=_CAD_REINJECT_E
 
     def _on_popup(target=None, *args, **kwargs):
         try:
-            _reinject_popup(win, target, needs_values)
+            _reinject_popup(win, target, needs_values, part_name)
         except Exception:  # noqa: BLE001 - best-effort backstop; never crash the app
             _log.warning("cad popup re-injection failed")
 
@@ -739,7 +817,7 @@ class _HostApi:
         )
         return list(result) if result else []
 
-    def open_cad_download(self, url, needs=None) -> str:
+    def open_cad_download(self, url, needs=None, part_name=None) -> str:
         """Open a vendor CAD-download page (Ultra Librarian / SnapEDA, or a DigiKey product
         page) in a SECOND, VISIBLE window dedicated to this one guided capture, and return a
         per-capture session TOKEN the SPA gates every forward on (B4). `needs` is the list of
@@ -778,7 +856,8 @@ class _HostApi:
             _CAD_WINDOW = None
 
         needs_set = _parse_needs(needs)
-        session = CaptureSession.start("", needs_set, now=time.time())
+        name = part_name or ""
+        session = CaptureSession.start(name, needs_set, now=time.time())
         session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
         _CAD_SESSION = session
 
@@ -795,12 +874,12 @@ class _HostApi:
         needs_values = [r.value for r in needs_set]
 
         def _on_cad_loaded() -> None:
-            _inject_cad_scripts(win, url, needs_values)
+            _inject_cad_scripts(win, url, needs_values, name)
 
         win.events.loaded += _on_cad_loaded
         # Best-effort popup / new-window re-injection when this pywebview backend exposes the
         # event; degrades silently otherwise (cross-site is DE-SCOPED - a LIGHT backstop only).
-        _wire_cad_reinjection(win, needs_values)
+        _wire_cad_reinjection(win, needs_values, name)
 
         thread_box: dict = {"t": None}
 

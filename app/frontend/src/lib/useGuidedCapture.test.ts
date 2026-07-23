@@ -110,7 +110,9 @@ describe("useGuidedCapture", () => {
     });
 
     expect(api.partCadSource).toHaveBeenCalledWith("part1");
-    expect(open).toHaveBeenCalledWith(UL_URL, KICAD_NEEDS);
+    // start() now threads the part name (empty here, since this adapter render passes none) as the
+    // third arg so the HUD can display part name + DigiKey (HUD-01).
+    expect(open).toHaveBeenCalledWith(UL_URL, KICAD_NEEDS, "");
     expect(result.current.status).toBe("receiving");
     expect(result.current.needs).toEqual(KICAD_NEEDS);
     expect(typeof window.__STOCKROOM_CAD_DOWNLOAD__).toBe("function");
@@ -225,6 +227,22 @@ describe("useGuidedCapture", () => {
     });
 
     expect(result.current.status).toBe("timed-out");
+  });
+
+  it("projects the terminal done state when the host forwards a done signal (DONE-02)", async () => {
+    mockHost("tok");
+    mockCadSourceUrl();
+    const { result } = render(["kicad_symbol"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe("done");
   });
 
   it("accepts a legacy bare-path forward and runs the KiCad pipeline", async () => {
