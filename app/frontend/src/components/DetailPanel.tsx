@@ -15,7 +15,7 @@
  */
 import { useState, type ReactNode } from "react";
 import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
-import { deriveTitle, deriveAttributes, isReferenceOnlySpecKey } from "../lib/derive";
+import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
 import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
 import { useInlineEdit } from "../lib/useInlineEdit";
@@ -184,9 +184,6 @@ export function DetailPanel({
   // headlines AND reads again on the serial line below.
   const titleIsMpn = derived === detail.mpn.trim();
   const headline = titleIsMpn && name && name !== detail.mpn.trim() ? name : derived;
-  // The part's tags plus a few chips derived from key specs (package, mounting,
-  // qualifications, salient features), so the attribute band is never empty.
-  const attributes = deriveAttributes(detail);
   // Grouped, extensible spec sheet (Electrical / Physical / Ratings / Other) from lib/specSchema,
   // with catalog metadata (manufacturer, country, packaging, ...) dropped so the sheet is the
   // physical parameters, not a distributor page. Groups emptied by the filter fall away.
@@ -341,13 +338,15 @@ export function DetailPanel({
           />
           <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
             <WorkbenchPanel id="specs" active={activeTab}>
-              <AttributesCard
-                derived={attributes}
-                manual={detail.tags}
+              {/* The specifications ARE the component - they lead the tab, fully visible (never
+                  collapsed). The old derived-attribute chips duplicated these rows, so they were
+                  removed; user tags follow as a quiet footer. */}
+              <SpecificationsSection groups={specGroups} count={specCount} />
+              <TagsCard
+                tags={detail.tags}
                 onEditTags={onEditField ? (next) => onEditField("tags", next) : undefined}
                 busy={busy}
               />
-              <SpecificationsSection groups={specGroups} count={specCount} />
             </WorkbenchPanel>
 
             <WorkbenchPanel id="sourcing" active={activeTab}>
@@ -796,86 +795,64 @@ function Filing({
   );
 }
 
-// The Attributes band: the FEW derived, parameter-ranked chips (deriveAttributes) plus any the
-// user pins by hand. Manual attributes persist in the record's `tags` field (the retired "tags"
-// concept is now this), so each shows a remove control and there is an inline add. Derived chips
-// are read-only (they mirror the specs); a manual chip that duplicates a derived one is hidden.
-function AttributesCard({
-  derived,
-  manual,
+// The Tags footer: user-added labels for the part, persisted in the record's `tags` field. This
+// used to be the "Attributes" band, which ALSO rendered chips derived from the specs - a
+// duplicate of the spec sheet right below it. Those derived chips were removed (the specifications
+// are the component's parameters and now lead the tab); what remains is the genuinely additive
+// part: the labels the user pins by hand. Renders as a quiet footer under the specs with an inline
+// add and per-tag remove, and hides entirely when there is nothing to show and no editor.
+function TagsCard({
+  tags,
   onEditTags,
   busy,
 }: {
-  derived: string[];
-  manual: string[];
+  tags: string[];
   onEditTags?: (next: string[]) => void;
   busy?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-
-  const derivedLower = new Set(derived.map((a) => a.toLowerCase()));
-  const manualChips = manual.filter(
-    (t) => t.trim() !== "" && !derivedLower.has(t.trim().toLowerCase()),
-  );
-  // A tight highlight glance, not an exhaustive dump: the top few derived chips (deriveAttributes
-  // ranks them, so the low-value tail - bare dimensions, near-duplicate case codes - falls off the
-  // end) plus every manual pin the user added. The full spec sheet sits right below and carries
-  // the rest, so the band stays a glance and every chip wraps whole (no single-row clip).
-  const HIGHLIGHT_CAP = 7;
-  const chips = [
-    ...derived.slice(0, HIGHLIGHT_CAP).map((label) => ({ label, manual: false })),
-    ...manualChips.map((label) => ({ label, manual: true })),
-  ];
+  const chips = tags.filter((t) => t.trim() !== "");
 
   const chipCls =
-    "inline-flex flex-none items-center gap-1.5 rounded-full border px-3 py-[5px] text-xs font-medium";
+    "inline-flex flex-none items-center gap-1.5 rounded-full border border-line2 bg-raise2 px-3 py-[5px] text-xs font-medium text-t1";
 
   function commitAdd() {
     const value = draft.trim();
     setDraft("");
     setAdding(false);
     if (!value || !onEditTags) return;
-    const exists =
-      derivedLower.has(value.toLowerCase()) ||
-      manual.some((t) => t.toLowerCase() === value.toLowerCase());
-    if (!exists) onEditTags([...manual, value]);
+    if (!tags.some((t) => t.toLowerCase() === value.toLowerCase())) onEditTags([...tags, value]);
   }
 
-  function removeManual(tag: string) {
-    onEditTags?.(manual.filter((t) => t !== tag));
+  function removeTag(tag: string) {
+    onEditTags?.(tags.filter((t) => t !== tag));
   }
 
   if (chips.length === 0 && !onEditTags) return null;
 
   return (
-    <div data-dev-id="detail.attributes" className="mb-5">
-      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
-        <Text id="detail.attributes">Attributes</Text>
+    <div data-dev-id="detail.attributes" className="mt-6 border-t border-line pt-4">
+      <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t2">
+        <Text id="detail.attributes">Tags</Text>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {chips.map((c) =>
-          c.manual ? (
-            <span key={`m-${c.label}`} className={chipCls + " border-line2 bg-raise2 text-t1"}>
-              {c.label}
-              {onEditTags ? (
-                <button
-                  type="button"
-                  onClick={() => removeManual(c.label)}
-                  disabled={busy}
-                  aria-label={`Remove ${c.label}`}
-                  className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
-                >
-                  <Icon id="detail.tag-remove" className="h-2.5 w-2.5" />
-                </button>
-              ) : null}
-            </span>
-          ) : (
-            <span key={`d-${c.label}`} className={chipCls + " border-line bg-field text-t2"}>
-              {c.label}
-            </span>
-          ),
-        )}
+        {chips.map((label) => (
+          <span key={label} className={chipCls}>
+            {label}
+            {onEditTags ? (
+              <button
+                type="button"
+                onClick={() => removeTag(label)}
+                disabled={busy}
+                aria-label={`Remove ${label}`}
+                className="-mr-1 grid h-4 w-4 place-items-center rounded-full text-t3 hover:bg-line2 hover:text-t1 disabled:opacity-50"
+              >
+                <Icon id="detail.tag-remove" className="h-2.5 w-2.5" />
+              </button>
+            ) : null}
+          </span>
+        ))}
         {onEditTags ? (
           adding ? (
             <input
@@ -890,8 +867,8 @@ function AttributesCard({
                   setAdding(false);
                 }
               }}
-              placeholder="Add attribute"
-              aria-label="Add attribute"
+              placeholder="Add tag"
+              aria-label="Add tag"
               className="h-[29px] w-36 flex-none rounded-full border border-line2 bg-field px-3 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
             />
           ) : (
@@ -1087,7 +1064,7 @@ function SpecificationsSection({ groups, count }: { groups: SpecGroup[]; count: 
                   className="flex items-baseline justify-between gap-4 border-b border-line/60 py-1.5 last:border-0"
                 >
                   <dt
-                    className="min-w-0 flex-1 break-words text-xs text-t3"
+                    className="min-w-0 flex-1 break-words text-xs text-t2"
                     title={typeof row.label === "string" ? row.label : undefined}
                   >
                     {row.label}
