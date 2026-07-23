@@ -9,7 +9,8 @@ function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-// A raised, hairline-bordered surface: the mockup's .file / .ss / .srcbar card.
+// A flat, hairline-bordered surface (Altium reads through borders, not shadow): the mockup's
+// .file / .ss / .srcbar card, restyled flat.
 export function Card({
   className,
   children,
@@ -18,7 +19,7 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-card border border-line bg-raise shadow-card",
+        "rounded-card border border-line bg-raise",
         className,
       )}
       {...rest}
@@ -52,19 +53,18 @@ export function Button({
     "focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-50 " +
     "disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none";
   const size = small ? "h-[27px] px-2.5 text-xs" : "h-[31px] px-3 text-sm";
-  // Default controls sit flat and lift on hover; the primary + destructive actions
-  // rest raised, so a page's main action reads as the one thing standing up.
+  // Flat, bordered controls (Altium): hover is a colour shift, not a lift + shadow. The press
+  // scale in `base` keeps them tactile; separation comes from the border, not elevation.
   const variants: Record<ButtonVariant, string> = {
     default:
-      "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1 hover:-translate-y-px hover:shadow-card",
+      "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1",
     accent:
-      "border-transparent bg-acc text-acc-on shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
+      "border-transparent bg-acc text-acc-on hover:brightness-110 font-semibold",
     danger:
-      "border-transparent bg-err text-white shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
-    // A raised-but-neutral action (north-star .addbtn): a subtle lifted tile, not a heavy
-    // solid accent bar. Reads clean on both themes (a light overlay on the panel).
+      "border-transparent bg-err text-white hover:brightness-110 font-semibold",
+    // A neutral action tile (north-star .addbtn), flat: a bordered fill that brightens on hover.
     soft:
-      "border-line2 bg-raise2 text-t1 font-semibold shadow-card hover:brightness-110 hover:-translate-y-px hover:shadow-raise",
+      "border-line2 bg-raise2 text-t1 font-semibold hover:brightness-125",
   };
   return (
     <button
@@ -318,7 +318,7 @@ export function TabStrip<T extends string>({
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
             "rounded-control px-3 py-1 text-sm transition-colors",
-            active === t.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2",
+            active === t.id ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
           )}
         >
           {t.label}
@@ -391,7 +391,7 @@ export function SegmentedControl<T extends string>({
           className={cx(
             "rounded-control transition-colors",
             pad,
-            value === opt.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2",
+            value === opt.id ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
           )}
         >
           {opt.label}

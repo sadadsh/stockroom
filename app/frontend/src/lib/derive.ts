@@ -115,6 +115,17 @@ const REFERENCE_ONLY_SPEC_KEYS: Set<string> = new Set(
     "HTS Code",
     "HTSUS",
     "Number of Parts",
+    // Echoes of data shown elsewhere on the opened component: the EIA case codes restate
+    // Package ("0402 (1005 metric)"), Aliases restate the MPN, and Type restates the title.
+    // Dropping them keeps the spec sheet parameters, not a duplicate of the header.
+    "Case Code - in",
+    "Case Code - mm",
+    "Case Code In",
+    "Case Code Mm",
+    "Part # Aliases",
+    "Part Aliases",
+    "Aliases",
+    "Type",
   ].map(normalizeSpecKey),
 );
 

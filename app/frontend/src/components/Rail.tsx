@@ -40,11 +40,11 @@ export function Rail() {
       data-dev-id="rail.root"
       className="flex w-[190px] flex-none flex-col border-r border-line bg-rail px-3 py-4"
     >
-      {/* wordmark (north-star .wm): flattened for the Altium restyle - the brand sits directly
-          on the rail (no raised tile / shadow), the way a docked panel header reads. */}
+      {/* wordmark (north-star .wm): the rail's panel header - the brand on the rail with a
+          bottom hairline that spans the rail width, the way a docked Altium panel is titled. */}
       <div
         data-dev-id="rail.wordmark"
-        className="mb-3 flex items-center gap-2.5 px-1.5 py-1"
+        className="-mx-3 mb-3 flex items-center gap-2.5 border-b border-line px-3.5 pb-3 pt-0.5"
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
@@ -96,7 +96,7 @@ export function Rail() {
               type="button"
               data-dev-id="rail.update"
               title="A new version is available"
-              className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line2 bg-raise2 px-2.5 text-xs font-semibold text-t1 shadow-card transition hover:brightness-110"
+              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t1 transition hover:bg-raise2"
             >
               <Icon id="nav.update" className="h-4 w-4 flex-none" />
               <Text id="nav.update">Update</Text>
@@ -104,7 +104,7 @@ export function Rail() {
           ) : (
             <div
               data-dev-id="rail.update"
-              className="flex h-[34px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2"
+              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2"
               title="You have the latest version"
             >
               {/* The registry stores the plain check (currentColor); the --c-ok tint was a call-site
@@ -122,7 +122,7 @@ export function Rail() {
             onClick={toggle}
             aria-label="Toggle light or dark theme"
             title="Toggle light or dark theme"
-            className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-control border border-line2 bg-raise2 text-t2 shadow-card transition hover:brightness-110 hover:text-t1"
+            className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-control border border-line bg-raise text-t2 transition hover:bg-raise2 hover:text-t1"
           >
             <Icon id="nav.theme" className="h-4 w-4 flex-none" />
           </button>
@@ -210,7 +210,7 @@ function RailItem({
       className={
         "flex h-[32px] items-center gap-2.5 rounded-control px-2.5 text-left text-base transition " +
         (selected
-          ? "bg-acc-soft font-semibold text-t1"
+          ? "bg-acc-soft font-semibold text-t1 shadow-[inset_2px_0_0_var(--c-acc)]"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
       }
     >

@@ -53,7 +53,7 @@ export function Finder({
     <div data-dev-id="components.finder" className="relative">
       <div
         data-dev-id="components.search-box"
-        className="flex h-[38px] items-center gap-2.5 rounded-control bg-field pl-3 pr-2"
+        className="flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field pl-2.5 pr-1.5 focus-within:border-acc"
       >
         <SearchIcon className="flex-none text-t3" />
         <input
@@ -72,7 +72,7 @@ export function Finder({
           className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
         />
         {onOpenSearch ? (
-          <kbd className="mr-0.5 flex-none rounded-control border border-line2 bg-raise2 px-1.5 py-[3px] font-mono text-2xs font-medium text-t2">
+          <kbd className="mr-0.5 flex-none rounded-control border border-line bg-raise px-1.5 py-[2px] font-mono text-2xs font-medium text-t3">
             Ctrl K
           </kbd>
         ) : null}
