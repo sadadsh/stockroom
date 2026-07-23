@@ -687,8 +687,20 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
     wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "220"))
     print(f"REALCAPTURE: running the real capture pipeline for up to {wait_s:.0f}s...", flush=True)
     deadline = _t.time() + wait_s
+    last_dump = 0.0
     while _t.time() < deadline and not session.is_complete():
         _t.sleep(2.0)
+        if _t.time() - last_dump > 12:
+            last_dump = _t.time()
+            try:
+                hud = win.evaluate_js(
+                    "(function(){var o=document.getElementById('__stockroom_overlay__');"
+                    "return o?((o.innerText||'').replace(/\\n+/g,' | ').replace(/ +/g,' ').slice(-170)):'NO_HUD';})()"
+                )
+                cur = win.evaluate_js("location.pathname")
+                print(f"HUD [{cur}]: {hud}", flush=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"HUD dump failed: {e!r}", flush=True)
     result["received"] = sorted(r.value for r in session.received)
     result["remaining"] = sorted(r.value for r in session.remaining())
     result["forwards"] = len(captured)
