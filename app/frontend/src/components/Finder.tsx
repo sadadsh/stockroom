@@ -49,10 +49,14 @@ export function Finder({
   const searchLabel = useText("components.search-placeholder", "Search Parts");
 
   return (
-    <div className="relative">
-      <div className="flex h-[38px] items-center gap-2.5 rounded-control bg-field pl-3 pr-2">
+    <div data-dev-id="components.finder" className="relative">
+      <div
+        data-dev-id="components.search-box"
+        className="flex h-[38px] items-center gap-2.5 rounded-control bg-field pl-3 pr-2"
+      >
         <SearchIcon className="flex-none text-t3" />
         <input
+          data-dev-id="components.search-input"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           onFocus={onOpenSearch ? (e) => { e.target.blur(); onOpenSearch(); } : undefined}
@@ -73,6 +77,7 @@ export function Finder({
         ) : null}
         <button
           type="button"
+          data-dev-id="components.filter-button"
           aria-label="Filters"
           onClick={() => setOpen((v) => !v)}
           className="inline-flex items-center gap-1.5 rounded-control p-1.5 text-t3 hover:bg-raise2 hover:text-t1"
@@ -96,10 +101,16 @@ export function Finder({
       </div>
 
       {open ? (
-        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
+        <div
+          data-dev-id="components.filter-panel"
+          className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop"
+        >
           <div className="mb-2 flex items-center justify-between">
             <div className="text-2xs font-semibold text-t3">Show</div>
-            <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
+            <label
+              data-dev-id="components.filter-complete"
+              className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1"
+            >
               <span
                 className={
                   "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
@@ -122,7 +133,10 @@ export function Finder({
 
           {duplicateCount > 0 ? (
             <div className="mb-2 flex items-center justify-end">
-              <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1">
+              <label
+                data-dev-id="components.filter-duplicates"
+                className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1"
+              >
                 <span
                   className={
                     "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
@@ -147,7 +161,7 @@ export function Finder({
           <div className="mb-2 mt-3 text-2xs font-semibold text-t3">
             Category
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div data-dev-id="components.filter-categories" className="max-h-64 overflow-y-auto">
             <FacetRow
               label="All Categories"
               count={facets ? facets.complete + facets.incomplete : 0}
