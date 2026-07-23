@@ -11,7 +11,21 @@
  */
 import type { PinDTO } from "../../api/types";
 
-export type PinCategory = "io" | "power" | "ground" | "reset" | "boot" | "vcap" | "nc";
+// The API's PinDTO.category vocabulary (_pin_category in api/routers/stm.py): the io
+// electrical class splits into four visual buckets (gpio/analog/debug/oscillator); every other
+// class passes through as itself. The two vocabularies MUST stay in lockstep — an unknown
+// category renders neutral and labels itself verbatim, never masquerading as another category.
+export type PinCategory =
+  | "gpio"
+  | "analog"
+  | "debug"
+  | "oscillator"
+  | "power"
+  | "ground"
+  | "reset"
+  | "boot"
+  | "vcap"
+  | "nc";
 
 export interface CategorySpec {
   key: PinCategory;
@@ -19,10 +33,13 @@ export interface CategorySpec {
   token: string;
 }
 
-// Ordered io-first (the class most pins carry) through the quietest (nc), the order the legend
-// teaches them in.
+// Ordered gpio-first (the bucket most pins carry) through the quietest (nc), the order the
+// legend teaches them in.
 export const PIN_CATEGORIES: readonly CategorySpec[] = [
-  { key: "io", label: "I/O", token: "--stm-cat-io" },
+  { key: "gpio", label: "GPIO", token: "--stm-cat-gpio" },
+  { key: "analog", label: "Analog", token: "--stm-cat-analog" },
+  { key: "debug", label: "Debug", token: "--stm-cat-debug" },
+  { key: "oscillator", label: "Oscillator", token: "--stm-cat-oscillator" },
   { key: "power", label: "Power", token: "--stm-cat-power" },
   { key: "ground", label: "Ground", token: "--stm-cat-ground" },
   { key: "reset", label: "Reset", token: "--stm-cat-reset" },
@@ -34,16 +51,21 @@ export const PIN_CATEGORIES: readonly CategorySpec[] = [
 const CATEGORY_BY_KEY: Record<string, CategorySpec> = Object.fromEntries(
   PIN_CATEGORIES.map((c) => [c.key, c]),
 );
+// A raw electrical_class "io" (a category the API only emits pre-split) reads as plain gpio.
+CATEGORY_BY_KEY.io = CATEGORY_BY_KEY.gpio;
 
-// The category fill as a token reference (never a raw hex), falling back to nc for an unknown
-// category so a pad always renders.
+// The category fill as a token reference (never a raw hex). An UNKNOWN category renders as a
+// neutral line tint — visibly un-categorized, never silently painted as Not Connected (that
+// exact fallback masked a real vocabulary mismatch as a "Not Connected" I/O pin).
 export function categoryFill(category: string): string {
-  const spec = CATEGORY_BY_KEY[category] ?? CATEGORY_BY_KEY.nc;
-  return `var(${spec.token})`;
+  const spec = CATEGORY_BY_KEY[category];
+  return spec ? `var(${spec.token})` : "var(--c-line2)";
 }
 
 export function categoryLabel(category: string): string {
-  return (CATEGORY_BY_KEY[category] ?? CATEGORY_BY_KEY.nc).label;
+  const spec = CATEGORY_BY_KEY[category];
+  if (spec) return spec.label;
+  return category ? category.charAt(0).toUpperCase() + category.slice(1) : "Unknown";
 }
 
 // The border channel: three neutral tiers keyed off the pin's role classes (never a hue). A pin

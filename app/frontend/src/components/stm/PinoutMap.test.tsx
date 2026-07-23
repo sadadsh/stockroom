@@ -91,14 +91,53 @@ describe("PinoutMap", () => {
     expect(other.querySelector('rect[stroke="var(--c-acc-strong)"]')).toBeNull();
   });
 
-  it("shows the layout-unavailable state when no pads can be laid out", () => {
+  it("falls back to a clickable pin list when no pads can be laid out", () => {
+    const onSelectPosition = vi.fn();
     const noGeom: PinoutDTO = {
       ...LQFP,
-      // perimeter pins with no lqfp_side cannot be placed -> an explicit unavailable state
-      pins: [pin({ position: "1", lqfp_side: null }), pin({ position: "2", lqfp_side: null })],
+      // perimeter pins with no lqfp_side cannot be placed -> the text pin-list fallback
+      pins: [
+        pin({ position: "1", lqfp_side: null, canonical_pin_name: "VDD" }),
+        pin({ position: "2", lqfp_side: null, canonical_pin_name: "PA9" }),
+      ],
     };
-    render(<PinoutMap pinout={noGeom} selectedPosition={null} onSelectPosition={vi.fn()} />);
-    expect(screen.getByText(/Layout unavailable/i)).toBeInTheDocument();
+    render(<PinoutMap pinout={noGeom} selectedPosition={null} onSelectPosition={onSelectPosition} />);
+    expect(screen.getByTestId("pinout-pin-list")).toBeInTheDocument();
     expect(screen.queryByTestId("pinout-map-svg")).toBeNull();
+    // every pin is listed and clicking one selects it
+    fireEvent.click(screen.getByText("PA9"));
+    expect(onSelectPosition).toHaveBeenCalledWith("2");
+  });
+
+  it("badges an inferred layout and never badges a curated one", () => {
+    const inferred: PinoutDTO = {
+      ...BGA,
+      geometry: { ...BGA.geometry, source: "inferred" },
+    };
+    const { rerender } = render(
+      <PinoutMap pinout={inferred} selectedPosition={null} onSelectPosition={vi.fn()} />,
+    );
+    expect(screen.getByText(/Layout inferred/i)).toBeInTheDocument();
+    rerender(
+      <PinoutMap
+        pinout={{ ...BGA, geometry: { ...BGA.geometry, source: "curated" } }}
+        selectedPosition={null}
+        onSelectPosition={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/Layout inferred/i)).toBeNull();
+  });
+
+  it("counts pads the layout could not place instead of hiding them", () => {
+    const partial: PinoutDTO = {
+      ...LQFP,
+      pins: [
+        ...LQFP.pins,
+        // a real pin whose position cannot be mapped (no side on a perimeter package)
+        pin({ position: "99", lqfp_side: null, canonical_pin_name: "VSS" }),
+      ],
+    };
+    render(<PinoutMap pinout={partial} selectedPosition={null} onSelectPosition={vi.fn()} />);
+    expect(screen.getByText(/1 pad without a mappable position/i)).toBeInTheDocument();
   });
 });

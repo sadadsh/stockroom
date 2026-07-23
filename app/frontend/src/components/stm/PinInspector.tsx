@@ -65,40 +65,7 @@ export function PinInspector({ pin }: { pin: PinDTO }) {
         </Row>
       ) : null}
 
-      {pin.functions.length > 0 ? (
-        <Section label="Functions">
-          <ul className="flex flex-col gap-1">
-            {pin.functions.map((fn, i) => (
-              <li key={`${fn.signal}-${i}`} className="flex items-baseline justify-between gap-3">
-                <span className="font-mono text-xs text-t1">{fn.signal}</span>
-                {fn.io_modes ? (
-                  <span className="truncate text-2xs text-t3">{fn.io_modes}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
-
-      {pin.alternate_functions.length > 0 ? (
-        <Section label="Alternate Functions">
-          <ul className="flex flex-col gap-1">
-            {pin.alternate_functions.map((af, i) => (
-              <li
-                key={`${af.af_index}-${af.signal}-${i}`}
-                className="flex items-baseline justify-between gap-3"
-              >
-                <span className="min-w-0 truncate font-mono text-xs text-t1">
-                  <span className="text-t3">AF{af.af_index}</span> {af.signal}
-                </span>
-                {af.peripheral ? (
-                  <span className="flex-none font-mono text-2xs text-t3">{af.peripheral}</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      ) : null}
+      <FunctionSections pin={pin} />
 
       {pin.roles.length > 0 ? (
         <Section label="Roles">
@@ -124,6 +91,71 @@ export function PinInspector({ pin }: { pin: PinDTO }) {
         )}
       </Section>
     </div>
+  );
+}
+
+/**
+ * The pin's function lists, split the way the mux actually works (the defect this replaces
+ * showed one undifferentiated signal list with no AF indices):
+ * - "Alternate Functions": the AF0-15 muxed signals, each with its AF index — the fact the
+ *   whole compatibility feature runs on.
+ * - "Analog & System": signals that are NOT AF-muxed (ADC/DAC inputs, wakeup, RTC refs),
+ *   separated so an analog input never reads as a muxable function.
+ * A pin with functions but NO AF set (the F1 legacy-AFIO families) keeps a single plain
+ * "Functions" list: on those parts the split would be a fiction, not a fact.
+ */
+function FunctionSections({ pin }: { pin: PinDTO }) {
+  const afs = pin.alternate_functions;
+  const afSignals = new Set(afs.map((af) => af.signal));
+  const plain = pin.functions.filter((fn) => !afSignals.has(fn.signal));
+
+  if (afs.length === 0) {
+    if (pin.functions.length === 0) return null;
+    return (
+      <Section label="Functions">
+        <PlainFunctionList functions={pin.functions} />
+      </Section>
+    );
+  }
+
+  return (
+    <>
+      <Section label="Alternate Functions">
+        <ul className="flex flex-col gap-1">
+          {afs.map((af, i) => (
+            <li
+              key={`${af.af_index}-${af.signal}-${i}`}
+              className="flex items-baseline justify-between gap-3"
+            >
+              <span className="min-w-0 truncate font-mono text-xs text-t1">
+                <span className="text-t3">AF{af.af_index}</span> {af.signal}
+              </span>
+              {af.peripheral ? (
+                <span className="flex-none font-mono text-2xs text-t3">{af.peripheral}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </Section>
+      {plain.length > 0 ? (
+        <Section label="Analog & System">
+          <PlainFunctionList functions={plain} />
+        </Section>
+      ) : null}
+    </>
+  );
+}
+
+function PlainFunctionList({ functions }: { functions: PinDTO["functions"] }) {
+  return (
+    <ul className="flex flex-col gap-1">
+      {functions.map((fn, i) => (
+        <li key={`${fn.signal}-${i}`} className="flex items-baseline justify-between gap-3">
+          <span className="font-mono text-xs text-t1">{fn.signal}</span>
+          {fn.io_modes ? <span className="truncate text-2xs text-t3">{fn.io_modes}</span> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 

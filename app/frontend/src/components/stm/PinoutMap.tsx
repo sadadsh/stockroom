@@ -87,15 +87,43 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
   );
 
   const unavailable = layout.pins.length === 0;
+  // Pins the layout could not place (no lqfp_side on a perimeter package, or a ball row label
+  // outside the JEDEC letter alphabet, e.g. the STM32MP1 SiP secondary zones). Surfaced as a
+  // count so a partial map never silently reads as the whole package.
+  const unplaced = pinout.pins.length - layout.pins.length;
+  const inferred = pinout.geometry.source === "inferred";
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-card bg-stage shadow-[inset_0_1px_0_var(--edge-hi)]">
         {unavailable ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <p className="text-sm text-t3">
-              Layout unavailable for this package. The pinout facts are still listed on the right.
+          <div className="flex h-full min-h-0 flex-col gap-2 p-4" data-testid="pinout-pin-list">
+            <p className="flex-none text-xs text-t3">
+              No drawable layout for this package. Select a pin from the list to inspect it.
             </p>
+            <ul className="min-h-0 flex-1 overflow-y-auto">
+              {pinout.pins.map((p) => (
+                <li key={`${p.position}-${p.raw_pin_name}`}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(p.position)}
+                    className={
+                      "flex w-full items-center gap-2 rounded-control px-2 py-1 text-left hover:bg-hover " +
+                      (p.position === selectedPosition ? "bg-acc-soft" : "")
+                    }
+                  >
+                    <span
+                      className="h-2 w-2 flex-none rounded-full"
+                      style={{ backgroundColor: categoryFill(p.category) }}
+                    />
+                    <span className="w-10 flex-none font-mono text-xs text-t3">{p.position}</span>
+                    <span className="truncate font-mono text-xs text-t1">
+                      {p.canonical_pin_name}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
           <svg
@@ -170,6 +198,20 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
           </svg>
         )}
 
+        {!unavailable && (inferred || unplaced > 0) ? (
+          <div className="absolute bottom-3 left-3 flex flex-col items-start gap-1">
+            {inferred ? (
+              <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
+                Layout inferred from pin positions
+              </span>
+            ) : null}
+            {unplaced > 0 ? (
+              <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
+                {unplaced} {unplaced === 1 ? "pad" : "pads"} without a mappable position
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {!unavailable ? (
           <button
             type="button"

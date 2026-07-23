@@ -44,13 +44,13 @@ export function PinoutLegend() {
       {/* Mark = 5V tolerant, Ring = selection (both neutral) */}
       <section className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="relative h-3 w-3 flex-none rounded-[3px] bg-stm-cat-io">
+          <span className="relative h-3 w-3 flex-none rounded-[3px] bg-stm-cat-gpio">
             <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-t1" />
           </span>
           <span className="text-xs text-t2">5V Tolerant</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="h-3 w-3 flex-none rounded-[3px] bg-stm-cat-io outline outline-2 outline-offset-1 outline-acc-strong" />
+          <span className="h-3 w-3 flex-none rounded-[3px] bg-stm-cat-gpio outline outline-2 outline-offset-1 outline-acc-strong" />
           <span className="text-xs text-t2">Selected</span>
         </div>
       </section>
