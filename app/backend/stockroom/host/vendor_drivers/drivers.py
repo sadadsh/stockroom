@@ -132,7 +132,6 @@ _DIGIKEY_RUN_MODELS = (
 # Then poll DigiKey's "Downloading... may take a few minutes" progress modal out before the next
 # format (a fixed gap raced the still-open modal and the 2nd pass no-op'd - live-observed 2026-07-23).
 _DIGIKEY_DOWNLOAD_FORMAT = (
-    # --- element locators (guarded, visibility-aware) ---
     "function fmtBtn(){var cs=document.querySelectorAll('a.btn-download-model,a.dk-btn__primary,button,a');"
     "for(var i=0;i<cs.length;i++){if(vis(cs[i])&&/select download format/i.test(cs[i].textContent||'')){return cs[i];}}return null;}"
     "function exportModal(){var m=document.querySelector('[id$=\"-export-options\"]');return (m&&m.querySelector('label'))?m:null;}"
@@ -140,43 +139,39 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     "var d=(m&&m.querySelector('[id^=\"btn-download-\"]'))||document.querySelector('[id^=\"btn-download-\"]');return (d&&!d.disabled)?d:null;}"
     "function completeModal(){var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
     "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/download complete/i.test(dlg[w].textContent||''))return dlg[w];}return null;}"
-    "function busyModal(){var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
-    "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/downloading/i.test(dlg[w].textContent||''))return dlg[w];}return null;}"
     "function dismissComplete(){var cm=completeModal();if(cm){try{var x=cm.querySelector('.dk-modal__close,[data-modal-dismiss]')||"
     "Array.from(cm.querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
     "if(x)x.click();}catch(e){}}}"
     "function closeModal(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
     "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}}"
-    "function formatRadio(spec){var modal=exportModal();if(!modal)return null;var ls=modal.querySelectorAll('label');"
-    "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
-    "if(spec.re.test(t))return labelInput(ls[j]);}return null;}"
-    "function stepRadio(){var modal=exportModal();if(!modal)return null;var ls=modal.querySelectorAll('label');"
-    "for(var m=0;m<ls.length;m++){var t=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
-    "if(/^step$/i.test(t))return labelInput(ls[m]);}return null;}"
-    # --- spam(done, act, cb): every `iv` ms, if done() -> cb(true); else act() and retry up to `max`
-    # times, then cb(false). Owner 2026-07-23: "every button should be spam clicked until it works." ---
-    "function spam(done,act,cb,max,iv){var n=0;max=max||40;iv=iv||250;(function tick(){var d=false;"
-    "try{d=done();}catch(e){d=false;}if(d){cb(true);return;}try{act();}catch(e){}n++;"
-    "if(n<max){setTimeout(tick,iv);}else{cb(false);}})();}"
-    # --- downloadFormat: SPAM every step until it works: expand provider -> open format list ->
-    # select the 2D format + STEP -> click Download. A "Download complete" dialog is dismissed on every
-    # tick so it can never block the next click. Falls through to the next source if a source lacks it.
     "function downloadFormat(present,spec,done){var pi=0;function tryProvider(){"
     "if(pi>=present.length){report(spec.key,false,'No visible source offers '+spec.name+' for this part; download it manually.');done();return;}"
     "var prov=present[pi++];"
-    "spam(function(){return !!fmtBtn();},function(){dismissComplete();"
-    "var row=document.querySelector('#'+prov[0]+'-media-active');if(row&&!fmtBtn())row.click();},function(ok1){"
-    "if(!ok1){report('provider',false,prov[1]+' did not open; trying the next source.');setTimeout(tryProvider,200);return;}"
-    "spam(function(){return !!exportModal();},function(){dismissComplete();var b=fmtBtn();if(b)b.click();},function(ok2){"
-    "if(!ok2){report('provider',false,prov[1]+' format list did not open; trying the next source.');closeModal();setTimeout(tryProvider,200);return;}"
-    "if(!formatRadio(spec)){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();setTimeout(tryProvider,300);return;}"
-    "spam(function(){var r=formatRadio(spec);return !!(r&&r.checked);},function(){var r=formatRadio(spec);if(r)r.click();var s=stepRadio();if(s&&!s.checked)s.click();},function(ok3){"
-    "if(!ok3){report('provider',false,'Could not select '+spec.name+' on '+prov[1]+'; trying the next source.');closeModal();setTimeout(tryProvider,300);return;}"
+    # FIRST clear any leftover "Download complete" dialog from the previous format - it stays up and,
+    # though the Select Download Format link is still in layout, the overlay intercepts the click, so
+    # the next pass would silently no-op (live-observed 2026-07-23, Altium stuck at 3/5).
+    "waitFor(function(){dismissComplete();return completeModal()?null:true;},function(){"
+    "try{if(!fmtBtn()){var row=document.querySelector('#'+prov[0]+'-media-active');if(row)row.click();}}catch(e){}"
+    # poll for the Select Download Format control (proceeds the instant it renders), then click it
+    "waitFor(fmtBtn,function(btn){"
+    "if(!btn){report('provider',false,prov[1]+' did not open; trying the next source.');setTimeout(tryProvider,150);return;}"
+    "try{btn.click();}catch(e){}"
+    # poll for the export modal (with its format labels) to render
+    "waitFor(exportModal,function(modal){var picked=false,has=false;try{if(modal){var ls=modal.querySelectorAll('label');"
+    "for(var j=0;j<ls.length;j++){var t=(ls[j].getAttribute('data-original')||ls[j].textContent||'').trim();"
+    "if(spec.re.test(t)){has=true;var inp=labelInput(ls[j]);try{(inp||ls[j]).click();picked=true;}catch(e){}break;}}"
+    "if(picked){for(var m=0;m<ls.length;m++){var t2=(ls[m].getAttribute('data-original')||ls[m].textContent||'').trim();"
+    "if(/^step$/i.test(t2)){var si=labelInput(ls[m]);try{(si||ls[m]).click();}catch(e){}break;}}}}}catch(e){}"
+    "if(!has){report('provider',false,prov[1]+' has no '+spec.name+'; trying the next source.');closeModal();setTimeout(tryProvider,200);return;}"
     "report(spec.key,true,'Selected '+spec.name+' plus the 3D model from '+prov[1]+'; downloading.');"
-    "spam(function(){return !!(busyModal()||completeModal());},function(){var dl=dlBtn();if(dl)dl.click();},function(ok4){"
-    "report('download',ok4,ok4?('Downloading '+spec.name+' from '+prov[1]+'.'):('Select a format, then click Download.'));"
-    "waitFor(completeModal,function(cm){dismissComplete();report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,150);},180000,500);"
-    "},48,250);},30,250);},30,300);},40,300);}"
+    # poll for the download button to enable (toggleRadioButton enables it), then click it
+    "waitFor(dlBtn,function(dl){var fired=false;if(dl){try{dl.click();fired=true;}catch(e){}}"
+    "report('download',fired,fired?('Downloading '+spec.name+' from '+prov[1]+'.'):('Select a format, then click Download.'));"
+    # poll (up to 3 min - the vendor generates each export server-side on demand) for the "Download
+    # complete" modal, close it, then move to the next format the INSTANT it appears (no fixed gap).
+    "waitFor(completeModal,function(cm){dismissComplete();"
+    "report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,150);},180000,500);"
+    "},9000,150);},9000,150);},9000,150);},6000,200);}"
     "tryProvider();}"
 )
 
