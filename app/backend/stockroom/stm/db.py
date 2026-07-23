@@ -572,8 +572,20 @@ def run_self_audit(conn: sqlite3.Connection) -> None:
     the intent. Both fields remain nullable columns, queryable, and simply
     absent where CubeMX itself provides no fact - never a fabricated value.
 
-    AF-range checks are explicitly OUT of this gate's scope (Phase 2 extends
-    it once the AF-mux join table exists).
+    Phase 2 (02-02 task 1) extends this SAME gate function (not a second,
+    parallel audit) with two further hard checks once the AF-mux join table
+    exists:
+
+      4. AF-range: every pin_alternate_function.af_index is explicitly
+         verified within 0..15 - redundant with the column's own
+         CHECK(af_index BETWEEN 0 AND 15), but asserted here explicitly
+         rather than relying on SQLite alone to silently reject a bad insert.
+      5. Orphan-join count: meta.af_orphan_join_count must be exactly 0. In
+         the normal build path this can never be non-zero - a real orphan
+         (a declared GPIO version with no matching Modes file) already raises
+         StmGpioModesNotFoundError directly from the per-device build loop,
+         well before this audit ever runs - but the count is re-asserted here
+         defensively rather than only trusting that raise.
     """
     issues: list[str] = []
 
@@ -632,6 +644,34 @@ def run_self_audit(conn: sqlite3.Connection) -> None:
             issues.append(
                 f"incomplete mcu_spec: mcu id {row['mcu_id']} (package "
                 f"{row['package_name']}) missing {', '.join(missing_fields)}"
+            )
+
+    # 4. AF-range (Phase 2, DATA-07): every af_index must be within 0..15.
+    # Only present in the schema after 02-01's pin_alternate_function table
+    # exists; the table exists on every connection this function is called
+    # against post-02-01, so no existence guard is needed.
+    for row in conn.execute(
+        "SELECT id, af_index FROM pin_alternate_function "
+        "WHERE af_index < 0 OR af_index > 15"
+    ):
+        issues.append(
+            f"AF-range violation: pin_alternate_function id {row['id']} has "
+            f"af_index {row['af_index']} outside 0..15"
+        )
+
+    # 5. Orphan-join count (Phase 2, DATA-04/DATA-07): must be exactly 0.
+    orphan_row = conn.execute(
+        "SELECT value FROM meta WHERE key = 'af_orphan_join_count'"
+    ).fetchone()
+    if orphan_row is not None:
+        try:
+            orphan_count = int(orphan_row["value"])
+        except (TypeError, ValueError):
+            orphan_count = -1
+        if orphan_count != 0:
+            issues.append(
+                f"AF orphan-join count is {orphan_count}, expected 0 (some "
+                "GPIO IP version failed to resolve to a Modes file)"
             )
 
     if issues:
@@ -920,6 +960,17 @@ class StmIndex:
             ("device_xml_count", str(availability.device_xml_count)),
             ("family_count", str(availability.family_count)),
             ("power_pad_flags", ",".join(power_pad_flags)),
+            # Phase 2 (02-02 task 1): af_schema_rev stamped the same way as
+            # classifier_rev/geometry_rev, checked in the SAME StmIndex.load
+            # stamp gate. af_orphan_join_count is always 0 in the reachable
+            # build path (a real orphan already raises StmGpioModesNotFoundError
+            # directly, well before this point) - stamped for the self-audit's
+            # explicit, defense-in-depth re-assertion. af_legacy_afio_device_count
+            # is the F1-shaped device tally, logged above as an accounted-for
+            # zero, never an orphan.
+            ("af_schema_rev", str(AF_SCHEMA_REV)),
+            ("af_orphan_join_count", str(af_orphan_join_count)),
+            ("af_legacy_afio_device_count", str(legacy_afio_device_count)),
         ):
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
 
@@ -954,10 +1005,15 @@ class StmIndex:
         try:
             classifier_rev = int(meta.get("classifier_rev", "-1"))
             geometry_rev = int(meta.get("geometry_rev", "-1"))
+            af_schema_rev = int(meta.get("af_schema_rev", "-1"))
         except (TypeError, ValueError):
             conn.close()
             return None
-        if classifier_rev != CLASSIFIER_REV or geometry_rev != geometry_mod.GEOMETRY_REV:
+        if (
+            classifier_rev != CLASSIFIER_REV
+            or geometry_rev != geometry_mod.GEOMETRY_REV
+            or af_schema_rev != AF_SCHEMA_REV
+        ):
             conn.close()
             return None
         return cls(conn)
