@@ -62,9 +62,9 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
 
 function mockCadSource(needs: string[]) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
-    url: "https://app.ultralibrarian.com/search?queryText=BQ24074",
+    url: "https://www.digikey.com/en/products/result?keywords=BQ24074",
     mpn: "BQ24074",
-    vendor: "UltraLibrarian",
+    vendor: "DigiKey",
     needs,
   } as never);
 }
@@ -125,6 +125,48 @@ describe("CompletePartModal - guided capture", () => {
     await waitFor(() => {
       expect(within(track("KiCad")).getByText("Received")).toBeInTheDocument();
     });
+  });
+
+  it("names DigiKey in the guided-capture subline, never a placeholder vendor", async () => {
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+    await screen.findByText("Files");
+    expect(screen.getByText(/from DigiKey\.?$/)).toBeInTheDocument();
+    expect(screen.queryByText(/the vendor/)).toBeNull();
+  });
+
+  it("makes Get Files the accent primary and Browse For Files the quiet secondary", async () => {
+    mockCadSource(["kicad_symbol"]);
+    render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+    const getFiles = await screen.findByRole("button", { name: "Get Files" });
+    const browse = screen.getByRole("button", { name: "Browse For Files" });
+    // the accent variant carries the solid accent background; the quiet fallback does not
+    expect(getFiles.className).toContain("bg-acc");
+    expect(browse.className).not.toContain("bg-acc");
+  });
+
+  it("never shows an asset word as both Added and Needed: DETAILS is metadata-only when FILES owns the assets", async () => {
+    // A part that already HAS a KiCad symbol but needs the Altium symbol + footprint. Before the
+    // fix, Symbol read "Added" in DETAILS and "Needed" in FILES at once.
+    const withSymbol = { ...DETAIL, symbol: { name: "BQ24074" } } as unknown as PartDetail;
+    mockCadSource(["altium_symbol", "altium_footprint"]);
+    render(<CompletePartModal detail={withSymbol} hasModel={true} onClose={() => {}} />, { wrapper });
+    await screen.findByText("Files");
+
+    // FILES owns the whole asset story: Symbol + Footprint live only under the Altium track, Needed.
+    expect(within(track("Altium")).getByText("Symbol")).toBeInTheDocument();
+    expect(within(track("Altium")).getByText("Footprint")).toBeInTheDocument();
+    expect(within(track("Altium")).getAllByText("Needed")).toHaveLength(2);
+
+    // DETAILS is metadata-only: no Symbol, Footprint, or 3D Model row survives when FILES owns them.
+    const details = screen.getByText("Details").closest("section") as HTMLElement;
+    expect(within(details).queryByText("Symbol")).toBeNull();
+    expect(within(details).queryByText("Footprint")).toBeNull();
+    expect(within(details).queryByText("3D Model")).toBeNull();
+
+    // So no asset word carries two conflicting statuses: Symbol appears exactly once, and not "Added".
+    expect(screen.getAllByText("Symbol")).toHaveLength(1);
+    expect(screen.getAllByText("Footprint")).toHaveLength(1);
   });
 
   it("hands the capture to the background and closes on Keep Working", async () => {

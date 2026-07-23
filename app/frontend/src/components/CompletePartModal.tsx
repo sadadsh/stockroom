@@ -267,7 +267,10 @@ export function CompletePartModal({
         { key: "mpn", label: "Part Number", kind: "text" as const, present: !!detail.mpn },
         { key: "manufacturer", label: "Manufacturer", kind: "text" as const, present: !!detail.manufacturer },
         { key: "description", label: "Value / Description", kind: "text" as const, present: !!detail.description },
-      ].filter((r) => !(showCad && r.key === "model")),
+        // When the FILES section is shown it owns the whole asset story (symbol, footprint,
+        // and 3D model), so drop those from DETAILS to avoid the same asset word reading
+        // "Added" here and "Needed" in FILES at once. DETAILS then stays metadata-only.
+      ].filter((r) => !(showCad && (r.key === "model" || r.key === "symbol" || r.key === "footprint"))),
     [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet, showCad],
   );
   const doneCount =
@@ -357,7 +360,7 @@ export function CompletePartModal({
                           : needsSubline(
                               kicadRows.length > 0 || sharedRows.length > 0,
                               altiumRows.length > 0,
-                              cadSource.data?.vendor ?? "the vendor",
+                              cadSource.data?.vendor ?? "DigiKey",
                             )}
                       </div>
                     </div>
