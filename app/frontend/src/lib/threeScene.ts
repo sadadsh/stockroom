@@ -81,15 +81,22 @@ export function mountModelScene(
       // A brushed-metal surface: reflective enough that the studio environment paints bright
       // highlights + dark shadow zones across it (high internal contrast = readable form on ANY
       // tile background), yet still monochrome so the part reads by shape, not by GLB colour.
-      // A refined matte surface (owner: the old render read as a cartoon). The near-black edge
-      // outlines that gave it that toon / technical-drawing look are GONE - the form now reads
-      // purely from the image-based lighting + the contact shadow. Rough + low metalness so it
-      // reads as a real matte component, not a shiny plastic toy.
+      // A refined matte surface, lit by the studio environment. Rough + low metalness so it reads
+      // as a real matte component, not a shiny plastic toy.
       const neutral = new THREE.MeshStandardMaterial({
         color: 0xc2c4ca,
         roughness: 0.52,
         metalness: 0.22,
         envMapIntensity: 1.1,
+      });
+      // SUBTLE feature lines so the part is legible even at a flat angle (a bare matte grey blob is
+      // impossible to read). NOT the old cartoon: a thin, soft, dark-grey line at low opacity on
+      // only the sharper creases (>~34 deg), so the silhouette + major features read without the
+      // comic "outline every edge in black" look.
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: 0x26272c,
+        transparent: true,
+        opacity: 0.42,
       });
       gltf.scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
@@ -100,6 +107,9 @@ export function mountModelScene(
         mesh.material = neutral;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        if (mesh.geometry) {
+          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 34), edgeMat));
+        }
       });
       // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
       // and the body points up, and the auto-spin turns it about that vertical axis.
