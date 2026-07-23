@@ -227,6 +227,22 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("timed-out");
   });
 
+  it("projects the terminal done state when the host forwards a done signal (DONE-02)", async () => {
+    mockHost("tok");
+    mockCadSourceUrl();
+    const { result } = render(["kicad_symbol"]);
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe("done");
+  });
+
   it("accepts a legacy bare-path forward and runs the KiCad pipeline", async () => {
     mockHost(undefined); // an old host that echoes no token and forwards a bare path
     mockCadSourceUrl();
