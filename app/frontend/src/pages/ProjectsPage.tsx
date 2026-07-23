@@ -464,7 +464,7 @@ function ProjectDetailView({
           </div>
         </div>
         <Button
-          variant="danger"
+          variant="ghost-danger"
           small
           onClick={onRemove}
           disabled={removeBusy}

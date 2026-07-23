@@ -28,7 +28,7 @@ export function Card({
   );
 }
 
-type ButtonVariant = "default" | "accent" | "danger" | "soft";
+type ButtonVariant = "default" | "accent" | "danger" | "ghost-danger" | "soft";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -61,6 +61,16 @@ export function Button({
       "border-transparent bg-acc text-acc-on shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
     danger:
       "border-transparent bg-err text-white shadow-card hover:brightness-105 hover:-translate-y-px hover:shadow-raise font-semibold",
+    // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
+    // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
+    // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
+    // token is mixed against transparent so the tint adapts to both themes; text stays full err
+    // (>=3:1 both themes). 6px control radius is inherited from `base`.
+    "ghost-danger":
+      "border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
+      "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err font-semibold " +
+      "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
+      "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)] hover:-translate-y-px hover:shadow-card",
     // A raised-but-neutral action (north-star .addbtn): a subtle lifted tile, not a heavy
     // solid accent bar. Reads clean on both themes (a light overlay on the panel).
     soft:
