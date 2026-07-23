@@ -40,12 +40,12 @@ _stm_build_lock = threading.Lock()
 def _configured_source(ctx) -> str:
     """The configured CubeMX source path: MachineConfig.stm_cubemx_source when set (that field
     lands in 03-03 - getattr keeps this working before it exists), else stm.source's own
-    env-var/candidate-path discovery."""
+    env-var/candidate-path discovery. Always non-empty: on a bare machine this names the
+    EXPECTED location (source_present says whether it exists) instead of an empty string."""
     configured = (getattr(ctx.config, "stm_cubemx_source", "") or "").strip()
     if configured:
         return configured
-    found = stm_source.default_cubemx_source()
-    return str(found) if found else ""
+    return str(stm_source.expected_cubemx_source())
 
 
 def _is_building(request: Request) -> bool:

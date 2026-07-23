@@ -77,6 +77,16 @@ def default_cubemx_source() -> Path | None:
     return None
 
 
+def expected_cubemx_source() -> Path:
+    """The path the status surface should NAME: the discovered source when one exists,
+    else the primary all-families candidate (where a fresh CubeMX install lands), so
+    status can always report a concrete expected location on a bare machine and
+    source_present carries the honest "it is not there". Build-time callers keep using
+    default_cubemx_source(), whose None still fails loudly."""
+    found = default_cubemx_source()
+    return found if found is not None else Path(_WINDOWS_CANDIDATES[0])
+
+
 def default_index_path() -> Path:
     """Where the derived STM index lives (per-machine state, never committed).
 
