@@ -323,33 +323,22 @@ export function DetailPanel({
             </div>
           </div>
 
-          <ReadinessBlock kicad={kicad} altium={altium} altiumNeeds={altiumNeeds} />
-
-          {canComplete && needsList.length > 0 ? (
-            <button
-              data-dev-id="detail.complete-part"
-              type="button"
-              onClick={() => setCompleteOpen(true)}
-              className="group flex w-full items-start gap-3 rounded-card border border-warn/40 bg-warn/[0.08] px-3.5 py-3 text-left transition hover:border-warn/70 hover:bg-warn/[0.12]"
-            >
-              <WarnIcon className="mt-0.5 h-4 w-4 flex-none text-warn" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-t1">
-                  <Text id="detail.complete-part">Complete Part</Text>
-                </span>
-                {/* plain-English: what completing does + exactly what is missing, so the action
-                    explains itself instead of leaving the user to guess what "complete" means.
-                    (User-facing prose avoids the lowercase letter y, per owner rule.) */}
-                <span className="mt-0.5 block text-2xs leading-snug text-t2">
-                  Add {needsList.join(", ")} to make this part usable.
-                </span>
-              </span>
-              <Icon
-                id="detail.chevron-right"
-                className="mt-0.5 h-4 w-4 flex-none text-t3 transition group-hover:translate-x-0.5 group-hover:text-t1"
-              />
-            </button>
-          ) : null}
+          <ReadinessBlock
+            kicad={kicad}
+            altium={altium}
+            altiumNeeds={altiumNeeds}
+            canComplete={canComplete}
+            needsList={needsList}
+            onComplete={() => setCompleteOpen(true)}
+          />
+          {/* filing (category) moved off the footer into the part pane, as one more labelled,
+              editable field that matches the rest - and it fills the pane so there is less dead space. */}
+          <Filing
+            category={detail.category}
+            categories={categories}
+            onMoveCategory={onMoveCategory}
+            busy={busy}
+          />
           </div>
 
           {/* COLUMN 2 - the specifications, the technical heart, in one clean single column. */}
@@ -423,16 +412,9 @@ export function DetailPanel({
           <PartTimeline key={detail.id} partId={detail.id} />
         </WorkbenchPanel>
 
-      {/* footer: filing (category) is organization, not identity, so it lives here, quiet; a
-          destructive action never earns prime real estate, so Delete is the quiet text link
-          opposite it. */}
-      <footer data-dev-id="detail.footer" className="mt-3 flex flex-none items-center justify-between border-t border-line pt-3">
-        <Filing
-          category={detail.category}
-          categories={categories}
-          onMoveCategory={onMoveCategory}
-          busy={busy}
-        />
+      {/* footer: filing moved into the part pane; a destructive action never earns prime real
+          estate, so Delete stays as the quiet text link at the far edge. */}
+      <footer data-dev-id="detail.footer" className="mt-3 flex flex-none items-center justify-end border-t border-line pt-2.5">
         {onDelete ? (
           <button
             data-dev-id="detail.delete"
@@ -695,11 +677,18 @@ function ReadinessBlock({
   kicad,
   altium,
   altiumNeeds,
+  canComplete,
+  needsList,
+  onComplete,
 }: {
   kicad: AssetReadiness;
   altium: AssetReadiness;
   altiumNeeds: string[];
+  canComplete: boolean;
+  needsList: string[];
+  onComplete: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   // KiCad needs come from the record's own refs; Altium needs prefer the capture query
   // (the record carries no Altium refs), falling back to its own blocking assets.
   const kicadNeeds = kicad.missing.filter((m) => m !== "3D Model");
@@ -707,11 +696,62 @@ function ReadinessBlock({
     altiumNeeds.length > 0
       ? altiumNeeds.map((n) => n.replace(/^Altium /, ""))
       : altium.missing.filter((m) => m !== "3D Model");
+  const allReady = kicad.ready && altium.ready;
+  // Readiness is tucked behind a button (owner's call): a compact status chip that opens a mini
+  // popover carrying the KiCad + Altium detail and the Complete action, so the pane stays clean.
   return (
-    <DetailSection title="Readiness" data-dev-id="detail.readiness">
-      <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
-      <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
-    </DetailSection>
+    <div className="relative" data-dev-id="detail.readiness">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-field px-3 py-2 text-left transition hover:bg-raise2"
+      >
+        <span className="flex items-center gap-2">
+          {allReady ? (
+            <Icon id="detail.ready-check" className="h-3.5 w-3.5 flex-none" />
+          ) : (
+            <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
+          )}
+          <span className="text-xs font-semibold text-t1">
+            {allReady ? "CAD complete" : "CAD incomplete"}
+          </span>
+        </span>
+        <Icon
+          id="detail.chevron-right"
+          className={
+            "h-3.5 w-3.5 flex-none text-t3 transition-transform " + (open ? "rotate-90" : "")
+          }
+        />
+      </button>
+      {open ? (
+        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
+          <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
+          <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
+          {canComplete && needsList.length > 0 ? (
+            <button
+              data-dev-id="detail.complete-part"
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onComplete();
+              }}
+              className="group mt-3 flex w-full items-start gap-2.5 rounded-control border border-warn/40 bg-warn/[0.08] px-3 py-2.5 text-left transition hover:border-warn/70 hover:bg-warn/[0.12]"
+            >
+              <WarnIcon className="mt-0.5 h-4 w-4 flex-none text-warn" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-t1">
+                  <Text id="detail.complete-part">Complete Part</Text>
+                </span>
+                <span className="mt-0.5 block text-2xs leading-snug text-t2">
+                  Add {needsList.join(", ")} to make this part usable.
+                </span>
+              </span>
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -853,38 +893,36 @@ function Filing({
   onMoveCategory?: (category: string) => void;
   busy?: boolean;
 }) {
-  if (!onMoveCategory || !categories || categories.length === 0) {
-    return (
-      <div data-dev-id="detail.filing" className="text-xs text-t3">
-        <Text id="detail.filing">Filing</Text> <span className="ml-1 text-t2">{category}</span>
-      </div>
-    );
-  }
+  // Filing is now a labelled section field like every other, and editable (a category dropdown)
+  // when moves are allowed - so it matches the rest instead of sitting oddly in the footer.
   return (
-    <label data-dev-id="detail.filing" className="flex items-center gap-1.5 text-xs text-t3">
-      <Text id="detail.filing">Filing</Text>
-      <span className="relative inline-block">
-        <select
-          aria-label="Category"
-          value={category}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value !== category) onMoveCategory(e.target.value);
-          }}
-          className="appearance-none rounded-control border border-line bg-transparent py-1 pl-2 pr-6 text-xs font-medium text-t1 outline-none hover:border-line2 focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        {/* Decorative select caret. Its source svg was aria-hidden; per the registry note (D-03)
-            dropping aria-hidden is acceptable for a bespoke <Icon> without a title, so no title is
-            passed here. */}
-        <Icon id="detail.select-chevron" className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-t3" />
-      </span>
-    </label>
+    <DetailSection title={<Text id="detail.filing">Filing</Text>} data-dev-id="detail.filing">
+      {onMoveCategory && categories && categories.length > 0 ? (
+        <div className="relative">
+          <select
+            aria-label="Category"
+            value={category}
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.value !== category) onMoveCategory(e.target.value);
+            }}
+            className="w-full appearance-none rounded-control border border-line bg-field py-1.5 pl-2.5 pr-7 text-xs font-medium text-t1 outline-none hover:border-line2 focus:border-acc disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <Icon
+            id="detail.select-chevron"
+            className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-t3"
+          />
+        </div>
+      ) : (
+        <span className="text-xs text-t2">{category}</span>
+      )}
+    </DetailSection>
   );
 }
 
@@ -968,10 +1006,8 @@ function AssetTile({
       <span className="text-2xs font-semibold text-t1">{name}</span>
       <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
         {present ? (
-          <>
-            <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden="true" />
-            {onOpen ? "View" : "Linked"}
-          </>
+          // no green "present" dot (owner's call - the render itself already reads as present)
+          <>{onOpen ? "View" : "Linked"}</>
         ) : onAttach ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
