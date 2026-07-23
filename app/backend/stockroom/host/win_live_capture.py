@@ -594,8 +594,12 @@ def _drive_production(webview, base: str, captured: list, result: dict) -> None:
         "https://www.digikey.com/en/products/result?keywords=" + mpn
     )
     result["url"] = url
-    needs = ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"]
-    formats = ["kicad", "altium"]
+    formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
+    needs_map = {
+        "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
+        "altium": ["altium_symbol", "altium_footprint"],
+    }
+    needs = [n for f in formats for n in needs_map.get(f, [])]
     cad = webview.create_window("stockroom-driver", url=url, width=1340, height=980)
 
     def on_loaded() -> None:

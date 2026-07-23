@@ -158,7 +158,14 @@ _DIGIKEY_DOWNLOAD_FORMAT = (
     "var dlg=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
     "for(var w=0;w<dlg.length;w++){if(vis(dlg[w])&&/downloading/i.test(dlg[w].textContent||'')){busy=true;break;}}"
     "}catch(e){}waited+=1200;if(busy&&waited<90000){setTimeout(waitDl,1200);}"
-    "else{report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,2500);}}"
+    # The download ends on a "Download complete" modal that stays up covering the next format's
+    # controls; CLOSE it (its X / Close button) before the next format, else the 2nd pass no-ops.
+    "else{try{var cm=document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal');"
+    "for(var c=0;c<cm.length;c++){if(vis(cm[c])&&/download complete/i.test(cm[c].textContent||'')){"
+    "var cb=cm[c].querySelector('.dk-modal__close,[data-modal-dismiss]')||"
+    "Array.from(cm[c].querySelectorAll('button,a')).find(function(e){return /^\\s*close\\s*$/i.test((e.textContent||'').trim());});"
+    "if(cb){try{cb.click();}catch(e){}}}}}catch(e){}"
+    "report('progress',true,'Finished the '+spec.name+' download.');setTimeout(done,2500);}}"
     "setTimeout(waitDl,2500);"
     "},900);},1600);},2400);}tryProvider();}"
 )
