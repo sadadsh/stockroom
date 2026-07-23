@@ -163,8 +163,15 @@ _DIGIKEY_REACTOR = (
     "iv=setInterval(function(){if(senseWall())settle(onFail,'wall');else if(senseError())settle(onFail,'error');},1500);"
     "wd=setTimeout(function(){settle(onFail,'timeout');},GEN_WD);}"
     "function refreshes(){try{return parseInt(sessionStorage.getItem('__SR_REFRESH__')||'0',10)||0;}catch(e){return 0;}}"
+    # Recovery navigates BACK THROUGH THE PRODUCT PAGE (the proven path: product -> models link ->
+    # a client-side navigation that renders fully) rather than reloading in place: a reloaded
+    # models page never renders any provider format control again (live 2026-07-23 - rows visible,
+    # sections dead, row clicks don't revive it). gotoModels stores the product URL on the way out;
+    # plain reload remains only the no-stored-URL fallback.
     "function refresh(){try{sessionStorage.setItem('__SR_REFRESH__',''+(refreshes()+1));}catch(e){}"
-    "trace('refresh',refreshes());location.reload();}"
+    "trace('refresh',refreshes());"
+    "var p=null;try{p=sessionStorage.getItem('__SR_PRODUCT__');}catch(e){}"
+    "if(p&&location.href!==p){location.href=p;}else{location.reload();}}"
     "function recover(spec,done){if(senseWall()){"
     "yourTurn('Please finish the quick verification in this window; I will continue right after.');"
     "until(function(){return !senseWall();},function(){clearTurn();refresh();},170000);return;}"
@@ -184,6 +191,7 @@ _DIGIKEY_RUN = (
     "return (a&&a.getAttribute('href'))?a:null;},function(a){"
     "if(!a){report('cad',false,'Open the EDA / CAD Models section on this page to download the files.');return;}"
     "report('cad',true,'Opening the EDA / CAD Models page.');"
+    "try{sessionStorage.setItem('__SR_PRODUCT__',location.href);}catch(e){}"
     "var h=a.getAttribute('href');location.href=(h.charAt(0)==='/')?(location.origin+h):h;},15000);}"
     "function providers(){var present=[];for(var i=0;i<PROVS.length;i++){var k=PROVS[i][0];"
     "if(vis(document.querySelector('#'+k+'-media-active')))present.push(PROVS[i]);}return present.length?present:null;}"
