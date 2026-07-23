@@ -1,0 +1,31 @@
+# Opt-in local guardrails: `pre-commit install`. Everything here runs on the files you TOUCH, not
+# the whole tree, so new code stays clean without a big-bang reformat of the repo. A deliberate
+# repo-wide format (`pre-commit run --all-files`) is a separate, intentional task.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'          # trailing spaces are a hard break in Markdown
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+        exclude: '^app/frontend/tsconfig.*\.json$'   # tsconfig allows comments (JSONC)
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Python: import order + real-issue lint (unused imports, undefined names) and the formatter.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Frontend: format ts/tsx/css/md/json consistently.
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: ^app/frontend/src/.*\.(ts|tsx|css)$
