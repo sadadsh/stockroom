@@ -201,7 +201,13 @@ def _digikey_driver_js(formats: list[str]) -> str:
     names = [{"kicad": "KiCad", "altium": "Altium"}[f] for f in fmts]
     start_msg = "Getting the " + (" and ".join(names) or "CAD") + " files from DigiKey."
     body = (
-        _DIGIKEY_HELPERS
+        # Re-entry guard: the host re-injects this driver on EVERY `loaded`, and the models page fires
+        # `loaded` more than once (its ?tab= query + SPA re-renders), so without this a second injection
+        # would spawn a CONCURRENT driver that opens a modal on top of the first's - the two race and
+        # stack modals (live-observed 2026-07-23, Altium stuck at 3/5). One driver per document; a real
+        # navigation (product -> /models/) is a fresh document, so the flag resets and it runs again.
+        "if(window.__SR_DK_RUNNING__)return;window.__SR_DK_RUNNING__=true;"
+        + _DIGIKEY_HELPERS
         + "var PROVS=" + json.dumps(_DIGIKEY_PROVIDER_KEYS) + ";"
         + "var SPECS=" + _digikey_format_specs_js(fmts) + ";"
         + "report('start',true," + json.dumps(start_msg) + ");"
