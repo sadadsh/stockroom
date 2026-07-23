@@ -17,19 +17,39 @@ def test_snapeda_driver_is_built_for_snapeda():
     assert "__STOCKROOM_OVERLAY__" in js
 
 
-def test_digikey_driver_guides_to_the_cad_models_section():
+def test_digikey_driver_dismisses_consent_finds_cad_and_opens_a_provider_control():
+    # The adaptive state machine: dismiss consent -> keep findCad (custom-scroll container +
+    # div-text match, live-validated) -> detect the aggregated providers -> open a download control.
     js = build_driver_js("digikey", ["kicad", "altium"])
-    assert "scrollIntoView" in js  # brings DigiKey's CAD / EDA models section into view
-    assert "__STOCKROOM_OVERLAY__" in js  # reports guidance into the overlay
-    assert js.count("try") >= 1 and js.count("catch") >= 1  # guarded, never throws
+    low = js.lower()
+    # step 1: a cookie/consent banner is dismissed first
+    assert "onetrust" in low or "accept" in low or "consent" in low
+    # step 2: findCad KEPT verbatim in behavior (custom scroll container + div-text match)
+    assert "scrollintoview" in low and "textcontent" in low
+    # step 3: detects the three providers DigiKey aggregates in its EDA / CAD Models section
+    assert ("ultra" in low or "librarian" in low) and "snapeda" in low and "samacsys" in low
+    # step 4: opens the Download / Add To Library control (no user click)
+    assert "download" in low and "add to library" in low
+    # reports every step into the overlay bridge, guarded, one self-contained IIFE
+    assert "__STOCKROOM_OVERLAY__" in js
+    assert js.count("try") >= 4 and js.count("catch") >= 4
+    assert js.count("report(") >= 4
     stripped = js.strip()
-    assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")  # a self-contained IIFE
-    assert "cad" in js.lower()  # targets the CAD download section, not fragile format toggles
+    assert stripped.startswith("(") and stripped.rstrip(";").endswith(")()")
 
 
-def test_digikey_driver_is_resilient_via_a_heading_text_fallback():
-    # DigiKey's markup changes, so the driver also finds the section by a CAD/symbol/EDA heading -
-    # it does not depend only on brittle id selectors (the owner did not want to tune selectors).
+def test_digikey_driver_prefers_ultra_librarian_before_snapeda_and_samacsys():
+    # Ultra Librarian is the most-complete default, so it is detected/preferred first, then
+    # SnapEDA, then SamacSys - the preference order is encoded in the generated machine.
+    low = build_driver_js("digikey", ["kicad"]).lower()
+    ul = low.find("ultra librarian")
+    if ul < 0:
+        ul = low.find("librarian")
+    assert 0 <= ul < low.find("snapeda") < low.find("samacsys")
+
+
+def test_digikey_driver_is_resilient_via_a_text_fallback():
+    # DigiKey's markup changes, so the driver also matches by textContent, not brittle ids only.
     js = build_driver_js("digikey", ["kicad"])
     assert "textContent" in js or "innerText" in js
 
