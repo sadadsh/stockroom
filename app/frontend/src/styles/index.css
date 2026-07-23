@@ -2,140 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
-/* The mockup's near-black canvas with two soft radial highlights (library-v2.html
-   .scroll). Kept as plain CSS because it is a fixed page backdrop, not a token. */
+/* Altium Designer restyle (2026-07-23). The palette is grounded on Altium's own
+   "Altium Dark Gray" / "Altium Light Gray" themes, color-sampled from Altium's
+   official documentation screenshots. Altium is a MEDIUM charcoal that separates
+   panes with visible thin borders, not a near-black that separates with shadow, so
+   the surfaces sit close in value and --c-line does the structural work. */
 @layer base {
   /* Dark is the default (:root); [data-theme="light"] overrides the same names.
-     The dark values are the mockup palette, so the dark app is byte-identical to
-     before the variable refactor. lib/theme.tsx flips the attribute. */
+     lib/theme.tsx flips the attribute; every token flows to tailwind via CSS vars. */
   :root {
-    /* A readable elevation ladder (design principle: structure reads through depth,
-       not borders). Four distinct steps on a cool near-black so the nav, the list, and
-       the detail cards separate into real layers instead of one flat grey field.
-       canvas (deepest) < rail/panel < raise (card) < raise2 (hover/selected). */
-    --c-canvas: #242427;
-    --c-rail: rgba(255, 255, 255, 0.032);
-    --c-surface: rgba(255, 255, 255, 0.016);
-    --c-raise: rgba(255, 255, 255, 0.07);
-    --c-raise2: rgba(255, 255, 255, 0.135);
-    --c-field: rgba(0, 0, 0, 0.28);
-    --c-line: rgba(255, 255, 255, 0.07);
-    --c-line2: rgba(255, 255, 255, 0.13);
-    --c-popover: #33333a;
-    --c-t1: #f4f4f4;
-    --c-t2: rgba(244, 244, 244, 0.66);
-    --c-t3: rgba(244, 244, 244, 0.4);
-    --c-ok: #5fd39a;
-    --c-warn: #e0b354;
-    --c-err: #e8756c;
-    /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
-       Near-white on dark, on the primary action, focus, active nav, selected row,
-       section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
-    --c-acc: #f4f4f5;
-    --c-acc-on: #141414;
-    --c-acc-strong: #ffffff;
-    --c-acc-soft: rgba(255, 255, 255, 0.11);
-    /* Corner radii as variables so dev mode can nudge them live (theme-agnostic: the same on
-       both themes). tailwind.config.js maps rounded-card / rounded-control onto these. */
-    --r-card: 14px;
-    --r-control: 8px;
-    /* The type scale as variables so dev mode can nudge each size live (theme-agnostic).
-       tailwind.config.js maps text-2xs .. text-title onto these; the line-heights stay bundled
-       in tailwind (the type scale bundles them). `body` uses --fs-base for its resting size. */
-    --fs-2xs: 10.5px;
-    --fs-xs: 11.5px;
-    --fs-sm: 12.5px;
-    --fs-base: 13px;
-    --fs-lg: 15px;
-    --fs-xl: 16px;
-    --fs-title: 22px;
-    /* One weight for the primary UI icon set (nav + action line icons). The .ico utility routes
-       those svgs' stroke-width through it so dev mode can nudge the whole set at once (theme-
-       agnostic). Bespoke icons (Upload/Close/Search/...) and the art glyphs keep their own
-       crafted weights and are tuned per-icon in the icon editor, not here. */
-    --icon-stroke: 1.9;
-    /* the soft studio glow under a lit hero specimen */
-    --c-hero-glow: rgba(255, 255, 255, 0.09);
-    /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
-       hairline top highlight (the inset line), so it reads as lifted off the
-       canvas instead of painted on it. Three steps: a resting card, a lifted/hover
-       card, and the pop layer for menus + the Add A Part window. */
-    --edge-hi: rgba(255, 255, 255, 0.10);
-    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.32),
-      0 3px 10px rgba(0, 0, 0, 0.22);
-    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.5),
-      0 16px 38px rgba(0, 0, 0, 0.44);
-    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4),
-      0 28px 64px rgba(0, 0, 0, 0.62);
-    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.16);
+    /* Altium Dark Gray chrome ladder (sampled): recessed field #2f2f2f < substrate
+       #2d2d2d < panel/tree #3b3b3b < panel body #3e4041 < toolbar/status #404040 <
+       command bar/buttons #4e4e4e. The steps are close on purpose; borders separate. */
+    --c-canvas: #2b2b2c;
+    --c-rail: #333335;
+    --c-surface: #2f2f30;
+    --c-raise: #3a3b3d;
+    --c-raise2: #47484b;
+    --c-field: #2c2c2e;
+    /* the defining Altium move: a VISIBLE thin cool border, lighter than the panel,
+       so the workspace reads as contiguous docked panes rather than floating cards. */
+    --c-line: #4b4c4f;
+    --c-line2: #57585c;
+    --c-popover: #37383a;
+    --c-t1: #d7d8da;
+    --c-t2: #9a9c9f;
+    --c-t3: #6d6f73;
+    --c-ok: #58a97f;
+    --c-warn: #cf9a44;
+    --c-err: #d0564e;
+    /* Altium's real accent is a MUTED steel-blue used only for selection / active
+       state (sampled from the highlighted row + active panel). Not a vivid web blue,
+       not teal, not green. `acc-strong` is a brighter step; `acc-soft` its row wash. */
+    --c-acc: #6183a1;
+    --c-acc-on: #f4f6f8;
+    --c-acc-strong: #7aa3c8;
+    --c-acc-soft: rgba(97, 131, 161, 0.22);
+    /* Squarer corners (Altium is nearly rectangular). tailwind maps rounded-card /
+       rounded-control onto these; dev mode can still nudge them live. */
+    --r-card: 3px;
+    --r-control: 2px;
+    /* Denser type scale (Altium runs ~12px base). Only the px size is a token; the
+       line-heights live in tailwind. `body` uses --fs-base for its resting size. */
+    --fs-2xs: 10px;
+    --fs-xs: 11px;
+    --fs-sm: 11.5px;
+    --fs-base: 12px;
+    --fs-lg: 13.5px;
+    --fs-xl: 15px;
+    --fs-title: 18px;
+    /* the primary UI icon weight (nav + action line icons). Altium's glyphs are light. */
+    --icon-stroke: 1.8;
+    /* a faint studio glow under a lit hero specimen (kept subtle for the flat look) */
+    --c-hero-glow: rgba(255, 255, 255, 0.05);
+    /* Near-flat elevation: borders carry the structure, so cards get almost no shadow.
+       Only genuinely floating chrome (menus, modals, floating panels) casts a real
+       drop shadow. The hairline top highlight is nearly gone (Altium is not glossy). */
+    --edge-hi: rgba(255, 255, 255, 0.045);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28);
+    --shadow-raise: 0 3px 10px rgba(0, 0, 0, 0.42);
+    --shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --shadow-file: 0 2px 8px rgba(0, 0, 0, 0.28);
     /* the springy easing used for tactile press + hover lift across controls */
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    /* page backdrop + chrome that lives outside the token classes: two soft neutral
-       highlights over a near-black base so the window reads lit, not flat. */
-    --body-bg: #202023;
-    --root-bg: #242427;
-    --sb-thumb: rgba(255, 255, 255, 0.13);
-    --sb-thumb-hover: rgba(255, 255, 255, 0.22);
-    --sb-track: rgba(255, 255, 255, 0.14);
+    /* page backdrop + chrome that lives outside the token classes: flat graphite. */
+    --body-bg: #262627;
+    --root-bg: #2b2b2c;
+    --sb-thumb: rgba(255, 255, 255, 0.16);
+    --sb-thumb-hover: rgba(255, 255, 255, 0.26);
+    --sb-track: rgba(255, 255, 255, 0.05);
     /* subtle row hover + the sticky category header band + the ring track */
-    --c-hover: rgba(255, 255, 255, 0.03);
-    --c-sticky: rgba(36, 36, 39, 0.8);
-    --c-ring-track: #26272c;
+    --c-hover: rgba(255, 255, 255, 0.045);
+    --c-sticky: rgba(43, 43, 44, 0.86);
+    --c-ring-track: #34353a;
     /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
        darker inset than the card so the 3D model / symbol / footprint read as lit
        objects in a well, not painted on the surface. Theme-aware. */
-    --c-stage: rgba(0, 0, 0, 0.26);
-    /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
-       pre-refactor dark value, so the dark app stays byte-identical. */
-    --c-icon-line: #8f8f8f;
-    --c-icon-fill: #858585;
-    --c-icon-cube: #8d8d8d;
-    --c-icon-edge: #4f4f4f;
-    --c-icon-faint: #cbcbcb;
+    --c-stage: rgba(0, 0, 0, 0.3);
+    /* the file-card line art (Symbol/Footprint/3D): neutral greys tuned to the
+       medium-charcoal surfaces so they read as etched, not glowing. */
+    --c-icon-line: #9a9a9a;
+    --c-icon-fill: #8f8f8f;
+    --c-icon-cube: #9a9a9a;
+    --c-icon-edge: #565656;
+    --c-icon-faint: #c2c2c2;
   }
 
   :root[data-theme="light"] {
-    --c-canvas: #e9eaee;
-    --c-rail: rgba(255, 255, 255, 0.5);
-    --c-surface: rgba(255, 255, 255, 0.66);
-    --c-raise: #ffffff;
-    --c-raise2: rgba(0, 0, 0, 0.08);
-    --c-field: rgba(0, 0, 0, 0.05);
-    --c-line: rgba(0, 0, 0, 0.1);
-    --c-line2: rgba(0, 0, 0, 0.16);
+    /* Altium Light Gray: light-steel chrome, dark cool-grey text, SAME steel-blue
+       accent (deepened for contrast on the light surfaces). */
+    --c-canvas: #d7d8db;
+    --c-rail: #e6e7ea;
+    --c-surface: #dcdde0;
+    --c-raise: #eeeeef;
+    --c-raise2: #e0e1e4;
+    --c-field: #ffffff;
+    --c-line: #bcbdc1;
+    --c-line2: #a8a9ad;
     --c-popover: #ffffff;
-    --c-t1: #17181b;
-    --c-t2: rgba(23, 24, 27, 0.68);
-    --c-t3: rgba(23, 24, 27, 0.46);
+    --c-t1: #202225;
+    --c-t2: #56585d;
+    --c-t3: #85878c;
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;
-    /* Neutral accent: near-black on light. */
-    --c-acc: #1b1b1e;
-    --c-acc-on: #f5f5f5;
-    --c-acc-strong: #1b1b1e;
-    --c-acc-soft: rgba(0, 0, 0, 0.06);
-    --c-hero-glow: rgba(0, 0, 0, 0.05);
-    /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
-       over soft, low-opacity shadows. */
-    --edge-hi: rgba(255, 255, 255, 0.9);
-    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.05),
-      0 3px 9px rgba(17, 18, 20, 0.05);
-    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09),
-      0 14px 30px rgba(17, 18, 20, 0.11);
-    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1),
-      0 28px 64px rgba(17, 18, 20, 0.2);
-    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
+    --c-acc: #4f7fab;
+    --c-acc-on: #ffffff;
+    --c-acc-strong: #3f6f9c;
+    --c-acc-soft: rgba(79, 127, 171, 0.18);
+    /* Light elevation: a bright top edge over soft, low-opacity shadows. */
+    --edge-hi: rgba(255, 255, 255, 0.8);
+    --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.1);
+    --shadow-raise: 0 3px 10px rgba(20, 22, 26, 0.14);
+    --shadow-pop: 0 6px 20px rgba(20, 22, 26, 0.2);
+    --shadow-file: 0 2px 8px rgba(20, 22, 26, 0.12);
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    --body-bg: #dfe0e4;
-    --root-bg: #e9eaee;
-    --sb-thumb: rgba(0, 0, 0, 0.2);
-    --sb-thumb-hover: rgba(0, 0, 0, 0.32);
-    --sb-track: rgba(0, 0, 0, 0.16);
-    --c-hover: rgba(0, 0, 0, 0.04);
-    --c-sticky: rgba(233, 234, 238, 0.85);
-    --c-ring-track: #dfe0e3;
-    --c-stage: rgba(17, 18, 20, 0.045);
+    --body-bg: #cfd0d3;
+    --root-bg: #d7d8db;
+    --sb-thumb: rgba(0, 0, 0, 0.22);
+    --sb-thumb-hover: rgba(0, 0, 0, 0.34);
+    --sb-track: rgba(0, 0, 0, 0.06);
+    --c-hover: rgba(0, 0, 0, 0.045);
+    --c-sticky: rgba(215, 216, 219, 0.88);
+    --c-ring-track: #cdced2;
+    --c-stage: rgba(20, 22, 26, 0.05);
     --c-icon-line: #6f6f6f;
     --c-icon-fill: #6f6f6f;
     --c-icon-cube: #6f6f6f;
@@ -158,8 +148,9 @@
     color: var(--c-t1);
     font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
     font-size: var(--fs-base);
-    line-height: 1.5;
-    letter-spacing: -0.008em;
+    /* tighter resting line-height for the denser Altium feel */
+    line-height: 1.45;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
