@@ -35,6 +35,10 @@
     --c-acc-on: #141414;
     --c-acc-strong: #ffffff;
     --c-acc-soft: rgba(255, 255, 255, 0.11);
+    /* Corner radii as variables so dev mode can nudge them live (theme-agnostic: the same on
+       both themes). tailwind.config.js maps rounded-card / rounded-control onto these. */
+    --r-card: 14px;
+    --r-control: 8px;
     /* the soft studio glow under a lit hero specimen */
     --c-hero-glow: rgba(255, 255, 255, 0.09);
     /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
