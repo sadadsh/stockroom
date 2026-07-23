@@ -4,7 +4,7 @@
  * refetches; select a part and the detail loads. keepPreviousData keeps the list
  * from flickering to empty while a new search is in flight.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -18,6 +18,7 @@ import type {
   FieldEdit,
   ManualFillBody,
   NetClass,
+  PartDetail,
   SetBoardSettingsBody,
   SetLibraryBody,
   SettingsPatch,
@@ -241,6 +242,23 @@ export function useSetSpecs() {
       qc.invalidateQueries({ queryKey: ["part-history", vars.id] });
     },
   });
+}
+
+// The per-part sourcing refresh is a WRITE-lane job (the record commits server-side with
+// fresh price/stock/lifecycle), streamed over SSE like every job. When it finishes it
+// invalidates the same views as any other part write, so refreshed procurement can never
+// linger stale in the list, the facets, the open detail, or the timeline.
+export function useRefreshSourcing(id: string) {
+  const invalidate = useInvalidateAfterWrite();
+  const job = useJob<PartDetail>();
+  const run = useCallback(() => job.start(() => api.refreshSourcing(id)), [job, id]);
+  const done = job.status === "done";
+  useEffect(() => {
+    if (done) invalidate(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- invalidate is a fresh
+    // closure every render; done/id are the real triggers.
+  }, [done, id]);
+  return { ...job, run };
 }
 
 // Enrichment is a lookup, not a write: it returns sourced fields without touching the

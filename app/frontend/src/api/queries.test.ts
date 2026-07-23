@@ -7,6 +7,7 @@ import {
   useDeletePart,
   useEditField,
   useDoSync,
+  useRefreshSourcing,
   useSetSpecs,
 } from "./queries";
 import { api } from "./client";
@@ -98,6 +99,65 @@ describe("profile + sync invalidation", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidatedKeys(spy)).not.toContain("parts");
+  });
+});
+
+describe("sourcing refresh (the per-part procurement refresh job)", () => {
+  // The refresh is a write-lane job: the record commits server-side and the SSE stream's
+  // terminal result carries the updated record. Lock that finishing the job invalidates
+  // the same views as any other part write (list, facets, detail, timeline), so refreshed
+  // price/stock can never linger stale on screen.
+  function sseStream(frames: string): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(frames));
+        controller.close();
+      },
+    });
+  }
+
+  it("a finished refresh invalidates the parts, facets, detail and timeline", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "refreshSourcing").mockResolvedValue({ job_id: "j1" });
+    vi.spyOn(api, "openJobStream").mockResolvedValue(
+      sseStream(
+        `event: result\ndata: ${JSON.stringify({ result: PART_DETAIL })}\n\n` +
+          `event: done\ndata: {}\n\n`,
+      ),
+    );
+
+    const { result } = renderHook(() => useRefreshSourcing("lm358"), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.run();
+    await waitFor(() => expect(result.current.status).toBe("done"));
+
+    expect(api.refreshSourcing).toHaveBeenCalledWith("lm358");
+    expect(invalidatedKeys(spy)).toEqual(
+      expect.arrayContaining(["parts", "facets", "part", "part-history"]),
+    );
+  });
+
+  it("a failed refresh surfaces the error and invalidates nothing", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "refreshSourcing").mockResolvedValue({ job_id: "j1" });
+    vi.spyOn(api, "openJobStream").mockResolvedValue(
+      sseStream(
+        `event: error\ndata: {"detail": "no distributor responded"}\n\n` +
+          `event: done\ndata: {}\n\n`,
+      ),
+    );
+
+    const { result } = renderHook(() => useRefreshSourcing("lm358"), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.run();
+    await waitFor(() => expect(result.current.status).toBe("error"));
+
+    expect(result.current.error).toBe("no distributor responded");
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 

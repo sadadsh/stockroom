@@ -29,13 +29,15 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
-import { useCadSourceQuery, usePreviewGlb } from "../api/queries";
+import { useCadSourceQuery, usePreviewGlb, useRefreshSourcing } from "../api/queries";
+import { useToast } from "../lib/toast";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
 import {
   CubeArt,
   ExternalIcon,
   FootprintArt,
+  RefreshIcon,
   SymbolArt,
   UploadIcon,
   WarnIcon,
@@ -156,6 +158,18 @@ export function DetailPanel({
   // KiCad-complete but still missing its Altium assets (the common case). Cached under
   // the same key the Complete Part window uses, so it is fetched once and shared.
   const cadSource = useCadSourceQuery(detail?.id ?? null, true);
+  // The per-part sourcing refresh (POST .../refresh): a write-lane job re-pulling
+  // price/stock/lifecycle from the distributor APIs. Its outcome reports through the
+  // quiet toasts like every other background mutation.
+  const refreshJob = useRefreshSourcing(detail?.id ?? "");
+  const { toast } = useToast();
+  const refreshStatus = refreshJob.status;
+  const refreshError = refreshJob.error;
+  useEffect(() => {
+    if (refreshStatus === "done") toast("Sourcing refreshed.", "ok");
+    else if (refreshStatus === "error")
+      toast(refreshError || "Could not refresh sourcing.", "err");
+  }, [refreshStatus, refreshError, toast]);
   if (isLoading) {
     return <PanelMessage>Loading part...</PanelMessage>;
   }
@@ -366,7 +380,29 @@ export function DetailPanel({
 
           {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note. */}
           <div className="flex min-h-0 flex-col gap-5 overflow-y-auto border-l border-line pl-5">
-            <DetailSection title={<Text id="detail.sourcing-head">Sourcing</Text>}>
+            <DetailSection
+              title={<Text id="detail.sourcing-head">Sourcing</Text>}
+              action={
+                detail.mpn ? (
+                  <button
+                    type="button"
+                    data-dev-id="detail.sourcing-refresh"
+                    onClick={() => refreshJob.run()}
+                    disabled={refreshStatus === "running"}
+                    className="inline-flex items-center gap-1 rounded-control px-1 py-0.5 text-2xs font-semibold text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:opacity-60"
+                  >
+                    <RefreshIcon
+                      className={refreshStatus === "running" ? "animate-spin" : undefined}
+                    />
+                    {refreshStatus === "running" ? (
+                      <Text id="detail.sourcing-refreshing">Refreshing</Text>
+                    ) : (
+                      <Text id="detail.sourcing-refresh-label">Refresh</Text>
+                    )}
+                  </button>
+                ) : undefined
+              }
+            >
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
             </DetailSection>
             <RailReference
