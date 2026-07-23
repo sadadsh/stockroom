@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStmPinAf, useStmSignalCandidates } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
+import { Eyebrow } from "../primitives";
 
 // The single numeric-aware collation (mirrors PinoutViewer.tsx): it orders "1","2","10" correctly
 // AND handles alphanumeric BGA labels "A1".."A10","AB12" — drop { numeric: true } and it goes red.
@@ -50,7 +51,7 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
   return (
     <div className="flex flex-col gap-4" data-testid="af-options-panel">
       <section>
-        <div className="mb-1.5 text-2xs font-semibold text-t3">Alternate Functions</div>
+        <Eyebrow className="mb-1.5">Alternate Functions</Eyebrow>
         {notBuilt ? (
           <p className="text-xs text-t3">Build the index to see alternate functions.</p>
         ) : pinAf.isLoading ? (
@@ -89,7 +90,7 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
       </section>
 
       <section>
-        <div className="mb-1.5 text-2xs font-semibold text-t3">Signal Candidates</div>
+        <Eyebrow className="mb-1.5">Signal Candidates</Eyebrow>
         {!signal ? (
           <p className="text-xs text-t3">Select a signal above to see every candidate pin for it.</p>
         ) : candidates.isLoading ? (

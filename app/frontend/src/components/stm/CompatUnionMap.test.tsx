@@ -34,11 +34,12 @@ function union(positions: UnionPositionDTO[]): UnionDTO {
   };
 }
 
-// The frozen CONTEXT tone map, as the CSS-var fills the SVG classification dot paints with.
+// The dedicated classification token set (unionClassificationHue), the CSS-var fills the SVG
+// classification dot paints with. A distinct family from the electrical-class pin hues.
 const TONE_FILL = {
-  shared: "var(--c-ok)",
-  divergent: "var(--c-warn)",
-  partial: "var(--c-t3)",
+  shared: "var(--stm-classify-shared)",
+  divergent: "var(--stm-classify-divergent)",
+  partial: "var(--stm-classify-partial)",
 };
 
 function dotFill(container: HTMLElement, position: string): string | null {
@@ -46,7 +47,7 @@ function dotFill(container: HTMLElement, position: string): string | null {
 }
 
 describe("CompatUnionMap", () => {
-  it("paints each position's classification dot with its CONTEXT tone (shared->ok, divergent->warn, partial->neutral)", () => {
+  it("paints each position's classification dot with its own --stm-classify token (shared/divergent/partial)", () => {
     const { container } = render(
       <CompatUnionMap
         union={union([

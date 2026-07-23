@@ -15,13 +15,9 @@ import { select } from "d3-selection";
 import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from "d3-zoom";
 import type { PinoutGeometryDTO, UnionDTO, UnionPositionDTO } from "../../api/types";
 import { pinMapGeometry, type PadLayout } from "../../lib/pinMapGeometry";
-import { Dot } from "../primitives";
-import {
-  CLASSIFICATION_LABEL,
-  TONE_VAR,
-  classificationTone,
-  type Classification,
-} from "./compatEncoding";
+import { unionClassificationHue } from "../../lib/stmPinHue";
+import { Button, LegendSwatch } from "../primitives";
+import { CLASSIFICATION_LABEL, type Classification } from "./compatEncoding";
 import { CompatReconcileDetail } from "./CompatReconcileDetail";
 
 const VIEW = 460;
@@ -133,7 +129,7 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
                         (p.position === selectedPosition ? "bg-acc-soft" : "")
                       }
                     >
-                      <Dot tone={classificationTone(p.classification)} />
+                      <LegendSwatch token={unionClassificationHue(p.classification).stroke} />
                       <span className="w-10 flex-none font-mono text-xs text-t3">{p.position}</span>
                       <span className="truncate text-xs text-t2">
                         {CLASSIFICATION_LABEL[p.classification]}
@@ -185,13 +181,14 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
           )}
         </div>
 
-        {/* The chamber footer: the classification legend left (the Dot is the one place status
-            color runs), camera reset right. A footer strip, never an overlay on the pad field. */}
+        {/* The chamber footer: the classification legend left (the swatch is the one place status
+            color runs, taught with the shared LegendSwatch), camera reset right. A footer strip,
+            never an overlay on the pad field. */}
         <div className="mt-2 flex flex-none items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             {LEGEND.map((c) => (
               <span key={c} className="flex items-center gap-1.5 text-2xs text-t3">
-                <Dot tone={classificationTone(c)} />
+                <LegendSwatch token={unionClassificationHue(c).stroke} />
                 {CLASSIFICATION_LABEL[c]}
               </span>
             ))}
@@ -202,13 +199,9 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
             ) : null}
           </div>
           {!unavailable ? (
-            <button
-              type="button"
-              onClick={reset}
-              className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
-            >
+            <Button type="button" small onClick={reset} className="flex-none">
               Reset View
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -235,7 +228,7 @@ const UnionPad = memo(function UnionPad({
 }) {
   const { x, y, w, h } = pad.rect;
   const classification = position?.classification;
-  const dotFill = classification ? TONE_VAR[classificationTone(classification)] : "var(--c-t3)";
+  const dotFill = classification ? unionClassificationHue(classification).stroke : "var(--c-t3)";
   const dotR = Math.min(w, h) * 0.3;
 
   return (
