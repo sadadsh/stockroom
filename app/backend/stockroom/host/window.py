@@ -897,24 +897,8 @@ class _HostApi:
                 return "altium"
             return None
 
-        cad_state = {"cleaned": False}
-
         def _on_cad_loaded() -> None:
             nxt = _next_format()
-            try:
-                cur = win.get_current_url()
-            except Exception:  # noqa: BLE001
-                cur = None
-            # One-time clean reload the first time we reach the models page, so the very first download
-            # starts from a pristine DOM (owner 2026-07-23: reload once before trying to download). The
-            # reload re-fires `loaded`, which then injects the driver on the clean page.
-            if nxt and "/models/" in (cur or "") and not cad_state["cleaned"]:
-                cad_state["cleaned"] = True
-                try:
-                    win.evaluate_js("setTimeout(function(){location.reload();},400);")
-                except Exception:  # noqa: BLE001
-                    pass
-                return
             _inject_cad_scripts(win, url, needs_values, name, driver_formats=([nxt] if nxt else []))
 
         win.events.loaded += _on_cad_loaded
@@ -947,12 +931,17 @@ class _HostApi:
         def _on_captured(captured_path) -> None:
             _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
             # One format per fresh page load: when this format's assets have landed but another format
-            # is still needed, reload the page for a clean DOM (DigiKey's stateful export +
-            # Download-complete modals can't be reliably reused in one session) - `loaded` then injects
-            # the next-format driver. Per the vendor's caching, the reload retrieves fast.
+            # is still needed, NAVIGATE BACK to the product page (never location.reload). A raw reload
+            # re-hydrates the SPA models page from restored UI state and leaves the provider accordion
+            # undrivable; a fresh navigation runs the normal mount path, so the next-format driver's
+            # gotoModels re-opens a clean, drivable models page. The navigation happens only AFTER this
+            # format's download reached Completed, so the in-flight DownloadOperation is never orphaned
+            # (WebView2Feedback #4435). `loaded` then injects the next-format driver.
             if not session.is_complete() and _next_format() is not None:
                 try:
-                    win.evaluate_js("setTimeout(function(){location.reload();},600);")
+                    win.evaluate_js(
+                        "setTimeout(function(){location.href=" + json.dumps(url) + ";},600);"
+                    )
                 except Exception:  # noqa: BLE001 - best-effort; the loaded handler still re-injects
                     pass
 
