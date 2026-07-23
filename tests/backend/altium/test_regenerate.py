@@ -83,3 +83,26 @@ def test_regenerate_is_idempotent(library_ops):
     assert second["emitted"] == 1
     assert ops.repo.head() == head_after_first  # no new (empty) commit
     assert second["dblib"].exists()
+
+
+def test_regenerate_survives_a_staged_never_committed_gitignore(library_ops):
+    # The live winverify failure (2026-07-23): an interrupted pre-migration run left
+    # altium/.gitignore STAGED but never committed. _is_tracked (an index read) calls it
+    # tracked, so the retirement joins the commit pathspec; `add -A` erases the staged
+    # entry and `commit --only` aborts on a path git no longer knows - 500ing every
+    # regenerate on that library forever. It must succeed and retire the file.
+    ops = library_ops
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
+    altium_dir = ops.lib.parts_dir.parent / "altium"
+    altium_dir.mkdir(parents=True, exist_ok=True)
+    gi = altium_dir / ".gitignore"
+    gi.write_text("stockroom-parts.xlsx\n", encoding="utf-8")
+    ops.repo._run("add", "--", str(gi))  # staged, never committed (the interrupted-run state)
+
+    result = ops.regenerate_altium_dblib()
+
+    assert result["emitted"] == 1
+    assert not gi.exists()  # retired from disk
+    tracked = ops.repo._run("ls-files", "--", str(altium_dir)).stdout.splitlines()
+    assert not any(p.endswith(".gitignore") for p in tracked)
