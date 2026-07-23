@@ -204,7 +204,7 @@ function PinoutRegion({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {inspectedPin ? (
-              <PinInspector pin={inspectedPin} />
+              <PinInspector pin={inspectedPin} part={activePart} />
             ) : (
               <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
             )}

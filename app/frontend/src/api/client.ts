@@ -80,6 +80,11 @@ import type {
   PinoutDTO,
   CompatUnionBody,
   UnionDTO,
+  PinAfResponse,
+  SignalCandidatesResponse,
+  SuggestionsResponse,
+  AfCheckBody,
+  AfCheckResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -1053,5 +1058,34 @@ export const api = {
   // invalidated after it resolves. A 409 raises ApiError(409) the caller routes to the build gate.
   postStmCompatUnion(body: CompatUnionBody): Promise<UnionDTO> {
     return request<UnionDTO>("POST", "/api/stm/compat/union", { body });
+  },
+
+  // One pin's complete AF0-15 set (SWAP-01). `part` is a ref_name OR an MPN, passed as a query
+  // param (never path-encoded), same as every other STM read.
+  getStmPinAf(part: string, position: string): Promise<PinAfResponse> {
+    return apiGet<PinAfResponse>("/api/stm/pin/af", { part, position });
+  },
+
+  // Every candidate pin a peripheral signal can be routed to across the part (SWAP-02).
+  getStmSignalCandidates(part: string, signal: string): Promise<SignalCandidatesResponse> {
+    return apiGet<SignalCandidatesResponse>("/api/stm/signal/candidates", { part, signal });
+  },
+
+  // Auto-discovered compatible sets grouped by pin-divergence signature (COMPAT-04), scoped to a
+  // (package, family). tolerance defaults to 0 server-side when omitted.
+  getStmCompatSuggestions(
+    pkg: string,
+    family: string,
+    tolerance?: number,
+  ): Promise<SuggestionsResponse> {
+    const params: Record<string, string> = { package: pkg, family };
+    if (tolerance != null) params.tolerance = String(tolerance);
+    return apiGet<SuggestionsResponse>("/api/stm/compat/suggestions", params);
+  },
+
+  // Conflict-check a client-held signal-to-pin assignment for one part (Layer B af_conflicts). A
+  // pure read over the assignment; nothing is written or persisted (CONTEXT decision 8).
+  postStmAfCheck(body: AfCheckBody): Promise<AfCheckResponse> {
+    return request<AfCheckResponse>("POST", "/api/stm/af-check", { body });
   },
 };
