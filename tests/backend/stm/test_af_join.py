@@ -178,3 +178,54 @@ def test_genuinely_unrecognized_af_value_shape_raises_loudly():
         db_mod.StmIndex.build(AF_FIXTURES / "anomaly")
     msg = str(exc_info.value)
     assert "NOT_A_RECOGNIZED_SHAPE_AT_ALL" in msg
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan 02 Task 1: self-audit AF-range + orphan-join clauses (DATA-07, redundant
+# with the schema CHECK / the build-time raise, asserted explicitly)
+# ─────────────────────────────────────────────────────────────────────────────
+def test_clean_af_build_passes_the_range_and_orphan_audit_clauses():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "happy")
+    db_mod.run_self_audit(idx._conn)  # must not raise
+
+
+def test_injected_out_of_range_af_index_raises():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "happy")
+    conn = idx._conn
+    # af_index carries CHECK(af_index BETWEEN 0 AND 15) - bypass it deliberately
+    # so the audit's OWN explicit range check (not just the schema CHECK) is
+    # what is actually exercised here.
+    conn.execute("PRAGMA ignore_check_constraints = 1")
+    conn.execute("UPDATE pin_alternate_function SET af_index = 99 WHERE id = "
+                 "(SELECT id FROM pin_alternate_function LIMIT 1)")
+    with pytest.raises(db_mod.StmAuditFailure) as exc_info:
+        db_mod.run_self_audit(conn)
+    assert "AF-range" in str(exc_info.value) or "af_index" in str(exc_info.value)
+
+
+def test_orphan_join_count_is_zero_on_a_clean_build():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "happy")
+    assert idx.meta()["af_orphan_join_count"] == "0"
+
+
+def test_injected_nonzero_orphan_join_count_raises():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "happy")
+    conn = idx._conn
+    conn.execute("UPDATE meta SET value = '1' WHERE key = 'af_orphan_join_count'")
+    with pytest.raises(db_mod.StmAuditFailure) as exc_info:
+        db_mod.run_self_audit(conn)
+    assert "orphan" in str(exc_info.value).lower()
+
+
+def test_f1_legacy_family_is_logged_as_accounted_for_and_not_an_orphan(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="stockroom.stm.db"):
+        idx = db_mod.StmIndex.build(AF_FIXTURES / "f1_legacy")
+    assert idx.meta()["af_orphan_join_count"] == "0"
+    assert idx.meta()["af_legacy_afio_device_count"] == "1"
+    assert any(
+        "legacy AFIO-remap family" in r.message and "1 devices" in r.message
+        for r in caplog.records
+    )
+    db_mod.run_self_audit(idx._conn)  # must not raise - a legitimate zero
