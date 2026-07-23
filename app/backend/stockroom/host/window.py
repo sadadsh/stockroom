@@ -1079,6 +1079,15 @@ def run_window(base_url: str, token: str) -> None:
         webview.settings["ALLOW_DOWNLOADS"] = True
     except Exception:  # noqa: BLE001 - an older pywebview without settings still runs
         pass
+    # Dev-only observability: STOCKROOM_CDP_PORT exposes WebView2's remote-debugging port so the
+    # REAL app can be driven and verified over CDP in live end-to-end tests (capture -> attach ->
+    # library placement). Never set in normal use; a pywebview without the setting ignores it.
+    cdp_port = os.environ.get("STOCKROOM_CDP_PORT")
+    if cdp_port:
+        try:
+            webview.settings["REMOTE_DEBUGGING_PORT"] = int(cdp_port)
+        except Exception:  # noqa: BLE001 - a bad value/old pywebview must never block launch
+            pass
 
     window = webview.create_window(
         "Stockroom", url=base_url, width=1400, height=900, js_api=_HostApi()
