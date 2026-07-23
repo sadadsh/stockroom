@@ -265,9 +265,9 @@ export function DetailPanel({
 
       {/* top row: Overview + Sourcing on the LEFT, the part's three asset views on the RIGHT.
           The wide Specifications sheet sits full-width BELOW this row. */}
-      <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-stretch gap-6">
+      <div className="mt-6 grid grid-cols-[1.5fr_1fr] items-start gap-6">
         <div className="flex min-w-0 flex-col gap-[22px]">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-card border border-line bg-raise shadow-card">
+          <div className="flex flex-col overflow-hidden rounded-card border border-line bg-raise shadow-card">
             <div className="px-[18px] py-[15px]">
               <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
                 Overview
@@ -311,7 +311,7 @@ export function DetailPanel({
                 busy={busy}
               />
             </div>
-            <div className="mt-auto border-t border-line px-[18px] py-[15px]">
+            <div className="border-t border-line px-[18px] py-[15px]">
               <div className="mb-3 text-[15px] font-semibold tracking-[-0.014em] text-t1">
                 Sourcing
               </div>
@@ -320,17 +320,16 @@ export function DetailPanel({
           </div>
         </div>
 
-        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint) in a 3-row grid. `grid-rows-3`
-            is repeat(3, minmax(0,1fr)) - the min-0 track means each tile takes exactly a third of the
-            column height WITHOUT the preview images leaking their natural height into it (a plain flex
-            stack balloons because an <img>/canvas child pushes the intrinsic size). The outer grid
-            (items-stretch) stretches this column to the row height, which is driven by the LEFT
-            Overview+Sourcing card, so the Footprint tile's bottom ALWAYS lines up with the Overview
-            card's bottom, whatever the sourcing content. min-h keeps a sane floor (3x184 + 2 gaps)
-            when the left card is short. Read-only previews; the Complete Part window adds a missing one. */}
-        <div className="grid grid-rows-3 gap-[18px] min-h-[588px]">
+        {/* RIGHT: three uniform asset tiles (3D / Symbol / Footprint), each a fixed, legible height
+            (FIX-04). The tiles size to their own content instead of being stretched to match the LEFT
+            Overview+Sourcing card, so a sparse part no longer leaves a tall empty gap. Each tile's
+            preview is still taken out of flow (absolute inset-0 in AssetTile) so a large GLB/SVG never
+            balloons the tile past its set height. Read-only previews; the Complete Part window adds a
+            missing one. */}
+        <div className="flex flex-col gap-[18px]">
           <AssetTile
             variant="tile"
+            className="h-[184px]"
             name="3D Model"            present={hasModel}
             art={<CubeArt />}
             thumb={
@@ -349,6 +348,7 @@ export function DetailPanel({
           />
           <AssetTile
             variant="tile"
+            className="h-[184px]"
             name="Symbol"            present={!!detail.symbol?.name}
             art={<SymbolArt />}
             thumb={
@@ -360,6 +360,7 @@ export function DetailPanel({
           />
           <AssetTile
             variant="tile"
+            className="h-[184px]"
             name="Footprint"            present={!!detail.footprint?.name}
             art={<FootprintArt />}
             thumb={

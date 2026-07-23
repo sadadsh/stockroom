@@ -10,6 +10,7 @@ import { ApiError } from "../api/client";
 import { useDoctorScan, useRepairLibrary } from "../api/queries";
 import type { DoctorScan, RepairAction, RepairFinding, RepairResult } from "../api/types";
 import { useToast } from "../lib/toast";
+import { statusTone } from "../lib/statusTone";
 import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
 
 function errMsg(err: unknown): string {
@@ -106,9 +107,11 @@ function HealthBody({
 
       {data.uncommitted.length > 0 ? (
         <div className="text-xs text-t3" data-testid="doctor-uncommitted">
-          {data.uncommitted.length}{" "}
-          {data.uncommitted.length === 1 ? "uncommitted change" : "uncommitted changes"} in the
-          working tree will be committed by the repair.
+          <span className={`font-semibold ${statusTone("uncommitted").text}`}>
+            {data.uncommitted.length}{" "}
+            {data.uncommitted.length === 1 ? "uncommitted change" : "uncommitted changes"}
+          </span>{" "}
+          in the working tree will be committed by the repair.
         </div>
       ) : null}
 

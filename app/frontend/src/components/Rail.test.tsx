@@ -45,4 +45,17 @@ describe("Rail", () => {
     expect(navigate).toHaveBeenCalledWith("components");
   });
 
+  it("shows a real version string in the About modal (FIX-02)", async () => {
+    render(<Rail />);
+    await userEvent.click(screen.getByRole("button", { name: /About/ }));
+    // a Title Case "Version" label with the build-injected value beside it
+    const label = screen.getByText("Version");
+    expect(label).toBeInTheDocument();
+    expect(typeof __APP_VERSION__).toBe("string");
+    expect(__APP_VERSION__.length).toBeGreaterThan(0);
+    expect(screen.getByText(__APP_VERSION__)).toBeInTheDocument();
+    // no em dash anywhere in the About modal copy (design contract)
+    expect(screen.getByRole("dialog").textContent).not.toContain("—");
+  });
+
 });

@@ -1,4 +1,4 @@
-from stockroom.ingest.component_naming import derive_value
+from stockroom.ingest.component_naming import derive_display_value, derive_value
 from stockroom.model.part import PartRecord
 
 
@@ -34,3 +34,37 @@ def test_active_value_is_mpn():
 def test_passive_with_no_defining_spec_is_blank_not_guessed():
     r = _rec("Resistors", {}, mpn="CRCW06035K05FKEA")
     assert derive_value(r) == ""
+
+
+# -- derive_display_value: the human-facing value that KEEPS the Ω unit (FIX-07 backend) --
+
+
+def test_display_value_resistor_keeps_ohm_while_derive_value_strips_it():
+    r = _rec("Resistors", {"Resistance": "5.05 kOhms"})
+    assert derive_display_value(r) == "5.05kΩ"  # human display keeps the unit
+    assert derive_value(r) == "5.05k"  # schematic/BOM convention still strips it
+
+
+def test_display_value_capacitor_matches_derive_value():
+    r = _rec("Capacitors", {"Capacitance": "1 uF"})
+    assert derive_display_value(r) == derive_value(r) == "1µF"
+
+
+def test_display_value_inductor_matches_derive_value():
+    r = _rec("Inductors", {"Inductance": "4.7 uH"})
+    assert derive_display_value(r) == derive_value(r) == "4.7µH"
+
+
+def test_display_value_ferrite_bead_matches_derive_value():
+    r = _rec("Inductors", {"Impedance": "600 Ohms"})
+    assert derive_display_value(r) == derive_value(r) == "600Ω"
+
+
+def test_display_value_active_matches_derive_value():
+    r = _rec("ICs", {}, mpn="BQ24074RGTT")
+    assert derive_display_value(r) == derive_value(r) == "BQ24074RGTT"
+
+
+def test_display_value_resistor_without_spec_is_blank():
+    r = _rec("Resistors", {}, mpn="CRCW06035K05FKEA")
+    assert derive_display_value(r) == derive_value(r) == ""

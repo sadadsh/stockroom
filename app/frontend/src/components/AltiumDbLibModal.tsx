@@ -4,10 +4,11 @@
  * an Attach action that opens the host file picker for its .SchLib/.PcbLib (or .IntLib), attaches
  * them, and regenerates so it lands in the library immediately.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { useAltiumAttach, useAltiumRegenerate, useAltiumStatus } from "../api/queries";
 import type { AltiumStatusRow } from "../api/types";
+import { matchAltiumFilesToParts } from "../lib/altiumBulk";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
 import { Badge, Button, Dot, SegmentedControl } from "./primitives";
@@ -38,11 +39,14 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   const { toast } = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [attachingId, setAttachingId] = useState<string | null>(null);
+  // The bulk selection over needs-files rows (by id), plus a lock for the multi-step bulk flow.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   // Escape + Tab focus-trap + focus-restore (the shared modal idiom); attach the ref to the dialog.
   const dialogRef = useModalDismiss(open, onClose);
   // Any in-flight write serializes the surface: a second attach or a regenerate can collide with the
   // backend's single git repo, so no Attach is offered while one is running (the backend also locks).
-  const busy = attach.isPending || regenerate.isPending;
+  const busy = attach.isPending || regenerate.isPending || bulkBusy;
 
   const rows = status.data?.rows ?? [];
   const readyCount = useMemo(() => rows.filter((r) => r.ready).length, [rows]);
@@ -50,6 +54,37 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
     () => rows.filter((r) => (filter === "all" ? true : filter === "ready" ? r.ready : !r.ready)),
     [rows, filter],
   );
+  // The selectable rows (only a not-ready row can be attached); the header select-all + the count
+  // are scoped to what is currently shown.
+  const needsShown = useMemo(() => shown.filter((r) => !r.ready), [shown]);
+  const selectedCount = useMemo(
+    () => needsShown.filter((r) => selected.has(r.id)).length,
+    [needsShown, selected],
+  );
+  const allSelected = needsShown.length > 0 && selectedCount === needsShown.length;
+
+  // Drop any selection that is no longer a shown needs-files row (a filter change or a completed
+  // attach), so the selection never references a stale/ready part.
+  useEffect(() => {
+    const valid = new Set(needsShown.map((r) => r.id));
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => valid.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [needsShown]);
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(needsShown.map((r) => r.id)));
+  }
 
   async function onAttach(row: AltiumStatusRow) {
     const picker = pickAltiumFiles();
@@ -87,6 +122,69 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         );
       }
     } finally {
+      setAttachingId(null);
+    }
+  }
+
+  // Bulk attach: ONE file picker for the whole selection, mapped to parts by MPN, each match
+  // attached through the existing per-part endpoint (serialized), then the DbLib regenerated ONCE.
+  // The result is reported honestly: no part is silently skipped, mis-bound, or fabricated.
+  async function onAttachSelected() {
+    const targets = needsShown.filter((r) => selected.has(r.id));
+    if (!targets.length) return;
+    const picker = pickAltiumFiles();
+    if (!picker) {
+      toast("Open Stockroom as the app to attach files. A web browser cannot read file paths.", "neutral");
+      return;
+    }
+    let paths: string[];
+    try {
+      paths = await picker;
+    } catch {
+      toast("Could not open the file picker.", "err");
+      return;
+    }
+    if (!paths.length) return; // cancelled
+    const plan = matchAltiumFilesToParts(targets, paths);
+    if (!plan.matched.length) {
+      toast(
+        `No picked files matched the ${targets.length} selected part${targets.length === 1 ? "" : "s"} by MPN.`,
+        "neutral",
+      );
+      return;
+    }
+    setBulkBusy(true);
+    let attached = 0;
+    const failed: string[] = [];
+    try {
+      for (const match of plan.matched) {
+        setAttachingId(match.row.id);
+        try {
+          await attach.mutateAsync({ id: match.row.id, paths: match.paths });
+          attached += 1;
+        } catch {
+          failed.push(match.row.display_name);
+        }
+      }
+      setAttachingId(null);
+      let regenOk = true;
+      if (attached > 0) {
+        try {
+          await regenerate.mutateAsync();
+        } catch {
+          regenOk = false;
+        }
+      }
+      const pieces = [`Attached ${attached} part${attached === 1 ? "" : "s"}`];
+      if (plan.unmatched.length) pieces.push(`${plan.unmatched.length} had no matching file`);
+      if (failed.length) pieces.push(`${failed.length} failed`);
+      let message = `${pieces.join("; ")}.`;
+      if (attached > 0 && !regenOk)
+        message += " The DbLib did not regenerate; click Regenerate DbLib to finish.";
+      toast(message, failed.length ? "err" : plan.unmatched.length ? "neutral" : "ok");
+      setSelected(new Set());
+    } finally {
+      setBulkBusy(false);
       setAttachingId(null);
     }
   }
@@ -141,6 +239,20 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
               { id: "needs", label: `Needs Files (${rows.length - readyCount})` },
             ]}
           />
+          {selectedCount > 0 ? (
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs text-t3">{selectedCount} selected</span>
+              <Button
+                small
+                variant="soft"
+                onClick={onAttachSelected}
+                disabled={busy}
+                icon={<UploadIcon className="h-3.5 w-3.5" />}
+              >
+                {bulkBusy ? "Attaching..." : "Attach Selected"}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
@@ -163,6 +275,19 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
             <table className="w-full table-fixed border-collapse">
               <thead>
                 <tr>
+                  <th className={`${TH} w-[40px]`}>
+                    <input
+                      type="checkbox"
+                      aria-label="Select All"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = selectedCount > 0 && !allSelected;
+                      }}
+                      onChange={toggleAll}
+                      disabled={busy || needsShown.length === 0}
+                      className="h-4 w-4 cursor-pointer rounded-[4px] accent-[var(--c-acc)] disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </th>
                   <th className={TH}>Part</th>
                   <th className={`${TH} w-[164px]`}>MPN</th>
                   <th className={`${TH} w-[76px]`}>Value</th>
@@ -175,6 +300,18 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
               <tbody>
                 {shown.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-b-0 hover:bg-raise2">
+                    <td className={TD}>
+                      {row.ready ? null : (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${row.display_name}`}
+                          checked={selected.has(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          disabled={busy}
+                          className="h-4 w-4 cursor-pointer rounded-[4px] accent-[var(--c-acc)] disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      )}
+                    </td>
                     <td className={`${TD} truncate text-t2`} title={row.display_name}>
                       {row.display_name}
                     </td>
