@@ -318,6 +318,12 @@ _DIGIKEY_DOWNLOAD = (
     "if(!fmtBtnFor(prov)){var row=document.querySelector('#'+prov[0]+'-media-active');if(row){try{row.click();}catch(e){}}}"
     "until(function(){var b=fmtBtnFor(prov);if(b&&actionable(b))return {b:b};"
     "if(externalOnly(prov))return {skip:1};return null;},function(v){"
+    # A freshly (re)navigated page can swallow the FIRST row click (handler not hydrated yet -
+    # live 2026-07-23, STM32 post-recovery). Knock once more on the same source before moving on.
+    "if(!v&&!spec['__knock_'+prov[0]]){spec['__knock_'+prov[0]]=1;"
+    "trace('knock',spec.key,prov[1]);"
+    "report('provider',false,prov[1]+' is slow to open; trying it once more.');"
+    "pi=Math.max(0,pi-1);tryProvider();return;}"
     "if(!v){report('provider',false,prov[1]+' did not open; trying the next source.');tryProvider();return;}"
     "if(v.skip){trace('skip',prov[1],'external only');"
     "report('provider',false,prov[1]+' opens the manufacturer site; trying the next source.');tryProvider();return;}"
