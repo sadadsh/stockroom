@@ -35,6 +35,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.stm import db as db_mod
+from stockroom.stm import source as source_mod
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stm"
 AF_FIXTURES = FIXTURES / "af_join"
@@ -290,6 +291,109 @@ def test_c_suffix_ball_gets_its_own_af_rows_never_inheriting_the_digital_pins_mu
     ]
     assert "COMP1_INM" not in {r["signal"] for r in pc2_af}
     assert "SPI2_MISO" not in {r["signal"] for r in pc2_c_af}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan 02 Task 3: non-F family validation against the real all-families
+# source (ROADMAP Phase 2 SC3). Skips cleanly (never fails) when the real
+# CubeMX source is not reachable on this machine - mirrors
+# test_all_families_build.py's own skip-guard convention exactly, since this
+# reuses the SAME file-backed, skip-rebuild-if-unchanged index that test
+# builds (or builds it fresh here if that test has not run yet in this
+# session/process).
+# ─────────────────────────────────────────────────────────────────────────────
+def _resolve_all_families_source() -> Path | None:
+    source = source_mod.default_cubemx_source()
+    if source is None or not source.is_dir():
+        return None
+    report = source_mod.check_availability(source)
+    if not report.all_families:
+        return None
+    return source
+
+
+_REAL_SOURCE = _resolve_all_families_source()
+
+requires_real_all_families_source = pytest.mark.skipif(
+    _REAL_SOURCE is None,
+    reason="no reachable all-families CubeMX source (STM32_CUBEMX unset and the "
+    "confirmed Windows-side default is absent or looks F-only on this machine)",
+)
+
+# One representative device family per non-F line the ROADMAP requires
+# (C, G, H, L, U, WB, WL, N) - confirmed present in the real all-families
+# source this session (2026-07-23).
+_NON_F_LINES = {
+    "C0": "STM32C0",
+    "G0": "STM32G0",
+    "G4": "STM32G4",
+    "H5": "STM32H5",
+    "H7": "STM32H7",
+    "L0": "STM32L0",
+    "L4": "STM32L4",
+    "L5": "STM32L5",
+    "U0": "STM32U0",
+    "U5": "STM32U5",
+    "WB": "STM32WB",
+    "WL": "STM32WL",
+    "N6": "STM32N6",
+}
+
+
+@requires_real_all_families_source
+def test_af_join_holds_with_zero_orphans_across_non_f_families_real_source():
+    """Builds (or reuses the persisted, file-backed) all-families index and
+    asserts zero orphans plus a clean, in-range AF join for at least one
+    representative device per non-F line. The underlying StmIndex.build call
+    itself already re-validates the 100%-join-resolution gate across EVERY
+    one of the ~2,123 real device XML in the source (not just the sampled
+    lines below) - reaching the assertions here without a raised
+    StmGpioModesNotFoundError/StmAfParseError already proves that."""
+    index_path = source_mod.default_index_path()
+    idx = db_mod.StmIndex.load(index_path)
+    if idx is None:
+        idx = db_mod.StmIndex.build(
+            _REAL_SOURCE, db_path=index_path, require_all_families=True
+        )
+    try:
+        meta = idx.meta()
+        assert meta["af_orphan_join_count"] == "0"
+        assert int(meta["device_xml_count"]) > 2000
+
+        conn = idx._conn
+        evidence: dict[str, dict] = {}
+        for label, family in _NON_F_LINES.items():
+            row = conn.execute(
+                "SELECT id, ref_name FROM mcu WHERE family = ? LIMIT 1", (family,)
+            ).fetchone()
+            if row is None:
+                continue
+            n_af, max_af = conn.execute(
+                "SELECT COUNT(*), MAX(af.af_index) FROM pin_alternate_function af "
+                "JOIN mcu_package_pin p ON p.id = af.mcu_package_pin_id "
+                "WHERE p.mcu_id = ?",
+                (row["id"],),
+            ).fetchone()
+            evidence[label] = {
+                "ref_name": row["ref_name"],
+                "af_rows": n_af,
+                "max_af_index": max_af,
+            }
+            assert n_af > 0, (
+                f"{label} ({row['ref_name']}) has zero AF rows - a real non-F "
+                "device must resolve a non-empty AF0-15 mux"
+            )
+            assert max_af is not None and 0 <= max_af <= 15
+
+        assert len(evidence) >= 8, (
+            f"expected representative devices across most non-F lines, got: {evidence}"
+        )
+        print("\nnon-F family AF-join validation (ROADMAP Phase 2 SC3):")
+        for label, ev in sorted(evidence.items()):
+            print(f"  {label}: {ev['ref_name']} - {ev['af_rows']} AF rows, "
+                  f"max af_index={ev['max_af_index']}")
+    finally:
+        idx.close()
 
 
 def test_af_join_code_never_falls_back_to_canonical_pin_name():
