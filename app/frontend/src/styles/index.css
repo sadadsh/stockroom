@@ -58,8 +58,6 @@
     --fs-title: 18px;
     /* the primary UI icon weight (nav + action line icons). Altium's glyphs are light. */
     --icon-stroke: 1.8;
-    /* a faint studio glow under a lit hero specimen (kept subtle for the flat look) */
-    --c-hero-glow: rgba(255, 255, 255, 0.05);
     /* Near-flat elevation: borders carry the structure, so cards get almost no shadow.
        Only genuinely floating chrome (menus, modals, floating panels) casts a real
        drop shadow. The hairline top highlight is nearly gone (Altium is not glossy). */
