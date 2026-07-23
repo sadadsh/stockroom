@@ -56,17 +56,21 @@ export function PreviewModal({
     >
       <div
         ref={dialogRef}
+        data-dev-id="preview.root"
         role="dialog"
         aria-modal="true"
         aria-label={`Previews for ${partName}`}
         tabIndex={-1}
         className="flex h-[80vh] max-h-[680px] w-full max-w-[860px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
       >
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <div
+          data-dev-id="preview.header"
+          className="flex items-center gap-3 border-b border-line px-4 py-3"
+        >
           <span className="min-w-0 flex-none truncate text-sm font-semibold text-t1">
             {partName}
           </span>
-          <div className="flex gap-1" role="tablist" aria-label="Preview Type">
+          <div data-dev-id="preview.tabs" className="flex gap-1" role="tablist" aria-label="Preview Type">
             {TABS.map((t) => {
               const enabled = available[t.kind];
               const active = kind === t.kind;
@@ -94,6 +98,7 @@ export function PreviewModal({
           </div>
           <button
             type="button"
+            data-dev-id="preview.close"
             onClick={onClose}
             aria-label="Close"
             className="ml-auto flex-none rounded-control border border-line2 bg-raise px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
@@ -102,7 +107,7 @@ export function PreviewModal({
           </button>
         </div>
 
-        <div className="relative flex-1 bg-field">
+        <div data-dev-id="preview.stage" className="relative flex-1 bg-field">
           {kind === "model" ? (
             <ModelViewer partId={partId} />
           ) : (

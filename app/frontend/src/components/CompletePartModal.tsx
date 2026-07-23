@@ -73,7 +73,7 @@ function CaptureChecklist({
     { name: "Altium", rows: ALTIUM_ROWS.filter((r) => needs.includes(r.req)) },
   ].filter((g) => g.rows.length > 0);
   return (
-    <div className="flex flex-col gap-3">
+    <div data-dev-id="complete.cad-checklist" className="flex flex-col gap-3">
       {groups.map((g) => (
         <div key={g.name}>
           <div className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-t3">
@@ -231,13 +231,17 @@ export function CompletePartModal({
       onClick={onClose}
     >
       <div
+        data-dev-id="complete.root"
         className="w-full max-w-[540px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label="Complete this part"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-line px-5 py-4">
+        <div
+          data-dev-id="complete.header"
+          className="flex items-start justify-between border-b border-line px-5 py-4"
+        >
           <div>
             <div className="text-base font-semibold text-t1">Complete This Part</div>
             <div className="mt-0.5 text-xs text-t3">
@@ -266,7 +270,10 @@ export function CompletePartModal({
               checklist fills live as each file lands, with a progress meter and per-row
               validation. Shown whenever the part is missing any CAD or Altium asset. */}
           {showCad ? (
-            <div className="mb-4 overflow-hidden rounded-control border border-line2 bg-field">
+            <div
+              data-dev-id="complete.cad"
+              className="mb-4 overflow-hidden rounded-control border border-line2 bg-field"
+            >
               <div className="flex items-start justify-between gap-3 border-b border-line px-3.5 py-2.5">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-t1">CAD Files</div>
@@ -288,7 +295,10 @@ export function CompletePartModal({
               </div>
               <div className="px-3.5 py-3">
                 <CaptureChecklist needs={needs} received={download.received} />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div
+                  data-dev-id="complete.cad-actions"
+                  className="mt-3 flex flex-wrap items-center gap-2"
+                >
                   {cadSource.data?.url ? (
                     <Button
                       variant="accent"
@@ -308,7 +318,7 @@ export function CompletePartModal({
             </div>
           ) : null}
 
-          <div className="flex flex-col divide-y divide-line">
+          <div data-dev-id="complete.requirements" className="flex flex-col divide-y divide-line">
             {requirements.map((req) => (
               <Requirement
                 key={req.key}
@@ -323,7 +333,7 @@ export function CompletePartModal({
         </div>
 
         <div className="flex justify-end border-t border-line px-5 py-3.5">
-          <Button variant="accent" small onClick={onClose}>
+          <Button data-dev-id="complete.done" variant="accent" small onClick={onClose}>
             Done
           </Button>
         </div>
@@ -373,7 +383,7 @@ function Requirement({
   }
 
   return (
-    <div className="py-2.5">
+    <div data-dev-id="complete.requirement-row" className="py-2.5">
       <div className="flex items-center gap-2.5">
         <span
           className={

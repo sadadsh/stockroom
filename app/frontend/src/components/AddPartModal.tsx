@@ -41,11 +41,13 @@ export function AddPartModal() {
 
   return (
     <div
+      data-dev-id="addpart.scrim"
       className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 p-4 pt-[8vh] backdrop-blur-sm"
       role="presentation"
       onClick={close}
     >
       <motion.div
+        data-dev-id="addpart.root"
         initial={{ opacity: 0, scale: 0.965, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 32 }}
@@ -55,10 +57,14 @@ export function AddPartModal() {
         aria-label="Add a Part"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex h-14 flex-none items-center justify-between border-b border-line px-5">
+        <div
+          data-dev-id="addpart.header"
+          className="flex h-14 flex-none items-center justify-between border-b border-line px-5"
+        >
           <div className="text-base font-semibold text-t1">Add a Part</div>
           <button
             type="button"
+            data-dev-id="addpart.close"
             aria-label="Close"
             onClick={close}
             className="flex h-8 w-8 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
@@ -66,7 +72,7 @@ export function AddPartModal() {
             <CloseIcon />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <IngestPage />
         </div>
       </motion.div>
