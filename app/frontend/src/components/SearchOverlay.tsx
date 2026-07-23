@@ -24,6 +24,7 @@ import {
   normalizeUnit,
   parseMagnitude,
   rowPrimaryValue,
+  rowMergedValue,
   sectionedRail,
   setRange,
   type RailSection as RailSectionData,
@@ -847,9 +848,11 @@ function ResultsTable({
                   (c.numeric ? " text-right font-mono text-t1" : " font-mono text-[11.5px] text-t2")
                 }
               >
-                {c.key === VALUE_COLUMN_KEY
-                  ? rowPrimaryValue(row.category, row.specs)
-                  : cellValue(row.specs, c.key)}
+                {c.keys
+                  ? rowMergedValue(row.specs, c.keys)
+                  : c.key === VALUE_COLUMN_KEY
+                    ? rowPrimaryValue(row.category, row.specs)
+                    : cellValue(row.specs, c.key)}
               </td>
             ))}
             <td className={td + " text-t2"}>{row.manufacturer || "—"}</td>

@@ -17,6 +17,7 @@ import {
   orderFacetsForRail,
   removeOption,
   rowPrimaryValue,
+  rowMergedValue,
   sectionedRail,
   setRange,
   toSpecParams,
@@ -176,6 +177,36 @@ describe("deriveColumns", () => {
     expect(keys[0]).toBe(VALUE_COLUMN_KEY);
     // every OTHER ranked column is retained
     expect(keys).toContain("Package");
+  });
+
+  it("collapses duplicate same-label columns into one adaptive column (FIX-09)", () => {
+    // Two distinct spec keys ("Voltage Rating" for resistors, "Voltage Rating DC" for caps) both
+    // resolve to the label "Voltage Rating" - pre-fix that produced two half-dashes columns.
+    const facets: ParametricFacet[] = [
+      { key: "Voltage Rating", label: "Voltage Rating", kind: "range", count: 40, min: 16, max: 200 },
+      { key: "Voltage Rating DC", label: "Voltage Rating DC", kind: "range", count: 30, min: 6.3, max: 100 },
+      { key: "Tolerance", label: "Tolerance", kind: "range", count: 50, min: 1, max: 10 },
+    ];
+    const cols = deriveColumns(facets, null, 5);
+    const voltage = cols.filter((c) => c.label === "Voltage Rating");
+    // exactly ONE "Voltage Rating" column (the two keys are merged, no more dash soup)
+    expect(voltage).toHaveLength(1);
+    // it carries both constituent keys so each row resolves its own value
+    expect(voltage[0].keys).toEqual(
+      expect.arrayContaining(["Voltage Rating", "Voltage Rating DC"]),
+    );
+    expect(voltage[0].numeric).toBe(false);
+  });
+
+  it("rowMergedValue resolves each row's value from whichever constituent key it carries (FIX-09)", () => {
+    const keys = ["Voltage Rating", "Voltage Rating DC"];
+    // a resistor row (plain key) and a cap row (DC key) each resolve their own value
+    expect(rowMergedValue({ "Voltage Rating": "75 V" }, keys)).not.toBe("—");
+    expect(rowMergedValue({ "Voltage Rating DC": "50 VDC" }, keys)).toBe(
+      cellValue({ "Voltage Rating DC": "50 VDC" }, "Voltage Rating DC"),
+    );
+    // a row with neither key falls back to the em dash
+    expect(rowMergedValue({ Package: "0603" }, keys)).toBe("—");
   });
 
   it("leaves a single-category list's columns unchanged (Resistance keeps its own column)", () => {
