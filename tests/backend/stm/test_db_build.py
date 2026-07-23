@@ -35,8 +35,8 @@ def test_build_populates_nine_table_schema_and_meta_stamp():
         "pin_function",
         "pin_role",
         "package_geometry",
+        "pin_alternate_function",  # Phase 2 (02-01): the AF0-15 mux join table
     }
-    assert "pin_alternate_function" not in tables  # Phase 2 owns this table
 
     assert conn.execute("SELECT COUNT(*) FROM source_artifact").fetchone()[0] == 1
 
@@ -152,11 +152,22 @@ def test_rebuild_with_unchanged_source_skips_reparse(tmp_path):
     second.close()
 
 
+def _copy_with_gpio_modes(src: Path, device_xml_name: str, modes_xml_name: str) -> None:
+    """Copy a real Phase 1 device XML fixture into a fresh source dir ALONG
+    WITH its matching real GPIO-<version>_Modes.xml (Phase 2's AF join now
+    resolves every declared GPIO peripheral version, so a bare device-XML
+    copy with no IP/ sibling would trip the 100%-join-resolution gate)."""
+    (src / device_xml_name).write_bytes((FIXTURES / device_xml_name).read_bytes())
+    ip_dir = src / "IP"
+    ip_dir.mkdir(exist_ok=True)
+    (ip_dir / modes_xml_name).write_bytes((FIXTURES / "IP" / modes_xml_name).read_bytes())
+
+
 def test_changing_an_input_byte_changes_source_sha256(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
-    (src / "STM32F030RCTx.xml").write_bytes(
-        (FIXTURES / "STM32F030RCTx.xml").read_bytes()
+    _copy_with_gpio_modes(
+        src, "STM32F030RCTx.xml", "GPIO-STM32F091_gpio_v1_0_Modes.xml"
     )
     sha_before = db_mod.StmIndex.build(src).meta()["source_sha256"]
 
@@ -173,15 +184,15 @@ def test_rebuild_reparses_when_source_changes(tmp_path):
     db_path = tmp_path / "index.sqlite"
     src = tmp_path / "src"
     src.mkdir()
-    (src / "STM32F030RCTx.xml").write_bytes(
-        (FIXTURES / "STM32F030RCTx.xml").read_bytes()
+    _copy_with_gpio_modes(
+        src, "STM32F030RCTx.xml", "GPIO-STM32F091_gpio_v1_0_Modes.xml"
     )
     first = db_mod.StmIndex.build(src, db_path=db_path)
     assert first.mcu_count() == 1
     first.close()
 
-    (src / "STM32F048C6Ux.xml").write_bytes(
-        (FIXTURES / "STM32F048C6Ux.xml").read_bytes()
+    _copy_with_gpio_modes(
+        src, "STM32F048C6Ux.xml", "GPIO-STM32F042_gpio_v1_0_Modes.xml"
     )
     second = db_mod.StmIndex.build(src, db_path=db_path)
     assert second.mcu_count() == 2

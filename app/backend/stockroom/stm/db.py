@@ -17,6 +17,7 @@ this phase's Plan 02 (self-audit gate + check_availability guard).
 
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 import xml.etree.ElementTree as ET
@@ -27,6 +28,8 @@ from pathlib import Path
 from stockroom.stm import geometry as geometry_mod
 from stockroom.stm import source as source_mod
 
+logger = logging.getLogger(__name__)
+
 # Classification revision: bump whenever canonical()/electrical_class()/roles() or
 # the schema's classification-derived columns change meaning, so a database built
 # by older classification code is never silently trusted (StmIndex.load() checks
@@ -36,6 +39,18 @@ from stockroom.stm import source as source_mod
 #     (mcu_id, physical_pin_number, raw_pin_name) so same-position PINREMAP
 #     identities are never collapsed.
 CLASSIFIER_REV = 1
+
+# Alternate-function (AF0-15 mux) revision, stamped into meta.af_schema_rev the
+# same way CLASSIFIER_REV/GEOMETRY_REV are - StmIndex.load() refuses a file
+# whose stamped af_schema_rev does not match this constant (Phase 2, DATA-08).
+#   rev 1 (2026-07-23): initial AF0-15 mux join (parse_gpio_ip_xml), keyed by
+#     raw_pin_name (never canonical_pin_name - PINREMAP/_C-suffix collisions
+#     collapse under the regex-derived canonical name). F1's classic
+#     __HAL_AFIO_REMAP_* legacy shape is recognized and skipped (zero rows,
+#     no gate trip); the 100%-join-resolution gate binds to FILE resolution
+#     only (a device's declared GPIO IP version resolving to an actual
+#     GPIO-<version>_Modes.xml on disk), never to content shape.
+AF_SCHEMA_REV = 1
 
 _NS = re.compile(r"\{[^}]*\}")
 
@@ -194,6 +209,107 @@ def parse_mcu_xml(path: Path) -> McuData:
                 pin.signals.append(Signal(child.get("Name", ""), child.get("IOModes", "")))
         mcu.pins.append(pin)
     return mcu
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AF0-15 mux (Phase 2, DATA-04) — join a device's declared GPIO IP version to
+# its GPIO-<version>_Modes.xml. NEW: no Hardware equivalent exists (the legacy
+# app never built this join at all).
+# ─────────────────────────────────────────────────────────────────────────────
+class StmGpioModesNotFoundError(Exception):
+    """Raised when a device's declared GPIO IP Version has no matching
+    GPIO-<version>_Modes.xml on disk under the source's IP/ directory - the
+    literal 100%-join-resolution gate (DATA-04). The build refuses to
+    complete rather than silently shipping a device with an unresolved AF
+    join; zero orphans is the only acceptable outcome."""
+
+
+class StmAfParseError(Exception):
+    """Raised when a GPIO_AF SpecificParameter's PossibleValue matches
+    NEITHER the AF0-15 shape (``^GPIO_AF(\\d+)_(.+)$``) NOR the F1 legacy
+    ``__HAL_AFIO_REMAP_`` prefix - a genuinely unrecognized value shape that
+    must be surfaced, never silently dropped (DATA-04/Pitfall-1: "surfaced
+    and handled, never silently mis-parsed")."""
+
+
+_AF_PATTERN = re.compile(r"^GPIO_AF(\d+)_(.+)$")
+_LEGACY_AFIO_REMAP_PREFIX = "__HAL_AFIO_REMAP_"
+
+
+def _is_legacy_afio_remap(value: str) -> bool:
+    """True for F1's classic peripheral-level partial-remap tokens (e.g.
+    ``__HAL_AFIO_REMAP_TIM2_PARTIAL_2``). The classic F1 line (F100/F103/
+    F105/F107) predates the AF0-15 mux entirely - verified this session by
+    parsing every GPIO_AF SpecificParameter value in its 7 GPIO Modes files:
+    100% carry this exact prefix. These contribute zero pin_alternate_function
+    rows and must NOT trip the join gate (an architecturally true zero, not a
+    parsing gap)."""
+    return value.startswith(_LEGACY_AFIO_REMAP_PREFIX)
+
+
+def parse_gpio_ip_xml(ip_dir: Path, version: str) -> dict[str, list[tuple[str, int, str]]]:
+    """Parse one ``GPIO-<version>_Modes.xml`` into
+    ``{raw_pin_name: [(signal, af_index, peripheral), ...]}``.
+
+    Raises StmGpioModesNotFoundError when the resolved file does not exist on
+    disk - this IS the literal 100%-join-resolution gate (DATA-04).
+
+    A real ElementTree parse (never a brittle ``/>`` string scan) is required:
+    STM32N6's per-device ``<IP Name="GPIO">`` element is NOT self-closing (it
+    has ``<ContextSplit>`` children) while F0's is - only ``.get()``/``.attrib``
+    handle both forms uniformly. This function itself must also handle two
+    distinct GPIO_AF shapes, verified against the real source this session:
+    the modern AF0-15 shape, where ``<SpecificParameter Name="GPIO_AF">`` is a
+    DIRECT child of ``<PinSignal>``, and F1's legacy shape, where that same
+    element is nested one level deeper inside a ``<RemapBlock>`` child of
+    ``<PinSignal>`` (confirmed against the real
+    ``GPIO-STM32F103xC_gpio_v1_0_Modes.xml`` - not the shape the phase's
+    initial research described, which assumed a direct child uniformly). GPIO_AF
+    SpecificParameter elements are therefore located by walking each
+    PinSignal's FULL subtree (``ps.iter()``), not just its direct children, so
+    both shapes resolve to the same classification path.
+    """
+    path = Path(ip_dir) / f"GPIO-{version}_Modes.xml"
+    if not path.exists():
+        raise StmGpioModesNotFoundError(
+            f"GPIO IP version {version!r} has no matching Modes file at "
+            f"{path} - 100%-join-resolution gate (DATA-04)"
+        )
+    root = ET.parse(path).getroot()
+    result: dict[str, list[tuple[str, int, str]]] = {}
+    for gp in root:
+        if _tag(gp) != "GPIO_Pin":
+            continue
+        pin_name = (gp.get("Name", "") or "").strip()
+        if not pin_name:
+            continue
+        entries: list[tuple[str, int, str]] = []
+        for ps in gp:
+            if _tag(ps) != "PinSignal":
+                continue
+            signal = (ps.get("Name", "") or "").strip()
+            for sp in ps.iter():
+                if _tag(sp) != "SpecificParameter" or sp.get("Name") != "GPIO_AF":
+                    continue
+                for pv in sp:
+                    if _tag(pv) != "PossibleValue":
+                        continue
+                    value = (pv.text or "").strip()
+                    m = _AF_PATTERN.match(value)
+                    if m:
+                        entries.append((signal, int(m.group(1)), m.group(2)))
+                    elif _is_legacy_afio_remap(value):
+                        continue
+                    else:
+                        raise StmAfParseError(
+                            f"unrecognized GPIO_AF value {value!r} for pin "
+                            f"{pin_name!r} signal {signal!r} in {path.name} - "
+                            "matches neither the AF0-15 shape nor the F1 "
+                            "legacy __HAL_AFIO_REMAP_ prefix"
+                        )
+        if entries:
+            result[pin_name] = entries
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -381,6 +497,17 @@ CREATE TABLE package_geometry (
     depopulation TEXT,
     citation TEXT, notes TEXT);
 
+-- the AF0-15 mux (Phase 2), sourced from GPIO IP XML, joined onto
+-- mcu_package_pin by raw_pin_name (NEVER canonical_pin_name - two
+-- same-position PINREMAP identities, or a plain ball and its _C-suffix
+-- sibling, share a canonical name but must each carry their own AF set).
+CREATE TABLE pin_alternate_function (
+    id INTEGER PRIMARY KEY, mcu_package_pin_id INTEGER NOT NULL,
+    af_index INTEGER NOT NULL CHECK(af_index BETWEEN 0 AND 15),
+    signal TEXT NOT NULL,
+    peripheral TEXT,
+    UNIQUE(mcu_package_pin_id, af_index, signal));
+
 CREATE INDEX ix_pin_mcu     ON mcu_package_pin(mcu_id);
 CREATE INDEX ix_role_pin    ON pin_role(mcu_package_pin_id);
 CREATE INDEX ix_func_pin    ON pin_function(mcu_package_pin_id);
@@ -388,6 +515,8 @@ CREATE INDEX ix_mcu_family  ON mcu(family);
 CREATE INDEX ix_mcu_package ON mcu(package_name);
 CREATE INDEX ix_periph_mcu  ON mcu_peripheral(mcu_id);
 CREATE INDEX ix_periph_name ON mcu_peripheral(peripheral_name);
+CREATE INDEX ix_af_pin      ON pin_alternate_function(mcu_package_pin_id);
+CREATE INDEX ix_af_signal   ON pin_alternate_function(signal);
 """
 
 
@@ -590,6 +719,21 @@ class StmIndex:
         total = len(files)
         power_pad_observed: dict[str, set[bool]] = {}
         n_mcu = 0
+        # AF0-15 mux ingest (Phase 2, DATA-04): ip_dir is the sibling IP/
+        # directory the GPIO Modes files live under, exactly CubeMX's own
+        # mcu/IP/ layout. af_cache holds one parsed {raw_pin_name: [...]}
+        # dict per GPIO IP version per build - 2,123 real devices resolve to
+        # only ~96 distinct Modes files, so re-parsing per-device would be
+        # wasteful. legacy_afio_device_count tracks F1-shaped devices (logged
+        # as an accounted-for zero, never an orphan); af_orphan_join_count
+        # stays 0 in the normal path (a real orphan already raises
+        # StmGpioModesNotFoundError directly, well before this counter would
+        # ever need to be non-zero - kept as an explicit, defense-in-depth
+        # value the self-audit re-asserts rather than only trusting the raise).
+        ip_dir = cubemx_source / "IP"
+        af_cache: dict[str, dict[str, list[tuple[str, int, str]]]] = {}
+        legacy_afio_device_count = 0
+        af_orphan_join_count = 0
         for i, f in enumerate(files):
             if progress and i % 25 == 0:
                 progress({"pct": int(100 * i / total) if total else 0, "message": f.stem})
@@ -644,6 +788,7 @@ class StmIndex:
                     (mcu_id, periph.name, periph.instance_name, periph.version),
                 )
 
+            pin_ids_by_raw_name: dict[str, list[int]] = {}
             for pin in mcu.pins:
                 ec = electrical_class(pin)
                 canon, port, idx = canonical(pin)
@@ -670,6 +815,7 @@ class StmIndex:
                         geo["lqfp_side"],
                     ),
                 ).lastrowid
+                pin_ids_by_raw_name.setdefault(pin.name, []).append(pin_id)
                 for s in pin.signals:
                     conn.execute(
                         "INSERT INTO pin_function (mcu_package_pin_id, function_name, "
@@ -682,6 +828,56 @@ class StmIndex:
                         "role_class) VALUES (?,?,?)",
                         (pin_id, rn, rc),
                     )
+
+            # AF0-15 mux ingest (Phase 2, DATA-04): the GPIO IP version for
+            # this device is read from the mcu_peripheral row just inserted
+            # above, matched by the EXACT peripheral_name = 'GPIO' (never a
+            # substring/LIKE '%GPIO%' test - STM32U5 also carries an
+            # LPBAMLPGPIO instance whose name contains "GPIO"). A device with
+            # no GPIO peripheral row at all (synthetic fixtures exercising
+            # unrelated behavior) simply gets zero AF rows - not an error.
+            gpio_peripheral = conn.execute(
+                "SELECT version FROM mcu_peripheral WHERE mcu_id = ? AND "
+                "peripheral_name = 'GPIO'",
+                (mcu_id,),
+            ).fetchone()
+            if gpio_peripheral is not None and gpio_peripheral["version"]:
+                version = gpio_peripheral["version"]
+                if version not in af_cache:
+                    try:
+                        af_cache[version] = parse_gpio_ip_xml(ip_dir, version)
+                    except StmGpioModesNotFoundError:
+                        af_orphan_join_count += 1
+                        raise
+                af_map = af_cache[version]
+                if not af_map:
+                    # Every GPIO_AF value in this version's Modes file was
+                    # either absent or a recognized F1 legacy AFIO-remap
+                    # token (parse_gpio_ip_xml raises on any genuinely
+                    # unrecognized shape, so an empty result here can only
+                    # mean the architecturally-true F1 zero-AF-mux case).
+                    legacy_afio_device_count += 1
+                for raw_name, af_list in af_map.items():
+                    pin_ids = pin_ids_by_raw_name.get(raw_name)
+                    if not pin_ids:
+                        # Shared-Modes-file superset case: this GPIO_Pin
+                        # entry belongs to a different package/density
+                        # variant sharing the same IP version - silently
+                        # skipped, never gate-counted.
+                        continue
+                    for pin_id in pin_ids:
+                        for signal, af_index, peripheral in af_list:
+                            conn.execute(
+                                "INSERT OR IGNORE INTO pin_alternate_function "
+                                "(mcu_package_pin_id, af_index, signal, peripheral) "
+                                "VALUES (?,?,?,?)",
+                                (pin_id, af_index, signal, peripheral),
+                            )
+
+        logger.info(
+            "AF join: legacy AFIO-remap family: %d devices, 0 AF rows, expected",
+            legacy_afio_device_count,
+        )
 
         # package_geometry is a static, curated reference table (stm.geometry.
         # PACKAGE_GEOMETRY) - populated in full regardless of which packages this
