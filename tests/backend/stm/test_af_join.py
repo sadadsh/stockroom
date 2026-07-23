@@ -229,3 +229,81 @@ def test_f1_legacy_family_is_logged_as_accounted_for_and_not_an_orphan(caplog):
         for r in caplog.records
     )
     db_mod.run_self_audit(idx._conn)  # must not raise - a legitimate zero
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plan 02 Task 2: grain integrity through the PINREMAP and _C-suffix collision
+# shapes (GREEN regression locks - Phase 1 already preserves both
+# same-position identities; a collapse here is a Phase 1 regression, never an
+# accepted gap, and must never be papered over by joining onto whichever
+# single row survives)
+# ─────────────────────────────────────────────────────────────────────────────
+def test_pinremap_same_position_identities_each_get_their_own_distinct_af_rows():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "pinremap")
+    conn = idx._conn
+    mcu_id = _mcu_id(conn, "SYNTH_PINREMAP_AF_Tx")
+
+    rows = conn.execute(
+        "SELECT physical_pin_number, raw_pin_name FROM mcu_package_pin "
+        "WHERE mcu_id = ? AND physical_pin_number = '30'",
+        (mcu_id,),
+    ).fetchall()
+    assert len(rows) == 2, "both same-position PINREMAP identities must survive as distinct rows"
+    raw_names = {r["raw_pin_name"] for r in rows}
+    assert raw_names == {"PA9", "PA9_Remap"}
+
+    pa9_af = _af_rows(conn, mcu_id, "PA9")
+    assert [(r["af_index"], r["signal"], r["peripheral"]) for r in pa9_af] == [
+        (1, "USART1_TX", "USART1"),
+    ]
+    remap_af = _af_rows(conn, mcu_id, "PA9_Remap")
+    assert [(r["af_index"], r["signal"], r["peripheral"]) for r in remap_af] == [
+        (4, "USART2_TX", "USART2"),
+    ]
+    # Never a merged/shared set: PA9 must not see USART2_TX and vice versa.
+    assert "USART2_TX" not in {r["signal"] for r in pa9_af}
+    assert "USART1_TX" not in {r["signal"] for r in remap_af}
+
+
+def test_c_suffix_ball_gets_its_own_af_rows_never_inheriting_the_digital_pins_mux():
+    idx = db_mod.StmIndex.build(AF_FIXTURES / "c_suffix")
+    conn = idx._conn
+    mcu_id = _mcu_id(conn, "SYNTH_C_SUFFIX_Tx")
+
+    # Both balls share a canonical_pin_name ("PC2") under the regex-collapsed
+    # canonical() rule, but are DISTINCT mcu_package_pin rows (different
+    # physical positions) with distinct raw_pin_name values.
+    canon_rows = conn.execute(
+        "SELECT raw_pin_name, canonical_pin_name FROM mcu_package_pin "
+        "WHERE mcu_id = ? AND canonical_pin_name = 'PC2'",
+        (mcu_id,),
+    ).fetchall()
+    assert {r["raw_pin_name"] for r in canon_rows} == {"PC2", "PC2_C"}
+
+    pc2_af = _af_rows(conn, mcu_id, "PC2")
+    assert [(r["af_index"], r["signal"], r["peripheral"]) for r in pc2_af] == [
+        (5, "SPI2_MISO", "SPI2"),
+    ]
+    pc2_c_af = _af_rows(conn, mcu_id, "PC2_C")
+    assert [(r["af_index"], r["signal"], r["peripheral"]) for r in pc2_c_af] == [
+        (9, "COMP1_INM", "COMP1"),
+    ]
+    assert "COMP1_INM" not in {r["signal"] for r in pc2_af}
+    assert "SPI2_MISO" not in {r["signal"] for r in pc2_c_af}
+
+
+def test_af_join_code_never_falls_back_to_canonical_pin_name():
+    import inspect
+
+    src = inspect.getsource(db_mod.StmIndex.build)
+    # The AF-ingest wiring must key strictly on raw_pin_name; canonical_pin_name
+    # is never referenced in that specific section of the build loop (bounded
+    # to the AF-ingest comment block through the F1-legacy summary log call
+    # that immediately follows it, so this does not spill into the NEXT
+    # device iteration's mcu_package_pin insert, which legitimately uses
+    # canonical_pin_name for an unrelated column).
+    af_ingest_start = src.index("gpio_peripheral = conn.execute(")
+    af_ingest_end = src.index("AF join: legacy AFIO-remap family", af_ingest_start)
+    af_ingest_section = src[af_ingest_start:af_ingest_end]
+    assert "canonical_pin_name" not in af_ingest_section
+    assert "pin_ids_by_raw_name" in af_ingest_section
