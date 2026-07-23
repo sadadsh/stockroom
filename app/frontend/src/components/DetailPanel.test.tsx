@@ -261,7 +261,8 @@ describe("DetailPanel attach-after affordance", () => {
         onAttachFootprint={vi.fn()}
       />,
     );
-    // the scattered per-tile attach buttons are gone; one Complete Part action opens the window
+    // readiness is tucked in a popover: open it, then the one Complete Part action opens the window
+    await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
     await userEvent.click(within(dialog).getByRole("button", { name: "Add Symbol" }));
@@ -281,6 +282,7 @@ describe("DetailPanel attach-after affordance", () => {
         onAttachFootprint={vi.fn()}
       />,
     );
+    await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     await userEvent.click(screen.getByRole("button", { name: /Complete Part/ }));
     const dialog = await screen.findByRole("dialog", { name: /complete this part/i });
     await userEvent.click(within(dialog).getByRole("button", { name: "Add Footprint" }));
@@ -310,6 +312,7 @@ describe("DetailPanel attach-after affordance", () => {
     // detail() is fully KiCad-complete (symbol + footprint + model) and BASE.missing is [],
     // so without the Altium gap the trigger would not show.
     wrap(<DetailPanel detail={detail()} {...BASE} onAttachSymbol={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     const trigger = await screen.findByRole("button", { name: /Complete Part/ });
     expect(trigger).toHaveTextContent("Altium symbol");
     expect(trigger).toHaveTextContent("Altium footprint");
