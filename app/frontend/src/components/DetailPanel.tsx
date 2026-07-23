@@ -275,7 +275,7 @@ export function DetailPanel({
               variant="hero"
               name="3D Model"
               present={hasModel}
-              className="h-[264px]"
+              className="h-[300px]"
               art={<CubeArt />}
               thumb={
                 hasModel ? (
@@ -1079,25 +1079,30 @@ function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
   // consistent rhythm; the pane owns its scroll, so however many rows a part carries, the page
   // never grows.
   return (
-    <div data-dev-id="detail.specs" className="flex flex-col">
+    <div data-dev-id="detail.specs" className="flex flex-col gap-3.5">
       {groups.map((group) => (
-        <section key={group.title} data-dev-id="detail.spec-group" className="mb-4 last:mb-0">
-          <div className="mb-1 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
-            {group.title}
+        <section key={group.title} data-dev-id="detail.spec-group">
+          {/* Altium property-grid feel: the group name sits on a divider band, then clean rows with
+              no per-row hairline (that ledger look is gone) - separation is the divider + a live
+              row hover, and the value reads in the mono data face. */}
+          <div className="mb-1 flex items-center gap-2 border-b border-line pb-1">
+            <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-t3">
+              {group.title}
+            </span>
           </div>
-          <dl>
+          <dl className="flex flex-col">
             {group.rows.map((row) => (
               <div
                 key={row.key}
-                className="flex items-baseline justify-between gap-3 border-b border-line/50 py-1 last:border-0"
+                className="-mx-1.5 flex items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]"
               >
                 <dt
-                  className="min-w-0 flex-1 break-words text-xs text-t2"
+                  className="min-w-0 flex-1 truncate text-xs text-t2"
                   title={typeof row.label === "string" ? row.label : undefined}
                 >
                   {row.label}
                 </dt>
-                <dd className="tnum max-w-[54%] flex-none break-words text-right font-mono text-xs text-t1">
+                <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
                   {row.unit ? `${row.value} ${row.unit}` : row.value}
                 </dd>
               </div>

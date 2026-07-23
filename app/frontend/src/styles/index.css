@@ -14,12 +14,12 @@
     /* Altium Dark Gray chrome ladder (sampled): recessed field #2f2f2f < substrate
        #2d2d2d < panel/tree #3b3b3b < panel body #3e4041 < toolbar/status #404040 <
        command bar/buttons #4e4e4e. The steps are close on purpose; borders separate. */
-    --c-canvas: #2b2b2c;
-    --c-rail: #333335;
-    --c-surface: #2f2f30;
-    --c-raise: #3a3b3d;
-    --c-raise2: #47484b;
-    --c-field: #2c2c2e;
+    --c-canvas: #232426;
+    --c-rail: #2b2c2e;
+    --c-surface: #2a2b2d;
+    --c-raise: #3f4044;
+    --c-raise2: #4a4b4f;
+    --c-field: #2a2b2d;
     /* the defining Altium move: a VISIBLE thin cool border, lighter than the panel,
        so the workspace reads as contiguous docked panes rather than floating cards. */
     --c-line: #4b4c4f;
@@ -27,7 +27,7 @@
     --c-popover: #37383a;
     /* the Altium "toolbar / title strip / status bar" band: the lighter chrome gray
        that carries panel title strips and the bottom status bar (sampled #404040). */
-    --c-band: #3f4043;
+    --c-band: #47484c;
     --c-t1: #d7d8da;
     /* muted tiers lightened for legibility on the medium charcoal: the shipped #9a9c9f/#6d6f73
        measured ~2.6:1 for faint text (below the AA floor); these clear ~3.5-5:1. */

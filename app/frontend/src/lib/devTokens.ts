@@ -51,7 +51,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#2b2b2c", light: "#d7d8db" },
+    default: { dark: "#232426", light: "#d7d8db" },
   },
   {
     cssVar: "--c-raise",
@@ -59,7 +59,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#3a3b3d", light: "#eeeeef" },
+    default: { dark: "#3f4044", light: "#eeeeef" },
   },
   {
     cssVar: "--c-field",
@@ -67,7 +67,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#2c2c2e", light: "#ffffff" },
+    default: { dark: "#2a2b2d", light: "#ffffff" },
   },
   {
     cssVar: "--c-line",
