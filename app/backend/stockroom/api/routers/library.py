@@ -33,21 +33,6 @@ from stockroom.verify.record_diff import extract_symbol_node, field_diff
 _HISTORY_MAX = 100
 
 
-def _preferred_cad_vendor(config) -> str:
-    """Which CAD-source vendor the guided window opens, from the saved logins: Ultra Librarian or
-    SnapEDA when the user has that login (so the guided window is signed in and can drive the
-    provider's own download control), and DigiKey otherwise. DigiKey is the login-free default: a
-    part's DigiKey page gathers the SnapEDA / Ultra Librarian / SamacSys CAD downloads in ONE
-    place, so a user with no vendor login still sees every option to pick from without signing in
-    to anything."""
-    has_ul = bool(getattr(config, "ul_username", "") or getattr(config, "ul_password", ""))
-    has_snap = bool(getattr(config, "snapeda_username", "") or getattr(config, "snapeda_password", ""))
-    if has_ul:
-        return "ultralibrarian"
-    if has_snap:
-        return "snapeda"
-    return "digikey"
-
 # Single-flight guard for POST /rescan: two concurrent rescans would double the API quota
 # AND clobber each other's rescan-state.json (each engine saves its whole in-memory dict,
 # last-writer-wins), so a second POST while one is QUEUED/RUNNING must return the SAME
@@ -404,20 +389,15 @@ def library_router(require_token) -> APIRouter:
 
         record = ctx.ops.load_record(part_id)
         needs = [req.value for req in capture_needs(record)]
-        # Primary source: an Ultra Librarian / SnapEDA page (both KiCad + Altium
-        # downloads behind a real control the guided window can click). Which one is picked from
-        # the user's saved vendor login (SnapEDA if that is the only one set, else Ultra Librarian).
-        from stockroom.enrich.asset_source import resolve_asset_page
-
-        page = resolve_asset_page(record.mpn, vendor=_preferred_cad_vendor(ctx.config))
-        if page is not None:
-            return {"url": page.url, "mpn": record.mpn, "vendor": page.vendor, "needs": needs}
-        # Fallback: open the DigiKey product page.
+        # DigiKey is the single CAD source: a part's DigiKey page gathers the SnapEDA / Ultra
+        # Librarian / SamacSys CAD downloads in ONE place. When the API resolves an exact product
+        # page we open that; otherwise the resolver falls back to a DigiKey keyword search, so a
+        # part with an mpn ALWAYS opens a real DigiKey page even with no DigiKey creds.
         from stockroom.enrich.cad_source import resolve_digikey_cad_source
 
         digikey = next((a for a in build_refresh_adapters(ctx)
                         if getattr(a, "vendor", "") == "DigiKey"), None)
-        url = resolve_digikey_cad_source(record.mpn, digikey) if digikey is not None else None
+        url = resolve_digikey_cad_source(record.mpn, digikey)
         return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
 
     @r.post("/rescan")
