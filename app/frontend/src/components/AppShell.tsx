@@ -66,11 +66,13 @@ function ShellStatusBar() {
     ? Object.values(facets.data.by_category).reduce((sum, n) => sum + n, 0)
     : null;
   const section = route.charAt(0).toUpperCase() + route.slice(1);
+  // State labels reuse the app's own noun for the collection ("components", as in the
+  // rail, the list title, and the parts count) - no new vocabulary, and no y-words.
   const state = facets.isError
-    ? { dot: "bg-err", label: "Library error" }
+    ? { dot: "bg-err", label: "Component load failed" }
     : facets.isLoading
-      ? { dot: "bg-t3", label: "Loading library" }
-      : { dot: "bg-ok", label: "Library ready" };
+      ? { dot: "bg-t3", label: "Loading components" }
+      : { dot: "bg-ok", label: "Components loaded" };
   return (
     <footer
       data-dev-id="shell.statusbar"
