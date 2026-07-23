@@ -5,6 +5,7 @@ import { DevModeProvider } from "../lib/devMode";
 import { Text } from "../lib/copy";
 import { DevPanel } from "./DevPanel";
 import { DevInspector } from "./DevInspector";
+import { Icon } from "./Icon";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -41,6 +42,9 @@ function Harness() {
         <div data-dev-id="detail.title" className="text-t1">
           <Text id="detail.title.copy">Original Title</Text>
         </div>
+        <button type="button" data-dev-id="rail.tab.components" aria-label="Components tab" className="text-t1">
+          <Icon id="nav.components" />
+        </button>
         <DevPanel />
         <DevInspector />
       </DevModeProvider>
@@ -132,11 +136,129 @@ describe("DevPanel inspect-first shell", () => {
     expect(scrollIntoViewMock).toHaveBeenCalled();
   });
 
-  it("renders the Icon and Box facet tabs disabled", () => {
+  it("enables the Icon facet tab and keeps the Box tab disabled", () => {
     render(<Harness />);
     toggleDevMode();
-    expect(screen.getByRole("tab", { name: "Icon" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Icon" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "Box" })).toBeDisabled();
+  });
+
+  it("the Icon tab shows an empty state when the selection has no icon", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Complete Part" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+    expect(
+      screen.getByText(/select an element that is or contains an icon/i),
+    ).toBeInTheDocument();
+  });
+
+  it("the Icon tab shows a same-category glyph picker + a raw-SVG editor for a selected icon", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Components tab" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+
+    // The raw-SVG editor is present (nav.components is a primary line icon, so raw editing is allowed).
+    expect(screen.getByLabelText("Edit icon SVG body")).toBeInTheDocument();
+    // The picker offers other primary glyphs (same category), and marks the current glyph active.
+    expect(screen.getByRole("button", { name: "Swap to nav.projects" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Swap to nav.components" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("clicking a picker glyph swaps the icon (the panel preview follows the resolved target)", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Components tab" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap to nav.projects" }));
+    // The resolved target moves to the picked glyph.
+    expect(screen.getByRole("button", { name: "Swap to nav.projects" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Swap to nav.components" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("editing the raw SVG drives a live, sanitised preview (no script survives)", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Components tab" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+
+    const editor = screen.getByLabelText("Edit icon SVG body");
+    fireEvent.change(editor, {
+      target: { value: '<path d="M2 2h9"/><script>alert(1)</script>' },
+    });
+    const preview = screen.getByTestId("icon-preview");
+    expect(preview.innerHTML).toContain('d="M2 2h9"');
+    expect(preview.innerHTML).not.toContain("script");
+  });
+
+  it("the per-icon Reset clears the override back to the registry default", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Components tab" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+
+    const editor = screen.getByLabelText("Edit icon SVG body");
+    fireEvent.change(editor, { target: { value: '<path d="M0 0h4"/>' } });
+    expect(editor).toHaveValue('<path d="M0 0h4"/>');
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset to default" }));
+    expect(screen.getByLabelText("Edit icon SVG body")).not.toHaveValue('<path d="M0 0h4"/>');
+  });
+
+  it("art/brand icons are swap-only (no raw-SVG textarea)", () => {
+    function ArtHarness() {
+      return (
+        <ThemeProvider>
+          <DevModeProvider>
+            <button type="button" data-dev-id="card.symbol" aria-label="Symbol art" className="text-t1">
+              <Icon id="art.symbol" />
+            </button>
+            <DevPanel />
+            <DevInspector />
+          </DevModeProvider>
+        </ThemeProvider>
+      );
+    }
+    render(<ArtHarness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Symbol art" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+
+    // Swap picker present, raw editor absent (D-03: art/brand markup is not hand-edited first).
+    expect(screen.getByRole("button", { name: "Swap to art.footprint" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Edit icon SVG body")).not.toBeInTheDocument();
+  });
+
+  it("a new icon selection surfaces the Icon tab automatically", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByRole("button", { name: "Components tab" }));
+    // No manual tab click: the Icon editor is already showing.
+    expect(screen.getByLabelText("Edit icon SVG body")).toBeInTheDocument();
+  });
+
+  it("DevPanel's own close glyph renders through <Icon> (itself inspectable)", () => {
+    render(<Harness />);
+    toggleDevMode();
+    expect(document.querySelector('[data-icon-id="dev.close"]')).toBeInTheDocument();
+  });
+
+  it("DevPanel's reset dot renders through <Icon> once a token is overridden", () => {
+    render(<Harness />);
+    toggleDevMode();
+    fireEvent.change(screen.getByLabelText("Accent value"), { target: { value: "#123456" } });
+    expect(document.querySelector('[data-icon-id="dev.reset"]')).toBeInTheDocument();
   });
 
   it("Show IDs renders one badge per [data-dev-id] node in the panel's world", () => {
