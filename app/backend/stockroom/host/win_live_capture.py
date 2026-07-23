@@ -672,22 +672,8 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
             return "altium"
         return None
 
-    cad_state = {"cleaned": False}
-
     def _on_loaded() -> None:
         nxt = _next_format()
-        try:
-            cur = win.get_current_url()
-        except Exception:  # noqa: BLE001
-            cur = None
-        if nxt and "/models/" in (cur or "") and not cad_state["cleaned"]:
-            cad_state["cleaned"] = True
-            print("REALCAPTURE: one-time clean reload before the first download", flush=True)
-            try:
-                win.evaluate_js("setTimeout(function(){location.reload();},400);")
-            except Exception:  # noqa: BLE001
-                pass
-            return
         W._inject_cad_scripts(win, url, needs_values, mpn, driver_formats=([nxt] if nxt else []))
 
     win.events.loaded += _on_loaded
@@ -697,9 +683,9 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
         print(f"CAPTURE: {len(session.received)}/{len(session.needs)} -> "
               f"{sorted(r.value for r in session.received)}", flush=True)
         if not session.is_complete() and _next_format() is not None:
-            print(f"CAPTURE: reloading for the next format ({_next_format()})", flush=True)
+            print(f"CAPTURE: navigating back to product for the next format ({_next_format()})", flush=True)
             try:
-                win.evaluate_js("setTimeout(function(){location.reload();},600);")
+                win.evaluate_js("setTimeout(function(){location.href=" + json.dumps(url) + ";},600);")
             except Exception:  # noqa: BLE001
                 pass
 
