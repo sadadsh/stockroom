@@ -108,6 +108,7 @@ import {
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ExternalIcon } from "../components/icons";
+import { Icon } from "../components/Icon";
 
 const INPUT_CLS =
   "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 " +
@@ -345,10 +346,7 @@ function ProjectRow({
         aria-hidden
         className="mt-0.5 grid h-9 w-9 flex-none place-items-center rounded-control border border-line2 bg-field text-t2"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M9 3v18M15 3v18M3 9h18M3 15h18" opacity="0.55" />
-        </svg>
+        <Icon id="glyph.project" className="h-[18px] w-[18px]" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
