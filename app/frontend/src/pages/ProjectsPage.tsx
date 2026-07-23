@@ -192,11 +192,11 @@ export function ProjectsPage() {
 
   return (
     <>
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1" data-dev-id="projects.root">
       {/* picker: self-heads like the Components picker (no full-width page header band) */}
-      <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-4">
+      <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-4" data-dev-id="projects.picker">
           <div className="flex items-baseline gap-2 px-2 pb-2.5">
-            <h1 className="text-lg font-semibold text-t1">Projects</h1>
+            <h1 className="text-lg font-semibold text-t1" data-dev-id="projects.picker-title">Projects</h1>
             {projectsQuery.data ? (
               <span className="tnum font-mono text-2xs text-t3">{projects.length}</span>
             ) : null}
@@ -220,7 +220,7 @@ export function ProjectsPage() {
         </div>
 
         {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+        <div className="min-w-0 flex-1 overflow-y-auto px-[30px] pt-[22px]" data-dev-id="projects.detail">
           {selected ? (
             <ProjectDetailView
               key={selected.id}
@@ -306,7 +306,7 @@ function ProjectPicker({
     );
   }
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5" data-dev-id="projects.list">
       {projects.map((project) => (
         <ProjectRow
           key={project.id}
@@ -331,6 +331,7 @@ function ProjectRow({
   return (
     <button
       type="button"
+      data-dev-id="projects.row"
       data-testid={`project-row-${project.id}`}
       onClick={onSelect}
       className={
@@ -392,7 +393,7 @@ function RegisterBar({
   busy: boolean;
 }) {
   return (
-    <div className="flex-none border-t border-line px-2 py-3">
+    <div className="flex-none border-t border-line px-2 py-3" data-dev-id="projects.register">
       <Eyebrow className="mb-1.5">Register Project</Eyebrow>
       <div className="flex flex-col gap-2">
         <input
@@ -404,12 +405,14 @@ function RegisterBar({
           placeholder="Absolute path to a KiCad project folder"
           className={INPUT_CLS}
           spellCheck={false}
+          data-dev-id="projects.register-input"
         />
         <Button
           variant="accent"
           onClick={onRegister}
           disabled={busy || !value.trim()}
           className="w-full justify-center"
+          data-dev-id="projects.register-action"
         >
           {busy ? "Registering..." : "Register Project"}
         </Button>
@@ -456,7 +459,7 @@ function ProjectDetailView({
 
   return (
     <div className="max-w-[860px] pb-12">
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-4 flex items-start justify-between gap-4" data-dev-id="projects.detail-header">
         <div className="min-w-0">
           <div className="truncate text-xl font-semibold text-t1">{project.name}</div>
           <div className="truncate font-mono text-xs text-t3" title={project.root}>
@@ -469,6 +472,7 @@ function ProjectDetailView({
           onClick={onRemove}
           disabled={removeBusy}
           className="flex-none"
+          data-dev-id="projects.remove"
         >
           Remove Project
         </Button>
@@ -479,6 +483,7 @@ function ProjectDetailView({
         active={tab}
         onSelect={setTab}
         idBase="project"
+        devIdBase="projects"
         className="mb-6"
         aria-label="Project sections"
       />
@@ -595,7 +600,7 @@ function AuditView({
     : audit.findings;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-dev-id="projects.audit">
       {/* headline */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
@@ -626,7 +631,7 @@ function AuditView({
         <>
           {/* breakdown chips: click one to filter the table by that kind */}
           {kinds.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2" data-testid="audit-chips">
+            <div className="flex flex-wrap items-center gap-2" data-testid="audit-chips" data-dev-id="projects.audit-chips">
               {kinds.map(([kind, count]) => {
                 const active = kindFilter === kind;
                 return (
@@ -683,7 +688,7 @@ function FindingsTable({ findings }: { findings: AuditFinding[] }) {
     );
   }
   return (
-    <Card className="overflow-hidden" data-testid="audit-findings">
+    <Card className="overflow-hidden" data-testid="audit-findings" data-dev-id="projects.audit-table">
       <table className="w-full text-left text-sm">
         <thead>
           <tr data-testid="findings-head" className="border-b border-line text-2xs text-t3">
@@ -812,7 +817,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
     { key: "git", label: "Version Control", state: v.signals.git.state },
   ];
   return (
-    <Card className="mb-5 p-4" data-testid="buildability-section">
+    <Card className="mb-5 p-4" data-testid="buildability-section" data-dev-id="projects.buildability">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Buildability</Eyebrow>
@@ -920,7 +925,7 @@ function ChecksSection({ projectId }: { projectId: string }) {
   const hasRun = data != null && data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="checks-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="checks-section" data-dev-id="projects.checks">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Rules Check</Eyebrow>
@@ -1290,7 +1295,7 @@ function BomSection({ projectId }: { projectId: string }) {
   const busy = starting || job.status === "running";
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="bom-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="bom-section" data-dev-id="projects.bom">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Build And Cost</Eyebrow>
@@ -1894,7 +1899,7 @@ function BomExportsSection({ projectId }: { projectId: string }) {
   const built = bomQuery.data != null && bomQuery.data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="exports-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="exports-section" data-dev-id="projects.bom-exports">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Exports</Eyebrow>
         <p className="text-xs text-t3">
@@ -2027,7 +2032,7 @@ function ProjectViewerSection({ projectId }: { projectId: string }) {
     : [];
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="viewer-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="viewer-section" data-dev-id="projects.viewer">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Board Viewer</Eyebrow>
         <p className="text-xs text-t3">
@@ -2083,7 +2088,7 @@ function FabSection({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="fab-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="fab-section" data-dev-id="projects.fab">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Fab Prep</Eyebrow>
         <p className="text-xs text-t3">
@@ -2250,7 +2255,7 @@ function RevisionDiffSection({ projectId }: { projectId: string }) {
   const revisions = revs.data?.revisions ?? [];
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="diff-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="diff-section" data-dev-id="projects.revision-diff">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Revision Diff</Eyebrow>
         <p className="text-xs text-t3">
@@ -2570,7 +2575,7 @@ function FieldsSection({ projectId }: { projectId: string }) {
   const canEdit = !!data && data.has_sch && data.under_git;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="fields-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="fields-section" data-dev-id="projects.fields">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -2709,7 +2714,7 @@ function EditorSection({ projectId }: { projectId: string }) {
   const data = design.data;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="editor-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="editor-section" data-dev-id="projects.editor">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Editor</Eyebrow>
         <p className="text-xs text-t3">
@@ -3288,7 +3293,7 @@ function BoardSetupSection({ projectId }: { projectId: string }) {
   const q = useProjectSettings(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="board-setup-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="board-setup-section" data-dev-id="projects.board-setup">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Board Setup</Eyebrow>
         <p className="text-xs text-t3">
@@ -3512,7 +3517,7 @@ function ProSettingsSection({ projectId }: { projectId: string }) {
   const q = useProjectSettings(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="pro-settings-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="pro-settings-section" data-dev-id="projects.pro-settings">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Design Checks and Variables</Eyebrow>
         <p className="text-xs text-t3">
@@ -3949,7 +3954,7 @@ function ConformSection({ projectId }: { projectId: string }) {
   const q = useProjectConform(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="conform-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="conform-section" data-dev-id="projects.conform">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Object Conform</Eyebrow>
         <p className="text-xs text-t3">
@@ -4242,7 +4247,7 @@ function StackupSection({ projectId }: { projectId: string }) {
   const q = useProjectStackup(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="stackup-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="stackup-section" data-dev-id="projects.stackup">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Stackup</Eyebrow>
         <p className="text-xs text-t3">
@@ -4745,7 +4750,7 @@ function PrepareSection({ projectId }: { projectId: string }) {
   const q = useProjectPrepare(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="prepare-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="prepare-section" data-dev-id="projects.prepare">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Prepare</Eyebrow>
         <p className="text-xs text-t3">
