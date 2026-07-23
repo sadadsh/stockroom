@@ -13,11 +13,14 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useStmMcus, useStmStatus, useBuildStmIndex } from "../api/stmQueries";
+import { useStmMcus, useStmStatus, useStmPinout, useBuildStmIndex } from "../api/stmQueries";
 import { ApiError } from "../api/client";
 import type { StmMcusArgs } from "../api/client";
 import { FamilyPicker } from "../components/stm/FamilyPicker";
 import { SpecMatrixTable } from "../components/stm/SpecMatrixTable";
+import { PinoutMap } from "../components/stm/PinoutMap";
+import { PinoutLegend } from "../components/stm/PinoutLegend";
+import { PinInspector } from "../components/stm/PinInspector";
 import { Button, Card, Eyebrow } from "../components/primitives";
 
 export interface StmScope extends StmMcusArgs {
@@ -37,10 +40,23 @@ function scopeToArgs(scope: StmScope): StmMcusArgs {
 export function StmViewerPage() {
   const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
   const [activePart, setActivePart] = useState<string | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
 
   const status = useStmStatus();
   const args = useMemo(() => scopeToArgs(scope), [scope]);
   const mcus = useStmMcus(args);
+  const pinout = useStmPinout(activePart);
+
+  // A new part clears any pin selection (the previous pin does not exist on the new package).
+  useEffect(() => {
+    setSelectedPosition(null);
+  }, [activePart]);
+
+  // The inspected pin, looked up from the ALREADY-fetched pinout (decision 4): no per-pin fetch.
+  const inspectedPin =
+    selectedPosition != null
+      ? (pinout.data?.pins.find((p) => p.position === selectedPosition) ?? null)
+      : null;
 
   const mcusError = mcus.error;
   const indexNotBuilt =
@@ -87,12 +103,94 @@ export function StmViewerPage() {
           )}
         </div>
 
-        {/* pinout map + inspector (04-03 fills this reserved region) */}
-        <aside className="flex w-[384px] flex-none flex-col border-l border-line px-4 pt-1">
-          <PinoutRegionPlaceholder activePart={activePart} />
+        {/* pinout map + legend + inspector */}
+        <aside className="flex w-[384px] flex-none flex-col overflow-hidden border-l border-line px-4 pt-1">
+          <PinoutRegion
+            activePart={activePart}
+            pinout={pinout.data ?? null}
+            isLoading={pinout.isLoading && !!activePart}
+            error={pinout.error}
+            selectedPosition={selectedPosition}
+            onSelectPosition={setSelectedPosition}
+            inspectedPin={inspectedPin}
+            onRetry={() => pinout.refetch()}
+          />
         </aside>
       </div>
     </PageShell>
+  );
+}
+
+// The specimen region: the empty state until a part is picked, then the pinout map + legend +
+// inspector for the active part, all off the single already-fetched pinout (decision 4).
+function PinoutRegion({
+  activePart,
+  pinout,
+  isLoading,
+  error,
+  selectedPosition,
+  onSelectPosition,
+  inspectedPin,
+  onRetry,
+}: {
+  activePart: string | null;
+  pinout: import("../api/types").PinoutDTO | null;
+  isLoading: boolean;
+  error: Error | null;
+  selectedPosition: string | null;
+  onSelectPosition: (position: string) => void;
+  inspectedPin: import("../api/types").PinDTO | null;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Eyebrow className="mb-2 px-1">Pinout</Eyebrow>
+
+      {!activePart ? (
+        <ChamberMessage>Select a part to see its pinout.</ChamberMessage>
+      ) : isLoading ? (
+        <ChamberMessage>Loading the pinout...</ChamberMessage>
+      ) : error ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-card bg-stage px-6 text-center">
+          <p className="text-sm text-err">
+            {error instanceof ApiError && error.status === 0
+              ? "Cannot reach the Stockroom server."
+              : error.message}
+          </p>
+          <Button small onClick={onRetry}>
+            Try Again
+          </Button>
+        </div>
+      ) : pinout ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="h-[320px] flex-none">
+            <PinoutMap
+              pinout={pinout}
+              selectedPosition={selectedPosition}
+              onSelectPosition={onSelectPosition}
+            />
+          </div>
+          <div className="flex-none border-b border-line pb-3">
+            <PinoutLegend />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {inspectedPin ? (
+              <PinInspector pin={inspectedPin} />
+            ) : (
+              <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ChamberMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]">
+      <p className="text-sm text-t3">{children}</p>
+    </div>
   );
 }
 
@@ -119,23 +217,6 @@ function PageShell({
         ) : null}
       </header>
       {children}
-    </div>
-  );
-}
-
-// The reserved specimen region (04-03 renders the pinout map + legend + inspector here). Until a
-// part is picked it is the recessed "chamber" empty state, so the column is never dead space.
-function PinoutRegionPlaceholder({ activePart }: { activePart: string | null }) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Eyebrow className="mb-2 px-1">Pinout</Eyebrow>
-      <div className="flex min-h-0 flex-1 items-center justify-center rounded-card bg-stage px-6 text-center shadow-[inset_0_1px_0_var(--edge-hi)]">
-        <p className="text-sm text-t3">
-          {activePart
-            ? "The pinout map lands here."
-            : "Select a part to see its pinout."}
-        </p>
-      </div>
     </div>
   );
 }
