@@ -338,7 +338,9 @@ function ColumnFilter({
     const [min, max] = (column.getFacetedMinMaxValues() as [number, number] | undefined) ?? [];
     const range = (value as [number | "", number | ""]) ?? ["", ""];
     return (
-      <div className="flex items-center gap-1">
+      // Stacked min-over-max: the narrow numeric columns (52px peripherals) cannot fit two
+      // side-by-side number inputs at a usable width.
+      <div className="flex flex-col gap-0.5">
         <input
           type="number"
           inputMode="numeric"
