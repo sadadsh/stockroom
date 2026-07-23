@@ -146,7 +146,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
       {/* top: the query field + a close affordance */}
       <div className="flex-none px-6 pt-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-[13px] border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
+          <div className="flex h-[52px] flex-1 items-center gap-3.5 rounded-control border border-line bg-raise px-[18px] shadow-card focus-within:border-line2">
             <SearchIcon className="h-5 w-5 flex-none text-t3" />
             <input
               ref={inputRef}
@@ -154,7 +154,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search components using a name, MPN, value, or specification..."
               aria-label="Search components"
-              className="min-w-0 flex-1 bg-transparent text-[17px] font-medium text-t1 outline-none placeholder:font-normal placeholder:text-t3"
+              className="min-w-0 flex-1 bg-transparent text-xl font-medium text-t1 outline-none placeholder:font-normal placeholder:text-t3"
             />
             {q ? (
               <button
@@ -173,7 +173,7 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
             className="flex h-[52px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-4 text-sm font-semibold text-t2 shadow-card hover:border-line2 hover:text-t1"
           >
             Close
-            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2">
+            <kbd className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-2xs font-medium text-t2">
               Esc
             </kbd>
           </button>
@@ -263,7 +263,7 @@ function KbdHint({ keys, label }: { keys: string[]; label: string }) {
       {keys.map((k) => (
         <kbd
           key={k}
-          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded border border-line2 bg-raise2 px-1.5 font-mono text-[10.5px] font-medium text-t2"
+          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-2xs font-medium text-t2"
         >
           {k}
         </kbd>
@@ -387,7 +387,7 @@ function SortControl({
                     setOpen(false);
                   }}
                   className={
-                    "flex w-full items-center justify-between rounded-[6px] px-2.5 py-1.5 text-left text-sm " +
+                    "flex w-full items-center justify-between rounded-control px-2.5 py-1.5 text-left text-sm " +
                     (on ? "bg-raise2 font-semibold text-t1" : "text-t2 hover:bg-raise2 hover:text-t1")
                   }
                 >
@@ -479,7 +479,7 @@ function FacetRail({
           ))
         )}
 
-        <div className="mt-3.5 flex gap-2 border-t border-line pt-3 text-[10.5px] leading-relaxed text-t3">
+        <div className="mt-3.5 flex gap-2 border-t border-line pt-3 text-2xs leading-relaxed text-t3">
           <Spark className="mt-0.5 h-3 w-3 flex-none" />
           <span>
             Filters are generated from each part's specs. Add a component with a new parameter
@@ -516,11 +516,11 @@ function FacetRail({
 
 function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean }) {
   return (
-    <div className="flex items-center gap-2 pb-0.5 pt-5 text-[10px] font-bold uppercase tracking-[0.07em] text-t3 first:pt-0.5">
+    <div className="flex items-center gap-2 pb-0.5 pt-5 text-2xs font-bold uppercase tracking-[0.07em] text-t3 first:pt-0.5">
       {label}
       {fromSpecs ? (
         <span
-          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-acc-soft px-1.5 py-0.5 text-[9px] font-semibold normal-case tracking-normal text-t2"
+          className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-acc-soft px-1.5 py-0.5 text-2xs font-semibold normal-case tracking-normal text-t2"
           title="These filters are generated from the category's part specs"
         >
           <Spark className="h-2.5 w-2.5" />
@@ -552,7 +552,7 @@ function FacetGroup({
         className="mb-2 flex w-full items-center text-sm font-semibold text-t1"
       >
         {title}
-        {unit ? <span className="ml-auto mr-2 font-mono text-[10px] font-medium text-t3">{unit}</span> : null}
+        {unit ? <span className="ml-auto mr-2 font-mono text-2xs font-medium text-t3">{unit}</span> : null}
         <Chevron className={"h-3 w-3 text-t3 transition-transform " + (open ? "" : "-rotate-90") + (unit ? "" : " ml-auto")} />
       </button>
       {open ? children : null}
@@ -582,7 +582,7 @@ function OptionRow({
     >
       <span
         className={
-          "grid h-4 w-4 flex-none place-items-center rounded-[5px] border-[1.5px] " +
+          "grid h-4 w-4 flex-none place-items-center rounded-control border-[1.5px] " +
           (on ? "border-acc bg-acc text-acc-on" : "border-line2 bg-field text-transparent")
         }
       >
@@ -661,7 +661,7 @@ function RangeFacet({
           })
         }
       />
-      <div className="mt-2 flex justify-between px-1.5 font-mono text-[9.5px] text-t3">
+      <div className="mt-2 flex justify-between px-1.5 font-mono text-2xs text-t3">
         {scale.ticks.map((t, i) => (
           <span key={i}>{formatMagnitude(t, unit)}</span>
         ))}
@@ -699,7 +699,7 @@ function RangeInput({
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === "Enter" && commit()}
-      className="h-[30px] w-full min-w-0 rounded-control border border-line bg-field px-2.5 text-center font-mono text-[11px] text-t1 outline-none focus:border-line2"
+      className="h-[30px] w-full min-w-0 rounded-control border border-line bg-field px-2.5 text-center font-mono text-xs text-t1 outline-none focus:border-line2"
     />
   );
 }
@@ -786,7 +786,7 @@ function ResultsTable({
       </div>
     );
   }
-  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-[10px] font-bold uppercase tracking-[0.06em] text-t3";
+  const th = "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-3 text-left text-2xs font-bold uppercase tracking-[0.06em] text-t3";
   const td = "whitespace-nowrap px-3 py-2.5 text-sm";
   return (
     <table className="w-max min-w-full border-collapse">
@@ -823,7 +823,7 @@ function ResultsTable({
                 <RowThumbnail id={row.id} category={row.category} />
                 <div className="min-w-0 max-w-[152px]">
                   <div className="truncate font-semibold text-t1">{row.display_name}</div>
-                  <div className="tnum truncate font-mono text-[11px] text-t2">{row.mpn}</div>
+                  <div className="tnum truncate font-mono text-xs text-t2">{row.mpn}</div>
                 </div>
               </div>
             </td>
@@ -832,7 +832,7 @@ function ResultsTable({
                 key={c.key}
                 className={
                   td +
-                  (c.numeric ? " text-right font-mono text-t1" : " font-mono text-[11.5px] text-t2")
+                  (c.numeric ? " text-right font-mono text-t1" : " font-mono text-xs text-t2")
                 }
               >
                 {cellValue(row.specs, c.key)}
@@ -861,7 +861,7 @@ function Lifecycle({ specs }: { specs: Record<string, string | number | boolean>
   const isActive = /active/i.test(raw);
   return (
     <span
-      className="inline-flex rounded-[6px] px-2 py-0.5 text-[11px] font-semibold"
+      className="inline-flex rounded-control px-2 py-0.5 text-xs font-semibold"
       style={
         isActive
           ? { color: "var(--c-ok)", background: "color-mix(in srgb, var(--c-ok) 16%, transparent)" }

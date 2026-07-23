@@ -7,6 +7,8 @@ import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
+import { DevModeProvider } from "./lib/devMode";
+import { DevPanel } from "./components/DevPanel";
 // The interface face, bundled offline (no CDN) so it renders identically inside
 // WebView2 on Windows. Imported before the token sheet, which names it. Work Sans
 // carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
@@ -36,13 +38,18 @@ createRoot(rootEl).render(
       {/* reducedMotion="user" makes every animation collapse to instant when the OS asks. */}
       <MotionConfig reducedMotion="user">
         <ThemeProvider>
-          <ToastProvider>
-            <RouterProvider>
-              <AddPartProvider>
-                <App />
-              </AddPartProvider>
-            </RouterProvider>
-          </ToastProvider>
+          {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
+              itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
+          <DevModeProvider>
+            <ToastProvider>
+              <RouterProvider>
+                <AddPartProvider>
+                  <App />
+                </AddPartProvider>
+              </RouterProvider>
+            </ToastProvider>
+            <DevPanel />
+          </DevModeProvider>
         </ThemeProvider>
       </MotionConfig>
     </QueryClientProvider>

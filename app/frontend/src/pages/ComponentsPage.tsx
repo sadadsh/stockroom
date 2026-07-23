@@ -30,6 +30,7 @@ import { DetailPanel } from "../components/DetailPanel";
 import { SearchOverlay } from "../components/SearchOverlay";
 import { AddPartIcon } from "../components/icons";
 import { Button } from "../components/primitives";
+import { Text } from "../lib/copy";
 
 export function ComponentsPage() {
   const [search, setSearch] = useState("");
@@ -219,7 +220,7 @@ export function ComponentsPage() {
               onClick={openAddPart}
               className="mb-2.5 h-9 w-full justify-center"
             >
-              Add Parts
+              <Text id="components.add-parts">Add Parts</Text>
             </Button>
             <Finder
               search={search}
@@ -255,8 +256,9 @@ export function ComponentsPage() {
           </div>
         </div>
 
-        {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto border-l border-line px-[30px] pt-[22px]">
+        {/* detail: the panel owns its own height, padding, and internal scroll (a fixed
+            rail + a tabbed workbench), so this column is a non-scrolling viewport. */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
           {selectedId ? (
             <DetailPanel
               detail={detailQuery.data}
@@ -275,9 +277,11 @@ export function ComponentsPage() {
             />
           ) : (
             <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
-              {partsQuery.isLoading
-                ? "Loading components..."
-                : "Select a part to see its details."}
+              {partsQuery.isLoading ? (
+                <Text id="components.loading">Loading components...</Text>
+              ) : (
+                <Text id="components.select-prompt">Select a part to see its details.</Text>
+              )}
             </div>
           )}
         </div>
@@ -355,10 +359,10 @@ function PickerBody({
           <AddPartIcon />
         </span>
         <div className="text-sm font-medium text-t2">
-          No Components Yet
+          <Text id="components.empty-title">No Components Yet</Text>
         </div>
         <div className="text-xs text-t3">
-          Add a part to get started.
+          <Text id="components.empty-hint">Add a part to get started.</Text>
         </div>
       </div>
     );

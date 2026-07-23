@@ -316,6 +316,8 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
+    // Enrich now lives in the part workbench's Enrich tab, so open it first.
+    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -358,6 +360,8 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
+    // Enrich now lives in the part workbench's Enrich tab, so open it first.
+    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
@@ -400,6 +404,8 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
+    // Enrich now lives in the part workbench's Enrich tab, so open it first.
+    await user.click(await screen.findByRole("tab", { name: "Enrich" }));
     await user.click(
       await screen.findByRole("button", { name: "Enrich From Distributor" }),
     );
