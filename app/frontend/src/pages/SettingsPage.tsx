@@ -28,7 +28,7 @@ import {
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
+import { Badge, Button, Card, Dot, Eyebrow, PanelTitle } from "../components/primitives";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Text, useText } from "../lib/copy";
 
@@ -41,8 +41,8 @@ function errMsg(err: unknown): string {
 }
 
 const INPUT_CLS =
-  "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 " +
-  "text-base text-t1 outline-none focus:border-acc disabled:opacity-50";
+  "h-[29px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 " +
+  "text-sm text-t1 outline-none focus:border-acc disabled:opacity-50";
 
 function Section({
   title,
@@ -60,7 +60,7 @@ function Section({
   "data-dev-id"?: string;
 }) {
   return (
-    <section className="mb-7" data-dev-id={devId}>
+    <section className="mb-6" data-dev-id={devId}>
       <Eyebrow className="mb-2">{titleId ? <Text id={titleId}>{title}</Text> : title}</Eyebrow>
       {hint ? (
         <p className="mb-2.5 text-xs text-t3">{hintId ? <Text id={hintId}>{hint}</Text> : hint}</p>
@@ -84,17 +84,20 @@ function StatusRow({
       <span className="flex-none text-xs text-t3">
         {labelId ? <Text id={labelId}>{label}</Text> : label}
       </span>
-      <span className="min-w-0 truncate text-right text-sm text-t2">{value}</span>
+      <span className="min-w-0 truncate text-right text-sm text-t1">{value}</span>
     </div>
   );
 }
 
 export function SettingsPage() {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[30px] pt-[22px]" data-dev-id="settings.root">
-      <div className="mx-auto max-w-[860px] pb-12">
-        <h1 className="mb-6 text-title font-bold tracking-[-0.02em] text-t1" data-dev-id="settings.title"><Text id="settings.title">Settings</Text></h1>
-        <AppearanceSection />
+    <div className="flex min-h-0 flex-1 flex-col" data-dev-id="settings.root">
+      <PanelTitle data-dev-id="settings.title">
+        <Text id="settings.title">Settings</Text>
+      </PanelTitle>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5">
+        <div className="max-w-[860px] pb-10">
+          <AppearanceSection />
           <ProfilesSection />
           <SyncSection />
           <GitHubSection />
@@ -105,6 +108,7 @@ export function SettingsPage() {
           <DistributorSection />
           <VendorLoginsSection />
           <UpdateSection />
+        </div>
       </div>
     </div>
   );
@@ -136,7 +140,7 @@ function AppearanceSection() {
               className={cx(
                 "rounded-control px-3 py-1 text-sm transition-colors",
                 theme === o.value
-                  ? "bg-raise2 text-t1"
+                  ? "bg-acc-soft font-medium text-t1"
                   : "text-t3 hover:text-t2",
               )}
             >
@@ -284,7 +288,7 @@ function ProfilesSection() {
         title={deleteTitle}
         body={
           <>
-            Delete the profile <b>{pendingDelete}</b>? Its parts stay on disk; only
+            Delete the profile <b>{pendingDelete}</b>? Its parts remain on disk; just
             the profile entry is removed.
           </>
         }
@@ -309,7 +313,7 @@ function SyncSection() {
         // Divergence and offline are FAILURES, surfaced verbatim and never faked
         // green; no-remote is informational; only a real pull/push/clean is ok.
         if (r.state === "diverged") {
-          toast("Sync failed: your components have diverged from the remote.", "err");
+          toast("Sync failed: the components have diverged from the remote.", "err");
           return;
         }
         if (r.state === "offline") {
@@ -318,7 +322,7 @@ function SyncSection() {
         }
         if (r.state === "denied") {
           toast(
-            "Sync failed: the remote refused this token (403). If you are a collaborator, accept the repo invitation and use a CLASSIC personal access token with the repo scope; a fine-grained token cannot access a repo owned by another user.",
+            "Sync failed: the remote refused this token (403). A collaborator must accept the repo invitation and use a CLASSIC personal access token with the repo scope; a fine-grained token cannot reach another user's repo.",
             "err",
           );
           return;
@@ -330,7 +334,7 @@ function SyncSection() {
         const parts: string[] = [];
         if (r.pulled) parts.push("pulled");
         if (r.pushed) parts.push("pushed");
-        const what = parts.length ? parts.join(" and ") : "already up to date";
+        const what = parts.length ? parts.join(" and ") : "up to date";
         toast(`Sync ${what}.`, "ok");
       },
       onError: (e) => toast(errMsg(e), "err"),
@@ -341,7 +345,7 @@ function SyncSection() {
     <Section
       title="Component Sync"
       titleId="settings.sync.title"
-      hint="Sync your components with the remote. Offline and divergence are reported, never guessed."
+      hint="Push and pull the components against the remote. Offline and divergence are reported, never guessed."
       hintId="settings.sync.hint"
       data-dev-id="settings.sync"
     >
@@ -398,7 +402,7 @@ function KiCadSection() {
   const cliPlaceholder = useText("settings.kicad.cli-placeholder", "Auto-discovered");
   const toastAppliedWired = useText(
     "settings.kicad.toast-applied-wired",
-    "KiCad settings applied. Your components are wired.",
+    "KiCad settings applied. The components are wired.",
   );
   const toastApplied = useText("settings.kicad.toast-applied", "KiCad settings applied.");
 
@@ -449,7 +453,7 @@ function KiCadSection() {
     <Section
       title="KiCad"
       titleId="settings.kicad.title"
-      hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs automatically on launch and on every profile switch. Leave the overrides blank to auto-detect."
+      hint="Where the app writes KiCad's symbol and footprint tables, and whether the command-line tools that render previews were found. Wiring runs on its own at launch and on each profile switch. Leave the overrides blank to auto-detect."
       hintId="settings.kicad.hint"
       data-dev-id="settings.kicad"
     >
@@ -489,7 +493,7 @@ function KiCadSection() {
               ) : settings.data?.kicad_wired ? (
                 <span className="text-ok">Wired to the active profile</span>
               ) : (
-                <span className="text-warn">Not wired yet (use Wire KiCad below)</span>
+                <span className="text-warn">Not wired so far (use Wire KiCad below)</span>
               )
             }
           />
@@ -525,7 +529,7 @@ function KiCadSection() {
               ) : (
                 <div className="flex items-center gap-2 text-ok">
                   <Dot tone="ok" />
-                  <span>KiCad is wired and ready.</span>
+                  <span>KiCad is wired and set.</span>
                 </div>
               )}
             </div>
@@ -766,7 +770,7 @@ function VendorLoginsSection() {
     <Section
       title="Vendor Logins"
       titleId="settings.vendor-logins.title"
-      hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window sign you in and stay logged in across parts. They are stored per machine and the password is never shown again."
+      hint="Saved Ultra Librarian and SnapEDA logins let the guided capture window log in on its own and remain signed in across parts. Both are stored per machine and the password is never shown again."
       hintId="settings.vendor-logins.hint"
       data-dev-id="settings.vendor-logins"
     >
@@ -815,7 +819,7 @@ function GitHubSection() {
   );
   const toastConnected = useText(
     "settings.github.toast-connected",
-    "Connected to GitHub. Your part changes will push automatically.",
+    "Connected to GitHub. Part changes now push on their own.",
   );
   const toastDisconnected = useText("settings.github.toast-disconnected", "Disconnected from GitHub.");
 
@@ -851,7 +855,7 @@ function GitHubSection() {
     <Section
       title="GitHub"
       titleId="settings.github.title"
-      hint="Connect a GitHub personal access token so adding or editing a part pushes it to your components repo automatically, and collaborators' changes pull in on launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
+      hint="Connect a GitHub personal access token so adding or editing a part pushes it to the components repo on its own, and collaborators' changes pull in at launch. The repo owner can use a fine-grained token with Contents: write. A collaborator on someone else's repo needs a CLASSIC token with the repo scope (GitHub does not let a fine-grained token reach another user's repo), and must accept the repo invitation first. Stored per machine, never shown again."
       hintId="settings.github.hint"
       data-dev-id="settings.github"
     >
@@ -923,7 +927,7 @@ function UpdateSection() {
     <Section
       title="App Update"
       titleId="settings.update.title"
-      hint="Pull the latest app from its repository. A non-fast-forward is surfaced, never force-applied."
+      hint="Pull the latest app from its repo. A non-fast-forward is surfaced, never force-applied."
       hintId="settings.update.hint"
       data-dev-id="settings.update"
     >
