@@ -564,6 +564,92 @@ def _load_vendor_creds(vendor_key: str) -> dict:
     }
 
 
+def cad_scripts_for_url(url: str, needs_values) -> list[str]:
+    """The cad scripts (overlay + optional per-vendor login autofill + driver) re-derived from a
+    url: vendor/label via `_vendor_from_url`, formats via `_formats_for_needs`, creds via
+    `_load_vendor_creds`. So a DigiKey url yields the DigiKey-account autofill (when creds are
+    saved), an in-page provider url (snapeda / samacsys / ultralibrarian) yields that provider's
+    autofill, and a url with no saved creds yields overlay + driver only. The single DRY path for
+    both the initial injection and every re-injection - all host->page evaluate_js, never the token
+    or a js_api bridge."""
+    vendor_key, vendor_label = _vendor_from_url(url)
+    formats = _formats_for_needs(needs_values)
+    creds = _load_vendor_creds(vendor_key)
+    return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds)
+
+
+def _inject_cad_scripts(win, fallback_url: str, needs_values) -> None:
+    """Re-derive the cad scripts from the window's CURRENT url (guarded `get_current_url`, falling
+    back to `fallback_url`) and inject them via `evaluate_js` - the light in-site re-injection, so
+    after an in-site DigiKey nav or an in-page modal the current url's overlay + autofill + driver
+    are re-injected. Injection is host->page `evaluate_js` only; never `inject_script`, never the
+    token or a js_api bridge."""
+    try:
+        current = win.get_current_url()
+    except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
+        current = None
+    url = current or fallback_url
+    for script in cad_scripts_for_url(url, needs_values):
+        try:
+            win.evaluate_js(script)
+        except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
+            _log.warning("cad guided-overlay/driver injection failed on load")
+
+
+# Candidate pywebview event slots for a popup / new-window / navigation, tried in order. The
+# surface is backend + version specific, so the wiring probes for whichever the installed
+# pywebview exposes and degrades silently when none is present (owner correction: cross-site is
+# DE-SCOPED, so this is a LIGHT backstop, not the architecture).
+_CAD_REINJECT_EVENTS = (
+    "new_window",
+    "new_window_request",
+    "window_open",
+    "popup",
+    "navigated",
+    "before_navigate",
+)
+
+
+def _reinject_popup(win, target, needs_values) -> None:
+    """Inject the cad scripts onto a popped / navigated window (or back onto `win` when the event
+    carried no window object), re-derived from that window's current url. Host->page `evaluate_js`
+    only - a popup NEVER receives the token or a js_api bridge."""
+    tw = target if (target is not None and hasattr(target, "evaluate_js")) else win
+    _inject_cad_scripts(tw, "", needs_values)
+
+
+def _wire_cad_reinjection(win, needs_values, *, candidate_events=_CAD_REINJECT_EVENTS) -> bool:
+    """LIGHT defensive backstop: best-effort subscribe to the installed pywebview's popup /
+    new-window / navigation event IF it exposes one, re-injecting the cad scripts onto that window
+    via `evaluate_js`. Returns True once a slot is subscribed; logs a warning and returns False
+    when the backend exposes none - the same silent-degrade discipline as
+    `_install_cad_download_intercept` on an older backend. NEVER calls `inject_script` and NEVER
+    wires js_api / the token onto the popup."""
+    try:
+        events = win.events
+    except Exception:  # noqa: BLE001 - no events surface; in-site re-injection still covers it
+        _log.warning("cad re-injection unavailable: window exposes no events; in-site re-inject covers it")
+        return False
+
+    def _on_popup(target=None, *args, **kwargs):
+        try:
+            _reinject_popup(win, target, needs_values)
+        except Exception:  # noqa: BLE001 - best-effort backstop; never crash the app
+            _log.warning("cad popup re-injection failed")
+
+    for name in candidate_events:
+        slot = getattr(events, name, None)
+        if slot is None:
+            continue
+        try:
+            slot += _on_popup
+            return True
+        except Exception:  # noqa: BLE001 - this slot did not accept a handler; try the next
+            continue
+    _log.warning("cad re-injection: no popup/new-window event on this pywebview backend; in-site re-inject covers it")
+    return False
+
+
 def _parse_needs(needs) -> frozenset:
     """The frontend hands the capture's needs as Requirement `.value` strings; map them back
     to the Requirement enum, dropping anything unrecognized (never trust remote input)."""
@@ -699,24 +785,22 @@ class _HostApi:
         win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
         _CAD_WINDOW = win
 
-        # Guide the capture INSIDE the vendor window: on each load, inject the overlay (the
-        # checklist + the __STOCKROOM_OVERLAY__ bridge), then a best-effort login auto-fill from
-        # the saved creds, then the vendor driver (auto-click, reporting into the overlay). All
-        # best-effort and guarded; injected ONLY on this remote window, never the SPA.
+        # Guide the capture INSIDE the vendor window: on each load, re-derive from the window's
+        # CURRENT url and inject the overlay (the checklist + the __STOCKROOM_OVERLAY__ bridge),
+        # then a best-effort login auto-fill from the saved creds, then the vendor driver
+        # (auto-click, reporting into the overlay). Re-deriving from the current url is the light
+        # in-site re-injection (LGN-03): an in-site DigiKey nav or an in-page modal re-injects the
+        # right scripts. All best-effort and guarded; injected ONLY on this remote window via
+        # evaluate_js, never the SPA, and NEVER with the per-launch token or a js_api bridge.
         needs_values = [r.value for r in needs_set]
-        vendor_key, vendor_label = _vendor_from_url(url)
-        formats = _formats_for_needs(needs_values)
-        creds = _load_vendor_creds(vendor_key)
-        loaded_scripts = cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds)
 
         def _on_cad_loaded() -> None:
-            for script in loaded_scripts:
-                try:
-                    win.evaluate_js(script)
-                except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
-                    _log.warning("cad guided-overlay/driver injection failed on load")
+            _inject_cad_scripts(win, url, needs_values)
 
         win.events.loaded += _on_cad_loaded
+        # Best-effort popup / new-window re-injection when this pywebview backend exposes the
+        # event; degrades silently otherwise (cross-site is DE-SCOPED - a LIGHT backstop only).
+        _wire_cad_reinjection(win, needs_values)
 
         thread_box: dict = {"t": None}
 

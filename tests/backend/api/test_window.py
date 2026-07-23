@@ -649,6 +649,171 @@ def test_cad_loaded_scripts_order_and_omission():
     assert "KiCad" in no_creds[1]
 
 
+# -- light defensive re-injection (Phase 2 LGN-03): cad_scripts_for_url + current-url
+#    re-derivation + best-effort popup subscribe + the no-token / no-js_api security lock --
+
+
+def _stub_creds(monkeypatch, **fields):
+    from stockroom.store import machine_config as MC
+
+    defaults = {
+        "digikey_username": "",
+        "digikey_password": "",
+        "ul_username": "",
+        "ul_password": "",
+        "snapeda_username": "",
+        "snapeda_password": "",
+        "samacsys_username": "",
+        "samacsys_password": "",
+    }
+    defaults.update(fields)
+    cfg = type("_Cfg", (), defaults)()
+    monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: cfg))
+
+
+def test_cad_scripts_for_url_digikey_includes_the_digikey_autofill(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
+    scripts = W.cad_scripts_for_url(
+        "https://www.digikey.com/en/products/x", ["kicad_symbol", "kicad_model"]
+    )
+    assert len(scripts) == 3  # overlay, DigiKey autofill, driver
+    assert "__STOCKROOM_OVERLAY__" in scripts[0]
+    assert json.dumps("dku") in scripts[1] and "password" in scripts[1]  # digikey autofill second
+    assert "scrollIntoView" in scripts[2]  # the digikey driver last
+
+
+def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        snapeda_username="snu",
+        snapeda_password="snp",
+        samacsys_username="smu",
+        samacsys_password="smp",
+    )
+    snap = W.cad_scripts_for_url("https://www.snapeda.com/parts/x", ["kicad_symbol"])
+    assert len(snap) == 3 and json.dumps("snu") in snap[1]
+    sam = W.cad_scripts_for_url("https://componentsearchengine.com/part/x", ["kicad_symbol"])
+    assert len(sam) == 3 and json.dumps("smu") in sam[1]
+
+
+def test_cad_scripts_for_url_without_creds_is_overlay_and_driver_only(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch)  # nothing saved
+    scripts = W.cad_scripts_for_url("https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(scripts) == 2  # overlay + driver, autofill omitted
+    assert "__STOCKROOM_OVERLAY__" in scripts[0] and "scrollIntoView" in scripts[1]
+
+
+def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
+    # after a simulated in-site nav the CURRENT url's scripts are injected, not the original.
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        digikey_username="dku",
+        digikey_password="dkp",
+        snapeda_username="snu",
+        snapeda_password="snp",
+    )
+
+    class NavWindow(_RecordingWindow):
+        def __init__(self, url):
+            super().__init__()
+            self._url = url
+
+        def get_current_url(self):
+            return self._url
+
+    win = NavWindow("https://www.snapeda.com/parts/x")
+    W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(win.scripts) == 3
+    assert json.dumps("snu") in win.scripts[1]  # the CURRENT (snapeda) url's autofill
+
+
+def test_inject_cad_scripts_falls_back_when_current_url_unavailable(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
+
+    class BadWindow(_RecordingWindow):
+        def get_current_url(self):
+            raise RuntimeError("this backend has no get_current_url")
+
+    win = BadWindow()
+    W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
+    assert len(win.scripts) == 3
+    assert json.dumps("dku") in win.scripts[1]  # fell back to the original digikey url
+
+
+def test_wire_cad_reinjection_subscribes_when_the_event_exists():
+    from stockroom.host.window import _wire_cad_reinjection
+
+    class Events:
+        def __init__(self):
+            self.new_window = _Slot()
+
+    class Window:
+        def __init__(self):
+            self.events = Events()
+
+    win = Window()
+    ok = _wire_cad_reinjection(win, ["kicad_symbol"], candidate_events=("new_window",))
+    assert ok is True
+    assert len(win.events.new_window) == 1  # a re-inject handler subscribed to the popup slot
+
+
+def test_wire_cad_reinjection_degrades_when_no_event_slot():
+    from stockroom.host.window import _wire_cad_reinjection
+
+    class Events:
+        pass  # this pywebview backend exposes no popup / new-window event
+
+    class Window:
+        def __init__(self):
+            self.events = Events()
+
+    assert (
+        _wire_cad_reinjection(Window(), ["kicad_symbol"], candidate_events=("new_window", "popup"))
+        is False
+    )
+
+
+def test_cad_scripts_never_leak_token(monkeypatch):
+    # SECURITY INVARIANT: no cad script (overlay / autofill / driver) for any vendor url references
+    # the SPA token global or a pywebview.api / js_api bridge - injection is one-way host->page.
+    from stockroom.host import window as W
+
+    _stub_creds(
+        monkeypatch,
+        digikey_username="dku",
+        digikey_password="dkp",
+        ul_username="ulu",
+        ul_password="ulp",
+        snapeda_username="snu",
+        snapeda_password="snp",
+        samacsys_username="smu",
+        samacsys_password="smp",
+    )
+    urls = [
+        "https://www.digikey.com/en/products/x",
+        "https://www.snapeda.com/parts/x",
+        "https://componentsearchengine.com/part/x",
+        "https://app.ultralibrarian.com/x",
+    ]
+    for u in urls:
+        for script in W.cad_scripts_for_url(u, ["kicad_symbol", "altium_symbol"]):
+            low = script.lower()
+            assert "__stockroom_token__" not in low
+            assert "__api_base__" not in low
+            assert "pywebview.api" not in low
+            assert "js_api" not in low
+
+
 # -- persistent vendor WebView2 profile (B5): the storage kwargs for webview.start --
 
 
