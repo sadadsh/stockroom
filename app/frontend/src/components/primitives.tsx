@@ -235,6 +235,7 @@ export function TabStrip<T extends string>({
   active,
   onSelect,
   idBase,
+  devIdBase,
   className,
   "aria-label": ariaLabel,
 }: {
@@ -242,6 +243,11 @@ export function TabStrip<T extends string>({
   active: T;
   onSelect: (id: T) => void;
   idBase: string;
+  // When set, the tablist and each tab carry a derived `data-dev-id`
+  // (`<devIdBase>.tabs` on the container, `<devIdBase>.tab-<id>` per tab) so
+  // templated tab strips get one stable dev-mode id per tab. Omit it and no
+  // `data-dev-id` is emitted (zero change for other callers).
+  devIdBase?: string;
   className?: string;
   "aria-label"?: string;
 }) {
@@ -266,6 +272,7 @@ export function TabStrip<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
+      data-dev-id={devIdBase ? `${devIdBase}.tabs` : undefined}
       className={cx("inline-flex rounded-card border border-line2 p-0.5", className)}
     >
       {tabs.map((t, i) => (
@@ -274,6 +281,7 @@ export function TabStrip<T extends string>({
           type="button"
           role="tab"
           id={tabButtonId(idBase, t.id)}
+          data-dev-id={devIdBase ? `${devIdBase}.tab-${t.id}` : undefined}
           aria-selected={active === t.id}
           aria-controls={tabPanelId(idBase, t.id)}
           tabIndex={active === t.id ? 0 : -1}
