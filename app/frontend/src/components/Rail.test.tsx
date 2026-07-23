@@ -4,10 +4,15 @@ import { Rail } from "./Rail";
 import { DevModeProvider } from "../lib/devMode";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 
-// A controllable router stand-in so the rail can be tested in isolation.
-const { state, navigate } = vi.hoisted(() => ({
+// A controllable router stand-in so the rail can be tested in isolation. The update-availability,
+// apply mutation, and its pending flag are hoisted too, so a test can drive the Update control
+// through both its available/click and busy states.
+const { state, navigate, applyMutate, updateState, applyState } = vi.hoisted(() => ({
   state: { route: "components" },
   navigate: vi.fn(),
+  applyMutate: vi.fn(),
+  updateState: { update_available: false },
+  applyState: { isPending: false },
 }));
 vi.mock("../lib/router", () => ({
   useRouter: () => ({ route: state.route, navigate }),
@@ -20,12 +25,19 @@ vi.mock("../lib/theme", () => ({
 vi.mock("../api/queries", () => ({
   useFacetsQuery: () => ({ data: { complete: 80, incomplete: 8 } }),
   useSyncStatus: () => ({ data: { current_branch: "main", ahead: 0, behind: 0 } }),
-  useUpdateCheck: () => ({ data: { update_available: false } }),
+  useUpdateCheck: () => ({ data: { update_available: updateState.update_available } }),
+  useApplyUpdate: () => ({ mutate: applyMutate, isPending: applyState.isPending }),
+}));
+vi.mock("../lib/toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
 }));
 
 describe("Rail", () => {
   beforeEach(() => {
     state.route = "components";
+    updateState.update_available = false;
+    applyState.isPending = false;
+    applyMutate.mockReset();
   });
 
   it("shows exactly the top-level destinations: Library, Projects, Settings", () => {
@@ -45,6 +57,28 @@ describe("Rail", () => {
     expect(library).toHaveAttribute("aria-current", "page");
     await userEvent.click(library);
     expect(navigate).toHaveBeenCalledWith("components");
+  });
+
+  it("applies the update when the rail's Update button is clicked", async () => {
+    updateState.update_available = true;
+    render(<Rail />);
+    const button = screen.getByRole("button", { name: /Update/ });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    // Same flow as Settings' Apply Update: the useApplyUpdate mutation with result-shaped
+    // toasts (asserted here at the mutation seam; the toast branching lives in onApply).
+    expect(applyMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a busy label and disables the Update button while the apply is in flight", () => {
+    updateState.update_available = true;
+    applyState.isPending = true;
+    render(<Rail />);
+    const button = screen.getByRole("button", { name: /Updating/ });
+    expect(button).toBeDisabled();
+    // clicking a disabled busy button must not fire a second apply
+    fireEvent.click(button);
+    expect(applyMutate).not.toHaveBeenCalled();
   });
 
   it("carries stable data-dev-id attributes, including the derived rail.nav-* ids, that all resolve via DEV_ID_BY_ID", () => {

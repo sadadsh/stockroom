@@ -9,9 +9,15 @@ import { useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
-import { useUpdateCheck } from "../api/queries";
+import { useApplyUpdate, useUpdateCheck } from "../api/queries";
+import { ApiError } from "../api/client";
+import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
+
+function errMsg(err: unknown): string {
+  return err instanceof ApiError ? err.message : "Something went wrong.";
+}
 
 // The primary nav destinations. Each glyph was a sizeless `.ico` svg taking its 17px box from the
 // parent span; <Icon>'s primary branch would inject its default h-3.5 box, so we pass h-full w-full
@@ -33,6 +39,28 @@ export function Rail() {
   const update = useUpdateCheck();
   const hasUpdate = !!update.data?.update_available;
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  // The Update pill applies the update right here - the same flow (and the same toasts) as
+  // Settings' Apply Update, so the two entry points can never behave differently.
+  const apply = useApplyUpdate();
+  const { toast } = useToast();
+  const toastRestart = useText("settings.update.toast-restart", "Update applied. Restart to finish.");
+  const toastApplied = useText("settings.update.toast-applied", "Update applied.");
+
+  function onApplyUpdate() {
+    apply.mutate(undefined, {
+      onSuccess: (r) => {
+        if (r.restart_requested) {
+          toast(toastRestart, "neutral");
+        } else if (r.updated) {
+          toast(toastApplied, "ok");
+        } else {
+          toast(r.detail || r.state, "neutral");
+        }
+      },
+      onError: (e) => toast(errMsg(e), "err"),
+    });
+  }
 
   return (
     <nav
@@ -97,10 +125,16 @@ export function Rail() {
               type="button"
               data-dev-id="rail.update"
               title="A new version is available"
-              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t1 transition hover:bg-raise2"
+              onClick={onApplyUpdate}
+              disabled={apply.isPending}
+              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raise"
             >
               <Icon id="nav.update" className="h-4 w-4 flex-none" />
-              <Text id="nav.update">Update</Text>
+              {apply.isPending ? (
+                <Text id="nav.update-busy">Updating...</Text>
+              ) : (
+                <Text id="nav.update">Update</Text>
+              )}
             </button>
           ) : (
             <div
