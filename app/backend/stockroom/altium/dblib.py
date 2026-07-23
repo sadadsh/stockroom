@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from stockroom.altium.odbc import SQLITE3_ODBC_DRIVER
+
 # (xlsx column, Altium Design Parameter, VisibleOnAdd). A bracketed ParameterName is a
 # reserved model/attribute binding; a bare name becomes an ordinary component parameter.
 FIELD_MAP: list[tuple[str, str, bool]] = [
@@ -34,7 +36,7 @@ FIELD_MAP: list[tuple[str, str, bool]] = [
 def _connection_string(data_filename: str) -> str:
     return (
         "Provider=MSDASQL.1;Persist Security Info=False;"
-        'Extended Properties="DRIVER=SQLite3 ODBC Driver;'
+        f'Extended Properties="DRIVER={SQLITE3_ODBC_DRIVER};'
         f"Database=.\\{data_filename};"
         'LongNames=0;Timeout=1000;NoTXN=0;SyncPragma=NORMAL;StepAPI=0;"'
     )

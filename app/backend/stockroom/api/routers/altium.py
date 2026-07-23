@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
+from stockroom.altium.odbc import odbc_status
 from stockroom.api.errors import ApiError
 from stockroom.ingest.component_naming import derive_display_value
 from stockroom.model.part import PartRecord, altium_place_ready
@@ -70,6 +71,12 @@ def altium_router(require_token) -> APIRouter:
             # not-ready first (the ones needing attention), then by name
             "rows": sorted(rows, key=lambda x: (x["ready"], x["display_name"].lower())),
         }
+
+    @r.get("/odbc-status")
+    def odbc() -> dict:
+        # Machine-level, not profile-scoped: whether the 64-bit SQLite3 ODBC driver Altium needs to
+        # read the DbLib is registered on this host, plus where to get it. Honest null off Windows.
+        return odbc_status()
 
     @r.post("/regenerate")
     def regenerate(request: Request) -> dict:

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 ALTIUM_FIX = Path(__file__).parent.parent / "altium" / "fixtures"
@@ -5,6 +6,23 @@ ALTIUM_FIX = Path(__file__).parent.parent / "altium" / "fixtures"
 
 def test_status_requires_token(anon_client):
     assert anon_client.get("/api/altium/status").status_code == 401
+
+
+def test_odbc_status_requires_token(anon_client):
+    assert anon_client.get("/api/altium/odbc-status").status_code == 401
+
+
+def test_odbc_status_reports_the_driver_and_installer_and_an_honest_installed_flag(client):
+    r = client.get("/api/altium/odbc-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["driver"] == "SQLite3 ODBC Driver"
+    assert body["download_url"].endswith("sqliteodbc_w64.exe")
+    # honest per-platform: a real bool on Windows (the registry can be read), null everywhere else
+    if os.name == "nt":
+        assert isinstance(body["installed"], bool)
+    else:
+        assert body["installed"] is None
 
 
 def test_status_reports_active_profile_and_zero_ready(client):
