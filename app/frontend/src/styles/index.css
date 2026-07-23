@@ -38,6 +38,19 @@
     --cat-connector: #b58cf0;
     --cat-crystal: #4fc3dd;
     --cat-ic: #8a9cf0;
+    /* STM pin electrical-class hues (VIZ-02) — a SEPARATE taxonomy from the --cat-* component
+       families above; color is the data on the pinout map, so these run saturated on the pad fill
+       only (never a surface tint). One hue per electrical_class; each verified >=3:1 against the
+       card/stage background in BOTH themes (dark values here sit light for the near-black well).
+       io is the calmest (most pins carry it); power is hot; ground is a cool desaturated reference;
+       reset amber; boot violet; vcap teal; nc the quietest inert grey. */
+    --stm-cat-io: #5aa9f0;
+    --stm-cat-power: #ef7a86;
+    --stm-cat-ground: #8b93a3;
+    --stm-cat-reset: #e0a24a;
+    --stm-cat-boot: #b58cf0;
+    --stm-cat-vcap: #4fc9a8;
+    --stm-cat-nc: #9a8f99;
     /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
        Near-white on dark, on the primary action, focus, active nav, selected row,
        section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
@@ -109,6 +122,15 @@
     --cat-connector: #7a45c2;
     --cat-crystal: #147d97;
     --cat-ic: #4a5bc0;
+    /* STM pin electrical-class hues (VIZ-02), darkened so each clears >=3:1 against the white
+       light card. Same taxonomy/order as the dark block above. */
+    --stm-cat-io: #1f6fc4;
+    --stm-cat-power: #c23b4a;
+    --stm-cat-ground: #59606c;
+    --stm-cat-reset: #b6710f;
+    --stm-cat-boot: #7a45c2;
+    --stm-cat-vcap: #12876a;
+    --stm-cat-nc: #6a5f68;
     /* Neutral accent: near-black on light. */
     --c-acc: #1b1b1e;
     --c-acc-on: #f5f5f5;
