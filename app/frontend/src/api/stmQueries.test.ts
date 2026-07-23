@@ -9,6 +9,10 @@ import {
   useStmPinout,
   useBuildStmIndex,
   useStmCompatUnion,
+  useStmPinAf,
+  useStmSignalCandidates,
+  useStmSuggestions,
+  useStmAfCheck,
 } from "./stmQueries";
 import { api, ApiError } from "./client";
 import type { McusResponse, PinoutDTO, StmStatusDTO, UnionDTO } from "./types";
@@ -160,5 +164,69 @@ describe("STM query hooks", () => {
     result.current.mutate({ family: "STM32F4", package: "LQFP100" });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect((result.current.error as ApiError).status).toBe(409);
+  });
+
+  it("useStmPinAf is disabled until a part AND position are set, then loads the AF set", async () => {
+    const spy = vi.spyOn(api, "getStmPinAf").mockResolvedValue({
+      position: "23",
+      alternate_functions: [{ af_index: 7, signal: "USART2_TX", peripheral: "USART2" }],
+    });
+    const qc = freshClient();
+    const { result, rerender } = renderHook(
+      ({ part, pos }: { part: string | null; pos: string | null }) => useStmPinAf(part, pos),
+      { wrapper: wrapperWith(qc), initialProps: { part: null, pos: null } as { part: string | null; pos: string | null } },
+    );
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe("idle");
+
+    rerender({ part: "STM32F407VETx", pos: "23" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith("STM32F407VETx", "23");
+  });
+
+  it("useStmSignalCandidates is disabled until a signal is chosen, then loads candidates", async () => {
+    const spy = vi.spyOn(api, "getStmSignalCandidates").mockResolvedValue({
+      signal: "USART2_TX",
+      candidates: [{ position: "A1", canonical_pin_name: "PA0", af_index: 7 }],
+    });
+    const qc = freshClient();
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: string | null }) => useStmSignalCandidates("STM32F407VETx", signal),
+      { wrapper: wrapperWith(qc), initialProps: { signal: null } as { signal: string | null } },
+    );
+    expect(spy).not.toHaveBeenCalled();
+
+    rerender({ signal: "USART2_TX" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith("STM32F407VETx", "USART2_TX");
+  });
+
+  it("useStmSuggestions is enabled-gated on package + family", async () => {
+    const spy = vi.spyOn(api, "getStmCompatSuggestions").mockResolvedValue({ groups: [] });
+    const qc = freshClient();
+    const { result, rerender } = renderHook(
+      ({ pkg, fam }: { pkg: string | null; fam: string | null }) => useStmSuggestions(pkg, fam),
+      { wrapper: wrapperWith(qc), initialProps: { pkg: null, fam: null } as { pkg: string | null; fam: string | null } },
+    );
+    expect(spy).not.toHaveBeenCalled();
+
+    rerender({ pkg: "LQFP100", fam: "STM32F4" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith("LQFP100", "STM32F4", undefined);
+  });
+
+  it("useStmAfCheck posts a client-held assignment and resolves the conflicts", async () => {
+    const spy = vi.spyOn(api, "postStmAfCheck").mockResolvedValue({ conflicts: [] });
+    const { result } = renderHook(() => useStmAfCheck(), { wrapper: wrapperWith(freshClient()) });
+    result.current.mutate({
+      part: "STM32F407VETx",
+      assignment: { "23": { signal: "USART2_TX", af_index: 7 } },
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(spy).toHaveBeenCalledWith({
+      part: "STM32F407VETx",
+      assignment: { "23": { signal: "USART2_TX", af_index: 7 } },
+    });
+    expect(result.current.data?.conflicts).toEqual([]);
   });
 });

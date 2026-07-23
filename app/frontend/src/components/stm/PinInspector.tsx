@@ -9,6 +9,7 @@
  */
 import type { PinDTO } from "../../api/types";
 import { categoryFill, categoryLabel, isFiveVoltTolerant } from "./pinEncoding";
+import { AfOptionsPanel } from "./AfOptionsPanel";
 
 const SIDE_LABEL: Record<string, string> = {
   left: "Left",
@@ -17,7 +18,9 @@ const SIDE_LABEL: Record<string, string> = {
   bottom: "Bottom",
 };
 
-export function PinInspector({ pin }: { pin: PinDTO }) {
+// `part` is the active ref_name / MPN the pin belongs to. When present, AfOptionsPanel (SWAP-01/02)
+// composes in as a section of the inspector, reachable from both the pin and the signal directions.
+export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null }) {
   const fiveV = isFiveVoltTolerant(pin);
   return (
     <div className="flex flex-col gap-4" data-testid="pin-inspector">
@@ -65,7 +68,11 @@ export function PinInspector({ pin }: { pin: PinDTO }) {
         </Row>
       ) : null}
 
-      <FunctionSections pin={pin} />
+      {/* When the active part is known, AfOptionsPanel owns the interactive alternate-function
+          surface (both directions), so the static AF list is suppressed to avoid a duplicate. */}
+      <FunctionSections pin={pin} showAf={!part} />
+
+      {part ? <AfOptionsPanel part={part} position={pin.position} /> : null}
 
       {pin.roles.length > 0 ? (
         <Section label="Roles">
@@ -104,7 +111,7 @@ export function PinInspector({ pin }: { pin: PinDTO }) {
  * A pin with functions but NO AF set (the F1 legacy-AFIO families) keeps a single plain
  * "Functions" list: on those parts the split would be a fiction, not a fact.
  */
-function FunctionSections({ pin }: { pin: PinDTO }) {
+function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
   const afs = pin.alternate_functions;
   const afSignals = new Set(afs.map((af) => af.signal));
   const plain = pin.functions.filter((fn) => !afSignals.has(fn.signal));
@@ -120,23 +127,25 @@ function FunctionSections({ pin }: { pin: PinDTO }) {
 
   return (
     <>
-      <Section label="Alternate Functions">
-        <ul className="flex flex-col gap-1">
-          {afs.map((af, i) => (
-            <li
-              key={`${af.af_index}-${af.signal}-${i}`}
-              className="flex items-baseline justify-between gap-3"
-            >
-              <span className="min-w-0 truncate font-mono text-xs text-t1">
-                <span className="text-t3">AF{af.af_index}</span> {af.signal}
-              </span>
-              {af.peripheral ? (
-                <span className="flex-none font-mono text-2xs text-t3">{af.peripheral}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Section>
+      {showAf ? (
+        <Section label="Alternate Functions">
+          <ul className="flex flex-col gap-1">
+            {afs.map((af, i) => (
+              <li
+                key={`${af.af_index}-${af.signal}-${i}`}
+                className="flex items-baseline justify-between gap-3"
+              >
+                <span className="min-w-0 truncate font-mono text-xs text-t1">
+                  <span className="text-t3">AF{af.af_index}</span> {af.signal}
+                </span>
+                {af.peripheral ? (
+                  <span className="flex-none font-mono text-2xs text-t3">{af.peripheral}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
       {plain.length > 0 ? (
         <Section label="Analog & System">
           <PlainFunctionList functions={plain} />

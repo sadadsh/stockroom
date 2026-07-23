@@ -15,6 +15,13 @@ vi.mock("../api/stmQueries", () => ({
   useStmFamilies: vi.fn(),
   useStmPinout: vi.fn(),
   useBuildStmIndex: vi.fn(),
+  // Phase 5 hooks used by components reachable from this page (AfOptionsPanel via PinInspector,
+  // CompatibilityWorkbench via the Compatibility tab). Stubbed benignly so the explorer tests render.
+  useStmPinAf: vi.fn(),
+  useStmSignalCandidates: vi.fn(),
+  useStmCompatUnion: vi.fn(),
+  useStmSuggestions: vi.fn(),
+  useStmAfCheck: vi.fn(),
 }));
 
 import {
@@ -23,6 +30,8 @@ import {
   useStmFamilies,
   useStmPinout,
   useBuildStmIndex,
+  useStmPinAf,
+  useStmSignalCandidates,
 } from "../api/stmQueries";
 import type { PinDTO, PinoutDTO } from "../api/types";
 
@@ -31,6 +40,8 @@ const mockMcus = vi.mocked(useStmMcus);
 const mockFamilies = vi.mocked(useStmFamilies);
 const mockPinout = vi.mocked(useStmPinout);
 const mockBuild = vi.mocked(useBuildStmIndex);
+const mockPinAf = vi.mocked(useStmPinAf);
+const mockSignalCandidates = vi.mocked(useStmSignalCandidates);
 
 const ROW: McuSpecRow = {
   part: "STM32F407V(E-G)Tx",
@@ -122,6 +133,8 @@ beforeEach(() => {
   );
   // by default no part is selected, so the pinout query is idle/empty
   mockPinout.mockReturnValue(query({ data: undefined }));
+  mockPinAf.mockReturnValue(query({ data: undefined }));
+  mockSignalCandidates.mockReturnValue(query({ data: undefined }));
 });
 
 describe("StmViewerPage", () => {
@@ -173,6 +186,10 @@ describe("StmViewerPage", () => {
     mockMcus.mockReturnValue(query({ data: { mcus: [ROW], count: 1, facets: {} } }));
     // the pinout is available for the selected part (one fetch per part; decision 4)
     mockPinout.mockReturnValue(query({ data: PINOUT }));
+    // the AF surface is now AfOptionsPanel (SWAP-01/02), fed by useStmPinAf for the inspected pin
+    mockPinAf.mockReturnValue(
+      query({ data: { position: "1", alternate_functions: [{ af_index: 0, signal: "TRACECLK", peripheral: "TRACE" }] } }),
+    );
 
     const { container } = wrap(<StmViewerPage />);
     // before a part is picked, the chamber empty state shows
@@ -191,7 +208,9 @@ describe("StmViewerPage", () => {
     fireEvent.click(pad1);
     expect(screen.getByTestId("pin-inspector")).toBeInTheDocument();
     expect(screen.getByText("PE2")).toBeInTheDocument();
-    expect(screen.getByText("TRACECLK")).toBeInTheDocument();
+    // the AF vocabulary now flows through AfOptionsPanel
+    expect(screen.getByTestId("af-options-panel")).toBeInTheDocument();
+    expect(screen.getByText(/TRACECLK/)).toBeInTheDocument();
   });
 
   it("looks the inspected pin up from the fetched pinout without an extra fetch per pin", async () => {
