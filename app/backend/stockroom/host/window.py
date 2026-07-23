@@ -898,8 +898,11 @@ class _HostApi:
             return None
 
         def _on_cad_loaded() -> None:
-            nxt = _next_format()
-            _inject_cad_scripts(win, url, needs_values, name, driver_formats=([nxt] if nxt else []))
+            # Drive ALL requested formats in ONE session: DigiKey downloads each selected format as its
+            # OWN zip and supports CONCURRENT downloads (owner 2026-07-23: "click both step and the
+            # kicad/altium, it downloads separate zips at once"), and tier-1 catches each DownloadStarting
+            # independently - so the driver fires them back-to-back without navigating between formats.
+            _inject_cad_scripts(win, url, needs_values, name)
 
         win.events.loaded += _on_cad_loaded
         # Best-effort popup / new-window re-injection when this pywebview backend exposes the
@@ -930,25 +933,6 @@ class _HostApi:
 
         def _on_captured(captured_path) -> None:
             _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
-            # One format per fresh page load: when this format's assets have landed but another format
-            # is still needed, NAVIGATE BACK to the product page (never location.reload). A raw reload
-            # re-hydrates the SPA models page from restored UI state and leaves the provider accordion
-            # undrivable; a fresh navigation runs the normal mount path, so the next-format driver's
-            # gotoModels re-opens a clean, drivable models page. The navigation happens only AFTER this
-            # format's download reached Completed, so the in-flight DownloadOperation is never orphaned
-            # (WebView2Feedback #4435). `loaded` then injects the next-format driver.
-            if not session.is_complete() and _next_format() is not None:
-                # Navigate on a Timer thread, NOT inline here: this runs inside the WebView2 download
-                # StateChanged event, and calling evaluate_js to navigate from within that event can
-                # re-enter the browser and hang it ("not responding"). The short delay also lets the
-                # just-completed download settle before the page tears down.
-                def _nav_next() -> None:
-                    try:
-                        win.evaluate_js("location.href=" + json.dumps(url) + ";")
-                    except Exception:  # noqa: BLE001 - best-effort; the loaded handler still re-injects
-                        pass
-
-                threading.Timer(0.8, _nav_next).start()
 
         _install_cad_download_intercept(win, session.temp_dir, _on_captured)
 
