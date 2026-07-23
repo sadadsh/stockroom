@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Mcu ClockTree="STM32F1" DBVersion="V3.0" Family="STM32F1" HasPowerPad="false" IOType="" Line="STM32F1x0" Package="SYNTH_F1_LEGACY_PKG" RefName="SYNTH_F1_LEGACY_Tx" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Core>Arm Cortex-M3</Core>
+    <Frequency>72</Frequency>
+    <Flash>128</Flash>
+    <Ram>20</Ram>
+    <IONb>2</IONb>
+    <Voltage Max="3.6" Min="2"/>
+    <IP ConfigFile="GPIO-STM32F1xx" InstanceName="GPIO" Name="GPIO" Version="F1LEGACY_gpio_v1_0"/>
+    <Pin Name="PA0-WKUP" Position="1" Type="I/O"/>
+    <Pin Name="PA1" Position="2" Type="I/O"/>
+</Mcu>

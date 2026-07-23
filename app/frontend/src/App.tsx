@@ -3,6 +3,7 @@ import { OnboardingGate } from "./components/OnboardingGate";
 import { CaptureStatusPill } from "./components/CaptureStatusPill";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { StmViewerPage } from "./pages/StmViewerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
 import { useRouter, type Route } from "./lib/router";
@@ -36,6 +37,8 @@ function renderRoute(route: Route) {
       return <LibraryPage />;
     case "projects":
       return <ProjectsPage />;
+    case "stm":
+      return <StmViewerPage />;
     case "settings":
       return <SettingsPage />;
     default:

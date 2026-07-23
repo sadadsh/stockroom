@@ -103,6 +103,10 @@ def _settings_dto(ctx) -> dict:
         # they resolve to, and whether SR_LIB currently points at the active profile.
         "kicad_config_override": config.kicad_config_override,
         "kicad_cli_override": config.kicad_cli_override,
+        # STM32CubeMX MCU XML source path (stm-viewer workstream, Phase 3). A plain
+        # filesystem path, not a secret - echoed raw, following the kicad_*_override
+        # pattern (NOT the masked-hint pattern used for API keys/passwords above).
+        "stm_cubemx_source": config.stm_cubemx_source,
         "kicad_config_dir": ctx.kicad_dir.as_posix(),
         "kicad_cli_path": ctx.cli.binary or "",
         "kicad_cli_available": ctx.cli.available,
@@ -186,6 +190,11 @@ def settings_router(require_token) -> APIRouter:
             # Rebuild the cli/ops/config-dir LIVE and rewire KiCad at the active
             # library, so the change takes effect without a restart.
             ctx.apply_kicad_settings()
+        if "stm_cubemx_source" in body:
+            # No live-apply side effect: changing the source path does not rebuild the
+            # STM index - the user separately POSTs /api/stm/build.
+            ctx.config.stm_cubemx_source = str(body["stm_cubemx_source"] or "").strip().strip('"')
+            ctx.config.save()
         return _settings_dto(ctx)
 
     return r

@@ -342,3 +342,52 @@ def test_get_settings_echoes_digikey_username_and_masks_the_password(client, app
     assert body["digikey_password_hint"] == "1234"
     assert "digikey_password" not in body
     assert "accountpw1234" not in json.dumps(body)
+
+
+# -- stm_cubemx_source (stm-viewer workstream, Phase 3, API-02) - a plain path, not a secret --
+
+
+def test_get_settings_reports_blank_stm_cubemx_source_by_default(client):
+    body = client.get("/api/settings").json()
+    assert body["stm_cubemx_source"] == ""
+
+
+def test_patch_sets_stm_cubemx_source_live_and_persists(client, app_ctx, tmp_path):
+    target = tmp_path / "cubemx" / "mcu"
+    r = client.patch("/api/settings", json={"stm_cubemx_source": str(target)})
+    assert r.status_code == 200
+    assert app_ctx.config.stm_cubemx_source == str(target)
+    assert r.json()["stm_cubemx_source"] == str(target)  # raw echo, never masked
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["stm_cubemx_source"] == str(target)
+
+
+def test_patch_clears_stm_cubemx_source_to_blank(client, app_ctx, tmp_path):
+    client.patch("/api/settings", json={"stm_cubemx_source": str(tmp_path)})
+    assert app_ctx.config.stm_cubemx_source != ""
+    r = client.patch("/api/settings", json={"stm_cubemx_source": ""})
+    assert r.status_code == 200
+    assert app_ctx.config.stm_cubemx_source == ""
+    assert r.json()["stm_cubemx_source"] == ""
+
+
+def test_patch_without_stm_cubemx_source_leaves_it_unchanged(client, app_ctx, tmp_path):
+    client.patch("/api/settings", json={"stm_cubemx_source": str(tmp_path)})
+    r = client.patch("/api/settings", json={})
+    assert r.status_code == 200
+    assert app_ctx.config.stm_cubemx_source == str(tmp_path)
+
+
+def test_default_cubemx_source_prefers_the_configured_setting(monkeypatch, tmp_path):
+    # STOCKROOM_CONFIG_DIR is already isolated by the autouse _isolate_machine_config
+    # fixture (same tmp_path), so MachineConfig.save()/load() here never touch the
+    # developer's real ~/.config/stockroom.
+    from stockroom.stm import source as stm_source
+    from stockroom.store.machine_config import MachineConfig
+
+    configured = tmp_path / "configured-cubemx"
+    configured.mkdir()
+    MachineConfig(stm_cubemx_source=str(configured)).save()
+    monkeypatch.setenv("STM32_CUBEMX", str(tmp_path))  # would win if the setting were ignored
+
+    assert stm_source.default_cubemx_source() == configured

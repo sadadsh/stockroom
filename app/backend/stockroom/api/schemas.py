@@ -418,3 +418,250 @@ class ManualFillBody(BaseModel):
 
     ref: str
     part_id: str
+
+
+class StmStatusDTO(BaseModel):
+    """The STM index build/health probe (stm-viewer INTERFACES.md section 4). Never gated on
+    409 - this IS the "is it built" check a 409-gated read endpoint routes the frontend to."""
+
+    built: bool
+    building: bool
+    source_path: str
+    source_present: bool
+    all_families: bool
+    device_xml_count: int
+    family_count: int
+    families: list[str] = []
+    mcu_count: int
+    classifier_rev: int
+    af_schema_rev: int
+    geometry_rev: int
+    source_sha256: str
+    built_at: str
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "StmStatusDTO":
+        return cls(
+            built=bool(d.get("built", False)),
+            building=bool(d.get("building", False)),
+            source_path=d.get("source_path", "") or "",
+            source_present=bool(d.get("source_present", False)),
+            all_families=bool(d.get("all_families", False)),
+            device_xml_count=int(d.get("device_xml_count", 0) or 0),
+            family_count=int(d.get("family_count", 0) or 0),
+            families=list(d.get("families", []) or []),
+            mcu_count=int(d.get("mcu_count", 0) or 0),
+            classifier_rev=int(d.get("classifier_rev", 0) or 0),
+            af_schema_rev=int(d.get("af_schema_rev", 0) or 0),
+            geometry_rev=int(d.get("geometry_rev", 0) or 0),
+            source_sha256=d.get("source_sha256", "") or "",
+            built_at=d.get("built_at", "") or "",
+        )
+
+
+class McuSpecRow(BaseModel):
+    """One spec-matrix row (ST-MCU-FINDER-shaped columns), stm-viewer INTERFACES.md section 4.
+    `part` (ref_name) is the addressable id used as the `?part=` query param; `mpn_example` is a
+    display-only expanded real MPN (the exact-match MPN resolution lives in stm.authority.
+    resolve_part, Phase 3 plan 03-02 - this is purely a readable example string for the table)."""
+
+    part: str
+    mpn_example: str
+    series: str
+    line: str
+    core: str
+    package: str
+    pin_count: int
+    io_count: int
+    flash_kb: int | None = None
+    ram_kb: int | None = None
+    max_freq_mhz: int | None = None
+    vdd_min: float | None = None
+    vdd_max: float | None = None
+    temp_min_c: int | None = None
+    temp_max_c: int | None = None
+    peripherals: dict[str, int] = {}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "McuSpecRow":
+        return cls(
+            part=d["part"],
+            mpn_example=d.get("mpn_example", "") or "",
+            series=d.get("series", "") or "",
+            line=d.get("line", "") or "",
+            core=d.get("core", "") or "",
+            package=d.get("package", "") or "",
+            pin_count=int(d.get("pin_count", 0) or 0),
+            io_count=int(d.get("io_count", 0) or 0),
+            flash_kb=d.get("flash_kb"),
+            ram_kb=d.get("ram_kb"),
+            max_freq_mhz=d.get("max_freq_mhz"),
+            vdd_min=d.get("vdd_min"),
+            vdd_max=d.get("vdd_max"),
+            temp_min_c=d.get("temp_min_c"),
+            temp_max_c=d.get("temp_max_c"),
+            peripherals=dict(d.get("peripherals", {}) or {}),
+        )
+
+
+class FamilyDTO(BaseModel):
+    family: str
+    lines: list[str] = []
+    mcu_count: int = 0
+    packages: list[str] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FamilyDTO":
+        return cls(
+            family=d["family"],
+            lines=list(d.get("lines", []) or []),
+            mcu_count=int(d.get("mcu_count", 0) or 0),
+            packages=list(d.get("packages", []) or []),
+        )
+
+
+class AfOptionDTO(BaseModel):
+    af_index: int
+    signal: str
+    peripheral: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "AfOptionDTO":
+        return cls(af_index=d["af_index"], signal=d["signal"], peripheral=d.get("peripheral"))
+
+
+class PinDTO(BaseModel):
+    """Every derived fact for one pin (VIZ-03), stm-viewer INTERFACES.md section 4."""
+
+    position: str
+    position_kind: str
+    lqfp_side: str | None = None
+    bga_row: str | None = None
+    bga_col: int | None = None
+    canonical_pin_name: str
+    raw_pin_name: str
+    pin_type: str | None = None
+    electrical_class: str
+    category: str
+    roles: list[dict] = []
+    functions: list[dict] = []
+    alternate_functions: list[AfOptionDTO] = []
+    five_v: dict | None = None
+    supply: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PinDTO":
+        return cls(
+            position=d["position"],
+            position_kind=d.get("position_kind", "numeric"),
+            lqfp_side=d.get("lqfp_side"),
+            bga_row=d.get("bga_row"),
+            bga_col=d.get("bga_col"),
+            canonical_pin_name=d["canonical_pin_name"],
+            raw_pin_name=d.get("raw_pin_name", "") or "",
+            pin_type=d.get("pin_type"),
+            electrical_class=d.get("electrical_class", "") or "",
+            category=d.get("category", "") or "",
+            roles=list(d.get("roles", []) or []),
+            functions=list(d.get("functions", []) or []),
+            alternate_functions=[
+                AfOptionDTO.from_dict(a) for a in (d.get("alternate_functions") or [])
+            ],
+            five_v=d.get("five_v"),
+            supply=d.get("supply"),
+        )
+
+
+class PinoutDTO(BaseModel):
+    part: str
+    mpn_example: str
+    package: str
+    geometry: dict
+    pins: list[PinDTO] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PinoutDTO":
+        return cls(
+            part=d["part"],
+            mpn_example=d.get("mpn_example", "") or "",
+            package=d.get("package", "") or "",
+            geometry=d.get("geometry", {}) or {},
+            pins=[PinDTO.from_dict(p) for p in (d.get("pins") or [])],
+        )
+
+
+class UnionPositionDTO(BaseModel):
+    """One socket-union position (COMPAT-02/03), classified at per-part grain -
+    never a package-majority collapse."""
+
+    position: str
+    position_kind: str
+    lqfp_side: str | None = None
+    bga_row: str | None = None
+    bga_col: int | None = None
+    classification: str
+    present_on: int
+    total: int
+    per_part: list[dict] = []
+    reconcile: dict | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "UnionPositionDTO":
+        return cls(
+            position=d["position"],
+            position_kind=d.get("position_kind", "numeric"),
+            lqfp_side=d.get("lqfp_side"),
+            bga_row=d.get("bga_row"),
+            bga_col=d.get("bga_col"),
+            classification=d.get("classification", "") or "",
+            present_on=int(d.get("present_on", 0) or 0),
+            total=int(d.get("total", 0) or 0),
+            per_part=list(d.get("per_part", []) or []),
+            reconcile=d.get("reconcile"),
+        )
+
+
+class UnionDTO(BaseModel):
+    """The socket-union computation's response (COMPAT-01/02/03/05)."""
+
+    parts: list[str] = []
+    resolved: list[dict] = []
+    package: str
+    family: str
+    grain: str = "per-part"
+    positions: list[UnionPositionDTO] = []
+    verdict: dict
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "UnionDTO":
+        return cls(
+            parts=list(d.get("parts", []) or []),
+            resolved=list(d.get("resolved", []) or []),
+            package=d.get("package", "") or "",
+            family=d.get("family", "") or "",
+            grain=d.get("grain", "per-part") or "per-part",
+            positions=[UnionPositionDTO.from_dict(p) for p in (d.get("positions") or [])],
+            verdict=d.get("verdict", {}) or {},
+        )
+
+
+class SuggestionGroupDTO(BaseModel):
+    """One compatibility-suggestion group (COMPAT-04)."""
+
+    signature_id: str
+    tier: str
+    package: str
+    family: str
+    refs: list[str] = []
+    divergent_positions: int = 0
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SuggestionGroupDTO":
+        return cls(
+            signature_id=d.get("signature_id", "") or "",
+            tier=d.get("tier", "") or "",
+            package=d.get("package", "") or "",
+            family=d.get("family", "") or "",
+            refs=list(d.get("refs", []) or []),
+            divergent_positions=int(d.get("divergent_positions", 0) or 0),
+        )

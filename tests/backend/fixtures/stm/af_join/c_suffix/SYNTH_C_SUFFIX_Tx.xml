@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<Mcu ClockTree="STM32H7" DBVersion="V3.0" Family="STM32H7" HasPowerPad="false" IOType="" Line="STM32H7x7" Package="SYNTH_C_SUFFIX_PKG" RefName="SYNTH_C_SUFFIX_Tx" xmlns="http://mcd.rou.st.com/modules.php?name=mcu">
+    <Core>Arm Cortex-M7</Core>
+    <Frequency>480</Frequency>
+    <Flash>2048</Flash>
+    <Ram>128</Ram>
+    <IONb>2</IONb>
+    <Voltage Max="3.6" Min="1.62"/>
+    <IP ConfigFile="GPIO-SYN" InstanceName="GPIO" Name="GPIO" Version="C_SUFFIX_gpio_v1_0"/>
+    <Pin Name="PC2" Position="1" Type="I/O">
+        <Signal Name="SPI2_MISO" IOModes="Alternate"/>
+    </Pin>
+    <Pin Name="PC2_C" Position="2" Type="I/O">
+        <Signal Name="COMP1_INM" IOModes="Analog"/>
+    </Pin>
+</Mcu>
