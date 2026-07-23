@@ -651,6 +651,14 @@ _DK_STATE_JS = (
     "var wall=!!document.querySelector('iframe[src*=\"challenges.cloudflare.com\"],#challenge-running,.cf-turnstile')"
     "||/verify you are (a )?human|checking your browser|complete the security check/.test(body);"
     "return JSON.stringify({path:location.pathname,running:!!window.__SR_DK_RUNNING__,"
+    # visibility + rAF liveness: on an occluded/locked desktop Chromium can mark the page hidden,
+    # which PAUSES requestAnimationFrame - and the reactor's until() debounces through rAF, and the
+    # vendor's own download JS may throttle. raf = ms since the PREVIOUS snapshot's scheduled rAF
+    # actually fired (-1 = never yet); a healthy visible page shows ~3000 (the snapshot cadence),
+    # a hidden page grows without bound.
+    "vis:document.visibilityState,"
+    "raf:(function(){var n=Date.now(),l=window.__SR_RAF_T__||0;"
+    "requestAnimationFrame(function(){window.__SR_RAF_T__=Date.now();});return l?(n-l):-1;})(),"
     "refresh:(function(){try{return sessionStorage.getItem('__SR_REFRESH__');}catch(e){return null;}})(),"
     "provs:provs,fmtBtns:fmtBtns,modalOpen:!!(modal&&vis(modal)),"
     "modalLabels:modal?[].slice.call(modal.querySelectorAll('label')).map(function(l){"
@@ -659,6 +667,20 @@ _DK_STATE_JS = (
     "downloading:/downloading/i.test(body),errToast:errToast,wall:wall,"
     "hud:(function(){var o=document.getElementById('__stockroom_overlay__');"
     "return o?((o.innerText||'').replace(/\\s+/g,' ').slice(-140)):'';})()});})()"
+)
+
+# One-shot deep dump for a STALLED "Downloading" state (fired once, ~45s in): every visible
+# button/link's text - is there a follow-up control the reactor never clicks (an agreement, a
+# "your file is ready" link)? - plus the export modal / download region's outerHTML.
+_DK_DUMP_JS = (
+    "(function(){function vis(el){return !!(el&&el.offsetParent!==null&&el.getClientRects().length);}"
+    "var btns=[];var ns=document.querySelectorAll('a,button,[role=button],input[type=submit]');"
+    "for(var i=0;i<ns.length;i++){var n=ns[i];if(!vis(n))continue;"
+    "var t=(n.textContent||n.value||'').trim().replace(/\\s+/g,' ').slice(0,70);"
+    "if(t)btns.push(t+(n.disabled?' [disabled]':''));}"
+    "var m=document.querySelector('[id$=\"-export-options\"]');var html=m?(m.outerHTML||''):'';"
+    "if(!html){var d=document.querySelector('[class*=\"download\" i]');html=d?(d.outerHTML||''):'';}"
+    "return JSON.stringify({btns:btns.slice(0,100),modalHtml:html.replace(/\\s+/g,' ').slice(0,5000)});})()"
 )
 
 
@@ -676,9 +698,11 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     import threading
     import time as _t
 
+    import re
+
     from stockroom.capture.requirements import Requirement
     from stockroom.capture.session import CaptureSession
-    from stockroom.host.cdp_probe import CDPClient, ConsoleTap, wait_for_target
+    from stockroom.host.cdp_probe import CDPClient, ConsoleTap, browser_ws_url, wait_for_target
     from stockroom.host.download_capture import DownloadsWatch, default_downloads_dir
 
     port = int(os.environ.get("STOCKROOM_CDP_PORT", "9222"))
@@ -741,24 +765,99 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
 
     # Attach CDP to the cad window's page target (poll: CoreWebView2 + its debug target come up async).
     tap = ConsoleTap(w, now=_t.time)
+
+    # Network visibility, filtered to the CAD/download traffic that matters (a product page loads
+    # hundreds of assets). requestWillBeSent stores id->url so loadingFailed can name its victim.
+    net_re = re.compile(
+        r"ultralibrarian|snapmagic|snapeda|traceparts|cadenas|export|download|/api/|cloudflare", re.I
+    )
+    req_urls: dict = {}
+
+    def _on_page_event(msg: dict) -> None:
+        m = msg.get("method", "")
+        p = msg.get("params", {}) or {}
+        if m == "Network.requestWillBeSent":
+            req = p.get("request") or {}
+            u = req.get("url") or ""
+            if net_re.search(u):
+                req_urls[p.get("requestId")] = u
+                if len(req_urls) > 800:
+                    req_urls.pop(next(iter(req_urls)), None)
+                w(f"{tap._stamp()} NET>    {req.get('method', '?')} {u[:150]}")
+                # The export POST body is the ground truth on WHAT FORMAT the page actually
+                # requested (live 2026-07-23: KiCad was selected, an Altium bundle arrived).
+                pd = req.get("postData")
+                if pd:
+                    w(f"{tap._stamp()} NETBODY {str(pd)[:400]}")
+        elif m == "Network.responseReceived":
+            resp = p.get("response") or {}
+            u = resp.get("url") or ""
+            if net_re.search(u):
+                w(f"{tap._stamp()} NET<    {resp.get('status', '?')} {u[:150]}")
+        elif m == "Network.loadingFailed":
+            u = req_urls.get(p.get("requestId"), "")
+            if u or p.get("type") in ("Document", "XHR", "Fetch"):
+                w(f"{tap._stamp()} NETFAIL {p.get('errorText', '')} canceled={p.get('canceled')} "
+                  f"type={p.get('type', '?')} {u[:150]}")
+        else:
+            tap.on_event(msg)
+
     target = wait_for_target(port, "digikey", tries=60, delay=0.5)
     client = None
     if target is None:
         w("# CDP: no digikey page target found (is REMOTE_DEBUGGING_PORT set?) - console tap unavailable")
     else:
         w(f"# CDP target: {target.get('url','')[:80]}")
-        client = CDPClient(target["webSocketDebuggerUrl"], on_event=tap.on_event)
+        client = CDPClient(target["webSocketDebuggerUrl"], on_event=_on_page_event)
         if client.connect():
             client.enable()
-            w("# CDP connected; console + exceptions streaming")
+            client.send("Network.enable")
+            w("# CDP connected; console + exceptions + filtered network streaming")
+            w(f"# CDP page: visibility={client.evaluate('document.visibilityState')}")
         else:
             w("# CDP connect failed - console tap unavailable")
             client = None
+
+    # Ground truth on downloads: the BROWSER target's Browser.downloadWillBegin/downloadProgress.
+    # behavior "default" leaves WebView2's own download handling (the tier-1 intercept) untouched;
+    # eventsEnabled only turns the events on. This answers "did the browser ever even START a
+    # download?" independently of the page's UI state.
+    dl_seen: set = set()
+
+    def _on_browser_event(msg: dict) -> None:
+        m = msg.get("method", "")
+        p = msg.get("params", {}) or {}
+        if m == "Browser.downloadWillBegin":
+            w(f"{tap._stamp()} DL-BEGIN {p.get('suggestedFilename', '?')} url={str(p.get('url') or '')[:150]}")
+        elif m == "Browser.downloadProgress":
+            st = str(p.get("state", ""))
+            guid = str(p.get("guid", ""))
+            if st == "inProgress" and guid in dl_seen:
+                return
+            dl_seen.add(guid)
+            w(f"{tap._stamp()} DL-{st.upper()} guid={guid[:8]} "
+              f"bytes={p.get('receivedBytes')}/{p.get('totalBytes')}")
+
+    bws = browser_ws_url(port)
+    bclient = None
+    if bws:
+        bclient = CDPClient(bws, on_event=_on_browser_event)
+        if bclient.connect():
+            bclient.send("Browser.setDownloadBehavior", {"behavior": "default", "eventsEnabled": True})
+            w("# CDP browser target attached; download events streaming")
+        else:
+            bclient = None
+            w("# CDP browser target connect failed - download events unavailable")
+    else:
+        w("# CDP browser target not found - download events unavailable")
 
     wait_s = float(os.environ.get("STOCKROOM_DRIVER_WAIT", "220"))
     print(f"CDPCAPTURE: running with CDP for up to {wait_s:.0f}s (log: {log_path})", flush=True)
     deadline = _t.time() + wait_s
     last_snap = 0.0
+    dl_first = 0.0
+    dumped = False
+    dead_snaps = 0
     while _t.time() < deadline and not session.is_complete():
         _t.sleep(1.0)
         if client is not None and _t.time() - last_snap > 3.0:
@@ -766,7 +865,38 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
             snap = client.evaluate(_DK_STATE_JS, timeout=6.0)
             recv = sorted(r.value for r in session.received)
             w(f"{tap._stamp()} STATE   recv={recv} {snap}")
+            if snap is None:
+                # A reload (recovery refresh) can swap the WebView2 page target/process, killing
+                # this CDP connection - the rest of the run would be blind (live 2026-07-23: every
+                # post-refresh snapshot was None). Re-attach to the current digikey page target.
+                dead_snaps += 1
+                if dead_snaps >= 3:
+                    dead_snaps = 0
+                    client.close()
+                    t2 = wait_for_target(port, "digikey", tries=4, delay=0.5)
+                    nc = CDPClient(t2["webSocketDebuggerUrl"], on_event=_on_page_event) if t2 else None
+                    if nc is not None and nc.connect():
+                        nc.enable()
+                        nc.send("Network.enable")
+                        client = nc
+                        w(f"# CDP re-attached: {t2.get('url', '')[:80]}")
+                    else:
+                        w("# CDP re-attach failed; will retry")
+                continue
+            dead_snaps = 0
+            # A "Downloading" state that persists 45s+ is a stall: dump the page ONCE - every
+            # visible control + the export modal's HTML - to catch a follow-up step the reactor
+            # is not clicking (the handoff's leading open question).
+            if '"downloading":true' in str(snap):
+                dl_first = dl_first or _t.time()
+                if not dumped and _t.time() - dl_first > 45.0:
+                    dumped = True
+                    w(f"{tap._stamp()} DUMP    {client.evaluate(_DK_DUMP_JS, timeout=8.0)}")
+            else:
+                dl_first = 0.0
     w(f"# DONE complete={session.is_complete()} received={sorted(r.value for r in session.received)}")
+    if bclient is not None:
+        bclient.close()
     if client is not None:
         client.close()
     try:

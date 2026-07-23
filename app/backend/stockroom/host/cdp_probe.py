@@ -45,6 +45,21 @@ def list_targets(port: int, *, host: str = "127.0.0.1", timeout: float = 2.0) ->
         return []
 
 
+def browser_ws_url(port: int, *, host: str = "127.0.0.1", timeout: float = 2.0) -> str | None:
+    """The BROWSER-level CDP websocket (http://host:port/json/version ->
+    webSocketDebuggerUrl). Browser-domain commands and events (Browser.setDownloadBehavior,
+    Browser.downloadWillBegin / downloadProgress) only exist on this target, never on a page
+    target. None on any error - the caller degrades to page-level visibility only."""
+    url = f"http://{host}:{port}/json/version"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310 - loopback debug port
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - port not ready / no CDP; caller degrades
+        return None
+    ws = data.get("webSocketDebuggerUrl") if isinstance(data, dict) else None
+    return ws if isinstance(ws, str) and ws else None
+
+
 def wait_for_target(
     port: int,
     url_contains: str = "",
