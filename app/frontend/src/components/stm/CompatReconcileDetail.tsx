@@ -63,7 +63,9 @@ export function CompatReconcileDetail({ position }: { position: UnionPositionDTO
 
       <section>
         <div className="mb-1.5 text-2xs font-semibold text-t3">Per Part</div>
-        <ul className="flex flex-col gap-2" data-testid="compat-per-part">
+        {/* Bounded: the audit trail across a whole-family set runs to dozens of parts; it
+            scrolls inside the card rather than stretching the page. */}
+        <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto" data-testid="compat-per-part">
           {per_part.map((pp, i) => (
             <li key={`${pp.ref}-${i}`} className="flex flex-col gap-0.5">
               <div className="flex items-baseline justify-between gap-3">

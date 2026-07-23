@@ -45,9 +45,17 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
         <>
           <p className="text-sm text-t2">
             A required signal cannot be placed on every part in the set.
+            {blocking.length > 0
+              ? ` ${blocking.length} blocking ${blocking.length === 1 ? "position" : "positions"}.`
+              : ""}
           </p>
           {blocking.length > 0 ? (
-            <ul className="flex flex-col gap-1.5" data-testid="compat-blocking">
+            // Bounded: a big set can block on dozens of positions; the list scrolls inside the
+            // banner so the verdict never pushes the union map itself out of the viewport.
+            <ul
+              className="flex max-h-56 flex-col gap-1.5 overflow-y-auto"
+              data-testid="compat-blocking"
+            >
               {blocking.map((b, i) => (
                 <li
                   key={`${b.position}-${b.signal}-${i}`}
