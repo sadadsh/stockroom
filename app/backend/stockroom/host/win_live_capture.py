@@ -641,7 +641,15 @@ _DK_STATE_JS = (
     "provs[k]=vis(q('#'+k+'-media-active'));});"
     "var fmtBtns=[].slice.call(document.querySelectorAll('a.btn-download-model,a,button')).filter("
     "function(e){return vis(e)&&/select download format/i.test(e.textContent||'');}).length;"
-    "var modal=q('[id$=\"-export-options\"]');var dl=q('[id^=\"btn-download-\"]');"
+    # A dk-modal is position:fixed (offsetParent always null) and DigiKey never updates its
+    # aria-hidden (an open modal still says aria-hidden=true - live 2026-07-23). Openness is the
+    # "visible" class; pick the OPEN modal if any, else the first with labels.
+    "var modal=null,modalIsOpen=false;var _ms=document.querySelectorAll('[id$=\"-export-options\"]');"
+    "for(var mi=0;mi<_ms.length;mi++){var _m=_ms[mi];"
+    "if(/\\bvisible\\b/.test(String(_m.className||''))&&_m.querySelector('label')){"
+    "modal=_m;modalIsOpen=true;break;}}"
+    "if(!modal){for(var mj=0;mj<_ms.length;mj++){if(_ms[mj].querySelector('label')){modal=_ms[mj];break;}}}"
+    "var dl=q('[id^=\"btn-download-\"]');"
     "var complete=[].slice.call(document.querySelectorAll('.dk-modal,[role=\"dialog\"],aside,.modal')).filter("
     "function(w){return vis(w)&&/download complete/i.test(w.textContent||'');}).length;"
     "var body=(document.body&&document.body.innerText||'').toLowerCase();"
@@ -660,7 +668,7 @@ _DK_STATE_JS = (
     "raf:(function(){var n=Date.now(),l=window.__SR_RAF_T__||0;"
     "requestAnimationFrame(function(){window.__SR_RAF_T__=Date.now();});return l?(n-l):-1;})(),"
     "refresh:(function(){try{return sessionStorage.getItem('__SR_REFRESH__');}catch(e){return null;}})(),"
-    "provs:provs,fmtBtns:fmtBtns,modalOpen:!!(modal&&vis(modal)),"
+    "provs:provs,fmtBtns:fmtBtns,modalOpen:modalIsOpen,"
     "modalLabels:modal?[].slice.call(modal.querySelectorAll('label')).map(function(l){"
     "return (l.getAttribute('data-original')||l.textContent||'').trim();}).slice(0,12):[],"
     "dlBtn:dl?{id:dl.id,disabled:!!dl.disabled,vis:vis(dl)}:null,completeModal:complete,"
@@ -725,6 +733,16 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     )
     result["url"] = url
     w(f"# CDP capture for {mpn}  url={url}")
+    # Dev-only provider pin (STOCKROOM_LIVE_PROVIDERS="traceparts,ultra"): reorder/limit the
+    # driver's provider preference so a specific provider's flow (or its fallthrough) can be
+    # exercised live even when a better source is offered. Never set in production.
+    prov_pin = [p.strip().lower() for p in os.environ.get("STOCKROOM_LIVE_PROVIDERS", "").split(",") if p.strip()]
+    if prov_pin:
+        from stockroom.host.vendor_drivers import drivers as D
+
+        by_key = {p[0]: p for p in D._DIGIKEY_PROVIDER_KEYS}
+        D._DIGIKEY_PROVIDER_KEYS[:] = [by_key[k] for k in prov_pin if k in by_key]
+        w(f"# provider pin: {[p[0] for p in D._DIGIKEY_PROVIDER_KEYS]}")
     formats = [f for f in os.environ.get("STOCKROOM_DRIVER_FORMATS", "kicad,altium").split(",") if f]
     needs_map = {
         "kicad": ["kicad_symbol", "kicad_footprint", "kicad_model"],
@@ -858,10 +876,18 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     dl_first = 0.0
     dumped = False
     dead_snaps = 0
+    snap_n = 0
     while _t.time() < deadline and not session.is_complete():
         _t.sleep(1.0)
         if client is not None and _t.time() - last_snap > 3.0:
             last_snap = _t.time()
+            snap_n += 1
+            if snap_n % 5 == 0:
+                # A same-URL refresh swaps the renderer process: evaluate keeps working but the
+                # console subscription silently dies (live 2026-07-23: zero [SRDRV] lines after
+                # every recovery refresh). Re-arm the event domains periodically; a no-op when
+                # already enabled.
+                client.send("Runtime.enable")
             snap = client.evaluate(_DK_STATE_JS, timeout=6.0)
             recv = sorted(r.value for r in session.received)
             w(f"{tap._stamp()} STATE   recv={recv} {snap}")
@@ -908,6 +934,187 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     result["tier1_armed"] = armed
     result["cdp_log"] = log_path
     result["ok"] = session.is_complete()
+
+
+def _drive_dkprobe(webview, base: str, captured: list, result: dict) -> None:
+    """DISCOVERY instrument (no driver, no clicks that download): open a part's DigiKey CAD models
+    page and, for EVERY visible provider row, dump what the driver would need to drive it - the
+    row, the section's visible controls (text/onclick/href), the export modal's radio groups
+    (input name/id/value/checked + label data-original), the footer download buttons, the export
+    handler sources (resolved from the buttons' onclick), and the sticky localStorage keys.
+    This is how "any provider" gets built on evidence instead of UL-shaped guesses. It clicks
+    ONLY provider rows and modal-opening controls (onclick displayExportModal / "Select Download
+    Format"), NEVER a download button. Writes C:\\srverify\\dkprobe_<mpn>.log."""
+    import os
+    import time as _t
+
+    from stockroom.host.cdp_probe import CDPClient, wait_for_target
+
+    port = int(os.environ.get("STOCKROOM_CDP_PORT", "9222"))
+    mpn = os.environ.get("STOCKROOM_LIVE_MPN", "RC0603FR-0710KL")
+    url = os.environ.get("STOCKROOM_LIVE_URL", "") or _resolve_digikey_url(mpn) or (
+        "https://www.digikey.com/en/products/result?keywords=" + mpn
+    )
+    result["url"] = url
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in mpn)
+    log_path = os.environ.get("STOCKROOM_CDP_LOG", rf"C:\srverify\dkprobe_{safe}.log")
+    try:
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    log_f = open(log_path, "w", encoding="utf-8", buffering=1)
+
+    def w(line: str) -> None:
+        try:
+            log_f.write(line + "\n")
+        except Exception:  # noqa: BLE001
+            pass
+
+    w(f"# dkprobe for {mpn}  url={url}")
+    webview.create_window("stockroom-probe", url=url, width=1340, height=980)
+
+    target = wait_for_target(port, "digikey", tries=60, delay=0.5)
+    if target is None:
+        w("# no CDP target; is REMOTE_DEBUGGING_PORT set?")
+        result["error"] = "no cdp target"
+        log_f.close()
+        return
+    client = CDPClient(target["webSocketDebuggerUrl"])
+    if not client.connect():
+        w("# CDP connect failed")
+        result["error"] = "cdp connect failed"
+        log_f.close()
+        return
+    client.enable()
+
+    def ev(js: str, timeout: float = 8.0):
+        return client.evaluate(js, timeout=timeout)
+
+    # 1. Product page -> the models page (the driver's own navigation, sans driver).
+    nav = None
+    for _ in range(30):
+        nav = ev(
+            "(function(){var a=document.querySelector('[data-testid=\"eda-cad-model-link\"]');"
+            "if(!a){var as=document.querySelectorAll('a[href]');for(var i=0;i<as.length;i++){"
+            "if(/\\/models\\//.test(as[i].getAttribute('href')||'')){a=as[i];break;}}}"
+            "return a?a.getAttribute('href'):null;})()"
+        )
+        if nav:
+            break
+        _t.sleep(1.0)
+    if not nav:
+        w("# no models link found on the product page")
+        result["error"] = "no models link"
+        client.close()
+        log_f.close()
+        return
+    ev(f"location.href={json.dumps(nav if str(nav).startswith('http') else 'https://www.digikey.com' + str(nav))}")
+    _t.sleep(1.0)
+    # The navigation can swap the page target: re-attach.
+    for _ in range(20):
+        t2 = wait_for_target(port, "/models/", tries=4, delay=0.5)
+        if t2:
+            client.close()
+            client = CDPClient(t2["webSocketDebuggerUrl"])
+            if client.connect():
+                client.enable()
+            break
+        _t.sleep(0.5)
+
+    provider_keys = ["ultra", "mfr", "snapmagic", "traceparts", "cadenas"]
+    provs = None
+    for _ in range(30):
+        provs = ev(
+            "(function(){function vis(el){return !!(el&&el.offsetParent!==null);}var o={};"
+            + "".join(
+                f"o['{k}']=vis(document.querySelector('#{k}-media-active'));" for k in provider_keys
+            )
+            + "return JSON.stringify(o);})()"
+        )
+        if provs and '"true' in str(provs).replace(" ", "").lower() or (provs and "true" in str(provs)):
+            break
+        _t.sleep(1.0)
+    w(f"PROVS {provs}")
+    try:
+        result["provs"] = json.loads(provs) if isinstance(provs, str) else {}
+    except (ValueError, TypeError):
+        result["provs"] = {}
+
+    section_js = (
+        "(function(){function vis(el){return !!(el&&el.offsetParent!==null);}"
+        "var region=document.querySelector('#KEY-container-content')||document.body;"
+        "var out={controls:[]};var ns=region.querySelectorAll('a,button');"
+        "for(var i=0;i<ns.length;i++){var n=ns[i];if(!vis(n))continue;"
+        "out.controls.push({t:(n.textContent||'').trim().replace(/\\s+/g,' ').slice(0,70),"
+        "onclick:(n.getAttribute('onclick')||'').slice(0,160),"
+        "href:(n.getAttribute('href')||'').slice(0,160),"
+        "id:n.id||'',cls:String(n.className||'').slice(0,80)});}"
+        "out.controls=out.controls.slice(0,40);return JSON.stringify(out);})()"
+    )
+    modal_js = (
+        "(function(){function vis(el){return !!(el&&el.offsetParent!==null);}"
+        "var out=[];var ms=document.querySelectorAll('[id$=\"-export-options\"]');"
+        "for(var i=0;i<ms.length;i++){var m=ms[i];var d={id:m.id,vis:vis(m),inputs:[],buttons:[]};"
+        "var ins=m.querySelectorAll('input');for(var j=0;j<ins.length;j++){var inp=ins[j];"
+        "var l=inp.id?m.querySelector('label[for=\"'+inp.id+'\"]'):null;l=l||inp.closest('label');"
+        "d.inputs.push({name:inp.name||'',id:inp.id||'',value:inp.value||'',checked:!!inp.checked,"
+        "label:l?(l.getAttribute('data-original')||l.textContent||'').trim().slice(0,50):''});}"
+        "var bs=m.querySelectorAll('button,a');for(var k2=0;k2<bs.length;k2++){var b=bs[k2];"
+        "d.buttons.push({id:b.id||'',t:(b.textContent||'').trim().replace(/\\s+/g,' ').slice(0,50),"
+        "disabled:!!b.disabled,onclick:(b.getAttribute('onclick')||'').slice(0,160)});}"
+        "d.inputs=d.inputs.slice(0,40);d.buttons=d.buttons.slice(0,12);out.push(d);}"
+        "return JSON.stringify(out);})()"
+    )
+
+    for k in provider_keys:
+        row_vis = ev(
+            f"(function(){{var r=document.querySelector('#{k}-media-active');"
+            "return !!(r&&r.offsetParent!==null);})()"
+        )
+        if not row_vis:
+            continue
+        w(f"\n===== provider {k}")
+        ev(f"(function(){{try{{var r=document.querySelector('#{k}-media-active');r&&r.click();}}catch(e){{}}}})()")
+        _t.sleep(2.0)
+        w(f"SECTION {ev(section_js.replace('KEY', k))}")
+        # Open the export modal ONLY via a modal-opening control - never a direct download link.
+        opened = ev(
+            "(function(){function vis(el){return !!(el&&el.offsetParent!==null);}"
+            "var ns=document.querySelectorAll('a,button');"
+            "for(var i=0;i<ns.length;i++){var n=ns[i];if(!vis(n))continue;"
+            "var oc=(n.getAttribute('onclick')||'');var t=(n.textContent||'');"
+            "if(/displayExportModal/i.test(oc)||/select download format/i.test(t)){"
+            "n.click();return (n.id||t.trim().slice(0,40));}}return null;})()"
+        )
+        w(f"OPENED {opened}")
+        _t.sleep(2.0)
+        w(f"MODALS {ev(modal_js, timeout=10.0)}")
+        # Resolve the export handler sources from the modal buttons' onclick names.
+        funcs = ev(
+            "(function(){var out={};var bs=document.querySelectorAll("
+            "'[id$=\"-export-options\"] button,[id$=\"-export-options\"] a,[id^=\"btn-download-\"]');"
+            "for(var i=0;i<bs.length;i++){var oc=bs[i].getAttribute('onclick')||'';"
+            "var m2=oc.match(/([A-Za-z_$][\\w$]*)\\s*\\(/);if(m2){var n=m2[1];"
+            "try{out[n]=window[n]?String(window[n]).slice(0,2500):null;}catch(e){out[n]='ERR';}}}"
+            "return JSON.stringify(out);})()",
+            timeout=10.0,
+        )
+        w(f"FUNCS {funcs}")
+        ev(
+            "(function(){try{var x=document.querySelector('[id$=\"-export-options\"] .dk-modal__close,"
+            "[id$=\"-export-options\"] [data-modal-dismiss]');if(x)x.click();}catch(e){}})()"
+        )
+        _t.sleep(0.8)
+    ls = ev(
+        "(function(){var o={};try{for(var i=0;i<localStorage.length;i++){var k2=localStorage.key(i);"
+        "if(/format|download/i.test(k2))o[k2]=String(localStorage.getItem(k2)).slice(0,60);}}catch(e){}"
+        "return JSON.stringify(o);})()"
+    )
+    w(f"\nLOCALSTORAGE {ls}")
+    client.close()
+    log_f.close()
+    result["log"] = log_path
+    result["ok"] = True
 
 
 def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None:
@@ -991,9 +1198,10 @@ def _drive_realcapture(webview, base: str, captured: list, result: dict) -> None
 def main() -> int:
     import webview
 
-    cdpcapture = "--cdpcapture" in sys.argv
-    realcapture = "--realcapture" in sys.argv and not cdpcapture
-    driver_mode = "--driver" in sys.argv and not realcapture and not cdpcapture
+    dkprobe = "--dkprobe" in sys.argv
+    cdpcapture = "--cdpcapture" in sys.argv and not dkprobe
+    realcapture = "--realcapture" in sys.argv and not cdpcapture and not dkprobe
+    driver_mode = "--driver" in sys.argv and not realcapture and not cdpcapture and not dkprobe
     signin = "--signin" in sys.argv and not driver_mode
     live = "--live" in sys.argv and not signin and not driver_mode
     digikey = "--digikey" in sys.argv and not live and not signin and not driver_mode
@@ -1002,7 +1210,8 @@ def main() -> int:
     W._emit_to_spa = lambda payload: captured.append(payload)
     base = _serve()
     mode = (
-        "cdpcapture" if cdpcapture
+        "dkprobe" if dkprobe
+        else "cdpcapture" if cdpcapture
         else "realcapture" if realcapture
         else "driver" if driver_mode
         else "signin" if signin
@@ -1021,7 +1230,7 @@ def main() -> int:
         pass
     # Enable WebView2 remote debugging (CDP) for the cdpcapture mode: pywebview wires
     # --remote-debugging-port from this setting, giving live console + page-eval visibility.
-    if cdpcapture:
+    if cdpcapture or dkprobe:
         import os as _os
 
         try:
@@ -1032,7 +1241,9 @@ def main() -> int:
     def driver() -> None:
         try:
             drive = (
-                _drive_cdpcapture
+                _drive_dkprobe
+                if dkprobe
+                else _drive_cdpcapture
                 if cdpcapture
                 else _drive_realcapture
                 if realcapture
@@ -1060,6 +1271,20 @@ def main() -> int:
 
     profile = Path(tempfile.gettempdir()) / "stockroom-live-profile"
     profile.mkdir(parents=True, exist_ok=True)
+
+    # Dev-harness hard stop: a failed run can leave the vendor's modal open, and WebView2's
+    # window destroy then never returns - webview.start() wedges the process past its deadline
+    # (live 2026-07-23: one wedged teardown blocked a 3-run matrix for 20+ minutes). Every
+    # observation is already on disk (the CDP trace), so losing the LIVE_RESULT print beats
+    # wedging the machine. Daemon thread: dies silently with a normal exit.
+    def _teardown_watchdog() -> None:
+        import os as _os
+
+        time.sleep(float(_os.environ.get("STOCKROOM_DRIVER_WAIT", "220")) + 120.0)
+        print("HARD-EXIT: teardown watchdog fired (window destroy wedged)", flush=True)
+        _os._exit(3)
+
+    threading.Thread(target=_teardown_watchdog, daemon=True).start()
     webview.start(driver, **W._webview_start_kwargs(webview.start, profile))
 
     print("LIVE_RESULT " + json.dumps(result, default=str))
