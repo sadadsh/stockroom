@@ -368,6 +368,9 @@ export interface SpecColumn {
   label: string;
   numeric: boolean; // range facet -> right-aligned mono column
   unit: string | null;
+  // When set, a merged same-label column (e.g. two "Voltage Rating" spec keys): the table resolves
+  // each row's own value from the first of these keys it carries, via rowMergedValue (FIX-09).
+  keys?: string[];
 }
 
 // A parameter's worth as a table column comes from its spec GROUP, so the columns are the
@@ -442,7 +445,39 @@ export function deriveColumns(
       });
     }
   }
+  // Collapse columns that share a display label (e.g. "Voltage Rating" resolved from both the
+  // "voltage rating" and "voltage rating dc" spec keys) into ONE adaptive column - each row
+  // resolves its own value from whichever constituent key it carries (rowMergedValue). Same
+  // dash-soup fix as the Value collapse above, generalized to any duplicated label (FIX-09). The
+  // synthetic Value column is already merged, so it is skipped.
+  const labelCount = new Map<string, number>();
+  for (const c of cols) labelCount.set(c.label, (labelCount.get(c.label) ?? 0) + 1);
+  if ([...labelCount.values()].some((n) => n > 1)) {
+    const pre = cols;
+    const done = new Set<string>();
+    cols = pre.flatMap((c) => {
+      if (c.key === VALUE_COLUMN_KEY || (labelCount.get(c.label) ?? 0) < 2) return [c];
+      if (done.has(c.label)) return [];
+      done.add(c.label);
+      const group = pre.filter((g) => g.label === c.label);
+      const sameUnit = group.every((g) => (g.unit ?? "") === (group[0].unit ?? ""));
+      return [{ ...c, keys: group.map((g) => g.key), numeric: false, unit: sameUnit ? c.unit : null }];
+    });
+  }
   return cols.slice(0, maxCols);
+}
+
+/** A merged same-label column (SpecColumn.keys) resolves each row's value from the first of its
+ * constituent keys that the row actually carries; falls back to an em dash when none apply. */
+export function rowMergedValue(
+  specs: Record<string, string | number | boolean>,
+  keys: string[],
+): string {
+  for (const k of keys) {
+    const v = cellValue(specs, k);
+    if (v !== "—") return v;
+  }
+  return "—";
 }
 
 // Where a facet sits in the rail: the same parameter-importance signal the columns use, but
