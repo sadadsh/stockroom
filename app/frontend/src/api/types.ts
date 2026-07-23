@@ -1556,6 +1556,9 @@ export interface PinoutGeometryDTO {
   cols: number | null;
   pitch_mm: number | null;
   has_center_pad: boolean;
+  // "curated": from the cited PACKAGE_GEOMETRY table; "inferred": derived at request time
+  // from the package name + real pin positions (the map badges this honestly).
+  source?: "curated" | "inferred";
 }
 
 export interface PinoutDTO {

@@ -92,7 +92,13 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
         header: "Core",
         filterFn: "includesString",
         meta: { filter: "text" } satisfies ColMeta,
-        cell: (ctx) => <span className="truncate text-xs text-t2">{ctx.getValue() as string}</span>,
+        // "Arm Cortex-M4" -> "M4": every STM32 core is an Arm Cortex, so the prefix is pure
+        // noise at column width (it truncated to "Arm Corte..." on every row).
+        cell: (ctx) => (
+          <span className="text-xs text-t2">
+            {((ctx.getValue() as string | null) ?? "").replace(/^(arm\s+)?cortex-/i, "")}
+          </span>
+        ),
       },
       {
         accessorKey: "series",

@@ -36,17 +36,38 @@ describe("PinInspector", () => {
     // roles
     expect(screen.getByText("Roles")).toBeInTheDocument();
     expect(screen.getByText("Wakeup")).toBeInTheDocument();
-    // functions
-    expect(screen.getByText("Functions")).toBeInTheDocument();
-    expect(screen.getByText("ADC1_IN0")).toBeInTheDocument();
-    // the full alternate-function set (read-only)
+    // the AF-muxed set carries its AF indices; the analog signal is separated, never mixed in
     expect(screen.getByText("Alternate Functions")).toBeInTheDocument();
-    expect(screen.getByText("TIM2_CH1")).toBeInTheDocument();
-    expect(screen.getByText("USART2_CTS")).toBeInTheDocument();
+    expect(screen.getByText("AF1")).toBeInTheDocument();
+    expect(screen.getByText("AF7")).toBeInTheDocument();
+    expect(screen.getByText(/TIM2_CH1/)).toBeInTheDocument();
+    expect(screen.getByText(/USART2_CTS/)).toBeInTheDocument();
     expect(screen.getByText("USART2")).toBeInTheDocument();
+    expect(screen.getByText("Analog & System")).toBeInTheDocument();
+    expect(screen.getByText("ADC1_IN0")).toBeInTheDocument();
+    expect(screen.queryByText("Functions")).toBeNull();
     // 5V tolerance
     expect(screen.getByText("5V Tolerance")).toBeInTheDocument();
     expect(screen.getByText("Tolerant")).toBeInTheDocument();
+  });
+
+  it("keeps a single plain Functions list for a pin with no AF set (F1 legacy AFIO)", () => {
+    render(
+      <PinInspector
+        pin={pin({
+          alternate_functions: [],
+          functions: [
+            { signal: "USART1_TX", io_modes: "In/Out" },
+            { signal: "ADC1_IN0", io_modes: "analog" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("Functions")).toBeInTheDocument();
+    expect(screen.getByText("USART1_TX")).toBeInTheDocument();
+    expect(screen.getByText("ADC1_IN0")).toBeInTheDocument();
+    expect(screen.queryByText("Alternate Functions")).toBeNull();
+    expect(screen.queryByText("Analog & System")).toBeNull();
   });
 
   it("shows the supply domain for a power pin", () => {

@@ -42,6 +42,10 @@ export default {
         // these are the one saturated channel, used on the pad fill only (a SEPARATE taxonomy from
         // the BOM-component --cat-* hues above; never reuse those here).
         "stm-cat-io": "var(--stm-cat-io)",
+        "stm-cat-gpio": "var(--stm-cat-gpio)",
+        "stm-cat-analog": "var(--stm-cat-analog)",
+        "stm-cat-debug": "var(--stm-cat-debug)",
+        "stm-cat-oscillator": "var(--stm-cat-oscillator)",
         "stm-cat-power": "var(--stm-cat-power)",
         "stm-cat-ground": "var(--stm-cat-ground)",
         "stm-cat-reset": "var(--stm-cat-reset)",

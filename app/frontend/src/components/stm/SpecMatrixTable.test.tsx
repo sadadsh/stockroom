@@ -46,6 +46,18 @@ describe("SpecMatrixTable", () => {
     }
   });
 
+  it("strips the Arm Cortex- prefix from the Core cell so the tier is readable", () => {
+    render(
+      <SpecMatrixTable
+        rows={[row({ part: "STM32F429ZITx", mpn_example: "STM32F429ZITx", core: "Arm Cortex-M4" })]}
+        activePart={null}
+        onSelectPart={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("M4")).toBeInTheDocument();
+    expect(screen.queryByText("Arm Cortex-M4")).toBeNull();
+  });
+
   it("shows mpn_example in the Part cell and never the raw ref_name", () => {
     render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
     expect(screen.getByText("STM32F407VETx")).toBeInTheDocument();
