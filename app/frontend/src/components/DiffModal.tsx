@@ -41,18 +41,22 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
     >
       <div
         ref={dialogRef}
+        data-dev-id="diff.root"
         role="dialog"
         aria-modal="true"
         aria-label={`Visual Diff for ${partName}`}
         tabIndex={-1}
         className="flex h-[80vh] max-h-[680px] w-full max-w-[860px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
       >
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <div
+          data-dev-id="diff.header"
+          className="flex items-center gap-3 border-b border-line px-4 py-3"
+        >
           <span className="min-w-0 flex-none truncate text-sm font-semibold text-t1">
             {partName}
           </span>
           {changed.length > 1 ? (
-            <div className="flex gap-1" role="tablist" aria-label="Diff Type">
+            <div data-dev-id="diff.tabs" className="flex gap-1" role="tablist" aria-label="Diff Type">
               {changed.map((k) => {
                 const active = kind === k;
                 return (
@@ -87,7 +91,7 @@ export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Pro
           </button>
         </div>
 
-        <div className="relative flex-1 bg-field">
+        <div data-dev-id="diff.stage" className="relative flex-1 bg-field">
           <DiffBody kind={kind} partId={partId} a={a} b={b} />
         </div>
       </div>
