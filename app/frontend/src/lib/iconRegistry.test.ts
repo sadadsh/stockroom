@@ -7,13 +7,13 @@ import {
 } from "./iconRegistry";
 
 // The registry is the single source of truth for the icon set (lifted from the blueprint inventory of
-// 57 icons: primary 21, bespoke 30, art 3, brand 3). These assertions lock its shape without reaching
+// 58 icons: primary 21, bespoke 31, art 3, brand 3). These assertions lock its shape without reaching
 // outside src/ - the inventory JSON lives under the gitignored .planning/ and is not present in CI.
 
 describe("iconRegistry", () => {
-  it("has 57 entries with a matching by-id map", () => {
-    expect(ICON_REGISTRY).toHaveLength(57);
-    expect(ICON_BY_ID.size).toBe(57);
+  it("has 58 entries with a matching by-id map", () => {
+    expect(ICON_REGISTRY).toHaveLength(58);
+    expect(ICON_BY_ID.size).toBe(58);
     for (const entry of ICON_REGISTRY) {
       expect(ICON_BY_ID.get(entry.id), entry.id).toBe(entry);
     }
@@ -30,12 +30,12 @@ describe("iconRegistry", () => {
     }
   });
 
-  it("has the expected per-category counts (primary 21 / bespoke 30 / art 3 / brand 3)", () => {
+  it("has the expected per-category counts (primary 21 / bespoke 31 / art 3 / brand 3)", () => {
     const counts = ICON_REGISTRY.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(counts).toEqual({ primary: 21, bespoke: 30, art: 3, brand: 3 });
+    expect(counts).toEqual({ primary: 21, bespoke: 31, art: 3, brand: 3 });
   });
 
   it("only uses the four declared categories", () => {

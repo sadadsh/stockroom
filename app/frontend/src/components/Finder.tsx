@@ -51,37 +51,41 @@ export function Finder({
 
   return (
     <div data-dev-id="components.finder" className="relative">
-      <div
-        data-dev-id="components.search-box"
-        className="flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field pl-2.5 pr-1.5 focus-within:border-acc"
-      >
-        <SearchIcon className="flex-none text-t3" />
-        <input
-          data-dev-id="components.search-input"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          onFocus={onOpenSearch ? (e) => { e.target.blur(); onOpenSearch(); } : undefined}
-          onMouseDown={
-            onOpenSearch
-              ? (e) => { e.preventDefault(); onOpenSearch(); }
-              : undefined
-          }
-          readOnly={!!onOpenSearch}
-          placeholder={searchLabel}
-          aria-label={searchLabel}
-          className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
-        />
+      <div className="flex items-center gap-1.5">
         {onOpenSearch ? (
-          <kbd className="mr-0.5 flex-none rounded-control border border-line bg-raise px-1.5 py-[2px] font-mono text-2xs font-medium text-t3">
-            Ctrl K
-          </kbd>
-        ) : null}
+          // The overlay trigger is an honest BUTTON (it never edited text in place), styled
+          // like every other flat control - no fake text box, no shortcut chip.
+          <button
+            type="button"
+            data-dev-id="components.search-box"
+            onClick={onOpenSearch}
+            className="flex h-[31px] min-w-0 flex-1 items-center gap-2.5 rounded-control border border-line bg-raise px-2.5 text-left text-sm font-medium text-t2 transition-colors hover:bg-raise2 hover:text-t1"
+          >
+            <SearchIcon className="flex-none text-t3" />
+            <span className="min-w-0 truncate">{searchLabel}</span>
+          </button>
+        ) : (
+          <div
+            data-dev-id="components.search-box"
+            className="flex h-[31px] min-w-0 flex-1 items-center gap-2.5 rounded-control border border-line bg-field pl-2.5 pr-1.5 focus-within:border-acc"
+          >
+            <SearchIcon className="flex-none text-t3" />
+            <input
+              data-dev-id="components.search-input"
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder={searchLabel}
+              aria-label={searchLabel}
+              className="min-w-0 flex-1 cursor-text bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
+            />
+          </div>
+        )}
         <button
           type="button"
           data-dev-id="components.filter-button"
           aria-label="Filters"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-control p-1.5 text-t3 hover:bg-raise2 hover:text-t1"
+          className="inline-flex h-[31px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t3 transition-colors hover:bg-raise2 hover:text-t1"
         >
           <Icon id="finder.filter" />
           {activeFilters > 0 ? (
@@ -171,7 +175,7 @@ export function Finder({
             ))}
             {categories.length === 0 ? (
               <div className="px-1.5 py-2 text-xs text-t3">
-                No categories yet
+                No categories so far
               </div>
             ) : null}
           </div>
