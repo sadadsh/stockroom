@@ -40,10 +40,11 @@ export function Rail() {
       data-dev-id="rail.root"
       className="flex w-[190px] flex-none flex-col border-r border-line bg-rail px-3 py-4"
     >
-      {/* wordmark card (north-star .wm): the stockroom, in miniature, set in a raised tile */}
+      {/* wordmark (north-star .wm): flattened for the Altium restyle - the brand sits directly
+          on the rail (no raised tile / shadow), the way a docked panel header reads. */}
       <div
         data-dev-id="rail.wordmark"
-        className="mb-3.5 flex items-center gap-2.5 rounded-control bg-raise2 px-[11px] py-[9px] shadow-card"
+        className="mb-3 flex items-center gap-2.5 px-1.5 py-1"
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
@@ -207,9 +208,9 @@ function RailItem({
       aria-current={selected ? "page" : undefined}
       onClick={onSelect}
       className={
-        "flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base transition " +
+        "flex h-[32px] items-center gap-2.5 rounded-control px-2.5 text-left text-base transition " +
         (selected
-          ? "bg-raise2 font-semibold text-t1 shadow-card"
+          ? "bg-acc-soft font-semibold text-t1"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
       }
     >

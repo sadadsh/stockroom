@@ -9,6 +9,8 @@ import { DropOverlay } from "./DropOverlay";
 import { AddPartModal } from "./AddPartModal";
 import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
+import { useRouter } from "../lib/router";
+import { useFacetsQuery } from "../api/queries";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { open: openAddPart } = useAddPart();
@@ -39,11 +41,50 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     // h-screen (not min-h-screen) so a tall page scrolls INSIDE its own pane and
     // the window never grows a body scrollbar that shifts the rail between pages.
-    <div data-dev-id="shell.root" className="flex h-screen w-full overflow-hidden bg-surface text-t1">
-      <Rail />
-      <div data-dev-id="shell.content" className="flex min-w-0 flex-1 flex-col">{children}</div>
+    // A column: the rail + page row on top, a full-width Altium status bar pinned
+    // across the very bottom (under everything, the way a docked app reads).
+    <div data-dev-id="shell.root" className="flex h-screen w-full flex-col overflow-hidden bg-surface text-t1">
+      <div className="flex min-h-0 flex-1">
+        <Rail />
+        <div data-dev-id="shell.content" className="flex min-w-0 flex-1 flex-col">{children}</div>
+      </div>
+      <ShellStatusBar />
       <DropOverlay onDrop={handleDrop} />
       <AddPartModal />
     </div>
+  );
+}
+
+// The bottom status bar: an Altium signature, and honest about the library. The dot + label
+// reflect the real facets query state (ready / loading / error); the right slot carries the
+// live library part count and the active section. Reads global server state already cached by
+// the pages, so it costs no extra request.
+function ShellStatusBar() {
+  const { route } = useRouter();
+  const facets = useFacetsQuery();
+  const total = facets.data
+    ? Object.values(facets.data.by_category).reduce((sum, n) => sum + n, 0)
+    : null;
+  const section = route.charAt(0).toUpperCase() + route.slice(1);
+  const state = facets.isError
+    ? { dot: "bg-err", label: "Library error" }
+    : facets.isLoading
+      ? { dot: "bg-t3", label: "Loading library" }
+      : { dot: "bg-ok", label: "Library ready" };
+  return (
+    <footer
+      data-dev-id="shell.statusbar"
+      className="flex h-[24px] flex-none items-center gap-2.5 border-t border-line bg-band px-3 text-2xs text-t2"
+    >
+      <span className="flex items-center gap-1.5">
+        <span className={"inline-block h-[6px] w-[6px] flex-none rounded-full " + state.dot} />
+        {state.label}
+      </span>
+      <span className="text-t3">/</span>
+      <span className="text-t3">{section}</span>
+      {total != null ? (
+        <span className="ml-auto tabular-nums text-t3">{total.toLocaleString()} parts</span>
+      ) : null}
+    </footer>
   );
 }

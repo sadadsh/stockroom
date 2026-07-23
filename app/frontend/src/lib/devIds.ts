@@ -36,6 +36,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "about.links", label: "About social links", area: "about" },
   { id: "components.root", label: "Components page", area: "components" },
   { id: "components.picker", label: "Parts picker column", area: "components" },
+  { id: "components.list-title", label: "Parts list title strip", area: "components" },
   { id: "components.add-parts", label: "Add Parts button", area: "components" },
   { id: "components.list-scroll", label: "Parts list scroll area", area: "components" },
   { id: "components.detail-pane", label: "Detail viewport column", area: "components" },
@@ -213,6 +214,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "shell.root", label: "App frame", area: "shell" },
   { id: "shell.content", label: "Page content column", area: "shell" },
   { id: "shell.drop-overlay", label: "Drag-and-drop overlay", area: "shell" },
+  { id: "shell.statusbar", label: "Bottom status bar", area: "shell" },
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.

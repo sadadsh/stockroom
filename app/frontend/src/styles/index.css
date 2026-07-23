@@ -25,6 +25,9 @@
     --c-line: #4b4c4f;
     --c-line2: #57585c;
     --c-popover: #37383a;
+    /* the Altium "toolbar / title strip / status bar" band: the lighter chrome gray
+       that carries panel title strips and the bottom status bar (sampled #404040). */
+    --c-band: #3f4043;
     --c-t1: #d7d8da;
     --c-t2: #9a9c9f;
     --c-t3: #6d6f73;
@@ -100,6 +103,7 @@
     --c-line: #bcbdc1;
     --c-line2: #a8a9ad;
     --c-popover: #ffffff;
+    --c-band: #e7e8ea;
     --c-t1: #202225;
     --c-t2: #56585d;
     --c-t3: #85878c;

@@ -38,7 +38,7 @@ const RAW = import.meta.glob("/src/**/*.{ts,tsx}", {
 }) as Record<string, string>;
 
 // Scan only app-authored source: exclude test/spec files and the id source of truth
-// itself (devIds.ts lists all 196 ids as `id: "..."`, which is not an emission).
+// itself (devIds.ts lists all 198 ids as `id: "..."`, which is not an emission).
 const SOURCE: ReadonlyArray<readonly [string, string]> = Object.entries(RAW).filter(
   ([path]) => !/\.(test|spec)\.[jt]sx?$/.test(path) && !path.endsWith("/lib/devIds.ts"),
 );

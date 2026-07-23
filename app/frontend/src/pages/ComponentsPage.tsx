@@ -29,7 +29,7 @@ import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
 import { SearchOverlay } from "../components/SearchOverlay";
 import { AddPartIcon } from "../components/icons";
-import { Button } from "../components/primitives";
+import { Button, PanelTitle } from "../components/primitives";
 import { Text } from "../lib/copy";
 
 export function ComponentsPage() {
@@ -211,9 +211,16 @@ export function ComponentsPage() {
   // header band (the active rail item + the rail's library readout carry that).
   return (
     <div data-dev-id="components.root" className="flex min-h-0 flex-1">
-        {/* picker */}
-        <div data-dev-id="components.picker" className="flex w-[320px] flex-none flex-col px-3.5 pt-4">
-          <div className="px-2 pt-2">
+        {/* picker: a docked panel - an Altium title strip, then the padded body. The rail's
+            right border and the detail pane's left border frame this column, so it needs none. */}
+        <div data-dev-id="components.picker" className="flex w-[320px] flex-none flex-col">
+          <PanelTitle
+            data-dev-id="components.list-title"
+            right={parts.length ? parts.length.toLocaleString() : undefined}
+          >
+            <Text id="components.list-title">Components</Text>
+          </PanelTitle>
+          <div className="px-3 pt-3">
             <Button
               variant="soft"
               data-dev-id="components.add-parts"
@@ -237,7 +244,7 @@ export function ComponentsPage() {
               onOpenSearch={() => setSearchOpen(true)}
             />
           </div>
-          <div data-dev-id="components.list-scroll" className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          <div data-dev-id="components.list-scroll" className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
             <PickerBody
               isLoading={partsQuery.isLoading}
               error={partsQuery.error}
