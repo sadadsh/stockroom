@@ -645,32 +645,41 @@ def _load_vendor_creds(vendor_key: str) -> dict:
     }
 
 
-def cad_scripts_for_url(url: str, needs_values, part_name: str = "") -> list[str]:
+def cad_scripts_for_url(
+    url: str, needs_values, part_name: str = "", driver_formats=None
+) -> list[str]:
     """The cad scripts (overlay + optional per-vendor login autofill + driver) re-derived from a
     url: vendor/label via `_vendor_from_url`, formats via `_formats_for_needs`, creds via
     `_load_vendor_creds`. So a DigiKey url yields the DigiKey-account autofill (when creds are
     saved), an in-page provider url (snapeda / samacsys / ultralibrarian) yields that provider's
     autofill, and a url with no saved creds yields overlay + driver only. The single DRY path for
     both the initial injection and every re-injection - all host->page evaluate_js, never the token
-    or a js_api bridge."""
+    or a js_api bridge.
+
+    `driver_formats` overrides which formats the DRIVER attempts while the OVERLAY still shows the
+    full `needs_values` checklist. The host drives ONE format per fresh page load (DigiKey's stateful
+    export + Download-complete modals cannot be reliably reused for a 2nd format in one session), so it
+    passes the single next-unmet format here; None (the default) means all requested formats."""
     vendor_key, vendor_label = _vendor_from_url(url)
-    formats = _formats_for_needs(needs_values)
+    formats = _formats_for_needs(needs_values) if driver_formats is None else list(driver_formats)
     creds = _load_vendor_creds(vendor_key)
     return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds, part_name)
 
 
-def _inject_cad_scripts(win, fallback_url: str, needs_values, part_name: str = "") -> None:
+def _inject_cad_scripts(
+    win, fallback_url: str, needs_values, part_name: str = "", driver_formats=None
+) -> None:
     """Re-derive the cad scripts from the window's CURRENT url (guarded `get_current_url`, falling
     back to `fallback_url`) and inject them via `evaluate_js` - the light in-site re-injection, so
     after an in-site DigiKey nav or an in-page modal the current url's overlay + autofill + driver
-    are re-injected. Injection is host->page `evaluate_js` only; never `inject_script`, never the
-    token or a js_api bridge."""
+    are re-injected. `driver_formats` scopes the driver to the next-unmet format (one per page load).
+    Injection is host->page `evaluate_js` only; never `inject_script`, never the token or a js_api."""
     try:
         current = win.get_current_url()
     except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
         current = None
     url = current or fallback_url
-    for script in cad_scripts_for_url(url, needs_values, part_name):
+    for script in cad_scripts_for_url(url, needs_values, part_name, driver_formats):
         try:
             win.evaluate_js(script)
         except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app
@@ -877,9 +886,20 @@ class _HostApi:
         # right scripts. All best-effort and guarded; injected ONLY on this remote window via
         # evaluate_js, never the SPA, and NEVER with the per-launch token or a js_api bridge.
         needs_values = [r.value for r in needs_set]
+        requested_formats = _formats_for_needs(needs_values)
+
+        def _next_format():
+            """The single next-unmet requested format (KiCad before Altium), or None when done. The
+            host drives ONE format per fresh page load; the driver is scoped to just this one."""
+            if "kicad" in requested_formats and not session.kicad_complete():
+                return "kicad"
+            if "altium" in requested_formats and not session.altium_complete():
+                return "altium"
+            return None
 
         def _on_cad_loaded() -> None:
-            _inject_cad_scripts(win, url, needs_values, name)
+            nxt = _next_format()
+            _inject_cad_scripts(win, url, needs_values, name, driver_formats=([nxt] if nxt else []))
 
         win.events.loaded += _on_cad_loaded
         # Best-effort popup / new-window re-injection when this pywebview backend exposes the
@@ -910,6 +930,15 @@ class _HostApi:
 
         def _on_captured(captured_path) -> None:
             _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
+            # One format per fresh page load: when this format's assets have landed but another format
+            # is still needed, reload the page for a clean DOM (DigiKey's stateful export +
+            # Download-complete modals can't be reliably reused in one session) - `loaded` then injects
+            # the next-format driver. Per the vendor's caching, the reload retrieves fast.
+            if not session.is_complete() and _next_format() is not None:
+                try:
+                    win.evaluate_js("setTimeout(function(){location.reload();},600);")
+                except Exception:  # noqa: BLE001 - best-effort; the loaded handler still re-injects
+                    pass
 
         _install_cad_download_intercept(win, session.temp_dir, _on_captured)
 
