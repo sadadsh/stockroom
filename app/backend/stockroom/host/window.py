@@ -324,26 +324,35 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     with _CAD_CAPTURE_LOCK:
         classified = classify_asset(Path(path))
         if session is not None:
+            # reqs may be EMPTY (a duplicate re-fire, or a wrong-format download): the SPA forward
+            # and HUD tick are gated on it below, but the completed relay still fires - the reactor
+            # must hear about every file that landed, or it waits out a watchdog on a done download.
             reqs = session.record(classified.requirements, path)
-            if not reqs:
-                return  # nothing new this capture satisfies - do not re-forward
             token = session.token
         else:
             reqs = sorted(classified.requirements, key=lambda r: r.value)
             token = None
         altium_paths = _altium_paths_from_capture(path, classified, reqs, extract_dir)
         payload = build_capture_payload(path, token, reqs, altium_paths)
-    _emit_to_spa(payload)
+    if payload.get("requirements"):
+        _emit_to_spa(payload)
     # Tick the HUD checklist live: push the newly-satisfied requirements to the cad window host
     # to page (only for a real capture session, and only when this file satisfied something new -
     # the same non-empty gate that prevents a redundant SPA re-forward). Outside the lock, like the
-    # SPA emit. Then relay a "completed" download event PER captured format so the in-page reactor
-    # advances to the next format the instant a real file lands - whichever tier caught it. This is
-    # the safe convergence point (off the download's critical-path handlers).
+    # SPA emit.
     if session is not None and reqs:
         _emit_to_cad_window(cad_overlay_received_js(reqs))
-        _reqs_values = [r.value if isinstance(r, Requirement) else str(r) for r in reqs]
-        for fmt in _formats_for_needs(_reqs_values):
+    # Relay a "completed" download event for EVERY captured file - including one that satisfied
+    # nothing new (a duplicate) or the WRONG format outright (live 2026-07-23: a sticky prior
+    # selection made UL serve its Altium+STEP bundle against a KiCad request). The format names
+    # what the FILE actually contains (classified), not what the session needed, so the reactor
+    # can tell "my format landed" from "something else landed" and react at once (wrongfile ->
+    # reselect) instead of waiting out its watchdog on a download that already finished.
+    if session is not None:
+        _classified_values = [
+            r.value if isinstance(r, Requirement) else str(r) for r in classified.requirements
+        ]
+        for fmt in _capture_formats(_classified_values) or ["unknown"]:
             _emit_to_cad_window(cad_download_event_js("completed", fmt))
 
 
@@ -505,22 +514,29 @@ def _install_cad_download_intercept(
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
             name = os.path.basename(str(args.ResultFilePath)) or "cad-download.zip"
-            dest = target_dir / name
+            dest = _unique_dest(target_dir, name)
+
+            fired = {"done": False}
 
             def _on_state_changed(op_sender, op_args) -> None:
-                # KEEP THIS HANDLER PRISTINE: it runs on WebView2's download thread, in the critical
-                # path of the download itself. Calling evaluate_js here (to relay an event) stalled the
-                # download outright (live-observed 2026-07-23: the file froze mid-stream). So the ONLY
-                # thing this does is forward the completed file; the reactor's "a format landed" signal
-                # is relayed from _forward_cad_capture instead, off the download's critical path.
+                # KEEP THIS HANDLER PRISTINE: it runs on WebView2's download COM thread, in the
+                # critical path of the download itself. Calling evaluate_js here stalled the download
+                # mid-stream (live-observed 2026-07-23), and running the forward pipeline (classify +
+                # extract + blocking evaluate_js pushes) synchronously here hung the thread mid-relay
+                # (live-observed 2026-07-23, second finding: the HUD ticked, then the completed relay
+                # never reached the page). So this reads the state and DISPATCHES the completed file
+                # to a worker thread - nothing else - and fires exactly once per download operation
+                # (a repeated Completed re-fire would relay a duplicate event the reactor could
+                # misread as a wrong-format delivery for the NEXT format).
                 try:
                     from Microsoft.Web.WebView2.Core import CoreWebView2DownloadState
 
                     done = operation.State == CoreWebView2DownloadState.Completed
                 except Exception:  # noqa: BLE001 - best-effort: treat an unreadable state as done
                     done = True
-                if done:
-                    on_captured(dest)  # idempotent: the session dedups a repeated Completed
+                if done and not fired["done"]:
+                    fired["done"] = True
+                    _dispatch_captured(on_captured, dest)
 
             operation.StateChanged += _on_state_changed
             args.ResultFilePath = str(dest)
@@ -600,6 +616,47 @@ def _formats_for_needs(needs) -> list[str]:
     if any(v.startswith("altium_") for v in values):
         formats.append("altium")
     return formats
+
+
+def _capture_formats(requirement_values) -> list[str]:
+    """The formats a CAPTURED file actually DELIVERS, for the reactor's completed relay: a format
+    counts only when its core symbol+footprint pair is present. This is deliberately stricter than
+    _formats_for_needs (which maps NEEDS, where any missing kicad_* must re-drive kicad): a stray
+    STEP classifies as kicad_model alone, and naming that a "kicad" delivery would falsely advance
+    the reactor past a format it never received (live 2026-07-23: UL's Altium+STEP bundle against a
+    KiCad request)."""
+    values = {str(n) for n in (requirement_values or [])}
+    formats: list[str] = []
+    if {"kicad_symbol", "kicad_footprint"} <= values:
+        formats.append("kicad")
+    if {"altium_symbol", "altium_footprint"} <= values:
+        formats.append("altium")
+    return formats
+
+
+def _unique_dest(target_dir, name: str) -> Path:
+    """A collision-free save path inside target_dir. The vendor names EVERY export the same
+    (<MPN>.zip), so a second format's download would OVERWRITE the first zip while its async SPA
+    attach may still be reading that path (live 2026-07-23: the Altium zip replaced the
+    just-captured KiCad zip on disk seconds after the KiCad forward). Appends -2, -3, ... before
+    the suffix until the name is free."""
+    base = Path(name).stem or "cad-download"
+    suffix = Path(name).suffix or (".zip" if not name else "")
+    dest = Path(target_dir) / f"{base}{suffix}"
+    n = 2
+    while dest.exists():
+        dest = Path(target_dir) / f"{base}-{n}{suffix}"
+        n += 1
+    return dest
+
+
+def _dispatch_captured(on_captured, dest) -> None:
+    """Hand a completed download to `on_captured` on a WORKER thread and return immediately.
+    Tier 1's StateChanged fires on WebView2's download COM thread; running the forward pipeline
+    (classify + extract + blocking evaluate_js pushes) on that thread hung it mid-relay
+    (live-observed 2026-07-23: the HUD ticked, then the completed relay never reached the page),
+    so the COM callback must never wait on the forward."""
+    threading.Thread(target=on_captured, args=(dest,), daemon=True).start()
 
 
 def _vendor_from_url(url: str) -> tuple[str, str]:

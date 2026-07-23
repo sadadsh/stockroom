@@ -61,6 +61,31 @@ def test_digikey_reactor_advances_on_the_real_browser_download_event():
     assert "waitFor" not in js  # no fixed-interval polling
 
 
+def test_digikey_driver_verifies_the_selection_and_reacts_to_a_wrong_file():
+    # Live 2026-07-23: the modal can open PRE-ARMED with a sticky prior selection (the persistent
+    # profile restores it - the download button was already enabled 341ms in), and UL then served
+    # its Altium+STEP bundle against a KiCad request. So the driver must not trust its clicks:
+    # (1) pickVerified reads the modal's REAL selection state back (input.checked / aria-checked /
+    # an active class), retries, and sweeps stale selections off before clicking Download; and
+    # (2) a completed download of the WRONG format settles the await as 'wrongfile' immediately
+    # (no watchdog wait) and the format is retried with the selection re-verified.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "pickVerified" in js  # selection is verified against the DOM, not assumed from a click
+    assert "isOn(" in js  # the readback: checked / aria-checked / active-class
+    assert "'wrongfile'" in js  # a wrong-format completion is sensed and reacted to at once
+    assert "aria-checked" in js  # custom toggles without a real input are still readable
+    # the wrong-file path retries the same format once in place before refresh recovery
+    assert "__retried" in js
+    # Live 2026-07-23 (round 2): UL's async displayExportModal RE-RENDERS the format list and
+    # restores its localStorage-sticky selection AFTER our clicks, then exportUltraFile reads
+    # input:checked synchronously in the Download click chain. So the driver must (a) clear the
+    # sticky keys so the re-render has nothing stale to restore, and (b) re-check the selection
+    # SYNCHRONOUSLY in the same task as the Download click (atomic: a re-render cannot interpose),
+    # re-picking reactively if it was wiped.
+    assert "ultraDownloadFormat2D" in js and "ultraDownloadFormat3D" in js  # sticky keys cleared
+    assert "wiped" in js  # the wiped-selection sense + reactive re-pick before Download
+
+
 def test_digikey_reactor_is_event_driven_not_timed():
     # "React to what's happening live, no timers": stepping is MutationObserver-driven (until reacts
     # the instant the DOM satisfies a predicate); timers appear ONLY as never-hang watchdogs.
