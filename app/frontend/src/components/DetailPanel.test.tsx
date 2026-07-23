@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 import type { PartDetail } from "../api/types";
+import { DEV_ID_BY_ID } from "../lib/devIds";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 import { DetailPanel } from "./DetailPanel";
@@ -360,6 +361,30 @@ describe("DetailPanel sourcing vendor label", () => {
     );
     // known-vendor map misses, so it Title Cases the stored name's first letter
     expect(screen.getByText("Acme parts")).toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel dev-mode ids (IDSYS-01)", () => {
+  it("carries the panel + workbench data-dev-id anchors, each a known catalog id", () => {
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+    for (const id of ["detail.root", "detail.workbench"]) {
+      const el = container.querySelector(`[data-dev-id="${id}"]`);
+      expect(el).not.toBeNull();
+      expect(DEV_ID_BY_ID.has(id)).toBe(true);
+    }
+  });
+
+  it("emits the derived tab-strip ids via TabStrip devIdBase, resolving via DEV_ID_BY_ID", () => {
+    const { container } = wrap(<DetailPanel detail={detail()} {...BASE} />);
+    // The tab strip carries its group id and the per-tab derived ids (locked decision 2):
+    // detail.tabs on the tablist, detail.tab-specs on the first tab.
+    const strip = container.querySelector('[data-dev-id="detail.tabs"]');
+    expect(strip).not.toBeNull();
+    const specsTab = container.querySelector('[data-dev-id="detail.tab-specs"]');
+    expect(specsTab).not.toBeNull();
+    // both derived ids are real catalog entries, not invented strings
+    expect(DEV_ID_BY_ID.has("detail.tabs")).toBe(true);
+    expect(DEV_ID_BY_ID.has("detail.tab-specs")).toBe(true);
   });
 });
 
