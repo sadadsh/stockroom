@@ -79,11 +79,54 @@ def test_digikey_driver_verifies_the_selection_and_reacts_to_a_wrong_file():
     # Live 2026-07-23 (round 2): UL's async displayExportModal RE-RENDERS the format list and
     # restores its localStorage-sticky selection AFTER our clicks, then exportUltraFile reads
     # input:checked synchronously in the Download click chain. So the driver must (a) clear the
-    # sticky keys so the re-render has nothing stale to restore, and (b) re-check the selection
+    # sticky keys so the re-render has nothing stale to restore - generically, ANY provider's
+    # <prov>DownloadFormat* key, not a hardcoded UL pair - and (b) re-check the selection
     # SYNCHRONOUSLY in the same task as the Download click (atomic: a re-render cannot interpose),
     # re-picking reactively if it was wiped.
-    assert "ultraDownloadFormat2D" in js and "ultraDownloadFormat3D" in js  # sticky keys cleared
+    assert "downloadformat" in js.lower()  # the generic sticky-key clear (any provider)
     assert "wiped" in js  # the wiped-selection sense + reactive re-pick before Download
+
+
+def test_digikey_driver_scopes_every_control_to_the_provider_being_driven():
+    # dkprobe 2026-07-23 (live DOM, ATMEGA328P-PU + USB4105-GF-A): every provider gets its OWN
+    # modal and radio groups under one shared DigiKey system - and the names DIVERGE from the row
+    # ids (row #snapmagic-media-active -> modal #snapeda-export-options + groups
+    # snapeda-format-selection[-3d]; row #ultra-media-active -> modal #ultralib-export-options +
+    # groups ultra-format-selection[-3d]). A document-wide control seek can drive the WRONG
+    # provider's modal, so the format control, modal, selection verify, and download button are
+    # all resolved per provider; the verify reads the SAME input[name=...]:checked the vendor's
+    # export function reads; the vendor's own Clear Selection button resets stale state; and a
+    # provider whose row only links out to the manufacturer's site is skipped fast.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    for token in (
+        "ultralib-export-options",
+        "snapeda-export-options",
+        "traceparts-export-options",
+        "mfr-export-options",
+        "cadenas-export-options",
+    ):
+        assert token in js  # the provider tuple carries its exact modal id
+    assert "-format-selection" in js  # verification via the vendor's own radio-group read
+    assert "btn-clear-selection" in js  # the vendor's Clear Selection resets both groups
+    assert "container-content" in js  # section-scoped fallback for the format control
+    assert "externalOnly" in js  # a link-out-only provider row is sensed and skipped fast
+
+
+def test_digikey_driver_falls_through_providers_before_refreshing():
+    # The resilience ladder mirrors the human: a wrong file retries the SAME source once with the
+    # selection re-verified; a second wrong file, an error toast, or a generation timeout moves to
+    # the NEXT visible source; only when every source that offered the format has failed does the
+    # bounded refresh recovery kick in. A format no source offers is reported honestly (no refresh
+    # loop for something that is not there).
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "fallthrough" in js  # error/timeout/second-wrongfile -> the next visible source
+    assert "attempted" in js  # exhaustion recovers ONLY when a source actually offered the format
+    assert "'wall'" in js  # a Cloudflare/login wall still hands off to the user immediately
+    # Owner heuristic (2026-07-23): a SUCCESSFUL run's download STARTS within ~5s of the click
+    # (observed +1.6s..+5.7s live). The host relays the real 'started' event; if nothing starts
+    # within the start watchdog, the attempt is already dead - fail 'nostart' at once and fall
+    # through, never wait out the 150s completion backstop on it.
+    assert "'started'" in js and "'nostart'" in js and "START_WD" in js
 
 
 def test_digikey_reactor_is_event_driven_not_timed():
