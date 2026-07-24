@@ -251,6 +251,23 @@ def test_digikey_reactor_hands_off_the_wall_for_the_user_to_solve():
     assert "cfRect" not in js
 
 
+def test_digikey_done_message_is_honest_about_what_actually_landed():
+    # Owner 2026-07-24: "why does it say downloaded?? it saying it downloaded should only say
+    # download once the file lands." The reactor advanced through each format and reported
+    # "All requested downloads are done." whether a format actually downloaded or was GIVEN UP
+    # on (recover -> done, or "no source offers it" -> done). So a stalled/failed Altium rolled
+    # up into "everything downloaded." The done callback must carry the real outcome, and the
+    # final message must name what landed vs what could not.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    # the blanket optimistic message is gone
+    assert "All requested downloads are done." not in js
+    # the per-format done callback carries success/failure, and only a REAL completion is a win
+    assert "done(true)" in js and "done(false)" in js
+    # the aggregate reflects what actually landed vs what did not
+    assert "missed" in js
+    assert "could NOT" in js.lower() or "could not download" in js.lower()
+
+
 def test_wall_clearance_never_hijacks_the_login_redirect_chain():
     # Live 2026-07-24: submitting the DigiKey sign-in makes the password field vanish
     # the instant the SSO redirect chain STARTS; recover() then refreshed to the product

@@ -217,7 +217,7 @@ _DIGIKEY_REACTOR = (
     "until(function(){return !senseWall();},function(){clearTurn();"
     "setTimeout(function(){if(!senseWall())refresh();},9000);},170000);return;}"
     "if(refreshes()>=MAX_REFRESH){report(spec.key,false,"
-    "'Could not fetch '+spec.name+' automatically; the files are here to grab by hand.');done();return;}"
+    "'Could not fetch '+spec.name+' automatically; the files are here to grab by hand.');done(false);return;}"
     "report(spec.key,false,'That stalled; refreshing to try '+spec.name+' again.');refresh();}"
 )
 
@@ -240,10 +240,21 @@ _DIGIKEY_RUN = (
     "if(!present){report('provider',false,'No CAD provider is offered here; download the files from this page by hand.');return;}"
     "report('provider',true,'Providers here: '+present.map(function(p){return p[1];}).join(', ')+'.');"
     "driveFormats(present);},15000);}"
-    "function driveFormats(present){var qi=0;function nextFmt(){"
-    "if(qi>=SPECS.length){report('done',true,'All requested downloads are done.');"
-    "try{sessionStorage.removeItem('__SR_REFRESH__');}catch(e){}return;}"
-    "var spec=SPECS[qi++];trace('nextFmt',qi+'/'+SPECS.length,spec.key);downloadFormat(present,spec,nextFmt);}nextFmt();}"
+    # The done callback carries the REAL outcome (ok = a file of this format actually landed, i.e.
+    # awaitDownload saw the browser's completed event that produced a captured file). A format that
+    # was given up on (recover exhausted, or no source offered it) reports ok=false. The aggregate
+    # then NAMES what landed vs what could not - never a blanket "everything downloaded" over a
+    # format that never arrived (owner 2026-07-24: "it saying it downloaded should only say download
+    # once the file lands").
+    "function driveFormats(present){var qi=0,landed=[],missed=[];"
+    "function finish(){try{sessionStorage.removeItem('__SR_REFRESH__');}catch(e){}"
+    "if(!missed.length){report('done',true,'Downloaded '+landed.join(' and ')+'.');}"
+    "else if(landed.length){report('done',false,'Downloaded '+landed.join(' and ')+', but could NOT get '"
+    "+missed.join(' and ')+' automatically. Grab it by hand or retry.');}"
+    "else{report('done',false,'Could not download '+missed.join(' and ')+' automatically. Grab the files by hand or retry.');}}"
+    "function nextFmt(){if(qi>=SPECS.length){finish();return;}"
+    "var spec=SPECS[qi++];trace('nextFmt',qi+'/'+SPECS.length,spec.key);"
+    "downloadFormat(present,spec,function(ok){(ok?landed:missed).push(spec.name);nextFmt();});}nextFmt();}"
 )
 
 # Per-format: react through each visible provider IN ORDER until one actually offers the format (its
@@ -364,7 +375,7 @@ _DIGIKEY_DOWNLOAD = (
     "function downloadFormat(present,spec,done){var pi=0,redrives=0,attempted=0;function tryProvider(){"
     "if(pi>=present.length){"
     "if(attempted){recover(spec,done);return;}"
-    "report(spec.key,false,'No visible source offers '+spec.name+'; download it by hand.');done();return;}"
+    "report(spec.key,false,'No visible source offers '+spec.name+'; download it by hand.');done(false);return;}"
     "var prov=present[pi++];trace('tryProvider',spec.key,prov[1]);"
     "if(!fmtBtnFor(prov)){var row=document.querySelector('#'+prov[0]+'-media-active');if(row){try{row.click();}catch(e){}}}"
     # The seek reacts to WHICHEVER appears first: the provider's format control, its export modal
@@ -413,7 +424,7 @@ _DIGIKEY_DOWNLOAD = (
     "if(!ok2){recover(spec,done);return;}sel=sel2;seekDl();});return;}"
     "try{v2.d.click();}catch(e){}attempted++;"
     "report('download',true,'Downloading '+spec.name+' from '+prov[1]+'; watching for the file.');"
-    "awaitDownload(spec,function(){report('progress',true,'Finished '+spec.name+'.');done();},"
+    "awaitDownload(spec,function(){report('progress',true,'Finished '+spec.name+'.');done(true);},"
     "function(why){"
     "if(why==='wall'){recover(spec,done);return;}"
     "if(why==='wrongfile'&&!spec.__retried){spec.__retried=1;"
