@@ -505,3 +505,46 @@ def test_rebuild_part_renames_to_the_spec_aware_name_atomically(tmp_path, fixtur
     mid = repo.head()
     ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
     assert repo.head() == mid  # no-op second pass
+
+
+def test_add_part_lands_file_less_on_identity_alone(tmp_path, fixtures_dir):
+    """The primary add flow (owner 2026-07-24): a part pulled from a purchase link lands
+    with NO symbol/footprint/3D at all - the guided capture attaches both EDA formats
+    right after. The record carries None asset refs (never a dangling LibRef) and no
+    category asset files appear."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.symbol_source = None
+    staged.symbol_source_name = ""
+    staged.footprint_source = None
+    staged.model_source = None
+    staged.entry_name = ""
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+
+    assert record.symbol is None
+    assert record.footprint is None
+    assert record.model is None
+    # identity + sourcing landed intact
+    assert record.mpn == "TPS62130RGTR"
+    assert record.purchase and record.purchase[0].vendor == "Mouser"
+    # no asset files were fabricated
+    lib = profile.library
+    sym_lib = SymbolLib.load(lib.symbol_lib_path("ICs"))
+    assert "TPS62130RGTR" not in sym_lib.symbol_names
+    assert not (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
+    # one clean commit
+    assert repo.is_clean()
+    # the JSON round-trips with null assets
+    again = PartRecord.loads((lib.parts_dir / f"{record.id}.json").read_text(encoding="utf-8"))
+    assert again.symbol is None and again.footprint is None
+
+
+def test_add_part_with_symbol_but_no_entry_name_fails_loud(tmp_path, fixtures_dir):
+    """A symbol source with no entry name would merge a symbol named "" into the
+    category lib - refuse honestly instead."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.entry_name = ""
+    ops = LibraryOps(profile, repo)
+    with pytest.raises(ValueError):
+        ops.add_part(staged)
+    assert repo.is_clean()

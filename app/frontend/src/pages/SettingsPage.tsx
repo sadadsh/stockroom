@@ -117,7 +117,7 @@ export function SettingsPage() {
         toast(
           res.loaded.length
             ? `Loaded dev creds: ${res.loaded.join(", ")}.`
-            : "No dev-creds.json found in the config directory.",
+            : `No dev-creds.json at ${res.config_path}. Copy it there from another machine to load keys in one keystroke.`,
           res.loaded.length ? "ok" : "neutral",
         ),
       onError: (e) => toast(errMsg(e), "err"),

@@ -54,11 +54,10 @@ class StagingCandidate:
         return self.footprint_variants[idx]
 
     def to_staged_part(self) -> StagedPart:
-        if self.symbol_lib_path is None:
-            raise IngestError("candidate has no symbol; cannot stage")
+        # A candidate may stage with NO asset files at all (the primary add flow lands a
+        # part on its pulled identity + sourcing; the guided capture attaches both EDA
+        # formats afterwards). The gate that decides entry is add_part's, not this shape.
         fp = self.chosen_footprint
-        if fp is None:
-            raise IngestError("candidate has no footprint; cannot stage")
         datasheet_meta = None
         if self.provenance is not None and self.provenance.source_url:
             datasheet_meta = Datasheet(source_url=self.provenance.source_url)
