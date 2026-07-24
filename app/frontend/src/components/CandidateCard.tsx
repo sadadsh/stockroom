@@ -15,7 +15,7 @@ import { Text, useText } from "../lib/copy";
 import type { SpecConflict } from "../lib/candidateFromResult";
 import { distributorLabel } from "../lib/sourced";
 import { Badge, Button, Card, Dot } from "./primitives";
-import { ProductPhoto, productPhotoUrl } from "./ProductPhoto";
+import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
 
 // where a shown conflict value came from: a distributor, or the dropped files' side
 const conflictSourceLabel = (source: string) =>
@@ -123,17 +123,14 @@ export function CandidateCard({
           among the info made the flow confusing): the part's name + the ONE accent
           button on top, the editable review fields below it */}
       <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-line pb-3">
-        {photoUrl ? (
-          <div
-            data-dev-id="ingest.candidate-photo"
-            className="h-[42px] w-[42px] flex-none overflow-hidden rounded-control border border-line bg-stage p-0.5"
-          >
-            <ProductPhoto key={photoUrl} url={photoUrl} alt="Product photo" />
-          </div>
-        ) : null}
         <span className="min-w-0 truncate text-sm font-semibold text-t1">
           {c.display_name || c.mpn || "New Part"}
         </span>
+        <PhotoTrigger
+          devId="ingest.candidate-photo"
+          url={photoUrl}
+          partName={c.display_name || c.mpn}
+        />
         <Button
           variant="accent"
           onClick={handleCommit}
