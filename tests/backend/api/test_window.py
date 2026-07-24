@@ -807,20 +807,30 @@ def test_cf_autoclick_tick_clicks_the_sensed_rect_bounded_and_gapped(monkeypatch
 
     win = _CfWindow(_cf_raw())
     monkeypatch.setattr(W, "_CAD_WINDOW", win)
+    gap = W._CF_ATTEMPT_GAP
     clicks = []
     state: dict = {}
     t = {"v": 100.0}
-    for _ in range(10):
-        W._cf_autoclick_tick(state, now=lambda: t["v"], click=lambda w, x, y: clicks.append((w, x, y)))
-        t["v"] += 1.0  # 1s per poll pass: the >=3s gap must throttle consecutive attempts
-    # bounded to 3 attempts total, each at least the gap apart, aimed at the checkbox
-    assert len(clicks) == 3
+    tick = lambda: W._cf_autoclick_tick(state, now=lambda: t["v"], click=lambda w, x, y: clicks.append((w, x, y)))
+    # the gap must exceed Cloudflare's verify+redirect window so we never re-click a widget that
+    # is mid-verification (a repeated programmatic click resets the Turnstile - the "keeps making
+    # you redo it" bug, live 2026-07-24). It is comfortably longer than a poll interval.
+    assert gap >= 12.0
+    # first pass clicks
+    tick()
+    assert len(clicks) == 1
+    # every pass WITHIN the gap is suppressed - the anti-reset guarantee
+    for dt in (1.0, 3.0, gap - 0.5):
+        t["v"] = 100.0 + dt
+        tick()
+    assert len(clicks) == 1
+    # once the gap elapses with the challenge still sensed, it retries; bounded to the max
+    for k in range(1, W._CF_MAX_ATTEMPTS + 3):
+        t["v"] = 100.0 + gap * k + 0.1
+        tick()
+    assert len(clicks) == W._CF_MAX_ATTEMPTS
     assert all(c == (win, 130, 232) for c in clicks)
-    assert state["attempts"] == 3
-    # a later pass never clicks again, even with the wall still sensed (Your Turn covers it)
-    t["v"] += 1000.0
-    W._cf_autoclick_tick(state, now=lambda: t["v"], click=lambda w, x, y: clicks.append((w, x, y)))
-    assert len(clicks) == 3
+    assert state["attempts"] == W._CF_MAX_ATTEMPTS
 
 
 def test_cf_autoclick_tick_without_a_rect_or_window_consumes_nothing(monkeypatch):
