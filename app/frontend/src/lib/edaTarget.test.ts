@@ -66,36 +66,49 @@ describe("assetReadiness", () => {
     expect(r.missing).toEqual(["3D Model"]);
   });
 
-  it("that same kicad part is NOT ready for altium (all three missing for that tool)", () => {
+  it("a kicad-only part is NOT ready for altium (its altium_* fields are empty)", () => {
+    // Altium readiness reads altium_symbol/altium_footprint, NOT the KiCad symbol/footprint.
+    // Reading the KiCad fields for altium made altium ALWAYS not-ready, so every part showed
+    // "CAD Incomplete" forever even with the Altium libraries attached (live 2026-07-24).
     const part = detail({
       symbol: { lib: "L", name: "S" },
       footprint: { lib: "L", name: "F" },
       model: null,
+      altium_symbol: null,
+      altium_footprint: null,
     });
     const r = assetReadiness(part, "altium");
     expect(r.symbol).toBe(false);
     expect(r.footprint).toBe(false);
-    expect(r.model).toBe(false);
     expect(r.ready).toBe(false);
-    expect(r.missing).toEqual(["Symbol", "Footprint", "3D Model"]);
+    // the 3D model is shared and never a separate Altium requirement
+    expect(r.missing).toEqual(["Symbol", "Footprint"]);
   });
 
-  it("counts an asset only when its tool matches the selected tool", () => {
+  it("a part with altium_symbol+altium_footprint IS ready for altium (regardless of kicad)", () => {
     const part = detail({
-      symbol: { lib: "L", name: "S", tool: "altium" },
-      footprint: { lib: "L", name: "F", tool: "altium" },
-      model: { file: "m.step", tool: "altium" },
+      symbol: { lib: "SR-Diodes", name: "TPD" }, // KiCad refs present
+      footprint: { lib: "SR-Diodes", name: "TPD" },
+      model: { file: "m.step" },
+      altium_symbol: { lib: "tpd.SchLib", name: "TPD" },
+      altium_footprint: { lib: "tpd.PcbLib", name: "RVZ" },
     });
     const alt = assetReadiness(part, "altium");
     expect(alt.symbol).toBe(true);
     expect(alt.footprint).toBe(true);
-    expect(alt.model).toBe(true);
     expect(alt.ready).toBe(true);
     expect(alt.missing).toEqual([]);
-    // the same altium assets do not count toward kicad
-    const kic = assetReadiness(part, "kicad");
-    expect(kic.ready).toBe(false);
-    expect(kic.missing).toEqual(["Symbol", "Footprint", "3D Model"]);
+    // and it is independently ready for kicad from its own kicad fields
+    expect(assetReadiness(part, "kicad").ready).toBe(true);
+  });
+
+  it("altium is not ready when only one of altium_symbol/altium_footprint is attached", () => {
+    const symOnly = detail({ altium_symbol: { lib: "l", name: "S" }, altium_footprint: null });
+    expect(assetReadiness(symOnly, "altium").ready).toBe(false);
+    expect(assetReadiness(symOnly, "altium").missing).toEqual(["Footprint"]);
+    const fpOnly = detail({ altium_symbol: null, altium_footprint: { lib: "l", name: "F" } });
+    expect(assetReadiness(fpOnly, "altium").ready).toBe(false);
+    expect(assetReadiness(fpOnly, "altium").missing).toEqual(["Symbol"]);
   });
 
   it("defaults a ref with no tool to kicad", () => {

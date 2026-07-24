@@ -40,12 +40,28 @@ export interface AssetReadiness {
   ready: boolean;
 }
 
-// The per-tool asset readiness of one part detail. An asset counts only when its reference
-// targets the selected tool; a KiCad-only part is therefore not ready for Altium.
+// The per-tool asset readiness of one part detail.
+//
+// Altium assets live in their OWN record fields (altium_symbol / altium_footprint), which carry
+// no `tool` discriminator; the part.symbol / part.footprint fields are the KiCad refs. Reading
+// part.symbol for the Altium tool made altium.ready ALWAYS false - so EVERY part showed "CAD
+// Incomplete" no matter what was attached, and a captured Altium set never flipped it to Complete
+// (live 2026-07-24). So the Altium tool reads the altium_* fields; KiCad reads the tool-tagged
+// symbol/footprint/model. The 3D model is shared (KiCad's STEP serves Altium too) and is never a
+// separate Altium requirement, matching the backend's capture_needs.
 export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness {
-  const symbol = targets(part.symbol, tool);
-  const footprint = targets(part.footprint, tool);
-  const model = targets(part.model, tool);
+  let symbol: boolean;
+  let footprint: boolean;
+  let model: boolean;
+  if (tool === "altium") {
+    symbol = !!part.altium_symbol?.name;
+    footprint = !!part.altium_footprint?.name;
+    model = true; // no separate Altium 3D-model requirement
+  } else {
+    symbol = targets(part.symbol, tool);
+    footprint = targets(part.footprint, tool);
+    model = targets(part.model, tool);
+  }
 
   const missing: string[] = [];
   if (!symbol) missing.push(SYMBOL_LABEL);

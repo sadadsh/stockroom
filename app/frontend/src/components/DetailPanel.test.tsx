@@ -313,19 +313,26 @@ describe("DetailPanel attach-after affordance", () => {
   });
 
   it("offers Complete Part for a KiCad-complete part that still needs Altium assets", async () => {
-    mockApi.partCadSource.mockResolvedValue({
-      url: "https://app.ultralibrarian.com/search?queryText=LM358DR",
-      mpn: "LM358DR",
-      vendor: "UltraLibrarian",
-      needs: ["altium_symbol", "altium_footprint"],
-    } as never);
-    // detail() is fully KiCad-complete (symbol + footprint + model) and BASE.missing is [],
-    // so without the Altium gap the trigger would not show.
+    // detail() is fully KiCad-complete (symbol + footprint + model) with NO altium_* refs, so the
+    // Altium gap comes straight off the record (assetReadiness reads altium_symbol/altium_footprint,
+    // not the cad-source query) and the trigger names it.
     wrap(<DetailPanel detail={detail()} {...BASE} onAttachSymbol={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
     const trigger = await screen.findByRole("button", { name: /Complete Part/ });
-    expect(trigger).toHaveTextContent("Altium symbol");
-    expect(trigger).toHaveTextContent("Altium footprint");
+    expect(trigger).toHaveTextContent("Altium Symbol");
+    expect(trigger).toHaveTextContent("Altium Footprint");
+  });
+
+  it("shows CAD Complete once BOTH the KiCad and Altium assets are on the record", () => {
+    // the regression the owner hit: a part with its Altium libraries attached stayed on
+    // "CAD Incomplete" forever because readiness read the KiCad fields for Altium.
+    const complete = detail({
+      altium_symbol: { lib: "p.SchLib", name: "P" },
+      altium_footprint: { lib: "p.PcbLib", name: "P" },
+    });
+    wrap(<DetailPanel detail={complete} {...BASE} onAttachSymbol={vi.fn()} />);
+    expect(screen.getByText("Complete")).toBeInTheDocument();
+    expect(screen.queryByText("Incomplete")).not.toBeInTheDocument();
   });
 });
 
