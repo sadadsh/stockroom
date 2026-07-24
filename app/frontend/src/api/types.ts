@@ -313,6 +313,10 @@ export interface EnrichmentResult {
   dist_urls?: Record<string, string>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
+  // Every kept disagreement between sources for a spec key: all values with their
+  // origins (merge-only-identical, owner 2026-07-24). Optional so fixtures/older
+  // payloads without it still type-check.
+  spec_conflicts?: Record<string, SourcedField[]>;
   // The backend always emits this; optional so fixtures/older payloads without it
   // still type-check. null (or absent) means the part is not a file-less passive.
   add_plan?: PassiveAddPlan | null;

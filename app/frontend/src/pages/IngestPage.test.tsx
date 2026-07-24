@@ -595,6 +595,60 @@ describe("IngestPage — unified Add A Part", () => {
     expect(probe).toHaveAttribute("data-addpart-open", "false");
   });
 
+  it("displays every pulled spec and every kept disagreement (merge-only-identical)", async () => {
+    // Owner 2026-07-24: "missing data that we pull, we should display all of it and only
+    // merge stuff thats identical". The pulled summary lists EVERY spec as a real row (not
+    // a count), a datasheet link included; a spec two sources disagreed on shows all its
+    // values with their origins, and the staged card carries the same disagreement.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(
+      enrichStream({
+        ...EMPTY_RESULT,
+        add_plan: null,
+        category: "ICs",
+        mpn: { value: "TPD6E05U06RVZR", source: "mouser", confidence: "high" },
+        datasheet_url: { value: "https://ti.com/tpd.pdf", source: "mouser", confidence: "high" },
+        specs: {
+          "Number of Channels": sf("6"),
+          "Working Voltage": sf("5.5 V"),
+          product_url: sf("https://mouser.com/x"),
+        },
+        spec_conflicts: {
+          "Working Voltage": [
+            { value: "5.5 V", source: "mouser", confidence: "high" },
+            { value: "6 V", source: "digikey", confidence: "high" },
+          ],
+        },
+      } as unknown as EnrichmentResult),
+    );
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    await screen.findByText("Review and Add");
+
+    // the full spec table: every pulled key is a row, the datasheet is a live link,
+    // and the internal product_url marker never shows
+    const table = screen.getByRole("region", { name: "Pulled Specs" });
+    expect(table).toHaveTextContent("Number of Channels");
+    expect(table).toHaveTextContent("6");
+    expect(screen.getByRole("link", { name: "https://ti.com/tpd.pdf" })).toBeInTheDocument();
+    expect(table).not.toHaveTextContent("mouser.com/x");
+
+    // the disagreement shows BOTH values with their origins, in the table...
+    expect(table).toHaveTextContent("5.5 V");
+    expect(table).toHaveTextContent("6 V");
+    expect(table).toHaveTextContent("DigiKey");
+    // ...and on the staged review card
+    const card = document.querySelector('[data-dev-id="ingest.candidate-conflicts"]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveTextContent("Working Voltage");
+    expect(card).toHaveTextContent("6 V");
+  });
+
   it("is honest when a link yields nothing addable", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
     mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));

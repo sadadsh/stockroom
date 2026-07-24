@@ -6,7 +6,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // by-id map — the four ways the hand-authored list could silently rot.
 describe("devIds catalogue", () => {
   it("has exactly 199 entries carrying only id/label/area", () => {
-    expect(DEV_IDS).toHaveLength(215);
+    expect(DEV_IDS).toHaveLength(217);
     for (const entry of DEV_IDS) {
       expect(Object.keys(entry).sort()).toEqual(["area", "id", "label"]);
       expect(typeof entry.id).toBe("string");
@@ -24,7 +24,7 @@ describe("devIds catalogue", () => {
       seen.add(entry.id);
       expect(entry.id.split(".")[0]).toBe(entry.area);
     }
-    expect(seen.size).toBe(215);
+    expect(seen.size).toBe(217);
   });
 
   it("enumerates the 15 areas in first-appearance order, and every entry is a member", () => {
@@ -61,7 +61,7 @@ describe("devIds catalogue", () => {
   });
 
   it("DEV_ID_BY_ID round-trips every entry", () => {
-    expect(DEV_ID_BY_ID.size).toBe(215);
+    expect(DEV_ID_BY_ID.size).toBe(217);
     for (const entry of DEV_IDS) {
       expect(DEV_ID_BY_ID.get(entry.id)).toBe(entry);
     }

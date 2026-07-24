@@ -189,3 +189,32 @@ def test_product_image_proxy_404s_when_the_fetch_yields_no_image(client, monkeyp
                         lambda url: b"<html>blocked</html>")
     r = client.get("/api/enrich/image", params={"url": "https://www.mouser.com/images/x.jpg"})
     assert r.status_code == 404
+
+
+def test_enrich_dto_carries_the_kept_spec_conflicts(client, monkeypatch):
+    # A disagreement between sources reaches the UI with every value + its origin, so the
+    # Add flow can show all of it (merge-only-identical, owner 2026-07-24).
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    class _FakePipeline:
+        def extract_from_url(self, url, progress=None):
+            r = EnrichmentResult(category="Resistors")
+            r.specs = {"Resistance": Sourced("100 mOhm", "mouser", "high")}
+            r.spec_conflicts = {
+                "Resistance": [
+                    Sourced("100 mOhm", "mouser", "high"),
+                    Sourced("105 mOhm", "digikey", "high"),
+                ]
+            }
+            return r
+
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _FakePipeline())
+    r = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"})
+    body = _drain_job(client, r.json()["job_id"])["result"]
+    assert body["spec_conflicts"] == {
+        "Resistance": [
+            {"value": "100 mOhm", "source": "mouser", "confidence": "high"},
+            {"value": "105 mOhm", "source": "digikey", "confidence": "high"},
+        ]
+    }

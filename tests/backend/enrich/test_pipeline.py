@@ -680,3 +680,19 @@ def test_paste_link_falls_back_to_render_when_the_api_misses(tmp_path):
         "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
     )
     assert r.mpn.value == "ERJ-P03F1101V"  # the RENDER filled it after the API missed
+
+
+def test_cache_round_trip_keeps_spec_conflicts(tmp_path):
+    # A cache hit must not silently resolve a kept disagreement (merge-only-identical).
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.specs = {"Vf": Sourced("0.7 V", "mouser", "high")}
+    r.spec_conflicts = {
+        "Vf": [Sourced("0.7 V", "mouser", "high"), Sourced("0.65 V", "digikey", "high")]
+    }
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    assert [(s.value, s.source) for s in back.spec_conflicts["Vf"]] == [
+        ("0.7 V", "mouser"), ("0.65 V", "digikey"),
+    ]

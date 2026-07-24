@@ -18,7 +18,14 @@ import { useAddPart } from "../lib/addPart";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { mergeResultIntoCandidate, vendorFromUrl } from "../lib/candidateFromResult";
+import {
+  mergeResultIntoCandidate,
+  pulledSpecConflicts,
+  vendorFromUrl,
+  type SpecConflict,
+} from "../lib/candidateFromResult";
+import { SPEC_HIDDEN_KEYS } from "../lib/specSchema";
+import { distributorLabel } from "../lib/sourced";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
@@ -35,6 +42,9 @@ interface Staged {
   id: number;
   candidate: StagingCandidate;
   datasheetUrl: string;
+  // every spec disagreement around this candidate (API-vs-API + ZIP-vs-pull), kept for
+  // display on the review card (merge-only-identical, owner 2026-07-24)
+  conflicts: SpecConflict[];
 }
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
@@ -161,7 +171,12 @@ export function IngestPage() {
           vendor: url ? vendorFromUrl(url) : "pulled",
         };
         setStaged([
-          { id: nextId.current++, candidate, datasheetUrl: sv(r.datasheet_url) },
+          {
+            id: nextId.current++,
+            candidate,
+            datasheetUrl: sv(r.datasheet_url),
+            conflicts: pulledSpecConflicts(FILE_LESS_CANDIDATE, r),
+          },
         ]);
       }
     } else if (enrich.status === "error") {
@@ -226,6 +241,8 @@ export function IngestPage() {
         id: nextId.current++,
         candidate: r ? mergeResultIntoCandidate(candidate, r, url) : candidate,
         datasheetUrl: r ? sv(r.datasheet_url) : "",
+        // conflicts compare the PRE-merge candidate (the ZIP's own answers) to the pull
+        conflicts: r ? pulledSpecConflicts(candidate, r) : [],
       })),
     );
     // enrich.result/lookedUpInput are read at settle time; re-running on their change would
@@ -445,10 +462,11 @@ export function IngestPage() {
           <Eyebrow>
             <Text id="ingest.review-eyebrow">Review and Add</Text>
           </Eyebrow>
-          {staged.map(({ id, candidate, datasheetUrl }) => (
+          {staged.map(({ id, candidate, datasheetUrl, conflicts }) => (
             <CandidateCard
               key={id}
               candidate={candidate}
+              conflicts={conflicts}
               initialDatasheetUrl={datasheetUrl}
               onCommitted={(created) => {
                 removeStaged(id);
@@ -554,12 +572,87 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
           </div>
         ) : null}
       </div>
-      {specCount > 0 ? (
-        <span className="text-xs text-t3">
-          {specCount} <Text id="ingest.specs-kept">specs pulled and kept.</Text>
-        </span>
-      ) : null}
+      <PulledSpecTable result={result} />
       <PulledDepth result={result} />
+    </div>
+  );
+}
+
+// EVERYTHING the pull returned, as real rows (owner 2026-07-24: "display all of it") -
+// not a count. A key two sources disagreed on shows every value with its origin
+// (merge-only-identical); internal keys (product_url, the photo URL) never show as rows.
+function PulledSpecTable({ result }: { result: EnrichmentResult }) {
+  const conflicts = result.spec_conflicts ?? {};
+  const specRows = Object.entries(result.specs)
+    .filter(
+      ([k, v]) =>
+        !SPEC_HIDDEN_KEYS.has(k) &&
+        k !== "product_url" &&
+        v != null &&
+        String(v.value ?? "").trim() !== "",
+    )
+    .map(([k, v]) => ({
+      key: k,
+      value: String(v?.value ?? ""),
+      conflict: conflicts[k],
+    }));
+  const datasheet = sv(result.datasheet_url);
+  if (specRows.length === 0 && !datasheet) return null;
+  return (
+    <div className="border-t border-line pt-3">
+      <div className="mb-2 flex items-baseline gap-2">
+        <Eyebrow>
+          <Text id="ingest.pulled-specs-title">Pulled Specs</Text>
+        </Eyebrow>
+        <span className="text-2xs tabular-nums text-t3">{specRows.length}</span>
+      </div>
+      <div
+        data-dev-id="ingest.pulled-specs"
+        className="max-h-56 overflow-y-auto"
+        role="region"
+        aria-label="Pulled Specs"
+        tabIndex={0}
+      >
+        <div className="grid grid-cols-1 gap-y-1 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
+          {datasheet ? (
+            <div className="contents">
+              <span className="text-t3">
+                <Text id="ingest.pulled-datasheet">Datasheet</Text>
+              </span>
+              <a
+                href={datasheet}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-acc outline-none hover:underline focus-visible:ring-2 focus-visible:ring-acc"
+              >
+                {datasheet}
+              </a>
+            </div>
+          ) : null}
+          {specRows.map((r) => (
+            <div key={r.key} className="contents">
+              <span className="text-t3">{r.key}</span>
+              {r.conflict && r.conflict.length > 1 ? (
+                <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-t1">
+                  {r.conflict.map((s, i) => (
+                    <span key={i} className="inline-flex items-baseline gap-1">
+                      {i > 0 ? (
+                        <span aria-hidden="true" className="text-t3">
+                          ·
+                        </span>
+                      ) : null}
+                      <span>{String(s.value ?? "")}</span>
+                      <span className="text-2xs text-t3">{distributorLabel(s.source)}</span>
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span className="truncate text-t1">{r.value}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
