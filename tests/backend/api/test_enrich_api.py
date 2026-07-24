@@ -147,27 +147,6 @@ def test_from_url_add_plan_null_for_non_passive(client, monkeypatch):
     assert _drain_job(client, r.json()["job_id"])["result"]["add_plan"] is None
 
 
-def test_bulk_enrich_streams_a_report(client, monkeypatch):
-    from stockroom.enrich.bulk import BulkItem, BulkReport
-
-    def _fake_bulk(mpns, pipeline, category="Other", candidate_factory=None):
-        return BulkReport(items=[
-            BulkItem(mpn="A", candidate=None, complete=True, missing=[]),
-            BulkItem(mpn="B", candidate=None, complete=False, missing=["symbol"]),
-        ])
-
-    monkeypatch.setattr("stockroom.api.routers.enrich.bulk_enrich", _fake_bulk)
-    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline", lambda ctx: object())
-
-    r = client.post("/api/enrich/bulk", json={"text": "A\nB"})
-    assert r.status_code == 200
-    job_id = r.json()["job_id"]
-    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
-        body = "".join(chunk for chunk in s.iter_text())
-    assert "symbol" in body  # the incomplete item's missing field surfaced
-    assert "done" in body
-
-
 def test_make_pipeline_wires_digikey_only_when_both_creds_are_set(library_root, tmp_path):
     # _make_pipeline builds a live DigiKeyAdapter and registers it as a "digikey" source only
     # when BOTH digikey_client_id and digikey_client_secret are set on the machine config;

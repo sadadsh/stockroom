@@ -226,34 +226,6 @@ def library_router(require_token) -> APIRouter:
         agg = aggregate_parametric(records, category=category, constraints=parse_spec_filters(spec))
         return ParametricFacetsDTO.from_aggregate(agg).model_dump()
 
-    @r.post("/bom-match")
-    def bom_match(request: Request, body: dict) -> dict:
-        """Match a pasted BOM (an MPN list or a BOM CSV) against the library: per
-        line, the part that already exists (and whether it is complete) or an
-        honest miss. Pure index reads, so it is synchronous and offline."""
-        from stockroom.enrich.bulk import parse_bom_csv, parse_mpn_list
-
-        ctx = request.app.state.ctx
-        mpns = parse_bom_csv(body["csv"]) if "csv" in body else parse_mpn_list(body.get("text", ""))
-        items = []
-        in_library = 0
-        for mpn in mpns:
-            rows = ctx.index.find_by_mpn(mpn)
-            if rows:
-                in_library += 1
-                row = rows[0]
-                items.append({
-                    "mpn": mpn, "part_id": row.id, "display_name": row.display_name,
-                    "is_complete": row.is_complete, "missing": list(row.missing),
-                    "matches": len(rows),
-                })
-            else:
-                items.append({
-                    "mpn": mpn, "part_id": None, "display_name": "",
-                    "is_complete": False, "missing": [], "matches": 0,
-                })
-        return {"items": items, "in_library": in_library, "total": len(items)}
-
     def _build_passive(body: dict):
         """Build a passive from the request body. Manual kind/package/value/tolerance
         (the pick-your-package fallback for an MPN no decoder knows) are passed
