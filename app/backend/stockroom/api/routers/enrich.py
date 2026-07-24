@@ -86,6 +86,11 @@ def _result_dto(r: EnrichmentResult) -> dict:
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],
         "specs": {k: _sourced_dto(v) for k, v in r.specs.items()},
+        # every kept disagreement between sources, all values with their origins (owner
+        # 2026-07-24: "display all of it and only merge stuff thats identical")
+        "spec_conflicts": {
+            k: [_sourced_dto(v) for v in vs] for k, vs in r.spec_conflicts.items()
+        },
         # The passive determination for the unified Add-A-Part flow (null = non-passive,
         # needs the symbol/footprint/3D dropped).
         "add_plan": _add_plan(r),

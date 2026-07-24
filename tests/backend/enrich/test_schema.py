@@ -120,3 +120,55 @@ def test_merge_missing_fills_procurement_fields_only_when_empty():
     assert a.lifecycle.source == "datasheet"
     assert a.lead_time.value == "12 Weeks"
     assert a.dist_pns == {"mouser": "595-KEEP", "lcsc": "C123"}
+
+
+# -- Spec conflicts (owner 2026-07-24: "display all of it and only merge stuff thats
+# identical"): when two sources DISAGREE on a spec, BOTH values are kept and surfaced;
+# identical values (normalized) merge silently as before.
+
+
+def test_merge_missing_records_a_spec_conflict_when_values_differ():
+    a = EnrichmentResult(category="ICs")
+    a.specs["Resistance"] = Sourced("100 mOhm", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    b.specs["Resistance"] = Sourced("105 mOhm", "digikey", "high")
+    a.merge_missing(b)
+    # the first source still wins the single-value slot (nothing overwritten)...
+    assert a.specs["Resistance"].value == "100 mOhm"
+    # ...but the disagreement is KEPT, both values with their sources
+    conflict = a.spec_conflicts["Resistance"]
+    assert [(s.value, s.source) for s in conflict] == [
+        ("100 mOhm", "mouser"),
+        ("105 mOhm", "digikey"),
+    ]
+
+
+def test_merge_missing_identical_values_merge_without_a_conflict():
+    a = EnrichmentResult(category="ICs")
+    a.specs["Tolerance"] = Sourced("1%", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    # identical after normalization (case + surrounding space): NOT a conflict
+    b.specs["Tolerance"] = Sourced(" 1% ", "digikey", "high")
+    a.merge_missing(b)
+    assert a.spec_conflicts == {}
+
+
+def test_merge_missing_a_third_differing_value_joins_the_conflict_once():
+    a = EnrichmentResult(category="ICs")
+    a.specs["Vf"] = Sourced("0.7 V", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    b.specs["Vf"] = Sourced("0.65 V", "digikey", "high")
+    a.merge_missing(b)
+    c = EnrichmentResult(category="ICs")
+    c.specs["Vf"] = Sourced("0.65 V", "lcsc", "medium")  # same value again: no duplicate
+    a.merge_missing(c)
+    assert [s.value for s in a.spec_conflicts["Vf"]] == ["0.7 V", "0.65 V"]
+
+
+def test_merge_missing_a_key_only_one_side_has_never_conflicts():
+    a = EnrichmentResult(category="ICs")
+    b = EnrichmentResult(category="ICs")
+    b.specs["New Key"] = Sourced("x", "digikey", "high")
+    a.merge_missing(b)
+    assert a.specs["New Key"].value == "x"
+    assert a.spec_conflicts == {}

@@ -12,8 +12,14 @@ import { useIngestCommit } from "../api/queries";
 import type { PartDetail, StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
+import type { SpecConflict } from "../lib/candidateFromResult";
+import { distributorLabel } from "../lib/sourced";
 import { Badge, Button, Card, Dot } from "./primitives";
 import { ProductPhoto, productPhotoUrl } from "./ProductPhoto";
+
+// where a shown conflict value came from: a distributor, or the dropped files' side
+const conflictSourceLabel = (source: string) =>
+  source === "files" ? "Files" : distributorLabel(source);
 
 const EMPTY_PROVENANCE = {
   source: "manual",
@@ -39,11 +45,15 @@ const titleCase = (s: string) =>
 
 export function CandidateCard({
   candidate,
+  conflicts,
   initialDatasheetUrl,
   onCommitted,
   toast,
 }: {
   candidate: StagingCandidate;
+  // spec disagreements kept for display (API-vs-API + ZIP-vs-pull): the first value won
+  // the slot, the rest are shown so nothing pulled is silently discarded
+  conflicts?: SpecConflict[];
   initialDatasheetUrl?: string;
   // Fires with the CREATED part so the Add flow can continue into its Complete Part
   // window (the guided both-format capture) instead of dead-ending on a toast.
@@ -137,6 +147,34 @@ export function CandidateCard({
           )}
         </Button>
       </div>
+      {conflicts && conflicts.length > 0 ? (
+        <div
+          data-dev-id="ingest.candidate-conflicts"
+          className="mb-3 flex flex-col gap-1.5 rounded-control border border-warn/40 bg-warn/[0.08] px-3 py-2.5"
+        >
+          <span className="text-xs font-medium text-warn">
+            <Text id="ingest.conflicts-title">
+              The sources disagree here. The first value is kept; everything stays editable after adding.
+            </Text>
+          </span>
+          {conflicts.map((cf) => (
+            <div key={cf.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+              <span className="text-t3">{cf.key}</span>
+              {cf.values.map((v, i) => (
+                <span key={i} className="inline-flex items-baseline gap-1 text-t1">
+                  {i > 0 ? (
+                    <span aria-hidden="true" className="text-t3">
+                      ·
+                    </span>
+                  ) : null}
+                  <span>{v.value}</span>
+                  <span className="text-2xs text-t3">{conflictSourceLabel(v.source)}</span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="grid gap-2.5">
         <Field label="Name" copyId="ingest.field-name" value={c.display_name} onChange={(v) => set("display_name", v)} />
         <Field label="Part Number" copyId="ingest.field-mpn" value={c.mpn} onChange={(v) => set("mpn", v)} mono />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
-import { mergeResultIntoCandidate, vendorFromUrl } from "./candidateFromResult";
+import { mergeResultIntoCandidate, pulledSpecConflicts, vendorFromUrl } from "./candidateFromResult";
 
 function sf(value: unknown) {
   return { value, source: "mouser", confidence: "high" };
@@ -130,5 +130,87 @@ describe("purchase ordering + per-vendor prices (owner 2026-07-24)", () => {
     expect(c.purchase[1].vendor).toBe("DigiKey");
     expect(c.purchase[1].price_breaks).toEqual([{ qty: 1, price: 0.5, currency: "USD" }]);
     expect(c.purchase[1].stock).toBe(100);
+  });
+});
+
+describe("pulledSpecConflicts", () => {
+  it("keeps every API-vs-API disagreement with its sources", () => {
+    const result: EnrichmentResult = {
+      ...RESULT,
+      spec_conflicts: {
+        Resistance: [
+          { value: "100 mOhm", source: "mouser", confidence: "high" },
+          { value: "105 mOhm", source: "digikey", confidence: "high" },
+        ],
+      },
+    };
+    const conflicts = pulledSpecConflicts(ZIP_CANDIDATE, result);
+    expect(conflicts).toEqual([
+      {
+        key: "Resistance",
+        values: [
+          { value: "100 mOhm", source: "mouser" },
+          { value: "105 mOhm", source: "digikey" },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps a ZIP-vs-pull disagreement, naming the files side", () => {
+    const zipWithSpecs = {
+      ...ZIP_CANDIDATE,
+      specs: { "Core Processor": "Cortex M3 rev2" },
+    } as StagingCandidate;
+    const conflicts = pulledSpecConflicts(zipWithSpecs, RESULT);
+    expect(conflicts).toEqual([
+      {
+        key: "Core Processor",
+        values: [
+          { value: "ARM Cortex-M3", source: "mouser" },
+          { value: "Cortex M3 rev2", source: "files" },
+        ],
+      },
+    ]);
+  });
+
+  it("identical values (normalized) are a merge, never a conflict", () => {
+    const zipWithSpecs = {
+      ...ZIP_CANDIDATE,
+      specs: { "Core Processor": " arm cortex-m3 " },
+    } as StagingCandidate;
+    expect(pulledSpecConflicts(zipWithSpecs, RESULT)).toEqual([]);
+  });
+
+  it("a key with both an API conflict and a ZIP diff folds into one entry", () => {
+    const result: EnrichmentResult = {
+      ...RESULT,
+      spec_conflicts: {
+        "Core Processor": [
+          { value: "ARM Cortex-M3", source: "mouser", confidence: "high" },
+          { value: "ARM Cortex M3F", source: "digikey", confidence: "high" },
+        ],
+      },
+    };
+    const zipWithSpecs = {
+      ...ZIP_CANDIDATE,
+      specs: { "Core Processor": "Cortex M3 rev2" },
+    } as StagingCandidate;
+    const [c] = pulledSpecConflicts(zipWithSpecs, result);
+    expect(c.key).toBe("Core Processor");
+    expect(c.values).toEqual([
+      { value: "ARM Cortex-M3", source: "mouser" },
+      { value: "ARM Cortex M3F", source: "digikey" },
+      { value: "Cortex M3 rev2", source: "files" },
+    ]);
+  });
+
+  it("is empty when nothing disagrees and hides internal keys", () => {
+    expect(pulledSpecConflicts(ZIP_CANDIDATE, RESULT)).toEqual([]);
+    // product_url is an internal marker, never a conflict row even if it differs
+    const zipWithSpecs = {
+      ...ZIP_CANDIDATE,
+      specs: { product_url: "https://elsewhere/x" },
+    } as StagingCandidate;
+    expect(pulledSpecConflicts(zipWithSpecs, RESULT)).toEqual([]);
   });
 });

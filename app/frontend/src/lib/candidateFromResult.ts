@@ -21,6 +21,54 @@ export function vendorFromUrl(url: string): string {
   return host.replace(/^www\./, "") || "manual";
 }
 
+// A spec disagreement kept for display: every distinct value with where it came from
+// ("mouser"/"digikey" from the APIs, "files" for the ZIP/schematic side). The single-value
+// slot on the candidate still carries the pulled answer; the review card SHOWS the
+// disagreement so the user decides before commit (merge-only-identical, owner 2026-07-24).
+export interface SpecConflict {
+  key: string;
+  values: { value: string; source: string }[];
+}
+
+// keys that are internal plumbing, never a displayable spec disagreement
+const INTERNAL_SPEC_KEYS = new Set(["product_url"]);
+
+const normSpec = (v: unknown) => String(v ?? "").trim().toLowerCase();
+
+/** Every spec disagreement around this candidate: the API-vs-API conflicts the backend
+ * kept (result.spec_conflicts) plus any ZIP-vs-pull difference, folded per key. Identical
+ * values (normalized) never appear - they merged. */
+export function pulledSpecConflicts(
+  candidate: StagingCandidate,
+  result: EnrichmentResult,
+): SpecConflict[] {
+  const byKey = new Map<string, { value: string; source: string }[]>();
+  const add = (key: string, value: string, source: string) => {
+    const list = byKey.get(key) ?? [];
+    if (list.every((v) => normSpec(v.value) !== normSpec(value))) {
+      list.push({ value, source });
+    }
+    byKey.set(key, list);
+  };
+  for (const [key, sourced] of Object.entries(result.spec_conflicts ?? {})) {
+    if (INTERNAL_SPEC_KEYS.has(key)) continue;
+    for (const s of sourced) add(key, String(s.value ?? ""), s.source);
+  }
+  const candidateSpecs = (candidate.specs ?? {}) as Record<string, unknown>;
+  for (const [key, zipValue] of Object.entries(candidateSpecs)) {
+    if (INTERNAL_SPEC_KEYS.has(key) || zipValue == null) continue;
+    const pulled = result.specs?.[key];
+    if (pulled == null) continue;
+    if (normSpec(pulled.value) === normSpec(zipValue)) continue;
+    // the pulled value leads (it wins the slot), the files' answer follows
+    add(key, String(pulled.value ?? ""), pulled.source);
+    add(key, String(zipValue), "files");
+  }
+  return Array.from(byKey.entries())
+    .filter(([, values]) => values.length > 1)
+    .map(([key, values]) => ({ key, values }));
+}
+
 export function mergeResultIntoCandidate(
   candidate: StagingCandidate,
   result: EnrichmentResult,

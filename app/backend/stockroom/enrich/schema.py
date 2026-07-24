@@ -104,6 +104,12 @@ _SOURCED_FIELDS: tuple[str, ...] = (
 )
 
 
+def _norm_spec(value) -> str:
+    """The comparison form of a spec value: sources agree when their values match after
+    trimming and case-folding ("1%" == " 1% "), so formatting noise never fakes a conflict."""
+    return str(value).strip().casefold()
+
+
 @dataclass
 class EnrichmentResult:
     category: str = ""
@@ -133,6 +139,11 @@ class EnrichmentResult:
     dist_stock: dict[str, int | None] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
+    # Where two sources DISAGREE on a spec, every distinct value is kept here with its
+    # source (the single-value specs slot still holds the first source's answer). The UI
+    # shows all of them (owner 2026-07-24: "display all of it and only merge stuff thats
+    # identical") - a disagreement is data, never silently discarded.
+    spec_conflicts: dict[str, list[Sourced]] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     def filled_fields(self) -> set[str]:
@@ -158,7 +169,17 @@ class EnrichmentResult:
         if not self.price_breaks and other.price_breaks:
             self.price_breaks = list(other.price_breaks)
         for key, val in other.specs.items():
-            self.specs.setdefault(key, val)
+            mine = self.specs.get(key)
+            if mine is None:
+                self.specs[key] = val
+                continue
+            # identical after normalization is a MERGE (no conflict); a real disagreement
+            # keeps every distinct value, each recorded once
+            if _norm_spec(val.value) == _norm_spec(mine.value):
+                continue
+            conflict = self.spec_conflicts.setdefault(key, [mine])
+            if all(_norm_spec(val.value) != _norm_spec(s.value) for s in conflict):
+                conflict.append(val)
         for key, val in other.dist_pns.items():
             self.dist_pns.setdefault(key, val)
         for key, val in other.dist_urls.items():
