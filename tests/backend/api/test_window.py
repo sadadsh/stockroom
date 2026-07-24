@@ -883,6 +883,8 @@ def test_login_autofill_uses_the_native_value_setter_and_refills():
     assert ".set" in js and ".call(" in js
     # re-fills over time so the second (password) step is caught even without a fresh load
     assert "setInterval" in js
+    # AUTO-SUBMIT: after filling it clicks Next/Sign-in itself so a capture logs in with no clicks
+    assert "function submit()" in js and "sent" in js
     # never clobbers a value the user is typing (only fills an empty / matching field)
     assert "offsetParent" in js
 
