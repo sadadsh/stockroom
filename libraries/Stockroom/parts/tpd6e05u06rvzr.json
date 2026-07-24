@@ -1,6 +1,14 @@
 {
-  "altium_footprint": null,
-  "altium_symbol": null,
+  "altium_footprint": {
+    "lib": "tpd6e05u06rvzr.PcbLib",
+    "name": "RVZ0014A",
+    "tool": "altium"
+  },
+  "altium_symbol": {
+    "lib": "tpd6e05u06rvzr.SchLib",
+    "name": "TPD6E05U06RVZR",
+    "tool": "altium"
+  },
   "category": "Diodes",
   "datasheet": {
     "fetched_at": "",
