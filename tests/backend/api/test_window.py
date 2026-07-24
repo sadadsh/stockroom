@@ -1021,6 +1021,25 @@ def test_login_autofill_json_encodes_creds_and_is_guarded():
     assert "password" in js  # fills a password field
 
 
+def test_login_autofill_uses_the_native_value_setter_and_refills():
+    # Live 2026-07-24: DigiKey's login is a React/PingFederate controlled form. Setting
+    # el.value directly does NOT update React's internal value tracker, so clicking Next
+    # validated an EMPTY field ("Please fill out this field") even though the email showed
+    # in the box. The fill must go through the prototype's native value setter so React
+    # registers it, and re-run for a while so the 2-step password page (which appears after
+    # Next) also gets filled.
+    from stockroom.host.window import build_login_autofill_js
+
+    js = build_login_autofill_js("digikey", "me@x.com", "s3cr3t")
+    # the native value setter (the React-controlled-input workaround), not a bare el.value=
+    assert "getOwnPropertyDescriptor" in js and "HTMLInputElement.prototype" in js
+    assert ".set" in js and ".call(" in js
+    # re-fills over time so the second (password) step is caught even without a fresh load
+    assert "setInterval" in js
+    # never clobbers a value the user is typing (only fills an empty / matching field)
+    assert "offsetParent" in js
+
+
 def test_login_autofill_fills_every_supported_vendor_and_is_empty_when_blank():
     # DigiKey account (primary) + Ultra Librarian + SnapEDA + SamacSys each auto-fill their own
     # login DOM, JSON-encoded + guarded; blank creds inject nothing (the LGN-02 "log in once" path).
@@ -1359,6 +1378,30 @@ def test_extract_altium_members_reaches_into_a_nested_zip(tmp_path):
     out = tmp_path / "x"
     got = sorted(Path(p).name for p in W._extract_altium_members(outer, out))
     assert got == ["part.PcbLib", "part.SchLib"]
+
+
+def test_grant_download_permission_sets_state_and_handled():
+    # Live 2026-07-24: the "allow multiple automatic downloads?" bar reappeared on the SECOND
+    # (Altium) download even with the auto-allow wired, so the Altium set never came after
+    # KiCad. Root cause: the handler set args.State=Allow but NOT args.Handled=True - and in
+    # WebView2, Handled=false still SHOWS the default prompt (State is only the preselection).
+    # Setting Handled=True is what actually suppresses the bar.
+    from stockroom.host import window as W
+
+    class _Args:
+        def __init__(self, kind):
+            self.PermissionKind = kind
+            self.State = None
+            self.Handled = False
+
+    a = _Args("MultipleAutomaticDownloads")
+    assert W._grant_download_permission(a, allow_state="ALLOW") is True
+    assert a.State == "ALLOW"
+    assert a.Handled is True  # the missing piece that suppresses the prompt
+
+    b = _Args("Microphone")
+    assert W._grant_download_permission(b, allow_state="ALLOW") is False
+    assert b.State is None and b.Handled is False  # non-download kinds keep their normal prompt
 
 
 def test_should_auto_allow_permission_only_for_download_kinds():

@@ -125,6 +125,12 @@ _DIGIKEY_HELPERS = (
     "'iframe[src*=\"challenges.cloudflare.com\"],#challenge-running,#cf-challenge-running,.cf-turnstile'))return true;"
     "var t=(document.title||'').toLowerCase();"
     "if(/just a moment|attention required|verify you are|checking your browser/.test(t))return true;"
+    # DigiKey's SSO login (auth.digikey.com, PingFederate) is a TWO-step flow: an EMAIL step
+    # with a Next button and NO password field, then the password step. A password-in-form
+    # check alone missed the email step, so the HUD wrongly said "open the CAD models section"
+    # while the user sat on a login page (live 2026-07-24). The auth host IS the wall - it
+    # covers both steps - and clears the moment the login redirects back to the store.
+    "if(/(^|\\.)auth\\.digikey\\.com$/i.test(location.hostname))return true;"
     "if(document.querySelector('input[type=password]')&&document.querySelector('form input[type=password]'))return true;"
     "return false;}catch(e){return false;}}"
     # The page cannot click the Turnstile itself - the checkbox lives in a cross-origin iframe,
@@ -482,7 +488,19 @@ def _digikey_driver_js(formats: list[str]) -> str:
         + "var PROVS=" + json.dumps(_DIGIKEY_PROVIDER_KEYS) + ";"
         + "var SPECS=" + _digikey_format_specs_js(fmts) + ";"
         + "report('start',true," + json.dumps(start_msg) + ");"
-        + "try{if(location.pathname.indexOf('/models/')>=0){runModels();}else{gotoModels();}}"
+        # Start-time wall gate: if the window opens onto (or lands on) a login / verification
+        # wall - the DigiKey SSO email step, its password step, or a Cloudflare check - hand off
+        # "Sign in" and WAIT for the wall to clear before driving the models page, rather than
+        # hunting for a CAD link a login page does not have and then reporting a misleading
+        # "open the CAD models section" (live 2026-07-24). A login that navigates to a fresh
+        # document re-injects this reactor, which then sees no wall and proceeds.
+        + "function drive(){try{if(location.pathname.indexOf('/models/')>=0){runModels();}"
+        "else{gotoModels();}}catch(e){"
+        "report('driver',false,'Open the EDA / CAD Models section and download the files.');}}"
+        + "try{if(senseWall()){"
+        "yourTurn('Sign in to DigiKey in this window; I will continue as soon as you are in.');"
+        "until(function(){return !senseWall();},function(){clearTurn();"
+        "setTimeout(drive,1500);},600000);}else{drive();}}"
         "catch(e){report('driver',false,'Open the EDA / CAD Models section and download the files.');}"
     )
     return f"(function(){{{body}}})();"

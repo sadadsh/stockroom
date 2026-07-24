@@ -218,6 +218,31 @@ def test_digikey_driver_iterates_sources_not_hardcoding_ultra_librarian():
     assert "data-original" in js and "step" in low
 
 
+def test_digikey_sensewall_covers_the_two_step_digikey_login():
+    # Live 2026-07-24: DigiKey's SSO login (auth.digikey.com, PingFederate) is TWO steps -
+    # an EMAIL step with a Next button and NO password field, then a password step. The old
+    # senseWall only saw a password-in-form, so on the email step it returned false and the
+    # HUD wrongly said "Open the EDA / CAD Models section" while the user sat on a login page.
+    # senseWall must treat the auth.digikey.com host as a wall (covers BOTH steps).
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "auth" in js and r"digikey\.com" in js  # the escaped auth-host regex
+    assert "location.hostname" in js
+
+
+def test_digikey_reactor_hands_off_when_it_starts_on_a_login_wall():
+    # When the capture window opens straight onto the login (or hits it), the reactor must
+    # hand off "Sign in" via Your Turn and WAIT for the wall to clear before driving the
+    # models page - never silently try to find a CAD link that a login page does not have.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    # a start-time wall gate: if senseWall() at launch, yourTurn "Sign in to DigiKey" + wait
+    # for !senseWall, then drive - never hunt for a CAD link on a login page
+    assert "Sign in to DigiKey in this window" in js
+    assert "function drive()" in js
+    assert "until(function(){return !senseWall();}" in js
+    # the your-turn hand-off is wired through the overlay action bridge
+    assert ".action({needsUser:true" in js
+
+
 def test_digikey_driver_senses_and_stashes_the_cloudflare_rect_for_the_host():
     # Owner 2026-07-24: "could u click the cloudflare for me". The page CANNOT click the
     # Turnstile itself (the checkbox lives in a cross-origin iframe, often behind a closed
