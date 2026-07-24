@@ -216,3 +216,16 @@ def test_digikey_driver_iterates_sources_not_hardcoding_ultra_librarian():
     assert "trying the next source" in low  # a source lacking the format falls through to the next
     # it still keys the format off the stable data-original label + selects the STEP 3D radio
     assert "data-original" in js and "step" in low
+
+
+def test_wall_clearance_never_hijacks_the_login_redirect_chain():
+    # Live 2026-07-24: submitting the DigiKey sign-in makes the password field vanish
+    # the instant the SSO redirect chain STARTS; recover() then refreshed to the product
+    # URL immediately, aborting the chain before the session cookie landed - so every
+    # login bounced straight back to sign-in. The wall-clear path must SETTLE first and
+    # only refresh when this same document is still alive and still unwalled (a login
+    # that navigated away died with the script; the re-injected reactor drives on).
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "setTimeout(function(){if(!senseWall())refresh();}" in js
+    # the your-turn message covers signing in, not only captcha verification
+    assert "Sign in" in js or "sign in" in js

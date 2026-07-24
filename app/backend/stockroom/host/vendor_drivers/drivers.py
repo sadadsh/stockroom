@@ -196,9 +196,20 @@ _DIGIKEY_REACTOR = (
     "trace('refresh',refreshes());"
     "var p=null;try{p=sessionStorage.getItem('__SR_PRODUCT__');}catch(e){}"
     "if(p&&location.href!==p){location.href=p;}else{location.reload();}}"
+    # The wall (a sign-in or a verify page) usually clears BY NAVIGATING: submitting the
+    # DigiKey login starts an SSO redirect chain and the password field vanishes at once.
+    # Refreshing the moment the wall "clears" hijacked that chain mid-flight, so the
+    # session cookie never landed and every login bounced back to sign-in (live
+    # 2026-07-24). So the clearance SETTLES for 9s and only refreshes when this same
+    # document is still alive and still unwalled (an in-place clearance, e.g. a
+    # Cloudflare check); a login that navigated away killed this script with the page,
+    # and the freshly injected reactor drives on from wherever the login landed. The
+    # !senseWall() guard also covers the until() TIMEOUT (cb fires with the wall still
+    # up): never refresh into a wall.
     "function recover(spec,done){if(senseWall()){"
-    "yourTurn('Please finish the quick verification in this window; I will continue right after.');"
-    "until(function(){return !senseWall();},function(){clearTurn();refresh();},170000);return;}"
+    "yourTurn('Sign in or finish the verification in this window; I will continue right after.');"
+    "until(function(){return !senseWall();},function(){clearTurn();"
+    "setTimeout(function(){if(!senseWall())refresh();},9000);},170000);return;}"
     "if(refreshes()>=MAX_REFRESH){report(spec.key,false,"
     "'Could not fetch '+spec.name+' automatically; the files are here to grab by hand.');done();return;}"
     "report(spec.key,false,'That stalled; refreshing to try '+spec.name+' again.');refresh();}"
