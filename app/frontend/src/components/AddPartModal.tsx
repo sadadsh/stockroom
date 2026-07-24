@@ -57,30 +57,39 @@ export function AddPartModal() {
         initial={{ opacity: 0, scale: 0.965, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 32 }}
-        className="flex max-h-[84vh] w-full max-w-[640px] flex-col overflow-hidden rounded-card border border-line bg-popover shadow-pop"
+        className="flex max-h-[84vh] w-full max-w-[720px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* the same header idiom as the Complete Part window (its sibling): a titled band
+            with a quiet subtitle, so the two part-windows read as one family */}
         <div
           data-dev-id="addpart.header"
-          className="flex h-[38px] flex-none items-center justify-between border-b border-line bg-band px-4"
+          className="flex flex-none items-start justify-between gap-3 border-b border-line bg-band px-5 py-3"
         >
-          <div className="text-sm font-semibold text-t1">
-            <Text id="modal.addPart.title">Add a Part</Text>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold leading-tight text-t1">
+              <Text id="modal.addPart.title">Add a Part</Text>
+            </div>
+            <div className="mt-0.5 text-xs text-t3">
+              <Text id="modal.addPart.subtitle">
+                Paste a link or part number, add a passive, or drop a vendor ZIP.
+              </Text>
+            </div>
           </div>
           <button
             type="button"
             data-dev-id="addpart.close"
             aria-label={closeLabel}
             onClick={close}
-            className="flex h-[26px] w-[26px] items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            className="grid h-7 w-7 flex-none place-items-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
           >
             <Icon id="action.close" />
           </button>
         </div>
-        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <IngestPage />
         </div>
       </motion.div>
