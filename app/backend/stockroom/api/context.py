@@ -268,14 +268,19 @@ def build_context(
     except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
         pass
     # Lazy STM index load: unlike `index`, no source is synced at launch, so this only picks
-    # up whatever derived index already sits on disk (default_index_path()). None is a
-    # legitimate result (first run, a stamp mismatch, or a missing/corrupt file) - never
-    # treated as an error, and never blocks the boot.
+    # up whatever derived index already sits on disk (default_index_path()). When nothing
+    # valid is on disk, the committed baked seed (stm/seed.py) is restored once and the load
+    # retried - the rev-stamp gate still decides; a stale seed is refused like any stale
+    # file. None remains a legitimate result (first run with no seed, a stamp mismatch on
+    # both paths, or corruption) - never treated as an error, and never blocks the boot.
     try:
         from stockroom.stm.db import StmIndex
+        from stockroom.stm.seed import restore_baked_index
         from stockroom.stm.source import default_index_path
 
         ctx.stm_index = StmIndex.load(default_index_path())
+        if ctx.stm_index is None and restore_baked_index(default_index_path()):
+            ctx.stm_index = StmIndex.load(default_index_path())
     except Exception:  # noqa: BLE001 - a missing/stale/corrupt STM index must never break the boot
         pass
     return ctx

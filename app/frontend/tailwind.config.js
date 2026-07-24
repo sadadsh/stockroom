@@ -40,20 +40,25 @@ export default {
         // the loud neutral (near-white/near-black) and its low-alpha active-surface wash
         "acc-strong": "var(--c-acc-strong)",
         "acc-soft": "var(--c-acc-soft)",
-        // STM pin electrical-class fill hues (VIZ-02): color IS the data on the pinout map, so
-        // these are the one saturated channel, used on the pad fill only (a SEPARATE taxonomy from
-        // the BOM-component --cat-* hues above; never reuse those here).
-        "stm-cat-io": "var(--stm-cat-io)",
-        "stm-cat-gpio": "var(--stm-cat-gpio)",
-        "stm-cat-analog": "var(--stm-cat-analog)",
-        "stm-cat-debug": "var(--stm-cat-debug)",
-        "stm-cat-oscillator": "var(--stm-cat-oscillator)",
-        "stm-cat-power": "var(--stm-cat-power)",
-        "stm-cat-ground": "var(--stm-cat-ground)",
-        "stm-cat-reset": "var(--stm-cat-reset)",
-        "stm-cat-boot": "var(--stm-cat-boot)",
-        "stm-cat-vcap": "var(--stm-cat-vcap)",
-        "stm-cat-nc": "var(--stm-cat-nc)",
+        // STM pin color-is-data fill hues (VIZ-02): color IS the data on the pinout map, so these
+        // are the one saturated channel, used on the pad fill only (a SEPARATE taxonomy from the
+        // BOM-component --cat-* hues above; never reuse those here). Phase 6 consolidated the Phase
+        // 4 per-bucket family onto this single --stm-* family (ten category buckets + the io alias).
+        "stm-io": "var(--stm-io)",
+        "stm-gpio": "var(--stm-gpio)",
+        "stm-analog": "var(--stm-analog)",
+        "stm-debug": "var(--stm-debug)",
+        "stm-oscillator": "var(--stm-oscillator)",
+        "stm-power": "var(--stm-power)",
+        "stm-ground": "var(--stm-ground)",
+        "stm-reset": "var(--stm-reset)",
+        "stm-boot": "var(--stm-boot)",
+        "stm-vcap": "var(--stm-vcap)",
+        "stm-nc": "var(--stm-nc)",
+        // Socket-union classification (COMPAT-02/03): a distinct three-value set from the pin hues.
+        "stm-classify-shared": "var(--stm-classify-shared)",
+        "stm-classify-divergent": "var(--stm-classify-divergent)",
+        "stm-classify-partial": "var(--stm-classify-partial)",
       },
       borderRadius: {
         // North-star direction (owner decision 2026-07-17): the rounder card + control.

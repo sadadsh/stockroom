@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { CompatUnionMap } from "./CompatUnionMap";
 import type { UnionDTO, UnionPositionDTO } from "../../api/types";
 
@@ -34,19 +34,20 @@ function union(positions: UnionPositionDTO[]): UnionDTO {
   };
 }
 
-// The frozen CONTEXT tone map, as the CSS-var fills the SVG classification dot paints with.
+// The dedicated classification token set (unionClassificationHue), the CSS-var fills the SVG
+// classification dot paints with. A distinct family from the electrical-class pin hues.
 const TONE_FILL = {
-  shared: "var(--c-ok)",
-  divergent: "var(--c-warn)",
-  partial: "var(--c-t3)",
+  shared: "var(--stm-classify-shared)",
+  divergent: "var(--stm-classify-divergent)",
+  partial: "var(--stm-classify-partial)",
 };
 
-function dotFill(container: HTMLElement, position: string): string | null {
-  return container.querySelector(`[data-position="${position}"] circle`)?.getAttribute("fill") ?? null;
+function padFill(container: HTMLElement, position: string): string | null {
+  return container.querySelector(`[data-position="${position}"] rect.pad`)?.getAttribute("fill") ?? null;
 }
 
 describe("CompatUnionMap", () => {
-  it("paints each position's classification dot with its CONTEXT tone (shared->ok, divergent->warn, partial->neutral)", () => {
+  it("fills each pad with its own --stm-classify token (shared/divergent/partial)", () => {
     const { container } = render(
       <CompatUnionMap
         union={union([
@@ -56,9 +57,9 @@ describe("CompatUnionMap", () => {
         ])}
       />,
     );
-    expect(dotFill(container, "1")).toBe(TONE_FILL.shared);
-    expect(dotFill(container, "2")).toBe(TONE_FILL.divergent);
-    expect(dotFill(container, "3")).toBe(TONE_FILL.partial);
+    expect(padFill(container, "1")).toBe(TONE_FILL.shared);
+    expect(padFill(container, "2")).toBe(TONE_FILL.divergent);
+    expect(padFill(container, "3")).toBe(TONE_FILL.partial);
   });
 
   it("lays the union out on the reused pinout geometry as an SVG map, one pad per position, never a flat table", () => {
@@ -124,5 +125,37 @@ describe("CompatUnionMap", () => {
     expect(screen.getAllByText("Partial").length).toBeGreaterThan(0);
     // the per-part signal is NOT painted onto the map (it is click detail only)
     expect(container.textContent).not.toContain("USART2_TX");
+  });
+
+  it("reveals the per-part audit trail only AFTER a divergent pad is clicked, never in the initial render", () => {
+    const { container } = render(
+      <CompatUnionMap
+        union={union([
+          pos({
+            position: "23",
+            lqfp_side: "left",
+            classification: "divergent",
+            per_part: [
+              { ref: "STM32F407VE", canonical_pin_name: "PA0", roles: ["gpio"], functions: ["USART2_CTS"] },
+            ],
+            reconcile: {
+              swappable: true,
+              swaps: [{ ref: "STM32F407VE", target_signal: "USART2_TX", via_af_index: 7 }],
+              reason: null,
+            },
+          }),
+        ])}
+      />,
+    );
+    // initial render: no reconcile detail, no per-part trail
+    expect(screen.queryByTestId("compat-reconcile-detail")).toBeNull();
+    expect(screen.queryByTestId("compat-per-part")).toBeNull();
+
+    fireEvent.click(container.querySelector('[data-position="23"]')!);
+
+    // after the click: the detail + per-part trail + reconciling swap appear
+    expect(screen.getByTestId("compat-reconcile-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("compat-per-part")).toBeInTheDocument();
+    expect(screen.getByText("USART2_TX")).toBeInTheDocument();
   });
 });

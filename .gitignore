@@ -52,7 +52,8 @@ docs/research/
 /.stockroom-enrich-cache/
 /.stockroom-previews/
 .firecrawl/
-# The derived STM32 pinout/spec index (config_dir()/stm/index.sqlite by default,
+# The derived STM32 pinout/spec index RAW sqlite (config_dir()/stm/index.sqlite by default,
+# stays per-machine; the COMMITTED artifact is the compressed seed at data/stm/index.sqlite.xz,
 # outside the repo already; these are belt-and-suspenders for any in-repo fallback path)
 /.stockroom-stm-index/
 *.stm-index.sqlite

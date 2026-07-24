@@ -1676,3 +1676,45 @@ export interface CompatUnionBody {
   family?: string;
   package?: string;
 }
+
+// GET /api/stm/pin/af?part=&position= -> one pin's complete AF0-15 set (SWAP-01). Reuses Phase 4's
+// AfOptionDTO for the array element (declared once above); this is only the response wrapper.
+export interface PinAfResponse {
+  position: string;
+  alternate_functions: AfOptionDTO[];
+}
+
+// GET /api/stm/signal/candidates?part=&signal= -> every candidate pin a peripheral signal can be
+// routed to across the part (SWAP-02).
+export interface SignalCandidatesResponse {
+  signal: string;
+  candidates: { position: string; canonical_pin_name: string; af_index: number }[];
+}
+
+// One auto-discovered compatible set, grouped by pin-divergence signature (COMPAT-04). Picking a
+// group loads its refs into the workbench assembly as an explicit action (never auto-applied).
+export interface SuggestionGroupDTO {
+  signature_id: string;
+  tier: "baseline" | "divergent";
+  package: string;
+  family: string;
+  refs: string[];
+  divergent_positions: number;
+}
+
+// GET /api/stm/compat/suggestions?package=&family=&tolerance= -> { groups: [...] }.
+export interface SuggestionsResponse {
+  groups: SuggestionGroupDTO[];
+}
+
+// POST /api/stm/af-check body: one part + a client-held assignment (position -> { signal, af_index }).
+// The assignment lives in React state only, never persisted (CONTEXT decision 8).
+export interface AfCheckBody {
+  part: string;
+  assignment: Record<string, { signal: string; af_index: number }>;
+}
+
+// POST /api/stm/af-check -> the conflicts a held assignment would introduce (empty list = clean).
+export interface AfCheckResponse {
+  conflicts: { kind: string; positions: string[]; peripheral: string; message: string }[];
+}
