@@ -625,6 +625,29 @@ def _should_auto_allow_permission(kind: str) -> bool:
     return "download" in (kind or "").lower()
 
 
+def _grant_download_permission(args, *, allow_state) -> bool:
+    """Apply the auto-allow decision to a WebView2 PermissionRequestedEventArgs: for a
+    download-related kind, set State=Allow AND Handled=True, and return True. Handled=True is
+    the load-bearing part - in WebView2, leaving Handled false still shows the default
+    permission dialog (State is only the preselection), so the "allow multiple automatic
+    downloads?" bar kept appearing on the SECOND download and the Altium set never followed
+    the KiCad one (live 2026-07-24). Kept pure (no pywebview types) so it unit-tests with a
+    fake args; the COM handler is a thin wrapper. Non-download kinds are left untouched, so
+    camera/mic/location keep their normal prompt."""
+    try:
+        kind = str(args.PermissionKind)
+    except Exception:  # noqa: BLE001 - an unreadable kind is simply not granted
+        return False
+    if not _should_auto_allow_permission(kind):
+        return False
+    args.State = allow_state
+    try:
+        args.Handled = True
+    except Exception:  # noqa: BLE001 - an older args without Handled still gets State=Allow
+        pass
+    return True
+
+
 def _install_cad_permission_autoallow(
     window, *, retries: int = 40, delay: float = 0.25, sleep=time.sleep
 ) -> None:
@@ -657,13 +680,20 @@ def _install_cad_permission_autoallow(
             return
 
         def _on_permission_requested(sender, args) -> None:
-            # KEEP PRISTINE: runs on the WebView2 COM thread. Read the kind, set the
-            # state, nothing else.
+            # KEEP PRISTINE: runs on the WebView2 COM thread. Read the kind, set State + Handled
+            # via the pure helper (Handled=True is what suppresses the prompt), log what fired
+            # for evidence, nothing else.
             try:
-                if _should_auto_allow_permission(str(args.PermissionKind)):
-                    from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+                from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
 
-                    args.State = CoreWebView2PermissionState.Allow
+                granted = _grant_download_permission(
+                    args, allow_state=CoreWebView2PermissionState.Allow
+                )
+                _log.info(
+                    "cad permission requested: %s -> %s",
+                    str(getattr(args, "PermissionKind", "?")),
+                    "allowed" if granted else "default prompt",
+                )
             except Exception:  # noqa: BLE001 - a shape mismatch degrades to the manual prompt
                 pass
 
@@ -829,11 +859,30 @@ def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
     return (
         "(function(){try{"
         f"var u={j(username)},p={j(password)};"
-        "function set(sel,val){if(!val)return false;var el=document.querySelector(sel);"
-        "if(el){el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));"
-        "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}return false;}"
-        f"set({j(sels['user'])},u);"
-        f"set({j(sels['pass'])},p);"
+        # DigiKey's login (PingFederate) and the vendor forms are React-controlled: assigning
+        # el.value directly leaves React's internal value tracker empty, so a submit validates
+        # an EMPTY field ("Please fill out this field") though the box shows the text (live
+        # 2026-07-24). Go through the prototype's NATIVE value setter so the input event React
+        # listens for carries a value it accepts.
+        "function nset(el,val){try{var proto=(el instanceof HTMLTextAreaElement)"
+        "?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;"
+        "var d=Object.getOwnPropertyDescriptor(proto,'value');"
+        "if(d&&d.set){d.set.call(el,val);}else{el.value=val;}}catch(e){el.value=val;}}"
+        # Only fill a field that is VISIBLE and not already carrying a different value the user
+        # is typing (never clobber a manual edit); a field already holding the target value is
+        # a no-op success.
+        "function fill(sel,val){if(!val)return false;var el=document.querySelector(sel);"
+        "if(!el||el.offsetParent===null)return false;"
+        "var cur=(el.value||'');if(cur===val)return true;if(cur.trim())return false;"
+        "nset(el,val);el.dispatchEvent(new Event('input',{bubbles:true}));"
+        "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}"
+        f"var US={j(sels['user'])},PS={j(sels['pass'])};"
+        # DigiKey's login is TWO steps (email -> Next -> password). The password field appears
+        # on a later step that can be a same-document render, so re-fill on a short interval to
+        # catch it even without a fresh page load; a full-page step re-injects this anyway.
+        "var n=0;var iv=setInterval(function(){n++;fill(US,u);fill(PS,p);"
+        "if(n>=30)clearInterval(iv);},500);"
+        "fill(US,u);fill(PS,p);"
         "}catch(e){}})();"
     )
 
