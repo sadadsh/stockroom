@@ -328,8 +328,9 @@ export function CompatibilityWorkbench() {
         </div>
       </div>
 
-      {/* the bench itself */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto border-l border-line px-4 pt-1">
+      {/* the bench itself. overflow-x-hidden so a wide inner table scrolls in ITS OWN wrapper
+          instead of stretching the whole pane past the window edge. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden border-l border-line px-4 pt-1">
         {indexNotBuilt ? (
           <BuildIndexGate />
         ) : !selectedPackage || coveredFamilies.length === 0 ? (
