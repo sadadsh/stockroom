@@ -36,6 +36,31 @@ from stockroom.host.vendor_drivers.drivers import build_driver_js
 
 _log = logging.getLogger("stockroom.host.cad")
 
+_CAPTURE_LOG_INSTALLED = {"done": False}
+
+
+def _install_capture_logfile() -> None:
+    """Route the guided-capture logger to a file in the config dir (capture.log) at INFO, so a
+    real capture leaves a durable trail of every file that lands, its classification, the Altium
+    paths pulled from it, and each forward. The windowed app otherwise logs to a console that is
+    not captured, so a field issue ("the Altium files aren't recognized") had no evidence to read.
+    Best-effort and installed once; a read-only config dir simply skips it."""
+    if _CAPTURE_LOG_INSTALLED["done"]:
+        return
+    _CAPTURE_LOG_INSTALLED["done"] = True
+    try:
+        from logging.handlers import RotatingFileHandler
+
+        from stockroom.store.machine_config import config_dir
+
+        path = config_dir() / "capture.log"
+        handler = RotatingFileHandler(path, maxBytes=1_000_000, backupCount=2, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        _log.addHandler(handler)
+        _log.setLevel(logging.INFO)
+    except Exception:  # noqa: BLE001 - logging is a diagnostic aid, never a launch blocker
+        pass
+
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
 _CAD_WINDOW = None
@@ -346,6 +371,11 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     file; the evaluate_js itself runs outside the lock."""
     with _CAD_CAPTURE_LOCK:
         classified = classify_asset(Path(path))
+        _log.info(
+            "capture: file=%s classified=%s",
+            os.path.basename(str(path)),
+            sorted(r.value for r in classified.requirements),
+        )
         # An altium requirement may only be RECORDED when backed by real attachable
         # paths. A capture whose altium content cannot be pulled out (a zip with no
         # extract_dir, an extraction failure) must leave the need OPEN - recording it
@@ -356,7 +386,17 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
         backed_altium: list[str] = []
         if altium_wanted:
             backed_altium = _altium_paths_from_capture(path, classified, altium_wanted, extract_dir)
+            _log.info(
+                "capture: altium wanted=%s backed=%s extract_dir=%s",
+                sorted(r.value for r in altium_wanted),
+                [os.path.basename(p) for p in backed_altium],
+                str(extract_dir),
+            )
             if not backed_altium:
+                _log.warning(
+                    "capture: altium content could NOT be pulled from %s - need stays open",
+                    os.path.basename(str(path)),
+                )
                 wanted = frozenset(r for r in wanted if r not in _ALTIUM_REQS)
         if session is not None:
             # reqs may be EMPTY (a duplicate re-fire, or a wrong-format download): the SPA forward
@@ -371,6 +411,11 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
         # (a dedup that dropped them must not re-send the files)
         altium_paths = backed_altium if any(r in _ALTIUM_REQS for r in reqs) else []
         payload = build_capture_payload(path, token, reqs, altium_paths)
+    _log.info(
+        "capture: forwarding reqs=%s altiumPaths=%s",
+        sorted(payload.get("requirements", [])),
+        [os.path.basename(p) for p in payload.get("altiumPaths", [])],
+    )
     if payload.get("requirements"):
         _emit_to_spa(payload)
     # Tick the HUD checklist live: push the newly-satisfied requirements to the cad window host
@@ -670,6 +715,7 @@ def _install_cad_download_intercept(
             target_dir.mkdir(parents=True, exist_ok=True)
             name = os.path.basename(str(args.ResultFilePath)) or "cad-download.zip"
             dest = _unique_dest(target_dir, name)
+            _log.info("cad tier-1: download starting name=%s -> %s", name, dest.name)
 
             fired = {"done": False}
 
@@ -1241,6 +1287,8 @@ def run_window(base_url: str, token: str) -> None:
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
     from stockroom.store.machine_config import config_dir
+
+    _install_capture_logfile()
 
     # pywebview blocks ALL downloads by default, which silently kills every export
     # in the app (the BOM CSV, the fab zip, the audit markdown are Blob+anchor
