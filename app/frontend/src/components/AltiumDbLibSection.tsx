@@ -13,7 +13,7 @@ import { useToast } from "../lib/toast";
 import { Text } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 import { AltiumSetupModal } from "./AltiumSetupModal";
-import { Button, Card, Dot, Eyebrow } from "./primitives";
+import { Button, Dot } from "./primitives";
 import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon } from "./icons";
 
 export function AltiumDbLibSection() {
@@ -51,13 +51,7 @@ export function AltiumDbLibSection() {
   }
 
   return (
-    <section className="mb-7" data-dev-id="altiumdb.section">
-      <Eyebrow className="mb-2">Altium Database Library</Eyebrow>
-      <p className="mb-2.5 text-xs text-t3">
-        One git-synced library Altium reads, regenerated from this profile&rsquo;s records. Install
-        it into Altium once, then it fills as you attach each part&rsquo;s Altium assets.
-      </p>
-      <Card className="px-4 py-3.5">
+    <>
         {status.isLoading ? (
           <p className="py-1 text-sm text-t3">Reading the library...</p>
         ) : status.isError ? (
@@ -127,12 +121,11 @@ export function AltiumDbLibSection() {
             <Text id="altiumdb.section-setup">Setup Guide</Text>
           </Button>
         </div>
-      </Card>
 
       <AltiumDbLibModal open={open} onClose={() => setOpen(false)} />
       <AltiumSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
 
-    </section>
+    </>
   );
 }
 

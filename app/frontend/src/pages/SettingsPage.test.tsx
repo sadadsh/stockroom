@@ -29,6 +29,7 @@ vi.mock("../api/client", async (importActual) => {
       wireKicad: vi.fn(),
       openJobStream: vi.fn(),
       altiumStatus: vi.fn(),
+      altiumOdbcStatus: vi.fn(),
       altiumRegenerate: vi.fn(),
       altiumAttach: vi.fn(),
     },
@@ -103,6 +104,31 @@ function toggleDevMode() {
   fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
 }
 
+// The grouped IA hides sections behind a nav group + a collapsed disclosure; every
+// test that exercises a section first walks there the way a person does.
+const SECTION_NAV: Record<string, RegExp> = {
+  "settings.appearance": /application/i,
+  "settings.update": /application/i,
+  "settings.profiles": /library/i,
+  "settings.sync": /library/i,
+  "settings.github": /library/i,
+  "settings.health": /library/i,
+  "settings.kicad": /kicad/i,
+  "settings.altium": /altium/i,
+  "settings.distributor": /sourcing/i,
+  "settings.vendor-logins": /sourcing/i,
+  "settings.rescan": /sourcing/i,
+};
+
+async function openSettings(devId: string) {
+  const user = userEvent.setup();
+  const nav = screen.getByRole("navigation", { name: /settings sections/i });
+  await user.click(within(nav).getByRole("button", { name: SECTION_NAV[devId] }));
+  const header = await screen.findByTestId(`${devId}.header`);
+  if (header.getAttribute("aria-expanded") !== "true") await user.click(header);
+}
+
+
 beforeEach(() => {
   localStorage.clear();
   delete document.documentElement.dataset.theme;
@@ -118,6 +144,7 @@ beforeEach(() => {
     behind: 2,
   });
   mockApi.checkUpdate.mockResolvedValue({ update_available: false, behind: 0 });
+  mockApi.altiumOdbcStatus.mockResolvedValue({ installed: true, driver: "SQLite3 ODBC Driver", download_url: "" });
   mockApi.getSystemInfo.mockResolvedValue({
     active_profile: "Main",
     part_count: 8,
@@ -155,13 +182,19 @@ beforeEach(() => {
 });
 
 function profileRow(name: string): HTMLElement {
-  const label = screen.getByText(name);
-  return label.closest("[data-profile-row]") as HTMLElement;
+  // the active profile's name ALSO shows in the Profiles disclosure summary, so
+  // resolve through the row wrapper, not a unique-text lookup
+  const row = screen
+    .getAllByText(name)
+    .map((el) => el.closest("[data-profile-row]"))
+    .find(Boolean);
+  return row as HTMLElement;
 }
 
 describe("SettingsPage — profiles", () => {
   it("lists profiles and marks the active one", async () => {
     renderPage();
+    await openSettings("settings.profiles");
     expect(await screen.findByText("Archive")).toBeInTheDocument();
     // the active profile is labelled and has no activate control
     expect(within(profileRow("Main")).getByText(/active/i)).toBeInTheDocument();
@@ -176,6 +209,7 @@ describe("SettingsPage — profiles", () => {
 
   it("activates a non-active profile", async () => {
     renderPage();
+    await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.click(
       within(profileRow("Archive")).getByRole("button", { name: /^activate$/i }),
@@ -185,6 +219,7 @@ describe("SettingsPage — profiles", () => {
 
   it("creates a profile with the archive flag", async () => {
     renderPage();
+    await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.type(
       screen.getByPlaceholderText(/new profile/i),
@@ -203,6 +238,7 @@ describe("SettingsPage — profiles", () => {
       }),
     );
     renderPage();
+    await openSettings("settings.profiles");
     await screen.findByText("Archive");
     const input = screen.getByPlaceholderText(/new profile/i);
     await userEvent.type(input, "Scratch");
@@ -215,6 +251,7 @@ describe("SettingsPage — profiles", () => {
 
   it("deletes a non-active profile only after an in-window confirm", async () => {
     renderPage();
+    await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.click(
       within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }),
@@ -230,7 +267,7 @@ describe("SettingsPage — profiles", () => {
 describe("SettingsPage — appearance", () => {
   it("switches the theme", async () => {
     renderPage();
-    await screen.findByText("Archive");
+    await openSettings("settings.appearance");
     await userEvent.click(screen.getByRole("button", { name: /^light$/i }));
     expect(document.documentElement.dataset.theme).toBe("light");
   });
@@ -239,7 +276,8 @@ describe("SettingsPage — appearance", () => {
 describe("SettingsPage — distributor key", () => {
   it("shows the key as not set and saves a typed key without ever exposing it", async () => {
     renderPage();
-    await screen.findByText(/not set/i);
+    await openSettings("settings.distributor");
+    await screen.findAllByText(/not set/i);
     const input = screen.getByLabelText(/mouser api key/i) as HTMLInputElement;
     expect(input.type).toBe("password");
     await userEvent.type(input, "MOUSERKEY123");
@@ -257,7 +295,8 @@ describe("SettingsPage — distributor key", () => {
       }),
     );
     renderPage();
-    await screen.findByText(/not set/i);
+    await openSettings("settings.distributor");
+    await screen.findAllByText(/not set/i);
     const input = screen.getByLabelText(/mouser api key/i);
     await userEvent.type(input, "MOUSERKEY123");
     await userEvent.type(input, "{Enter}{Enter}");
@@ -272,6 +311,7 @@ describe("SettingsPage — distributor key", () => {
       mouser_api_key_hint: "1234",
     });
     renderPage();
+    await openSettings("settings.distributor");
     expect(await screen.findByText(/1234/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /clear/i }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith({ mouser_api_key: "" });
@@ -281,7 +321,8 @@ describe("SettingsPage — distributor key", () => {
 describe("SettingsPage — sync + kicad + update", () => {
   it("renders sync status and runs a sync", async () => {
     renderPage();
-    expect(await screen.findByText(/main/)).toBeInTheDocument();
+    await openSettings("settings.sync");
+    expect((await screen.findAllByText(/main/)).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
   });
@@ -294,7 +335,8 @@ describe("SettingsPage — sync + kicad + update", () => {
       detail: "! [rejected] main -> main (non-fast-forward)",
     });
     renderPage();
-    await screen.findByText("Archive");
+    await openSettings("settings.sync");
+    await screen.findByRole("button", { name: /sync now/i });
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(await screen.findByText(/diverged from the remote/i)).toBeInTheDocument();
     expect(screen.queryByText(/already up to date/i)).toBeNull();
@@ -308,7 +350,8 @@ describe("SettingsPage — sync + kicad + update", () => {
       detail: "remote: Repository not found.",
     });
     renderPage();
-    await screen.findByText("Archive");
+    await openSettings("settings.sync");
+    await screen.findByRole("button", { name: /sync now/i });
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(await screen.findByText(/refused this token/i)).toBeInTheDocument();
     expect(screen.queryByText(/diverged/i)).toBeNull();
@@ -322,7 +365,8 @@ describe("SettingsPage — sync + kicad + update", () => {
       detail: "no remote configured",
     });
     renderPage();
-    await screen.findByText("Archive");
+    await openSettings("settings.sync");
+    await screen.findByRole("button", { name: /sync now/i });
     await userEvent.click(screen.getByRole("button", { name: /sync now/i }));
     expect(await screen.findByText(/no remote is configured/i)).toBeInTheDocument();
     expect(screen.queryByText(/already up to date/i)).toBeNull();
@@ -330,12 +374,14 @@ describe("SettingsPage — sync + kicad + update", () => {
 
   it("renders the kicad status", async () => {
     renderPage();
+    await openSettings("settings.kicad");
     expect(await screen.findByText("/usr/bin/kicad-cli")).toBeInTheDocument();
     expect(screen.getByText("/home/x/.config/kicad")).toBeInTheDocument();
   });
 
   it("shows the wiring status when SR_LIB points at the active library", async () => {
     renderPage();
+    await openSettings("settings.kicad");
     expect(
       await screen.findByText(/wired to the active profile/i),
     ).toBeInTheDocument();
@@ -344,6 +390,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows an honest not-wired status", async () => {
     mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS, kicad_wired: false });
     renderPage();
+    await openSettings("settings.kicad");
     expect(await screen.findByText(/not wired so far/i)).toBeInTheDocument();
   });
 
@@ -353,6 +400,7 @@ describe("SettingsPage — sync + kicad + update", () => {
       kicad_cli_override: "/opt/kicad/kicad-cli",
     });
     renderPage();
+    await openSettings("settings.kicad");
     // the prefill arrives with the settings query, so wait for the value itself
     await screen.findByDisplayValue("/opt/kicad/kicad-cli");
     const cfg = screen.getByLabelText(/config directory override/i);
@@ -366,6 +414,7 @@ describe("SettingsPage — sync + kicad + update", () => {
 
   it("disables saving overrides until something changed", async () => {
     renderPage();
+    await openSettings("settings.kicad");
     await screen.findByLabelText(/config directory override/i);
     expect(screen.getByRole("button", { name: /save overrides/i })).toBeDisabled();
   });
@@ -373,6 +422,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("applies an available update", async () => {
     mockApi.checkUpdate.mockResolvedValue({ update_available: true, behind: 3 });
     renderPage();
+    await openSettings("settings.update");
     const apply = await screen.findByRole("button", { name: /apply update/i });
     await userEvent.click(apply);
     expect(mockApi.applyUpdate).toHaveBeenCalled();
@@ -380,7 +430,8 @@ describe("SettingsPage — sync + kicad + update", () => {
 
   it("does not offer to apply when up to date", async () => {
     renderPage();
-    expect(await screen.findByText(/up to date/i)).toBeInTheDocument();
+    await openSettings("settings.update");
+    expect((await screen.findAllByText(/up to date/i)).length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("button", { name: /apply update/i }),
     ).toBeNull();
@@ -390,6 +441,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("connects a GitHub token so part changes auto-push, and never asks for it raw", async () => {
     mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.github");
     await screen.findByText("GitHub");
     const input = screen.getByLabelText("GitHub Personal Access Token");
     expect((input as HTMLInputElement).type).toBe("password"); // the token is never shown
@@ -431,6 +483,7 @@ describe("SettingsPage — KiCad wiring", () => {
       ]),
     );
     renderPage();
+    await openSettings("settings.kicad");
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole("button", { name: "Wire KiCad" }));
@@ -446,6 +499,7 @@ describe("SettingsPage - capture credentials", () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     await user.type(screen.getByLabelText("Ultra Librarian Username"), "me@x.com");
     await user.type(screen.getByLabelText("Ultra Librarian Password"), "secret");
@@ -459,6 +513,7 @@ describe("SettingsPage - capture credentials", () => {
 
   it("renders the password input as type password", async () => {
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     expect(screen.getByLabelText("Ultra Librarian Password")).toHaveAttribute(
       "type",
@@ -470,6 +525,7 @@ describe("SettingsPage - capture credentials", () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     await user.type(screen.getByLabelText("SnapEDA Username"), "sn@x.com");
     await user.type(screen.getByLabelText("SnapEDA Password"), "snpw");
@@ -483,6 +539,7 @@ describe("SettingsPage - capture credentials", () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     await user.type(screen.getByLabelText("SamacSys Username"), "sam@x.com");
     await user.type(screen.getByLabelText("SamacSys Password"), "sampw");
@@ -496,6 +553,7 @@ describe("SettingsPage - capture credentials", () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     const pass = screen.getByLabelText("DigiKey Account Password");
     expect(pass).toHaveAttribute("type", "password");
@@ -513,6 +571,7 @@ describe("SettingsPage - capture credentials", () => {
     const user = userEvent.setup();
     mockApi.updateSettings.mockResolvedValue({ ...BASE_SETTINGS });
     renderPage();
+    await openSettings("settings.vendor-logins");
     await screen.findByText("Capture Credentials");
     const secret = screen.getByLabelText("DigiKey API Client Secret");
     expect(secret).toHaveAttribute("type", "password");
@@ -533,8 +592,9 @@ describe("SettingsPage - capture credentials", () => {
 describe("SettingsPage - copy adoption", () => {
   it("exposes settings.* copy ids on its labels once dev mode is on", async () => {
     const { container } = renderDevPage();
-    // Let the section queries settle so every section (and its labels) is mounted.
-    await screen.findByText("Archive");
+    // Walk to the Library group and open the sections whose labels we spot-check.
+    await openSettings("settings.sync");
+    await openSettings("settings.github");
     await screen.findByRole("button", { name: /^connect$/i });
 
     // Outside dev mode a <Text> is a bare string with no wrapper: no copy targets yet.
@@ -542,12 +602,12 @@ describe("SettingsPage - copy adoption", () => {
 
     toggleDevMode();
 
-    // A representative spread across sections: the page H1, a static section title, a
-    // primary action whose static caption is wrapped, and a button label.
+    // A representative spread: the page H1, a disclosure header title, a primary
+    // action whose static caption is wrapped, and a button label.
     await waitFor(() =>
       expect(container.querySelector('[data-copy-id="settings.title"]')).not.toBeNull(),
     );
-    expect(container.querySelector('[data-copy-id="settings.appearance.title"]')).not.toBeNull();
+    expect(container.querySelector('[data-copy-id="settings.sync.title"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="settings.sync.action"]')).not.toBeNull();
     expect(container.querySelector('[data-copy-id="settings.github.connect"]')).not.toBeNull();
   });
@@ -557,7 +617,8 @@ describe("SettingsPage - copy adoption", () => {
     // The wrapped labels still render their default text verbatim (no wrapper leaks
     // into the accessible name) and the sync action still fires its mutation. The page
     // header is the shared PanelTitle strip (no page-level heading, same as the other panes).
-    await screen.findByText("Archive");
+    await openSettings("settings.sync");
+    await openSettings("settings.github");
     expect(
       document.querySelector('[data-dev-id="settings.title"]')?.textContent,
     ).toBe("Settings");
@@ -568,6 +629,7 @@ describe("SettingsPage - copy adoption", () => {
 
   it("still shows the delete ConfirmDialog title and confirm action through the copy layer", async () => {
     renderPage();
+    await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.click(
       within(profileRow("Archive")).getByRole("button", { name: /^delete$/i }),
@@ -579,5 +641,88 @@ describe("SettingsPage - copy adoption", () => {
     expect(
       within(dialog).getByRole("button", { name: /^delete$/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPage - grouped IA + Machine Setup band", () => {
+  it("opens on the Application group with every section collapsed", async () => {
+    renderPage();
+    // the disclosure headers are visible, their content is not mounted
+    const appearance = await screen.findByTestId("settings.appearance.header");
+    expect(appearance).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /^light$/i })).toBeNull();
+    // other groups' sections are not on screen at all
+    expect(screen.queryByTestId("settings.profiles.header")).toBeNull();
+  });
+
+  it("states the machine verdict from the live settings (all met reads Ready)", async () => {
+    mockApi.getSettings.mockResolvedValue({
+      ...BASE_SETTINGS,
+      mouser_api_key_set: true,
+      github_token_set: true,
+    });
+    renderPage();
+    expect(await screen.findByText("This Machine Is Ready")).toBeInTheDocument();
+  });
+
+  it("counts the unmet setup steps and jumps to the owning section on click", async () => {
+    // BASE has no distributor key and no GitHub token: 2 steps remain
+    renderPage();
+    expect(await screen.findByText("2 Setup Steps Remaining")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /add a distributor key/i }));
+    // the jump lands on the Sourcing group with the Distributor section open
+    const header = await screen.findByTestId("settings.distributor.header");
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText(/mouser api key/i)).toBeInTheDocument();
+  });
+
+  it("auto-opens a section in an attention state (KiCad not wired)", async () => {
+    mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS, kicad_wired: false });
+    renderPage();
+    // the nav carries an attention dot on KiCad, and walking there finds the
+    // section already open
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await user.click(within(nav).getByRole("button", { name: /kicad/i }));
+    const header = await screen.findByTestId("settings.kicad.header");
+    await waitFor(() => expect(header).toHaveAttribute("aria-expanded", "true"));
+  });
+
+  it("shows the ODBC driver step only when the probe answers (never off-Windows null)", async () => {
+    mockApi.altiumOdbcStatus.mockResolvedValue({ installed: null, driver: "SQLite3 ODBC Driver", download_url: "" });
+    mockApi.getSettings.mockResolvedValue({
+      ...BASE_SETTINGS,
+      mouser_api_key_set: true,
+      github_token_set: true,
+    });
+    renderPage();
+    // with the probe honest-null, the ODBC step is absent and the machine still reads Ready
+    expect(await screen.findByText("This Machine Is Ready")).toBeInTheDocument();
+    expect(screen.queryByText(/install the odbc driver/i)).toBeNull();
+  });
+});
+
+describe("SettingsPage - critique fixes", () => {
+  it("a met step reads as achieved state, never as a command", async () => {
+    mockApi.getSettings.mockResolvedValue({
+      ...BASE_SETTINGS,
+      mouser_api_key_set: true,
+      github_token_set: true,
+    });
+    renderPage();
+    expect(await screen.findByText("KiCad Wired")).toBeInTheDocument();
+    expect(screen.getByText("ODBC Driver Installed")).toBeInTheDocument();
+    expect(screen.getByText("Distributor Key Saved")).toBeInTheDocument();
+    expect(screen.getByText("GitHub Connected")).toBeInTheDocument();
+    expect(screen.queryByText("Wire KiCad")).toBeNull();
+  });
+
+  it("a single-section group opens its section on arrival", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const nav = screen.getByRole("navigation", { name: /settings sections/i });
+    await user.click(within(nav).getByRole("button", { name: /altium/i }));
+    const header = await screen.findByTestId("settings.altium.header");
+    expect(header).toHaveAttribute("aria-expanded", "true");
   });
 });
