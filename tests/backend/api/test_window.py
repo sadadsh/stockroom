@@ -1227,6 +1227,16 @@ def test_extract_altium_members_reaches_into_a_nested_zip(tmp_path):
     assert got == ["part.PcbLib", "part.SchLib"]
 
 
+def test_origin_of_extracts_scheme_host_port():
+    from stockroom.host.window import _origin_of
+
+    assert _origin_of("https://www.digikey.com/en/products/detail/x?y=1") == "https://www.digikey.com"
+    assert _origin_of("http://127.0.0.1:8791/page") == "http://127.0.0.1:8791"
+    assert _origin_of("") == ""
+    assert _origin_of("not a url") == ""
+    assert _origin_of("/relative/path") == ""
+
+
 def test_arm_download_permission_subscribes_once_on_the_ui_thread():
     # Live 2026-07-24: the old install polled CoreWebView2 from a DAEMON thread and threw
     # "CoreWebView2 can only be accessed from the UI thread" (E_NOINTERFACE), so the handler
