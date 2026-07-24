@@ -126,6 +126,11 @@ class EnrichmentResult:
     # answer a lookup we keep BOTH buy links, not only the pasted one, so the part carries every
     # place it can be ordered from (the owner's "store both the Mouser and DigiKey links").
     dist_urls: dict[str, str] = field(default_factory=dict)
+    # Each distributor's OWN price ladder + live stock ("mouser"->[breaks...]), kept
+    # alongside the merged primary ladder so the part can SHOW every vendor's prices
+    # for comparison (owner 2026-07-24), not only the pasted vendor's.
+    dist_price_breaks: dict[str, list[PriceBreak]] = field(default_factory=dict)
+    dist_stock: dict[str, int | None] = field(default_factory=dict)
     price_breaks: list[PriceBreak] = field(default_factory=list)
     specs: dict[str, Sourced] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION

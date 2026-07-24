@@ -305,6 +305,8 @@ export interface EnrichmentResult {
   lead_time?: SourcedField | null;
   product_url?: SourcedField | null;
   dist_pns?: Record<string, string>;
+  dist_price_breaks?: Record<string, { qty: number; price: number; currency: string }[]>;
+  dist_stock?: Record<string, number | null>;
   // Each distributor's own buy link ("mouser"->..., "digikey"->...): when both APIs answer a
   // lookup we keep BOTH, so the part carries every place it can be ordered, not only the pasted
   // link. Optional so older payloads without it still type-check.
