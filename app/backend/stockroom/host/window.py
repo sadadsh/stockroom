@@ -524,44 +524,71 @@ def _grant_download_permission(args, *, allow_state) -> bool:
     return True
 
 
-def _arm_download_permission_on_ui(core, state: dict) -> None:
-    """Subscribe the CAD window's CoreWebView2.PermissionRequested to auto-allow Edge's "allow
-    multiple automatic downloads?" bar, so the second (Altium) download is never gated behind it
-    (the owner's must-keep). Subscribes at most once per session (the `state["armed"]` flag).
+def _origin_of(url: str) -> str:
+    """The scheme://host[:port] origin of a URL, or "" when it has none. WebView2's
+    SetPermissionStateAsync keys the automatic-downloads content setting on the top-level
+    page origin, so this is what to pre-authorize."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return ""
+    if not parts.scheme or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}"
 
-    MUST run on the UI thread. CoreWebView2 is UI-thread-only: the prior install polled it from a
-    background daemon thread and threw "CoreWebView2 can only be accessed from the UI thread"
-    (E_NOINTERFACE), which was silently swallowed - so the handler never attached and the bar kept
-    blocking the Altium download, capturing only the KiCad zip (live 2026-07-24). The download-
-    starting callback fires on the UI thread with the CoreWebView2 as `sender`, and on the FIRST
-    (KiCad) download - before the site initiates the second - so arming there is both thread-correct
-    and early enough. Subscribing a delegate is a lightweight COM op, safe on that callback."""
+
+def _arm_download_permission_on_ui(core, state: dict) -> None:
+    """Make the second (Altium) download never stall behind Edge's "allow multiple automatic
+    downloads?" bar (the owner's must-keep). Runs once per session (the `state["armed"]` flag)
+    on the UI thread - the download-starting callback fires there with the CoreWebView2 as
+    `sender`, on the FIRST (KiCad) download, before the site initiates the second.
+
+    PRIMARY mechanism: PRE-AUTHORIZE the page origin via CoreWebView2Profile.SetPermissionStateAsync
+    (MultipleAutomaticDownloads -> Allow), so the bar never appears and it PERSISTS in the profile
+    for later captures. This is required because WebView2 150.x does NOT raise PermissionRequested
+    for that bar (isolated real-Windows test 2026-07-24: the 2nd download was blocked and no
+    PermissionRequested fired). BACKUP: also subscribe PermissionRequested for any runtime that does
+    raise it (harmless where it doesn't). MUST be on the UI thread - the prior daemon-thread install
+    threw "CoreWebView2 can only be accessed from the UI thread" (E_NOINTERFACE) and never attached,
+    so only the KiCad zip was ever captured (live 2026-07-24)."""
     if state.get("armed"):
         return
     state["armed"] = True
 
+    # PRIMARY: pre-authorize the origin so the bar never shows (persists in the profile).
+    try:
+        from Microsoft.Web.WebView2.Core import (
+            CoreWebView2PermissionKind,
+            CoreWebView2PermissionState,
+        )
+
+        origin = _origin_of(str(getattr(core, "Source", "") or ""))
+        profile = getattr(core, "Profile", None)
+        if origin and profile is not None:
+            profile.SetPermissionStateAsync(
+                CoreWebView2PermissionKind.MultipleAutomaticDownloads,
+                origin,
+                CoreWebView2PermissionState.Allow,
+            )
+            _log.info("cad multi-download pre-authorized for %s", origin)
+        else:
+            _log.warning("cad multi-download: no origin/profile to pre-authorize; the bar may prompt")
+    except Exception:  # noqa: BLE001 - older runtime without the API degrades to the backup below
+        _log.warning("cad multi-download pre-authorize unavailable; relying on the permission event")
+
+    # BACKUP: the permission event, for any runtime that DOES raise it for this bar.
     def _on_permission_requested(sender, args) -> None:
-        # Runs on the WebView2 UI thread. Set State + Handled via the pure helper (Handled=True
-        # is what actually suppresses the prompt), log what fired for evidence, nothing else.
         try:
             from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
 
-            granted = _grant_download_permission(
-                args, allow_state=CoreWebView2PermissionState.Allow
-            )
-            _log.info(
-                "cad permission requested: %s -> %s",
-                str(getattr(args, "PermissionKind", "?")),
-                "allowed" if granted else "default prompt",
-            )
+            _grant_download_permission(args, allow_state=CoreWebView2PermissionState.Allow)
         except Exception:  # noqa: BLE001 - a shape mismatch degrades to the manual prompt
             pass
 
     try:
         core.PermissionRequested += _on_permission_requested
-        _log.info("cad permission auto-allow armed on the UI thread")
-    except Exception:  # noqa: BLE001 - could not subscribe; the manual prompt remains
-        _log.warning("cad permission auto-allow: could not subscribe; prompts stay manual")
+    except Exception:  # noqa: BLE001 - could not subscribe; the pre-authorize above covers it
+        pass
 
 
 def _install_cad_download_intercept(
