@@ -211,25 +211,6 @@ def projects_router(require_token) -> APIRouter:
         ctx.bom_cache[project_id] = result
         return result
 
-    @r.get("/{project_id}/procurement")
-    def get_procurement(request: Request, project_id: str) -> dict:
-        # Per-line orderability + sourcing/stock risk + lead time, computed offline over
-        # the CACHED BOM build (M7d). No rebuild: procurement is a pure read of the last
-        # priced BOM, so before a build it is an honest not-built shape (never a fabricated
-        # risk), and an unpriced build lists its lines with unknown (never-a-risk) stock.
-        # Unknown id -> 404.
-        from stockroom.projects.procurement import project_procurement
-
-        ctx = request.app.state.ctx
-        rec = ctx.project_ops.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
-        cached = ctx.bom_cache.get(project_id) or {"ran_at": None, "boards": 1,
-                                                   "priced": False, "lines": []}
-        proc = project_procurement(cached)
-        proc["project"] = rec.name
-        return proc
-
     @r.get("/{project_id}/bom/export")
     def export_bom(request: Request, project_id: str, kind: str = "csv",
                    boards: int | None = None, spares_pct: float = 0.0,

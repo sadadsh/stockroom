@@ -577,17 +577,6 @@ export function useBuildability(id: string | null) {
   });
 }
 
-// The procurement view (M7d) over the cached BOM: per-line orderability + sourcing/stock
-// risk + lead time. Disabled until a project is selected; an honest not-built shape before a
-// build. Invalidated when the BOM (re)builds so it re-reads the fresh sourcing data.
-export function useProjectProcurement(id: string | null) {
-  return useQuery({
-    queryKey: ["project-procurement", id],
-    queryFn: () => api.getProcurement(id as string),
-    enabled: !!id,
-  });
-}
-
 // The Fab panel's honest gate (M7i): board presence + kicad-cli availability. Disabled until a
 // project is selected.
 export function useProjectFab(id: string | null) {

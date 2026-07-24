@@ -37,7 +37,6 @@ import type {
   NetClass,
   PartsResponse,
   ProcurementExportOptions,
-  ProcurementResult,
   ConformBody,
   ConformCatalog,
   ConformPreview,
@@ -498,26 +497,6 @@ export const api = {
     });
   },
 
-  // Bulk-enrich a pasted list of MPNs (one per line) or a BOM CSV (spec section 8.1). Returns a
-  // job ref; the SSE stream ends with a BulkReport of per-MPN completeness. Triage only: it
-  // reports what enrichment found, it does not add parts (each still needs a symbol to pass the
-  // complete-to-add gate).
-  enrichBulk(input: { text?: string; csv?: string; category?: string }): Promise<JobRef> {
-    return request<JobRef>("POST", "/api/enrich/bulk", { body: input });
-  },
-
-  // Fill a staged candidate: apply the pasted datasheet/purchase links, read
-  // identity from the stored datasheet, then enrich what is still blank. Returns a
-  // job ref; the SSE result carries the updated candidate plus an honest report.
-  ingestEnrich(body: {
-    candidate: StagingCandidate;
-    datasheet_url?: string;
-    purchase_url?: string;
-    datasheet_file?: string;
-  }): Promise<JobRef> {
-    return request<JobRef>("POST", "/api/ingest/enrich", { body });
-  },
-
   // Add a staging candidate to the library. On success returns the new record; on
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {
@@ -748,12 +727,6 @@ export const api = {
     return request<BomResult>("POST", `/api/projects/${encodeURIComponent(id)}/bom/reprice`, {
       body: opts,
     });
-  },
-
-  // The per-line orderability + sourcing/stock risk + lead time computed over the cached
-  // BOM (M7d). Honest not-built shape (built false) before a build; never a fabricated risk.
-  getProcurement(id: string): Promise<ProcurementResult> {
-    return apiGet<ProcurementResult>(`/api/projects/${encodeURIComponent(id)}/procurement`);
   },
 
   // The Fab panel's honest gate (M7i): whether the project has a board to fabricate and

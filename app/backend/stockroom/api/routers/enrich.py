@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from stockroom.enrich.bulk import bulk_enrich, parse_bom_csv, parse_mpn_list
 from stockroom.enrich.pipeline import EnrichmentPipeline
 from stockroom.enrich.schema import EnrichmentResult, Sourced
 
@@ -132,32 +131,5 @@ def enrich_router(require_token) -> APIRouter:
             return _result_dto(pipeline.extract_from_url(url, progress=progress))
 
         return {"job_id": ctx.jobs.submit(work)}
-
-    @r.post("/bulk")
-    def enrich_bulk(request: Request, body: dict) -> dict:
-        ctx = request.app.state.ctx
-        if "csv" in body:
-            mpns = parse_bom_csv(body["csv"])
-        else:
-            mpns = parse_mpn_list(body.get("text", ""))
-        category = body.get("category", "Other")
-
-        def work(progress):
-            progress({"pct": 1, "message": f"enriching {len(mpns)} parts"})
-            pipeline = _make_pipeline(ctx)
-            report = bulk_enrich(mpns, pipeline, category=category)
-            return _report_dto(report)
-
-        return {"job_id": ctx.jobs.submit(work)}
-
-    @r.post("/datasheet")
-    def enrich_datasheet(request: Request, body: dict) -> dict:
-        from stockroom.api.routers.ingest import dto_to_candidate
-
-        ctx = request.app.state.ctx
-        pipeline = _make_pipeline(ctx)
-        candidate = dto_to_candidate(body.get("candidate", {}))
-        path = pipeline.fetch_and_store_datasheet(candidate, body["url"])
-        return {"stored": str(path) if path else None}
 
     return r

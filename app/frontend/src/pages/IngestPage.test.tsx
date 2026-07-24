@@ -25,7 +25,6 @@ vi.mock("../api/client", async (im) => {
       ingestInspect: vi.fn(),
       openJobStream: vi.fn(),
       ingestCommit: vi.fn(),
-      ingestEnrich: vi.fn(),
     },
   };
 });

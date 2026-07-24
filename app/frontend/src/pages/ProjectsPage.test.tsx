@@ -10,7 +10,6 @@ import type {
   ConformCatalog,
   DesignResult,
   FabStatus,
-  ProcurementResult,
   ProjectDetail,
   ProjectSummary,
   RevisionsResult,
@@ -37,7 +36,6 @@ vi.mock("../api/client", async (importActual) => {
       runBom: vi.fn(),
       getBom: vi.fn(),
       repriceBom: vi.fn(),
-      getProcurement: vi.fn(),
       getFab: vi.fn(),
       downloadFabExport: vi.fn(),
       projectFile: vi.fn(),
@@ -389,17 +387,6 @@ function renderPage() {
   );
 }
 
-const PROC_NOT_BUILT: ProcurementResult = {
-  project: "Netdeck",
-  built: false,
-  priced: false,
-  boards: 1,
-  lines: [],
-  risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
-  lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
-  summary: "",
-};
-
 const FAB_READY: FabStatus = {
   project: "Netdeck",
   has_board: true,
@@ -702,7 +689,6 @@ beforeEach(() => {
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
   mockApi.repriceBom.mockResolvedValue(NOT_BUILT);
-  mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
   mockApi.getFab.mockResolvedValue(FAB_READY);
   mockApi.downloadFabExport.mockResolvedValue(undefined);
   mockApi.projectFile.mockResolvedValue("(kicad_pcb (version 20240108))");
