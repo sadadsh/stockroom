@@ -922,6 +922,36 @@ class _HostApi:
         return session.token
 
 
+def _apply_window_icon(window_title: str) -> None:
+    """Set the native window + taskbar icon to host/assets/stockroom.ico (the in-app
+    wordmark glyph), via Win32 WM_SETICON. pywebview's WebView2 backend exposes no icon
+    parameter and otherwise shows the Python interpreter's icon. No-ops silently off
+    Windows, when the asset is missing, or on any Win32 failure - the icon is polish
+    and must never affect the launch."""
+    if os.name != "nt":  # pragma: no cover - Windows-only cosmetic path
+        return
+    try:  # pragma: no cover - exercised only on the real Windows host
+        import ctypes
+
+        ico = Path(__file__).resolve().parent / "assets" / "stockroom.ico"
+        if not ico.is_file():
+            return
+        user32 = ctypes.windll.user32
+        hwnd = user32.FindWindowW(None, window_title)
+        if not hwnd:
+            return
+        LR_LOADFROMFILE, IMAGE_ICON = 0x0010, 1
+        WM_SETICON, ICON_SMALL, ICON_BIG = 0x0080, 0, 1
+        for size, which in ((16, ICON_SMALL), (32, ICON_BIG)):
+            hicon = user32.LoadImageW(
+                None, str(ico), IMAGE_ICON, size, size, LR_LOADFROMFILE
+            )
+            if hicon:
+                user32.SendMessageW(hwnd, WM_SETICON, which, hicon)
+    except Exception:  # noqa: BLE001 - cosmetic only; never block or crash the host
+        _log.debug("window icon apply failed", exc_info=True)
+
+
 def _webview_start_kwargs(start_fn, profile_dir) -> dict:
     """The private_mode/storage_path kwargs that make the guided-capture (vendor) window's
     login persist across parts and app launches (B5). pywebview's storage is set once at
@@ -1011,6 +1041,12 @@ def run_window(base_url: str, token: str) -> None:
         _bind_native_drop()
 
     window.events.loaded += _on_loaded
+    # Window/taskbar icon parity with the in-app wordmark (owner ask 2026-07-23): pywebview on
+    # the WebView2 backend takes the pythonw exe's icon, so the shipped host/assets/stockroom.ico
+    # (a render of the SAME box glyph the rail's wordmark card draws) is applied natively via
+    # WM_SETICON on the first load. Best effort and Windows-only; any failure leaves the stock
+    # icon and never touches the launch.
+    window.events.loaded += lambda: _apply_window_icon("Stockroom")
     # Adding a vendor ZIP also works through the native file picker exposed as
     # window.pywebview.api.pick_ingest_files (js_api above), the fallback path that
     # never depends on the drag-drop DOM registration above.

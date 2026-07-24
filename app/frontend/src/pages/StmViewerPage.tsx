@@ -244,19 +244,24 @@ function PinoutRegion({
               />
             )}
           </div>
-          <div className="flex-none border-b border-line pb-3">
-            <PinoutLegend
-              pinout={pinout}
-              highlight={highlight}
-              onToggleHighlight={toggleHighlight}
-            />
-          </div>
+          {/* ONE scroller for legend + inspector: the legend grew live counts and the
+              bring-up section, so pinning it flex-none clipped its tail (and the whole
+              inspector) with no way to scroll onto them. */}
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {inspectedPin ? (
-              <PinInspector pin={inspectedPin} part={activePart} />
-            ) : (
-              <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
-            )}
+            <div className="border-b border-line pb-3">
+              <PinoutLegend
+                pinout={pinout}
+                highlight={highlight}
+                onToggleHighlight={toggleHighlight}
+              />
+            </div>
+            <div className="pt-2">
+              {inspectedPin ? (
+                <PinInspector pin={inspectedPin} part={activePart} />
+              ) : (
+                <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
