@@ -7,6 +7,7 @@
  */
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { distributorLabel, sv } from "./sourced";
+import { SPEC_HIDDEN_KEYS } from "./specSchema";
 
 export function vendorFromUrl(url: string): string {
   let host = "";
@@ -30,8 +31,11 @@ export interface SpecConflict {
   values: { value: string; source: string }[];
 }
 
-// keys that are internal plumbing, never a displayable spec disagreement
-const INTERNAL_SPEC_KEYS = new Set(["product_url"]);
+// Keys that are internal plumbing or rendered elsewhere, never a displayable spec
+// disagreement: the hidden set (Image is the rendered photo, product_url the link
+// marker, the asset refs) - two vendors' CDN thumbnails ALWAYS differ, and a wall of
+// raw URLs labeled "Image" is noise, not a conflict (live shot 2026-07-24).
+const INTERNAL_SPEC_KEYS = new Set(["product_url", ...SPEC_HIDDEN_KEYS]);
 
 const normSpec = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
@@ -64,9 +68,12 @@ export function pulledSpecConflicts(
     add(key, String(pulled.value ?? ""), pulled.source);
     add(key, String(zipValue), "files");
   }
+  // sorted by key so the block reads the same across pulls (the backend dict order
+  // varies per lookup, which made the two themes' shots disagree)
   return Array.from(byKey.entries())
     .filter(([, values]) => values.length > 1)
-    .map(([key, values]) => ({ key, values }));
+    .map(([key, values]) => ({ key, values }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 export function mergeResultIntoCandidate(
