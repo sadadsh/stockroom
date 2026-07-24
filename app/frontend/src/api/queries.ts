@@ -358,6 +358,19 @@ export function usePreviewGlb(id: string, enabled: boolean) {
   });
 }
 
+// The pulled product photo through the backend proxy (the ProductPhoto fallback lane).
+// Keyed by the vendor URL; a proxied miss (400/404) is an honest "no image" - do not
+// hammer the vendor CDN with retries, and keep the answer for the session.
+export function useProductImage(url: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["product-image", url],
+    queryFn: () => api.productImage(url),
+    enabled: enabled && !!url,
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+}
+
 // Stock previews by footprint lib_id (the Add-A-Part flow shows a passive's built-in
 // footprint + 3D model before it is committed, so there is no part id to key on).
 export function useStockPreviewSvg(fp: string, enabled = true) {

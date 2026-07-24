@@ -24,6 +24,7 @@ import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
 import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
+import { ProductPhoto, productPhotoUrl } from "../components/ProductPhoto";
 import { PulledDepth } from "../components/PulledDepth";
 import { UploadIcon } from "../components/icons";
 
@@ -525,23 +526,34 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
       </span>
     );
   }
+  const photoUrl = productPhotoUrl(result.specs);
   return (
     <div
       data-dev-id="ingest.pulled-summary"
       className="flex flex-col gap-2 rounded-card border border-line2 bg-raise2 p-4"
     >
-      {rows.length > 0 ? (
-        <div className="grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
-          {rows.map(([copyId, k, v]) => (
-            <div key={k} className="contents">
-              <span className="text-t3">
-                <Text id={copyId}>{k}</Text>
-              </span>
-              <span className="truncate text-t1">{v}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <div className="flex items-start gap-4">
+        {photoUrl ? (
+          <div
+            data-dev-id="ingest.pulled-photo"
+            className="h-[72px] w-[72px] flex-none overflow-hidden rounded-control border border-line bg-stage p-1"
+          >
+            <ProductPhoto key={photoUrl} url={photoUrl} alt="Product photo" />
+          </div>
+        ) : null}
+        {rows.length > 0 ? (
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 text-sm sm:grid-cols-[max-content_1fr] sm:gap-x-4">
+            {rows.map(([copyId, k, v]) => (
+              <div key={k} className="contents">
+                <span className="text-t3">
+                  <Text id={copyId}>{k}</Text>
+                </span>
+                <span className="truncate text-t1">{v}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
       {specCount > 0 ? (
         <span className="text-xs text-t3">
           {specCount} <Text id="ingest.specs-kept">specs pulled and kept.</Text>
