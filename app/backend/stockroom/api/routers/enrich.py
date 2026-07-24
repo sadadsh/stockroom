@@ -7,7 +7,8 @@ never blocks the gate)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 
 from stockroom.enrich.pipeline import EnrichmentPipeline
 from stockroom.enrich.schema import EnrichmentResult, Sourced
@@ -137,5 +138,26 @@ def enrich_router(require_token) -> APIRouter:
             return _result_dto(pipeline.extract_from_url(url, progress=progress))
 
         return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/image")
+    def product_image(request: Request, url: str) -> Response:
+        """Proxy a pulled product photo (specs["Image"]) for the SPA's <img> fallback: a
+        vendor CDN that refuses the browser's hotlink still renders, served from the disk
+        cache after the first fetch. 400 for a URL the proxy refuses to touch (hostile
+        input - loopback/private/plain-http); 404 when the fetch yields no real image."""
+        from stockroom.enrich.image_proxy import allowed_image_url, fetch_product_image
+
+        ctx = request.app.state.ctx
+        if not allowed_image_url(url):
+            raise HTTPException(status_code=400, detail="URL not allowed")
+        got = fetch_product_image(url, ctx.enrich_cache_dir)
+        if got is None:
+            raise HTTPException(status_code=404, detail="No image at that URL")
+        data, ctype = got
+        return Response(
+            content=data,
+            media_type=ctype,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     return r

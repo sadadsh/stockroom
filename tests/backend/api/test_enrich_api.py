@@ -163,3 +163,29 @@ def test_make_pipeline_wires_digikey_only_when_both_creds_are_set(library_root, 
                          token="testtoken")
     names2 = {s.name for s in _make_pipeline(ctx2).registry.sources}
     assert "digikey" not in names2
+
+
+def test_product_image_proxy_serves_a_cached_vendor_image(client, monkeypatch):
+    # The SPA's <img> fallback: GET /api/enrich/image?url=... proxies the vendor CDN photo
+    # through the backend (browser-refused hotlinks still render) and serves real image bytes
+    # with the sniffed content type.
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
+    monkeypatch.setattr("stockroom.enrich.image_proxy._http_fetch", lambda url: png)
+    r = client.get("/api/enrich/image", params={"url": "https://mm.digikey.com/Images/x.png"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/png")
+    assert r.content == png
+
+
+def test_product_image_proxy_rejects_a_disallowed_url(client):
+    # hostile input: the URL originates from remote page content - loopback/private/plain-http
+    # targets are refused up front (400), never fetched
+    r = client.get("/api/enrich/image", params={"url": "https://127.0.0.1/x.png"})
+    assert r.status_code == 400
+
+
+def test_product_image_proxy_404s_when_the_fetch_yields_no_image(client, monkeypatch):
+    monkeypatch.setattr("stockroom.enrich.image_proxy._http_fetch",
+                        lambda url: b"<html>blocked</html>")
+    r = client.get("/api/enrich/image", params={"url": "https://www.mouser.com/images/x.jpg"})
+    assert r.status_code == 404

@@ -19,6 +19,8 @@ export const SPEC_HIDDEN_KEYS = new Set([
   "3D Model",
   "product_url",
   "pinout",
+  // the pulled product photo URL: rendered as a real image (ProductPhoto), never a URL row
+  "Image",
 ]);
 
 // Spec values that mean "the distributor did not fill this" - dropped so an

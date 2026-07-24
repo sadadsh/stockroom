@@ -28,6 +28,7 @@ import { PinoutViewer, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
+import { ProductPhoto, productPhotoUrl } from "./ProductPhoto";
 import { Glb3DView } from "./Glb3DView";
 import { useCadSourceQuery, useDetachAsset, usePreviewGlb, useRefreshSourcing } from "../api/queries";
 import { useToast } from "../lib/toast";
@@ -149,6 +150,9 @@ export function DetailPanel({
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
   const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
+  // The pulled product photo (specs["Image"]): the physical-object hero until a real
+  // 3D model is attached (owner 2026-07-24: pulled images must actually render).
+  const heroPhotoUrl = productPhotoUrl(detail?.specs);
   // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
@@ -312,6 +316,24 @@ export function DetailPanel({
               present={hasModel}
               className="min-h-[300px] flex-1"
               art={<CubeArt />}
+              // the pulled product photo stands in as the physical-object hero until a
+              // 3D model is attached (the file-less link add has a photo long before CAD)
+              absentArt={
+                heroPhotoUrl ? (
+                  <ProductPhoto
+                    key={heroPhotoUrl}
+                    url={heroPhotoUrl}
+                    alt="Product photo"
+                    className="h-full w-full object-contain p-4"
+                    fallback={
+                      <div className="flex flex-col items-center gap-1.5">
+                        <UploadIcon />
+                        <span className="text-2xs">No 3D Model</span>
+                      </div>
+                    }
+                  />
+                ) : undefined
+              }
               thumb={
                 hasModel ? (
                   <div className="pointer-events-none h-full w-full">
@@ -1124,6 +1146,7 @@ function AssetTile({
   present,
   art,
   thumb,
+  absentArt,
   onOpen,
   onAttach,
   className,
@@ -1136,6 +1159,10 @@ function AssetTile({
   // The live render shown when present (falls back to `art` internally on failure);
   // omit it and `art` is shown directly.
   thumb?: ReactNode;
+  // Shown on the stage when the asset is ABSENT, in place of the upload glyph (the
+  // hero uses it for the pulled product photo: the real physical object stands in
+  // until a 3D model is attached; the footer keeps the honest Attach affordance).
+  absentArt?: ReactNode;
   // When present and set, the whole tile is a button that expands the preview.
   onOpen?: () => void;
   // When the asset is MISSING and set, the whole tile is a button that opens the
@@ -1168,10 +1195,12 @@ function AssetTile({
         {present ? (
           thumb ?? art
         ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <UploadIcon />
-            <span className="text-2xs">No {name}</span>
-          </div>
+          absentArt ?? (
+            <div className="flex flex-col items-center gap-1.5">
+              <UploadIcon />
+              <span className="text-2xs">No {name}</span>
+            </div>
+          )
         )}
       </div>
     </div>

@@ -13,6 +13,7 @@ import type { PartDetail, StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Badge, Button, Card, Dot } from "./primitives";
+import { ProductPhoto, productPhotoUrl } from "./ProductPhoto";
 
 const EMPTY_PROVENANCE = {
   source: "manual",
@@ -90,6 +91,8 @@ export function CandidateCard({
 
   // Guard the array itself: a candidate may arrive without a purchase field.
   const purchaseUrl = c.purchase?.[0]?.url ?? "";
+  // the pulled product photo rides the candidate's specs (rendered, never a URL row)
+  const photoUrl = productPhotoUrl(c.specs);
   const datasheetUrl = c.provenance?.source_url ?? "";
   const chosenFootprint = c.footprint_variants[c.chosen_footprint_index] ?? "";
   // A datasheet is satisfied by a stored PDF OR a known link (mirrors the backend gate).
@@ -110,6 +113,14 @@ export function CandidateCard({
           among the info made the flow confusing): the part's name + the ONE accent
           button on top, the editable review fields below it */}
       <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-line pb-3">
+        {photoUrl ? (
+          <div
+            data-dev-id="ingest.candidate-photo"
+            className="h-[42px] w-[42px] flex-none overflow-hidden rounded-control border border-line bg-stage p-0.5"
+          >
+            <ProductPhoto key={photoUrl} url={photoUrl} alt="Product photo" />
+          </div>
+        ) : null}
         <span className="min-w-0 truncate text-sm font-semibold text-t1">
           {c.display_name || c.mpn || "New Part"}
         </span>
