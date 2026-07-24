@@ -36,7 +36,6 @@ interface Staged {
   datasheetUrl: string;
 }
 
-
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 // The file-less seed a pulled result stages onto: every asset slot empty (the guided
@@ -440,6 +439,36 @@ export function IngestPage() {
         </Card>
       ) : null}
 
+      {staged && staged.length > 0 ? (
+        <div data-dev-id="ingest.staged" className="flex flex-col gap-4">
+          <Eyebrow>
+            <Text id="ingest.review-eyebrow">Review and Add</Text>
+          </Eyebrow>
+          {staged.map(({ id, candidate, datasheetUrl }) => (
+            <CandidateCard
+              key={id}
+              candidate={candidate}
+              initialDatasheetUrl={datasheetUrl}
+              onCommitted={(created) => {
+                removeStaged(id);
+                // Continue into Complete Part only when this emptied the staging list
+                // (a bulk ZIP add stays here so the remaining cards keep their place).
+                const remaining = (staged ?? []).filter((x) => x.id !== id).length;
+                if (remaining === 0) {
+                  capture.requestOpenFor(created.id);
+                  addPart.close();
+                }
+              }}
+              toast={toast}
+            />
+          ))}
+        </div>
+      ) : staged && staged.length === 0 ? (
+        <div className="py-4 text-center text-sm text-t3">
+          <Text id="ingest.no-parts">No parts found in what was dropped.</Text>
+        </div>
+      ) : null}
+
       {nonPassive ? (
         <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
           <div className="flex flex-col gap-3">
@@ -473,35 +502,6 @@ export function IngestPage() {
         </div>
       ) : null}
 
-      {staged && staged.length > 0 ? (
-        <div data-dev-id="ingest.staged" className="flex flex-col gap-4">
-          <Eyebrow>
-            <Text id="ingest.review-eyebrow">Review and Add</Text>
-          </Eyebrow>
-          {staged.map(({ id, candidate, datasheetUrl }) => (
-            <CandidateCard
-              key={id}
-              candidate={candidate}
-              initialDatasheetUrl={datasheetUrl}
-              onCommitted={(created) => {
-                removeStaged(id);
-                // Continue into Complete Part only when this emptied the staging list
-                // (a bulk ZIP add stays here so the remaining cards keep their place).
-                const remaining = (staged ?? []).filter((x) => x.id !== id).length;
-                if (remaining === 0) {
-                  capture.requestOpenFor(created.id);
-                  addPart.close();
-                }
-              }}
-              toast={toast}
-            />
-          ))}
-        </div>
-      ) : staged && staged.length === 0 ? (
-        <div className="py-4 text-center text-sm text-t3">
-          <Text id="ingest.no-parts">No parts found in what was dropped.</Text>
-        </div>
-      ) : null}
     </div>
   );
 }

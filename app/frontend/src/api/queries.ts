@@ -211,6 +211,21 @@ export function useAttachFootprint() {
   });
 }
 
+// Removing one element is a write like any other; the altium status and the capture
+// needs both change with it, so those refresh too.
+export function useDetachAsset() {
+  const invalidate = useInvalidateAfterWrite();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; kind: string }) => api.detachAsset(vars.id, vars.kind),
+    onSuccess: (_data, vars) => {
+      invalidate(vars.id);
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
+      qc.invalidateQueries({ queryKey: ["cad-source", vars.id] });
+    },
+  });
+}
+
 export function useDeletePart() {
   const qc = useQueryClient();
   return useMutation({

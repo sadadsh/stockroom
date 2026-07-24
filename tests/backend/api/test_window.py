@@ -1162,3 +1162,60 @@ def test_webview_start_kwargs_empty_on_an_older_pywebview(tmp_path):
         ...
 
     assert _webview_start_kwargs(start, tmp_path / "p") == {}
+
+
+def test_forward_cad_capture_never_records_altium_reqs_it_cannot_back(tmp_path, monkeypatch):
+    # Live 2026-07-24: a session marked its Altium needs satisfied by a capture that
+    # yielded NO attachable altium paths, so the session completed, the window closed,
+    # and nothing ever attached. An altium requirement is recorded ONLY when backed by
+    # real loose paths; an unbacked zip leaves the need open for the real file.
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    win = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", win)
+    z = tmp_path / "m.zip"
+    _make_mixed_zip(z)  # classification says altium content IS inside
+    s = _session({R.ALTIUM_SYMBOL, R.ALTIUM_FOOTPRINT})
+    # no extract_dir -> the altium members cannot be pulled out -> nothing to attach
+    W._forward_cad_capture(z, s, extract_dir=None)
+    assert not s.is_complete()
+    assert _capture_payloads(win) == []
+    # the real extractable capture afterwards still satisfies the needs
+    W._forward_cad_capture(z, s, extract_dir=tmp_path / "x")
+    [p] = _capture_payloads(win)
+    assert set(p["requirements"]) == {"altium_symbol", "altium_footprint"}
+    assert len(p["altiumPaths"]) == 2
+    assert s.is_complete()
+
+
+def test_extract_altium_members_reaches_into_a_nested_zip(tmp_path):
+    import io
+    import zipfile as _zf
+
+    from stockroom.host import window as W
+
+    inner = io.BytesIO()
+    with _zf.ZipFile(inner, "w") as z:
+        z.writestr("part.SchLib", "sch-bytes")
+        z.writestr("part.PcbLib", "pcb-bytes")
+    outer = tmp_path / "bundle.zip"
+    with _zf.ZipFile(outer, "w") as z:
+        z.writestr("README.txt", "hi")
+        z.writestr("altium/part-altium.zip", inner.getvalue())
+    out = tmp_path / "x"
+    got = sorted(Path(p).name for p in W._extract_altium_members(outer, out))
+    assert got == ["part.PcbLib", "part.SchLib"]
+
+
+def test_should_auto_allow_permission_only_for_download_kinds():
+    from stockroom.host import window as W
+
+    # Edge's multiple-automatic-downloads bar (the exact kind string varies by SDK)
+    assert W._should_auto_allow_permission("MultipleAutomaticDownloads")
+    assert W._should_auto_allow_permission("CoreWebView2PermissionKind.MultipleAutomaticDownloadsRequested")
+    # everything else keeps its prompt
+    assert not W._should_auto_allow_permission("Microphone")
+    assert not W._should_auto_allow_permission("Geolocation")
+    assert not W._should_auto_allow_permission("")
+    assert not W._should_auto_allow_permission(None)

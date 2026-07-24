@@ -261,19 +261,30 @@ describe("useGuidedCapture", () => {
     expect(result.current.status).toBe("timed-out");
   });
 
-  it("projects the terminal done state when the host forwards a done signal (DONE-02)", async () => {
+  it("projects done only once the needs actually attached; a bare host done stays honest (DONE-02)", async () => {
     mockHost("tok");
     mockCadSourceUrl();
-    const { result } = render(["kicad_symbol"]);
+    vi.spyOn(api, "altiumAttach").mockResolvedValue({} as never);
+    vi.spyOn(api, "altiumRegenerate").mockResolvedValue({} as never);
+    const { result } = render(["altium_symbol"]);
 
     await act(async () => {
       await result.current.start();
     });
+    // a done with nothing attached is NOT done (live 2026-07-24)
     await act(async () => {
       window.__STOCKROOM_CAD_DOWNLOAD__!({ signal: "done", token: "tok" });
       await Promise.resolve();
     });
+    expect(result.current.status).not.toBe("done");
 
+    // the attach forward completes it
+    await act(async () => {
+      await window.__STOCKROOM_CAD_DOWNLOAD__!({
+        path: "C:/dl/a.SchLib", token: "tok",
+        requirements: ["altium_symbol"], altiumPaths: ["C:/dl/a.SchLib"],
+      });
+    });
     expect(result.current.status).toBe("done");
   });
 

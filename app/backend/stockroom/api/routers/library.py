@@ -499,6 +499,20 @@ def library_router(require_token) -> APIRouter:
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return rec.to_dict()
 
+    @r.delete("/parts/{part_id}/assets/{kind}")
+    def detach_asset(request: Request, part_id: str, kind: str) -> dict:
+        """Remove ONE element from a part (symbol / footprint / model / datasheet /
+        altium_symbol / altium_footprint): the file goes, the ref nulls, one scoped
+        commit. Unknown id -> 404; a kind the part does not carry -> 400 (loud, never
+        a silent no-op)."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        record = ctx.ops.detach_asset(part_id, kind)
+        ctx.rebuild_index()
+        ctx.auto_push()
+        return record.to_dict()
+
     @r.delete("/parts/{part_id}", status_code=204)
     def delete_part(request: Request, part_id: str) -> Response:
         ctx = request.app.state.ctx

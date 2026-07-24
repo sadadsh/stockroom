@@ -548,3 +548,69 @@ def test_add_part_with_symbol_but_no_entry_name_fails_loud(tmp_path, fixtures_di
     with pytest.raises(ValueError):
         ops.add_part(staged)
     assert repo.is_clean()
+
+
+def test_detach_asset_removes_each_element_and_nulls_its_ref(tmp_path, fixtures_dir):
+    """Per-element removal (owner 2026-07-24): a wrongly-captured symbol / footprint /
+    model / datasheet / altium side can be deleted individually - the file goes, the
+    record ref nulls, one scoped commit each, and the rest of the part stands."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    lib = profile.library
+
+    r = ops.detach_asset(record.id, "model")
+    assert r.model is None
+    assert not (lib.models_dir / "TPS62130RGTR.step").exists()
+
+    r = ops.detach_asset(record.id, "footprint")
+    assert r.footprint is None
+    assert not (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
+
+    r = ops.detach_asset(record.id, "symbol")
+    assert r.symbol is None
+    sym_lib = SymbolLib.load(lib.symbol_lib_path("ICs"))
+    assert "TPS62130RGTR" not in sym_lib.symbol_names
+
+    r = ops.detach_asset(record.id, "datasheet")
+    assert r.datasheet is None
+    assert not (lib.datasheets_dir / f"{record.id}.pdf").exists()
+
+    assert repo.is_clean()
+    # identity survives untouched
+    again = ops.load_record(record.id)
+    assert again.mpn == "TPS62130RGTR"
+
+
+def test_detach_asset_altium_sides(tmp_path, fixtures_dir):
+    from pathlib import Path as _P
+
+    repo, profile, _staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    FIXA = _P(__file__).parent.parent / "altium" / "fixtures"
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "d.json").write_text(
+        PartRecord(id="d", display_name="d", category="Diodes", mpn="S1M").dumps(),
+        encoding="utf-8",
+    )
+    ops.attach_altium_assets("d", FIXA / "sample.SchLib", FIXA / "sample.PcbLib")
+
+    r = ops.detach_asset("d", "altium_symbol")
+    assert r.altium_symbol is None
+    assert not (ops.lib.parts_dir.parent / "altium" / "d.SchLib").exists()
+    assert r.altium_footprint is not None  # the other side stands
+
+    r = ops.detach_asset("d", "altium_footprint")
+    assert r.altium_footprint is None
+    assert not (ops.lib.parts_dir.parent / "altium" / "d.PcbLib").exists()
+
+
+def test_detach_asset_unknown_kind_or_absent_asset_fails_loud(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    with pytest.raises(ValueError):
+        ops.detach_asset(record.id, "bogus")
+    ops.detach_asset(record.id, "model")
+    with pytest.raises(ValueError):
+        ops.detach_asset(record.id, "model")  # already gone: honest, never a silent no-op

@@ -54,16 +54,15 @@ def test_attach_rejects_symbol_only_intlib_zero_trace(library_ops):
     assert ops.load_record("x").altium_symbol is None
 
 
-def test_attach_rejects_ambiguous_multi_symbol_lib_zero_trace(library_ops):
-    # multi_symbol.SchLib holds two symbols; with an MPN matching neither, binding is ambiguous
+def test_attach_binds_the_first_symbol_when_the_mpn_matches_none(library_ops):
+    # permissive by owner directive (2026-07-24): a multi-symbol lib with no MPN match
+    # binds its first entry instead of refusing the capture (the lib is stored verbatim
+    # and the binding is re-attachable).
     ops = library_ops
     _seed(ops, "amb", "NOMATCH")
-
-    with pytest.raises(ValueError, match="entries"):
-        ops.attach_altium_assets("amb", FIX / "multi_symbol.SchLib", FIX / "sample.PcbLib")
-
-    assert not (ops.lib.parts_dir.parent / "altium").exists()
-    assert ops.load_record("amb").altium_symbol is None
+    record = ops.attach_altium_assets("amb", FIX / "multi_symbol.SchLib", FIX / "sample.PcbLib")
+    assert record.altium_symbol is not None
+    assert record.altium_symbol.name  # bound to a real entry, never empty
 
 
 def test_attach_picks_the_mpn_matching_symbol_from_a_multi_symbol_lib(library_ops):
@@ -96,3 +95,51 @@ def test_attach_rolls_back_first_file_if_second_copy_fails(library_ops, monkeypa
     # the first-copied .SchLib must NOT leak, and the record stays untouched (zero trace)
     assert not (ops.lib.parts_dir.parent / "altium" / "leak.SchLib").exists()
     assert ops.load_record("leak").altium_symbol is None
+
+
+def test_attach_prefers_the_mpn_matching_footprint_from_a_multi_footprint_lib(library_ops, monkeypatch):
+    # Live 2026-07-24: a vendor PcbLib carrying several footprint variants failed the
+    # attach outright because only the SYMBOL side preferred the MPN. The footprint
+    # side now prefers it the same way (exact, then the one name containing it).
+    import stockroom.altium.oleread as oleread
+
+    ops = library_ops
+    _seed(ops, "tpd", "S1M")
+    monkeypatch.setattr(
+        oleread, "read_footprint_names",
+        lambda path: ["SOT-23_DENSE", "S1M_VARIANT"],
+    )
+    record = ops.attach_altium_assets("tpd", FIX / "sample.SchLib", FIX / "sample.PcbLib")
+    assert record.altium_footprint.name == "S1M_VARIANT"
+
+
+def test_attach_accepts_a_lone_schlib_then_the_pcblib_completes_the_pair(library_ops):
+    # Robustness (owner 2026-07-24): vendors can serve the SchLib and PcbLib as SEPARATE
+    # downloads, and each capture forward attaches per file. A lone .SchLib lands the
+    # symbol side; the later lone .PcbLib lands the footprint side WITHOUT clearing the
+    # symbol already attached.
+    ops = library_ops
+    _seed(ops, "split", "S1M")
+
+    first = ops.attach_altium_assets("split", FIX / "sample.SchLib")
+    assert first.altium_symbol is not None and first.altium_symbol.name == "S1M"
+    assert first.altium_footprint is None
+
+    second = ops.attach_altium_assets("split", FIX / "sample.PcbLib")
+    assert second.altium_footprint is not None
+    assert second.altium_footprint.name == "DIOM5227X270N"
+    assert second.altium_symbol is not None and second.altium_symbol.name == "S1M"
+    # both files stored
+    altium_dir = ops.lib.parts_dir.parent / "altium"
+    assert (altium_dir / "split.SchLib").exists() and (altium_dir / "split.PcbLib").exists()
+
+
+def test_attach_takes_the_loose_pair_when_a_bundle_carries_intlib_and_pair(library_ops):
+    # Some vendor bundles ship the IntLib AND the loose pair together; the loose pair
+    # wins and the IntLib fills nothing (never a refused capture over redundancy).
+    ops = library_ops
+    _seed(ops, "trio", "S1M")
+    record = ops.attach_altium_assets(
+        "trio", FIX / "sample.IntLib", FIX / "sample.SchLib", FIX / "sample.PcbLib"
+    )
+    assert record.altium_symbol is not None and record.altium_footprint is not None

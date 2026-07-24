@@ -95,8 +95,53 @@ def classify_asset(path: Path) -> ClassifiedAsset:
     # not mis-scanned.
     if suffix == ".zip" or (not reqs and suffix not in _KIND_FOR_SUFFIX and _is_zip(p)):
         return _classify_zip(p)
+    if not reqs and suffix not in _KIND_FOR_SUFFIX:
+        # A loose Altium library saved under a GUID ".tmp" name (WebView2 with no
+        # Content-Disposition filename) is an OLE compound file: classify by CONTENT,
+        # never drop a valid download over its name (mirrors the zip-by-content rule).
+        ole = _classify_ole(p)
+        if ole is not None:
+            return ole
     tool, kind = _KIND_FOR_SUFFIX.get(suffix, ("unknown", "unknown"))
     return ClassifiedAsset(tool=tool, kind=kind, requirements=reqs)
+
+
+_OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+
+
+def _classify_ole(path: Path) -> ClassifiedAsset | None:
+    """Classify an OLE compound file by its Altium streams: a .SchLib carries symbol
+    names in FileHeader (LibRef records), a .PcbLib carries the Library/Data name
+    records. None when the file is not OLE or matches neither shape."""
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(8) != _OLE_MAGIC:
+                return None
+    except OSError:
+        return None
+    try:
+        import olefile
+
+        # Discriminate by the AUTHORITATIVE streams, not the permissive name fallbacks
+        # (read_footprint_names' storage-walk would match a SchLib's component storages
+        # too): Library/Data is the .PcbLib name table; a FileHeader with LibRef records
+        # is the .SchLib component list.
+        with olefile.OleFileIO(str(path)) as ole:
+            if ole.exists(["Library", "Data"]):
+                return ClassifiedAsset(
+                    tool="altium", kind="footprint",
+                    requirements=frozenset({Requirement.ALTIUM_FOOTPRINT}),
+                )
+            if ole.exists(["FileHeader"]):
+                header = ole.openstream(["FileHeader"]).read()
+                if b"LibRef" in header or b"LIBREF" in header:
+                    return ClassifiedAsset(
+                        tool="altium", kind="symbol",
+                        requirements=frozenset({Requirement.ALTIUM_SYMBOL}),
+                    )
+    except Exception:  # noqa: BLE001 - an unreadable OLE is simply not classifiable
+        return None
+    return None
 
 
 def _classify_zip(path: Path) -> ClassifiedAsset:
@@ -105,6 +150,19 @@ def _classify_zip(path: Path) -> ClassifiedAsset:
         with zipfile.ZipFile(path) as zf:
             for name in zf.namelist():
                 reqs |= _reqs_for_suffix(Path(name).suffix)
+                # a zip nested INSIDE the bundle (one level) counts by its members too -
+                # vendors wrap the Altium set that way, and a valid download must never
+                # classify as unknown over its packaging
+                if Path(name).suffix.lower() == ".zip":
+                    try:
+                        import io
+
+                        with zf.open(name) as inner_fh:
+                            with zipfile.ZipFile(io.BytesIO(inner_fh.read())) as inner:
+                                for iname in inner.namelist():
+                                    reqs |= _reqs_for_suffix(Path(iname).suffix)
+                    except (zipfile.BadZipFile, OSError, KeyError):
+                        continue
     except (zipfile.BadZipFile, OSError):
         return ClassifiedAsset(tool="unknown", kind="zip", requirements=frozenset())
     return ClassifiedAsset(tool=_tool_for_reqs(reqs), kind="zip", requirements=frozenset(reqs))

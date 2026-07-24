@@ -282,7 +282,7 @@ describe("IngestPage — unified Add A Part", () => {
     await user.click(screen.getByRole("button", { name: "Look Up" }));
 
     expect(await screen.findByText("Files Via Capture")).toBeInTheDocument();
-    expect(screen.getByText("STM32F103C8T6")).toBeInTheDocument(); // pulled identity shown
+    expect(screen.getAllByText("STM32F103C8T6").length).toBeGreaterThan(0); // pulled identity shown
 
     await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
     await waitFor(() => expect(pick).toHaveBeenCalled());

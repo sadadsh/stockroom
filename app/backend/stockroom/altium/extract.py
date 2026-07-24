@@ -65,22 +65,27 @@ def extract_intlib(intlib_path, out_dir) -> tuple[Path, Path]:
     return sch_out, pcb_out
 
 
-def normalize_altium_source(*sources, out_dir=None) -> tuple[Path, Path]:
-    """Return a loose (schlib, pcblib) pair from EITHER a single .IntLib OR a .SchLib + .PcbLib
-    pair (order-independent). For an .IntLib, `out_dir` is required (extraction target). Raises
-    ValueError on any other combination, so the caller always gets exactly one of each."""
+def normalize_altium_source(*sources, out_dir=None) -> tuple[Path | None, Path | None]:
+    """Return a loose (schlib, pcblib) pair - EITHER side may be None - from whatever mix of
+    .SchLib/.PcbLib/.IntLib the capture delivered. Deliberately permissive (owner 2026-07-24:
+    a downloaded Altium file must never be refused over its packaging): the loose files win,
+    duplicates take the first, and an .IntLib fills only the sides the loose files did not
+    provide (extraction needs `out_dir`). A LONE side is returned with None for the other
+    (vendors serve the SchLib and PcbLib as separate downloads). Raises ValueError only when
+    nothing Altium-usable was given at all."""
     paths = [Path(s) for s in sources]
-    intlibs = [p for p in paths if p.suffix.lower() == ".intlib"]
-    schlibs = [p for p in paths if p.suffix.lower() == ".schlib"]
-    pcblibs = [p for p in paths if p.suffix.lower() == ".pcblib"]
-
-    if len(intlibs) == 1 and not schlibs and not pcblibs:
+    sch = next((p for p in paths if p.suffix.lower() == ".schlib"), None)
+    pcb = next((p for p in paths if p.suffix.lower() == ".pcblib"), None)
+    intlib = next((p for p in paths if p.suffix.lower() == ".intlib"), None)
+    if intlib is not None and (sch is None or pcb is None):
         if out_dir is None:
             raise ValueError("out_dir is required to extract an .IntLib")
-        return extract_intlib(intlibs[0], out_dir)
-    if len(schlibs) == 1 and len(pcblibs) == 1 and not intlibs:
-        return schlibs[0], pcblibs[0]
-    raise ValueError(
-        "provide either a single .IntLib or one .SchLib + one .PcbLib; got: "
-        + (", ".join(p.name for p in paths) or "nothing")
-    )
+        i_sch, i_pcb = extract_intlib(intlib, out_dir)
+        sch = sch or i_sch
+        pcb = pcb or i_pcb
+    if sch is None and pcb is None:
+        raise ValueError(
+            "provide an .SchLib, a .PcbLib, or an .IntLib; got: "
+            + (", ".join(p.name for p in paths) or "nothing")
+        )
+    return sch, pcb

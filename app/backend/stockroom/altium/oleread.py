@@ -82,16 +82,19 @@ def read_footprint_names(path) -> list[str]:
 
 
 def pick_entry(names: list[str], kind: str, prefer: str | None = None) -> str:
-    """Choose the one entry to bind from a library's entry names. A single entry is used; with
-    several, an exact `prefer` (e.g. the MPN) wins; otherwise it is ambiguous and we fail loud
-    rather than silently binding the alphabetically-first (which would place the wrong part)."""
+    """Choose the entry to bind from a library's entry names: an exact `prefer` (the MPN)
+    wins, else a name containing it (vendor footprints often wrap the MPN:
+    "TPD6E05U06RVZR_RVZ6"; several containing it bind the first), else the FIRST entry.
+    Deliberately permissive (owner 2026-07-24): a multi-entry vendor library must never
+    fail the capture - the whole file is stored verbatim, so a wrong best-effort binding
+    is visible and re-bindable, while a refused attach silently loses the download. Only
+    an EMPTY library (nothing to bind at all) is an error."""
     if not names:
         raise ValueError(f"no {kind} entry found in the library")
-    if len(names) == 1:
-        return names[0]
-    if prefer and prefer in names:
-        return prefer
-    raise ValueError(
-        f"the library has {len(names)} {kind} entries {names}; expected one, or a name matching "
-        f"the MPN. Provide a single-part library or the exact entry name."
-    )
+    if prefer:
+        if prefer in names:
+            return prefer
+        containing = [n for n in names if prefer.lower() in n.lower()]
+        if containing:
+            return containing[0]
+    return names[0]
