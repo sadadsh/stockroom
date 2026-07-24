@@ -10,11 +10,18 @@
   "description": "ESD Protection Diodes / TVS Diodes 6-CH lo cap IEC ESD protect diodes",
   "display_name": "TPD6E05U06RVZR",
   "enrichment": {},
-  "footprint": null,
+  "footprint": {
+    "lib": "SR-Diodes",
+    "name": "TPD6E05U06RVZR",
+    "tool": "kicad"
+  },
   "hashes": null,
   "id": "tpd6e05u06rvzr",
   "manufacturer": "Texas Instruments",
-  "model": null,
+  "model": {
+    "file": "models/TPD6E05U06RVZR.stp",
+    "tool": "kicad"
+  },
   "mpn": "TPD6E05U06RVZR",
   "passive": false,
   "provenance": {
@@ -111,7 +118,11 @@
     "Voltage - Clamping (Max) @ Ipp": "14V",
     "Voltage - Reverse Standoff (Typ)": "5.5V (Max)"
   },
-  "symbol": null,
+  "symbol": {
+    "lib": "SR-Diodes",
+    "name": "TPD6E05U06RVZR",
+    "tool": "kicad"
+  },
   "tags": [],
   "value": ""
 }
