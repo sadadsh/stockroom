@@ -134,9 +134,14 @@ def settings_router(require_token) -> APIRouter:
         # The hidden "secret combo" target: pull any API keys / logins from the per-machine
         # dev-creds.json (OS config dir, never the repo) into the config so live validation is not
         # blocked on retyping them. Absent file -> empty loaded list, DTO unchanged.
+        from stockroom.store.machine_config import config_dir
+
         ctx = request.app.state.ctx
         loaded = _load_dev_creds(ctx)
-        return {"loaded": loaded, **_settings_dto(ctx)}
+        # the exact path searched, so an empty result can say WHERE to put the file
+        # (the owner hit a bare "not found" on a fresh laptop, 2026-07-24)
+        return {"loaded": loaded, "config_path": (config_dir() / "dev-creds.json").as_posix(),
+                **_settings_dto(ctx)}
 
     @r.patch("")
     def update_settings(request: Request, body: dict) -> dict:

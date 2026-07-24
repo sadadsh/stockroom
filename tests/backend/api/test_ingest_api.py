@@ -237,3 +237,30 @@ def _drain_job(client, job_id):
     return None
 
 
+
+
+def test_commit_lands_a_file_less_candidate_from_a_pulled_link(client):
+    # The primary add flow (owner 2026-07-24): a part pulled from a purchase link commits
+    # with NO asset files at all - identity + datasheet link + purchase suffice - and the
+    # guided capture attaches both EDA formats afterwards. The detail carries null asset
+    # refs, never a fabricated LibRef.
+    r = client.post("/api/ingest/commit", json={
+        "vendor": "Mouser",
+        "symbol_lib_path": None, "symbol_name": "",
+        "footprint_variants": [], "chosen_footprint_index": 0,
+        "model_path": None, "datasheet_path": None,
+        "category": "ICs", "mpn": "TPD6E05U06RVZR", "display_name": "TPD6E05U06",
+        "entry_name": "", "manufacturer": "TI", "description": "6-ch ESD array",
+        "purchase": [{"vendor": "Mouser", "url": "https://www.mouser.com/ProductDetail/x"}],
+        "provenance": {"source": "mouser", "source_url": "https://ti.com/tpd6e05u06.pdf",
+                       "original_zip_sha256": "", "ingested_at": ""},
+        "gaps": [],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["symbol"] is None
+    assert body["footprint"] is None
+    assert body["model"] is None
+    assert body["mpn"] == "TPD6E05U06RVZR"
+    detail = client.get(f"/api/library/parts/{body['id']}").json()
+    assert detail["symbol"] is None and detail["footprint"] is None

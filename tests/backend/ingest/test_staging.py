@@ -61,16 +61,13 @@ def test_to_staged_part_purchase_defaults_empty():
     assert sp.purchase == []
 
 
-def test_to_staged_part_rejects_missing_symbol():
-    c = _candidate(symbol_lib_path=None)
-    with pytest.raises(IngestError):
-        c.to_staged_part()
-
-
-def test_to_staged_part_rejects_missing_footprint():
-    c = _candidate(footprint_variants=[])
-    with pytest.raises(IngestError):
-        c.to_staged_part()
+def test_to_staged_part_stages_without_a_symbol_or_footprint():
+    # The primary add flow (owner 2026-07-24) lands a part on its pulled identity +
+    # sourcing; the guided capture attaches both EDA formats afterwards. Staging a
+    # file-less candidate therefore carries None sources instead of refusing.
+    staged = _candidate(symbol_lib_path=None, footprint_variants=[]).to_staged_part()
+    assert staged.symbol_source is None
+    assert staged.footprint_source is None
 
 
 def _cli():

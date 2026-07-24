@@ -281,7 +281,7 @@ describe("IngestPage — unified Add A Part", () => {
     );
     await user.click(screen.getByRole("button", { name: "Look Up" }));
 
-    expect(await screen.findByText("Needs Files")).toBeInTheDocument();
+    expect(await screen.findByText("Files Via Capture")).toBeInTheDocument();
     expect(screen.getByText("STM32F103C8T6")).toBeInTheDocument(); // pulled identity shown
 
     await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
@@ -464,15 +464,15 @@ describe("IngestPage — unified Add A Part", () => {
       "https://www.mouser.com/stm32",
     );
     await user.click(screen.getByRole("button", { name: "Look Up" }));
-    await screen.findByText("Needs Files");
+    await screen.findByText("Files Via Capture");
     await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
     await screen.findByText("Review and Add");
     expect(screen.getByLabelText("Part Number")).toHaveValue("STM32F103C8T6"); // merged X
     await user.click(screen.getByRole("button", { name: "Add to Components" }));
     await screen.findByText(/Added STM32F103/i);
 
-    // the whole part context tore down: no leftover "Needs Files" card, no resurrected staged card
-    expect(screen.queryByText("Needs Files")).not.toBeInTheDocument();
+    // the whole part context tore down: no leftover "Files Via Capture" card, no resurrected staged card
+    expect(screen.queryByText("Files Via Capture")).not.toBeInTheDocument();
     expect(screen.queryByText("Review and Add")).not.toBeInTheDocument();
 
     // browse an UNRELATED ZIP: it must NOT inherit the committed part's MPN
@@ -550,6 +550,49 @@ describe("IngestPage — unified Add A Part", () => {
     await waitFor(() => expect(probe).toHaveAttribute("data-reopen", "new-part"));
     expect(probe).toHaveAttribute("data-addpart-open", "false");
     delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
+  it("a pulled non-passive stages itself for a one-click file-less add into the capture", async () => {
+    // The perfect workflow (owner): paste a vendor link -> the pull fills EVERYTHING ->
+    // one click lands the part file-less -> the Complete Part window opens and the
+    // guided capture downloads BOTH the KiCad and Altium sets. No ZIP required.
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(
+      enrichStream({
+        ...EMPTY_RESULT,
+        add_plan: null,
+        category: "ICs",
+        mpn: { value: "TPD6E05U06RVZR", source: "mouser", confidence: "high" },
+        manufacturer: { value: "Texas Instruments", source: "mouser", confidence: "high" },
+        description: { value: "6-ch ESD array", source: "mouser", confidence: "high" },
+        datasheet_url: { value: "https://ti.com/tpd.pdf", source: "mouser", confidence: "high" },
+      } as unknown as EnrichmentResult),
+    );
+    mockApi.ingestCommit.mockResolvedValue({ id: "tpd6e05u06rvzr", display_name: "TPD6E05U06RVZR" } as PartDetail);
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    const probe = screen.getByTestId("continuation-probe");
+
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+
+    // the pulled part stages itself: the review card is prefilled, no ZIP demanded
+    await screen.findByText("Review and Add");
+    expect(screen.getByLabelText("Part Number")).toHaveValue("TPD6E05U06RVZR");
+    expect(screen.getByLabelText("Manufacturer")).toHaveValue("Texas Instruments");
+
+    await user.click(screen.getByRole("button", { name: "Add to Components" }));
+    await waitFor(() => expect(mockApi.ingestCommit).toHaveBeenCalled());
+    const committed = mockApi.ingestCommit.mock.calls[0][0];
+    expect(committed.symbol_lib_path).toBeNull();
+    expect(committed.footprint_variants).toEqual([]);
+    expect(committed.mpn).toBe("TPD6E05U06RVZR");
+    // ...and the flow hands off into the Complete Part capture
+    await waitFor(() => expect(probe).toHaveAttribute("data-reopen", "tpd6e05u06rvzr"));
+    expect(probe).toHaveAttribute("data-addpart-open", "false");
   });
 
   it("is honest when a link yields nothing addable", async () => {

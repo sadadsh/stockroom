@@ -200,6 +200,10 @@ class LibraryOps:
             missing = staged_missing_fields(staged)
             if missing:
                 raise IncompleteError(missing)
+        # A symbol source with no entry name would merge a symbol named "" into the
+        # category lib; refuse honestly before any write.
+        if staged.symbol_source is not None and not staged.entry_name:
+            raise ValueError("a staged symbol needs an entry name to merge under")
         part_id = new_part_id(self.lib.parts_dir, staged.mpn or staged.display_name)
         nickname = category_nickname(staged.category)
         sym_lib_path = self.lib.symbol_lib_path(staged.category)
@@ -219,10 +223,15 @@ class LibraryOps:
 
         with Transaction(self.repo) as txn:
             txn.track_dir(*fresh_dirs)
+            # Every asset step is conditional: the primary add flow lands a part on its
+            # identity + sourcing alone (owner 2026-07-16 / 2026-07-24) and the guided
+            # capture attaches both EDA formats afterwards. A file-less add fabricates
+            # NO asset files and records None refs, never a dangling LibRef.
             # 0. ensure the category libraries exist (idempotent); a freshly created
             # empty symbol lib is tracked so it commits atomically.
-            ensure_footprint_lib(pretty_dir)
-            if not sym_lib_path.exists():
+            if staged.footprint_source is not None:
+                ensure_footprint_lib(pretty_dir)
+            if staged.symbol_source is not None and not sym_lib_path.exists():
                 if self.cli is None:
                     raise ValueError(
                         f"category symbol library {sym_lib_path.name} is missing and "
@@ -232,25 +241,29 @@ class LibraryOps:
                 txn.track(sym_lib_path)
 
             # 1. merge the symbol (renamed to entry_name) into the category lib
-            merge_symbol_into_lib(
-                sym_lib_path, staged.symbol_source, staged.symbol_source_name, staged.entry_name
-            )
-            txn.track(sym_lib_path)
+            if staged.symbol_source is not None:
+                merge_symbol_into_lib(
+                    sym_lib_path, staged.symbol_source, staged.symbol_source_name, staged.entry_name
+                )
+                txn.track(sym_lib_path)
 
             # 2. place the footprint into the category .pretty
-            fp_path = place_footprint(pretty_dir, staged.footprint_source, staged.entry_name)
-            txn.track(fp_path)
+            fp_path = None
+            if staged.footprint_source is not None:
+                fp_path = place_footprint(pretty_dir, staged.footprint_source, staged.entry_name)
+                txn.track(fp_path)
 
-            # 3. model file + (model ...) link
+            # 3. model file + (model ...) link (the link only when a footprint landed)
             model_ref = None
             if staged.model_source is not None:
-                model_name = f"{staged.entry_name}{Path(staged.model_source).suffix}"
+                model_name = f"{staged.entry_name or part_id}{Path(staged.model_source).suffix}"
                 model_dst = self.lib.models_dir / model_name
                 shutil.copyfile(staged.model_source, model_dst)
                 txn.track(model_dst)
-                fp = Footprint.load(fp_path)
-                fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
-                fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
+                if fp_path is not None:
+                    fp = Footprint.load(fp_path)
+                    fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
+                    fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
                 model_ref = ModelRef(file=f"models/{model_name}")
 
             # 4. datasheet: a downloaded PDF, a known link, or both. A URL-only
@@ -275,27 +288,37 @@ class LibraryOps:
                 mpn=staged.mpn,
                 manufacturer=staged.manufacturer,
                 datasheet=datasheet,
-                symbol=LibRef(lib=nickname, name=staged.entry_name),
-                footprint=LibRef(lib=nickname, name=staged.entry_name),
+                symbol=LibRef(lib=nickname, name=staged.entry_name)
+                if staged.symbol_source is not None else None,
+                footprint=LibRef(lib=nickname, name=staged.entry_name)
+                if staged.footprint_source is not None else None,
                 model=model_ref,
                 provenance=staged.provenance,
                 purchase=list(staged.purchase),
                 specs=dict(staged.specs),
             )
-            sym_lib = SymbolLib.load(sym_lib_path)
-            sym = sym_lib.get_symbol(staged.entry_name)
-            sym.set_property("Footprint", f"{nickname}:{staged.entry_name}")
-            mirror_fields_to_symbol(sym, record)
-            sym_lib.save(sym_lib_path)
+            if staged.symbol_source is not None:
+                sym_lib = SymbolLib.load(sym_lib_path)
+                sym = sym_lib.get_symbol(staged.entry_name)
+                sym.set_property("Footprint", f"{nickname}:{staged.entry_name}")
+                mirror_fields_to_symbol(sym, record)
+                sym_lib.save(sym_lib_path)
 
             # 6. the JSON record
             json_path = self.lib.parts_dir / f"{part_id}.json"
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
 
-            txn.commit(f"Add {staged.entry_name} ({staged.category}): symbol, footprint, "
-                       f"{'3D model, ' if model_ref else ''}"
-                       f"{'datasheet, ' if datasheet else ''}record")
+            placed = [p for p, there in (
+                ("symbol", staged.symbol_source is not None),
+                ("footprint", staged.footprint_source is not None),
+                ("3D model", model_ref is not None),
+                ("datasheet", datasheet is not None),
+            ) if there]
+            txn.commit(
+                f"Add {staged.entry_name or staged.mpn or staged.display_name} "
+                f"({staged.category}): {', '.join(placed + ['record'])}"
+            )
         return record
 
     def add_passive_part(self, record: PartRecord, require_complete: bool = True) -> PartRecord:

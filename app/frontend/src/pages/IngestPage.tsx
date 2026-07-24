@@ -18,7 +18,7 @@ import { useAddPart } from "../lib/addPart";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { onQueuedPaths } from "../lib/ingestQueue";
-import { mergeResultIntoCandidate } from "../lib/candidateFromResult";
+import { mergeResultIntoCandidate, vendorFromUrl } from "../lib/candidateFromResult";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
 import { CandidateCard } from "../components/CandidateCard";
@@ -38,6 +38,29 @@ interface Staged {
 
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
+
+// The file-less seed a pulled result stages onto: every asset slot empty (the guided
+// capture attaches both EDA formats AFTER the part lands), everything else filled by
+// mergeResultIntoCandidate from the pull.
+const FILE_LESS_CANDIDATE: StagingCandidate = {
+  vendor: "",
+  symbol_lib_path: null,
+  symbol_name: "",
+  footprint_variants: [],
+  chosen_footprint_index: 0,
+  model_path: null,
+  datasheet_path: null,
+  display_name: "",
+  entry_name: "",
+  category: "",
+  mpn: "",
+  manufacturer: "",
+  description: "",
+  tags: [],
+  purchase: [],
+  gaps: [],
+  specs: {},
+};
 
 // One step of the part's path (pull -> KiCad -> Altium): a numbered micro-label in the
 // quiet eyebrow register, so the sequence reads as structure, never a prose wall.
@@ -127,6 +150,19 @@ export function IngestPage() {
         r.mpn || r.manufacturer || r.datasheet_url || Object.keys(r.specs).length > 0 || r.add_plan;
       if (!gotAnything) {
         toast(toastNothing, "neutral");
+      } else if (!r.add_plan) {
+        // The perfect workflow (owner): a pulled NON-passive stages itself immediately -
+        // one click lands it file-less, then the Complete Part window opens and the
+        // guided capture downloads both the KiCad and Altium sets. A vendor ZIP stays
+        // the fallback (inspecting one replaces this staged candidate wholesale).
+        const url = isUrl(lookedUpInput) ? lookedUpInput : "";
+        const candidate = {
+          ...mergeResultIntoCandidate(FILE_LESS_CANDIDATE, r, url),
+          vendor: url ? vendorFromUrl(url) : "pulled",
+        };
+        setStaged([
+          { id: nextId.current++, candidate, datasheetUrl: sv(r.datasheet_url) },
+        ]);
       }
     } else if (enrich.status === "error") {
       toast(enrich.error ?? toastLookupFailed, "err");
@@ -350,11 +386,11 @@ export function IngestPage() {
               </PathStep>
               <PathArrow />
               <PathStep n={2}>
-                <Text id="ingest.path-kicad">KiCad Files</Text>
+                <Text id="ingest.path-add">Add The Part</Text>
               </PathStep>
               <PathArrow />
               <PathStep n={3}>
-                <Text id="ingest.path-altium">Altium Capture</Text>
+                <Text id="ingest.path-capture">Capture KiCad + Altium Files</Text>
               </PathStep>
             </div>
           </>
@@ -408,11 +444,11 @@ export function IngestPage() {
         <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-sm text-t2">
-              <Badge tone="warn">
-                <Text id="ingest.needs-files">Needs Files</Text>
+              <Badge tone="neutral">
+                <Text id="ingest.needs-files">Files Via Capture</Text>
               </Badge>
               <span>
-                <Text id="ingest.needs-msg">This part needs its KiCad files (symbol, footprint, 3D model) to land.</Text>
+                <Text id="ingest.needs-msg">Add it below and the guided capture downloads the KiCad and Altium files.</Text>
               </span>
             </div>
             <PulledSummary result={result} />
@@ -422,7 +458,7 @@ export function IngestPage() {
               </Button>
               <span className="text-xs text-t3">
                 <Text id="ingest.drop-hint">
-                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) or browse - that covers KiCad. Once it lands, the Complete Part window opens and the guided capture finishes the Altium set. The pulled details are kept.
+                  The fallback when the capture cannot: a vendor ZIP (SnapEDA, Ultra Librarian) supplies the KiCad files up front. The pulled details are kept either way.
                 </Text>
               </span>
             </div>

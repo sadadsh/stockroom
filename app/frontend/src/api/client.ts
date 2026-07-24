@@ -570,8 +570,8 @@ export const api = {
   // Dev convenience (the hidden Settings combo): load any API keys / logins from the per-machine
   // dev-creds.json (in the OS config dir, never the public repo) into the config. Returns the
   // redacted settings plus `loaded`, the field names that were applied.
-  loadDevCreds(): Promise<SettingsInfo & { loaded: string[] }> {
-    return request<SettingsInfo & { loaded: string[] }>(
+  loadDevCreds(): Promise<SettingsInfo & { loaded: string[]; config_path: string }> {
+    return request<SettingsInfo & { loaded: string[]; config_path: string }>(
       "POST",
       "/api/settings/load-dev-creds",
     );

@@ -733,7 +733,7 @@ describe("SettingsPage - dev-creds hotkey", () => {
     // The listener must live at the page level: before this test existed it sat in
     // VendorLoginsSection, which the grouped IA only mounts when that disclosure is
     // open, so the hotkey silently died on the collapsed default (2026-07-24 report).
-    mockApi.loadDevCreds.mockResolvedValue({ ...BASE_SETTINGS, loaded: ["mouser_api_key"] });
+    mockApi.loadDevCreds.mockResolvedValue({ ...BASE_SETTINGS, loaded: ["mouser_api_key"], config_path: "C:/Users/x/AppData/Roaming/Stockroom/dev-creds.json" });
     renderPage();
     await screen.findByTestId("settings.appearance.header"); // page settled, all collapsed
     fireEvent.keyDown(window, { key: "k", ctrlKey: true, altKey: true });
