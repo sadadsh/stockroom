@@ -4,6 +4,7 @@ import { AppShell } from "./AppShell";
 import { onQueuedPaths } from "../lib/ingestQueue";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
+import { CaptureProvider } from "../lib/capture";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 
@@ -29,11 +30,13 @@ function renderShell() {
       <ThemeProvider>
         <ToastProvider>
           <RouterProvider>
-            <AddPartProvider>
+            <CaptureProvider>
+        <AddPartProvider>
               <AppShell>
                 <AddPartProbe />
               </AppShell>
             </AddPartProvider>
+        </CaptureProvider>
           </RouterProvider>
         </ToastProvider>
       </ThemeProvider>

@@ -110,6 +110,9 @@ export interface CaptureApi {
   // The pill asks to reopen its part's modal; the Components surface honors the intent.
   reopenPartId: string | null;
   requestReopen: () => void;
+  // Route to ANY part's Complete Part window (the Add flow's "added, now get its
+  // files" continuation): Components selects the part and the detail opens the window.
+  requestOpenFor: (partId: string) => void;
   clearReopen: () => void;
 }
 
@@ -433,11 +436,13 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, backgrounded: false }));
   }, []);
 
+  const requestOpenFor = useCallback((partId: string) => setReopenPartId(partId), []);
+
   const clearReopen = useCallback(() => setReopenPartId(null), []);
 
   return (
     <CaptureContext.Provider
-      value={{ active: state, start, submitPaths, reset, keepWorking, reopenPartId, requestReopen, clearReopen }}
+      value={{ active: state, start, submitPaths, reset, keepWorking, reopenPartId, requestReopen, requestOpenFor, clearReopen }}
     >
       {children}
     </CaptureContext.Provider>

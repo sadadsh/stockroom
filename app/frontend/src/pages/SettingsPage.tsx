@@ -101,6 +101,39 @@ export function SettingsPage() {
   const [group, setGroup] = useState<GroupId>("application");
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
+  // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine
+  // dev-creds.json so live validation is not blocked on retyping them. It lives at
+  // the PAGE level deliberately - inside a section it dies whenever that section's
+  // disclosure is collapsed (the grouped IA unmounts collapsed content), which
+  // silently killed the hotkey (2026-07-24 report). A ref keeps the listener
+  // subscribed once while always firing the latest handler.
+  const loadDev = useLoadDevCreds();
+  const { toast } = useToast();
+  const fireDevLoad = useRef<() => void>(() => {});
+  fireDevLoad.current = () => {
+    if (loadDev.isPending) return;
+    loadDev.mutate(undefined, {
+      onSuccess: (res) =>
+        toast(
+          res.loaded.length
+            ? `Loaded dev creds: ${res.loaded.join(", ")}.`
+            : "No dev-creds.json found in the config directory.",
+          res.loaded.length ? "ok" : "neutral",
+        ),
+      onError: (e) => toast(errMsg(e), "err"),
+    });
+  };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.altKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        fireDevLoad.current();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // A section in an attention state opens itself the first time the data lands, so
   // the fix is one glance away instead of hidden behind a collapsed header.
   const seededRef = useRef(false);
@@ -1115,7 +1148,6 @@ function CredentialGroup({ label, children }: { label: string; children: ReactNo
 function VendorLoginsSection() {
   const settings = useSettings();
   const save = useUpdateSettings();
-  const loadDev = useLoadDevCreds();
   const { toast } = useToast();
   const d = settings.data;
 
@@ -1125,34 +1157,6 @@ function VendorLoginsSection() {
       onError: (e) => toast(errMsg(e), "err"),
     });
   }
-
-  // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine dev-creds.json
-  // so live validation is not blocked on retyping them. A ref keeps the listener subscribed once
-  // while always firing the latest handler.
-  const fireDevLoad = useRef<() => void>(() => {});
-  fireDevLoad.current = () => {
-    if (loadDev.isPending) return;
-    loadDev.mutate(undefined, {
-      onSuccess: (res) =>
-        toast(
-          res.loaded.length
-            ? `Loaded dev creds: ${res.loaded.join(", ")}.`
-            : "No dev-creds.json found in the config directory.",
-          res.loaded.length ? "ok" : "neutral",
-        ),
-      onError: (e) => toast(errMsg(e), "err"),
-    });
-  };
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.ctrlKey && e.altKey && (e.key === "k" || e.key === "K")) {
-        e.preventDefault();
-        fireDevLoad.current();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   return (
     <>

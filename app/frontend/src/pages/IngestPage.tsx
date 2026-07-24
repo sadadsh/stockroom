@@ -2,15 +2,19 @@
  * Add A Part: the one place to add a part to the library. Paste a product link (Mouser,
  * LCSC, DigiKey...) or a part number and Stockroom pulls every field and decides what the
  * part needs. A passive (R/C/L) is complete with no files: it uses KiCad's stock symbol,
- * footprint and 3D model, which are shown before it is added. A non-passive needs its
- * symbol, footprint and 3D model dropped as a vendor ZIP; the pulled identity/specs merge
- * onto it so nothing is re-typed. A vendor ZIP dropped with no link still works on its own.
+ * footprint and 3D model, which are shown before it is added. A non-passive takes its KiCad
+ * files from a vendor ZIP here (the complete-to-add gate), and the moment it lands the
+ * Complete Part window opens so the guided capture finishes the ALTIUM set - the add flow
+ * hands off into the both-EDA workflow instead of dead-ending on a toast. The pulled
+ * identity/specs merge onto the ZIP so nothing is re-typed; a ZIP with no link still works.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
-import { useEnrichLookup } from "../api/queries";
+import { useEnrichLookup, useSettings } from "../api/queries";
+import { useCapture } from "../lib/capture";
+import { useAddPart } from "../lib/addPart";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { onQueuedPaths } from "../lib/ingestQueue";
@@ -50,6 +54,12 @@ export function IngestPage() {
   const enrich = useEnrichLookup();
   const looking = enrich.status === "running";
   const { toast } = useToast();
+  // The added-part continuation (the new Altium workflow): when the LAST staged
+  // candidate lands, the Add window closes and the new part opens in its Complete
+  // Part window, where the guided capture pulls the KiCad AND Altium assets in one
+  // pass. Adding is no longer a dead end that leaves the part file-less.
+  const capture = useCapture();
+  const addPart = useAddPart();
   // Copy layer: strings that fire from callbacks/attributes resolve here (stable hook order);
   // everything visible below is a <Text> so the whole window is dev-mode editable.
   const inputAria = useText("ingest.input-aria", "Product link or part number");
@@ -225,6 +235,19 @@ export function IngestPage() {
   // empty (blocked/not a product page) - the latter must NOT assert "needs files".
   const nonPassive = result !== null && plan === null && pulledSomething;
   const blockedFetch = result !== null && plan === null && !pulledSomething;
+  // When the empty pull came from a recognized distributor link and the matching API key
+  // is absent, the blocked card names THE fix (the API-first lane is what makes those
+  // Akamai-guarded links reliable) instead of a generic shrug. Unknown settings (still
+  // loading / errored) keep the generic message: never claim a key is missing unseen.
+  const settingsQ = useSettings();
+  const blockedKeyVendor = (() => {
+    if (!blockedFetch || !isUrl(lookedUpInput) || !settingsQ.data) return null;
+    const u = lookedUpInput.toLowerCase();
+    if (u.includes("mouser.") && !settingsQ.data.mouser_api_key_set) return "mouser";
+    if ((u.includes("digikey.") || u.includes("digi-key")) && !settingsQ.data.digikey_client_secret_set)
+      return "digikey";
+    return null;
+  })();
 
   return (
     <div data-dev-id="ingest.root" className="flex flex-col gap-4">
@@ -232,7 +255,7 @@ export function IngestPage() {
       <div data-dev-id="ingest.hero">
         <p className="mb-2.5 text-xs text-t3">
           <Text id="ingest.hero-hint">
-            Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls it all. A passive is complete with no files; a non-passive needs its symbol, footprint and 3D model.
+            Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls it all. A passive is complete with no files; a non-passive takes its KiCad files from a vendor ZIP, and the Altium set follows right after it lands.
           </Text>
         </p>
         <div className="flex items-center gap-2.5">
@@ -300,9 +323,19 @@ export function IngestPage() {
         <Card data-dev-id="ingest.blocked" className="px-4 py-4">
           <div className="flex flex-col gap-3">
             <span className="text-sm text-warn">
-              <Text id="ingest.blocked-msg">
-                Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
-              </Text>
+              {blockedKeyVendor === "mouser" ? (
+                <Text id="ingest.blocked-mouser-key">
+                  Nothing was pulled, and no Mouser API key is set. Mouser blocks the page fetch, so the key is what resolves a Mouser link reliably. Add one in Settings under Sourcing, then look this up again, or drop a vendor ZIP.
+                </Text>
+              ) : blockedKeyVendor === "digikey" ? (
+                <Text id="ingest.blocked-digikey-key">
+                  Nothing was pulled, and no DigiKey API key is set. DigiKey blocks the page fetch, so the key is what resolves a DigiKey link reliably. Add one in Settings under Sourcing, then look this up again, or drop a vendor ZIP.
+                </Text>
+              ) : (
+                <Text id="ingest.blocked-msg">
+                  Nothing was pulled. The page might have blocked the fetch, or the link is not a product page. Use a different link, or drop a vendor ZIP.
+                </Text>
+              )}
             </span>
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
@@ -321,7 +354,7 @@ export function IngestPage() {
                 <Text id="ingest.needs-files">Needs Files</Text>
               </Badge>
               <span>
-                <Text id="ingest.needs-msg">This part needs a symbol, footprint and 3D model.</Text>
+                <Text id="ingest.needs-msg">This part needs its KiCad files (symbol, footprint, 3D model) to land.</Text>
               </span>
             </div>
             <PulledSummary result={result} />
@@ -331,7 +364,7 @@ export function IngestPage() {
               </Button>
               <span className="text-xs text-t3">
                 <Text id="ingest.drop-hint">
-                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) into the window, or browse. The pulled details are kept, so all that is left is the files.
+                  Drop its vendor ZIP (SnapEDA, Ultra Librarian) or browse - that covers KiCad. Once it lands, the Complete Part window opens and the guided capture finishes the Altium set. The pulled details are kept.
                 </Text>
               </span>
             </div>
@@ -356,7 +389,16 @@ export function IngestPage() {
               key={id}
               candidate={candidate}
               initialDatasheetUrl={datasheetUrl}
-              onCommitted={() => removeStaged(id)}
+              onCommitted={(created) => {
+                removeStaged(id);
+                // Continue into Complete Part only when this emptied the staging list
+                // (a bulk ZIP add stays here so the remaining cards keep their place).
+                const remaining = (staged ?? []).filter((x) => x.id !== id).length;
+                if (remaining === 0) {
+                  capture.requestOpenFor(created.id);
+                  addPart.close();
+                }
+              }}
               toast={toast}
             />
           ))}

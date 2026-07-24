@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { ApiError } from "../api/client";
 import { useIngestCommit } from "../api/queries";
-import type { StagingCandidate } from "../api/types";
+import type { PartDetail, StagingCandidate } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Badge, Button, Card, Dot } from "./primitives";
@@ -44,7 +44,9 @@ export function CandidateCard({
 }: {
   candidate: StagingCandidate;
   initialDatasheetUrl?: string;
-  onCommitted: () => void;
+  // Fires with the CREATED part so the Add flow can continue into its Complete Part
+  // window (the guided both-format capture) instead of dead-ending on a toast.
+  onCommitted: (created: PartDetail) => void;
   toast: (message: string, tone?: ToastTone) => void;
 }) {
   const [c, setC] = useState<StagingCandidate>(() =>
@@ -71,9 +73,9 @@ export function CandidateCard({
   function handleCommit() {
     setMissing([]);
     commit.mutate(c, {
-      onSuccess: () => {
+      onSuccess: (created) => {
         toast(`${toastAdded} ${c.display_name || "part"}`, "ok");
-        onCommitted();
+        onCommitted(created);
       },
       onError: (err) => {
         if (err instanceof ApiError && err.missing && err.missing.length > 0) {
