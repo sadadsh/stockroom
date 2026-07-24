@@ -11,7 +11,7 @@ import { useDoctorScan, useRepairLibrary } from "../api/queries";
 import type { DoctorScan, RepairAction, RepairFinding, RepairResult } from "../api/types";
 import { useToast } from "../lib/toast";
 import { statusTone } from "../lib/statusTone";
-import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
+import { Badge, Button, Dot } from "./primitives";
 
 function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
@@ -54,13 +54,7 @@ export function LibraryHealthSection() {
   }
 
   return (
-    <section className="mb-7" data-dev-id="settings.health">
-      <Eyebrow className="mb-2">Library Health</Eyebrow>
-      <p className="mb-2.5 text-xs text-t3">
-        Reconcile every part with its record and every file with the repository. Repair heals
-        what it safely can and lists what needs your hand.
-      </p>
-      <Card className="px-4 py-3.5">
+    <>
         {scan.isLoading ? (
           <p className="py-1 text-sm text-t3">Scanning your components...</p>
         ) : scan.isError ? (
@@ -68,8 +62,7 @@ export function LibraryHealthSection() {
         ) : scan.data ? (
           <HealthBody data={scan.data} onRepair={onRepair} repairing={repair.isPending} />
         ) : null}
-      </Card>
-    </section>
+    </>
   );
 }
 

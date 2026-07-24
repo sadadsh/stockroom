@@ -17,7 +17,7 @@ import { useRescanState } from "../api/queries";
 import { useRescan, type RescanTally } from "../lib/useRescan";
 import type { RescanStateResponse, RescanSummary } from "../api/types";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow } from "./primitives";
+import { Badge, Button, Dot } from "./primitives";
 import { RefreshIcon } from "./icons";
 
 // ISO 8601 -> a compact local date/time; fall back to the raw string if it does not parse
@@ -69,13 +69,7 @@ export function RescanSection() {
   }
 
   return (
-    <section className="mb-7" data-dev-id="settings.rescan">
-      <Eyebrow className="mb-2">Procurement Rescan</Eyebrow>
-      <p className="mb-2.5 text-xs text-t3">
-        Refresh every part&rsquo;s price, stock and lifecycle status from Mouser and DigiKey.
-        Parts checked recently are skipped unless you force a full pass.
-      </p>
-      <Card className="px-4 py-3.5">
+    <>
         {rescan.status === "running" ? (
           <RunningBody
             tally={rescan.tally}
@@ -125,8 +119,7 @@ export function RescanSection() {
             Force Full Rescan
           </label>
         </div>
-      </Card>
-    </section>
+    </>
   );
 }
 
