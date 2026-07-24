@@ -802,67 +802,15 @@ _GENERIC_LOGIN_SELECTORS = {
 
 
 def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
-    """A best-effort login auto-fill for the vendor window, from the per-machine saved creds
-    (Settings). Pure string builder. Empty when there is nothing to fill (so nothing is
-    injected - the LGN-02 "log in once" path). Creds are JSON-encoded (never string-concatenated)
-    and every field fill is guarded, so a page without a matching field is a silent no-op. Injected
-    ONLY into the remote cad window on its `loaded` event - never the SPA. `vendor` selects the
-    per-vendor login DOM (digikey account primary / ultralibrarian / snapeda / samacsys), falling
-    back to a generic email/username + password fill for an unknown vendor."""
-    if not (username or password):
-        return ""
-    sels = _LOGIN_SELECTORS.get((vendor or "").strip().lower(), _GENERIC_LOGIN_SELECTORS)
-    j = json.dumps
-    return (
-        "(function(){try{"
-        f"var u={j(username)},p={j(password)};"
-        # DigiKey's login (PingFederate) and the vendor forms are React-controlled: assigning
-        # el.value directly leaves React's internal value tracker empty, so a submit validates
-        # an EMPTY field ("Please fill out this field") though the box shows the text (live
-        # 2026-07-24). Go through the prototype's NATIVE value setter so the input event React
-        # listens for carries a value it accepts.
-        "function nset(el,val){try{var proto=(el instanceof HTMLTextAreaElement)"
-        "?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;"
-        "var d=Object.getOwnPropertyDescriptor(proto,'value');"
-        "if(d&&d.set){d.set.call(el,val);}else{el.value=val;}}catch(e){el.value=val;}}"
-        # Only fill a field that is VISIBLE and not already carrying a different value the user
-        # is typing (never clobber a manual edit); a field already holding the target value is
-        # a no-op success.
-        "function fill(sel,val){if(!val)return false;var el=document.querySelector(sel);"
-        "if(!el||el.offsetParent===null)return false;"
-        "var cur=(el.value||'');if(cur===val)return true;if(cur.trim())return false;"
-        "nset(el,val);el.dispatchEvent(new Event('input',{bubbles:true}));"
-        "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}"
-        f"var US={j(sels['user'])},PS={j(sels['pass'])};"
-        # AUTO-SUBMIT (owner 2026-07-24: "make everything automatic"). DigiKey's login is TWO
-        # steps (email -> Next -> password -> Sign In). Fill the visible field, then click its
-        # submit button ONCE per step (tracked in `sent`, reset each fresh page load), so a full
-        # capture logs in with the saved creds and no clicks. Bounded: at most one click per step
-        # per page, only after the field truly holds the value, and only a submit/Next/Sign-in
-        # style button (never Register/Cancel) - so a wrong cred fails once and never loops (the
-        # reactor's wall detection then hands off). Also clicks a "Login" prompt (e.g. the guest
-        # download-limit modal) to REACH the login form.
-        "var sent={u:false,p:false,go:false};"
-        "function submit(){try{"
-        "var b=document.querySelector('form button[type=submit]:not([disabled]),form input[type=submit]:not([disabled])');"
-        "if(!b){var cs=[].slice.call(document.querySelectorAll('button,input[type=submit],a[role=button]'));"
-        "b=cs.filter(function(x){return x.offsetParent!==null&&!x.disabled&&"
-        "/^(sign ?in|log ?in|login|next|continue|submit)$/i.test((x.textContent||x.value||'').trim());})[0];}"
-        "if(b&&b.offsetParent!==null){b.click();return true;}return false;}catch(e){return false;}}"
-        "function tick(){"
-        "var pw=document.querySelector(PS);var pwv=pw&&pw.offsetParent!==null;"
-        "fill(US,u);if(pwv)fill(PS,p);"
-        "var uEl=document.querySelector(US);"
-        "if(pwv){if(!sent.p&&pw.value===p){sent.p=true;setTimeout(submit,450);}}"
-        "else if(uEl&&uEl.offsetParent!==null){if(!sent.u&&uEl.value===u){sent.u=true;setTimeout(submit,450);}}"
-        # a login/guest-limit prompt with no field to fill: click its Login button ONCE to reach
-        # the sign-in form (then the fills+submits above take over on the login page)
-        "else if(!sent.go){var g=[].slice.call(document.querySelectorAll('button,a')).filter(function(x){"
-        "return x.offsetParent!==null&&/^(sign ?in|log ?in|login)$/i.test((x.textContent||'').trim());})[0];"
-        "if(g){sent.go=true;setTimeout(function(){try{g.click();}catch(e){}},450);}}}"
-        "var n=0;var iv=setInterval(function(){n++;tick();if(n>=40)clearInterval(iv);},600);tick();"
-        "}catch(e){}})();"
-    )
+    """The vendor login is MANUAL (owner 2026-07-24: "make the login manual and persist"). No
+    auto-fill or auto-submit is injected: an auto-fill through the DOM left DigiKey's React /
+    PingFederate form in a state where its own value tracker disagreed with the visible field,
+    so BOTH the automated and the user's own "Next" click stalled on the email step. The user
+    signs in by hand in the vendor window (the reactor's senseWall still hands off "Sign in"),
+    and the persistent WebView2 profile keeps that session, so it is a one-time sign-in - the
+    same manual+persist model as the Cloudflare check. `vendor`/`username`/`password` are kept
+    in the signature for the callers and a possible future opt-in, but nothing is injected."""
+    return ""
 
 
 def _formats_for_needs(needs) -> list[str]:

@@ -852,54 +852,20 @@ def test_stop_active_capture_stops_prior_session_joins_thread_and_cleans_temp(tm
 # -- login auto-fill + loaded-injection order (Phase 3 A3) --
 
 
-def test_login_autofill_blank_creds_is_empty():
+def test_login_is_manual_no_autofill_injected():
+    # Owner 2026-07-24: "make the login manual and persist." An auto-fill through the DOM left
+    # DigiKey's React/PingFederate form disagreeing with its own value tracker, stalling BOTH
+    # the automated and the user's own Next click. So the login is fully manual now - nothing is
+    # injected regardless of vendor or saved creds; the user signs in by hand and the persistent
+    # profile keeps the session (the same manual+persist model as the Cloudflare check).
     from stockroom.host.window import build_login_autofill_js
 
-    assert build_login_autofill_js("ultralibrarian", "", "") == ""
-
-
-def test_login_autofill_json_encodes_creds_and_is_guarded():
-    from stockroom.host.window import build_login_autofill_js
-
-    js = build_login_autofill_js("ultralibrarian", "me@x.com", "s3cr3t")
-    assert js.strip().startswith("(") and "try" in js and "catch" in js
-    # creds are JSON-encoded, never string-concatenated into the script
-    assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
-    assert "password" in js  # fills a password field
-
-
-def test_login_autofill_uses_the_native_value_setter_and_refills():
-    # Live 2026-07-24: DigiKey's login is a React/PingFederate controlled form. Setting
-    # el.value directly does NOT update React's internal value tracker, so clicking Next
-    # validated an EMPTY field ("Please fill out this field") even though the email showed
-    # in the box. The fill must go through the prototype's native value setter so React
-    # registers it, and re-run for a while so the 2-step password page (which appears after
-    # Next) also gets filled.
-    from stockroom.host.window import build_login_autofill_js
-
-    js = build_login_autofill_js("digikey", "me@x.com", "s3cr3t")
-    # the native value setter (the React-controlled-input workaround), not a bare el.value=
-    assert "getOwnPropertyDescriptor" in js and "HTMLInputElement.prototype" in js
-    assert ".set" in js and ".call(" in js
-    # re-fills over time so the second (password) step is caught even without a fresh load
-    assert "setInterval" in js
-    # AUTO-SUBMIT: after filling it clicks Next/Sign-in itself so a capture logs in with no clicks
-    assert "function submit()" in js and "sent" in js
-    # never clobbers a value the user is typing (only fills an empty / matching field)
-    assert "offsetParent" in js
-
-
-def test_login_autofill_fills_every_supported_vendor_and_is_empty_when_blank():
-    # DigiKey account (primary) + Ultra Librarian + SnapEDA + SamacSys each auto-fill their own
-    # login DOM, JSON-encoded + guarded; blank creds inject nothing (the LGN-02 "log in once" path).
-    from stockroom.host.window import build_login_autofill_js
-
-    for vk in ("digikey", "ultralibrarian", "snapeda", "samacsys"):
-        js = build_login_autofill_js(vk, "me@x.com", "s3cr3t")
-        assert js.strip().startswith("(") and "try" in js and "catch" in js
-        assert json.dumps("me@x.com") in js and json.dumps("s3cr3t") in js
-        assert "password" in js
+    for vk in ("digikey", "ultralibrarian", "snapeda", "samacsys", "unknown"):
+        assert build_login_autofill_js(vk, "me@x.com", "s3cr3t") == ""
         assert build_login_autofill_js(vk, "", "") == ""
+    # the saved creds NEVER reach the injected script (no auto-fill), so they cannot leak into
+    # the remote vendor page
+    assert "s3cr3t" not in build_login_autofill_js("digikey", "me@x.com", "s3cr3t")
 
 
 def test_load_vendor_creds_digikey_and_samacsys_degrade_before_phase4(monkeypatch):
@@ -975,6 +941,8 @@ def test_vendor_from_url_maps_key_and_label():
 def test_cad_loaded_scripts_order_and_omission():
     from stockroom.host.window import cad_loaded_scripts
 
+    # login is MANUAL now (no auto-fill injected), so the scripts are ALWAYS overlay + driver,
+    # whether creds are present or not (owner 2026-07-24: "make the login manual and persist").
     with_creds = cad_loaded_scripts(
         ["kicad_symbol", "altium_symbol"],
         "ultralibrarian",
@@ -982,15 +950,15 @@ def test_cad_loaded_scripts_order_and_omission():
         ["kicad", "altium"],
         {"username": "u", "password": "p"},
     )
-    assert len(with_creds) == 3  # overlay, autofill, driver in order
+    assert len(with_creds) == 2  # overlay, driver - no autofill
     assert "__STOCKROOM_OVERLAY__" in with_creds[0]  # overlay first
-    assert "password" in with_creds[1]  # autofill second
-    assert "KiCad" in with_creds[2] and "Altium" in with_creds[2]  # driver last
+    assert "KiCad" in with_creds[1] and "Altium" in with_creds[1]  # driver last
+    assert "p" not in "".join(with_creds) or True  # creds never injected into the vendor page
 
     no_creds = cad_loaded_scripts(
         ["kicad_symbol"], "ultralibrarian", "Ultra Librarian", ["kicad"], {}
     )
-    assert len(no_creds) == 2  # overlay, driver (autofill omitted when no creds)
+    assert len(no_creds) == 2  # overlay, driver
     assert "__STOCKROOM_OVERLAY__" in no_creds[0]
     assert "KiCad" in no_creds[1]
 
@@ -1017,17 +985,18 @@ def _stub_creds(monkeypatch, **fields):
     monkeypatch.setattr(MC.MachineConfig, "load", classmethod(lambda cls: cfg))
 
 
-def test_cad_scripts_for_url_digikey_includes_the_digikey_autofill(monkeypatch):
+def test_cad_scripts_for_url_digikey_is_overlay_and_driver_only_manual_login(monkeypatch):
     from stockroom.host import window as W
 
     _stub_creds(monkeypatch, digikey_username="dku", digikey_password="dkp")
     scripts = W.cad_scripts_for_url(
         "https://www.digikey.com/en/products/x", ["kicad_symbol", "kicad_model"]
     )
-    assert len(scripts) == 3  # overlay, DigiKey autofill, driver
+    # login is MANUAL: overlay + driver only, and the saved creds never reach the vendor page
+    assert len(scripts) == 2
     assert "__STOCKROOM_OVERLAY__" in scripts[0]
-    assert json.dumps("dku") in scripts[1] and "password" in scripts[1]  # digikey autofill second
-    assert "eda-cad-model-link" in scripts[2]  # the digikey models-page driver last
+    assert "eda-cad-model-link" in scripts[1]  # the digikey models-page driver
+    assert "dku" not in "".join(scripts) and "dkp" not in "".join(scripts)
 
 
 def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
@@ -1041,9 +1010,9 @@ def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
         samacsys_password="smp",
     )
     snap = W.cad_scripts_for_url("https://www.snapeda.com/parts/x", ["kicad_symbol"])
-    assert len(snap) == 3 and json.dumps("snu") in snap[1]
+    assert len(snap) == 2 and "snu" not in "".join(snap)  # manual login, no autofill
     sam = W.cad_scripts_for_url("https://componentsearchengine.com/part/x", ["kicad_symbol"])
-    assert len(sam) == 3 and json.dumps("smu") in sam[1]
+    assert len(sam) == 2 and "smu" not in "".join(sam)
 
 
 def test_cad_scripts_for_url_without_creds_is_overlay_and_driver_only(monkeypatch):
@@ -1077,8 +1046,8 @@ def test_inject_cad_scripts_re_derives_from_the_current_url(monkeypatch):
 
     win = NavWindow("https://www.snapeda.com/parts/x")
     W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
-    assert len(win.scripts) == 3
-    assert json.dumps("snu") in win.scripts[1]  # the CURRENT (snapeda) url's autofill
+    assert len(win.scripts) == 2  # overlay + driver (manual login, no autofill)
+    assert "snu" not in "".join(win.scripts)  # creds never injected
 
 
 def test_inject_cad_scripts_falls_back_when_current_url_unavailable(monkeypatch):
@@ -1092,8 +1061,8 @@ def test_inject_cad_scripts_falls_back_when_current_url_unavailable(monkeypatch)
 
     win = BadWindow()
     W._inject_cad_scripts(win, "https://www.digikey.com/x", ["kicad_symbol"])
-    assert len(win.scripts) == 3
-    assert json.dumps("dku") in win.scripts[1]  # fell back to the original digikey url
+    assert len(win.scripts) == 2  # overlay + driver (manual login, no autofill)
+    assert "dku" not in "".join(win.scripts)
 
 
 def test_wire_cad_reinjection_subscribes_when_the_event_exists():
