@@ -1201,6 +1201,13 @@ class _HostApi:
         session = CaptureSession.start(name, needs_set, now=time.time())
         session.temp_dir = Path(tempfile.mkdtemp(prefix="stockroom-cad-"))
         _CAD_SESSION = session
+        _log.info(
+            "capture: session start part=%s needs=%s url=%s temp=%s",
+            name,
+            sorted(r.value for r in needs_set),
+            url,
+            session.temp_dir.name,
+        )
 
         win = webview.create_window("stockroom-cad", url=url, width=1200, height=900)
         _CAD_WINDOW = win
@@ -1260,10 +1267,16 @@ class _HostApi:
 
         # tier-1 also arms the multi-download permission auto-allow on the UI thread from its
         # download-starting callback (see _arm_download_permission_on_ui); no separate install.
-        _install_cad_download_intercept(win, session.temp_dir, _on_captured)
+        tier1 = _install_cad_download_intercept(win, session.temp_dir, _on_captured)
 
-        watch = DownloadsWatch.start(default_downloads_dir())
+        downloads_dir = default_downloads_dir()
+        watch = DownloadsWatch.start(downloads_dir)
         _CAD_DOWNLOADS_WATCH = watch
+        _log.info(
+            "capture: tiers armed tier1_intercept=%s tier2_watch=%s",
+            bool(tier1),
+            str(downloads_dir),
+        )
         thread = threading.Thread(
             target=_poll_downloads_watch,
             args=(watch, session),

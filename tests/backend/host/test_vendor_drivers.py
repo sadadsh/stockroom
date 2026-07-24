@@ -115,12 +115,15 @@ def test_digikey_driver_scopes_every_control_to_the_provider_being_driven():
 def test_digikey_driver_falls_through_providers_before_refreshing():
     # The resilience ladder mirrors the human: a wrong file retries the SAME source once with the
     # selection re-verified; a second wrong file, an error toast, or a generation timeout moves to
-    # the NEXT visible source; only when every source that offered the format has failed does the
-    # bounded refresh recovery kick in. A format no source offers is reported honestly (no refresh
-    # loop for something that is not there).
+    # the NEXT visible source; when every visible provider is exhausted WITHOUT the format - whether
+    # a source genuinely lacks it OR the page loaded only empty provider skeletons - the bounded
+    # refresh recovery reloads through the product page (live 2026-07-24: the Ultra Librarian
+    # section came up as an unloaded skeleton, and the old immediate give-up stranded it).
     js = build_driver_js("digikey", ["kicad", "altium"])
     assert "fallthrough" in js  # error/timeout/second-wrongfile -> the next visible source
-    assert "attempted" in js  # exhaustion recovers ONLY when a source actually offered the format
+    # provider exhaustion ALWAYS routes to the bounded refresh recovery (no immediate hand-off that
+    # stranded an empty-skeleton page); it still ends honestly after MAX_REFRESH via done(false)
+    assert "if(pi>=present.length){recover(spec,done);return;}" in js
     assert "'wall'" in js  # a Cloudflare/login wall still hands off to the user immediately
     # Owner heuristic (2026-07-23): a SUCCESSFUL run's download STARTS within ~5s of the click
     # (observed +1.6s..+5.7s live). The host relays the real 'started' event; if nothing starts
