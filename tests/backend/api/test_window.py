@@ -1227,6 +1227,36 @@ def test_extract_altium_members_reaches_into_a_nested_zip(tmp_path):
     assert got == ["part.PcbLib", "part.SchLib"]
 
 
+def test_arm_download_permission_subscribes_once_on_the_ui_thread():
+    # Live 2026-07-24: the old install polled CoreWebView2 from a DAEMON thread and threw
+    # "CoreWebView2 can only be accessed from the UI thread" (E_NOINTERFACE), so the handler
+    # never attached and the "allow multiple downloads" bar kept blocking the 2nd (Altium)
+    # download. The arm now runs on the UI thread (the download-starting callback) with the
+    # CoreWebView2 as sender, and subscribes exactly once across a session's downloads.
+    from stockroom.host import window as W
+
+    class _Ev:
+        def __init__(self):
+            self.subs = []
+
+        def __iadd__(self, handler):
+            self.subs.append(handler)
+            return self
+
+    class _Core:
+        def __init__(self):
+            self.PermissionRequested = _Ev()
+
+    core = _Core()
+    state: dict = {}
+    W._arm_download_permission_on_ui(core, state)
+    assert len(core.PermissionRequested.subs) == 1
+    assert state.get("armed") is True
+    # a second download-starting on the same session must not double-subscribe
+    W._arm_download_permission_on_ui(core, state)
+    assert len(core.PermissionRequested.subs) == 1
+
+
 def test_grant_download_permission_sets_state_and_handled():
     # Live 2026-07-24: the "allow multiple automatic downloads?" bar reappeared on the SECOND
     # (Altium) download even with the auto-allow wired, so the Altium set never came after

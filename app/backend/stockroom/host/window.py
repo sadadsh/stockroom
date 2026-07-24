@@ -524,66 +524,44 @@ def _grant_download_permission(args, *, allow_state) -> bool:
     return True
 
 
-def _install_cad_permission_autoallow(
-    window, *, retries: int = 40, delay: float = 0.25, sleep=time.sleep
-) -> None:
-    """Best-effort (Windows only): subscribe to THIS window's CoreWebView2
-    PermissionRequested and auto-allow the download-related kinds, so the both-format
-    capture's second download never stalls behind Edge's "allow multiple automatic
-    downloads?" bar. Runs on a daemon thread because CoreWebView2 initializes
-    asynchronously; concedes silently after `retries` (the user can still click Allow
-    by hand - degraded, never broken). Reaches pywebview internals the same way (and
-    with the same guards) as the tier-1 download intercept above."""
-    if os.name != "nt":
+def _arm_download_permission_on_ui(core, state: dict) -> None:
+    """Subscribe the CAD window's CoreWebView2.PermissionRequested to auto-allow Edge's "allow
+    multiple automatic downloads?" bar, so the second (Altium) download is never gated behind it
+    (the owner's must-keep). Subscribes at most once per session (the `state["armed"]` flag).
+
+    MUST run on the UI thread. CoreWebView2 is UI-thread-only: the prior install polled it from a
+    background daemon thread and threw "CoreWebView2 can only be accessed from the UI thread"
+    (E_NOINTERFACE), which was silently swallowed - so the handler never attached and the bar kept
+    blocking the Altium download, capturing only the KiCad zip (live 2026-07-24). The download-
+    starting callback fires on the UI thread with the CoreWebView2 as `sender`, and on the FIRST
+    (KiCad) download - before the site initiates the second - so arming there is both thread-correct
+    and early enough. Subscribing a delegate is a lightweight COM op, safe on that callback."""
+    if state.get("armed"):
         return
+    state["armed"] = True
 
-    def _subscribe() -> None:
+    def _on_permission_requested(sender, args) -> None:
+        # Runs on the WebView2 UI thread. Set State + Handled via the pure helper (Handled=True
+        # is what actually suppresses the prompt), log what fired for evidence, nothing else.
         try:
-            from webview.platforms.winforms import BrowserView
-        except Exception:  # noqa: BLE001 - not the Windows backend; nothing to do
-            return
-        core = None
-        for _ in range(max(1, retries)):
-            browser_form = BrowserView.instances.get(getattr(window, "uid", None))
-            edge = getattr(browser_form, "browser", None)
-            # pywebview's EdgeChrome names the WebView2 control `webview` (NOT `web_view`):
-            # `self.webview.CoreWebView2` is the live core once init completes (verified against
-            # the vendored edgechromium source). The wrong name left `core` None forever, so the
-            # handler never attached and the multi-download bar was never auto-allowed (live
-            # 2026-07-24: "CoreWebView2 never appeared").
-            control = getattr(edge, "webview", None)
-            core = getattr(control, "CoreWebView2", None)
-            if core is not None:
-                break
-            sleep(delay)
-        if core is None:
-            _log.warning("cad permission auto-allow: CoreWebView2 never appeared; prompts stay manual")
-            return
+            from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
 
-        def _on_permission_requested(sender, args) -> None:
-            # KEEP PRISTINE: runs on the WebView2 COM thread. Read the kind, set State + Handled
-            # via the pure helper (Handled=True is what suppresses the prompt), log what fired
-            # for evidence, nothing else.
-            try:
-                from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+            granted = _grant_download_permission(
+                args, allow_state=CoreWebView2PermissionState.Allow
+            )
+            _log.info(
+                "cad permission requested: %s -> %s",
+                str(getattr(args, "PermissionKind", "?")),
+                "allowed" if granted else "default prompt",
+            )
+        except Exception:  # noqa: BLE001 - a shape mismatch degrades to the manual prompt
+            pass
 
-                granted = _grant_download_permission(
-                    args, allow_state=CoreWebView2PermissionState.Allow
-                )
-                _log.info(
-                    "cad permission requested: %s -> %s",
-                    str(getattr(args, "PermissionKind", "?")),
-                    "allowed" if granted else "default prompt",
-                )
-            except Exception:  # noqa: BLE001 - a shape mismatch degrades to the manual prompt
-                pass
-
-        try:
-            core.PermissionRequested += _on_permission_requested
-        except Exception:  # noqa: BLE001 - could not subscribe; the manual prompt remains
-            _log.warning("cad permission auto-allow: could not subscribe; prompts stay manual")
-
-    threading.Thread(target=_subscribe, daemon=True).start()
+    try:
+        core.PermissionRequested += _on_permission_requested
+        _log.info("cad permission auto-allow armed on the UI thread")
+    except Exception:  # noqa: BLE001 - could not subscribe; the manual prompt remains
+        _log.warning("cad permission auto-allow: could not subscribe; prompts stay manual")
 
 
 def _install_cad_download_intercept(
@@ -644,7 +622,14 @@ def _install_cad_download_intercept(
         _log.warning("cad tier-1: EdgeChrome browser not ready after %d tries; tier 2 covers it", retries)
         return False
 
+    perm_state: dict = {}
+
     def _on_download_starting(sender, args) -> None:
+        # Arm the multi-download permission auto-allow HERE (not on a daemon thread): this callback
+        # is on the UI thread with the CoreWebView2 as `sender`, and fires on the first download,
+        # before the site initiates the second - so the "allow multiple downloads?" bar for the
+        # Altium download is auto-accepted (owner's must-keep). Guarded to subscribe once.
+        _arm_download_permission_on_ui(sender, perm_state)
         # A download IS starting - relay the real 'started' event to the reactor from a worker
         # thread (this handler runs on the COM thread and must stay pristine). Fires on both
         # branches below: even when completion can't be observed, the start happened.
@@ -1182,8 +1167,9 @@ class _HostApi:
         def _on_captured(captured_path) -> None:
             _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
 
+        # tier-1 also arms the multi-download permission auto-allow on the UI thread from its
+        # download-starting callback (see _arm_download_permission_on_ui); no separate install.
         _install_cad_download_intercept(win, session.temp_dir, _on_captured)
-        _install_cad_permission_autoallow(win)
 
         watch = DownloadsWatch.start(default_downloads_dir())
         _CAD_DOWNLOADS_WATCH = watch
