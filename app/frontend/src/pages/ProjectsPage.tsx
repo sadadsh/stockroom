@@ -194,7 +194,7 @@ export function ProjectsPage() {
     <>
       <div className="flex min-h-0 flex-1">
       {/* picker: self-heads like the Components picker (no full-width page header band) */}
-      <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-4">
+      <div className="flex w-[320px] flex-none flex-col border-r border-line px-3.5 pt-4">
           <div className="flex items-baseline gap-2 px-2 pb-2.5">
             <h1 className="text-lg font-semibold text-t1">Projects</h1>
             {projectsQuery.data ? (

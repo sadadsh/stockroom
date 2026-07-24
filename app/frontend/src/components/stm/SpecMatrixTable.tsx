@@ -41,20 +41,22 @@ interface ColMeta {
 
 const ROW_HEIGHT = 34;
 
-// Per-column track widths for the shared grid template (header, filter row, and every body row).
-// Fixed tracks so columns NEVER squish as visibility changes; the matrix scrolls horizontally
-// instead. Part flexes from a comfortable minimum; the tabular figures stay put.
-const COLUMN_WIDTHS: Record<string, string> = {
-  mpn_example: "minmax(180px,1.7fr)",
-  core: "92px",
-  series: "92px",
-  package: "108px",
-  io_count: "64px",
-  flash_kb: "80px",
-  ram_kb: "76px",
-  max_freq_mhz: "100px",
+// Per-column DEFAULT widths (px) for the shared grid template (header, filter row, and every
+// body row). Fixed tracks so columns NEVER squish as visibility changes - the matrix scrolls
+// horizontally instead - and every header carries a drag handle so a cut-off header is one
+// resize away (TanStack columnSizing drives the live track width).
+const COLUMN_WIDTHS: Record<string, number> = {
+  mpn_example: 200,
+  core: 92,
+  series: 92,
+  package: 112,
+  io_count: 64,
+  flash_kb: 84,
+  ram_kb: 80,
+  max_freq_mhz: 104,
 };
-const PERIPH_WIDTH = "56px";
+const PERIPH_WIDTH = 60;
+const MIN_COLUMN_WIDTH = 48;
 
 interface Props {
   rows: McuSpecRow[];
@@ -68,6 +70,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
   const [columnsOpen, setColumnsOpen] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +98,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
       accessorKey: key,
       header,
       filterFn: "inNumberRange",
+      size: COLUMN_WIDTHS[key as string] ?? PERIPH_WIDTH,
       meta: { filter: "range", align: "right", mono: true, unit } satisfies ColMeta,
       cell: (ctx) => <NumCell value={ctx.getValue() as number} unit={unit} />,
     });
@@ -103,6 +107,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
       accessorFn: (row) => row.peripherals?.[name] ?? 0,
       header: name,
       filterFn: "inNumberRange",
+      size: PERIPH_WIDTH,
       meta: { filter: "range", align: "right", mono: true } satisfies ColMeta,
       cell: (ctx) => {
         const v = ctx.getValue() as number;
@@ -116,6 +121,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
     return [
       {
         accessorKey: "mpn_example",
+        size: COLUMN_WIDTHS.mpn_example,
         header: "Part",
         filterFn: "includesString",
         meta: { filter: "text", mono: true } satisfies ColMeta,
@@ -127,6 +133,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
       },
       {
         accessorKey: "core",
+        size: COLUMN_WIDTHS.core,
         header: "Core",
         filterFn: "includesString",
         meta: { filter: "text" } satisfies ColMeta,
@@ -140,6 +147,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
       },
       {
         accessorKey: "series",
+        size: COLUMN_WIDTHS.series,
         header: "Series",
         filterFn: "includesString",
         meta: { filter: "text", mono: true } satisfies ColMeta,
@@ -149,6 +157,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
       },
       {
         accessorKey: "package",
+        size: COLUMN_WIDTHS.package,
         header: "Package",
         filterFn: "includesString",
         meta: { filter: "text", mono: true } satisfies ColMeta,
@@ -167,11 +176,14 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    state: { sorting, columnFilters, globalFilter, columnVisibility, columnSizing },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    columnResizeMode: "onChange",
+    defaultColumn: { minSize: MIN_COLUMN_WIDTH, size: PERIPH_WIDTH },
     globalFilterFn: "includesString",
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -203,11 +215,9 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const gridStyle = useMemo(
     () => ({
       display: "grid" as const,
-      gridTemplateColumns: visibleColumns
-        .map((c) => COLUMN_WIDTHS[c.id] ?? PERIPH_WIDTH)
-        .join(" "),
+      gridTemplateColumns: visibleColumns.map((c) => `${c.getSize()}px`).join(" "),
     }),
-    [visibleColumns],
+    [visibleColumns, columnSizing],
   );
 
   return (
@@ -301,22 +311,33 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
               const meta = header.column.columnDef.meta as ColMeta | undefined;
               const sorted = header.column.getIsSorted();
               return (
-                <button
-                  key={header.id}
-                  type="button"
-                  onClick={header.column.getToggleSortingHandler()}
-                  className={
-                    "flex items-center gap-1 px-2.5 py-2 text-2xs font-semibold text-t3 hover:text-t1 " +
-                    (meta?.align === "right" ? "justify-end" : "justify-start")
-                  }
-                >
-                  <span className="truncate">
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </span>
-                  <span className="w-2 flex-none text-t2">
-                    {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
-                  </span>
-                </button>
+                <div key={header.id} className="relative flex min-w-0">
+                  <button
+                    type="button"
+                    onClick={header.column.getToggleSortingHandler()}
+                    className={
+                      "flex min-w-0 flex-1 items-center gap-1 px-2.5 py-2 text-2xs font-semibold text-t3 hover:text-t1 " +
+                      (meta?.align === "right" ? "justify-end" : "justify-start")
+                    }
+                  >
+                    <span className="truncate">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </span>
+                    <span className="w-2 flex-none text-t2">
+                      {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
+                    </span>
+                  </button>
+                  {/* the drag handle: a hairline that widens on hover; double-click resets */}
+                  <div
+                    role="separator"
+                    aria-label={`Resize ${String(header.column.columnDef.header)}`}
+                    data-testid={`col-resize-${header.column.id}`}
+                    onMouseDown={header.getResizeHandler()}
+                    onTouchStart={header.getResizeHandler()}
+                    onDoubleClick={() => header.column.resetSize()}
+                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none border-r border-line hover:border-acc"
+                  />
+                </div>
               );
             })}
           </div>

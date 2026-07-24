@@ -40,6 +40,20 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
       <rect x="8" y="8" width="8" height="8" rx="1" />
     </svg>
   ),
+  stm: (
+    <svg {...svgProps}>
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+      <circle cx="9.5" cy="9.5" r="0.6" fill="currentColor" />
+      <path d="M9 6V3" />
+      <path d="M15 6V3" />
+      <path d="M9 21v-3" />
+      <path d="M15 21v-3" />
+      <path d="M6 9H3" />
+      <path d="M6 15H3" />
+      <path d="M21 9h-3" />
+      <path d="M21 15h-3" />
+    </svg>
+  ),
   projects: (
     <svg {...svgProps}>
       <rect width="18" height="18" x="3" y="3" rx="2" />
