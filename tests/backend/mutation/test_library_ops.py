@@ -614,3 +614,74 @@ def test_detach_asset_unknown_kind_or_absent_asset_fails_loud(tmp_path, fixtures
     ops.detach_asset(record.id, "model")
     with pytest.raises(ValueError):
         ops.detach_asset(record.id, "model")  # already gone: honest, never a silent no-op
+
+
+def test_delete_part_handles_a_file_less_part(tmp_path, fixtures_dir):
+    """A part added file-less from a purchase link (symbol/footprint/model all None)
+    deletes cleanly - live 2026-07-24: delete crashed on record.symbol.name, so the
+    primary add flow produced parts that could never be deleted."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.symbol_source = None
+    staged.symbol_source_name = ""
+    staged.footprint_source = None
+    staged.model_source = None
+    staged.entry_name = ""
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    ops.delete_part(record.id)
+    assert not (profile.library.parts_dir / f"{record.id}.json").exists()
+    assert repo.is_clean()
+
+
+def test_delete_part_survives_a_detached_symbol(tmp_path, fixtures_dir):
+    """detach_asset('symbol') nulls the ref; the later delete must still remove the
+    footprint file (keyed by its OWN ref, not the symbol's name) and the record."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    ops.detach_asset(record.id, "symbol")
+    fp_path = profile.library.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod"
+    assert fp_path.exists()
+    ops.delete_part(record.id)
+    assert not fp_path.exists()
+    assert not (profile.library.parts_dir / f"{record.id}.json").exists()
+    assert repo.is_clean()
+
+
+def test_delete_part_removes_the_altium_libs_it_owns(tmp_path, fixtures_dir):
+    """The part's per-part Altium libs (altium/<id>.SchLib/.PcbLib) go with it - a
+    delete must not orphan them in the tree."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    altium_dir = profile.library.parts_dir.parent / "altium"
+    altium_dir.mkdir(parents=True, exist_ok=True)
+    sch = altium_dir / f"{record.id}.SchLib"
+    pcb = altium_dir / f"{record.id}.PcbLib"
+    sch.write_bytes(b"SCH")
+    pcb.write_bytes(b"PCB")
+    repo.commit("Attach Altium assets (test)", [sch, pcb])
+    from stockroom.model.part import LibRef
+
+    ops.edit_field(record.id, "altium_symbol", LibRef(lib="altium", name=record.id))
+    ops.delete_part(record.id)
+    assert not sch.exists()
+    assert not pcb.exists()
+    assert repo.is_clean()
+
+
+def test_move_category_of_a_file_less_part_is_a_field_change(tmp_path, fixtures_dir):
+    """Moving a file-less part between categories is just the category field - there is
+    no symbol/footprint to relocate, and it must not crash on record.symbol.name."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.symbol_source = None
+    staged.symbol_source_name = ""
+    staged.footprint_source = None
+    staged.model_source = None
+    staged.entry_name = ""
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    rec = ops.move_category(record.id, "Modules")
+    assert rec.category == "Modules"
+    assert rec.symbol is None and rec.footprint is None
+    assert repo.is_clean()

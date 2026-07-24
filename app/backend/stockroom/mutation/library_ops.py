@@ -780,14 +780,24 @@ class LibraryOps:
         json_path = self.lib.parts_dir / f"{part_id}.json"
         # A passive owns no symbol/footprint files and its stock lib_ids
         # (Device:R, Resistor_SMD:...) do not depend on the category, so moving it is
-        # just a category field change on the record.
-        if record.passive:
+        # just a category field change on the record. A FILE-LESS part (the link-add
+        # path: symbol and footprint both None, capture pending) moves the same way -
+        # there is nothing category-placed to relocate, and reading record.symbol.name
+        # here crashed the move (same defect as delete, 2026-07-24).
+        if record.passive or (record.symbol is None and record.footprint is None):
             with Transaction(self.repo) as txn:
                 record.category = new_category
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
                 txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
             return record
+        if record.symbol is None or record.footprint is None:
+            # a partially-detached part would need a per-asset relocation this move does
+            # not model; refuse loud rather than half-move (re-attach or detach the rest)
+            raise ValueError(
+                f"{part_id} has only one of symbol/footprint; detach it or complete the "
+                "part before moving categories"
+            )
         name = record.symbol.name
         old_sym = self.lib.symbol_lib_path(old_cat)
         new_sym = self.lib.symbol_lib_path(new_category)
@@ -823,17 +833,23 @@ class LibraryOps:
         record = self.load_record(part_id)
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
-            # A passive owns no symbol/footprint files (it references KiCad stock
-            # lib_ids), so there is nothing to remove from the category lib/.pretty;
-            # only the JSON record (and any owned datasheet PDF) is deleted.
-            if not record.passive:
+            # Each owned asset is removed off ITS OWN ref, independently: a passive
+            # references KiCad stock lib_ids (nothing to remove), a file-less link-add
+            # carries None refs (live 2026-07-24: reading record.symbol.name here crashed
+            # every delete of the primary add flow's parts), and a detach_asset may have
+            # nulled one side already - so no ref may ever be derived from another.
+            if not record.passive and record.symbol is not None:
                 name = record.symbol.name
                 sym_lib_path = self.lib.symbol_lib_path(record.category)
-                fp_path = self.lib.footprint_lib_path(record.category) / f"{name}.kicad_mod"
                 sym_lib_path.write_text(
                     self._remove_symbol_node(sym_lib_path, name), encoding="utf-8", newline=""
                 )
                 txn.track(sym_lib_path)
+            if not record.passive and record.footprint is not None:
+                fp_path = (
+                    self.lib.footprint_lib_path(record.category)
+                    / f"{record.footprint.name}.kicad_mod"
+                )
                 if fp_path.exists():
                     fp_path.unlink()
                     txn.track(fp_path)
@@ -850,6 +866,13 @@ class LibraryOps:
                 if dp.exists():
                     dp.unlink()
                     txn.track(dp)
+            # the part's per-part Altium libs go with it - never orphaned in the tree
+            altium_dir = self.lib.parts_dir.parent / "altium"
+            for suffix in (".SchLib", ".PcbLib", ".IntLib"):
+                ap = altium_dir / f"{part_id}{suffix}"
+                if ap.exists():
+                    ap.unlink()
+                    txn.track(ap)
             txn.commit(f"Delete {part_id}")
 
     def detect_drift(self) -> DriftReport:
