@@ -501,13 +501,39 @@ def test_compat_union_returns_shared_and_verdict(client, app_ctx):
     assert "interchangeable" in body["verdict"]
 
 
-def test_compat_union_mixed_scope_is_400(client, app_ctx):
+def test_compat_union_mixed_package_scope_is_400(client, app_ctx):
+    # F407 is LQFP64, F103 is LQFP48 in this seed: a cross-PACKAGE set stays a 400
+    # (a socket is a physical footprint). Cross-FAMILY same-package sets are legal
+    # since the 2026-07-23 owner amendment (covered at authority grain in
+    # tests/backend/stm/test_authority.py).
     _seed_stm_index(app_ctx)
     r = client.post(
         "/api/stm/compat/union",
         json={"parts": ["STM32F407V(E-G)Tx", "STM32F103C(8-B)Tx"]},
     )
     assert r.status_code == 400
+
+
+def test_compat_union_accepts_a_families_array_scope(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.post(
+        "/api/stm/compat/union", json={"families": ["STM32F4"], "package": "LQFP64"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["families"] == ["STM32F4"]
+    assert body["family"] == "STM32F4"
+
+
+def test_compat_suggestions_accepts_a_comma_separated_family_scope(client, app_ctx):
+    _seed_stm_index(app_ctx)
+    r = client.get(
+        "/api/stm/compat/suggestions",
+        params={"package": "LQFP64", "family": "STM32F4,STM32F1"},
+    )
+    assert r.status_code == 200
+    groups = r.json()["groups"]
+    assert groups and groups[0]["family"] == "STM32F1 + STM32F4"
 
 
 def test_compat_suggestions_returns_groups(client, app_ctx):

@@ -20,9 +20,17 @@ import { SpecMatrixTable } from "../components/stm/SpecMatrixTable";
 import { PinoutMap } from "../components/stm/PinoutMap";
 import { PinoutLegend } from "../components/stm/PinoutLegend";
 import { PinInspector } from "../components/stm/PinInspector";
+import { PinoutTable } from "../components/stm/PinoutTable";
 import { BuildIndexGate } from "../components/stm/BuildIndexGate";
 import { CompatibilityWorkbench } from "../components/stm/CompatibilityWorkbench";
-import { Button, Eyebrow, TabPanel, TabStrip, type TabItem } from "../components/primitives";
+import {
+  Button,
+  Eyebrow,
+  SegmentedControl,
+  TabPanel,
+  TabStrip,
+  type TabItem,
+} from "../components/primitives";
 
 export interface StmScope extends StmMcusArgs {
   families: string[];
@@ -32,11 +40,12 @@ export interface StmScope extends StmMcusArgs {
 const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
 
 // The STM Viewer's two co-equal sections (CONTEXT decision 10 - a tab of this page, never a new
-// nav route): the Phase-4 explorer and the Phase-5 compatibility workbench.
+// nav route): the Phase-4 explorer and the Bench (the socket-union workbench, named for the
+// retired Hardware app's Bench tab this workstream rebuilds - owner rename 2026-07-23).
 type StmTab = "explorer" | "compatibility";
 const STM_TABS: readonly TabItem<StmTab>[] = [
   { id: "explorer", label: "Explorer" },
-  { id: "compatibility", label: "Compatibility" },
+  { id: "compatibility", label: "Bench" },
 ];
 
 // The coarse server-side narrowing (decision 3): exactly one selected family narrows server-side;
@@ -147,8 +156,9 @@ export function StmViewerPage() {
   );
 }
 
-// The specimen region: the empty state until a part is picked, then the pinout map + legend +
-// inspector for the active part, all off the single already-fetched pinout (decision 4).
+// The specimen region: the empty state until a part is picked, then the pinout map OR the full
+// pinout table (one selection model across both), the modular legend, and the inspector - all off
+// the single already-fetched pinout (decision 4).
 function PinoutRegion({
   activePart,
   pinout,
@@ -168,9 +178,35 @@ function PinoutRegion({
   inspectedPin: import("../api/types").PinDTO | null;
   onRetry: () => void;
 }) {
+  const [view, setView] = useState<"map" | "table">("map");
+  // The legend's category lens: highlighted buckets dim every other pad on the map. Reset when
+  // the part changes (the lens describes the previous part's pins).
+  const [highlight, setHighlight] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    setHighlight(new Set());
+  }, [activePart]);
+  const toggleHighlight = (key: string) =>
+    setHighlight((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <Eyebrow className="mb-2 px-1">Pinout</Eyebrow>
+      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+        <Eyebrow>Pinout</Eyebrow>
+        {pinout ? (
+          <SegmentedControl
+            options={PINOUT_VIEWS}
+            value={view}
+            onChange={setView}
+            size="small"
+            aria-label="Pinout view"
+          />
+        ) : null}
+      </div>
 
       {!activePart ? (
         <GhostSpecimen />
@@ -191,16 +227,29 @@ function PinoutRegion({
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           {/* A definite-height COLUMN FLEX slot: PinoutMap's chamber shrinks inside it so the
               chamber footer (badges + Reset View) stays within the slot instead of spilling
-              over the legend below. */}
+              over the legend below. The table view fills the same slot. */}
           <div className="flex h-[392px] flex-none flex-col">
-            <PinoutMap
-              pinout={pinout}
-              selectedPosition={selectedPosition}
-              onSelectPosition={onSelectPosition}
-            />
+            {view === "map" ? (
+              <PinoutMap
+                pinout={pinout}
+                selectedPosition={selectedPosition}
+                onSelectPosition={onSelectPosition}
+                highlight={highlight}
+              />
+            ) : (
+              <PinoutTable
+                pinout={pinout}
+                selectedPosition={selectedPosition}
+                onSelectPosition={onSelectPosition}
+              />
+            )}
           </div>
           <div className="flex-none border-b border-line pb-3">
-            <PinoutLegend />
+            <PinoutLegend
+              pinout={pinout}
+              highlight={highlight}
+              onToggleHighlight={toggleHighlight}
+            />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {inspectedPin ? (
@@ -214,6 +263,11 @@ function PinoutRegion({
     </div>
   );
 }
+
+const PINOUT_VIEWS = [
+  { id: "map", label: "Map" },
+  { id: "table", label: "Table" },
+] as const;
 
 function ChamberMessage({ children }: { children: React.ReactNode }) {
   return (

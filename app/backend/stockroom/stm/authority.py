@@ -9,9 +9,11 @@ NEW functions the compatibility surface needs:
 `pin_signature`, `package_family_union`, `socket_union`, `af_conflicts`, and
 `compatibility_suggestions`. No API, no SVG, no switch semantics - pure Python +
 parameterized SQL against the frozen Phase-1/2 schema. Every computation stays at
-(mcu, package, position) grain; every union is scoped by (package, family)
-TOGETHER, never a bare package string (the legacy tool's design, and explicitly
-NOT this workstream's contract - see socket_union's ValueError on a mixed scope).
+(mcu, package, position) grain; every union is scoped by ONE package plus an
+explicit family scope - one family or several (owner amendment 2026-07-23: a
+cross-family set on one footprint IS the build-card goal), never a bare package
+string sweeping in families nobody named. socket_union still raises on a
+cross-package set (a socket is a physical footprint).
 """
 
 from __future__ import annotations
@@ -306,17 +308,30 @@ def package_family_union(conn: sqlite3.Connection, package: str, family: str) ->
 
 
 def compatibility_suggestions(
-    conn: sqlite3.Connection, package: str, family: str, tolerance: int = 0
+    conn: sqlite3.Connection,
+    package: str,
+    family: str | None = None,
+    tolerance: int = 0,
+    families: list[str] | None = None,
 ) -> list[dict]:
-    """Groups the MCUs in the (package, family) scope by their FULL per-position
+    """Groups the MCUs in the (package, families) scope by their FULL per-position
     pin-divergence vector (COMPAT-04). The largest exact-match group is the
     "baseline" tier; every other group is "divergent", carrying the count of
     positions where its vector differs from the baseline. `tolerance` merges a
-    divergent group into the baseline when its divergence count is <= tolerance."""
+    divergent group into the baseline when its divergence count is <= tolerance.
+    The scope may span several families (owner amendment 2026-07-23) - a group is
+    then free to mix families, which is exactly the cross-family drop-in discovery
+    the build-card concept wants; the echoed `family` field joins the scope names."""
+    scope_families = list(families or ([family] if family else []))
+    if not scope_families:
+        raise ValueError("compatibility_suggestions requires at least one family")
+    family = " + ".join(sorted(scope_families))
+    marks = ",".join("?" for _ in scope_families)
     mcu_rows = list(
         conn.execute(
-            "SELECT id, ref_name FROM mcu WHERE package_name = ? AND family = ? ORDER BY ref_name",
-            (package, family),
+            "SELECT id, ref_name FROM mcu "
+            f"WHERE package_name = ? AND family IN ({marks}) ORDER BY ref_name",
+            (package, *scope_families),
         )
     )
     all_positions = sorted(
@@ -324,8 +339,8 @@ def compatibility_suggestions(
             r["physical_pin_number"]
             for r in conn.execute(
                 "SELECT DISTINCT p.physical_pin_number FROM mcu_package_pin p "
-                "JOIN mcu m ON m.id = p.mcu_id WHERE m.package_name = ? AND m.family = ?",
-                (package, family),
+                f"JOIN mcu m ON m.id = p.mcu_id WHERE m.package_name = ? AND m.family IN ({marks})",
+                (package, *scope_families),
             )
         },
         key=_position_sort_key,
@@ -460,13 +475,18 @@ def socket_union(
     refs: list[str] | None = None,
     family: str | None = None,
     package: str | None = None,
+    families: list[str] | None = None,
 ) -> dict:
     """The socket-union computation (INTERFACES.md section 2, COMPAT-01/02/03/05)
     at (mcu, package, position) grain. Resolves an explicit `refs` list (each via
-    the same MPN-resolution ladder as resolve_part) OR selects a whole (family,
-    package) group. Every part MUST share one (package_name, family) scope -
-    raises ValueError on a mixed scope (never a bare-package cross-family union,
-    the legacy tool's design and explicitly not this workstream's contract)."""
+    the same MPN-resolution ladder as resolve_part) OR selects a whole
+    (families, package) group. Every part MUST share ONE package (a socket is a
+    physical footprint) - raises ValueError on a cross-package set. Families MAY
+    mix (owner amendment 2026-07-23: the build-card goal is exactly a cross-family
+    socket on one footprint); each part keeps its own per-part grain, so a
+    cross-family identity difference classifies divergent, never a silent merge.
+    The result carries `families` (the sorted real scope) plus `family` (a
+    joined display string, the single name when the scope is one family)."""
     if refs:
         rows = []
         for ref in refs:
@@ -475,27 +495,33 @@ def socket_union(
                 raise ValueError(f"unknown part: {ref}")
             rows.append(row)
     else:
-        if not family or not package:
-            raise ValueError("socket_union requires either refs or both family and package")
+        scope_families_in = list(families or ([family] if family else []))
+        if not scope_families_in or not package:
+            raise ValueError(
+                "socket_union requires either refs or a package plus at least one family"
+            )
+        marks = ",".join("?" for _ in scope_families_in)
         rows = list(
             conn.execute(
                 "SELECT id, package_name, family, line, ref_name FROM mcu "
-                "WHERE package_name = ? AND family = ? ORDER BY ref_name",
-                (package, family),
+                f"WHERE package_name = ? AND family IN ({marks}) ORDER BY ref_name",
+                (package, *scope_families_in),
             )
         )
         if not rows:
-            raise ValueError(f"no MCUs found for package={package} family={family}")
+            raise ValueError(
+                f"no MCUs found for package={package} families={scope_families_in}"
+            )
 
     scope_packages = {r["package_name"] for r in rows}
-    scope_families = {r["family"] for r in rows}
-    if len(scope_packages) > 1 or len(scope_families) > 1:
+    if len(scope_packages) > 1:
         raise ValueError(
-            "socket_union requires every part to share ONE (package, family) scope: "
-            f"got packages={sorted(scope_packages)} families={sorted(scope_families)}"
+            "socket_union requires every part to share ONE package (a socket is a "
+            f"physical footprint): got packages={sorted(scope_packages)}"
         )
     scope_package = next(iter(scope_packages))
-    scope_family = next(iter(scope_families))
+    scope_family_list = sorted({r["family"] for r in rows})
+    scope_family = " + ".join(scope_family_list)
 
     ref_by_mcu_id = {r["id"]: r["ref_name"] for r in rows}
     mcu_ids = list(ref_by_mcu_id)
@@ -622,6 +648,7 @@ def socket_union(
         "resolved": [{"ref": ref_by_mcu_id[mcu_id]} for mcu_id in mcu_ids],
         "package": scope_package,
         "family": scope_family,
+        "families": scope_family_list,
         "grain": "per-part",
         "positions": positions_out,
         "verdict": verdict,

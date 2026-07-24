@@ -29,6 +29,7 @@ REF_MCU1 = "STM32F401VBTx"
 REF_MCU1B = "STM32F401RETx"
 REF_MCU2 = "STM32F407V(E-G)Tx"
 REF_MCU3 = "STM32F103C(8-B)Tx"
+REF_MCU4 = "STM32F030C8Tx"  # a DIFFERENT package (TSSOP20): the cross-package raise case
 
 
 def _insert_mcu(conn, art_id, ref_name, family, line, package, pin_count) -> int:
@@ -89,6 +90,10 @@ def stm_conn():
     mcu1b = _insert_mcu(conn, art_id, REF_MCU1B, "STM32F4", "STM32F401", "LQFP64", 64)
     mcu2 = _insert_mcu(conn, art_id, REF_MCU2, "STM32F4", "STM32F407", "LQFP64", 64)
     mcu3 = _insert_mcu(conn, art_id, REF_MCU3, "STM32F1", "STM32F103", "LQFP64", 64)
+    mcu4 = _insert_mcu(conn, art_id, REF_MCU4, "STM32F0", "STM32F030", "TSSOP20", 20)
+    _insert_pin(
+        conn, mcu4, "TSSOP20", "1", "PA0", "PA0", "I/O", "io", roles=[("gpio", "io")],
+    )
 
     # position "12" (PA9): identical on MCU1/MCU1B/MCU2 -> a SHARED union position.
     for mcu_id in (mcu1, mcu1b, mcu2):
@@ -167,4 +172,10 @@ def stm_conn():
 
 @pytest.fixture
 def stm_refs():
-    return {"mcu1": REF_MCU1, "mcu1b": REF_MCU1B, "mcu2": REF_MCU2, "mcu3": REF_MCU3}
+    return {
+        "mcu1": REF_MCU1,
+        "mcu1b": REF_MCU1B,
+        "mcu2": REF_MCU2,
+        "mcu3": REF_MCU3,
+        "mcu4": REF_MCU4,
+    }
