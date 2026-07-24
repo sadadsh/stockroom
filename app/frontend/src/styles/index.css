@@ -2,73 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Altium Designer restyle (2026-07-23). The palette is grounded on Altium's own
-   "Altium Dark Gray" / "Altium Light Gray" themes, color-sampled from Altium's
-   official documentation screenshots. Altium is a MEDIUM charcoal that separates
-   panes with visible thin borders, not a near-black that separates with shadow, so
-   the surfaces sit close in value and --c-line does the structural work. */
+/* The mockup's near-black canvas with two soft radial highlights (library-v2.html
+   .scroll). Kept as plain CSS because it is a fixed page backdrop, not a token. */
 @layer base {
   /* Dark is the default (:root); [data-theme="light"] overrides the same names.
-     lib/theme.tsx flips the attribute; every token flows to tailwind via CSS vars. */
+     The dark values are the mockup palette, so the dark app is byte-identical to
+     before the variable refactor. lib/theme.tsx flips the attribute. */
   :root {
-    /* Altium Dark Gray chrome ladder (sampled): recessed field #2f2f2f < substrate
-       #2d2d2d < panel/tree #3b3b3b < panel body #3e4041 < toolbar/status #404040 <
-       command bar/buttons #4e4e4e. The steps are close on purpose; borders separate. */
-    --c-canvas: #232426;
-    --c-rail: #2b2c2e;
-    --c-surface: #2a2b2d;
-    --c-raise: #3f4044;
-    --c-raise2: #4a4b4f;
-    --c-field: #2a2b2d;
-    /* the defining Altium move: a VISIBLE thin cool border, lighter than the panel,
-       so the workspace reads as contiguous docked panes rather than floating cards. */
-    --c-line: #4b4c4f;
-    --c-line2: #57585c;
-    --c-popover: #37383a;
-    /* the Altium "toolbar / title strip / status bar" band: the lighter chrome gray
-       that carries panel title strips and the bottom status bar (sampled #404040). */
-    --c-band: #47484c;
-    --c-t1: #d7d8da;
-    /* muted tiers lightened for legibility on the medium charcoal: the shipped #9a9c9f/#6d6f73
-       measured ~2.6:1 for faint text (below the AA floor); these clear ~3.5-5:1. */
-    --c-t2: #a9adb2;
-    --c-t3: #878b90;
-    --c-ok: #58a97f;
-    --c-warn: #cf9a44;
-    --c-err: #d0564e;
-    /* Altium's real accent is a MUTED steel-blue used only for selection / active
-       state (sampled from the highlighted row + active panel). Not a vivid web blue,
-       not teal, not green. `acc-strong` is a brighter step; `acc-soft` its row wash. */
-    --c-acc: #6183a1;
-    --c-acc-on: #f4f6f8;
-    --c-acc-strong: #7aa3c8;
-    --c-acc-soft: rgba(97, 131, 161, 0.22);
-    /* Squarer corners (Altium is nearly rectangular). tailwind maps rounded-card /
-       rounded-control onto these; dev mode can still nudge them live. */
-    --r-card: 3px;
-    --r-control: 2px;
-    /* Denser type scale (Altium runs ~12px base). Only the px size is a token; the
-       line-heights live in tailwind. `body` uses --fs-base for its resting size. */
-    --fs-2xs: 10px;
-    --fs-xs: 11px;
-    --fs-sm: 11.5px;
-    --fs-base: 12px;
-    --fs-lg: 13.5px;
-    --fs-xl: 15px;
-    --fs-title: 18px;
-    /* the primary UI icon weight (nav + action line icons). Altium's glyphs are light. */
-    --icon-stroke: 1.8;
-    /* Near-flat elevation: borders carry the structure, so cards get almost no shadow.
-       Only genuinely floating chrome (menus, modals, floating panels) casts a real
-       drop shadow. The hairline top highlight is nearly gone (Altium is not glossy). */
-    --edge-hi: rgba(255, 255, 255, 0.045);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28);
-    --shadow-raise: 0 3px 10px rgba(0, 0, 0, 0.42);
-    --shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --shadow-file: 0 2px 8px rgba(0, 0, 0, 0.28);
+    /* A readable elevation ladder (design principle: structure reads through depth,
+       not borders). Four distinct steps on a cool near-black so the nav, the list, and
+       the detail cards separate into real layers instead of one flat grey field.
+       canvas (deepest) < rail/panel < raise (card) < raise2 (hover/selected). */
+    --c-canvas: #242427;
+    --c-rail: rgba(255, 255, 255, 0.032);
+    --c-surface: rgba(255, 255, 255, 0.016);
+    --c-raise: rgba(255, 255, 255, 0.07);
+    --c-raise2: rgba(255, 255, 255, 0.135);
+    --c-field: rgba(0, 0, 0, 0.28);
+    --c-line: rgba(255, 255, 255, 0.07);
+    --c-line2: rgba(255, 255, 255, 0.13);
+    --c-popover: #33333a;
+    --c-t1: #f4f4f4;
+    --c-t2: rgba(244, 244, 244, 0.66);
+    --c-t3: rgba(244, 244, 244, 0.4);
+    --c-ok: #5fd39a;
+    --c-warn: #e0b354;
+    --c-err: #e8756c;
     /* Category hues (FIX-03): a subtle, distinct tint per component family so the list-row
        fallback thumbnails read apart at a glance. Dark-theme values sit light enough (L ~62-70%)
-       to clear >=3:1 against the recessed dark stage tile; the light theme darkens them below. */
+       to clear >=3:1 against the recessed near-black tile; the light theme darkens them below. */
     --cat-resistor: #e0a24a;
     --cat-capacitor: #5aa9f0;
     --cat-inductor: #4fc9a8;
@@ -76,67 +38,95 @@
     --cat-connector: #b58cf0;
     --cat-crystal: #4fc3dd;
     --cat-ic: #8a9cf0;
-    /* STM pin electrical-class hues (VIZ-02) — a SEPARATE taxonomy from the --cat-* component
-       families above; color is the data on the pinout map, so these run saturated on the pad fill
-       only (never a surface tint). One hue per electrical_class; each verified >=3:1 against the
-       card/stage background in BOTH themes (dark values here sit light for the near-black well).
-       io is the calmest (most pins carry it); power is hot; ground is a cool desaturated reference;
-       reset amber; boot violet; vcap teal; nc the quietest inert grey. */
-    --stm-cat-io: #5aa9f0;
-    --stm-cat-power: #ef7a86;
-    --stm-cat-ground: #8b93a3;
-    --stm-cat-reset: #e0a24a;
-    --stm-cat-boot: #b58cf0;
-    --stm-cat-vcap: #4fc9a8;
-    --stm-cat-nc: #9a8f99;
-    /* The io class splits into four visual categories (the API's _pin_category buckets):
-       plain gpio keeps the calm io blue; analog chartreuse; debug magenta; oscillator the
-       crystal cyan. Verified >=3:1 against stage + card in BOTH themes (measured 4.0-9.3). */
-    --stm-cat-gpio: #5aa9f0;
-    --stm-cat-analog: #9ecf63;
-    --stm-cat-debug: #e389cf;
-    --stm-cat-oscillator: #4fc3dd;
+    /* STM pin color-is-data family (VIZ-02) — the ONE token family for the pinout map's
+       electrical-class/category encoding axis (Phase 6 consolidation: this supersedes and renames
+       the Phase 4 per-bucket family; there is no longer a parallel set). A SEPARATE taxonomy from
+       the --cat-* BOM-component families above; color is the data on the pinout map, so these run
+       saturated on the pad fill only (never a surface tint). The ten API category buckets plus the
+       legacy io electrical_class (which the API only emits pre-split; it reads as plain gpio). Each
+       verified >=3:1 against the card/stage background in BOTH themes (dark values here sit light
+       for the near-black well). io/gpio is the calmest (most pins carry it); power is hot; ground a
+       cool desaturated reference; reset amber; boot violet; vcap teal; nc the quietest inert grey;
+       analog chartreuse; debug magenta; oscillator the crystal cyan. Measured 3.4-9.3 both themes. */
+    --stm-io: #5aa9f0;
+    --stm-gpio: #5aa9f0;
+    --stm-analog: #9ecf63;
+    --stm-debug: #e389cf;
+    --stm-oscillator: #4fc3dd;
+    --stm-power: #ef7a86;
+    --stm-ground: #8b93a3;
+    --stm-reset: #e0a24a;
+    --stm-boot: #b58cf0;
+    --stm-vcap: #4fc9a8;
+    --stm-nc: #9a8f99;
+    /* Socket-union classification (COMPAT-02/03) — a DISTINCT three-value token set from the
+       electrical-class hues above, because classification encodes a different fact (do a pin's
+       identities agree across a set). Tuned to the shipped compatEncoding semantic: shared reads
+       as the calm positive green, divergent the warm amber that asks for attention, partial the
+       quiet cool grey of an absent position. Each clears >=3:1 on the recessed dark tile. */
+    --stm-classify-shared: #5fd39a;
+    --stm-classify-divergent: #e0b354;
+    --stm-classify-partial: #7f8794;
+    /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
+       Near-white on dark, on the primary action, focus, active nav, selected row,
+       section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
+    --c-acc: #f4f4f5;
+    --c-acc-on: #141414;
+    --c-acc-strong: #ffffff;
+    --c-acc-soft: rgba(255, 255, 255, 0.11);
+    /* the soft studio glow under a lit hero specimen */
+    --c-hero-glow: rgba(255, 255, 255, 0.09);
+    /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
+       hairline top highlight (the inset line), so it reads as lifted off the
+       canvas instead of painted on it. Three steps: a resting card, a lifted/hover
+       card, and the pop layer for menus + the Add A Part window. */
+    --edge-hi: rgba(255, 255, 255, 0.10);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.5),
+      0 6px 18px rgba(0, 0, 0, 0.42);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.5),
+      0 16px 38px rgba(0, 0, 0, 0.44);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4),
+      0 28px 64px rgba(0, 0, 0, 0.62);
+    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.16);
     /* the springy easing used for tactile press + hover lift across controls */
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    /* page backdrop + chrome that lives outside the token classes: flat graphite. */
-    --body-bg: #262627;
-    --root-bg: #2b2b2c;
-    --sb-thumb: rgba(255, 255, 255, 0.16);
-    --sb-thumb-hover: rgba(255, 255, 255, 0.26);
-    --sb-track: rgba(255, 255, 255, 0.05);
+    /* page backdrop + chrome that lives outside the token classes: two soft neutral
+       highlights over a near-black base so the window reads lit, not flat. */
+    --body-bg: #202023;
+    --root-bg: #242427;
+    --sb-thumb: rgba(255, 255, 255, 0.13);
+    --sb-thumb-hover: rgba(255, 255, 255, 0.22);
+    --sb-track: rgba(255, 255, 255, 0.14);
     /* subtle row hover + the sticky category header band + the ring track */
-    --c-hover: rgba(255, 255, 255, 0.045);
-    --c-sticky: rgba(43, 43, 44, 0.86);
-    --c-ring-track: #34353a;
+    --c-hover: rgba(255, 255, 255, 0.03);
+    --c-sticky: rgba(36, 36, 39, 0.8);
+    --c-ring-track: #26272c;
     /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
        darker inset than the card so the 3D model / symbol / footprint read as lit
        objects in a well, not painted on the surface. Theme-aware. */
-    --c-stage: rgba(0, 0, 0, 0.3);
-    /* the file-card line art (Symbol/Footprint/3D): neutral greys tuned to the
-       medium-charcoal surfaces so they read as etched, not glowing. */
-    --c-icon-line: #9a9a9a;
-    --c-icon-fill: #8f8f8f;
-    --c-icon-cube: #9a9a9a;
-    --c-icon-edge: #565656;
-    --c-icon-faint: #c2c2c2;
+    --c-stage: rgba(0, 0, 0, 0.26);
+    /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
+       pre-refactor dark value, so the dark app stays byte-identical. */
+    --c-icon-line: #8f8f8f;
+    --c-icon-fill: #858585;
+    --c-icon-cube: #8d8d8d;
+    --c-icon-edge: #4f4f4f;
+    --c-icon-faint: #cbcbcb;
   }
 
   :root[data-theme="light"] {
-    /* Altium Light Gray: light-steel chrome, dark cool-grey text, SAME steel-blue
-       accent (deepened for contrast on the light surfaces). */
-    --c-canvas: #d7d8db;
-    --c-rail: #e6e7ea;
-    --c-surface: #dcdde0;
-    --c-raise: #eeeeef;
-    --c-raise2: #e0e1e4;
-    --c-field: #ffffff;
-    --c-line: #bcbdc1;
-    --c-line2: #a8a9ad;
+    --c-canvas: #e9eaee;
+    --c-rail: rgba(255, 255, 255, 0.5);
+    --c-surface: rgba(255, 255, 255, 0.66);
+    --c-raise: #ffffff;
+    --c-raise2: rgba(0, 0, 0, 0.08);
+    --c-field: rgba(0, 0, 0, 0.05);
+    --c-line: rgba(0, 0, 0, 0.1);
+    --c-line2: rgba(0, 0, 0, 0.16);
     --c-popover: #ffffff;
-    --c-band: #e7e8ea;
-    --c-t1: #202225;
-    --c-t2: #56585d;
-    --c-t3: #767980;
+    --c-t1: #17181b;
+    --c-t2: rgba(23, 24, 27, 0.68);
+    --c-t3: rgba(23, 24, 27, 0.46);
     --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;
@@ -148,40 +138,50 @@
     --cat-connector: #7a45c2;
     --cat-crystal: #147d97;
     --cat-ic: #4a5bc0;
-    /* STM pin electrical-class hues (VIZ-02), darkened so each clears >=3:1 against the white
-       light card. Same taxonomy/order as the dark block above. */
-    --stm-cat-io: #1f6fc4;
-    --stm-cat-power: #c23b4a;
-    --stm-cat-ground: #59606c;
-    --stm-cat-reset: #b6710f;
-    --stm-cat-boot: #7a45c2;
-    --stm-cat-vcap: #12876a;
-    --stm-cat-nc: #6a5f68;
-    /* io-split categories, darkened for the light stage (same taxonomy as the dark block). */
-    --stm-cat-gpio: #1f6fc4;
-    --stm-cat-analog: #55801c;
-    --stm-cat-debug: #a2439b;
-    --stm-cat-oscillator: #147d97;
-    --c-acc: #4f7fab;
-    --c-acc-on: #ffffff;
-    --c-acc-strong: #3f6f9c;
-    --c-acc-soft: rgba(79, 127, 171, 0.18);
-    /* Light elevation: a bright top edge over soft, low-opacity shadows. */
-    --edge-hi: rgba(255, 255, 255, 0.8);
-    --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.1);
-    --shadow-raise: 0 3px 10px rgba(20, 22, 26, 0.14);
-    --shadow-pop: 0 6px 20px rgba(20, 22, 26, 0.2);
-    --shadow-file: 0 2px 8px rgba(20, 22, 26, 0.12);
+    /* STM pin color-is-data family (VIZ-02), darkened so each clears >=3:1 against the white
+       light card. Same taxonomy/order as the dark block above (Phase 6 consolidated family). */
+    --stm-io: #1f6fc4;
+    --stm-gpio: #1f6fc4;
+    --stm-analog: #55801c;
+    --stm-debug: #a2439b;
+    --stm-oscillator: #147d97;
+    --stm-power: #c23b4a;
+    --stm-ground: #59606c;
+    --stm-reset: #b6710f;
+    --stm-boot: #7a45c2;
+    --stm-vcap: #12876a;
+    --stm-nc: #6a5f68;
+    /* Socket-union classification (COMPAT-02/03), darkened for the white light card. Same
+       shared/divergent/partial semantic as the dark block. */
+    --stm-classify-shared: #2f9e63;
+    --stm-classify-divergent: #a9761b;
+    --stm-classify-partial: #66606e;
+    /* Neutral accent: near-black on light. */
+    --c-acc: #1b1b1e;
+    --c-acc-on: #f5f5f5;
+    --c-acc-strong: #1b1b1e;
+    --c-acc-soft: rgba(0, 0, 0, 0.06);
+    --c-hero-glow: rgba(0, 0, 0, 0.05);
+    /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
+       over soft, low-opacity shadows. */
+    --edge-hi: rgba(255, 255, 255, 0.9);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.06),
+      0 4px 14px rgba(17, 18, 20, 0.07);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09),
+      0 14px 30px rgba(17, 18, 20, 0.11);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1),
+      0 28px 64px rgba(17, 18, 20, 0.2);
+    --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
     --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-    --body-bg: #cfd0d3;
-    --root-bg: #d7d8db;
-    --sb-thumb: rgba(0, 0, 0, 0.22);
-    --sb-thumb-hover: rgba(0, 0, 0, 0.34);
-    --sb-track: rgba(0, 0, 0, 0.06);
-    --c-hover: rgba(0, 0, 0, 0.045);
-    --c-sticky: rgba(215, 216, 219, 0.88);
-    --c-ring-track: #cdced2;
-    --c-stage: rgba(20, 22, 26, 0.05);
+    --body-bg: #dfe0e4;
+    --root-bg: #e9eaee;
+    --sb-thumb: rgba(0, 0, 0, 0.2);
+    --sb-thumb-hover: rgba(0, 0, 0, 0.32);
+    --sb-track: rgba(0, 0, 0, 0.16);
+    --c-hover: rgba(0, 0, 0, 0.04);
+    --c-sticky: rgba(233, 234, 238, 0.85);
+    --c-ring-track: #dfe0e3;
+    --c-stage: rgba(17, 18, 20, 0.045);
     --c-icon-line: #6f6f6f;
     --c-icon-fill: #6f6f6f;
     --c-icon-cube: #6f6f6f;
@@ -203,10 +203,9 @@
     background: var(--body-bg);
     color: var(--c-t1);
     font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
-    font-size: var(--fs-base);
-    /* tighter resting line-height for the denser Altium feel */
-    line-height: 1.45;
-    letter-spacing: -0.006em;
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -248,19 +247,4 @@
 /* tabular figures for stock counts and prices */
 .tnum {
   font-variant-numeric: tabular-nums;
-}
-
-/* The primary UI icon weight, as one token. A class (not the presentation attribute, which cannot
-   read a CSS var) so it overrides the svg's hardcoded stroke-width fallback; carried by the
-   icons.tsx Svg helper and the rail's nav svgs so dev mode nudges the whole set at once. */
-.ico {
-  stroke-width: var(--icon-stroke);
-}
-
-/* The dev panel's scalar fields lean on their slider, so hide the number spinner: it is redundant
-   and its buttons eat the width a fractional value (10.5) needs, clipping it to "10." otherwise. */
-.nospin::-webkit-inner-spin-button,
-.nospin::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }

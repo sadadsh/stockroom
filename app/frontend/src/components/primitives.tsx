@@ -249,6 +249,37 @@ export function Dot({ tone }: { tone: BadgeTone }) {
   );
 }
 
+// A small token-driven swatch for a color-is-data legend: a tiny rounded tile filled from a single
+// CSS-variable token reference passed in (e.g. "var(--stm-power)" or "var(--stm-classify-shared)").
+// It emits no color value of its own, so every hue stays in the token layer and flips on data-theme.
+// `variant` optionally overlays the pinout map's non-color channels on the same swatch: "dot" marks
+// a 5V-tolerant pin, "ring" marks the neutral selection accent. Shared by PinoutLegend and any
+// future encoded surface (CONTEXT decision 3) instead of a swatch inlined once in components/stm.
+export function LegendSwatch({
+  token,
+  variant = "fill",
+  className,
+}: {
+  token: string;
+  variant?: "fill" | "dot" | "ring";
+  className?: string;
+}) {
+  return (
+    <span
+      className={cx(
+        "relative inline-block h-3 w-3 flex-none rounded-control",
+        variant === "ring" && "outline outline-2 outline-offset-1 outline-acc-strong",
+        className,
+      )}
+      style={{ backgroundColor: token }}
+    >
+      {variant === "dot" ? (
+        <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-t1" />
+      ) : null}
+    </span>
+  );
+}
+
 export interface TabItem<T extends string> {
   id: T;
   label: string;

@@ -12,7 +12,7 @@
 import { useCallback } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { api, type StmMcusArgs } from "./client";
-import type { CompatUnionBody, StmStatusDTO } from "./types";
+import type { AfCheckBody, CompatUnionBody, StmStatusDTO } from "./types";
 import { useJob } from "../lib/useJob";
 
 // The build/source/stamp state. retry:false so a 409 (index not built) resolves to an error
@@ -81,5 +81,52 @@ export function useBuildStmIndex() {
 export function useStmCompatUnion() {
   return useMutation({
     mutationFn: (body: CompatUnionBody) => api.postStmCompatUnion(body),
+  });
+}
+
+// One pin's complete AF0-15 set (SWAP-01). Disabled until a part AND a position are set, so the
+// panel shows its prompt with no wasted call while nothing is selected. retry:false so a 409 reaches
+// the reused not-built state at once.
+export function useStmPinAf(part: string | null, position: string | null) {
+  return useQuery({
+    queryKey: ["stm-pin-af", part, position],
+    queryFn: () => api.getStmPinAf(part as string, position as string),
+    enabled: !!part && !!position,
+    retry: false,
+  });
+}
+
+// Every candidate pin for a chosen peripheral signal across the part (SWAP-02). Disabled until a
+// part AND a signal are chosen, so nothing fetches until the user picks a signal to route.
+export function useStmSignalCandidates(part: string | null, signal: string | null) {
+  return useQuery({
+    queryKey: ["stm-signal-candidates", part, signal],
+    queryFn: () => api.getStmSignalCandidates(part as string, signal as string),
+    enabled: !!part && !!signal,
+    retry: false,
+  });
+}
+
+// Auto-discovered compatible sets for a (package, family) scope (COMPAT-04). Enabled-gated on both,
+// so it fires only once a group scope is chosen.
+export function useStmSuggestions(
+  pkg: string | null,
+  family: string | null,
+  tolerance?: number,
+) {
+  return useQuery({
+    queryKey: ["stm-suggestions", pkg, family, tolerance ?? 0],
+    queryFn: () => api.getStmCompatSuggestions(pkg as string, family as string, tolerance),
+    enabled: !!pkg && !!family,
+    retry: false,
+  });
+}
+
+// Conflict-check a client-held assignment (COMPAT reconcile support). A plain useMutation mirroring
+// useStmCompatUnion: the conflict result is ephemeral, not a stored resource, so nothing is
+// invalidated. The held assignment lives in React state only, never persisted (CONTEXT decision 8).
+export function useStmAfCheck() {
+  return useMutation({
+    mutationFn: (body: AfCheckBody) => api.postStmAfCheck(body),
   });
 }

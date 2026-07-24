@@ -2,9 +2,9 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import { CompatibilityWorkbench, unionBody } from "./CompatibilityWorkbench";
+import { AfCheckPanel, CompatibilityWorkbench, buildAssignments, unionBody } from "./CompatibilityWorkbench";
 import { api, ApiError } from "../../api/client";
-import type { FamiliesResponse, UnionDTO } from "../../api/types";
+import type { FamiliesResponse, SuggestionsResponse, UnionDTO, UnionPositionDTO } from "../../api/types";
 
 const FAMILIES: FamiliesResponse = {
   families: [
@@ -119,5 +119,106 @@ describe("CompatibilityWorkbench", () => {
     expect(
       await screen.findByRole("heading", { name: "Build the Index" }),
     ).toBeInTheDocument();
+  });
+
+  it("loads a suggested set into the assembly on pick, without auto-running the union (COMPAT-04)", async () => {
+    vi.spyOn(api, "getStmFamilies").mockResolvedValue(FAMILIES);
+    const suggestions: SuggestionsResponse = {
+      groups: [
+        {
+          signature_id: "sig-a",
+          tier: "baseline",
+          package: "LQFP100",
+          family: "STM32F4",
+          refs: ["STM32F407VETx", "STM32F407VGTx"],
+          divergent_positions: 0,
+        },
+      ],
+    };
+    vi.spyOn(api, "getStmCompatSuggestions").mockResolvedValue(suggestions);
+    const unionSpy = vi.spyOn(api, "postStmCompatUnion").mockResolvedValue(unionResult());
+
+    render(<CompatibilityWorkbench />, { wrapper: wrapperWith(freshClient()) });
+    fireEvent.click(await screen.findByText("STM32F4"));
+    fireEvent.click(await screen.findByText("LQFP100"));
+
+    // pick the suggested set
+    fireEvent.click(await screen.findByRole("button", { name: "Load This Set" }));
+
+    // the assembly now reflects the loaded set, and the union was NOT auto-run (opt-in)
+    expect(await screen.findByText(/Building from a loaded set of 2 parts/)).toBeInTheDocument();
+    expect(unionSpy).not.toHaveBeenCalled();
+
+    // the user still presses Build Set, which posts the explicit ref list
+    fireEvent.click(screen.getByRole("button", { name: "Build Set" }));
+    await waitFor(() =>
+      expect(unionSpy).toHaveBeenCalledWith({ parts: ["STM32F407VETx", "STM32F407VGTx"] }),
+    );
+  });
+});
+
+function divergentPosition(): UnionPositionDTO {
+  return {
+    position: "23",
+    position_kind: "numeric",
+    lqfp_side: "left",
+    bga_row: null,
+    bga_col: null,
+    classification: "divergent",
+    present_on: 2,
+    total: 2,
+    per_part: [],
+    reconcile: {
+      swappable: true,
+      swaps: [{ ref: "STM32F407VE", target_signal: "USART2_TX", via_af_index: 7 }],
+      reason: null,
+    },
+  };
+}
+
+function unionWithSwaps(): UnionDTO {
+  return { ...unionResult(), positions: [divergentPosition()] };
+}
+
+describe("buildAssignments", () => {
+  it("derives a per-ref position->{signal, af_index} assignment from the reconcile swaps", () => {
+    expect(buildAssignments(unionWithSwaps())).toEqual({
+      STM32F407VE: { "23": { signal: "USART2_TX", af_index: 7 } },
+    });
+  });
+});
+
+describe("AfCheckPanel", () => {
+  it("posts the held assignment and renders returned conflicts (kind + message)", async () => {
+    const spy = vi.spyOn(api, "postStmAfCheck").mockResolvedValue({
+      conflicts: [
+        {
+          kind: "peripheral-collision",
+          positions: ["23", "41"],
+          peripheral: "USART2",
+          message: "USART2 is already routed to position 41 in this assignment.",
+        },
+      ],
+    });
+    render(<AfCheckPanel union={unionWithSwaps()} />, { wrapper: wrapperWith(freshClient()) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Check Conflicts" }));
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith({
+        part: "STM32F407VE",
+        assignment: { "23": { signal: "USART2_TX", af_index: 7 } },
+      }),
+    );
+    expect(await screen.findByTestId("af-check-conflicts")).toBeInTheDocument();
+    expect(screen.getByText("peripheral-collision")).toBeInTheDocument();
+    expect(screen.getByText(/already routed to position 41/)).toBeInTheDocument();
+  });
+
+  it("renders a clean no-conflict state for an empty conflicts list", async () => {
+    vi.spyOn(api, "postStmAfCheck").mockResolvedValue({ conflicts: [] });
+    render(<AfCheckPanel union={unionWithSwaps()} />, { wrapper: wrapperWith(freshClient()) });
+    fireEvent.click(screen.getByRole("button", { name: "Check Conflicts" }));
+    expect(await screen.findByTestId("af-check-clean")).toBeInTheDocument();
+    expect(screen.queryByTestId("af-check-conflicts")).toBeNull();
   });
 });

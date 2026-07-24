@@ -9,6 +9,11 @@
  * (decision 7); the transform stays un-eased ("crisp, not gamey"). Per-pad screen position is
  * computed once, and each pad is memoized on its position so a hover/select on one pad never
  * re-renders the others (PITFALLS.md Pitfall 11).
+ *
+ * Maximize opens the same chamber as a large modal specimen (the scrim idiom the preview/diff
+ * modals use, via useModalDismiss), because the rail slot caps the everyday hero at ~300px and
+ * a 176-ball grid deserves a full-window read. The modal hosts a SECOND PinoutMapView instance
+ * with its own camera, so zooming the big view never disturbs the rail view's framing.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select } from "d3-selection";
@@ -18,6 +23,8 @@ import {
   pinMapGeometry,
   type PadLayout,
 } from "../../lib/pinMapGeometry";
+import { Button } from "../primitives";
+import { useModalDismiss } from "../../lib/useModalDismiss";
 import { categoryFill, isFiveVoltTolerant, roleStroke } from "./pinEncoding";
 
 const VIEW = 460;
@@ -35,7 +42,59 @@ interface Camera {
 }
 const IDENTITY: Camera = { k: 1, x: 0, y: 0 };
 
-export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props) {
+export function PinoutMap(props: Props) {
+  const [maximized, setMaximized] = useState(false);
+  const close = useCallback(() => setMaximized(false), []);
+  const dialogRef = useModalDismiss(maximized, close);
+
+  return (
+    <>
+      <PinoutMapView {...props} onMaximize={() => setMaximized(true)} />
+
+      {maximized ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-6"
+          data-testid="pinout-max-overlay"
+          onClick={close}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Maximized pinout for ${props.pinout.mpn_example}`}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line2 bg-popover p-4 shadow-pop outline-none"
+          >
+            <div className="mb-3 flex flex-none items-center justify-between gap-3">
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-sm font-semibold text-t1">
+                  {props.pinout.mpn_example}
+                </span>
+                <span className="font-mono text-xs text-t3">{props.pinout.package}</span>
+              </div>
+              <Button type="button" small onClick={close}>
+                Close
+              </Button>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <PinoutMapView {...props} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+// The chamber + footer, instantiable twice (rail slot and maximized modal), each instance owning
+// its own camera so the two zooms stay independent.
+function PinoutMapView({
+  pinout,
+  selectedPosition,
+  onSelectPosition,
+  onMaximize,
+}: Props & { onMaximize?: () => void }) {
   const layout = useMemo(
     () => pinMapGeometry(pinout.pins, pinout.geometry, VIEW, VIEW),
     [pinout],
@@ -201,10 +260,9 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
             </g>
           </svg>
         )}
-
       </div>
 
-      {/* The chamber footer: honesty badges left, camera reset right. A footer strip, never an
+      {/* The chamber footer: honesty badges left, camera controls right. A footer strip, never an
           overlay - a full-height ball grid owns the whole chamber, so anything floated over it
           sat on top of real pads. */}
       {!unavailable ? (
@@ -221,13 +279,16 @@ export function PinoutMap({ pinout, selectedPosition, onSelectPosition }: Props)
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={reset}
-            className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
-          >
-            Reset View
-          </button>
+          <div className="flex flex-none items-center gap-1.5">
+            {onMaximize ? (
+              <Button type="button" small onClick={onMaximize}>
+                Maximize
+              </Button>
+            ) : null}
+            <Button type="button" small onClick={reset}>
+              Reset View
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -249,7 +310,7 @@ const Pad = memo(function Pad({
   onSelect: (position: string) => void;
 }) {
   const { x, y, w, h } = pad.rect;
-  const fill = pin ? categoryFill(pin.category) : "var(--stm-cat-nc)";
+  const fill = pin ? categoryFill(pin.category) : "var(--stm-nc)";
   const stroke = pin ? roleStroke(pin) : { color: "var(--c-line2)", width: 1 };
   const fiveV = pin ? isFiveVoltTolerant(pin) : false;
   const markR = Math.min(w, h) * 0.22;

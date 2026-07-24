@@ -1,9 +1,10 @@
 /**
  * CompatUnionMap (COMPAT-02/03): the live socket-union map. It lays the union's positions with the
- * SAME lib/pinMapGeometry path PinoutMap uses (CONTEXT decision 3 — reused, never reimplemented) and
+ * SAME lib/pinMapGeometry path PinoutMap uses (CONTEXT decision 3 - reused, never reimplemented) and
  * paints each position by its classification (shared / divergent / partial) instead of by pin
- * category. Status color runs through a single small classification dot per pad, never a filled pad
- * background (VIZ-02 "color is data"); the per-part audit trail is click detail, never per-pad.
+ * category: the classification hue fills the pad itself, the same color-is-data doctrine as the
+ * explorer's category pads (owner amendment 2026-07-23, superseding the earlier dot-only rule);
+ * the per-part audit trail is click detail, never per-pad.
  *
  * A UnionDTO carries no PinoutGeometryDTO of its own, so the body shape is inferred from the
  * positions' geometry hints (a BGA row present -> ball grid, else perimeter) and handed to the same
@@ -15,13 +16,10 @@ import { select } from "d3-selection";
 import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from "d3-zoom";
 import type { PinoutGeometryDTO, UnionDTO, UnionPositionDTO } from "../../api/types";
 import { pinMapGeometry, type PadLayout } from "../../lib/pinMapGeometry";
-import { Dot } from "../primitives";
-import {
-  CLASSIFICATION_LABEL,
-  TONE_VAR,
-  classificationTone,
-  type Classification,
-} from "./compatEncoding";
+import { unionClassificationHue } from "../../lib/stmPinHue";
+import { Button, LegendSwatch } from "../primitives";
+import { CLASSIFICATION_LABEL, type Classification } from "./compatEncoding";
+import { CompatReconcileDetail } from "./CompatReconcileDetail";
 
 const VIEW = 460;
 
@@ -99,6 +97,9 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
 
   const handleSelect = useCallback((position: string) => setSelectedPosition(position), []);
 
+  // The clicked position, looked up from the union data already in hand (no new fetch). Its per-part
+  // trail + reconcile swaps render below the map as click detail, never painted per-pad (decision 3).
+  const selected = selectedPosition != null ? (byPosition.get(selectedPosition) ?? null) : null;
   const unavailable = layout.pins.length === 0;
   // Positions the layout could not place (a perimeter position with no lqfp_side, or a ball row
   // outside the JEDEC alphabet). Surfaced as a count so a partial map never reads as the whole set.
@@ -129,7 +130,7 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
                         (p.position === selectedPosition ? "bg-acc-soft" : "")
                       }
                     >
-                      <Dot tone={classificationTone(p.classification)} />
+                      <LegendSwatch token={unionClassificationHue(p.classification).stroke} />
                       <span className="w-10 flex-none font-mono text-xs text-t3">{p.position}</span>
                       <span className="truncate text-xs text-t2">
                         {CLASSIFICATION_LABEL[p.classification]}
@@ -181,13 +182,14 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
           )}
         </div>
 
-        {/* The chamber footer: the classification legend left (the Dot is the one place status
-            color runs), camera reset right. A footer strip, never an overlay on the pad field. */}
+        {/* The chamber footer: the classification legend left (the swatch is the one place status
+            color runs, taught with the shared LegendSwatch), camera reset right. A footer strip,
+            never an overlay on the pad field. */}
         <div className="mt-2 flex flex-none items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             {LEGEND.map((c) => (
               <span key={c} className="flex items-center gap-1.5 text-2xs text-t3">
-                <Dot tone={classificationTone(c)} />
+                <LegendSwatch token={unionClassificationHue(c).stroke} />
                 {CLASSIFICATION_LABEL[c]}
               </span>
             ))}
@@ -198,22 +200,25 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
             ) : null}
           </div>
           {!unavailable ? (
-            <button
-              type="button"
-              onClick={reset}
-              className="flex-none rounded-control border border-line2 bg-raise2 px-2.5 py-1 text-xs font-medium text-t2 hover:text-t1"
-            >
+            <Button type="button" small onClick={reset} className="flex-none">
               Reset View
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
+
+      {/* The per-part audit trail + reconcile swaps for the clicked position (COMPAT-03). Rendered
+          only on selection, never per-pad on the map (CONTEXT decision 3). */}
+      {selected ? <CompatReconcileDetail position={selected} /> : null}
     </div>
   );
 }
 
-// One union pad: a neutral body rect carrying a single classification dot (never a filled pad
-// background). Memoized on its position so a select elsewhere never re-renders it (Pitfall 11).
+// One union pad, filled with its classification hue - the same color-is-data doctrine the
+// explorer's category pads use, applied to the classification axis (owner amendment 2026-07-23:
+// supersedes the earlier dot-only rendering, which read washed next to the explorer map; the
+// per-part audit trail stays click detail, never per-pad). An unclassified pad stays neutral.
+// Memoized on its position so a select elsewhere never re-renders it (Pitfall 11).
 const UnionPad = memo(function UnionPad({
   pad,
   position,
@@ -227,8 +232,7 @@ const UnionPad = memo(function UnionPad({
 }) {
   const { x, y, w, h } = pad.rect;
   const classification = position?.classification;
-  const dotFill = classification ? TONE_VAR[classificationTone(classification)] : "var(--c-t3)";
-  const dotR = Math.min(w, h) * 0.3;
+  const fill = classification ? unionClassificationHue(classification).stroke : "var(--c-raise2)";
 
   return (
     <g
@@ -261,11 +265,10 @@ const UnionPad = memo(function UnionPad({
         width={w}
         height={h}
         rx={1.5}
-        fill="var(--c-raise2)"
+        fill={fill}
         stroke="var(--c-line2)"
         strokeWidth={1}
       />
-      <circle cx={x + w / 2} cy={y + h / 2} r={dotR} fill={dotFill} />
     </g>
   );
 });

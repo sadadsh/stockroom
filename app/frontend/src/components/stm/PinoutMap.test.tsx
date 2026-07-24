@@ -128,6 +128,18 @@ describe("PinoutMap", () => {
     expect(screen.queryByText(/Layout inferred/i)).toBeNull();
   });
 
+  it("maximize opens a large modal specimen and Escape closes it", () => {
+    render(<PinoutMap pinout={LQFP} selectedPosition={null} onSelectPosition={vi.fn()} />);
+    expect(screen.queryByTestId("pinout-max-overlay")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Maximize" }));
+    const overlay = screen.getByTestId("pinout-max-overlay");
+    expect(overlay).toBeInTheDocument();
+    // the modal hosts its own second chamber instance
+    expect(overlay.querySelectorAll('svg[data-testid="pinout-map-svg"]')).toHaveLength(1);
+    fireEvent.keyDown(overlay.querySelector('[role="dialog"]')!, { key: "Escape" });
+    expect(screen.queryByTestId("pinout-max-overlay")).toBeNull();
+  });
+
   it("counts pads the layout could not place instead of hiding them", () => {
     const partial: PinoutDTO = {
       ...LQFP,

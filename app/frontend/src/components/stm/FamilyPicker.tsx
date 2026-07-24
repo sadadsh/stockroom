@@ -133,7 +133,7 @@ function FamilyGroup({
             type="button"
             onClick={onExpand}
             aria-label={expanded ? `Collapse ${family.family}` : `Expand ${family.family}`}
-            className="flex-none rounded-[5px] p-0.5 text-t3 hover:text-t1"
+            className="flex-none rounded-control p-0.5 text-t3 hover:text-t1"
           >
             <ChevronIcon
               className={"h-3.5 w-3.5 transition-transform " + (expanded ? "rotate-90" : "")}
@@ -178,11 +178,11 @@ function FamilyGroup({
 // A neutral checkbox indicator (the app's own field-checkbox idiom): accent fill when checked, a
 // hairline square when not. Not a saturated hue (selection stays neutral, design contract).
 function CheckBox({ checked, small = false }: { checked: boolean; small?: boolean }) {
-  const size = small ? "h-[15px] w-[15px] text-[10px]" : "h-[17px] w-[17px] text-[11px]";
+  const size = small ? "h-[15px] w-[15px] text-2xs" : "h-[17px] w-[17px] text-xs";
   return (
     <span
       className={
-        "flex flex-none items-center justify-center rounded-[5px] border-[1.5px] " +
+        "flex flex-none items-center justify-center rounded-control border-[1.5px] " +
         size +
         " " +
         (checked ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
