@@ -115,6 +115,7 @@ def _components_from_stream(raw: bytes) -> list[dict]:
             "designator": "",
             "lib_ref": objects[i].get("LIBREFERENCE", ""),
             "design_item_id": objects[i].get("DESIGNITEMID", ""),
+            "_part_id": objects[i].get("CURRENTPARTID", ""),
             "params": {},
             "footprint": "",
         }
@@ -141,21 +142,29 @@ def _components_from_stream(raw: bytes) -> list[dict]:
             if owner is not None and rec.get("MODELNAME"):
                 by_index[owner]["footprint"] = rec["MODELNAME"]
 
-    # Collapse multi-part placements: same designator + same LIBREFERENCE is ONE
-    # physical component. A blank designator never merges (each stays its own line).
+    # Collapse multi-part placements: same designator + same LIBREFERENCE with a
+    # DIFFERENT unit id (CURRENTPARTID) is another unit of ONE physical component.
+    # The same unit id repeated (two unannotated "R?" copies of a single-part
+    # symbol) is two physical parts and never merges; a blank designator never
+    # merges either.
     out: list[dict] = []
     seen: dict[tuple[str, str], dict] = {}
     for i in sorted(by_index):
         c = by_index[i]
+        part_id = c.pop("_part_id")
         key = (c["designator"], c["lib_ref"])
         if c["designator"] and key in seen:
-            merged = seen[key]
-            for k, v in c["params"].items():
-                merged["params"].setdefault(k, v)
-            if not merged["footprint"]:
-                merged["footprint"] = c["footprint"]
-            continue
-        seen[key] = c
+            merged, seen_part_ids = seen[key]
+            if part_id not in seen_part_ids:
+                seen_part_ids.add(part_id)
+                for k, v in c["params"].items():
+                    merged["params"].setdefault(k, v)
+                if not merged["footprint"]:
+                    merged["footprint"] = c["footprint"]
+                continue
+            # same unit id again: a distinct physical copy, falls through to append
+        if c["designator"]:
+            seen.setdefault(key, (c, {part_id}))
         out.append(c)
     return out
 

@@ -68,6 +68,21 @@ def test_multi_unit_placements_collapse_to_one_physical_component():
     assert [c["designator"] for c in comps] == ["U1"]
 
 
+def test_two_unannotated_copies_stay_two_components():
+    # Two placed-but-unannotated copies of a SINGLE-part symbol share the designator
+    # ("R?") AND the library reference, but both are unit 1 (same CURRENTPARTID).
+    # They are two physical parts; only DIFFERENT unit ids collapse.
+    stream = (
+        HEADER
+        + _rec("RECORD=1", "LIBREFERENCE=RES", "OWNERPARTID=-1", "CURRENTPARTID=1")
+        + _rec("RECORD=34", "OWNERINDEX=0", "NAME=Designator", "TEXT=R?")
+        + _rec("RECORD=1", "LIBREFERENCE=RES", "OWNERPARTID=-1", "CURRENTPARTID=1")
+        + _rec("RECORD=34", "OWNERINDEX=2", "NAME=Designator", "TEXT=R?")
+    )
+    comps = _components_from_stream(stream)
+    assert [c["designator"] for c in comps] == ["R?", "R?"]
+
+
 def test_two_distinct_components_stay_distinct():
     stream = (
         HEADER

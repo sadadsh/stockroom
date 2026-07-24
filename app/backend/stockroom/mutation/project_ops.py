@@ -22,7 +22,7 @@ from stockroom.projects import conform_ops, fab_export as fab_export_mod, fab_op
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
-from stockroom.projects.health import audit_project
+from stockroom.projects.health import audit_altium_project, audit_project
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
 
@@ -35,13 +35,28 @@ def _resolve_parts(library_parts):
     return list(parts or ())
 
 
+# What each EDA's registration can do in the Projects surface. The base set works for
+# any project (the audit reads the schematics, the BOM builds offline, git history is
+# git). The KiCad-only set needs KiCad files or kicad-cli: ERC/DRC, fab exports, the
+# .kicad_pro editors (setup/net classes), Prepare (annotate/fill writes), and the
+# board/schematic viewer. Altium binaries are read-only here, so those honestly stay off.
+KICAD_ONLY_CAPABILITIES = ("checks", "fab", "setup", "netclasses", "prepare", "viewer")
+
+
+def project_capabilities(rec: ProjectRecord) -> list[str]:
+    caps = ["audit", "bom", "revisions", "restore", "file"]
+    if rec.eda == "kicad":
+        caps += list(KICAD_ONLY_CAPABILITIES)
+    return caps
+
+
 class ProjectOps:
     def __init__(self, store: ProjectStore, cli=None):
         self.store = store
         self.cli = cli
 
-    def register(self, root) -> ProjectRecord:
-        return self.store.register(root)
+    def register(self, root, eda: str | None = None) -> ProjectRecord:
+        return self.store.register(root, eda=eda)
 
     def list(self) -> list[ProjectRecord]:
         return self.store.list()
@@ -61,8 +76,11 @@ class ProjectOps:
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         root = Path(rec.root)
-        sheet_paths = [root / s for s in rec.sheet_paths]
-        au = audit_project(sheet_paths, footprint_dirs=footprint_dirs, model_dirs=model_dirs)
+        if rec.eda == "altium":
+            au = audit_altium_project(root, rec.pro_path, rec.sheet_paths)
+        else:
+            sheet_paths = [root / s for s in rec.sheet_paths]
+            au = audit_project(sheet_paths, footprint_dirs=footprint_dirs, model_dirs=model_dirs)
         au["project"] = rec.name
         return au
 
@@ -72,9 +90,7 @@ class ProjectOps:
         Buildability verdict read. Raises FileNotFoundError for an unknown id. A missing
         kicad-cli surfaces an honest per-check cli-absent result rather than a fabricated
         pass; the router gates on cli availability first for an immediate honest 502."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         cli = getattr(self.cli, "binary", self.cli)
         return project_checks(
             rec.root, rec.pro_path, rec.board_paths, rec.sheet_paths,
@@ -103,9 +119,7 @@ class ProjectOps:
         """The honest state the Fab panel gates on (M7i): whether the project has a board to
         fabricate and whether kicad-cli is available, plus the board file names for the
         picker. Read-only, no shell-out. Raises FileNotFoundError for an unknown id."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         cli = getattr(self.cli, "binary", self.cli)
         boards = [Path(b).name for b in rec.board_paths]
         return {
@@ -125,9 +139,7 @@ class ProjectOps:
         (no board / an unknown board name) and KiCadCliError (missing cli / failed plot).
         `board` selects one board file by name when the project has more than one; the first
         board is the default."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         if not rec.board_paths:
             raise ValueError("this project has no .kicad_pcb to fabricate")
         if board:
@@ -236,38 +248,51 @@ class ProjectOps:
         warnings: list[dict] = []
 
         # -- completeness (live read; no library) --
+        kicad = rec.eda == "kicad"
         sheets = self._sheet_abs(rec)
         has_sch = bool(sheets)
         comps: list[dict] = []
-        for p in sheets:
-            with open(p, encoding="utf-8", newline="") as fh:
-                comps.extend(fill.read_components(SexpDocument.parse(fh.read())))
+        if kicad:
+            for p in sheets:
+                with open(p, encoding="utf-8", newline="") as fh:
+                    comps.extend(fill.read_components(SexpDocument.parse(fh.read())))
+        else:
+            # Altium sheets read through the schdoc reader into the SAME component
+            # shape, so readiness computes identically for both EDAs.
+            from stockroom.projects.health import altium_project_components
+
+            comps = altium_project_components(Path(rec.root), rec.sheet_paths)
         cr = fill.project_readiness(comps)
         comp_state = "pass"
         if not has_sch:
             comp_state = "fail"
             blockers.append({"kind": "no_schematic",
                              "detail": "This project has no schematic to build from.",
-                             "next_step": "Register a project that has a .kicad_sch."})
+                             "next_step": "Register a project that has a "
+                                          + (".kicad_sch." if kicad else ".SchDoc.")})
         else:
             if cr["unannotated"]:
                 comp_state = "fail"
                 # Prepare auto-numbers single-unit refs but DEFERS multi-unit / repeated-hierarchy
                 # ones to KiCad (fill.annotate_document), so the count is a superset of what
                 # Prepare can fix; the remedy must name KiCad too, never a Prepare-only dead-end.
+                # An Altium schematic annotates in Altium (Prepare is a KiCad-only writer).
                 blockers.append({"kind": "unannotated",
                                  "detail": f"{cr['unannotated']} reference(s) are not annotated.",
-                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad."})
+                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad."
+                                 if kicad else "Annotate the schematic in Altium."})
             if cr["missing_footprint"]:
                 comp_state = "fail"
                 blockers.append({"kind": "missing_footprint",
                                  "detail": f"{cr['missing_footprint']} component(s) have no footprint.",
-                                 "next_step": "Assign footprints (Prepare, or in KiCad)."})
+                                 "next_step": "Assign footprints (Prepare, or in KiCad)."
+                                 if kicad else "Assign footprints in Altium."})
             incomplete = cr["total"] - cr["complete"]
             if incomplete:
                 warnings.append({"kind": "identity_incomplete",
                                  "detail": f"{incomplete} component(s) have incomplete library identity.",
-                                 "next_step": "Prepare the project (Prepare section)."})
+                                 "next_step": "Prepare the project (Prepare section)."
+                                 if kicad else "Complete the parts in Altium or the library."})
                 # A warning-only completeness must read amber "warn", agreeing with the Prepare
                 # section, not green "pass" (mirrors the BOM signal's soft-issue downgrade).
                 if comp_state == "pass":
@@ -278,7 +303,12 @@ class ProjectOps:
                         "incomplete_refs": cr["incomplete_refs"], "missing_counts": cr["missing_counts"]}
 
         # -- ERC/DRC (cached; cold cache = not run = HARD blocker, never a pass) --
-        if not checks or checks.get("ran_at") is None:
+        # An Altium project runs its rule checks inside Altium, not here: the signal
+        # says so honestly and never blocks (a not_applicable is not a cold cache).
+        if not kicad:
+            checks_signal = {"state": "not_applicable", "ran_at": None, "errors": 0,
+                             "warnings": 0, "checked": 0, "ok": True}
+        elif not checks or checks.get("ran_at") is None:
             checks_signal = {"state": "not_run", "ran_at": None, "errors": 0,
                              "warnings": 0, "checked": 0, "ok": False}
             blockers.append({"kind": "checks_not_run",
@@ -374,6 +404,18 @@ class ProjectOps:
             raise FileNotFoundError(f"no such project: {project_id}")
         return rec
 
+    def require_kicad(self, project_id: str) -> ProjectRecord:
+        """The KiCad-only operations (ERC/DRC, fab exports, the .kicad_pro editors,
+        Prepare writes, the viewer) refuse an Altium registration with an honest 400
+        (ValueError) instead of failing deep in a file parser."""
+        rec = self._require(project_id)
+        if rec.eda != "kicad":
+            raise ValueError(
+                f"{rec.name} is an Altium project; this operation applies only to "
+                "KiCad projects"
+            )
+        return rec
+
     def _pro_path(self, rec: ProjectRecord) -> Path:
         if not rec.pro_path:
             raise ValueError("this project has no .kicad_pro to edit")
@@ -384,7 +426,7 @@ class ProjectOps:
         .kicad_pro, plus a fab-floor validation of the classes (M7e). Raises
         FileNotFoundError for an unknown id; a project with no .kicad_pro is an honest
         empty shape, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         data = {}
         if rec.pro_path:
             pro = Path(rec.root) / rec.pro_path
@@ -435,7 +477,7 @@ class ProjectOps:
         as a minimal diff, one scoped commit on the project's own git (M7e). Returns the
         reconciled classes + a fab-floor validation. Raises FileNotFoundError (unknown id)
         / ValueError (no .kicad_pro or not under git)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         pro = self._pro_path(rec)
         existing = []
         if pro.exists():
@@ -459,7 +501,7 @@ class ProjectOps:
         the project's own git (M7e). The size lists are replaced wholesale (the editor
         sends the full list); rules are field-merged so an unspecified rule is preserved.
         Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro or not under git)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         ds: dict = {"rules": dict(rules)}
         if track_widths is not None:
             ds["track_widths"] = list(track_widths)
@@ -507,7 +549,7 @@ class ProjectOps:
         netclass that exists among the project's classes (an unknown one is a ValueError ->
         400). Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro, not under git,
         or a bad row)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         pro = self._pro_path(rec)
         # Read the project's own classes to validate the netclass references. When the file is
         # gone from disk we cannot know the valid set, so membership is deferred and _write_pro
@@ -555,7 +597,7 @@ class ProjectOps:
         """The KiField bulk-field grid: every placed component across every sheet as a
         rows-by-fields table, Reference read-only (M7h). Read-only. Raises FileNotFoundError for
         an unknown id; a project with no schematic is an honest empty grid, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         grid = fields_mod.build_field_grid(self._placed_components(rec))
         return {
             "project": rec.name,
@@ -573,7 +615,7 @@ class ProjectOps:
         nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id); ValueError for a
         project not under git or with uncommitted schematic changes (the same dirty-tree guard as
         Prepare, so a user's in-progress sheet edits are never swept into the field commit)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing fields"
@@ -648,7 +690,7 @@ class ProjectOps:
         erc_pin_map is the file's matrix or None when absent: it is NEVER fabricated as an
         all-OK matrix, since that would silently disable every pin-conflict check KiCad's real
         default enforces (the editor only offers the matrix when the file already carries one)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         setup: dict = {}
         thickness = None
@@ -707,7 +749,7 @@ class ProjectOps:
         `erc_severities`/`drc_severities`/`erc_pin_map` treat an empty/None value as 'not
         submitted'; `text_variables` uses None for 'not submitted' so an empty {} is still a
         legitimate 'clear all vars'."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
 
         has_board_edit = bool(board_setup) or thickness is not None
         has_erc_sev = bool(erc_severities)
@@ -818,7 +860,7 @@ class ProjectOps:
         """The object-conform category catalog (Title Case labels + suggested sizes) plus the
         project's honest state (has a board / has a sheet / under git), for the editor's initial
         render (M7f-B). Read-only. Raises FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         boards, sheets = self._kicad_files(rec)
         return {
             "project": rec.name,
@@ -866,7 +908,7 @@ class ProjectOps:
         WITHOUT writing or touching git (M7f-B). Validates the targets (unknown category / bad
         size or thickness -> ValueError -> 400) and refuses an empty selection. Raises
         FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         conform_ops.validate_targets(pcb_targets, sch_targets)
         if not conform_ops.any_targets(pcb_targets, sch_targets):
             raise ValueError("select at least one object type to conform")
@@ -887,7 +929,7 @@ class ProjectOps:
         fabricated empty commit. Raises FileNotFoundError (unknown id); ValueError for an empty
         selection, a bad target, or a project not under git. Returns the per-file counts + the
         commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         conform_ops.validate_targets(pcb_targets, sch_targets)
         if not conform_ops.any_targets(pcb_targets, sch_targets):
             raise ValueError("select at least one object type to conform")
@@ -932,7 +974,7 @@ class ProjectOps:
         overall thickness, and the fab-preset catalog, for the Stackup editor's render (M7f-C).
         Read-only. Raises FileNotFoundError for an unknown id; a project with no board is an honest
         empty shape, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         current = None
         copper_names: list[str] = []
@@ -1023,7 +1065,7 @@ class ProjectOps:
         touching git (M7f-C). Validates the request (bad/empty/conflicting mode, unknown or
         mismatched preset, field edit on a stackless board -> ValueError -> 400). Raises
         FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         if board_path is None:
             raise ValueError("this project has no .kicad_pcb to preview")
@@ -1049,7 +1091,7 @@ class ProjectOps:
         honest no-commit no-op ({committed: None, changed: False}). Raises FileNotFoundError (unknown
         id); ValueError for a bad request, no board, or a project not under git. Returns the re-read
         stackup + the commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing"
@@ -1163,7 +1205,7 @@ class ProjectOps:
         or touching git (M7f-D). `library_parts` (the active profile's PartRecords, passed by the
         router) is the match library. Read-only. Raises FileNotFoundError for an unknown id; a project
         with no sheets is an honest empty shape, never a crash."""
-        rec = self._require(project_id)  # 404 before the (possibly large) library is loaded
+        rec = self.require_kicad(project_id)  # 404 before the (possibly large) library is loaded
         index = fill.library_match_records(_resolve_parts(library_parts))
         staged, plan, current, after = self._stage_prepare(rec, index)
         return {
@@ -1191,7 +1233,7 @@ class ProjectOps:
         ({committed: None}). `progress` (an SSE callback) reports the phase. Raises FileNotFoundError
         (unknown id); ValueError for a project not under git. Returns the counts + the residual passport
         + the commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before preparing"
@@ -1242,7 +1284,7 @@ class ProjectOps:
         project's own git (M7f-D). The residual filler for a component the auto pass could not match.
         A link that changes nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id);
         ValueError for a project not under git, an unknown library part, or no such component `ref`."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before filling"

@@ -671,6 +671,8 @@ export interface ProjectSummary {
   id: string;
   name: string;
   root: string;
+  // Which EDA owns the project files: "kicad" | "altium".
+  eda: string;
   board_count: number;
   sheet_count: number;
   has_git: boolean;
@@ -687,6 +689,10 @@ export interface ProjectDetail {
   pro_path: string;
   board_paths: string[];
   sheet_paths: string[];
+  // Which EDA owns the project files, and what this registration can do here (the
+  // server's truth: the KiCad-only surfaces are absent for an Altium project).
+  eda: string;
+  capabilities: string[];
   git_root: string | null;
   audit_digest: Record<string, unknown> | null;
   registered_at: string;

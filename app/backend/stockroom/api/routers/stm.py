@@ -20,7 +20,6 @@ from stockroom.api.schemas import (
     AfOptionDTO,
     FamilyDTO,
     McuSpecRow,
-    PinDTO,
     PinoutDTO,
     StmStatusDTO,
     SuggestionGroupDTO,
@@ -430,19 +429,6 @@ def stm_router(require_token) -> APIRouter:
         if dto_dict is None:
             raise ApiError(404, f"no such part: {part}")
         return PinoutDTO.from_dict(dto_dict).model_dump()
-
-    @r.get("/pin")
-    def get_pin(request: Request, part: str, position: str) -> dict:
-        ctx = request.app.state.ctx
-        if ctx.stm_index is None:
-            raise ApiError(409, "STM index not built")
-        dto_dict = _build_pinout_dto(ctx, part)
-        if dto_dict is None:
-            raise ApiError(404, f"no such part: {part}")
-        pin = next((p for p in dto_dict["pins"] if p["position"] == position), None)
-        if pin is None:
-            raise ApiError(404, f"no such position {position!r} on {part}")
-        return PinDTO.from_dict(pin).model_dump()
 
     @r.get("/pin/af")
     def get_pin_af(request: Request, part: str, position: str) -> dict:

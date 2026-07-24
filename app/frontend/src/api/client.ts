@@ -687,10 +687,14 @@ export const api = {
     return apiGet<ProjectSummary[]>("/api/projects");
   },
 
-  // Register an external project directory by its absolute path. A bad/nonexistent
-  // dir, a dir with no KiCad files, or an already-registered root each returns 400.
-  registerProject(root: string): Promise<ProjectDetail> {
-    return request<ProjectDetail>("POST", "/api/projects", { body: { root } });
+  // Register an external project directory by its absolute path. The EDA is
+  // auto-detected (KiCad vs Altium); a dir holding both needs `eda` passed
+  // explicitly. A bad/nonexistent dir, a dir with no project files, an ambiguous
+  // dir, or an already-registered root each returns 400.
+  registerProject(root: string, eda?: string): Promise<ProjectDetail> {
+    return request<ProjectDetail>("POST", "/api/projects", {
+      body: eda ? { root, eda } : { root },
+    });
   },
 
   getProject(id: string): Promise<ProjectDetail> {
