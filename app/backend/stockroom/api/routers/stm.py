@@ -36,6 +36,13 @@ from stockroom.stm import source as stm_source
 # the handler that actually uses it lands in 03-03.
 _stm_build_lock = threading.Lock()
 
+# Read serialization for the shared StmIndex sqlite connection. FastAPI sync handlers run on a
+# threadpool, and the Bench redesign (2026-07-23) fires suggestions + the socket-union
+# CONCURRENTLY - two threads on one sqlite3 connection raise InterfaceError ("bad parameter or
+# other API misuse"). Layer B reads are milliseconds, so serializing them is free; every
+# handler that touches ctx.stm_index.conn takes this lock.
+_stm_read_lock = threading.Lock()
+
 
 def _configured_source(ctx) -> str:
     """The configured CubeMX source path: MachineConfig.stm_cubemx_source when set (that field
@@ -335,15 +342,17 @@ def stm_router(require_token) -> APIRouter:
                 }
             ).model_dump()
 
-        meta = ctx.stm_index.meta()
-        families = sorted(
-            {
-                row["family"]
-                for row in ctx.stm_index.conn.execute(
-                    "SELECT DISTINCT family FROM mcu WHERE family IS NOT NULL AND family <> ''"
-                )
-            }
-        )
+        with _stm_read_lock:
+            meta = ctx.stm_index.meta()
+            families = sorted(
+                {
+                    row["family"]
+                    for row in ctx.stm_index.conn.execute(
+                        "SELECT DISTINCT family FROM mcu WHERE family IS NOT NULL AND family <> ''"
+                    )
+                }
+            )
+            mcu_count = ctx.stm_index.mcu_count()
         source_path = meta.get("source_path", "") or configured_source
         return StmStatusDTO.from_dict(
             {
@@ -355,7 +364,7 @@ def stm_router(require_token) -> APIRouter:
                 "device_xml_count": meta.get("device_xml_count", 0),
                 "family_count": meta.get("family_count", 0),
                 "families": families,
-                "mcu_count": ctx.stm_index.mcu_count(),
+                "mcu_count": mcu_count,
                 "classifier_rev": meta.get("classifier_rev", 0),
                 "af_schema_rev": meta.get("af_schema_rev", 0),
                 "geometry_rev": meta.get("geometry_rev", 0),
@@ -419,14 +428,17 @@ def stm_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
-        return {"families": [FamilyDTO.from_dict(f).model_dump() for f in _families_rollup(ctx)]}
+        with _stm_read_lock:
+            rollup = _families_rollup(ctx)
+        return {"families": [FamilyDTO.from_dict(f).model_dump() for f in rollup]}
 
     @r.get("/pinout")
     def get_pinout(request: Request, part: str) -> dict:
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
-        dto_dict = _build_pinout_dto(ctx, part)
+        with _stm_read_lock:
+            dto_dict = _build_pinout_dto(ctx, part)
         if dto_dict is None:
             raise ApiError(404, f"no such part: {part}")
         return PinoutDTO.from_dict(dto_dict).model_dump()
@@ -436,7 +448,8 @@ def stm_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
-        dto_dict = _build_pinout_dto(ctx, part)
+        with _stm_read_lock:
+            dto_dict = _build_pinout_dto(ctx, part)
         if dto_dict is None:
             raise ApiError(404, f"no such part: {part}")
         pin = next((p for p in dto_dict["pins"] if p["position"] == position), None)
@@ -451,7 +464,8 @@ def stm_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
-        dto_dict = _build_pinout_dto(ctx, part)
+        with _stm_read_lock:
+            dto_dict = _build_pinout_dto(ctx, part)
         if dto_dict is None:
             raise ApiError(404, f"no such part: {part}")
         pin = next((p for p in dto_dict["pins"] if p["position"] == position), None)
@@ -472,26 +486,27 @@ def stm_router(require_token) -> APIRouter:
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
         conn = ctx.stm_index.conn
-        resolved = stm_authority.resolve_part(conn, part)
-        if resolved is None:
-            raise ApiError(404, f"no such part: {part}")
-        mcu_row = conn.execute(
-            "SELECT id FROM mcu WHERE ref_name = ?", (resolved["part"],)
-        ).fetchone()
-        candidates = [
-            {
-                "position": row["physical_pin_number"],
-                "canonical_pin_name": row["canonical_pin_name"],
-                "af_index": row["af_index"],
-            }
-            for row in conn.execute(
-                "SELECT p.physical_pin_number, p.canonical_pin_name, af.af_index "
-                "FROM pin_alternate_function af "
-                "JOIN mcu_package_pin p ON p.id = af.mcu_package_pin_id "
-                "WHERE p.mcu_id = ? AND af.signal = ? ORDER BY p.physical_pin_number",
-                (mcu_row["id"], signal),
-            )
-        ]
+        with _stm_read_lock:
+            resolved = stm_authority.resolve_part(conn, part)
+            if resolved is None:
+                raise ApiError(404, f"no such part: {part}")
+            mcu_row = conn.execute(
+                "SELECT id FROM mcu WHERE ref_name = ?", (resolved["part"],)
+            ).fetchone()
+            candidates = [
+                {
+                    "position": row["physical_pin_number"],
+                    "canonical_pin_name": row["canonical_pin_name"],
+                    "af_index": row["af_index"],
+                }
+                for row in conn.execute(
+                    "SELECT p.physical_pin_number, p.canonical_pin_name, af.af_index "
+                    "FROM pin_alternate_function af "
+                    "JOIN mcu_package_pin p ON p.id = af.mcu_package_pin_id "
+                    "WHERE p.mcu_id = ? AND af.signal = ? ORDER BY p.physical_pin_number",
+                    (mcu_row["id"], signal),
+                )
+            ]
         return {"signal": signal, "candidates": candidates}
 
     @r.post("/compat/union")
@@ -506,9 +521,10 @@ def stm_router(require_token) -> APIRouter:
         family = body.get("family")
         families = body.get("families")
         package = body.get("package")
-        result = stm_authority.socket_union(
-            ctx.stm_index.conn, refs=parts, family=family, families=families, package=package
-        )
+        with _stm_read_lock:
+            result = stm_authority.socket_union(
+                ctx.stm_index.conn, refs=parts, family=family, families=families, package=package
+            )
         result = dict(result)
         result["resolved"] = [
             {"ref": ref, "mpn": _mpn_example_from_ref(ref)} for ref in result["parts"]
@@ -526,9 +542,10 @@ def stm_router(require_token) -> APIRouter:
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
         families = [f.strip() for f in family.split(",") if f.strip()]
-        groups = stm_authority.compatibility_suggestions(
-            ctx.stm_index.conn, package, families=families, tolerance=tolerance
-        )
+        with _stm_read_lock:
+            groups = stm_authority.compatibility_suggestions(
+                ctx.stm_index.conn, package, families=families, tolerance=tolerance
+            )
         return {"groups": [SuggestionGroupDTO.from_dict(g).model_dump() for g in groups]}
 
     @r.post("/af-check")
@@ -538,7 +555,8 @@ def stm_router(require_token) -> APIRouter:
             raise ApiError(409, "STM index not built")
         part = body.get("part")
         assignment = body.get("assignment") or {}
-        conflicts = stm_authority.af_conflicts(ctx.stm_index.conn, part, assignment)
+        with _stm_read_lock:
+            conflicts = stm_authority.af_conflicts(ctx.stm_index.conn, part, assignment)
         return {"conflicts": conflicts}
 
     @r.post("/build")

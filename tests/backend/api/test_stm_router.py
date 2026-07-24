@@ -575,3 +575,30 @@ def test_af_check_conflict_free_returns_empty_list(client, app_ctx):
     )
     assert r.status_code == 200
     assert r.json()["conflicts"] == []
+
+
+def test_concurrent_stm_reads_share_one_connection_safely(client, app_ctx):
+    """The Bench fires suggestions and the socket-union CONCURRENTLY (redesign 2026-07-23).
+    Two threadpool handlers on one sqlite connection raised InterfaceError before the
+    router's read lock; this drives a mixed burst in parallel and requires every response
+    to succeed."""
+    import concurrent.futures
+
+    _seed_stm_index(app_ctx)
+
+    def call(kind: str) -> int:
+        if kind == "union":
+            return client.post(
+                "/api/stm/compat/union", json={"family": "STM32F4", "package": "LQFP64"}
+            ).status_code
+        if kind == "sugg":
+            return client.get(
+                "/api/stm/compat/suggestions",
+                params={"package": "LQFP64", "family": "STM32F4"},
+            ).status_code
+        return client.get("/api/stm/pinout", params={"part": "STM32F407V(E-G)Tx"}).status_code
+
+    kinds = ["union", "sugg", "pinout"] * 8
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        codes = list(pool.map(call, kinds))
+    assert codes == [200] * len(kinds)
