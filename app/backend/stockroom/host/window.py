@@ -834,12 +834,33 @@ def build_login_autofill_js(vendor: str, username: str, password: str) -> str:
         "nset(el,val);el.dispatchEvent(new Event('input',{bubbles:true}));"
         "el.dispatchEvent(new Event('change',{bubbles:true}));return true;}"
         f"var US={j(sels['user'])},PS={j(sels['pass'])};"
-        # DigiKey's login is TWO steps (email -> Next -> password). The password field appears
-        # on a later step that can be a same-document render, so re-fill on a short interval to
-        # catch it even without a fresh page load; a full-page step re-injects this anyway.
-        "var n=0;var iv=setInterval(function(){n++;fill(US,u);fill(PS,p);"
-        "if(n>=30)clearInterval(iv);},500);"
-        "fill(US,u);fill(PS,p);"
+        # AUTO-SUBMIT (owner 2026-07-24: "make everything automatic"). DigiKey's login is TWO
+        # steps (email -> Next -> password -> Sign In). Fill the visible field, then click its
+        # submit button ONCE per step (tracked in `sent`, reset each fresh page load), so a full
+        # capture logs in with the saved creds and no clicks. Bounded: at most one click per step
+        # per page, only after the field truly holds the value, and only a submit/Next/Sign-in
+        # style button (never Register/Cancel) - so a wrong cred fails once and never loops (the
+        # reactor's wall detection then hands off). Also clicks a "Login" prompt (e.g. the guest
+        # download-limit modal) to REACH the login form.
+        "var sent={u:false,p:false,go:false};"
+        "function submit(){try{"
+        "var b=document.querySelector('form button[type=submit]:not([disabled]),form input[type=submit]:not([disabled])');"
+        "if(!b){var cs=[].slice.call(document.querySelectorAll('button,input[type=submit],a[role=button]'));"
+        "b=cs.filter(function(x){return x.offsetParent!==null&&!x.disabled&&"
+        "/^(sign ?in|log ?in|login|next|continue|submit)$/i.test((x.textContent||x.value||'').trim());})[0];}"
+        "if(b&&b.offsetParent!==null){b.click();return true;}return false;}catch(e){return false;}}"
+        "function tick(){"
+        "var pw=document.querySelector(PS);var pwv=pw&&pw.offsetParent!==null;"
+        "fill(US,u);if(pwv)fill(PS,p);"
+        "var uEl=document.querySelector(US);"
+        "if(pwv){if(!sent.p&&pw.value===p){sent.p=true;setTimeout(submit,450);}}"
+        "else if(uEl&&uEl.offsetParent!==null){if(!sent.u&&uEl.value===u){sent.u=true;setTimeout(submit,450);}}"
+        # a login/guest-limit prompt with no field to fill: click its Login button ONCE to reach
+        # the sign-in form (then the fills+submits above take over on the login page)
+        "else if(!sent.go){var g=[].slice.call(document.querySelectorAll('button,a')).filter(function(x){"
+        "return x.offsetParent!==null&&/^(sign ?in|log ?in|login)$/i.test((x.textContent||'').trim());})[0];"
+        "if(g){sent.go=true;setTimeout(function(){try{g.click();}catch(e){}},450);}}}"
+        "var n=0;var iv=setInterval(function(){n++;tick();if(n>=40)clearInterval(iv);},600);tick();"
         "}catch(e){}})();"
     )
 
