@@ -209,7 +209,7 @@ function cadButtonId(status: GuidedStatus): string {
 const REQ_TOAST: Record<Requirement, string> = {
   kicad_symbol: "KiCad symbol received",
   kicad_footprint: "KiCad footprint received",
-  kicad_model: "KiCad 3D model received",
+  kicad_model: "3D model received",
   altium_symbol: "Altium symbol received",
   altium_footprint: "Altium footprint received",
 };

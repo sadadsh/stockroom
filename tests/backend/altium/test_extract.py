@@ -35,6 +35,12 @@ def test_normalize_extracts_an_intlib(tmp_path):
     assert read_footprint_names(pcb) == ["DIOM5227X270N"]
 
 
-def test_normalize_rejects_ambiguous_input():
+def test_normalize_returns_a_lone_side_with_none_for_the_other():
+    # split delivery (owner 2026-07-24): a lone .SchLib is half the pair, not an error
+    sch, pcb = normalize_altium_source(FIX / "sample.SchLib")
+    assert sch is not None and pcb is None
+
+
+def test_normalize_rejects_nothing_usable():
     with pytest.raises(ValueError):
-        normalize_altium_source(FIX / "sample.SchLib")  # schlib only: neither a pair nor an IntLib
+        normalize_altium_source()

@@ -458,6 +458,15 @@ export const api = {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
   },
 
+  // Remove ONE element from a part (symbol / footprint / model / datasheet /
+  // altium_symbol / altium_footprint): the file goes, the ref nulls, one scoped commit.
+  detachAsset(id: string, kind: string): Promise<PartDetail> {
+    return request<PartDetail>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/assets/${encodeURIComponent(kind)}`,
+    );
+  },
+
   // Refresh one part's volatile procurement data (price/stock/lifecycle/lead/dist P/N)
   // from the distributor APIs. A write-lane job: the record commits server-side and the
   // job's terminal SSE result carries the updated record.

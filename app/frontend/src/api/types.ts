@@ -165,6 +165,10 @@ export interface PartDetail {
   symbol: LibRef | null;
   footprint: LibRef | null;
   model: ModelRef | null;
+  // Altium DbLib bindings (the stored .SchLib/.PcbLib + the bound entry names); null
+  // until the capture attaches them. Optional so older fixtures still type-check.
+  altium_symbol?: { lib: string; name: string } | null;
+  altium_footprint?: { lib: string; name: string } | null;
   provenance: Provenance | null;
   hashes: Record<string, string> | null;
   enrichment: Record<string, { source: string; confidence: string }>;

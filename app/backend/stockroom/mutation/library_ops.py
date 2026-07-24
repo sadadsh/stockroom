@@ -469,31 +469,132 @@ class LibraryOps:
         json_path = self.lib.parts_dir / f"{part_id}.json"
 
         with tempfile.TemporaryDirectory() as td:
-            # normalize to a loose (schlib, pcblib) pair (extracting an IntLib into the tempdir)
+            # normalize to a loose (schlib, pcblib) pair, EITHER side possibly None (split
+            # vendor delivery attaches one side per capture forward; the other side keeps
+            # whatever the record already carries)
             sch_src, pcb_src = normalize_altium_source(*sources, out_dir=td)
-            # pick the one entry to bind; an exact MPN match wins for the symbol, a multi-entry
-            # library is rejected rather than silently binding the alphabetically-first (wrong part)
-            sym_name = pick_entry(read_symbol_names(sch_src), "symbol", prefer=record.mpn)
-            fp_name = pick_entry(read_footprint_names(pcb_src), "footprint")
+            # best-effort entry binding (exact MPN, then the name containing it, then the
+            # first entry): a multi-entry vendor library must never refuse the capture
+            sym_name = (
+                pick_entry(read_symbol_names(sch_src), "symbol", prefer=record.mpn)
+                if sch_src is not None else None
+            )
+            fp_name = (
+                pick_entry(read_footprint_names(pcb_src), "footprint", prefer=record.mpn)
+                if pcb_src is not None else None
+            )
 
             # mkdir AFTER validation so a normalize/read failure leaves zero trace
             fresh = [] if altium_dir.exists() else [altium_dir]
             altium_dir.mkdir(parents=True, exist_ok=True)
-            sch_dst = altium_dir / f"{part_id}.SchLib"
-            pcb_dst = altium_dir / f"{part_id}.PcbLib"
             with Transaction(self.repo) as txn:
                 txn.track_dir(*fresh)
+                landed: list[str] = []
                 # track EACH file right after its copy so a failure of the second copy still
                 # rolls back the first (no leaked .SchLib on a partial failure)
-                shutil.copyfile(sch_src, sch_dst)
-                txn.track(sch_dst)
-                shutil.copyfile(pcb_src, pcb_dst)
-                txn.track(pcb_dst)
-                record.altium_symbol = AltiumRef(lib=sch_dst.name, name=sym_name)
-                record.altium_footprint = AltiumRef(lib=pcb_dst.name, name=fp_name)
+                if sch_src is not None:
+                    sch_dst = altium_dir / f"{part_id}.SchLib"
+                    shutil.copyfile(sch_src, sch_dst)
+                    txn.track(sch_dst)
+                    record.altium_symbol = AltiumRef(lib=sch_dst.name, name=sym_name)
+                    landed.append(sym_name or sch_dst.name)
+                if pcb_src is not None:
+                    pcb_dst = altium_dir / f"{part_id}.PcbLib"
+                    shutil.copyfile(pcb_src, pcb_dst)
+                    txn.track(pcb_dst)
+                    record.altium_footprint = AltiumRef(lib=pcb_dst.name, name=fp_name)
+                    landed.append(fp_name or pcb_dst.name)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
-                txn.commit(f"Attach Altium assets to {part_id}: {sym_name} + {fp_name}")
+                txn.commit(f"Attach Altium assets to {part_id}: {' + '.join(landed)}")
+        return record
+
+    def detach_asset(self, part_id: str, kind: str) -> PartRecord:
+        """Remove ONE element from a part (owner 2026-07-24): the file goes, the record
+        ref nulls, one scoped commit; everything else on the part stands. `kind` is one of
+        symbol / footprint / model / datasheet / altium_symbol / altium_footprint. A kind
+        the part does not carry is a loud ValueError, never a silent no-op (so the UI can
+        never pretend to remove something that was not there)."""
+        record = self.load_record(part_id)
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        altium_dir = self.lib.parts_dir.parent / "altium"
+
+        def _missing(what: str):
+            return ValueError(f"{part_id} has no {what} to remove")
+
+        with Transaction(self.repo) as txn:
+            if kind == "symbol":
+                if record.symbol is None:
+                    raise _missing("symbol")
+                sym_lib_path = self.lib.symbol_lib_path(record.category)
+                if sym_lib_path.exists():
+                    sym_lib = SymbolLib.load(sym_lib_path)
+                    if record.symbol.name in sym_lib.symbol_names:
+                        sym_lib.remove_symbol(record.symbol.name)
+                        sym_lib.save(sym_lib_path)
+                        txn.track(sym_lib_path)
+                record.symbol = None
+            elif kind == "footprint":
+                if record.footprint is None:
+                    raise _missing("footprint")
+                fp_path = (
+                    self.lib.footprint_lib_path(record.category)
+                    / f"{record.footprint.name}.kicad_mod"
+                )
+                if fp_path.exists():
+                    txn.track(fp_path)
+                    fp_path.unlink()
+                record.footprint = None
+            elif kind == "model":
+                if record.model is None:
+                    raise _missing("3D model")
+                model_path = self.lib.parts_dir.parent / record.model.file
+                if model_path.exists():
+                    txn.track(model_path)
+                    model_path.unlink()
+                # strip the dangling (model ...) link from the footprint, if one stands
+                if record.footprint is not None:
+                    fp_path = (
+                        self.lib.footprint_lib_path(record.category)
+                        / f"{record.footprint.name}.kicad_mod"
+                    )
+                    if fp_path.exists():
+                        fp = Footprint.load(fp_path)
+                        if fp.model_path:
+                            fp.set_model_path("")
+                            fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
+                            txn.track(fp_path)
+                record.model = None
+            elif kind == "datasheet":
+                if record.datasheet is None:
+                    raise _missing("datasheet")
+                if record.datasheet.file:
+                    ds_path = self.lib.datasheets_dir / record.datasheet.file
+                    if ds_path.exists():
+                        txn.track(ds_path)
+                        ds_path.unlink()
+                record.datasheet = None
+            elif kind == "altium_symbol":
+                if record.altium_symbol is None:
+                    raise _missing("Altium symbol")
+                sch = altium_dir / f"{part_id}.SchLib"
+                if sch.exists():
+                    txn.track(sch)
+                    sch.unlink()
+                record.altium_symbol = None
+            elif kind == "altium_footprint":
+                if record.altium_footprint is None:
+                    raise _missing("Altium footprint")
+                pcb = altium_dir / f"{part_id}.PcbLib"
+                if pcb.exists():
+                    txn.track(pcb)
+                    pcb.unlink()
+                record.altium_footprint = None
+            else:
+                raise ValueError(f"unknown asset kind: {kind!r}")
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(f"Remove {kind.replace('_', ' ')} from {part_id}")
         return record
 
     def load_record(self, part_id: str) -> PartRecord:

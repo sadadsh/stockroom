@@ -29,7 +29,7 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { Glb3DView } from "./Glb3DView";
-import { useCadSourceQuery, usePreviewGlb, useRefreshSourcing } from "../api/queries";
+import { useCadSourceQuery, useDetachAsset, usePreviewGlb, useRefreshSourcing } from "../api/queries";
 import { useToast } from "../lib/toast";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
@@ -163,6 +163,10 @@ export function DetailPanel({
   // quiet toasts like every other background mutation.
   const refreshJob = useRefreshSourcing(detail?.id ?? "");
   const { toast } = useToast();
+  // Per-element removal (owner 2026-07-24): a wrongly-captured element deletes on its
+  // own, confirmed in-window, leaving the rest of the part standing.
+  const detach = useDetachAsset();
+  const [pendingDetach, setPendingDetach] = useState<{ kind: string; label: string } | null>(null);
   const refreshStatus = refreshJob.status;
   const refreshError = refreshJob.error;
   useEffect(() => {
@@ -361,6 +365,23 @@ export function DetailPanel({
               canComplete={canComplete}
               needsList={needsList}
               onComplete={() => setCompleteOpen(true)}
+              removable={
+                // a passive references KiCad STOCK assets by id (no owned files);
+                // element removal applies to owned files only
+                onEditField && !detail.passive
+                  ? ([
+                      detail.symbol ? { kind: "symbol", label: "KiCad Symbol" } : null,
+                      detail.footprint ? { kind: "footprint", label: "KiCad Footprint" } : null,
+                      detail.model ? { kind: "model", label: "3D Model" } : null,
+                      detail.datasheet ? { kind: "datasheet", label: "Datasheet" } : null,
+                      detail.altium_symbol ? { kind: "altium_symbol", label: "Altium Symbol" } : null,
+                      detail.altium_footprint
+                        ? { kind: "altium_footprint", label: "Altium Footprint" }
+                        : null,
+                    ].filter(Boolean) as { kind: string; label: string }[])
+                  : []
+              }
+              onRemove={(kind, label) => setPendingDetach({ kind, label })}
             />
             <Filing
               category={detail.category}
@@ -507,6 +528,38 @@ export function DetailPanel({
         }}
         initialKind={preview ?? "symbol"}
         onClose={() => setPreview(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingDetach !== null}
+          title="Remove This Element?"
+          body={
+            <>
+              Remove the <b>{pendingDetach?.label}</b> from this part? The file is
+              deleted and the reference cleared; everything else stays.
+            </>
+          }
+          confirmLabel="Remove"
+          danger
+          busy={detach.isPending}
+          onCancel={() => setPendingDetach(null)}
+          onConfirm={() => {
+            if (!pendingDetach || !detail) return;
+            const label = pendingDetach.label;
+            detach.mutate(
+              { id: detail.id, kind: pendingDetach.kind },
+              {
+                onSuccess: () => {
+                  toast(`${label} removed.`, "ok");
+                  setPendingDetach(null);
+                },
+                onError: (e) => {
+                  toast(e instanceof Error ? e.message : "Could not remove it.", "err");
+                  setPendingDetach(null);
+                },
+              },
+            );
+          }}
       />
 
       {onDelete ? (
@@ -734,6 +787,8 @@ function ReadinessBlock({
   canComplete,
   needsList,
   onComplete,
+  removable = [],
+  onRemove,
 }: {
   kicad: AssetReadiness;
   altium: AssetReadiness;
@@ -741,6 +796,10 @@ function ReadinessBlock({
   canComplete: boolean;
   needsList: string[];
   onComplete: () => void;
+  // The elements this part carries that can be removed one by one (owner 2026-07-24:
+  // a wrong capture must be deletable without touching the rest of the part).
+  removable?: { kind: string; label: string }[];
+  onRemove?: (kind: string, label: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   // KiCad needs come from the record's own refs; Altium needs prefer the capture query
@@ -803,6 +862,30 @@ function ReadinessBlock({
                 </span>
               </span>
             </button>
+          ) : null}
+          {onRemove && removable.length > 0 ? (
+            <div className="mt-3 border-t border-line pt-2.5">
+              <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+                <Text id="detail.remove-eyebrow">Remove</Text>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {removable.map((r) => (
+                  <button
+                    key={r.kind}
+                    type="button"
+                    data-dev-id="detail.remove-asset"
+                    onClick={() => {
+                      setOpen(false);
+                      onRemove(r.kind, r.label);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-control border border-line px-2 py-1 text-2xs font-medium text-t2 transition-colors hover:border-err/60 hover:text-err focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                  >
+                    {r.label}
+                    <span aria-hidden>{"\u00d7"}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : null}
         </div>
       ) : null}

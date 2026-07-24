@@ -271,6 +271,29 @@ def _extract_altium_members(zip_path, out_dir) -> list[str]:
                 with zf.open(name) as src, open(dest, "wb") as dst:
                     shutil.copyfileobj(src, dst)
                 extracted.append(str(dest))
+            # one level of nesting: vendors wrap the Altium set in an inner zip inside
+            # the bundle; its loose members extract the same way (flattened basenames)
+            for name in zf.namelist():
+                if Path(name).suffix.lower() != ".zip":
+                    continue
+                try:
+                    import io as _io
+
+                    with zf.open(name) as inner_fh:
+                        with zipfile.ZipFile(_io.BytesIO(inner_fh.read())) as inner:
+                            inner_members = [
+                                n for n in inner.namelist()
+                                if Path(n).suffix.lower() in _ALTIUM_SUFFIXES
+                            ]
+                            if inner_members:
+                                out.mkdir(parents=True, exist_ok=True)
+                            for iname in inner_members:
+                                dest = out / Path(iname).name
+                                with inner.open(iname) as src, open(dest, "wb") as dst:
+                                    shutil.copyfileobj(src, dst)
+                                extracted.append(str(dest))
+                except (zipfile.BadZipFile, OSError, KeyError):
+                    continue
     except (zipfile.BadZipFile, OSError):
         return []
     return extracted
@@ -323,16 +346,30 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     file; the evaluate_js itself runs outside the lock."""
     with _CAD_CAPTURE_LOCK:
         classified = classify_asset(Path(path))
+        # An altium requirement may only be RECORDED when backed by real attachable
+        # paths. A capture whose altium content cannot be pulled out (a zip with no
+        # extract_dir, an extraction failure) must leave the need OPEN - recording it
+        # unbacked completed the session and closed the window while the SPA had
+        # nothing to attach (live 2026-07-24: "got all the files", record incomplete).
+        wanted = classified.requirements
+        altium_wanted = [r for r in wanted if r in _ALTIUM_REQS]
+        backed_altium: list[str] = []
+        if altium_wanted:
+            backed_altium = _altium_paths_from_capture(path, classified, altium_wanted, extract_dir)
+            if not backed_altium:
+                wanted = frozenset(r for r in wanted if r not in _ALTIUM_REQS)
         if session is not None:
             # reqs may be EMPTY (a duplicate re-fire, or a wrong-format download): the SPA forward
             # and HUD tick are gated on it below, but the completed relay still fires - the reactor
             # must hear about every file that landed, or it waits out a watchdog on a done download.
-            reqs = session.record(classified.requirements, path)
+            reqs = session.record(wanted, path)
             token = session.token
         else:
-            reqs = sorted(classified.requirements, key=lambda r: r.value)
+            reqs = sorted(wanted, key=lambda r: r.value)
             token = None
-        altium_paths = _altium_paths_from_capture(path, classified, reqs, extract_dir)
+        # hand the altium paths over only when this forward actually carries altium reqs
+        # (a dedup that dropped them must not re-send the files)
+        altium_paths = backed_altium if any(r in _ALTIUM_REQS for r in reqs) else []
         payload = build_capture_payload(path, token, reqs, altium_paths)
     if payload.get("requirements"):
         _emit_to_spa(payload)
@@ -445,6 +482,64 @@ def _poll_downloads_watch(
         return
     if not _session_complete(session):
         _forward_timeout_signal(session)
+
+
+def _should_auto_allow_permission(kind: str) -> bool:
+    """Whether a WebView2 permission request in the CAD window is auto-granted. ONLY the
+    download-related kinds (Edge's "allow multiple automatic downloads?" bar, which blocked
+    the second file of the both-format capture, live 2026-07-24) - camera/mic/location and
+    everything else keep their normal prompts."""
+    return "download" in (kind or "").lower()
+
+
+def _install_cad_permission_autoallow(
+    window, *, retries: int = 40, delay: float = 0.25, sleep=time.sleep
+) -> None:
+    """Best-effort (Windows only): subscribe to THIS window's CoreWebView2
+    PermissionRequested and auto-allow the download-related kinds, so the both-format
+    capture's second download never stalls behind Edge's "allow multiple automatic
+    downloads?" bar. Runs on a daemon thread because CoreWebView2 initializes
+    asynchronously; concedes silently after `retries` (the user can still click Allow
+    by hand - degraded, never broken). Reaches pywebview internals the same way (and
+    with the same guards) as the tier-1 download intercept above."""
+    if os.name != "nt":
+        return
+
+    def _subscribe() -> None:
+        try:
+            from webview.platforms.winforms import BrowserView
+        except Exception:  # noqa: BLE001 - not the Windows backend; nothing to do
+            return
+        core = None
+        for _ in range(max(1, retries)):
+            browser_form = BrowserView.instances.get(getattr(window, "uid", None))
+            edge = getattr(browser_form, "browser", None)
+            web_view = getattr(edge, "web_view", None)
+            core = getattr(web_view, "CoreWebView2", None)
+            if core is not None:
+                break
+            sleep(delay)
+        if core is None:
+            _log.warning("cad permission auto-allow: CoreWebView2 never appeared; prompts stay manual")
+            return
+
+        def _on_permission_requested(sender, args) -> None:
+            # KEEP PRISTINE: runs on the WebView2 COM thread. Read the kind, set the
+            # state, nothing else.
+            try:
+                if _should_auto_allow_permission(str(args.PermissionKind)):
+                    from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+
+                    args.State = CoreWebView2PermissionState.Allow
+            except Exception:  # noqa: BLE001 - a shape mismatch degrades to the manual prompt
+                pass
+
+        try:
+            core.PermissionRequested += _on_permission_requested
+        except Exception:  # noqa: BLE001 - could not subscribe; the manual prompt remains
+            _log.warning("cad permission auto-allow: could not subscribe; prompts stay manual")
+
+    threading.Thread(target=_subscribe, daemon=True).start()
 
 
 def _install_cad_download_intercept(
@@ -1025,6 +1120,7 @@ class _HostApi:
             _forward_cad_capture(captured_path, session, extract_dir=session.temp_dir)
 
         _install_cad_download_intercept(win, session.temp_dir, _on_captured)
+        _install_cad_permission_autoallow(win)
 
         watch = DownloadsWatch.start(default_downloads_dir())
         _CAD_DOWNLOADS_WATCH = watch

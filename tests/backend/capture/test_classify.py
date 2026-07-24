@@ -123,3 +123,49 @@ def test_classify_prefers_known_suffix_over_content_sniff(tmp_path):
     p.write_text("(kicad_symbol_lib)")
     c = classify_asset(p)
     assert c.requirements == frozenset({Requirement.KICAD_SYMBOL})
+
+
+def test_suffixless_ole_schlib_classifies_by_content(tmp_path):
+    # WebView2 can save a download as a GUID ".tmp" with no useful name. A zip already
+    # classifies by its members; an OLE compound file (a loose .SchLib/.PcbLib saved
+    # that way) must classify by ITS content too, never drop as unknown.
+    import shutil as _sh
+    from pathlib import Path as _P
+
+    fx = _P(__file__).parent.parent / "altium" / "fixtures"
+    p = tmp_path / "guid-download.tmp"
+    _sh.copyfile(fx / "sample.SchLib", p)
+    got = classify_asset(p)
+    assert got.tool == "altium"
+    assert Requirement.ALTIUM_SYMBOL in got.requirements
+
+
+def test_suffixless_ole_pcblib_classifies_by_content(tmp_path):
+    import shutil as _sh
+    from pathlib import Path as _P
+
+    fx = _P(__file__).parent.parent / "altium" / "fixtures"
+    p = tmp_path / "guid-download2.tmp"
+    _sh.copyfile(fx / "sample.PcbLib", p)
+    got = classify_asset(p)
+    assert got.tool == "altium"
+    assert Requirement.ALTIUM_FOOTPRINT in got.requirements
+
+
+def test_zip_nested_inside_a_zip_classifies_its_members(tmp_path):
+    # Vendors sometimes wrap the Altium zip INSIDE the bundle zip; the members of an
+    # inner zip (one level) count toward the classification.
+    import io
+    import zipfile as _zf
+
+    inner = io.BytesIO()
+    with _zf.ZipFile(inner, "w") as z:
+        z.writestr("part.SchLib", "x")
+        z.writestr("part.PcbLib", "x")
+    outer = tmp_path / "bundle.zip"
+    with _zf.ZipFile(outer, "w") as z:
+        z.writestr("README.txt", "hi")
+        z.writestr("altium/part-altium.zip", inner.getvalue())
+    got = classify_asset(outer)
+    assert Requirement.ALTIUM_SYMBOL in got.requirements
+    assert Requirement.ALTIUM_FOOTPRINT in got.requirements

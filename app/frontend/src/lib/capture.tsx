@@ -47,6 +47,16 @@ export interface CaptureForward {
 
 export const KICAD_REQS: Requirement[] = ["kicad_symbol", "kicad_footprint", "kicad_model"];
 export const ALTIUM_REQS: Requirement[] = ["altium_symbol", "altium_footprint"];
+
+// Human labels for the honest not-all-attached message (the 3D model is tool-neutral:
+// never "KiCad 3D Model").
+export const REQ_LABELS: Record<Requirement, string> = {
+  kicad_symbol: "KiCad Symbol",
+  kicad_footprint: "KiCad Footprint",
+  kicad_model: "3D Model",
+  altium_symbol: "Altium Symbol",
+  altium_footprint: "Altium Footprint",
+};
 const WATCHDOG_MS = 180_000;
 
 type Received = Partial<Record<Requirement, boolean>>;
@@ -251,17 +261,35 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
       }
       if (tokenRef.current && p.token && p.token !== tokenRef.current) return; // B4 guard
       if (p.signal === "done") {
-        // The host finished the capture and closed the vendor window: land on a clean terminal
-        // done state directly, rather than relying only on the last per-file forward (a host that
-        // completes faster than the final forward still resolves cleanly here). Placed AFTER the
-        // B4 guard so a stale done cannot mark a replaced part complete; idempotent when already done.
+        // The host finished the capture and closed the vendor window. "Done" from the
+        // host means DOWNLOADED - it may only become "attached" here when every need
+        // actually attached (live 2026-07-24: the altium set downloaded, never attached,
+        // and the old unconditional done buried it). Anything still missing lands as an
+        // honest, actionable state instead; the handler stays armed so a late forward
+        // or Browse For Files can still complete it. Placed AFTER the B4 guard so a
+        // stale done cannot mark a replaced part complete; idempotent when already done.
         clearWatchdog();
-        clearHandler();
-        setState((s) =>
-          s.status === "done"
-            ? s
-            : { ...s, status: "done", message: "All files received and attached." },
-        );
+        if (allReceived()) {
+          clearHandler();
+          setState((s) =>
+            s.status === "done"
+              ? s
+              : { ...s, status: "done", message: "All files received and attached." },
+          );
+        } else {
+          const missing = needsRef.current
+            .filter((r) => !receivedRef.current[r])
+            .map((r) => REQ_LABELS[r] ?? r);
+          setState((s) =>
+            s.status === "done"
+              ? s
+              : {
+                  ...s,
+                  status: "receiving",
+                  message: `The vendor window finished, but not everything attached yet: ${missing.join(", ")}. Browse for the files or retry.`,
+                },
+          );
+        }
         return;
       }
       // Scope this forward to the part that was active when it arrived: if the user replaces the

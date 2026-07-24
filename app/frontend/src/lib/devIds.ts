@@ -68,6 +68,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.asset-stage", label: "Asset tile stage / chamber", area: "detail" },
   { id: "detail.readiness", label: "KiCad / Altium readiness", area: "detail" },
   { id: "detail.complete-part", label: "Complete Part action", area: "detail" },
+  { id: "detail.remove-asset", label: "Remove element chip", area: "detail" },
   { id: "detail.reference", label: "Datasheet + notes block", area: "detail" },
   { id: "detail.datasheet-row", label: "Datasheet row", area: "detail" },
   { id: "detail.notes-row", label: "Notes row", area: "detail" },

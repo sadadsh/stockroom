@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
@@ -500,5 +500,30 @@ describe("DetailPanel spec sheet + identity", () => {
     expect(
       screen.getByRole("heading", { name: "10 kΩ ±1% Resistor" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("DetailPanel element removal", () => {
+  it("offers per-element Remove chips in the CAD popover and confirms before detaching", async () => {
+    mockApi.detachAsset = vi.fn().mockResolvedValue({} as never);
+    const user = userEvent.setup();
+    const { container } = wrap(
+      <DetailPanel
+        detail={detail({ datasheet: { file: "x.pdf", source_url: "", fetched_at: "" } })}
+        {...BASE}
+        onEditField={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /cad/i }));
+    const chips = container.querySelectorAll('[data-dev-id="detail.remove-asset"]');
+    expect(chips.length).toBeGreaterThan(0);
+    await user.click(
+      [...chips].find((c) => c.textContent?.includes("3D Model")) as HTMLElement,
+    );
+    // in-window confirm, then the detach fires
+    await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+    await waitFor(() =>
+      expect(mockApi.detachAsset).toHaveBeenCalledWith("lm358", "model"),
+    );
   });
 });

@@ -55,11 +55,30 @@ def test_pick_entry_prefers_exact_match_when_multiple():
     assert pick_entry(["A", "BQ24074RGTT", "C"], "symbol", prefer="BQ24074RGTT") == "BQ24074RGTT"
 
 
-def test_pick_entry_raises_on_ambiguous_multiple():
-    with pytest.raises(ValueError, match="entries"):
-        pick_entry(["A", "B"], "footprint")  # no prefer, cannot disambiguate
+def test_pick_entry_binds_the_first_with_no_prefer():
+    # permissive (owner 2026-07-24): with nothing to prefer, the first entry binds
+    assert pick_entry(["A", "B"], "footprint") == "A"
 
 
 def test_pick_entry_raises_on_empty():
     with pytest.raises(ValueError, match="no footprint"):
         pick_entry([], "footprint")
+
+
+def test_pick_entry_falls_back_to_the_single_name_containing_the_mpn():
+    # Vendor PcbLibs often name the footprint around the MPN ("TPD6E05U06RVZR_RVZ6"):
+    # an exact prefer match wins, else the ONE name containing it binds; still loud
+    # when several contain it (never a silent wrong-part pick).
+    names = ["SOT-23_ALT", "TPD6E05U06RVZR_RVZ6", "SOT-23_DENSE"]
+    assert pick_entry(names, "footprint", prefer="TPD6E05U06RVZR") == "TPD6E05U06RVZR_RVZ6"
+
+
+def test_pick_entry_binds_the_first_when_several_names_contain_the_mpn():
+    # permissive by owner directive (2026-07-24): the library is stored verbatim, so a
+    # best-effort binding beats a refused capture; the first containing name wins
+    names = ["TPD6E05U06RVZR_L", "TPD6E05U06RVZR_M"]
+    assert pick_entry(names, "footprint", prefer="TPD6E05U06RVZR") == "TPD6E05U06RVZR_L"
+
+
+def test_pick_entry_binds_the_first_when_nothing_matches_the_mpn():
+    assert pick_entry(["A", "B", "C"], "symbol", prefer="ZZZ") == "A"

@@ -106,6 +106,26 @@ export function CandidateCard({
 
   return (
     <Card data-dev-id="ingest.candidate" data-candidate className="px-4 py-4">
+      {/* the action leads (owner 2026-07-24: burying Add at the bottom of a long card
+          among the info made the flow confusing): the part's name + the ONE accent
+          button on top, the editable review fields below it */}
+      <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-line pb-3">
+        <span className="min-w-0 truncate text-sm font-semibold text-t1">
+          {c.display_name || c.mpn || "New Part"}
+        </span>
+        <Button
+          variant="accent"
+          onClick={handleCommit}
+          disabled={commit.isPending}
+          className="flex-none"
+        >
+          {commit.isPending ? (
+            <Text id="ingest.commit-busy">Adding...</Text>
+          ) : (
+            <Text id="ingest.commit">Add to Components</Text>
+          )}
+        </Button>
+      </div>
       <div className="grid gap-2.5">
         <Field label="Name" copyId="ingest.field-name" value={c.display_name} onChange={(v) => set("display_name", v)} />
         <Field label="Part Number" copyId="ingest.field-mpn" value={c.mpn} onChange={(v) => set("mpn", v)} mono />
@@ -186,19 +206,6 @@ export function CandidateCard({
         </div>
       ) : null}
 
-      <div className="mt-4 flex items-center justify-end">
-        <Button
-          variant="accent"
-          onClick={handleCommit}
-          disabled={commit.isPending}
-        >
-          {commit.isPending ? (
-            <Text id="ingest.commit-busy">Adding...</Text>
-          ) : (
-            <Text id="ingest.commit">Add to Components</Text>
-          )}
-        </Button>
-      </div>
     </Card>
   );
 }

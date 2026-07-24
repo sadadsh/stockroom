@@ -141,3 +141,17 @@ def test_attach_footprint_endpoint_tags_kicad_tool(client):
 def test_attach_symbol_endpoint_requires_a_name(client):
     r = client.post("/api/library/parts/mystery/symbol", json={"lib": "Device"})
     assert r.status_code == 422
+
+
+def test_detach_asset_removes_one_element_and_400s_when_absent(client):
+    # the fixture library's tps62130 carries a symbol; removing it nulls the ref
+    detail = client.get("/api/library/parts/tps62130").json()
+    assert detail["symbol"] is not None
+    r = client.delete("/api/library/parts/tps62130/assets/symbol")
+    assert r.status_code == 200
+    assert r.json()["symbol"] is None
+    # removing it again is an honest 400, never a silent no-op
+    assert client.delete("/api/library/parts/tps62130/assets/symbol").status_code == 400
+    # unknown kind -> 400; unknown part -> 404
+    assert client.delete("/api/library/parts/tps62130/assets/bogus").status_code == 400
+    assert client.delete("/api/library/parts/nope/assets/symbol").status_code == 404
