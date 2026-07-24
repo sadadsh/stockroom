@@ -229,14 +229,15 @@ def test_digikey_sensewall_covers_the_two_step_digikey_login():
     assert "location.hostname" in js
 
 
-def test_digikey_reactor_hands_off_when_it_starts_on_a_login_wall():
-    # When the capture window opens straight onto the login (or hits it), the reactor must
-    # hand off "Sign in" via Your Turn and WAIT for the wall to clear before driving the
-    # models page - never silently try to find a CAD link that a login page does not have.
+def test_digikey_reactor_hands_off_the_wall_for_the_user_to_solve():
+    # Owner 2026-07-24: the OS-level Turnstile auto-click only tripped Cloudflare's bot
+    # detection (verify -> reset loop), so the driver NO LONGER clicks anything. When the
+    # window opens onto (or hits) a login / Cloudflare wall, it hands off "Your Turn" and
+    # WAITS for the USER to solve it before driving the models page - never a CAD-link hunt
+    # on a wall page, and never a stashed rect for a host auto-click.
     js = build_driver_js("digikey", ["kicad", "altium"])
-    # a start-time wall gate: if senseWall() at launch, yourTurn "Sign in to DigiKey" + wait
-    # for the wall to clear, then drive - never hunt for a CAD link on a login page
-    assert "Sign in to DigiKey in this window" in js
+    # the hand-off names BOTH the sign-in and the Cloudflare verification the user finishes
+    assert "sign-in" in js.lower() and "verification" in js.lower()
     assert "function drive()" in js
     # the wait POLLS senseWall on an interval, not a MutationObserver: a Cloudflare check that
     # clears in-place leaves the page settled with no further mutations, so a mutation-only
@@ -245,24 +246,9 @@ def test_digikey_reactor_hands_off_when_it_starts_on_a_login_wall():
     assert "if(!senseWall())" in js
     # the your-turn hand-off is wired through the overlay action bridge
     assert ".action({needsUser:true" in js
-
-
-def test_digikey_driver_senses_and_stashes_the_cloudflare_rect_for_the_host():
-    # Owner 2026-07-24: "could u click the cloudflare for me". The page CANNOT click the
-    # Turnstile itself (the checkbox lives in a cross-origin iframe, often behind a closed
-    # shadow root), so the driver only SENSES it: a light 1500ms watcher stashes the visible
-    # challenge's viewport rect + devicePixelRatio as JSON in window.__SR_CF_RECT__ for the
-    # HOST, which fires a REAL OS-level click at the checkbox. The global clears whenever no
-    # challenge is visible, so the host can never click a stale rect.
-    js = build_driver_js("digikey", ["kicad", "altium"])
-    assert "__SR_CF_RECT__" in js
-    assert "getBoundingClientRect" in js and "devicePixelRatio" in js
-    # the challenge iframe first, the widget/interstitial containers as the fallback (the
-    # Turnstile iframe hides inside a closed shadow root, so the container rect stands in)
-    assert "challenges.cloudflare.com" in js and ".cf-turnstile" in js
-    assert "#challenge-stage" in js
-    assert "setInterval(cfRect,1500)" in js  # the light watcher cadence (sensor-class, like health)
-    assert "window.__SR_CF_RECT__=null" in js  # cleared when absent - never a stale rect
+    # the abandoned auto-click sensor is gone entirely (no rect stashed for the host)
+    assert "__SR_CF_RECT__" not in js
+    assert "cfRect" not in js
 
 
 def test_wall_clearance_never_hijacks_the_login_redirect_chain():
