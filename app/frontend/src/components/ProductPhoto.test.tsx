@@ -5,9 +5,10 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import { ProductPhoto, productPhotoUrl } from "./ProductPhoto";
+import { PhotoTrigger, ProductPhoto, productPhotoUrl } from "./ProductPhoto";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -84,5 +85,38 @@ describe("ProductPhoto", () => {
     wrap(<ProductPhoto url="" alt="part photo" fallback={<span>glyph</span>} />);
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.getByText("glyph")).toBeInTheDocument();
+  });
+});
+
+describe("PhotoTrigger + PhotoCard (owner 2026-07-24: hidden until clicked)", () => {
+  it("renders no image until the chip is clicked, then opens the viewer card", async () => {
+    const user = userEvent.setup();
+    wrap(<PhotoTrigger url={URL_} partName="TPD6E05U06RVZR" />);
+    // hidden by default: the chip only, no <img> anywhere
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /View Photo/i }));
+    const dialog = screen.getByRole("dialog", { name: /TPD6E05U06RVZR/ });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAttribute("src", URL_);
+  });
+
+  it("closes on Escape and on the close button", async () => {
+    const user = userEvent.setup();
+    wrap(<PhotoTrigger url={URL_} partName="X" />);
+    await user.click(screen.getByRole("button", { name: /View Photo/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /View Photo/i }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("renders nothing at all without a url", () => {
+    const { container } = wrap(<PhotoTrigger url="" partName="X" />);
+    expect(container.querySelector("button")).toBeNull();
   });
 });

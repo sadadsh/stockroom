@@ -105,7 +105,11 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.pinout",
   "detail.enrich",
   "detail.history",
-]; // 7
+  // ProductPhoto.tsx PhotoTrigger: devId= string prop on the click-to-view photo chips.
+  "detail.photo",
+  "ingest.pulled-photo",
+  "ingest.candidate-photo",
+]; // 10
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
