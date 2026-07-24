@@ -157,11 +157,12 @@ export function DetailPanel({
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
   const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
-  // The part's capture needs (KiCad + Altium). Altium presence is not on the detail
-  // record, so this is how the panel knows to offer Complete Part for a part that is
-  // KiCad-complete but still missing its Altium assets (the common case). Cached under
-  // the same key the Complete Part window uses, so it is fetched once and shared.
-  const cadSource = useCadSourceQuery(detail?.id ?? null, true);
+  // Warm the cad-source (DigiKey URL) cache so the Complete Part window opens instantly; its
+  // result is NOT used for readiness anymore. Readiness (incl. Altium) reads the part RECORD via
+  // assetReadiness, so it refreshes on the clean ["part", id] invalidation after an attach - the
+  // old cad-source-derived Altium needs went stale and left a captured part stuck on "CAD
+  // Incomplete" (live 2026-07-24). Prefetch only; a failure never affects the readiness display.
+  useCadSourceQuery(detail?.id ?? null, true);
   // The per-part sourcing refresh (POST .../refresh): a write-lane job re-pulling
   // price/stock/lifecycle from the distributor APIs. Its outcome reports through the
   // quiet toasts like every other background mutation.
@@ -192,17 +193,23 @@ export function DetailPanel({
     return <PanelMessage>Select a part to see its details.</PanelMessage>;
   }
 
+  // Per-tool readiness read straight off the part RECORD (KiCad from symbol/footprint/model,
+  // Altium from altium_symbol/altium_footprint) - so an attach refreshes it on the ["part", id]
+  // invalidation. Declared before the needs derivation below, which reads altium.missing.
+  const kicad = assetReadiness(detail, "kicad");
+  const altium = assetReadiness(detail, "altium");
+
   // What the part still needs, files + data, for the one Complete-Part window and its trigger.
   const missingAssets = [
     !detail.symbol?.name ? "symbol" : null,
     !detail.footprint?.name ? "footprint" : null,
     !hasModel ? "3D model" : null,
   ].filter((x): x is string => x !== null);
-  // Altium gaps come from the capture-needs query (not on the detail record), so an
-  // Altium-only-missing part still offers Complete Part.
-  const altiumNeeds = (cadSource.data?.needs ?? [])
-    .filter((n) => n === "altium_symbol" || n === "altium_footprint")
-    .map((n) => (n === "altium_symbol" ? "Altium symbol" : "Altium footprint"));
+  // Altium gaps read straight off the part RECORD (altium.missing from assetReadiness), so an
+  // attach updates them on the ["part", id] refresh - never a stale cad-source needs list.
+  const altiumNeeds = altium.missing
+    .filter((m) => m === "Symbol" || m === "Footprint")
+    .map((m) => `Altium ${m}`);
   const needsList = [...missing, ...missingAssets, ...altiumNeeds];
   // The panel is completable when it can edit a field OR attach an asset (a read-only panel gets
   // no Complete Part affordance, only the honest "Not linked" state on the tiles).
@@ -229,9 +236,6 @@ export function DetailPanel({
   // the enrichment map. Shown when present, in both read-only and editable modes.
   const pinout = parsePinout(detail.specs);
   const pinoutProvenance = detail.enrichment?.pinout;
-
-  const kicad = assetReadiness(detail, "kicad");
-  const altium = assetReadiness(detail, "altium");
 
   // The workbench tabs: Specs and Sourcing always; Pinout only when the record carries one;
   // Enrich only in editable mode with an MPN to look up by; History always. The active tab
