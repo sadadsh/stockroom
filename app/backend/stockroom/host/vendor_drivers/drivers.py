@@ -132,6 +132,16 @@ _DIGIKEY_HELPERS = (
     # covers both steps - and clears the moment the login redirects back to the store.
     "if(/(^|\\.)auth\\.digikey\\.com$/i.test(location.hostname))return true;"
     "if(document.querySelector('input[type=password]')&&document.querySelector('form input[type=password]'))return true;"
+    # DigiKey caps GUEST (not-signed-in) downloads at a small daily quota; once hit it shows a
+    # "Download Speed Bump! ... you've hit today's guest limit for downloads" modal with a Login
+    # button (live 2026-07-24 - THE cause of "KiCad attached, Altium not": the 1st download slips
+    # under the quota, the 2nd is blocked). Treat that modal as a wall so the reactor hands off
+    # "Sign in" instead of silently retrying. Cheap: scoped to modal/dialog containers' own text,
+    # never document.body.innerText, and keyed on the distinctive quota wording.
+    "var dlg=document.querySelectorAll('[role=dialog],[class*=modal i],[class*=dialog i]');"
+    "for(var i=0;i<dlg.length;i++){var el=dlg[i];"
+    "if(el.getClientRects().length){var dt=txt(el);"
+    "if(/download speed bump|guest (download )?limit|limit for downloads|create.{0,4}(a )?my ?digikey/.test(dt))return true;}}"
     "return false;}catch(e){return false;}}"
 )
 
@@ -213,7 +223,7 @@ _DIGIKEY_REACTOR = (
     # !senseWall() guard also covers the until() TIMEOUT (cb fires with the wall still
     # up): never refresh into a wall.
     "function recover(spec,done){if(senseWall()){"
-    "yourTurn('Sign in or finish the verification in this window; I will continue right after.');"
+    "yourTurn('Sign in to DigiKey here (a free account lifts the guest download limit) or finish the verification; I will continue right after.');"
     "until(function(){return !senseWall();},function(){clearTurn();"
     "setTimeout(function(){if(!senseWall())refresh();},9000);},170000);return;}"
     "if(refreshes()>=MAX_REFRESH){report(spec.key,false,"
