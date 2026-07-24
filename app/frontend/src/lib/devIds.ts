@@ -113,6 +113,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "ingest.input", label: "Link / part-number input", area: "ingest" },
   { id: "ingest.lookup", label: "Look Up button", area: "ingest" },
   { id: "ingest.stages", label: "Enrichment stages", area: "ingest" },
+  { id: "ingest.zip-tile", label: "Vendor ZIP tile", area: "ingest" },
+  { id: "ingest.path", label: "Part path strip", area: "ingest" },
   { id: "ingest.browse", label: "Browse for ZIP", area: "ingest" },
   { id: "ingest.passive", label: "Passive add card", area: "ingest" },
   { id: "ingest.blocked", label: "Blocked-fetch card", area: "ingest" },

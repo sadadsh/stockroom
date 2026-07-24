@@ -8,7 +8,7 @@
  * hands off into the both-EDA workflow instead of dead-ending on a toast. The pulled
  * identity/specs merge onto the ZIP so nothing is re-typed; a ZIP with no link still works.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { useJob, type JobProgress } from "../lib/useJob";
@@ -38,6 +38,27 @@ interface Staged {
 
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
+
+// One step of the part's path (pull -> KiCad -> Altium): a numbered micro-label in the
+// quiet eyebrow register, so the sequence reads as structure, never a prose wall.
+function PathStep({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+      <span className="tnum grid h-4 w-4 flex-none place-items-center rounded-full border border-line2 font-mono text-[9px] leading-none text-t2">
+        {n}
+      </span>
+      {children}
+    </span>
+  );
+}
+
+function PathArrow() {
+  return (
+    <span aria-hidden className="text-2xs text-t3/60">
+      {"→"}
+    </span>
+  );
+}
 
 export function IngestPage() {
   const [input, setInput] = useState("");
@@ -250,14 +271,12 @@ export function IngestPage() {
   })();
 
   return (
-    <div data-dev-id="ingest.root" className="flex flex-col gap-4">
+    <div data-dev-id="ingest.root" className="flex flex-col gap-5">
       {/* The hero: paste a link, or drop a ZIP. This is the whole point of the window. */}
       <div data-dev-id="ingest.hero">
-        <p className="mb-2.5 text-xs text-t3">
-          <Text id="ingest.hero-hint">
-            Paste a product link (Mouser, LCSC, DigiKey...) or a part number and Stockroom pulls it all. A passive is complete with no files; a non-passive takes its KiCad files from a vendor ZIP, and the Altium set follows right after it lands.
-          </Text>
-        </p>
+        <Eyebrow className="mb-2">
+          <Text id="ingest.source-eyebrow">Source</Text>
+        </Eyebrow>
         <div className="flex items-center gap-2.5">
           <input
             data-dev-id="ingest.input"
@@ -269,7 +288,7 @@ export function IngestPage() {
             }}
             placeholder={inputPlaceholder}
             disabled={looking}
-            className="h-[31px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
+            className="h-[34px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
           />
           <Button
             data-dev-id="ingest.lookup"
@@ -285,21 +304,60 @@ export function IngestPage() {
             )}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-t3">
+          <Text id="ingest.hero-hint">
+            A product link (Mouser, LCSC, DigiKey...) or a part number pulls every detail. A passive lands complete with no files.
+          </Text>
+        </p>
         {looking ? (
           <div data-dev-id="ingest.stages" className="mt-3.5">
             <EnrichStages progress={enrich.progress} />
           </div>
         ) : !result ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button data-dev-id="ingest.browse" onClick={browseForZip} disabled={busy} icon={<UploadIcon />}>
-              <Text id="ingest.browse-label">Browse for ZIP</Text>
-            </Button>
-            <span className="text-xs text-t3">
-              <Text id="ingest.browse-hint">
-                Or add a part straight from a vendor ZIP (SnapEDA, Ultra Librarian).
-              </Text>
-            </span>
-          </div>
+          <>
+            {/* the alternate route: a vendor ZIP, as a region tile (the Complete Part
+                window's file-tile idiom, so the two part-windows read as one family) */}
+            <div
+              data-dev-id="ingest.zip-tile"
+              className="mt-3.5 flex items-center gap-3 rounded-control border border-line2 bg-raise p-3.5 shadow-file"
+            >
+              <span className="grid h-7 w-7 flex-none place-items-center rounded-control bg-raise2 text-t1">
+                <UploadIcon className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-t1">
+                  <Text id="ingest.zip-title">Vendor ZIP</Text>
+                </div>
+                <div className="mt-0.5 text-xs text-t3">
+                  <Text id="ingest.browse-hint">
+                    A SnapEDA or Ultra Librarian ZIP carries the KiCad files. Drop it anywhere in the window, or browse.
+                  </Text>
+                </div>
+              </div>
+              <Button data-dev-id="ingest.browse" onClick={browseForZip} disabled={busy} className="flex-none">
+                <Text id="ingest.browse-label">Browse for ZIP</Text>
+              </Button>
+            </div>
+            {/* the path a non-passive takes, as structure instead of prose: pull the
+                details, land with the KiCad files, then the guided capture finishes the
+                Altium set. The sequence IS the app's two-EDA design philosophy. */}
+            <div
+              data-dev-id="ingest.path"
+              className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line pt-3"
+            >
+              <PathStep n={1}>
+                <Text id="ingest.path-pull">Pull Details</Text>
+              </PathStep>
+              <PathArrow />
+              <PathStep n={2}>
+                <Text id="ingest.path-kicad">KiCad Files</Text>
+              </PathStep>
+              <PathArrow />
+              <PathStep n={3}>
+                <Text id="ingest.path-altium">Altium Capture</Text>
+              </PathStep>
+            </div>
+          </>
         ) : null}
       </div>
 
