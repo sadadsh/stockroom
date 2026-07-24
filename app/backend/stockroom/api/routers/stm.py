@@ -504,9 +504,10 @@ def stm_router(require_token) -> APIRouter:
             raise ApiError(409, "STM index not built")
         parts = body.get("parts")
         family = body.get("family")
+        families = body.get("families")
         package = body.get("package")
         result = stm_authority.socket_union(
-            ctx.stm_index.conn, refs=parts, family=family, package=package
+            ctx.stm_index.conn, refs=parts, family=family, families=families, package=package
         )
         result = dict(result)
         result["resolved"] = [
@@ -518,11 +519,15 @@ def stm_router(require_token) -> APIRouter:
     def compat_suggestions(
         request: Request, package: str, family: str, tolerance: int = 0
     ) -> dict:
+        """`family` accepts one name OR a comma-separated multi-family scope (owner
+        amendment 2026-07-23) - groups are then free to mix families, the cross-family
+        drop-in discovery the build-card concept wants."""
         ctx = request.app.state.ctx
         if ctx.stm_index is None:
             raise ApiError(409, "STM index not built")
+        families = [f.strip() for f in family.split(",") if f.strip()]
         groups = stm_authority.compatibility_suggestions(
-            ctx.stm_index.conn, package, family, tolerance=tolerance
+            ctx.stm_index.conn, package, families=families, tolerance=tolerance
         )
         return {"groups": [SuggestionGroupDTO.from_dict(g).model_dump() for g in groups]}
 

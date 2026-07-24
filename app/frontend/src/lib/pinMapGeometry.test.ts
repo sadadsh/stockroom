@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { pinMapGeometry, bgaRowIndex } from "./pinMapGeometry";
+import {
+  ballGridHeaders,
+  bgaRowIndex,
+  perimeterLabels,
+  pinMapGeometry,
+} from "./pinMapGeometry";
 import type { PinDTO, PinoutGeometryDTO } from "../api/types";
 
 function pin(over: Partial<PinDTO>): PinDTO {
@@ -115,5 +120,52 @@ describe("pinMapGeometry — degenerate input", () => {
     const layout = pinMapGeometry([], QFP_GEOM, W, H);
     expect(layout.pins).toEqual([]);
     expect(layout.body).toEqual({ x: 0, y: 0, w: 0, h: 0 });
+  });
+});
+
+
+describe("pin-number labels", () => {
+  const geometry = {
+    body_shape: "qfp" as const,
+    pin_count: 4,
+    rows: null,
+    cols: null,
+    pitch_mm: null,
+    has_center_pad: false,
+  };
+  const perimeterPins = [
+    { position: "1", lqfp_side: "left" },
+    { position: "2", lqfp_side: "bottom" },
+    { position: "3", lqfp_side: "right" },
+    { position: "4", lqfp_side: "top" },
+  ];
+
+  it("perimeterLabels places one label per placed pad, outside its side", () => {
+    const layout = pinMapGeometry(perimeterPins, geometry, 460, 460);
+    const labels = perimeterLabels(layout);
+    expect(labels.map((l) => l.position).sort()).toEqual(["1", "2", "3", "4"]);
+    const byPos = Object.fromEntries(labels.map((l) => [l.position, l]));
+    const rects = Object.fromEntries(layout.pins.map((p) => [p.position, p.rect]));
+    expect(byPos["1"].x).toBeLessThan(rects["1"].x); // left label sits left of its pad
+    expect(byPos["3"].x).toBeGreaterThan(rects["3"].x + rects["3"].w); // right label right of pad
+    expect(byPos["4"].y).toBeLessThan(rects["4"].y); // top label above pad
+    expect(byPos["2"].y).toBeGreaterThan(rects["2"].y + rects["2"].h); // bottom label below pad
+  });
+
+  it("ballGridHeaders derives row and column headers from the real balls, mirrored per edge", () => {
+    const balls = [
+      { position: "A1", bga_row: "A", bga_col: 1 },
+      { position: "B2", bga_row: "B", bga_col: 2 },
+    ];
+    const layout = pinMapGeometry(balls, { ...geometry, body_shape: "bga" }, 460, 460);
+    const { rows, cols } = ballGridHeaders(balls, layout);
+    expect(rows.map((r) => r.text).sort()).toEqual(["A", "A", "B", "B"]);
+    expect(cols.map((c) => c.text).sort()).toEqual(["1", "1", "2", "2"]);
+  });
+
+  it("returns nothing for an empty layout", () => {
+    const empty = pinMapGeometry([], geometry, 460, 460);
+    expect(perimeterLabels(empty)).toEqual([]);
+    expect(ballGridHeaders([], empty)).toEqual({ rows: [], cols: [] });
   });
 });

@@ -28,6 +28,7 @@ function union(positions: UnionPositionDTO[]): UnionDTO {
     ],
     package: "LQFP100",
     family: "STM32F4",
+    families: ["STM32F4"],
     grain: "per-part",
     positions,
     verdict: { interchangeable: true, swaps_required: 0, blocking: [] },
