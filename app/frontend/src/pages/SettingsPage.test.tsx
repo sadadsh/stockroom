@@ -30,6 +30,7 @@ vi.mock("../api/client", async (importActual) => {
       openJobStream: vi.fn(),
       altiumStatus: vi.fn(),
       altiumOdbcStatus: vi.fn(),
+      loadDevCreds: vi.fn(),
       altiumRegenerate: vi.fn(),
       altiumAttach: vi.fn(),
     },
@@ -724,5 +725,19 @@ describe("SettingsPage - critique fixes", () => {
     await user.click(within(nav).getByRole("button", { name: /altium/i }));
     const header = await screen.findByTestId("settings.altium.header");
     expect(header).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("SettingsPage - dev-creds hotkey", () => {
+  it("Ctrl+Alt+K loads the dev creds from ANYWHERE on Settings, sections collapsed", async () => {
+    // The listener must live at the page level: before this test existed it sat in
+    // VendorLoginsSection, which the grouped IA only mounts when that disclosure is
+    // open, so the hotkey silently died on the collapsed default (2026-07-24 report).
+    mockApi.loadDevCreds.mockResolvedValue({ ...BASE_SETTINGS, loaded: ["mouser_api_key"] });
+    renderPage();
+    await screen.findByTestId("settings.appearance.header"); // page settled, all collapsed
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true, altKey: true });
+    await waitFor(() => expect(mockApi.loadDevCreds).toHaveBeenCalled());
+    expect(await screen.findByText(/loaded dev creds: mouser_api_key/i)).toBeInTheDocument();
   });
 });

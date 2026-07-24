@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
@@ -7,6 +8,8 @@ import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/type
 import { queuePaths } from "../lib/ingestQueue";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
+import { CaptureProvider, useCapture } from "../lib/capture";
+import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { IngestPage } from "./IngestPage";
 
 vi.mock("../api/client", async (im) => {
@@ -25,6 +28,7 @@ vi.mock("../api/client", async (im) => {
       ingestInspect: vi.fn(),
       openJobStream: vi.fn(),
       ingestCommit: vi.fn(),
+      getSettings: vi.fn(),
     },
   };
 });
@@ -115,12 +119,39 @@ function enrichStream(r: EnrichmentResult): ReadableStream<Uint8Array> {
   ]);
 }
 
+// The continuation probes: the page routes "last candidate added" into the Complete
+// Part window via the capture store's reopen intent + the Add window's close.
+function ContinuationProbe() {
+  const { reopenPartId } = useCapture();
+  const { isOpen } = useAddPart();
+  return (
+    <div data-testid="continuation-probe" data-reopen={reopenPartId ?? ""} data-addpart-open={String(isOpen)} />
+  );
+}
+
+function OpenAddPartOnMount() {
+  const { open } = useAddPart();
+  useEffect(() => {
+    open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <ToastProvider>{ui}</ToastProvider>
+        <CaptureProvider>
+          <AddPartProvider>
+            <ToastProvider>
+              {ui}
+              <OpenAddPartOnMount />
+              <ContinuationProbe />
+            </ToastProvider>
+          </AddPartProvider>
+        </CaptureProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -495,6 +526,32 @@ describe("IngestPage — unified Add A Part", () => {
     delete (window as unknown as { pywebview?: unknown }).pywebview;
   });
 
+  it("hands off into Complete Part after the last staged candidate lands (the Altium continuation)", async () => {
+    // The new workflow: a ZIP covers the KiCad files at add, and the moment the part
+    // lands the Add window closes and the part's Complete Part window opens so the
+    // guided capture finishes the ALTIUM set. Locked here via the capture store's
+    // reopen intent + the Add window's open state.
+    mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
+    mockApi.openJobStream.mockResolvedValue(resultStream([ZIP_CANDIDATE]));
+    mockApi.ingestCommit.mockResolvedValue({ id: "new-part", display_name: "New Part" } as PartDetail);
+    const pick = vi.fn().mockResolvedValue(["C:/dl/part.zip"]);
+    (window as unknown as { pywebview?: unknown }).pywebview = {
+      api: { pick_ingest_files: pick },
+    };
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    const probe = screen.getByTestId("continuation-probe");
+    expect(probe).toHaveAttribute("data-addpart-open", "true");
+
+    await user.click(screen.getByRole("button", { name: "Browse for ZIP" }));
+    await screen.findByText("Review and Add");
+    await user.click(screen.getByRole("button", { name: "Add to Components" }));
+
+    await waitFor(() => expect(probe).toHaveAttribute("data-reopen", "new-part"));
+    expect(probe).toHaveAttribute("data-addpart-open", "false");
+    delete (window as unknown as { pywebview?: unknown }).pywebview;
+  });
+
   it("is honest when a link yields nothing addable", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
     mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
@@ -506,5 +563,44 @@ describe("IngestPage — unified Add A Part", () => {
     );
     await user.click(screen.getByRole("button", { name: "Look Up" }));
     expect(await screen.findByText(/Nothing was pulled/i)).toBeInTheDocument();
+  });
+
+  it("names the missing API key when a Mouser link pulls nothing and no key is set", async () => {
+    // The API-first lane is what makes a Mouser link reliable (the Akamai-guarded page
+    // blocks the scrape); with no key the blocked card must say THE fix, not shrug.
+    mockApi.getSettings.mockResolvedValue({
+      mouser_api_key_set: false,
+      digikey_client_secret_set: false,
+    } as never);
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    expect(
+      await screen.findByText(/no Mouser API key is set/i),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the generic blocked message when the key IS set (the key was not the problem)", async () => {
+    mockApi.getSettings.mockResolvedValue({
+      mouser_api_key_set: true,
+      digikey_client_secret_set: false,
+    } as never);
+    mockApi.enrichFromUrl.mockResolvedValue({ job_id: "e1" });
+    mockApi.openJobStream.mockResolvedValue(enrichStream({ ...EMPTY_RESULT, add_plan: null }));
+    wrap(<IngestPage />);
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByLabelText("Product link or part number"),
+      "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR",
+    );
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    expect(await screen.findByText(/Nothing was pulled/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no Mouser API key is set/i)).toBeNull();
   });
 });
