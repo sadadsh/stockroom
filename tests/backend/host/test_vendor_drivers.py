@@ -235,10 +235,14 @@ def test_digikey_reactor_hands_off_when_it_starts_on_a_login_wall():
     # models page - never silently try to find a CAD link that a login page does not have.
     js = build_driver_js("digikey", ["kicad", "altium"])
     # a start-time wall gate: if senseWall() at launch, yourTurn "Sign in to DigiKey" + wait
-    # for !senseWall, then drive - never hunt for a CAD link on a login page
+    # for the wall to clear, then drive - never hunt for a CAD link on a login page
     assert "Sign in to DigiKey in this window" in js
     assert "function drive()" in js
-    assert "until(function(){return !senseWall();}" in js
+    # the wait POLLS senseWall on an interval, not a MutationObserver: a Cloudflare check that
+    # clears in-place leaves the page settled with no further mutations, so a mutation-only
+    # wait (until) would hang forever after the wall is gone (live 2026-07-24)
+    assert "setInterval(function(){" in js
+    assert "if(!senseWall())" in js
     # the your-turn hand-off is wired through the overlay action bridge
     assert ".action({needsUser:true" in js
 

@@ -497,10 +497,16 @@ def _digikey_driver_js(formats: list[str]) -> str:
         + "function drive(){try{if(location.pathname.indexOf('/models/')>=0){runModels();}"
         "else{gotoModels();}}catch(e){"
         "report('driver',false,'Open the EDA / CAD Models section and download the files.');}}"
+        # The wait for the wall to clear POLLS senseWall on a light interval rather than using
+        # the MutationObserver-based until(): a Cloudflare check that clears IN-PLACE leaves the
+        # page settled with no further DOM mutations, so a mutation-only wait would hang forever
+        # after the wall was already gone (live 2026-07-24 - the reactor sat on "Your Turn" with
+        # the product page fully loaded behind it). ~10 min bounded, then it drives anyway.
         + "try{if(senseWall()){"
         "yourTurn('Sign in to DigiKey in this window; I will continue as soon as you are in.');"
-        "until(function(){return !senseWall();},function(){clearTurn();"
-        "setTimeout(drive,1500);},600000);}else{drive();}}"
+        "var _wg=0;var _wi=setInterval(function(){_wg++;"
+        "if(!senseWall()){clearInterval(_wi);clearTurn();drive();return;}"
+        "if(_wg>=400){clearInterval(_wi);clearTurn();drive();}},1500);}else{drive();}}"
         "catch(e){report('driver',false,'Open the EDA / CAD Models section and download the files.');}"
     )
     return f"(function(){{{body}}})();"
