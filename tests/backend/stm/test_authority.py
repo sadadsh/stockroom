@@ -281,9 +281,24 @@ def test_socket_union_verdict_interchangeable_when_only_swappable_divergences(st
     assert result["verdict"]["blocking"] == []
 
 
-def test_socket_union_raises_on_mixed_scope(stm_conn, stm_refs):
+def test_socket_union_raises_on_mixed_package_scope(stm_conn, stm_refs):
+    # The PHYSICAL constraint stands: one socket = one package. Cross-package unions raise.
     with pytest.raises(ValueError):
-        socket_union(stm_conn, refs=[stm_refs["mcu1"], stm_refs["mcu3"]])
+        socket_union(stm_conn, refs=[stm_refs["mcu1"], stm_refs["mcu4"]])
+
+
+def test_socket_union_accepts_a_cross_family_same_package_set(stm_conn, stm_refs):
+    """Owner amendment 2026-07-23: a set may span FAMILIES as long as it shares one
+    package - the build-card goal is exactly an F4-vs-F1 socket on one footprint. The
+    out-of-family part participates at real per-part grain (its reset identity at
+    position 12 diverges from the F4 parts' USART identity, never a silent merge)."""
+    result = socket_union(stm_conn, refs=[stm_refs["mcu1"], stm_refs["mcu3"]])
+    assert sorted(result["families"]) == ["STM32F1", "STM32F4"]
+    assert result["package"] == "LQFP64"
+    pos12 = next(p for p in result["positions"] if p["position"] == "12")
+    assert pos12["classification"] == "divergent"
+    per_part_names = {pp["ref"]: pp["canonical_pin_name"] for pp in pos12["per_part"]}
+    assert per_part_names[stm_refs["mcu3"]] == "PA9"
 
 
 def test_socket_union_by_family_package_group(stm_conn):
@@ -291,6 +306,15 @@ def test_socket_union_by_family_package_group(stm_conn):
     assert len(result["parts"]) == 3
     assert result["package"] == "LQFP64"
     assert result["family"] == "STM32F4"
+    assert result["families"] == ["STM32F4"]
+
+
+def test_socket_union_by_multi_family_package_group(stm_conn, stm_refs):
+    result = socket_union(stm_conn, families=["STM32F4", "STM32F1"], package="LQFP64")
+    assert len(result["parts"]) == 4
+    assert result["families"] == ["STM32F1", "STM32F4"]
+    # the display scope names every family so a mixed set never masquerades as one
+    assert result["family"] == "STM32F1 + STM32F4"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

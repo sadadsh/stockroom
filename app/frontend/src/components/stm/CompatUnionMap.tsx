@@ -15,7 +15,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from "d3-zoom";
 import type { PinoutGeometryDTO, UnionDTO, UnionPositionDTO } from "../../api/types";
-import { pinMapGeometry, type PadLayout } from "../../lib/pinMapGeometry";
+import {
+  ballGridHeaders,
+  perimeterLabels,
+  pinMapGeometry,
+  type PadLayout,
+} from "../../lib/pinMapGeometry";
 import { unionClassificationHue } from "../../lib/stmPinHue";
 import { Button, LegendSwatch } from "../primitives";
 import { CLASSIFICATION_LABEL, type Classification } from "./compatEncoding";
@@ -61,6 +66,19 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
     for (const p of union.positions) m.set(p.position, p);
     return m;
   }, [union.positions]);
+  // Pin-number labels, matching the explorer map: per-pad numbers on a perimeter package,
+  // row/column edge headers on a ball grid.
+  const labels = useMemo(
+    () => (geometry.body_shape === "bga" ? [] : perimeterLabels(layout)),
+    [geometry.body_shape, layout],
+  );
+  const headers = useMemo(
+    () =>
+      geometry.body_shape === "bga"
+        ? ballGridHeaders(union.positions, layout)
+        : { rows: [], cols: [] },
+    [geometry.body_shape, union.positions, layout],
+  );
 
   const [camera, setCamera] = useState<Camera>(IDENTITY);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -177,6 +195,36 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
                     onSelect={handleSelect}
                   />
                 ))}
+
+                <g data-testid="union-pin-numbers" className="pointer-events-none select-none">
+                  {labels.map((l) => (
+                    <text
+                      key={l.position}
+                      x={l.x}
+                      y={l.y}
+                      textAnchor={l.anchor}
+                      dominantBaseline="middle"
+                      transform={l.rotate ? `rotate(${l.rotate} ${l.x} ${l.y})` : undefined}
+                      className="fill-t3 font-mono"
+                      fontSize={6}
+                    >
+                      {l.position}
+                    </text>
+                  ))}
+                  {[...headers.rows, ...headers.cols].map((h, i) => (
+                    <text
+                      key={`${h.text}-${i}`}
+                      x={h.x}
+                      y={h.y}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="fill-t3 font-mono"
+                      fontSize={8}
+                    >
+                      {h.text}
+                    </text>
+                  ))}
+                </g>
               </g>
             </svg>
           )}

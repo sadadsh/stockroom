@@ -20,6 +20,8 @@ import { select } from "d3-selection";
 import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior } from "d3-zoom";
 import type { PinDTO, PinoutDTO } from "../../api/types";
 import {
+  ballGridHeaders,
+  perimeterLabels,
   pinMapGeometry,
   type PadLayout,
 } from "../../lib/pinMapGeometry";
@@ -33,6 +35,8 @@ interface Props {
   pinout: PinoutDTO;
   selectedPosition: string | null;
   onSelectPosition: (position: string) => void;
+  // category keys spotlighted by the legend lens; a non-empty set dims every other pad.
+  highlight?: ReadonlySet<string>;
 }
 
 interface Camera {
@@ -93,6 +97,7 @@ function PinoutMapView({
   pinout,
   selectedPosition,
   onSelectPosition,
+  highlight,
   onMaximize,
 }: Props & { onMaximize?: () => void }) {
   const layout = useMemo(
@@ -104,6 +109,18 @@ function PinoutMapView({
     for (const p of pinout.pins) m.set(p.position, p);
     return m;
   }, [pinout]);
+  // Pin-number labels: per-pad numbers outside each perimeter pad; row/column edge headers for a
+  // ball grid (per-ball text would collide at BGA density). Both scale with the zoom camera.
+  const areaArray =
+    pinout.geometry.body_shape === "bga" || pinout.geometry.body_shape === "wlcsp";
+  const labels = useMemo(
+    () => (areaArray ? [] : perimeterLabels(layout)),
+    [areaArray, layout],
+  );
+  const headers = useMemo(
+    () => (areaArray ? ballGridHeaders(pinout.pins, layout) : { rows: [], cols: [] }),
+    [areaArray, pinout.pins, layout],
+  );
 
   const [camera, setCamera] = useState<Camera>(IDENTITY);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -248,15 +265,64 @@ function PinoutMapView({
                 );
               })()}
 
-              {layout.pins.map((pad) => (
-                <Pad
-                  key={pad.position}
-                  pad={pad}
-                  pin={pinByPosition.get(pad.position)}
-                  selected={pad.position === selectedPosition}
-                  onSelect={handleSelect}
-                />
-              ))}
+              {layout.pins.map((pad) => {
+                const pin = pinByPosition.get(pad.position);
+                const bucket = pin ? (pin.category === "io" ? "gpio" : pin.category) : "";
+                const dimmed = !!highlight && highlight.size > 0 && !highlight.has(bucket);
+                return (
+                  <Pad
+                    key={pad.position}
+                    pad={pad}
+                    pin={pin}
+                    selected={pad.position === selectedPosition}
+                    dimmed={dimmed}
+                    onSelect={handleSelect}
+                  />
+                );
+              })}
+
+              {/* pin numbers: quiet, datasheet-style, zooming with the camera */}
+              <g data-testid="pinout-pin-numbers" className="pointer-events-none select-none">
+                {labels.map((l) => (
+                  <text
+                    key={l.position}
+                    x={l.x}
+                    y={l.y}
+                    textAnchor={l.anchor}
+                    dominantBaseline="middle"
+                    transform={l.rotate ? `rotate(${l.rotate} ${l.x} ${l.y})` : undefined}
+                    className="fill-t3 font-mono"
+                    fontSize={6}
+                  >
+                    {l.position}
+                  </text>
+                ))}
+                {headers.rows.map((h, i) => (
+                  <text
+                    key={`r-${h.text}-${i}`}
+                    x={h.x}
+                    y={h.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="fill-t3 font-mono"
+                    fontSize={8}
+                  >
+                    {h.text}
+                  </text>
+                ))}
+                {headers.cols.map((h, i) => (
+                  <text
+                    key={`c-${h.text}-${i}`}
+                    x={h.x}
+                    y={h.y}
+                    textAnchor="middle"
+                    className="fill-t3 font-mono"
+                    fontSize={8}
+                  >
+                    {h.text}
+                  </text>
+                ))}
+              </g>
             </g>
           </svg>
         )}
@@ -302,11 +368,13 @@ const Pad = memo(function Pad({
   pad,
   pin,
   selected,
+  dimmed,
   onSelect,
 }: {
   pad: PadLayout;
   pin: PinDTO | undefined;
   selected: boolean;
+  dimmed?: boolean;
   onSelect: (position: string) => void;
 }) {
   const { x, y, w, h } = pad.rect;
@@ -320,6 +388,7 @@ const Pad = memo(function Pad({
       onClick={() => onSelect(pad.position)}
       className="cursor-pointer [&>rect.pad]:hover:brightness-110 motion-reduce:[&>rect.pad]:hover:brightness-100"
       data-position={pad.position}
+      opacity={dimmed ? 0.22 : undefined}
     >
       <title>{pin ? `${pin.canonical_pin_name} · ${pad.position}` : pad.position}</title>
       {selected ? (

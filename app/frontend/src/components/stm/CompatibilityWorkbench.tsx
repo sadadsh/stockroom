@@ -22,19 +22,19 @@ import { BuildIndexGate } from "./BuildIndexGate";
 import { Badge, Button, Card, Eyebrow } from "../primitives";
 
 export interface Assembly {
-  family: string | null;
+  families: string[];
   package: string | null;
-  // an explicit ref list (loaded by 05-02's suggestions); takes precedence over the group path.
+  // an explicit ref list (loaded by the suggestions); takes precedence over the group path.
   parts: string[];
 }
 
 // The union body from the current assembly, or null when it is not yet buildable. An explicit ref
-// list posts { parts }; otherwise a complete (family, package) group posts { family, package } -
-// both shapes POST /api/stm/compat/union accepts (INTERFACES section 4). A partial group (a family
-// but no package) is not buildable, so Build Set stays disabled rather than posting a bad request.
+// list posts { parts }; otherwise a complete (families, package) group posts { families, package }
+// - both shapes POST /api/stm/compat/union accepts. A partial group (families but no package) is
+// not buildable, so Build Set stays disabled rather than posting a bad request.
 export function unionBody(a: Assembly): CompatUnionBody | null {
   if (a.parts.length > 0) return { parts: a.parts };
-  if (a.family && a.package) return { family: a.family, package: a.package };
+  if (a.families.length > 0 && a.package) return { families: a.families, package: a.package };
   return null;
 }
 
@@ -47,25 +47,30 @@ export function CompatibilityWorkbench() {
   const families = useStmFamilies();
   const union = useStmCompatUnion();
 
-  // The union scope is a single family (the group path needs exactly one; the union requires all
-  // parts share a family AND package). Zero or many selected families leaves the group path unset.
-  const family = scope.families.length === 1 ? scope.families[0] : null;
+  // The union scope is EVERY selected family (owner amendment 2026-07-23). One package must be
+  // shared by all of them - a socket is one physical footprint - so the package chips offer the
+  // INTERSECTION of the selected families' package lists.
+  const selectedFamilies = scope.families;
+  const familiesKey = selectedFamilies.join(",");
 
-  // A new family invalidates the previously chosen package (it may not exist on the new family).
+  // A scope change invalidates the previously chosen package (it may not exist on the new scope).
   useEffect(() => {
     setSelectedPackage(null);
-  }, [family]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [familiesKey]);
 
   const familyPackages = useMemo(() => {
-    if (!family) return [];
-    const fam = families.data?.families.find((f) => f.family === family);
-    return fam?.packages ?? [];
-  }, [family, families.data]);
+    if (selectedFamilies.length === 0) return [];
+    const lists = selectedFamilies.map(
+      (name) => families.data?.families.find((f) => f.family === name)?.packages ?? [],
+    );
+    return lists.reduce((acc, list) => acc.filter((pkg) => list.includes(pkg)));
+  }, [familiesKey, families.data]);
 
-  const assembly: Assembly = { family, package: selectedPackage, parts };
+  const assembly: Assembly = { families: selectedFamilies, package: selectedPackage, parts };
   const body = useMemo(
     () => unionBody(assembly),
-    [family, selectedPackage, parts],
+    [familiesKey, selectedPackage, parts],
   );
 
   const err = union.error;
@@ -83,10 +88,12 @@ export function CompatibilityWorkbench() {
             <p className="px-1 text-xs text-t3">
               Building from a loaded set of {parts.length} parts.
             </p>
-          ) : !family ? (
-            <p className="px-1 text-xs text-t3">Select one family to choose a package.</p>
+          ) : selectedFamilies.length === 0 ? (
+            <p className="px-1 text-xs text-t3">Select one or more families to choose a package.</p>
           ) : familyPackages.length === 0 ? (
-            <p className="px-1 text-xs text-t3">No packages for this family.</p>
+            <p className="px-1 text-xs text-t3">
+              No package is shared by every selected family.
+            </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {familyPackages.map((pkg) => {
@@ -136,7 +143,7 @@ export function CompatibilityWorkbench() {
             as an explicit action; the user still presses Build Set (never auto-unioned). */}
         <SuggestionGroupList
           package={selectedPackage}
-          family={family}
+          family={selectedFamilies.length > 0 ? selectedFamilies.join(",") : null}
           onLoadSet={(refs) => setParts(refs)}
         />
       </div>
@@ -162,6 +169,14 @@ export function CompatibilityWorkbench() {
           <div className="flex min-h-0 flex-1 flex-col gap-3 pb-4">
             {/* The verdict is the one dominant focal element, above the map (CONTEXT decision 5). */}
             <CompatVerdictBanner verdict={union.data.verdict} />
+            <SetStrip
+              union={union.data}
+              onDropPart={(ref) => {
+                // dropping a part is an EXPLICIT edit: it loads the remaining refs into the
+                // assembly (the same path a suggestion pick uses); the user rebuilds the set.
+                setParts(union.data ? union.data.parts.filter((p) => p !== ref) : []);
+              }}
+            />
             <CompatUnionMap union={union.data} />
             <AfCheckPanel union={union.data} />
           </div>
@@ -169,6 +184,53 @@ export function CompatibilityWorkbench() {
           <ChamberMessage>Assemble a set and build the socket-union to compare it.</ChamberMessage>
         )}
       </div>
+    </div>
+  );
+}
+
+// The set strip: every part in the built union as a card chip (ref/mpn + family), each removable
+// as an explicit edit - the Bench's per-part "build card" identity, so the set reads as a set of
+// real parts, not an anonymous count. Dropping never auto-rebuilds; the user presses Build Set.
+export function SetStrip({
+  union,
+  onDropPart,
+}: {
+  union: UnionDTO;
+  onDropPart: (ref: string) => void;
+}) {
+  const familyOf = (ref: string) => {
+    const m = /^STM32([A-Z]+\d)/.exec(ref);
+    return m ? `STM32${m[1]}` : union.family;
+  };
+  return (
+    // Bounded: a whole-family set runs to dozens of chips; the strip scrolls internally so it
+    // never pushes the union map below the fold (the bounded-list discipline).
+    <div
+      className="flex max-h-28 flex-wrap items-center gap-1.5 overflow-y-auto"
+      data-testid="compat-set-strip"
+    >
+      <span className="text-2xs font-semibold text-t3">
+        Set of {union.parts.length} on {union.package}
+      </span>
+      {union.resolved.map((r) => (
+        <span
+          key={r.ref}
+          className="flex items-center gap-1.5 rounded-control bg-raise px-2 py-1 shadow-[inset_0_1px_0_var(--edge-hi)]"
+        >
+          <span className="font-mono text-2xs text-t1">{r.mpn || r.ref}</span>
+          <span className="font-mono text-2xs text-t3">{familyOf(r.ref)}</span>
+          {union.parts.length > 2 ? (
+            <button
+              type="button"
+              aria-label={`Remove ${r.mpn || r.ref} from the set`}
+              onClick={() => onDropPart(r.ref)}
+              className="text-t3 hover:text-t1"
+            >
+              ×
+            </button>
+          ) : null}
+        </span>
+      ))}
     </div>
   );
 }

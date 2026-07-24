@@ -6,11 +6,12 @@
  * smooth at all-family row counts. A row click emits the part upward (the seam the pinout map
  * consumes). The Part cell shows mpn_example, never the ref_name wildcard (Pitfall 1).
  */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
   type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFacetedMinMaxValues,
@@ -40,6 +41,21 @@ interface ColMeta {
 
 const ROW_HEIGHT = 34;
 
+// Per-column track widths for the shared grid template (header, filter row, and every body row).
+// Fixed tracks so columns NEVER squish as visibility changes; the matrix scrolls horizontally
+// instead. Part flexes from a comfortable minimum; the tabular figures stay put.
+const COLUMN_WIDTHS: Record<string, string> = {
+  mpn_example: "minmax(180px,1.7fr)",
+  core: "92px",
+  series: "92px",
+  package: "108px",
+  io_count: "64px",
+  flash_kb: "80px",
+  ram_kb: "76px",
+  max_freq_mhz: "100px",
+};
+const PERIPH_WIDTH = "56px";
+
 interface Props {
   rows: McuSpecRow[];
   activePart: string | null;
@@ -51,6 +67,28 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const columnsRef = useRef<HTMLDivElement>(null);
+
+  // Close the column picker on any outside click or Escape (a mini popover, not a modal).
+  useEffect(() => {
+    if (!columnsOpen) return;
+    function onDown(e: MouseEvent) {
+      if (columnsRef.current && !columnsRef.current.contains(e.target as Node)) {
+        setColumnsOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setColumnsOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [columnsOpen]);
 
   const columns = useMemo<ColumnDef<McuSpecRow>[]>(() => {
     const num = (key: keyof McuSpecRow, header: string, unit?: string): ColumnDef<McuSpecRow> => ({
@@ -129,10 +167,11 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting, columnFilters, globalFilter },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: setColumnVisibility,
     globalFilterFn: "includesString",
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -158,12 +197,18 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const totalSize = virtualizer.getTotalSize();
 
   // A shared grid template so the sticky header, the filter row, and every body row align down
-  // the matrix. Part flexes; the tabular figures sit in fixed columns so numbers line up.
-  const gridStyle = {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(150px,1.7fr) 92px 84px 104px 60px 76px 72px 96px repeat(6, 52px)",
-  } as const;
+  // the matrix, DERIVED from the visible columns so hiding one never squishes the rest (each
+  // visible column keeps its fixed track; the matrix scrolls horizontally instead).
+  const visibleColumns = table.getVisibleLeafColumns();
+  const gridStyle = useMemo(
+    () => ({
+      display: "grid" as const,
+      gridTemplateColumns: visibleColumns
+        .map((c) => COLUMN_WIDTHS[c.id] ?? PERIPH_WIDTH)
+        .join(" "),
+    }),
+    [visibleColumns],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -195,6 +240,49 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
         >
           Filters
         </button>
+        {/* The column-visibility mini popover: every column toggleable except Part (the row
+            identity is never hideable). Hidden columns free horizontal room; visible ones keep
+            their fixed tracks (never squished). */}
+        <div className="relative flex-none" ref={columnsRef}>
+          <button
+            type="button"
+            onClick={() => setColumnsOpen((v) => !v)}
+            aria-pressed={columnsOpen}
+            aria-haspopup="true"
+            className={
+              "flex-none rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
+              (columnsOpen
+                ? "border-line2 bg-raise2 text-t1"
+                : "border-line bg-raise text-t2 hover:text-t1")
+            }
+          >
+            Columns
+          </button>
+          {columnsOpen ? (
+            <div
+              data-testid="column-picker"
+              className="absolute right-0 top-full z-[60] mt-1.5 w-44 rounded-card border border-line bg-popover p-2 shadow-pop"
+            >
+              {table
+                .getAllLeafColumns()
+                .filter((c) => c.id !== "mpn_example")
+                .map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-t2 hover:bg-hover hover:text-t1"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={c.getIsVisible()}
+                      onChange={c.getToggleVisibilityHandler()}
+                      className="accent-[var(--c-acc)]"
+                    />
+                    {String(c.columnDef.header)}
+                  </label>
+                ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* the scroll container: header + filter row + virtualized body all share the grid */}
