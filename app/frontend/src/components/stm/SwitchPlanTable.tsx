@@ -58,7 +58,7 @@ function resolution(position: UnionPositionDTO): { label: string; tone: "ok" | "
     return { label: n > 0 ? `AF swap on ${n} ${n === 1 ? "part" : "parts"}` : "No swap needed", tone: "warn" };
   }
   if (rec && !rec.swappable) {
-    return { label: "Needs switching hardware", tone: "err" };
+    return { label: "Needs switching", tone: "err" };
   }
   return { label: "", tone: "neutral" };
 }
@@ -121,18 +121,18 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
                       <td className="px-2.5 py-1.5">
                         <span className="font-mono text-xs text-t1">{base.name}</span>
                         {base.functions.length > 0 ? (
-                          <span className="ml-1.5 font-mono text-2xs text-t3">
+                          <span className="ml-1.5 inline-block max-w-[220px] truncate align-bottom font-mono text-2xs text-t3">
                             {base.functions.slice(0, 3).join(" · ")}
                             {base.functions.length > 3 ? " …" : ""}
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-2.5 py-1.5 font-mono text-2xs text-t2">
+                      <td className="whitespace-nowrap px-2.5 py-1.5 font-mono text-2xs text-t2">
                         {base.divergers.length > 0
                           ? `${base.divergers.length} ${base.divergers.length === 1 ? "part" : "parts"}`
                           : ""}
                       </td>
-                      <td className="px-2.5 py-1.5">
+                      <td className="whitespace-nowrap px-2.5 py-1.5">
                         {res.label ? (
                           <Badge tone={res.tone} size="sm">
                             {res.label}

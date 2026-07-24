@@ -228,7 +228,7 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     const plan = await screen.findByTestId("switch-plan");
     expect(within(plan).getByText("23")).toBeInTheDocument();
     expect(within(plan).getByText("PA9")).toBeInTheDocument(); // the baseline identity
-    expect(within(plan).getByText("Needs switching hardware")).toBeInTheDocument();
+    expect(within(plan).getByText("Needs switching")).toBeInTheDocument();
     expect(within(plan).getByText(/1 shared/)).toBeInTheDocument();
   });
 
