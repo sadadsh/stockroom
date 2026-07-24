@@ -296,3 +296,76 @@ def test_wall_clearance_never_hijacks_the_login_redirect_chain():
     assert "setTimeout(function(){if(!senseWall())refresh();}" in js
     # the your-turn message covers signing in, not only captcha verification
     assert "Sign in" in js or "sign in" in js
+
+
+# -- return-to-page recovery + login-first routing (owner ask 2026-07-23) --
+
+
+def test_digikey_driver_embeds_the_session_target_for_return_to_page():
+    # The host threads the capture session's original product URL in as TARGET so the
+    # reactor can bring a wandered-off user back to the part page.
+    url = "https://www.digikey.com/en/products/detail/texas-instruments/TPD6E05U06RVZR/13563754"
+    js = build_driver_js("digikey", ["kicad", "altium"], target_url=url)
+    assert url in js  # the TARGET constant
+    assert "returnToPart" in js
+    # Backward-compatible: no target given -> an empty TARGET, the reactor still builds
+    bare = build_driver_js("digikey", ["kicad", "altium"])
+    assert url not in bare
+    assert "returnToPart" in bare
+
+
+def test_digikey_offsite_check_precedes_the_wall_gate():
+    # A foreign site's password form must never trigger the "finish the DigiKey sign-in"
+    # handoff: the off-site branch (hostname without digikey -> return to the part page)
+    # is checked BEFORE the start-time wall gate.
+    js = build_driver_js(
+        "digikey", ["kicad"], target_url="https://www.digikey.com/en/products/detail/x/1"
+    )
+    gate = js.find("if(offsite()){returnToPart();}")
+    assert gate >= 0
+    assert gate < js.find("if(senseWall()){", gate) < js.find("drive();", gate)
+
+
+def test_digikey_return_to_part_is_bounded_and_cleaned_up():
+    js = build_driver_js(
+        "digikey", ["kicad"], target_url="https://www.digikey.com/en/products/detail/x/1"
+    )
+    # bounded by a sessionStorage counter so a part page genuinely without a CAD models
+    # section degrades to the manual guidance message, never a reload loop
+    assert "__SR_RETURN__" in js and "MAX_RETURN" in js
+    assert "taking you back" in js.lower()
+    assert "open the eda / cad models section" in js.lower()
+    # never navigate out from under a wall (the user may be mid-login/mid-captcha)
+    assert "if(!senseWall())location.href=dest" in js
+    # finish() clears the counter alongside the refresh budget
+    finish = js[js.find("function finish()") : js.find("function nextFmt()")]
+    assert "__SR_RETURN__" in finish and "__SR_REFRESH__" in finish
+
+
+def test_digikey_account_pages_short_circuit_back_to_the_part():
+    # A completed login typically lands on a MyDigiKey/account page that can never carry a
+    # CAD models link - return at once instead of seeking one for 15s.
+    js = build_driver_js(
+        "digikey", ["kicad"], target_url="https://www.digikey.com/en/products/detail/x/1"
+    )
+    assert "mydigikey|cart|checkout|ordering|mylists" in js
+    short = js.find("mydigikey|cart|checkout|ordering|mylists")
+    assert "returnToPart" in js[short : short + 120]
+
+
+def test_digikey_signed_out_session_routes_through_the_login_first():
+    # Owner ask 2026-07-23: when not signed in, reach the DigiKey login FIRST, not the
+    # product page's download flow (a signed-out capture trips the guest download limit).
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    # anchored text match: "Supplier Login" or prose mentioning login can never match
+    assert "^(log ?in|sign ?in)$" in js
+    assert "mydigikey\\/(login|signin)" in js or "mydigikey/(login|signin)" in js
+    # once per window - an abandoned login never loops back into routing
+    assert "__SR_LOGIN_SENT__" in js
+    assert "signed out" in js.lower()
+    # the no-navigation backstop: a Login control that only opens a menu must not strand
+    # the run - after a grace period the capture drives on as a guest
+    assert "setTimeout(function(){if(!senseWall())driveMain();}" in js
+    # routing runs before the models/product drive branch
+    body = js[js.find("function drive()") :]
+    assert 0 <= body.find("routeLogin()") < body.find("driveMain();")
