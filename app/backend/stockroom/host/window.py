@@ -597,7 +597,10 @@ def _click_cad_window_at(window, x: int, y: int) -> bool:
         from webview.platforms.winforms import BrowserView
 
         form = BrowserView.instances.get(getattr(window, "uid", None))
-        control = getattr(getattr(form, "browser", None), "web_view", None)
+        # pywebview's EdgeChrome control attribute is `webview` (not `web_view`); the wrong name
+        # left `control` None, so the Cloudflare click never had a handle to target and silently
+        # did nothing (live 2026-07-24).
+        control = getattr(getattr(form, "browser", None), "webview", None)
         hwnd = _hwnd_int(getattr(control, "Handle", None))
         form_hwnd = _hwnd_int(getattr(form, "Handle", None))
         if hwnd is None or form_hwnd is None:
@@ -670,8 +673,13 @@ def _install_cad_permission_autoallow(
         for _ in range(max(1, retries)):
             browser_form = BrowserView.instances.get(getattr(window, "uid", None))
             edge = getattr(browser_form, "browser", None)
-            web_view = getattr(edge, "web_view", None)
-            core = getattr(web_view, "CoreWebView2", None)
+            # pywebview's EdgeChrome names the WebView2 control `webview` (NOT `web_view`):
+            # `self.webview.CoreWebView2` is the live core once init completes (verified against
+            # the vendored edgechromium source). The wrong name left `core` None forever, so the
+            # handler never attached and the multi-download bar was never auto-allowed (live
+            # 2026-07-24: "CoreWebView2 never appeared").
+            control = getattr(edge, "webview", None)
+            core = getattr(control, "CoreWebView2", None)
             if core is not None:
                 break
             sleep(delay)
