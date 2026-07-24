@@ -373,9 +373,14 @@ _DIGIKEY_DOWNLOAD = (
     # refresh recovery; no source offered it at all -> say so honestly (never refresh-loop after
     # something that is not there). A wall always hands off to the user at once.
     "function downloadFormat(present,spec,done){var pi=0,redrives=0,attempted=0;function tryProvider(){"
-    "if(pi>=present.length){"
-    "if(attempted){recover(spec,done);return;}"
-    "report(spec.key,false,'No visible source offers '+spec.name+'; download it by hand.');done(false);return;}"
+    # Every visible provider exhausted without getting the format. This is INDISTINGUISHABLE from
+    # the page having loaded only empty provider SKELETONS (live 2026-07-24: #ultra-media-active
+    # comes up class="load-content active" data-view="ultra-model-skeleton" with an EMPTY
+    # #ultra-container-content and no Select-Download-Format control - the lazy content never
+    # populated). So recover() (a bounded refresh through the product page, which re-renders the
+    # sections fully) instead of giving up at once - a genuinely absent format still ends honestly
+    # after MAX_REFRESH (recover -> done(false)), but a skeleton page gets the reload it needs.
+    "if(pi>=present.length){recover(spec,done);return;}"
     "var prov=present[pi++];trace('tryProvider',spec.key,prov[1]);"
     "if(!fmtBtnFor(prov)){var row=document.querySelector('#'+prov[0]+'-media-active');if(row){try{row.click();}catch(e){}}}"
     # The seek reacts to WHICHEVER appears first: the provider's format control, its export modal
