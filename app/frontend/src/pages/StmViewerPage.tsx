@@ -112,7 +112,7 @@ export function StmViewerPage() {
       </div>
 
       {tab === "explorer" ? (
-        <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 flex-1">
+        <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 min-w-0 flex-1">
           {/* scope */}
           <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
             <FamilyPicker scope={scope} onScopeChange={setScope} />
@@ -148,7 +148,7 @@ export function StmViewerPage() {
           </aside>
         </TabPanel>
       ) : (
-        <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 flex-1">
+        <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 min-w-0 flex-1">
           <CompatibilityWorkbench />
         </TabPanel>
       )}
