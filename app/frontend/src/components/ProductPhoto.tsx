@@ -145,17 +145,22 @@ export function PhotoCard({
           </button>
         </div>
         <div className="flex min-h-[280px] items-center justify-center bg-stage p-6">
-          <ProductPhoto
-            key={url}
-            url={url}
-            alt={`Photo of ${partName || "this part"}`}
-            className="max-h-[60vh] w-full object-contain"
-            fallback={
-              <span className="text-sm text-t3">
-                <Text id="photo.unavailable">The vendor did not serve this photo.</Text>
-              </span>
-            }
-          />
+          {/* vendor product shots are white-matte JPEGs: mount them on a deliberate white
+              chamber so the photo reads as a mounted photograph in BOTH themes, never a
+              glaring white hole punched into the dark stage */}
+          <div className="flex max-h-[60vh] w-full items-center justify-center rounded-control bg-white p-4">
+            <ProductPhoto
+              key={url}
+              url={url}
+              alt={`Photo of ${partName || "this part"}`}
+              className="max-h-[55vh] w-full object-contain"
+              fallback={
+                <span className="py-10 text-sm text-neutral-500">
+                  <Text id="photo.unavailable">The vendor did not serve this photo.</Text>
+                </span>
+              }
+            />
+          </div>
         </div>
       </div>
     </div>
