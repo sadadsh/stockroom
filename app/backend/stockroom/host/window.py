@@ -498,7 +498,14 @@ def _poll_downloads_watch(
 # "Your Turn" hand-off when clicking does not solve it.
 
 _CF_MAX_ATTEMPTS = 3
-_CF_ATTEMPT_GAP = 3.0
+# Seconds between click attempts. It MUST outlast Cloudflare's whole verify+redirect window,
+# because the Turnstile widget stays in the DOM (still yielding a rect) through its multi-second
+# "Verifying..." animation - a re-click landing in that window resets the challenge, so the user
+# is made to "redo it like you never clicked it" (owner 2026-07-24, the same completion-window
+# hijack as the login-redirect bug). A successful first click makes the widget disappear (rect
+# clears) long before this elapses, so a second click only ever fires when the first genuinely
+# missed. Comfortably longer than the ~1.5s poll interval.
+_CF_ATTEMPT_GAP = 15.0
 
 
 def _parse_cf_rect(raw) -> dict | None:
