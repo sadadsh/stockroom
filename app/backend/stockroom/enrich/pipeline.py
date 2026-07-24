@@ -475,6 +475,15 @@ class EnrichmentPipeline:
             # a single primary product_url. The pasted vendor's link is set to the pasted url below.
             if partial.product_url is not None:
                 result.dist_urls.setdefault(name, str(partial.product_url.value))
+            # keep THIS vendor's own ladder + stock too: merge_missing keeps only the
+            # first vendor's, and the comparison view needs every vendor's prices
+            if partial.price_breaks:
+                result.dist_price_breaks.setdefault(name, list(partial.price_breaks))
+            if partial.stock is not None:
+                try:
+                    result.dist_stock.setdefault(name, int(float(str(partial.stock.value))))
+                except (TypeError, ValueError):
+                    pass
             result.merge_missing(partial)
         return result
 
@@ -695,6 +704,11 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         "lifecycle": s(r.lifecycle), "lead_time": s(r.lead_time), "product_url": s(r.product_url),
         "dist_pns": dict(r.dist_pns),
         "dist_urls": dict(r.dist_urls),
+        "dist_price_breaks": {
+            k: [{"qty": p.qty, "price": p.price, "currency": p.currency} for p in v]
+            for k, v in r.dist_price_breaks.items()
+        },
+        "dist_stock": dict(r.dist_stock),
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
     }
@@ -711,6 +725,12 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.lifecycle, r.lead_time, r.product_url = s(d.get("lifecycle")), s(d.get("lead_time")), s(d.get("product_url"))
     r.dist_pns = dict(d.get("dist_pns", {}))
     r.dist_urls = dict(d.get("dist_urls", {}))
+    r.dist_price_breaks = {
+        k: [PriceBreak(qty=int(b["qty"]), price=float(b["price"]), currency=b.get("currency", "USD"))
+            for b in v]
+        for k, v in d.get("dist_price_breaks", {}).items()
+    }
+    r.dist_stock = dict(d.get("dist_stock", {}))
     r.price_breaks = [PriceBreak(**b) for b in d.get("price_breaks", [])]
     r.specs = {k: Sourced(v["value"], v["source"], v["confidence"]) for k, v in d.get("specs", {}).items()}
     return r

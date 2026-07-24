@@ -61,14 +61,22 @@ export function mergeResultIntoCandidate(
   const linkEntries = Object.entries(result.dist_urls ?? {}).filter(([, u]) => u);
   let purchase: StagingCandidate["purchase"];
   if (linkEntries.length > 0) {
-    purchase = linkEntries.map(([key, u]) => {
+    // The PASTED vendor is the purchase link and leads the list (owner 2026-07-24:
+    // the given link is the primary, the others ride along for price comparison);
+    // every vendor carries ITS OWN ladder + stock from its API pull, so all prices show.
+    const ordered = [...linkEntries].sort(
+      ([a], [b]) => (a === primaryKey ? -1 : b === primaryKey ? 1 : 0),
+    );
+    purchase = ordered.map(([key, u]) => {
       const isPrimary = key === primaryKey;
+      const own = result.dist_price_breaks?.[key];
+      const ownStock = result.dist_stock?.[key];
       return {
         vendor: distributorLabel(key),
-        url: u,
+        url: isPrimary && url ? url : u,
         part_number: result.dist_pns?.[key] ?? "",
-        price_breaks: isPrimary ? priceBreaks : [],
-        stock: isPrimary ? stockNum : null,
+        price_breaks: own ?? (isPrimary ? priceBreaks : []),
+        stock: ownStock !== undefined ? ownStock : isPrimary ? stockNum : null,
       };
     });
   } else if (url) {

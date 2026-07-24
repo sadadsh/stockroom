@@ -108,3 +108,27 @@ describe("mergeResultIntoCandidate", () => {
     expect(byVendor.Mouser.stock).toBe(1500);
   });
 });
+
+describe("purchase ordering + per-vendor prices (owner 2026-07-24)", () => {
+  it("the pasted vendor leads with the exact pasted url; every vendor keeps its own ladder", () => {
+    const result = {
+      ...RESULT,
+      dist_urls: { digikey: "https://www.digikey.com/p/x", mouser: "https://www.mouser.com/c/y" },
+      dist_pns: { digikey: "296-1234-ND", mouser: "595-TPD" },
+      dist_price_breaks: {
+        digikey: [{ qty: 1, price: 0.5, currency: "USD" }],
+        mouser: [{ qty: 1, price: 0.45, currency: "USD" }],
+      },
+      dist_stock: { digikey: 100, mouser: 200 },
+    } as unknown as EnrichmentResult;
+    const pasted = "https://www.mouser.com/ProductDetail/595-TPD?qs=abc";
+    const c = mergeResultIntoCandidate(ZIP_CANDIDATE, result, pasted);
+    expect(c.purchase[0].vendor).toBe("Mouser");
+    expect(c.purchase[0].url).toBe(pasted); // the EXACT link the user gave, qs and all
+    expect(c.purchase[0].price_breaks).toEqual([{ qty: 1, price: 0.45, currency: "USD" }]);
+    expect(c.purchase[0].stock).toBe(200);
+    expect(c.purchase[1].vendor).toBe("DigiKey");
+    expect(c.purchase[1].price_breaks).toEqual([{ qty: 1, price: 0.5, currency: "USD" }]);
+    expect(c.purchase[1].stock).toBe(100);
+  });
+});
