@@ -735,6 +735,159 @@ def test_poll_loop_stops_silently_when_the_session_is_stopped(tmp_path, monkeypa
     assert win.scripts == []  # no forward, and crucially no timeout signal onto a new part
 
 
+# -- Cloudflare auto-click (owner 2026-07-24: "could u click the cloudflare for me") --
+# The DRIVER only senses the challenge (it stashes the widget's viewport rect as JSON in
+# window.__SR_CF_RECT__); the HOST reads it from the tier-2 poll thread and fires a REAL
+# OS-level click at the Turnstile checkbox - bounded attempts, seconds apart, degrading
+# silently to the driver's existing "Your Turn" hand-off.
+
+
+class _CfWindow(_RecordingWindow):
+    """A cad-window stand-in whose __SR_CF_RECT__ read returns a canned value while every
+    other evaluate_js still records."""
+
+    def __init__(self, rect_raw):
+        super().__init__()
+        self.rect_raw = rect_raw
+
+    def evaluate_js(self, script):
+        if "__SR_CF_RECT__" in script:
+            return self.rect_raw
+        return super().evaluate_js(script)
+
+
+def _cf_raw(**over):
+    rect = {"left": 100.0, "top": 200.0, "width": 300.0, "height": 65.0, "dpr": 1.0}
+    rect.update(over)
+    return json.dumps(rect)
+
+
+def test_parse_cf_rect_accepts_a_sensed_rect_and_defaults_dpr():
+    from stockroom.host import window as W
+
+    rect = W._parse_cf_rect(_cf_raw(dpr=2.0))
+    assert rect == {"left": 100.0, "top": 200.0, "width": 300.0, "height": 65.0, "dpr": 2.0}
+    # a missing or nonsensical dpr degrades to 1.0, never a reject (the rect is still clickable)
+    assert W._parse_cf_rect(json.dumps({"left": 1, "top": 2, "width": 3, "height": 4}))["dpr"] == 1.0
+    assert W._parse_cf_rect(_cf_raw(dpr=0))["dpr"] == 1.0
+
+
+def test_parse_cf_rect_rejects_junk():
+    from stockroom.host import window as W
+
+    for raw in (
+        None,
+        "",
+        "null",
+        "not json",
+        json.dumps([1, 2]),
+        json.dumps({"left": 1, "top": 2, "width": 3}),  # height missing
+        json.dumps({"left": "a", "top": 2, "width": 3, "height": 4}),  # non-numeric
+        json.dumps({"left": 1, "top": 2, "width": 0, "height": 4}),  # zero-size
+        json.dumps({"left": 1, "top": 2, "width": 3, "height": -4}),  # negative size
+        json.dumps({"left": True, "top": 2, "width": 3, "height": 4}),  # bool is not a coord
+        '{"left": Infinity, "top": 2, "width": 3, "height": 4}',  # nonfinite
+    ):
+        assert W._parse_cf_rect(raw) is None, raw
+
+
+def test_cf_click_target_aims_at_the_turnstile_checkbox_in_physical_pixels():
+    from stockroom.host import window as W
+
+    # the checkbox sits at the widget's left edge: x = left + min(30, 15% of width), y = mid-
+    # height, both scaled to PHYSICAL pixels (ClientToScreen expects them) by devicePixelRatio
+    rect = {"left": 100.0, "top": 200.0, "width": 300.0, "height": 65.0, "dpr": 2.0}
+    assert W._cf_click_target(rect) == (260, 465)  # (100+30)*2, (200+32.5)*2
+    small = {"left": 0.0, "top": 0.0, "width": 100.0, "height": 40.0, "dpr": 1.0}
+    assert W._cf_click_target(small) == (15, 20)  # min(30, 15% of 100) = 15
+
+
+def test_cf_autoclick_tick_clicks_the_sensed_rect_bounded_and_gapped(monkeypatch):
+    from stockroom.host import window as W
+
+    win = _CfWindow(_cf_raw())
+    monkeypatch.setattr(W, "_CAD_WINDOW", win)
+    clicks = []
+    state: dict = {}
+    t = {"v": 100.0}
+    for _ in range(10):
+        W._cf_autoclick_tick(state, now=lambda: t["v"], click=lambda w, x, y: clicks.append((w, x, y)))
+        t["v"] += 1.0  # 1s per poll pass: the >=3s gap must throttle consecutive attempts
+    # bounded to 3 attempts total, each at least the gap apart, aimed at the checkbox
+    assert len(clicks) == 3
+    assert all(c == (win, 130, 232) for c in clicks)
+    assert state["attempts"] == 3
+    # a later pass never clicks again, even with the wall still sensed (Your Turn covers it)
+    t["v"] += 1000.0
+    W._cf_autoclick_tick(state, now=lambda: t["v"], click=lambda w, x, y: clicks.append((w, x, y)))
+    assert len(clicks) == 3
+
+
+def test_cf_autoclick_tick_without_a_rect_or_window_consumes_nothing(monkeypatch):
+    from stockroom.host import window as W
+
+    state: dict = {}
+    boom = lambda *a: (_ for _ in ()).throw(AssertionError("must not click"))  # noqa: E731
+
+    # no cad window at all: a pure no-op that never even reads the clock (the poll loop's
+    # injectable now() may be a finite iterator - see the timeout-signal test)
+    monkeypatch.setattr(W, "_CAD_WINDOW", None)
+    W._cf_autoclick_tick(state, now=boom, click=boom)
+    assert state == {}
+
+    # a window with no sensed rect (or junk): nothing clicked, no attempt consumed
+    for raw in (None, "null", "not json"):
+        monkeypatch.setattr(W, "_CAD_WINDOW", _CfWindow(raw))
+        W._cf_autoclick_tick(state, now=boom, click=boom)
+        assert state == {}
+
+    # an evaluate_js that raises (window mid-close) degrades silently
+    class _Dead:
+        def evaluate_js(self, script):
+            raise RuntimeError("gone")
+
+    monkeypatch.setattr(W, "_CAD_WINDOW", _Dead())
+    W._cf_autoclick_tick(state, now=boom, click=boom)
+    assert state == {}
+
+
+def test_cf_autoclick_tick_skips_an_offscreen_target(monkeypatch):
+    from stockroom.host import window as W
+
+    # a rect scrolled off the viewport computes a nonpositive client target; clicking there
+    # would land on chrome or another window - skip without consuming an attempt
+    monkeypatch.setattr(W, "_CAD_WINDOW", _CfWindow(_cf_raw(left=-500.0)))
+    state: dict = {}
+    W._cf_autoclick_tick(state, now=lambda: 0.0, click=lambda *a: (_ for _ in ()).throw(AssertionError))
+    assert state == {}
+
+
+def test_poll_loop_runs_the_cf_autoclick_each_pass(tmp_path, monkeypatch):
+    from stockroom.capture.requirements import Requirement as R
+    from stockroom.host import window as W
+
+    spa = _RecordingWindow()
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", spa)
+    cad = _CfWindow(_cf_raw())
+    monkeypatch.setattr(W, "_CAD_WINDOW", cad)
+    clicks = []
+    monkeypatch.setattr(W, "_click_cad_window_at", lambda w, x, y: clicks.append((w, x, y)))
+    s = _session({R.KICAD_SYMBOL})
+    times = iter([0.0, 0.0, 10.0, 1000.0])  # deadline; pass 1 (tick clicks at 10.0); past-deadline
+    W._poll_downloads_watch(
+        _FakeWatch([]), s, extract_dir=tmp_path / "x",
+        interval=0.0, timeout=300.0, sleep=lambda *_: None, now=lambda: next(times),
+    )
+    assert clicks == [(cad, 130, 232)]  # the poll thread drove the OS-level click
+
+
+def test_click_cad_window_at_is_windows_only():
+    from stockroom.host import window as W
+
+    # on a non-Windows host the ctypes path must not even be attempted
+    assert W._click_cad_window_at(_RecordingWindow(), 10, 10) is False
+
+
 # -- finish-and-close on completion (DONE-01): Complete flash + done signal + window destroy --
 
 

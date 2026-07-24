@@ -127,6 +127,21 @@ _DIGIKEY_HELPERS = (
     "if(/just a moment|attention required|verify you are|checking your browser/.test(t))return true;"
     "if(document.querySelector('input[type=password]')&&document.querySelector('form input[type=password]'))return true;"
     "return false;}catch(e){return false;}}"
+    # The page cannot click the Turnstile itself - the checkbox lives in a cross-origin iframe,
+    # usually behind a CLOSED shadow root, out of reach of any in-page script (owner 2026-07-24:
+    # "could u click the cloudflare for me"). So the driver only SENSES it: stash the visible
+    # challenge's viewport rect + devicePixelRatio as JSON in window.__SR_CF_RECT__ for the HOST,
+    # which fires a real OS-level click at the checkbox from the tier-2 poll thread. The iframe is
+    # preferred (its rect IS the widget); the .cf-turnstile widget mount / interstitial
+    # #challenge-stage containers stand in when the iframe is shadow-hidden. Cleared whenever no
+    # challenge is visible, so the host can never click a stale rect.
+    "function cfRect(){try{"
+    "var el=document.querySelector('iframe[src*=\"challenges.cloudflare.com\"]');"
+    "if(!vis(el))el=document.querySelector('.cf-turnstile,#challenge-stage');"
+    "if(el&&vis(el)){var r=el.getBoundingClientRect();"
+    "if(r.width>0&&r.height>0){window.__SR_CF_RECT__=JSON.stringify("
+    "{left:r.left,top:r.top,width:r.width,height:r.height,dpr:window.devicePixelRatio||1});return;}}"
+    "window.__SR_CF_RECT__=null;}catch(e){}}"
 )
 
 # The download bridge + recovery. window.__SR_DL__ receives the browser's REAL download lifecycle
@@ -456,6 +471,11 @@ def _digikey_driver_js(formats: list[str]) -> str:
         # matters: a larger part's export began 9.8s after the click (live 2026-07-23, ATMEGA).
         "var GEN_WD=150000,START_WD=20000,MAX_REFRESH=3;"
         + _DIGIKEY_HELPERS
+        # The Cloudflare sensor runs the whole document's life on the same light 1500ms cadence as
+        # the health interval (sensor-class, one querySelector + one rect read - never innerText),
+        # independent of which until()/await is active, so a wall at ANY phase (initial
+        # interstitial, login, mid-download) is sensed and the host can click it.
+        + "setInterval(cfRect,1500);cfRect();"
         + _DIGIKEY_REACTOR
         + _DIGIKEY_RUN
         + _DIGIKEY_DOWNLOAD

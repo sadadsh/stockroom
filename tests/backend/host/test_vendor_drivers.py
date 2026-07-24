@@ -218,6 +218,24 @@ def test_digikey_driver_iterates_sources_not_hardcoding_ultra_librarian():
     assert "data-original" in js and "step" in low
 
 
+def test_digikey_driver_senses_and_stashes_the_cloudflare_rect_for_the_host():
+    # Owner 2026-07-24: "could u click the cloudflare for me". The page CANNOT click the
+    # Turnstile itself (the checkbox lives in a cross-origin iframe, often behind a closed
+    # shadow root), so the driver only SENSES it: a light 1500ms watcher stashes the visible
+    # challenge's viewport rect + devicePixelRatio as JSON in window.__SR_CF_RECT__ for the
+    # HOST, which fires a REAL OS-level click at the checkbox. The global clears whenever no
+    # challenge is visible, so the host can never click a stale rect.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    assert "__SR_CF_RECT__" in js
+    assert "getBoundingClientRect" in js and "devicePixelRatio" in js
+    # the challenge iframe first, the widget/interstitial containers as the fallback (the
+    # Turnstile iframe hides inside a closed shadow root, so the container rect stands in)
+    assert "challenges.cloudflare.com" in js and ".cf-turnstile" in js
+    assert "#challenge-stage" in js
+    assert "setInterval(cfRect,1500)" in js  # the light watcher cadence (sensor-class, like health)
+    assert "window.__SR_CF_RECT__=null" in js  # cleared when absent - never a stale rect
+
+
 def test_wall_clearance_never_hijacks_the_login_redirect_chain():
     # Live 2026-07-24: submitting the DigiKey sign-in makes the password field vanish
     # the instant the SSO redirect chain STARTS; recover() then refreshed to the product

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import shutil
 import tempfile
@@ -466,7 +467,11 @@ def _poll_downloads_watch(
     open_cad_download. Zero pywebview dependency (importable and callable on Linux); only
     ever finds a real file on Windows watching a real Downloads folder."""
     deadline = now() + timeout
+    cf_state: dict = {}
     while not session.stop_flag["stop"] and now() < deadline:
+        # Auto-click a sensed Cloudflare challenge (bounded + gapped inside the tick); the
+        # driver stashes the rect, this thread fires the real OS-level click.
+        _cf_autoclick_tick(cf_state, now=now)
         if _session_complete(session):
             # all needs met: flash Complete on the HUD, tell the SPA it is done, and auto-close the
             # cad window (DONE-01). The temp dir is left for the async Altium attach (cleaned on the
@@ -482,6 +487,134 @@ def _poll_downloads_watch(
         return
     if not _session_complete(session):
         _forward_timeout_signal(session)
+
+
+# -- Cloudflare Turnstile auto-click (owner 2026-07-24: "could u click the cloudflare for me").
+# The in-page driver can only SENSE the challenge (the checkbox lives in a cross-origin iframe,
+# usually behind a closed shadow root): it stashes the widget's viewport rect + devicePixelRatio
+# as JSON in window.__SR_CF_RECT__ (drivers.py cfRect, refreshed/cleared on a 1500ms cadence).
+# The HOST reads that global from the tier-2 poll thread and fires a REAL OS-level click at the
+# checkbox - bounded attempts, seconds apart, degrading silently to the driver's existing
+# "Your Turn" hand-off when clicking does not solve it.
+
+_CF_MAX_ATTEMPTS = 3
+_CF_ATTEMPT_GAP = 3.0
+
+
+def _parse_cf_rect(raw) -> dict | None:
+    """The sensed Cloudflare rect out of the driver's JSON stash, or None for anything that is
+    not a plainly clickable rect: not a JSON object, a missing/non-numeric/nonfinite coordinate,
+    or a degenerate size. A missing or nonsensical dpr degrades to 1.0 (the rect is still
+    clickable), never a reject. Never raises - remote page content feeds this."""
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    rect: dict = {}
+    for key in ("left", "top", "width", "height"):
+        v = data.get(key)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            return None
+        rect[key] = float(v)
+    if rect["width"] <= 0 or rect["height"] <= 0:
+        return None
+    dpr = data.get("dpr")
+    ok_dpr = not isinstance(dpr, bool) and isinstance(dpr, (int, float)) and math.isfinite(dpr) and dpr > 0
+    rect["dpr"] = float(dpr) if ok_dpr else 1.0
+    return rect
+
+
+def _cf_click_target(rect: dict) -> tuple[int, int]:
+    """The click point in PHYSICAL client pixels (ClientToScreen expects them; the sensed rect
+    is CSS pixels, so scale by devicePixelRatio). The Turnstile checkbox sits at the widget's
+    LEFT edge: x = left + min(30px, 15% of width) - the 15% floor keeps a narrow container's
+    click inside it - and y = mid-height."""
+    x = rect["left"] + min(30.0, rect["width"] * 0.15)
+    y = rect["top"] + rect["height"] / 2.0
+    return (int(round(x * rect["dpr"])), int(round(y * rect["dpr"])))
+
+
+def _cf_autoclick_tick(state: dict, *, now=time.time, click=None) -> None:
+    """One poll-thread pass of the Cloudflare auto-click: read the driver's sensed rect off the
+    cad window, and when a clickable challenge is present fire the OS-level click - at most
+    _CF_MAX_ATTEMPTS per session, at least _CF_ATTEMPT_GAP seconds apart (per-attempt bookkeeping
+    in `state`). Every early-out consumes NOTHING - not an attempt, and not even a now() read
+    (the poll loop's injectable clock may be a finite iterator). Exhausted attempts degrade
+    silently: the driver's "Your Turn" hand-off already covers an unsolved wall."""
+    if state.get("attempts", 0) >= _CF_MAX_ATTEMPTS:
+        return
+    win = _CAD_WINDOW
+    if win is None:
+        return
+    try:
+        raw = win.evaluate_js("window.__SR_CF_RECT__||null")
+    except Exception:  # noqa: BLE001 - a window mid-close must never crash the poll thread
+        return
+    rect = _parse_cf_rect(raw)
+    if rect is None:
+        return
+    x, y = _cf_click_target(rect)
+    if x <= 0 or y <= 0:
+        return  # scrolled off the viewport: the click would land outside the page
+    t = now()
+    last = state.get("last")
+    if last is not None and t - last < _CF_ATTEMPT_GAP:
+        return
+    state["last"] = t
+    state["attempts"] = state.get("attempts", 0) + 1
+    if click is None:
+        click = _click_cad_window_at
+    click(win, x, y)
+
+
+def _hwnd_int(handle) -> int | None:
+    """A .NET IntPtr (or anything int-like) as a plain int HWND, or None."""
+    try:
+        if hasattr(handle, "ToInt64"):
+            return int(handle.ToInt64())
+        return int(handle)
+    except Exception:  # noqa: BLE001 - an unconvertible handle is simply unusable
+        return None
+
+
+def _click_cad_window_at(window, x: int, y: int) -> bool:
+    """A REAL OS-level left click at CLIENT physical (x, y) inside the cad window's WebView2
+    control (Windows only): foreground the window's form, ClientToScreen on the WebView2
+    control's handle, then SetCursorPos + mouse_event. A synthetic in-page click can never
+    satisfy the Turnstile (it verifies trusted input), which is why this goes through the OS.
+    Reaches pywebview internals with the same guards as _install_cad_permission_autoallow:
+    any shape mismatch returns False silently - the "Your Turn" hand-off covers it."""
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        from webview.platforms.winforms import BrowserView
+
+        form = BrowserView.instances.get(getattr(window, "uid", None))
+        control = getattr(getattr(form, "browser", None), "web_view", None)
+        hwnd = _hwnd_int(getattr(control, "Handle", None))
+        form_hwnd = _hwnd_int(getattr(form, "Handle", None))
+        if hwnd is None or form_hwnd is None:
+            return False
+        user32 = ctypes.windll.user32
+        user32.SetForegroundWindow(form_hwnd)
+        pt = wintypes.POINT(int(x), int(y))
+        if not user32.ClientToScreen(hwnd, ctypes.byref(pt)):
+            return False
+        user32.SetCursorPos(pt.x, pt.y)
+        user32.mouse_event(0x0002, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTDOWN
+        user32.mouse_event(0x0004, 0, 0, 0, 0)  # MOUSEEVENTF_LEFTUP
+        _log.info("cad cloudflare auto-click fired at client (%d, %d)", x, y)
+        return True
+    except Exception:  # noqa: BLE001 - degrade to the manual "Your Turn" hand-off
+        _log.warning("cad cloudflare auto-click failed; the Your Turn hand-off covers it")
+        return False
 
 
 def _should_auto_allow_permission(kind: str) -> bool:
