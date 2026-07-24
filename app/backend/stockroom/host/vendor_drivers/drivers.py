@@ -231,6 +231,55 @@ _DIGIKEY_REACTOR = (
     "report(spec.key,false,'That stalled; refreshing to try '+spec.name+' again.');refresh();}"
 )
 
+# Return-to-page + login-first (owner ask 2026-07-23). The part page the reactor RETURNS a
+# wandered capture to is sessionStorage's __SR_PRODUCT__ (stored when leaving the product page,
+# and before routing to the login) falling back to TARGET, the session's original URL the host
+# threads in. returnToPart is BOUNDED (__SR_RETURN__, MAX_RETURN) so a part page genuinely
+# without a CAD models section degrades to the manual guidance message, never a reload loop -
+# and it never navigates out from under a wall (the user may be mid-login / mid-captcha).
+# loginLink senses the signed-out header ("Login or REGISTER", live 2026-07-24; signed in it
+# shows the account name instead) - OWNER-VALIDATE like every selector here. The text match is
+# ANCHORED so "Supplier Login" or prose mentioning login can never match; the href form covers
+# a text-less link. routeLogin fires ONCE per window (__SR_LOGIN_SENT__ - an abandoned login
+# never loops), and its click may only open a header menu rather than navigate, so a bounded
+# backstop drives on as a guest instead of stranding the run. A real login navigates to
+# auth.digikey.com, which senseWall covers - the start-time wall gate hands off "Your Turn",
+# and the post-login landing page (typically a MyDigiKey/account page) is returned to the part
+# page by drive()'s short-circuit on the next injection. The two behaviors compose.
+_DIGIKEY_PAGE_GUARD = (
+    "function partUrl(){var p=null;try{p=sessionStorage.getItem('__SR_PRODUCT__');}catch(e){}"
+    "return p||TARGET||'';}"
+    "function offsite(){try{return (location.hostname||'').toLowerCase().indexOf('digikey')<0;}"
+    "catch(e){return false;}}"
+    "function returns(){try{return parseInt(sessionStorage.getItem('__SR_RETURN__')||'0',10)||0;}"
+    "catch(e){return 0;}}"
+    "function returnToPart(){var dest=partUrl();"
+    "if(dest&&location.href===dest)dest='';"
+    "if(!dest||returns()>=MAX_RETURN){report('page',false,"
+    "'Open the EDA / CAD Models section on this page to download the files.');return;}"
+    "try{sessionStorage.setItem('__SR_RETURN__',''+(returns()+1));}catch(e){}"
+    "trace('returnToPart',dest);"
+    "report('page',true,'That is not the part page; taking you back.');"
+    "setTimeout(function(){if(!senseWall())location.href=dest;},2500);}"
+    # OWNER-VALIDATE: the signed-out DigiKey header's Login link (first-guess selectors).
+    "function loginLink(){try{var as=document.querySelectorAll('a[href]');"
+    "for(var i=0;i<as.length;i++){var a=as[i];if(!vis(a))continue;"
+    "var t=(a.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();"
+    "if(/^(log ?in|sign ?in)$/.test(t))return a;"
+    "var h=(a.getAttribute('href')||'').toLowerCase();"
+    "if(/mydigikey\\/(login|signin)/.test(h))return a;}return null;}catch(e){return null;}}"
+    "function routeLogin(){var sent=null;"
+    "try{sent=sessionStorage.getItem('__SR_LOGIN_SENT__');}catch(e){}"
+    "if(sent)return false;var a=loginLink();if(!a)return false;"
+    "try{sessionStorage.setItem('__SR_LOGIN_SENT__','1');}catch(e){}"
+    "try{sessionStorage.setItem('__SR_PRODUCT__',location.href);}catch(e){}"
+    "trace('routeLogin');"
+    "report('login',true,'You are signed out; opening the DigiKey login first "
+    "(an account lifts the download limit). I will carry on after you sign in.');"
+    "try{a.click();}catch(e){}"
+    "setTimeout(function(){if(!senseWall())driveMain();},5000);return true;}"
+)
+
 # Phase 1 (product page): react to the CAD models link, navigate in-place (a fresh document, so the
 # host re-injects the reactor on the models page). Phase 2 (models page): react to the provider bar,
 # enumerate the VISIBLE provider rows in preference order, then drive each requested format in turn.
@@ -240,7 +289,7 @@ _DIGIKEY_RUN = (
     "if(!a){var as=document.querySelectorAll('a[href]');for(var i=0;i<as.length;i++){"
     "if(/\\/models\\//.test(as[i].getAttribute('href')||'')){a=as[i];break;}}}"
     "return (a&&a.getAttribute('href'))?a:null;},function(a){"
-    "if(!a){report('cad',false,'Open the EDA / CAD Models section on this page to download the files.');return;}"
+    "if(!a){returnToPart();return;}"
     "report('cad',true,'Opening the EDA / CAD Models page.');"
     "try{sessionStorage.setItem('__SR_PRODUCT__',location.href);}catch(e){}"
     "var h=a.getAttribute('href');location.href=(h.charAt(0)==='/')?(location.origin+h):h;},15000);}"
@@ -257,7 +306,8 @@ _DIGIKEY_RUN = (
     # format that never arrived (owner 2026-07-24: "it saying it downloaded should only say download
     # once the file lands").
     "function driveFormats(present){var qi=0,landed=[],missed=[];"
-    "function finish(){try{sessionStorage.removeItem('__SR_REFRESH__');}catch(e){}"
+    "function finish(){try{sessionStorage.removeItem('__SR_REFRESH__');"
+    "sessionStorage.removeItem('__SR_RETURN__');}catch(e){}"
     "if(!missed.length){report('done',true,'Downloaded '+landed.join(' and ')+'.');}"
     "else if(landed.length){report('done',false,'Downloaded '+landed.join(' and ')+', but could NOT get '"
     "+missed.join(' and ')+' automatically. Grab it by hand or retry.');}"
@@ -471,7 +521,7 @@ def _digikey_format_specs_js(formats: list[str]) -> str:
     )
 
 
-def _digikey_driver_js(formats: list[str]) -> str:
+def _digikey_driver_js(formats: list[str], target_url: str = "") -> str:
     fmts = [f for f in ("kicad", "altium") if f in (formats or [])]
     names = [{"kicad": "KiCad", "altium": "Altium"}[f] for f in fmts]
     start_msg = "Getting the " + (" and ".join(names) or "CAD") + " files from DigiKey."
@@ -486,29 +536,47 @@ def _digikey_driver_js(formats: list[str]) -> str:
         # START_WD: the owner's "a successful run downloads in under 5 seconds" heuristic with
         # margin - no real download start within it means the attempt is dead (nostart). Margin
         # matters: a larger part's export began 9.8s after the click (live 2026-07-23, ATMEGA).
-        "var GEN_WD=150000,START_WD=20000,MAX_REFRESH=3;"
+        # MAX_RETURN bounds returnToPart; TARGET is the session's part page the host threads in.
+        "var GEN_WD=150000,START_WD=20000,MAX_REFRESH=3,MAX_RETURN=4;"
+        + "var TARGET=" + json.dumps(target_url or "") + ";"
         + _DIGIKEY_HELPERS
         + _DIGIKEY_REACTOR
+        + _DIGIKEY_PAGE_GUARD
         + _DIGIKEY_RUN
         + _DIGIKEY_DOWNLOAD
         + "var PROVS=" + json.dumps(_DIGIKEY_PROVIDER_KEYS) + ";"
         + "var SPECS=" + _digikey_format_specs_js(fmts) + ";"
         + "report('start',true," + json.dumps(start_msg) + ");"
-        # Start-time wall gate: if the window opens onto (or lands on) a login / verification
-        # wall - the DigiKey SSO email step, its password step, or a Cloudflare check - hand off
-        # "Sign in" and WAIT for the wall to clear before driving the models page, rather than
-        # hunting for a CAD link a login page does not have and then reporting a misleading
-        # "open the CAD models section" (live 2026-07-24). A login that navigates to a fresh
-        # document re-injects this reactor, which then sees no wall and proceeds.
-        + "function drive(){try{if(location.pathname.indexOf('/models/')>=0){runModels();}"
+        # driveMain is the models/product drive; drive() wraps it with the page guards: an
+        # account page a login typically lands on can never carry a CAD models link, so it
+        # returns to the part page at once instead of seeking one for 15s; a signed-out
+        # session routes through the site's own Login link BEFORE any download is attempted
+        # (a guest capture trips DigiKey's download quota on the 2nd file).
+        + "function driveMain(){try{if(location.pathname.indexOf('/models/')>=0){runModels();}"
         "else{gotoModels();}}catch(e){"
         "report('driver',false,'Open the EDA / CAD Models section and download the files.');}}"
+        + "function drive(){try{"
+        "if(/\\/(mydigikey|cart|checkout|ordering|mylists)\\b/i.test(location.pathname)){returnToPart();return;}"
+        "if(routeLogin())return;"
+        "driveMain();}catch(e){"
+        "report('driver',false,'Open the EDA / CAD Models section and download the files.');}}"
+        # Start-time page + wall gate. The OFF-SITE check runs FIRST: a wandered capture window
+        # (or a load-error document) goes back to the part page, and a foreign site's password
+        # field never false-positives senseWall into a "finish the DigiKey sign-in" handoff on
+        # a page that is not DigiKey's. Then the wall gate: if the window opens onto (or lands
+        # on) a login / verification wall - the DigiKey SSO email step, its password step, or a
+        # Cloudflare check - hand off "Sign in" and WAIT for the wall to clear before driving
+        # the models page, rather than hunting for a CAD link a login page does not have and
+        # then reporting a misleading "open the CAD models section" (live 2026-07-24). A login
+        # that navigates to a fresh document re-injects this reactor, which then sees no wall
+        # and proceeds.
         # The wait for the wall to clear POLLS senseWall on a light interval rather than using
         # the MutationObserver-based until(): a Cloudflare check that clears IN-PLACE leaves the
         # page settled with no further DOM mutations, so a mutation-only wait would hang forever
         # after the wall was already gone (live 2026-07-24 - the reactor sat on "Your Turn" with
         # the product page fully loaded behind it). ~10 min bounded, then it drives anyway.
-        + "try{if(senseWall()){"
+        + "try{if(offsite()){returnToPart();}"
+        "else if(senseWall()){"
         "yourTurn('Please finish the DigiKey sign-in or the Cloudflare verification in this window; I will continue as soon as you are through.');"
         "var _wg=0;var _wi=setInterval(function(){_wg++;"
         "if(!senseWall()){clearInterval(_wi);clearTurn();drive();return;}"
@@ -518,10 +586,10 @@ def _digikey_driver_js(formats: list[str]) -> str:
     return f"(function(){{{body}}})();"
 
 
-def build_driver_js(vendor: str, formats: list[str]) -> str:
+def build_driver_js(vendor: str, formats: list[str], target_url: str = "") -> str:
     key = (vendor or "").strip().lower()
     if key == "digikey":
-        return _digikey_driver_js(formats)
+        return _digikey_driver_js(formats, target_url)
     spec = _VENDORS.get(key)
     if spec is None:
         # Guidance-only: never click anything, but tell the overlay so it can guide manually.

@@ -895,19 +895,27 @@ def _vendor_from_url(url: str) -> tuple[str, str]:
 
 
 def cad_loaded_scripts(
-    needs, vendor_key: str, vendor_label: str, formats, creds, part_name: str = ""
+    needs,
+    vendor_key: str,
+    vendor_label: str,
+    formats,
+    creds,
+    part_name: str = "",
+    target_url: str = "",
 ) -> list[str]:
     """The scripts to inject into the cad window on each `loaded`, in order: the overlay (so
     the panel + `window.__STOCKROOM_OVERLAY__` bridge exist first), then a best-effort login
     auto-fill (omitted when there are no creds), then the vendor driver (which reports into the
-    overlay). `part_name` is shown as the HUD header focal point when non-empty."""
+    overlay). `part_name` is shown as the HUD header focal point when non-empty. `target_url`
+    is the capture session's original part-page URL, threaded into the driver as the page the
+    reactor returns a wandered capture to (return-to-page, owner ask 2026-07-23)."""
     scripts = [build_overlay_js(list(needs), vendor_label, part_name)]
     autofill = build_login_autofill_js(
         vendor_key, (creds or {}).get("username", ""), (creds or {}).get("password", "")
     )
     if autofill:
         scripts.append(autofill)
-    scripts.append(build_driver_js(vendor_key, list(formats)))
+    scripts.append(build_driver_js(vendor_key, list(formats), target_url=target_url))
     return scripts
 
 
@@ -942,7 +950,7 @@ def _load_vendor_creds(vendor_key: str) -> dict:
 
 
 def cad_scripts_for_url(
-    url: str, needs_values, part_name: str = "", driver_formats=None
+    url: str, needs_values, part_name: str = "", driver_formats=None, target_url: str = ""
 ) -> list[str]:
     """The cad scripts (overlay + optional per-vendor login autofill + driver) re-derived from a
     url: vendor/label via `_vendor_from_url`, formats via `_formats_for_needs`, creds via
@@ -955,11 +963,20 @@ def cad_scripts_for_url(
     `driver_formats` overrides which formats the DRIVER attempts while the OVERLAY still shows the
     full `needs_values` checklist. The host drives ONE format per fresh page load (DigiKey's stateful
     export + Download-complete modals cannot be reliably reused for a 2nd format in one session), so it
-    passes the single next-unmet format here; None (the default) means all requested formats."""
+    passes the single next-unmet format here; None (the default) means all requested formats.
+
+    `target_url` is the capture session's ORIGINAL part-page URL. It is threaded into the driver
+    (return-to-page), and when the CURRENT url derives to no known vendor - the user wandered the
+    capture window off-site - the vendor is re-derived from it, so the wandered page still gets
+    the session's reactor (whose off-site branch navigates back) rather than the guidance noop."""
     vendor_key, vendor_label = _vendor_from_url(url)
+    if not vendor_key and target_url:
+        vendor_key, vendor_label = _vendor_from_url(target_url)
     formats = _formats_for_needs(needs_values) if driver_formats is None else list(driver_formats)
     creds = _load_vendor_creds(vendor_key)
-    return cad_loaded_scripts(needs_values, vendor_key, vendor_label, formats, creds, part_name)
+    return cad_loaded_scripts(
+        needs_values, vendor_key, vendor_label, formats, creds, part_name, target_url=target_url
+    )
 
 
 def _inject_cad_scripts(
@@ -975,7 +992,9 @@ def _inject_cad_scripts(
     except Exception:  # noqa: BLE001 - a backend without get_current_url falls back to the original
         current = None
     url = current or fallback_url
-    for script in cad_scripts_for_url(url, needs_values, part_name, driver_formats):
+    for script in cad_scripts_for_url(
+        url, needs_values, part_name, driver_formats, target_url=fallback_url
+    ):
         try:
             win.evaluate_js(script)
         except Exception:  # noqa: BLE001 - injection is best-effort; never crash the app

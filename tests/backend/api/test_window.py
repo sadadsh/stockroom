@@ -999,6 +999,25 @@ def test_cad_scripts_for_url_digikey_is_overlay_and_driver_only_manual_login(mon
     assert "dku" not in "".join(scripts) and "dkp" not in "".join(scripts)
 
 
+def test_cad_scripts_for_a_wandered_page_still_carry_the_session_reactor(monkeypatch):
+    from stockroom.host import window as W
+
+    _stub_creds(monkeypatch)
+    # The user wandered the capture window off to a non-vendor site: the CURRENT url derives
+    # to no vendor, but the session's target_url still yields the DigiKey reactor - whose
+    # off-site branch brings them back to the part page - never the guidance-only noop.
+    scripts = W.cad_scripts_for_url(
+        "https://www.example.com/somewhere",
+        ["kicad_symbol"],
+        "BQ24074",
+        target_url="https://www.digikey.com/en/products/detail/x/13563754",
+    )
+    joined = "".join(scripts)
+    assert "__SR_DK_RUNNING__" in joined  # the DigiKey reactor
+    assert "digikey.com/en/products/detail/x/13563754" in joined  # TARGET embedded
+    assert "No automation for this vendor" not in joined
+
+
 def test_cad_scripts_for_url_snapeda_and_samacsys_autofill(monkeypatch):
     from stockroom.host import window as W
 
