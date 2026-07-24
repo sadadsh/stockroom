@@ -359,6 +359,23 @@ def _emit_to_cad_window(js: str) -> None:
         pass
 
 
+def _preserve_unrecognized(path) -> None:
+    """Copy a captured file whose Altium content could not be pulled into a durable
+    capture-debug dir under the config dir, so a field report ("the Altium files aren't
+    recognized / are corrupted") can be diagnosed against the ACTUAL bytes even after the
+    session temp dir is cleaned by the next capture. Best-effort; never raises."""
+    try:
+        from stockroom.store.machine_config import config_dir
+
+        dbg = config_dir() / "capture-debug"
+        dbg.mkdir(parents=True, exist_ok=True)
+        dest = _unique_dest(dbg, os.path.basename(str(path)) or "capture.bin")
+        shutil.copyfile(path, dest)
+        _log.warning("capture: preserved the unrecognized file at %s", dest)
+    except Exception:  # noqa: BLE001 - a diagnostic aid, never a capture blocker
+        pass
+
+
 def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
     """Classify a captured file, record the requirements it satisfies into `session`, and
     forward the rich CaptureForward payload (path + live token + classified requirements +
@@ -397,6 +414,7 @@ def _forward_cad_capture(path, session=None, *, extract_dir=None) -> None:
                     "capture: altium content could NOT be pulled from %s - need stays open",
                     os.path.basename(str(path)),
                 )
+                _preserve_unrecognized(path)
                 wanted = frozenset(r for r in wanted if r not in _ALTIUM_REQS)
         if session is not None:
             # reqs may be EMPTY (a duplicate re-fire, or a wrong-format download): the SPA forward
