@@ -1378,6 +1378,8 @@ def run_window(base_url: str, token: str) -> None:
         if bind_native_drop(window, _on_native_drop):
             bound_doc["id"] = id(doc)
 
+    _autocap = {"fired": False}
+
     def _on_loaded():
         # Re-inject on every SPA load (after a self-update reload or route change the
         # renderer must always carry the base + token), but ONLY when the loaded page
@@ -1387,6 +1389,22 @@ def run_window(base_url: str, token: str) -> None:
             return
         window.evaluate_js(inject_script(base_url, token))
         _bind_native_drop()
+        # DEV-ONLY (STOCKROOM_AUTOCAP=<part_id>): trigger the guided capture for a part straight
+        # from the host, so a real capture can be exercised WITHOUT the CDP remote-debugging port
+        # that makes DigiKey serve a degraded page. Fetches the part's cad-source (url + needs)
+        # and calls the js_api open_cad_download - the same path the Get Files button takes. Fires
+        # once. No-op unless the env var is set.
+        autocap_id = os.environ.get("STOCKROOM_AUTOCAP")
+        if autocap_id and not _autocap["fired"]:
+            _autocap["fired"] = True
+            window.evaluate_js(
+                "(async()=>{try{var b=window.__API_BASE__,t=window.__STOCKROOM_TOKEN__;"
+                "var r=await fetch(b+'/api/library/parts/" + autocap_id + "/cad-source',"
+                "{headers:{Authorization:'Bearer '+t}});var d=await r.json();"
+                "if(window.pywebview&&window.pywebview.api&&window.pywebview.api.open_cad_download)"
+                "{window.pywebview.api.open_cad_download(d.url,d.needs,d.mpn||'');}"
+                "}catch(e){}})();"
+            )
 
     window.events.loaded += _on_loaded
     # Adding a vendor ZIP also works through the native file picker exposed as
