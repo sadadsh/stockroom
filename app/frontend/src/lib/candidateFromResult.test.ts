@@ -204,6 +204,39 @@ describe("pulledSpecConflicts", () => {
     ]);
   });
 
+  it("never shows an Image conflict (two vendors' CDN thumbnails always differ)", () => {
+    const result: EnrichmentResult = {
+      ...RESULT,
+      spec_conflicts: {
+        Image: [
+          { value: "https://mouser.com/a.jpg", source: "mouser", confidence: "medium" },
+          { value: "https://digikey.com/b.jpg", source: "digikey", confidence: "medium" },
+        ],
+      },
+    };
+    expect(pulledSpecConflicts(ZIP_CANDIDATE, result)).toEqual([]);
+  });
+
+  it("sorts conflict entries by key for a stable display", () => {
+    const result: EnrichmentResult = {
+      ...RESULT,
+      spec_conflicts: {
+        RoHS: [
+          { value: "RoHS Compliant", source: "mouser", confidence: "high" },
+          { value: "ROHS3 Compliant", source: "digikey", confidence: "high" },
+        ],
+        "HTS Code": [
+          { value: "8541100080", source: "mouser", confidence: "high" },
+          { value: "8541.10.0080", source: "digikey", confidence: "high" },
+        ],
+      },
+    };
+    expect(pulledSpecConflicts(ZIP_CANDIDATE, result).map((c) => c.key)).toEqual([
+      "HTS Code",
+      "RoHS",
+    ]);
+  });
+
   it("is empty when nothing disagrees and hides internal keys", () => {
     expect(pulledSpecConflicts(ZIP_CANDIDATE, RESULT)).toEqual([]);
     // product_url is an internal marker, never a conflict row even if it differs
