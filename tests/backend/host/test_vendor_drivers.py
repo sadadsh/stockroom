@@ -221,6 +221,20 @@ def test_digikey_driver_iterates_sources_not_hardcoding_ultra_librarian():
     assert "data-original" in js and "step" in low
 
 
+def test_digikey_sensewall_detects_the_guest_download_limit_modal():
+    # Live 2026-07-24 (THE root cause of "KiCad attached, Altium not"): browsing DigiKey as a
+    # GUEST (not signed in) caps downloads at a small daily quota. The 1st download (KiCad) slips
+    # under it; the 2nd (Altium) trips a "Download Speed Bump! ... you've hit today's guest limit
+    # for downloads" modal with a Login button. senseWall must treat that modal as a wall so the
+    # reactor hands off "Sign in" instead of silently retrying a download the quota will keep
+    # blocking. Scoped to modal/dialog text (cheap), keyed on the quota wording.
+    js = build_driver_js("digikey", ["kicad", "altium"])
+    low = js.lower()
+    assert "download speed bump" in low or "guest" in low
+    assert "limit for downloads" in low or "guest download limit" in low or "guest limit" in low
+    assert "role=dialog" in js or "modal" in low  # scans modal/dialog containers only
+
+
 def test_digikey_sensewall_covers_the_two_step_digikey_login():
     # Live 2026-07-24: DigiKey's SSO login (auth.digikey.com, PingFederate) is TWO steps -
     # an EMAIL step with a Next button and NO password field, then a password step. The old
