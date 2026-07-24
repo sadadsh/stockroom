@@ -136,6 +136,9 @@ export function ProjectsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rootInput, setRootInput] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ProjectSummary | null>(null);
+  // A folder holding BOTH KiCad and Altium files needs an explicit choice; the 400
+  // turns into an in-place picker for this path instead of a dead-end toast.
+  const [edaChoiceRoot, setEdaChoiceRoot] = useState<string | null>(null);
 
   const projects = projectsQuery.data ?? [];
 
@@ -155,16 +158,23 @@ export function ProjectsPage() {
     }
   }, [projects, selectedId, projectsFetching]);
 
-  function handleRegister() {
-    const root = rootInput.trim();
+  function handleRegister(eda?: string) {
+    const root = (edaChoiceRoot && eda ? edaChoiceRoot : rootInput).trim();
     if (!root || register.isPending) return;
-    register.mutate(root, {
+    register.mutate(eda ? { root, eda } : root, {
       onSuccess: (rec) => {
         toast(`Registered ${rec.name}.`, "ok");
         setRootInput("");
+        setEdaChoiceRoot(null);
         setSelectedId(rec.id);
       },
-      onError: (err) => toast(errMsg(err, "Could not register the project."), "err"),
+      onError: (err) => {
+        if (err instanceof ApiError && /both KiCad and Altium/i.test(err.message)) {
+          setEdaChoiceRoot(root);
+          return;
+        }
+        toast(errMsg(err, "Could not register the project."), "err");
+      },
     });
   }
 
@@ -219,6 +229,8 @@ export function ProjectsPage() {
             onChange={setRootInput}
             onRegister={handleRegister}
             busy={register.isPending}
+            edaChoice={edaChoiceRoot != null}
+            onCancelChoice={() => setEdaChoiceRoot(null)}
           />
         </div>
 
@@ -359,6 +371,12 @@ function ProjectRow({
             {project.name}
           </span>
           <span
+            className="flex-none rounded-control border border-line2 bg-field px-1.5 py-px text-2xs font-semibold text-t2"
+            title={project.eda === "altium" ? "An Altium project" : "A KiCad project"}
+          >
+            {project.eda === "altium" ? "Altium" : "KiCad"}
+          </span>
+          <span
             className={
               "inline-flex flex-none items-center gap-1 text-2xs font-medium " +
               (project.has_git ? "text-ok" : "text-t3")
@@ -389,37 +407,80 @@ function RegisterBar({
   onChange,
   onRegister,
   busy,
+  edaChoice,
+  onCancelChoice,
 }: {
   value: string;
   onChange: (v: string) => void;
-  onRegister: () => void;
+  onRegister: (eda?: string) => void;
   busy: boolean;
+  edaChoice: boolean;
+  onCancelChoice: () => void;
 }) {
   return (
     <div className="flex-none border-t border-line px-3 py-3" data-dev-id="projects.register">
       <Eyebrow className="mb-1.5">Register Project</Eyebrow>
-      <div className="flex flex-col gap-2">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onRegister();
-          }}
-          placeholder="Absolute path to a KiCad project folder"
-          className={INPUT_CLS}
-          spellCheck={false}
-          data-dev-id="projects.register-input"
-        />
-        <Button
-          variant="accent"
-          onClick={onRegister}
-          disabled={busy || !value.trim()}
-          className="w-full justify-center"
-          data-dev-id="projects.register-action"
-        >
-          {busy ? "Registering..." : "Register Project"}
-        </Button>
-      </div>
+      {edaChoice ? (
+        // The folder holds BOTH KiCad and Altium project files: registration needs an
+        // explicit choice, offered in place (never a dead-end error).
+        <div className="flex flex-col gap-2" data-dev-id="projects.register-eda-choice">
+          <p className="text-xs text-t2">
+            This folder holds both KiCad and Altium project files. Which should Stockroom
+            manage here?
+          </p>
+          <Button
+            variant="accent"
+            small
+            onClick={() => onRegister("kicad")}
+            disabled={busy}
+            className="w-full justify-center"
+            data-dev-id="projects.register-as-kicad"
+          >
+            Register As KiCad
+          </Button>
+          <Button
+            variant="accent"
+            small
+            onClick={() => onRegister("altium")}
+            disabled={busy}
+            className="w-full justify-center"
+            data-dev-id="projects.register-as-altium"
+          >
+            Register As Altium
+          </Button>
+          <Button
+            small
+            onClick={onCancelChoice}
+            disabled={busy}
+            className="w-full justify-center"
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRegister();
+            }}
+            placeholder="Absolute path to a KiCad or Altium project folder"
+            className={INPUT_CLS}
+            spellCheck={false}
+            data-dev-id="projects.register-input"
+          />
+          <Button
+            variant="accent"
+            onClick={() => onRegister()}
+            disabled={busy || !value.trim()}
+            className="w-full justify-center"
+            data-dev-id="projects.register-action"
+          >
+            {busy ? "Registering..." : "Register Project"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -446,6 +507,15 @@ const PROJECT_TABS: readonly TabItem<ProjectTab>[] = [
 const TAB_BODY_CLS =
   "[&>*:first-child]:mt-0 [&>*:first-child]:border-t-0 [&>*:first-child]:pt-0";
 
+// What an EDA's registration can do, derived the same way the server derives it, so
+// the tab strip renders correctly BEFORE the detail (the server's authoritative
+// capabilities list) arrives. Once loaded, the server list wins.
+const EDA_FALLBACK_CAPABILITIES: Record<string, string[]> = {
+  kicad: ["audit", "bom", "revisions", "restore", "file",
+          "checks", "fab", "setup", "netclasses", "prepare", "viewer"],
+  altium: ["audit", "bom", "revisions", "restore", "file"],
+};
+
 function ProjectDetailView({
   project,
   onRemove,
@@ -459,6 +529,21 @@ function ProjectDetailView({
   // remounts it and this lands back on Overview with a fresh, flash-free state (no
   // post-paint reset effect, no stale tab briefly rendered against the new project).
   const [tab, setTab] = useState<ProjectTab>("overview");
+  // The server's capabilities (what this EDA's registration can do here) gate the
+  // tabs and the per-tab KiCad-only sections; the eda-derived fallback prevents a
+  // tab flash while the detail loads.
+  const detailQuery = useProjectQuery(project.id);
+  const caps = new Set(
+    detailQuery.data?.capabilities
+      ?? EDA_FALLBACK_CAPABILITIES[project.eda]
+      ?? EDA_FALLBACK_CAPABILITIES.kicad,
+  );
+  const tabs = PROJECT_TABS.filter(
+    (t) =>
+      (t.id !== "setup" || caps.has("setup"))
+      && (t.id !== "netclasses" || caps.has("netclasses")),
+  );
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : "overview";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -470,6 +555,7 @@ function ProjectDetailView({
       >
         <span className="min-w-0 truncate text-sm font-semibold text-t1">{project.name}</span>
         <span className="ml-auto flex-none truncate text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+          {project.eda === "altium" ? "Altium" : "KiCad"} ·{" "}
           {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
           {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
         </span>
@@ -482,8 +568,8 @@ function ProjectDetailView({
             {project.root}
           </span>
           <TabStrip
-            tabs={PROJECT_TABS}
-            active={tab}
+            tabs={tabs}
+            active={activeTab}
             onSelect={setTab}
             idBase="project"
             devIdBase="projects"
@@ -493,14 +579,14 @@ function ProjectDetailView({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pt-4">
-          <TabPanel idBase="project" tab={tab} className={TAB_BODY_CLS + " max-w-[900px] pb-4"}>
-            {tab === "overview" ? (
-              <OverviewTab projectId={project.id} />
-            ) : tab === "health" ? (
-              <HealthTab projectId={project.id} />
-            ) : tab === "bom" ? (
-              <BomTab projectId={project.id} />
-            ) : tab === "setup" ? (
+          <TabPanel idBase="project" tab={activeTab} className={TAB_BODY_CLS + " max-w-[900px] pb-4"}>
+            {activeTab === "overview" ? (
+              <OverviewTab projectId={project.id} caps={caps} />
+            ) : activeTab === "health" ? (
+              <HealthTab projectId={project.id} caps={caps} />
+            ) : activeTab === "bom" ? (
+              <BomTab projectId={project.id} caps={caps} />
+            ) : activeTab === "setup" ? (
               <SetupTab projectId={project.id} />
             ) : (
               <NetClassesTab projectId={project.id} />
@@ -526,12 +612,12 @@ function ProjectDetailView({
   );
 }
 
-// Overview: the readiness verdict card and the board viewer.
-function OverviewTab({ projectId }: { projectId: string }) {
+// Overview: the readiness verdict card and (for a KiCad project) the board viewer.
+function OverviewTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
   return (
     <>
       <BuildabilitySection projectId={projectId} />
-      <ProjectViewerSection projectId={projectId} />
+      {caps.has("viewer") ? <ProjectViewerSection projectId={projectId} /> : null}
     </>
   );
 }
@@ -539,7 +625,7 @@ function OverviewTab({ projectId }: { projectId: string }) {
 // Health: the audit findings table (with its kind filter), the ERC/DRC checks, and
 // Prepare This Project (Fix-All + Restore). The audit query is scoped here so it
 // loads only when Health is open, not on every project select.
-function HealthTab({ projectId }: { projectId: string }) {
+function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
   const auditQuery = useProjectAudit(projectId);
   // The active kind filter for the findings table. null = show every finding.
   const [kindFilter, setKindFilter] = useState<string | null>(null);
@@ -564,21 +650,21 @@ function HealthTab({ projectId }: { projectId: string }) {
         />
       ) : null}
 
-      <ChecksSection projectId={projectId} />
-      <PrepareSection projectId={projectId} />
+      {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
+      {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
     </>
   );
 }
 
 // BOM & Procurement: build and cost, per-line orderability, revision diff, and the
 // fab (gerber/drill/placement) exports.
-function BomTab({ projectId }: { projectId: string }) {
+function BomTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
   return (
     <>
       <BomSection projectId={projectId} />
       <BomExportsSection projectId={projectId} />
       <RevisionDiffSection projectId={projectId} />
-      <FabSection projectId={projectId} />
+      {caps.has("fab") ? <FabSection projectId={projectId} /> : null}
     </>
   );
 }
@@ -792,6 +878,8 @@ const BUILD_SIGNAL_LABEL: Record<string, string> = {
   not_built: "Not Built",
   dirty: "Uncommitted",
   not_git: "No Git",
+  // An Altium project runs ERC/DRC inside Altium; the verdict says so, never blocks.
+  not_applicable: "In Altium",
 };
 
 // The backend's detail/next_step strings sometimes end with their own period; render
@@ -801,9 +889,10 @@ function sentence(s: string): string {
   return trimmed ? `${trimmed}.` : "";
 }
 
-function buildSignalTone(state: string): "ok" | "warn" | "err" {
+function buildSignalTone(state: string): "ok" | "warn" | "err" | "neutral" {
   if (state === "pass" || state === "clean") return "ok";
   if (state === "fail" || state === "not_run" || state === "not_built") return "err";
+  if (state === "not_applicable") return "neutral"; // checked in the owning EDA, not here
   return "warn"; // warn / dirty / not_git
 }
 

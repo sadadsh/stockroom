@@ -31,6 +31,7 @@ from stockroom.api.schemas import (
     StackupBody,
 )
 from stockroom.kicad.errors import KiCadCliError
+from stockroom.mutation.project_ops import project_capabilities
 
 
 def projects_router(require_token) -> APIRouter:
@@ -43,12 +44,13 @@ def projects_router(require_token) -> APIRouter:
 
     @r.post("")
     def register_project(request: Request, body: RegisterProjectBody) -> dict:
-        # A bad/nonexistent dir, a dir with no KiCad files, or an already-registered
-        # root each raises ValueError in the store -> 400 via the error layer.
+        # A bad/nonexistent dir, a dir with no project files, an ambiguous dir holding
+        # both EDAs with no explicit choice, or an already-registered root each raises
+        # ValueError in the store -> 400 via the error layer.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.register(body.root)
+        rec = ctx.project_ops.register(body.root, eda=body.eda)
         ctx.rebuild_project_index()
-        return rec.to_dict()
+        return dict(rec.to_dict(), capabilities=project_capabilities(rec))
 
     @r.get("/{project_id}")
     def project_detail(request: Request, project_id: str) -> dict:
@@ -56,7 +58,9 @@ def projects_router(require_token) -> APIRouter:
         rec = ctx.project_ops.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
-        return rec.to_dict()
+        # capabilities say what this EDA's registration can do here, so the frontend
+        # renders tabs from the server's truth instead of hardcoding per-EDA rules.
+        return dict(rec.to_dict(), capabilities=project_capabilities(rec))
 
     @r.delete("/{project_id}", status_code=204)
     def delete_project(request: Request, project_id: str) -> Response:
@@ -106,8 +110,9 @@ def projects_router(require_token) -> APIRouter:
         # honest 502 (never a fabricated clean pass, Decision 8). The result is cached
         # in AppContext so Overview and Buildability read one consistent verdict.
         ctx = request.app.state.ctx
-        if ctx.project_ops.get(project_id) is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        # gate BEFORE the job is submitted: an Altium project gets its honest 400 now,
+        # never a job that fails asynchronously
+        ctx.project_ops.require_kicad(project_id)
         if not ctx.cli.available:
             raise KiCadCliError(
                 "kicad-cli not found; install KiCad 10 (or set its path in Settings) to run ERC and DRC"
@@ -128,9 +133,7 @@ def projects_router(require_token) -> APIRouter:
         # The cached last run, or an honest not-run shape (never a fabricated pass) so
         # the frontend can render a stable "not checked yet" state. Unknown id -> 404.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = ctx.project_ops.require_kicad(project_id)
         cached = ctx.checks_cache.get(project_id)
         if cached is None:
             return {"project": rec.name, "ran_at": None, "erc": None, "drc": [], "summary": None}
@@ -491,9 +494,7 @@ def projects_router(require_token) -> APIRouter:
         # not-under-git 400 are resolved before the job is submitted (an immediate honest error, not an
         # async one). A Prepare changes the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = ctx.project_ops.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before preparing"

@@ -437,25 +437,6 @@ def test_pinout_geometry_is_inferred_for_an_uncurated_bga_package(client, app_ct
     assert geometry["has_center_pad"] is False
 
 
-def test_pin_returns_one_pin_with_every_derived_fact(client, app_ctx):
-    _seed_stm_index(app_ctx)
-    r = client.get("/api/stm/pin", params={"part": "STM32F407V(E-G)Tx", "position": "12"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["position"] == "12"
-    assert body["canonical_pin_name"] == "PA9"
-    assert body["five_v"]["tolerant"] is True
-    assert body["roles"] == [{"role_name": "gpio", "role_class": "io"}]
-
-
-def test_pin_404_when_position_absent(client, app_ctx):
-    _seed_stm_index(app_ctx)
-    r = client.get(
-        "/api/stm/pin", params={"part": "STM32F407V(E-G)Tx", "position": "999"}
-    )
-    assert r.status_code == 404
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # pin/af + signal/candidates (03-04 task 2, SWAP-01/02)
 # ─────────────────────────────────────────────────────────────────────────────

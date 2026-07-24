@@ -102,6 +102,67 @@ def test_pin_pad_mismatch_and_missing_model(tmp_path):
     assert au["checked_footprints"] == 1
 
 
+def _write_altium_sheet(path, *blocks):
+    from tests.backend.projects.test_bom import _write_schdoc
+
+    return _write_schdoc(path, *blocks)
+
+
+def test_audit_altium_project_runs_the_same_checks(tmp_path):
+    from stockroom.projects.health import audit_altium_project
+
+    _write_altium_sheet(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "U1", "lib_ref": "LM358",
+         "params": {"MPN": "LM358DR", "Manufacturer": "TI"}, "footprint": "SOIC-8"},
+        {"designator": "R?", "lib_ref": "RES", "params": {"Value": "10k"}},
+        {"designator": "C1", "lib_ref": "CAP", "params": {"Value": "1uF"}},
+    )
+    au = audit_altium_project(tmp_path, "Amp.PrjPcb", ["Amp.SchDoc"])
+    assert au["components"] == 3
+    assert au["sheets"] == 1
+    kinds = {f["kind"] for f in au["findings"]}
+    assert "unannotated" in kinds  # R? never annotated
+    assert "no_footprint" in kinds  # R? and C1 carry no footprint
+    assert "no_mpn" in kinds  # the passives cannot be sourced
+    u1_findings = [f for f in au["findings"] if f["ref"] == "U1"]
+    assert u1_findings == []  # a complete DbLib placement is healthy
+
+
+def test_audit_altium_project_flags_documents_missing_on_disk(tmp_path):
+    from stockroom.projects.health import audit_altium_project
+
+    _write_altium_sheet(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "R1", "lib_ref": "RES", "params": {"Value": "10k", "MPN": "X"},
+         "footprint": "RESC1005X40"},
+    )
+    au = audit_altium_project(tmp_path, "Amp.PrjPcb", ["Amp.SchDoc", "Gone.SchDoc"])
+    missing = [f for f in au["findings"] if f["kind"] == "missing_document"]
+    assert len(missing) == 1
+    assert missing[0]["ref"] == "Gone.SchDoc"
+    assert missing[0]["severity"] == "error"
+    assert au["sheets"] == 2
+
+
+def test_audit_altium_project_duplicate_designators_error(tmp_path):
+    from stockroom.projects.health import audit_altium_project
+
+    _write_altium_sheet(
+        tmp_path / "A.SchDoc",
+        {"designator": "R1", "lib_ref": "RES", "params": {"Value": "10k", "MPN": "X"},
+         "footprint": "R0402"},
+    )
+    _write_altium_sheet(
+        tmp_path / "B.SchDoc",
+        {"designator": "R1", "lib_ref": "CAP", "params": {"Value": "1uF", "MPN": "Y"},
+         "footprint": "C0402"},
+    )
+    au = audit_altium_project(tmp_path, "", ["A.SchDoc", "B.SchDoc"])
+    dups = [f for f in au["findings"] if f["kind"] == "duplicate_ref"]
+    assert len(dups) == 1 and dups[0]["ref"] == "R1"
+
+
 def test_audit_report_markdown_is_shareable(tmp_path):
     sch = _write_sch(
         tmp_path / "board.kicad_sch",

@@ -7,6 +7,8 @@ No em dashes anywhere (standing owner rule)."""
 
 from __future__ import annotations
 
+from tests.backend.api.conftest import _drain_job
+
 # a single unannotated resistor symbol with an empty Footprint: yields both an
 # `unannotated` (R? reference) and a `no_footprint` finding when audited.
 _UNANNOTATED = (
@@ -60,6 +62,7 @@ def test_list_returns_registered_projects_as_summaries(client, tmp_path):
         "id",
         "name",
         "root",
+        "eda",
         "board_count",
         "sheet_count",
         "has_git",
@@ -1784,3 +1787,121 @@ def test_project_file_requires_the_token(anon_client, client, tmp_path):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
     assert anon_client.get(f"/api/projects/{rec['id']}/file",
                            params={"path": "board.kicad_pcb"}).status_code == 401
+
+
+# ---- EDA-neutral projects: Altium registration + per-EDA capabilities --------
+
+
+def _make_altium_api_project(dir_path, name="Amp", blocks=None):
+    from tests.backend.projects.test_bom import _write_schdoc
+
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / f"{name}.PrjPcb").write_text(
+        f"[Design]\nVersion=1.0\n\n[Document1]\nDocumentPath={name}.SchDoc\n",
+        encoding="utf-8",
+    )
+    _write_schdoc(
+        dir_path / f"{name}.SchDoc",
+        *(blocks if blocks is not None else [
+            {"designator": "U1", "lib_ref": "LM358",
+             "params": {"MPN": "LM358DR", "Manufacturer": "TI", "Value": "LM358DR",
+                        "Datasheet": "https://ti.com/lm358.pdf",
+                        "Description": "Dual op-amp"},
+             "footprint": "SOIC-8"},
+        ]),
+    )
+    return dir_path
+
+
+def test_register_detects_an_altium_project(client, tmp_path):
+    proj = _make_altium_api_project(tmp_path / "ext" / "amp")
+    rec = _register(client, proj)
+    assert rec["eda"] == "altium"
+    assert rec["pro_path"] == "Amp.PrjPcb"
+    assert rec["sheet_paths"] == ["Amp.SchDoc"]
+    row = client.get("/api/projects").json()[0]
+    assert row["eda"] == "altium"
+
+
+def test_register_an_ambiguous_dir_needs_an_explicit_eda(client, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")
+    _make_altium_api_project(proj, name="board")
+    r = client.post("/api/projects", json={"root": proj.as_posix()})
+    assert r.status_code == 400
+    assert "both" in r.json()["detail"]
+    r = client.post("/api/projects", json={"root": proj.as_posix(), "eda": "altium"})
+    assert r.status_code == 200
+    assert r.json()["eda"] == "altium"
+
+
+def test_project_detail_carries_capabilities_per_eda(client, tmp_path):
+    kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    k = client.get(f"/api/projects/{kicad['id']}").json()
+    a = client.get(f"/api/projects/{altium['id']}").json()
+    assert "checks" in k["capabilities"] and "setup" in k["capabilities"]
+    assert "bom" in a["capabilities"] and "audit" in a["capabilities"]
+    for kicad_only in ("checks", "fab", "setup", "netclasses", "prepare", "viewer"):
+        assert kicad_only not in a["capabilities"]
+
+
+def test_audit_reads_an_altium_project(client, tmp_path):
+    proj = _make_altium_api_project(
+        tmp_path / "ext" / "amp",
+        blocks=[
+            {"designator": "U1", "lib_ref": "LM358",
+             "params": {"MPN": "LM358DR", "Manufacturer": "TI"}, "footprint": "SOIC-8"},
+            {"designator": "R?", "lib_ref": "RES", "params": {"Value": "10k"}},
+        ],
+    )
+    rec = _register(client, proj)
+    au = client.get(f"/api/projects/{rec['id']}/audit").json()
+    assert au["components"] == 2
+    kinds = {f["kind"] for f in au["findings"]}
+    assert "unannotated" in kinds
+
+
+def test_kicad_only_endpoints_are_an_honest_400_for_an_altium_project(client, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    pid = rec["id"]
+    gated = [
+        ("post", f"/api/projects/{pid}/checks", {}),
+        ("get", f"/api/projects/{pid}/checks", None),
+        ("get", f"/api/projects/{pid}/fab", None),
+        ("get", f"/api/projects/{pid}/design", None),
+        ("get", f"/api/projects/{pid}/settings", None),
+        ("get", f"/api/projects/{pid}/fields", None),
+        ("get", f"/api/projects/{pid}/conform", None),
+        ("get", f"/api/projects/{pid}/stackup", None),
+        ("get", f"/api/projects/{pid}/prepare", None),
+        ("post", f"/api/projects/{pid}/prepare", {}),
+    ]
+    for method, path, body in gated:
+        fn = getattr(client, method)
+        r = fn(path, json=body) if body is not None else fn(path)
+        assert r.status_code == 400, (path, r.status_code, r.text)
+        assert "Altium" in r.json()["detail"], path
+
+
+def test_buildability_for_an_altium_project_skips_erc_drc_honestly(client, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    v = client.get(f"/api/projects/{rec['id']}/buildability").json()
+    # ERC/DRC run inside Altium, not here: the signal says not_applicable and never
+    # blocks, while the BOM cold cache still does.
+    assert v["signals"]["checks"]["state"] == "not_applicable"
+    kinds = {b["kind"] for b in v["blockers"]}
+    assert "checks_not_run" not in kinds
+    assert "bom_not_built" in kinds
+    # the complete DbLib placement carries an annotated ref and a footprint
+    assert v["signals"]["completeness"]["state"] == "pass"
+
+
+def test_bom_builds_for_an_altium_project(client, app_ctx, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    r = client.post(f"/api/projects/{rec['id']}/bom", json={})
+    assert r.status_code == 200, r.text
+    job = r.json()["job_id"]
+    _drain_job(client, job)
+    bom = client.get(f"/api/projects/{rec['id']}/bom").json()
+    assert bom["line_count"] == 1
+    assert bom["lines"][0]["mpn"] == "LM358DR"

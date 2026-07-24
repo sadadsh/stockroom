@@ -635,7 +635,12 @@ export function useBomDiff(id: string, a: string | null, b: string) {
 export function useRegisterProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (root: string) => api.registerProject(root),
+    mutationFn: (vars: string | { root: string; eda?: string }) =>
+      typeof vars === "string"
+        ? api.registerProject(vars)
+        : vars.eda
+          ? api.registerProject(vars.root, vars.eda)
+          : api.registerProject(vars.root),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
 }

@@ -316,6 +316,89 @@ def audit_project(sch_paths, footprint_dirs=None, model_dirs=None) -> dict:
     return au
 
 
+def audit_altium_project(root, pro_path, sheet_paths) -> dict:
+    """Health across an Altium project's .SchDoc sheets, through the SAME check
+    registry as the KiCad audit (unannotated / duplicate refs / no footprint /
+    no MPN), plus the Altium-specific findings the .PrjPcb makes possible: a
+    document the project lists that is missing on disk, and a sheet that exists
+    but cannot be read as a schematic. The pin/pad and 3D checks need KiCad
+    footprint libraries, so they honestly skip here (no fabricated results).
+
+    Same designator + same library reference on two sheets is ONE component
+    (multi-part units spread across pages); the same designator with a DIFFERENT
+    library reference is a genuine annotation error."""
+    comps, extra_findings, n = _collect_altium(root, sheet_paths)
+    au = _audit_components(comps, {}, None, None, detect_duplicates=False,
+                           extra_findings=extra_findings)
+    au["project"] = "project"
+    au["sheets"] = n
+    return au
+
+
+def altium_project_components(root, sheet_paths) -> list[dict]:
+    """The placed components of an Altium project in the SAME {ref, lib_id, value,
+    footprint, props} shape fill.read_components yields for KiCad, so readiness and
+    the Buildability verdict compute identically for both EDAs."""
+    comps, _findings, _n = _collect_altium(root, sheet_paths)
+    return comps
+
+
+def _collect_altium(root, sheet_paths) -> tuple[list[dict], list[dict], int]:
+    from stockroom.altium.schdoc import read_schdoc_components
+
+    root = Path(root)
+    comps: list = []
+    extra_findings: list = []
+    seen_keys: set = set()
+    ref_libref: dict = {}
+    n = 0
+    for rel in sheet_paths or []:
+        n += 1
+        sp = root / rel
+        if not sp.exists():
+            extra_findings.append({
+                "ref": rel, "severity": "error", "kind": "missing_document",
+                "detail": f"the project lists {rel} but it is missing on disk",
+            })
+            continue
+        try:
+            sheet = read_schdoc_components(sp)
+        except Exception:  # noqa: BLE001 - a corrupt sheet is a finding, never a crash
+            extra_findings.append({
+                "ref": rel, "severity": "warning", "kind": "unreadable_document",
+                "detail": f"{rel} could not be read as an Altium schematic",
+            })
+            continue
+        for c in sheet:
+            ref = c["designator"]
+            key = (ref, c["lib_ref"])
+            if ref and key in seen_keys:
+                continue  # another unit of the same physical part on a later sheet
+            seen_keys.add(key)
+            if ref and not ref.endswith("?"):
+                prev = ref_libref.get(ref)
+                if prev is not None and prev != c["lib_ref"]:
+                    extra_findings.append({
+                        "ref": ref, "severity": "error", "kind": "duplicate_ref",
+                        "detail": f"2 components share reference {ref} across sheets",
+                    })
+                ref_libref.setdefault(ref, c["lib_ref"])
+            props = dict(c["params"])
+            props["Reference"] = ref
+            if not (props.get("Footprint") or "").strip():
+                props["Footprint"] = c["footprint"]
+            if not (props.get("MPN") or "").strip() and (c["design_item_id"] or "").strip():
+                props["MPN"] = c["design_item_id"]
+            comps.append({
+                "ref": ref,
+                "value": props.get("Value", ""),
+                "footprint": props.get("Footprint", ""),
+                "lib_id": f"altium:{c['lib_ref']}" if c["lib_ref"] else "",
+                "props": props,
+            })
+    return comps, extra_findings, n
+
+
 def audit_report_markdown(audit: dict) -> str:
     """A shareable markdown report from an audit result."""
     s = audit["counts"]["by_severity"]

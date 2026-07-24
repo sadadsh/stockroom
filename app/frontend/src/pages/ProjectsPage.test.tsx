@@ -74,6 +74,7 @@ const NETDECK: ProjectSummary = {
   id: "netdeck",
   name: "Netdeck",
   root: "/home/sadad/git/netdeck",
+  eda: "kicad",
   board_count: 1,
   sheet_count: 3,
   has_git: true,
@@ -84,6 +85,7 @@ const BENCH: ProjectSummary = {
   id: "bench",
   name: "Bench",
   root: "/home/sadad/git/bench",
+  eda: "kicad",
   board_count: 1,
   sheet_count: 1,
   has_git: false,
@@ -97,6 +99,9 @@ const NETDECK_DETAIL: ProjectDetail = {
   pro_path: "/home/sadad/git/netdeck/netdeck.kicad_pro",
   board_paths: ["/home/sadad/git/netdeck/netdeck.kicad_pcb"],
   sheet_paths: ["/home/sadad/git/netdeck/netdeck.kicad_sch"],
+  eda: "kicad",
+  capabilities: ["audit", "bom", "revisions", "restore", "file",
+                 "checks", "fab", "setup", "netclasses", "prepare", "viewer"],
   git_root: "/home/sadad/git/netdeck",
   audit_digest: null,
   registered_at: "2026-07-13T12:00:00-04:00",
@@ -2741,5 +2746,101 @@ describe("Project tabs (IA)", () => {
     expect(panel).toHaveAttribute("id", panelId);
     // the panel points back at the tab that labels it
     expect(panel.getAttribute("aria-labelledby")).toBe(overview.getAttribute("id"));
+  });
+});
+
+describe("EDA-neutral projects", () => {
+  const AMP: ProjectSummary = {
+    id: "amp",
+    name: "Amp",
+    root: "/home/sadad/altium/amp",
+    eda: "altium",
+    board_count: 1,
+    sheet_count: 1,
+    has_git: true,
+    registered_at: "2026-07-23T12:00:00-04:00",
+  };
+  const AMP_DETAIL: ProjectDetail = {
+    id: "amp",
+    name: "Amp",
+    root: "/home/sadad/altium/amp",
+    pro_path: "Amp.PrjPcb",
+    board_paths: ["Amp.PcbDoc"],
+    sheet_paths: ["Amp.SchDoc"],
+    eda: "altium",
+    capabilities: ["audit", "bom", "revisions", "restore", "file"],
+    git_root: "/home/sadad/altium/amp",
+    audit_digest: null,
+    registered_at: "2026-07-23T12:00:00-04:00",
+  };
+
+  it("an Altium project shows its EDA tag and only the EDA-neutral tabs", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    expect(await screen.findByTestId("project-row-amp")).toHaveTextContent("Altium");
+    await screen.findByRole("tab", { name: "Overview" });
+    expect(screen.getByRole("tab", { name: "Health" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "BOM & Procurement" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("tab", { name: "PCB Setup" })).toBeNull(),
+    );
+    expect(screen.queryByRole("tab", { name: "Net Classes" })).toBeNull();
+  });
+
+  it("a KiCad project row carries its EDA tag too", async () => {
+    renderPage();
+    expect(await screen.findByTestId("project-row-netdeck")).toHaveTextContent("KiCad");
+  });
+
+  it("an Altium project's Health tab runs the audit but offers no ERC/DRC or Prepare", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    // the audit findings render (the shared fixture audit)
+    expect(await screen.findByTestId("audit-findings")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /Run Checks/i })).toBeNull(),
+    );
+    expect(screen.queryByText(/Prepare This Project/i)).toBeNull();
+  });
+
+  it("an Altium project's BOM tab omits the KiCad fab exports", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    // the BOM build affordance is there for both EDAs
+    expect(await screen.findByRole("button", { name: /Build And Cost/i })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId("fab-section")).toBeNull(),
+    );
+  });
+
+  it("an ambiguous folder offers an explicit EDA choice and registers with it", async () => {
+    mockApi.listProjects.mockResolvedValue([]);
+    mockApi.registerProject.mockRejectedValueOnce(
+      new ApiError(
+        400,
+        "/x holds both KiCad and Altium project files; pass eda='kicad' or eda='altium' to choose",
+      ),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    const input = await screen.findByPlaceholderText(/absolute path/i);
+    await user.type(input, "/x");
+    await user.click(screen.getByRole("button", { name: "Register Project" }));
+
+    // the ambiguity turns into an explicit in-place choice, not a dead-end toast
+    const asAltium = await screen.findByRole("button", { name: "Register As Altium" });
+    expect(screen.getByRole("button", { name: "Register As KiCad" })).toBeInTheDocument();
+    mockApi.registerProject.mockResolvedValueOnce(AMP_DETAIL);
+    await user.click(asAltium);
+    await waitFor(() =>
+      expect(mockApi.registerProject).toHaveBeenLastCalledWith("/x", "altium"),
+    );
   });
 });
