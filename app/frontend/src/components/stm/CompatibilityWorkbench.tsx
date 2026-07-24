@@ -251,7 +251,7 @@ export function CompatibilityWorkbench() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1">
       {/* scope rail: families + the package grid (union with coverage, filterable) */}
       <div className="flex w-[272px] flex-none flex-col gap-4 overflow-y-auto px-3 pt-1">
         <FamilyPicker scope={scope} onScopeChange={setScope} />
