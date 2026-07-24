@@ -203,7 +203,12 @@ export function SetStrip({
     return m ? `STM32${m[1]}` : union.family;
   };
   return (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="compat-set-strip">
+    // Bounded: a whole-family set runs to dozens of chips; the strip scrolls internally so it
+    // never pushes the union map below the fold (the bounded-list discipline).
+    <div
+      className="flex max-h-28 flex-wrap items-center gap-1.5 overflow-y-auto"
+      data-testid="compat-set-strip"
+    >
       <span className="text-2xs font-semibold text-t3">
         Set of {union.parts.length} on {union.package}
       </span>
