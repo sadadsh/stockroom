@@ -1072,7 +1072,8 @@ export const api = {
   },
 
   // Auto-discovered compatible sets grouped by pin-divergence signature (COMPAT-04), scoped to a
-  // (package, family). tolerance defaults to 0 server-side when omitted.
+  // (package, families) - `family` accepts one name or a comma-separated multi-family scope
+  // (owner amendment 2026-07-23). tolerance defaults to 0 server-side when omitted.
   getStmCompatSuggestions(
     pkg: string,
     family: string,

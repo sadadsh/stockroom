@@ -58,6 +58,20 @@ describe("SpecMatrixTable", () => {
     expect(screen.queryByText("Arm Cortex-M4")).toBeNull();
   });
 
+  it("the Columns popover hides and restores a column without squishing the rest", async () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+    // the Series header (a sort button) is present, and its cells render
+    expect(screen.getByRole("button", { name: /^Series/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Columns" }));
+    const picker = screen.getByTestId("column-picker");
+    // Part is the row identity and never hideable
+    expect(within(picker).queryByLabelText("Part")).toBeNull();
+    await userEvent.click(within(picker).getByLabelText("Series"));
+    expect(screen.queryByRole("button", { name: /^Series/ })).toBeNull();
+    await userEvent.click(within(picker).getByLabelText("Series"));
+    expect(screen.getByRole("button", { name: /^Series/ })).toBeInTheDocument();
+  });
+
   it("shows mpn_example in the Part cell and never the raw ref_name", () => {
     render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
     expect(screen.getByText("STM32F407VETx")).toBeInTheDocument();

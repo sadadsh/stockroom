@@ -1608,7 +1608,9 @@ export interface UnionDTO {
   parts: string[];
   resolved: { ref: string; mpn: string }[];
   package: string;
+  // the display scope (joined names for a cross-family set) + the real sorted family list
   family: string;
+  families: string[];
   grain: "per-part";
   positions: UnionPositionDTO[];
   // the one dominant verdict (COMPAT-05): interchangeable with N swaps, or incompatible with the
@@ -1620,10 +1622,13 @@ export interface UnionDTO {
   };
 }
 
-// The body POST /api/stm/compat/union accepts: an explicit set of refs OR a (family, package) group.
+// The body POST /api/stm/compat/union accepts: an explicit set of refs OR a (families, package)
+// group. Families may mix (owner amendment 2026-07-23); the package is always singular (a socket
+// is a physical footprint).
 export interface CompatUnionBody {
   parts?: string[];
   family?: string;
+  families?: string[];
   package?: string;
 }
 

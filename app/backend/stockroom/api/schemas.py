@@ -627,7 +627,10 @@ class UnionDTO(BaseModel):
     parts: list[str] = []
     resolved: list[dict] = []
     package: str
+    # `family` is the display scope (joined names for a cross-family set); `families`
+    # is the real sorted list (owner amendment 2026-07-23: sets may span families).
     family: str
+    families: list[str] = []
     grain: str = "per-part"
     positions: list[UnionPositionDTO] = []
     verdict: dict
@@ -639,6 +642,7 @@ class UnionDTO(BaseModel):
             resolved=list(d.get("resolved", []) or []),
             package=d.get("package", "") or "",
             family=d.get("family", "") or "",
+            families=list(d.get("families", []) or []),
             grain=d.get("grain", "per-part") or "per-part",
             positions=[UnionPositionDTO.from_dict(p) for p in (d.get("positions") or [])],
             verdict=d.get("verdict", {}) or {},

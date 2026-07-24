@@ -21,6 +21,7 @@ function unionResult(): UnionDTO {
     ],
     package: "LQFP100",
     family: "STM32F4",
+    families: ["STM32F4"],
     grain: "per-part",
     positions: [
       {
@@ -53,21 +54,27 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("unionBody", () => {
   it("posts an explicit ref list when parts are loaded (takes precedence over a group)", () => {
-    expect(unionBody({ family: "STM32F4", package: "LQFP100", parts: ["A", "B"] })).toEqual({
+    expect(unionBody({ families: ["STM32F4"], package: "LQFP100", parts: ["A", "B"] })).toEqual({
       parts: ["A", "B"],
     });
   });
 
-  it("posts a (family, package) group when both are chosen and no explicit parts", () => {
-    expect(unionBody({ family: "STM32F4", package: "LQFP100", parts: [] })).toEqual({
-      family: "STM32F4",
+  it("posts a (families, package) group when both are chosen and no explicit parts", () => {
+    expect(unionBody({ families: ["STM32F4"], package: "LQFP100", parts: [] })).toEqual({
+      families: ["STM32F4"],
       package: "LQFP100",
     });
   });
 
-  it("is not buildable from a partial group (a family but no package)", () => {
-    expect(unionBody({ family: "STM32F4", package: null, parts: [] })).toBeNull();
-    expect(unionBody({ family: null, package: null, parts: [] })).toBeNull();
+  it("posts a MULTI-family group (owner amendment: cross-family sets on one footprint)", () => {
+    expect(unionBody({ families: ["STM32F4", "STM32F7"], package: "LQFP100", parts: [] })).toEqual(
+      { families: ["STM32F4", "STM32F7"], package: "LQFP100" },
+    );
+  });
+
+  it("is not buildable from a partial group (families but no package)", () => {
+    expect(unionBody({ families: ["STM32F4"], package: null, parts: [] })).toBeNull();
+    expect(unionBody({ families: [], package: null, parts: [] })).toBeNull();
   });
 });
 
@@ -85,7 +92,7 @@ describe("CompatibilityWorkbench", () => {
     // Build Set fires the union with the group body
     fireEvent.click(screen.getByRole("button", { name: "Build Set" }));
     await waitFor(() =>
-      expect(unionSpy).toHaveBeenCalledWith({ family: "STM32F4", package: "LQFP100" }),
+      expect(unionSpy).toHaveBeenCalledWith({ families: ["STM32F4"], package: "LQFP100" }),
     );
 
     // the socket-union map renders from the result
