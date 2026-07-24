@@ -84,8 +84,17 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
           Every position is identical across the set. A plain socket carries all parts.
         </p>
       ) : (
-        <div className="max-h-80 overflow-auto rounded-card bg-stage shadow-[inset_0_1px_0_var(--edge-hi)]">
-          <table className="w-full border-collapse text-left">
+        <div className="max-h-80 overflow-y-auto rounded-card bg-stage shadow-[inset_0_1px_0_var(--edge-hi)]">
+          {/* table-fixed + colgroup: the layout obeys these tracks exactly, so the plan can
+              NEVER outgrow its container - Baseline truncates internally instead. */}
+          <table className="w-full table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[76px]" />
+              <col className="w-[104px]" />
+              <col />
+              <col className="w-[96px]" />
+              <col className="w-[148px]" />
+            </colgroup>
             <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
               <tr className="border-b border-line text-2xs font-semibold text-t3">
                 <th className="px-2.5 py-1.5">Position</th>
@@ -118,10 +127,10 @@ export function SwitchPlanTable({ union }: { union: UnionDTO }) {
                           {CLASSIFICATION_LABEL[p.classification]}
                         </Badge>
                       </td>
-                      <td className="px-2.5 py-1.5">
+                      <td className="truncate px-2.5 py-1.5">
                         <span className="font-mono text-xs text-t1">{base.name}</span>
                         {base.functions.length > 0 ? (
-                          <span className="ml-1.5 inline-block max-w-[220px] truncate align-bottom font-mono text-2xs text-t3">
+                          <span className="ml-1.5 font-mono text-2xs text-t3">
                             {base.functions.slice(0, 3).join(" · ")}
                             {base.functions.length > 3 ? " …" : ""}
                           </span>
