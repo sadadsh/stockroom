@@ -1743,7 +1743,11 @@ function SpecificationsSection({
   return (
     <div data-dev-id="detail.specs" className="flex flex-col gap-3.5">
       {groups.map((group) => (
-        <section key={group.title} data-dev-id="detail.spec-group">
+        // px-1.5 ABSORBS THE ROW HOVER BLEED, and belongs on the row's DIRECT container. Each spec
+        // row is `-mx-1.5 px-1.5` so its hover highlight extends past the text column; with no
+        // padding to land in, that bleed pushed 6px outside (measured: clientWidth 486, scrollWidth
+        // 492) and put a horizontal scrollbar under a column with nothing to scroll to.
+        <section key={group.title} data-dev-id="detail.spec-group" className="px-1.5">
           {/* Altium property-grid feel: clean rows with no per-row hairline (that ledger look is
               gone) - separation is spacing plus a live row hover, and the value reads in the mono
               data face.
@@ -1841,7 +1845,9 @@ function TradeCompliance({
   onUseSpecValue?: (key: string, value: string, source: string) => void;
 }) {
   return (
-    <section data-dev-id="detail.trade" className="mt-5 border-t border-line pt-3.5">
+    // px-1.5 for the same reason as the specs column: these are SpecRows, and their -mx-1.5 hover
+    // bleed needs padding to land in or it overflows the block (measured 527 vs 533).
+    <section data-dev-id="detail.trade" className="mt-5 border-t border-line px-1.5 pt-3.5">
       <div className={`mb-0.5 ${EYEBROW_DENSE}`}>
         Trade And Compliance
       </div>
