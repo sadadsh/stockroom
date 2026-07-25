@@ -304,7 +304,17 @@ def run(args) -> int:
     # A project surface needs a project. `project-health` implies the seed, so the surface can never be
     # requested in a state where it silently degrades to the "No projects are registered" empty view
     # and a green shot proves nothing.
-    seed = args.seed or any(s.startswith("project-") for s in surfaces)
+    #
+    # A --click ALSO implies the seed, and that one was learned the hard way on 2026-07-25: a
+    # settings shot ran `--click settings.library-lfs.adopt` against the DEFAULT library, which is
+    # the owner's real in-repo one, and the click did exactly what the button says - it wrote
+    # workspace hygiene rules and committed them to the real repository. A screenshot tool must not
+    # be able to mutate the thing it is photographing. The seed COPIES the real library, so the shot
+    # still shows real content; only the writes are thrown away.
+    clicking = bool(args.click)
+    seed = args.seed or clicking or any(s.startswith("project-") for s in surfaces)
+    if clicking and not args.seed:
+        print("  --click implies --seed: clicks can mutate, and the default library is the real one")
     scratch: tempfile.TemporaryDirectory | None = None
     library = Path(args.library)
     seed_project: Path | None = None
