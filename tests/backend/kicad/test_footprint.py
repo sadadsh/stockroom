@@ -192,3 +192,59 @@ class TestModelPlacement:
         before = (tmp_path / "t.kicad_mod").read_bytes()
         _ = fp.model_placement
         assert (tmp_path / "t.kicad_mod").read_bytes() == before
+
+
+class TestPads:
+    """The land pattern, as geometry a 3D view can draw.
+
+    Owner, 2026-07-25: "cant see just the footprint in 3d option either. that way with the footprint
+    showing u can see if the 3d model is oriented properly." That is the POINT of this - a body
+    floating alone cannot be checked against anything, but a body sitting on its own pads either
+    lines up or visibly does not.
+
+    KiCad units: `at` is mm from the footprint origin with an optional rotation in DEGREES, `size`
+    is mm. Y is reported EXACTLY as KiCad stores it (screen coordinates, +Y down); converting here
+    would hide which frame the caller is in, the same reasoning as ModelPlacement.
+    """
+
+    def _fp(self, tmp_path, body: str):
+        p = tmp_path / "t.kicad_mod"
+        p.write_text(f'(footprint "T"\n\t(layer "F.Cu")\n{body}\n)\n', encoding="utf-8")
+        return Footprint.load(p)
+
+    def test_reads_position_size_shape_and_rotation(self, tmp_path):
+        fp = self._fp(
+            tmp_path,
+            '\t(pad "1" smd roundrect (at -0.675 -1.5) (size 0.75 0.2) (layers "F.Cu"))\n'
+            '\t(pad "2" smd rect (at 0.675 1.5 90) (size 0.8 0.3) (layers "F.Cu"))\n',
+        )
+        pads = fp.pads
+        assert len(pads) == 2
+        assert pads[0].number == "1"
+        assert pads[0].at == (-0.675, -1.5)
+        assert pads[0].size == (0.75, 0.2)
+        assert pads[0].shape == "roundrect"
+        assert pads[0].rotation == 0.0
+        assert pads[1].rotation == 90.0
+
+    def test_ignores_a_size_that_belongs_to_something_else(self, tmp_path):
+        # A footprint carries (size ...) inside text properties too. Reading the first `size` in
+        # the FILE rather than the one inside each pad would silently mis-size every pad.
+        fp = self._fp(
+            tmp_path,
+            '\t(property "Reference" "REF**" (at 0 -2.7 0) (effects (font (size 1 1))))\n'
+            '\t(pad "1" smd roundrect (at -0.675 -1.5) (size 0.75 0.2) (layers "F.Cu"))\n',
+        )
+        assert len(fp.pads) == 1
+        assert fp.pads[0].size == (0.75, 0.2)
+
+    def test_is_empty_for_a_footprint_with_no_pads(self, tmp_path):
+        assert self._fp(tmp_path, '\t(fp_line (start 0 0) (end 1 1))').pads == []
+
+    def test_reading_pads_does_not_rewrite_the_file(self, tmp_path):
+        fp = self._fp(
+            tmp_path, '\t(pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))'
+        )
+        before = (tmp_path / "t.kicad_mod").read_bytes()
+        _ = fp.pads
+        assert (tmp_path / "t.kicad_mod").read_bytes() == before

@@ -31,6 +31,22 @@ class ModelPlacement:
         )
 
 
+@dataclass(frozen=True)
+class Pad:
+    """One pad of the land pattern, in KiCad's own units and frame.
+
+    `at` is millimetres from the footprint origin and `rotation` is degrees; Y is left EXACTLY as
+    KiCad stores it (+Y down on screen) rather than flipped here, so a caller always knows which
+    frame it is in - the same reasoning as ModelPlacement.
+    """
+
+    number: str
+    at: tuple[float, float]
+    size: tuple[float, float]
+    shape: str = "rect"
+    rotation: float = 0.0
+
+
 class Footprint:
     def __init__(self, doc: SexpDocument):
         self._doc = doc
@@ -57,6 +73,49 @@ class Footprint:
     def model_path(self) -> str | None:
         node = self._model_node()
         return node.children[1].value if node else None
+
+    @property
+    def pads(self) -> list["Pad"]:
+        """Every pad in the land pattern, so a 3D view can draw what the body sits on.
+
+        Each `(size ...)` is read from INSIDE its own pad node, never by scanning the file: a
+        footprint also carries `(size ...)` inside text `(effects (font ...))`, and taking the
+        first one in the document would silently mis-size every pad.
+        """
+        out: list[Pad] = []
+        for node in self._doc.root.find_all("pad"):
+            kids = node.children
+            # (pad "<number>" <type> <shape> ...)
+            number = kids[1].value if len(kids) > 1 else ""
+            shape = kids[3].value if len(kids) > 3 else "rect"
+
+            def pair(key: str, default: tuple[float, float]) -> tuple[float, float]:
+                sub = node.find(key)
+                if sub is None or len(sub.children) < 3:
+                    return default
+                try:
+                    return (float(sub.children[1].value), float(sub.children[2].value))
+                except (TypeError, ValueError):
+                    return default
+
+            at_node = node.find("at")
+            rotation = 0.0
+            if at_node is not None and len(at_node.children) >= 4:
+                try:
+                    rotation = float(at_node.children[3].value)
+                except (TypeError, ValueError):
+                    rotation = 0.0
+
+            out.append(
+                Pad(
+                    number=str(number),
+                    at=pair("at", (0.0, 0.0)),
+                    size=pair("size", (0.0, 0.0)),
+                    shape=str(shape),
+                    rotation=rotation,
+                )
+            )
+        return out
 
     @property
     def model_placement(self) -> "ModelPlacement | None":

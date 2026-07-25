@@ -203,6 +203,34 @@ def scalable_svg(text: str) -> str:
     return text[: match.start()] + stripped + text[match.end() :]
 
 
+def _resolve_footprint_file(ctx, part_id: str):
+    """(record, .kicad_mod path, its .pretty dir) for a part, or an honest FileNotFoundError.
+
+    Shared by the SVG preview and the 3D land-pattern endpoint so the two can never disagree about
+    WHICH file a part's footprint is - a passive points at a KiCad STOCK footprint it does not own,
+    everything else at the profile's own library.
+    """
+    rec = ctx.ops.load_record(part_id)
+    kicad = rec.assets_for("kicad")
+    if kicad.footprint is None or not kicad.footprint.name:
+        raise FileNotFoundError(f"part {part_id} has no footprint")
+    if rec.passive:
+        fp_file = stock_footprint_file(kicad.footprint.lib, kicad.footprint.name)
+        if fp_file is None:
+            raise FileNotFoundError(
+                f"KiCad stock footprint {kicad.footprint.lib}:{kicad.footprint.name} "
+                "is not installed"
+            )
+        return rec, fp_file, fp_file.parent
+    pretty = ctx.profile.library.footprint_lib_path(rec.category)
+    if not pretty.exists():
+        raise FileNotFoundError(f"footprint library missing for {rec.category}")
+    fp_file = pretty / f"{kicad.footprint.name}.kicad_mod"
+    if not fp_file.exists():
+        raise FileNotFoundError(f"footprint file missing: {kicad.footprint.name}")
+    return rec, fp_file, pretty
+
+
 def previews_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/previews", dependencies=[Depends(require_token)])
 
@@ -247,6 +275,49 @@ def previews_router(require_token) -> APIRouter:
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
 
+    @r.get("/land/{part_id}.json")
+    def land_pattern(request: Request, part_id: str) -> dict:
+        """The footprint's pads plus the 3D model's placement, for the viewer's board mode.
+
+        Owner, 2026-07-25: "cant see just the footprint in 3d option either. that way with the
+        footprint showing u can see if the 3d model is oriented properly." A body floating alone
+        cannot be checked against anything; a body sitting on its own land pattern either lines up
+        or visibly does not. So the two travel together in ONE response - asking the viewer to
+        correlate two endpoints is how they end up disagreeing.
+
+        Geometry is passed in KiCad's own units and frame (mm, +Y down, degrees). The viewer owns
+        the conversion to scene axes, because that is where the model's own axis convention is
+        already handled.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        _rec, fp_file, _pretty = _resolve_footprint_file(ctx, part_id)
+        fp = Footprint.load(fp_file)
+        place = fp.model_placement
+        return {
+            "units": "mm",
+            "pads": [
+                {
+                    "number": p.number,
+                    "at": [p.at[0], p.at[1]],
+                    "size": [p.size[0], p.size[1]],
+                    "shape": p.shape,
+                    "rotation": p.rotation,
+                }
+                for p in fp.pads
+            ],
+            "model_placement": (
+                None
+                if place is None
+                else {
+                    "offset": list(place.offset),
+                    "scale": list(place.scale),
+                    "rotate": list(place.rotate),
+                }
+            ),
+        }
+
     @r.get("/footprint/{part_id}.svg")
     def footprint_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
         ctx = request.app.state.ctx
@@ -254,26 +325,7 @@ def previews_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         if rev:
             return _svg_response(_svg_at_rev(ctx, part_id, "fp", rev, bw))
-        rec = ctx.ops.load_record(part_id)
-        kicad = rec.assets_for("kicad")
-        if kicad.footprint is None or not kicad.footprint.name:
-            raise FileNotFoundError(f"part {part_id} has no footprint")
-        # A passive references a KiCad STOCK footprint with no owned file.
-        if rec.passive:
-            fp_file = stock_footprint_file(kicad.footprint.lib, kicad.footprint.name)
-            if fp_file is None:
-                raise FileNotFoundError(
-                    f"KiCad stock footprint {kicad.footprint.lib}:{kicad.footprint.name} "
-                    "is not installed"
-                )
-            pretty = fp_file.parent
-        else:
-            pretty = ctx.profile.library.footprint_lib_path(rec.category)
-            if not pretty.exists():
-                raise FileNotFoundError(f"footprint library missing for {rec.category}")
-            fp_file = pretty / f"{kicad.footprint.name}.kicad_mod"
-            if not fp_file.exists():
-                raise FileNotFoundError(f"footprint file missing: {kicad.footprint.name}")
+        rec, fp_file, pretty = _resolve_footprint_file(ctx, part_id)
         variant = "_bw" if bw else ""
         # Content-address the key (like the symbol + model endpoints) so an edited
         # footprint re-renders and two profiles sharing a part_id + footprint name in
@@ -283,7 +335,7 @@ def previews_router(require_token) -> APIRouter:
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            text = _clean_footprint_svg(ctx.cli, fp_file, kicad.footprint.name, bw, Path(td))
+            text = _clean_footprint_svg(ctx.cli, fp_file, fp_file.stem, bw, Path(td))
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
 
