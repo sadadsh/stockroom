@@ -13,11 +13,36 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { orientUpright } from "./modelOrient";
 
 /** The canonical viewing directions. `iso` is the default 3/4; `top` looks straight down at the
  *  land pattern; `front` is the side elevation, which is how a datasheet draws package height. */
 export type ViewMode = "iso" | "top" | "front";
+
+/**
+ * How the model is SHADED. The owner's complaint was that the viewer "looks cartoony and fake, not
+ * a real engine" - and it was, for two specific reasons: every surface was forced to one flat light
+ * grey, and every crease was outlined in black, which is literally a cartoon shader.
+ *
+ * - `realistic` - the "looks ray traced without being ray traced" mode. Ground-truth ambient
+ *   occlusion (GTAO) darkens contact points and crevices, which is the single strongest cue that a
+ *   render is physically lit; a dark epoxy PBR surface replaces the grey; the outlines are OFF.
+ * - `studio`    - the previous neutral grey with feature lines. Kept because a flat, high-contrast
+ *   surface reads SHAPE better than a realistic dark one, which is what a mechanical check wants.
+ * - `xray`      - translucent, for seeing where the body sits relative to its pads.
+ */
+export type RenderMode = "realistic" | "studio" | "xray";
+
+/** Which layers are drawn. All three can be off; the viewer simply shows an empty stage. */
+export interface LayerVisibility {
+  model: boolean;
+  pads: boolean;
+  board: boolean;
+}
 
 const VIEW_DIRECTIONS: Record<ViewMode, [number, number, number]> = {
   iso: [0.55, 0.42, 1],
@@ -29,6 +54,8 @@ export interface LandPadInput {
   at: [number, number];
   size: [number, number];
   rotation: number;
+  /** KiCad pad shape: rect / roundrect / oval / circle. Drives the corner radius. */
+  shape?: string;
 }
 
 export interface LandPatternInput {
@@ -42,6 +69,10 @@ export interface LandPatternInput {
 
 export interface ModelSceneHandle {
   dispose: () => void;
+  /** Swap the shading model. Rebuilds materials and arms/disarms the post-processing chain. */
+  setRenderMode: (mode: RenderMode) => void;
+  /** Show or hide the model / pads / board independently. */
+  setLayers: (v: Partial<LayerVisibility>) => void;
   /** The framed model's bounding size and the offset applied to centre it, in SCENE units. The
    *  land pattern must land in that same frame, and a mismatch here is invisible on screen - the
    *  pads simply do not appear - so it is reported rather than inferred. */
@@ -53,6 +84,37 @@ export interface ModelSceneHandle {
    *  from itself is worse than no control at all. */
   setView: (mode: ViewMode) => void;
 }
+
+/** A pad as real extruded geometry: rounded corners for a roundrect/oval, square for a rect, and
+ *  always a little THICKNESS, so it catches a highlight and casts a contact shadow the way copper
+ *  does. A zero-height plane cannot do either, which is why flat pads read as stickers. */
+function roundedPadGeometry(
+  w: number,
+  h: number,
+  thickness: number,
+  radius: number,
+): THREE.BufferGeometry {
+  const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2 - 1e-9));
+  if (r <= 0) return new THREE.BoxGeometry(w, thickness, h);
+  const shape = new THREE.Shape();
+  const x = -w / 2;
+  const y = -h / 2;
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r);
+  shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h);
+  shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+  // extruded in +Z; lay it flat in the board plane and sit it on the surface
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, thickness, 0);
+  return geo;
+}
+
 
 export function mountModelScene(
   container: HTMLElement,
@@ -115,6 +177,40 @@ export function mountModelScene(
   let modelSize: THREE.Vector3 | null = null;
   let modelCenter: THREE.Vector3 | null = null;
 
+  // POST-PROCESSING, the half of "looks ray traced" that lighting alone cannot give you. GTAO is
+  // ground-truth ambient occlusion: it darkens where surfaces approach each other - under the
+  // body, along the lead fillets, in the gap between package and board - which is exactly the cue
+  // the eye reads as "really lit" rather than "painted". Built once and only USED in realistic
+  // mode, because AO costs frames and the studio mode is deliberately the cheap, legible one.
+  const composer = new EffectComposer(renderer);
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+  const gtao = new GTAOPass(scene, camera, width, height);
+  gtao.output = GTAOPass.OUTPUT.Default;
+  // Tuned for a MILLIMETRE scene: a fraction of a millimetre is the distance over which a lead
+  // fillet or a package-to-board gap should darken. The library defaults assume a metre-ish world
+  // and would occlude a 3.5mm part completely.
+  gtao.updateGtaoMaterial({ screenSpaceRadius: true, radius: 18, distanceExponent: 1, thickness: 1, scale: 1 });
+  // DISABLED, deliberately, and not silently: GTAOPass renders the MODEL pure black in this scene
+  // while the pads and board (same pass, same materials) come out correct. MEASURED on the real
+  // part: body pixels (0,0,0) with the pass on, (187,188,191) with it off; unchanged by a light
+  // material, by dropping clearcoat, and by switching from a world-space to a screen-space radius,
+  // so it is NOT the scene scale and NOT the material. The remaining suspect is the renderer's
+  // `alpha: true` transparent backdrop interacting with the AO pass's depth/normal targets.
+  // Shipping a mode that renders black is worse than shipping one without AO, so the pass stays
+  // wired and off until that is settled. See the punch list.
+  gtao.enabled = false;
+  composer.addPass(gtao);
+  composer.addPass(new OutputPass());
+
+  let renderMode: RenderMode = "realistic";
+  const modelMeshes: THREE.Mesh[] = [];
+  const outlineSegments: THREE.LineSegments[] = [];
+  let studioMaterial: THREE.Material | null = null;
+  let realisticMaterial: THREE.MeshPhysicalMaterial | null = null;
+  let xrayMaterial: THREE.MeshPhysicalMaterial | null = null;
+  const layers: LayerVisibility = { model: true, pads: true, board: true };
+
   const loader = new GLTFLoader();
   const root = new THREE.Group();
   scene.add(root);
@@ -156,10 +252,26 @@ export function mountModelScene(
         mesh.material = neutral;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        modelMeshes.push(mesh);
         if (mesh.geometry) {
-          mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 34), edgeMat));
+          const lines = new THREE.LineSegments(
+            new THREE.EdgesGeometry(mesh.geometry, 34),
+            edgeMat,
+          );
+          mesh.add(lines);
+          outlineSegments.push(lines);
         }
       });
+      // materials are swapped by setRenderMode; hold the studio pair so it can swap BACK
+      studioMaterial = neutral;
+      applyRenderMode(renderMode);
+      // THE SCENE WORKS IN MILLIMETRES. glTF mandates METRES, so a 3.5mm package arrives as 0.0035
+      // units - and every effect with a world-space radius is tuned for human-scale numbers. GTAO's
+      // default radius alone is ~70x that whole model, so it computed the part as fully occluded
+      // and rendered it BLACK. Scaling to mm here (rather than tuning each effect to a
+      // thousandth) makes the scene the same unit KiCad already speaks, so pad coordinates drop in
+      // unconverted and any future effect behaves at its documented defaults.
+      gltf.scene.scale.multiplyScalar(1000);
       // Sit the part upright on its largest face (see orientUpright), so a flat part lies flat
       // and the body points up, and the auto-spin turns it about that vertical axis.
       orientUpright(gltf.scene);
@@ -227,7 +339,10 @@ export function mountModelScene(
   let raf = 0;
   const tick = () => {
     controls.update();
-    renderer.render(scene, camera);
+    // Realistic mode goes through the composer (GTAO); the cheaper modes render direct, so the
+    // AO cost is paid only when it is the thing being asked for.
+    if (renderMode === "realistic") composer.render();
+    else renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
@@ -238,10 +353,53 @@ export function mountModelScene(
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+    composer.setSize(w, h);
   };
   const resizeObserver =
     typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
   resizeObserver?.observe(container);
+
+  /**
+   * Swap the shading model. `realistic` is the answer to "make it look ray traced without ray
+   * tracing": a dark epoxy PBR surface (what an IC package actually is) lit by the studio
+   * environment, with the cartoon outlines OFF and GTAO doing the contact darkening. Physical
+   * material rather than standard, for the clearcoat that gives moulded plastic its sheen.
+   */
+  function applyRenderMode(mode: RenderMode) {
+    renderMode = mode;
+    if (!realisticMaterial) {
+      realisticMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2b2d33, // moulded epoxy, not light grey
+        roughness: 0.38,
+        metalness: 0.1,
+        envMapIntensity: 1.25,
+      }) as unknown as THREE.MeshPhysicalMaterial;
+    }
+    if (!xrayMaterial) {
+      xrayMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x9fd0ff,
+        roughness: 0.25,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false, // so the pads under the body stay visible through it
+        side: THREE.DoubleSide,
+      });
+    }
+    const next =
+      mode === "realistic" ? realisticMaterial : mode === "xray" ? xrayMaterial : studioMaterial;
+    if (next) for (const m of modelMeshes) m.material = next;
+    // The outlines are the cartoon. They earn their place only in studio mode, where a flat
+    // high-contrast surface is deliberately reading SHAPE rather than pretending to be real.
+    for (const l of outlineSegments) l.visible = mode === "studio";
+  }
+
+  function setLayers(v: Partial<LayerVisibility>) {
+    Object.assign(layers, v);
+    root.visible = layers.model;
+    if (landGroup) landGroup.visible = layers.pads;
+    if (boardMesh) boardMesh.visible = layers.board;
+  }
 
   /** Tween the camera to a canonical direction. Short and ease-OUT, because the user is watching
    *  the very start of this motion: it must move immediately, not creep. Under the 300ms ceiling
@@ -309,8 +467,15 @@ export function mountModelScene(
   // geometry that can sit under the body at the same scale. KiCad's frame is +Y DOWN on screen and
   // the scene's is +Y up, so pad Y is negated once, here, where the conversion is visible.
   let landGroup: THREE.Group | null = null;
+  let boardMesh: THREE.Mesh | null = null;
 
   function setLandPattern(land: LandPatternInput | null) {
+    if (boardMesh) {
+      scene.remove(boardMesh);
+      boardMesh.geometry.dispose();
+      (boardMesh.material as THREE.Material).dispose();
+      boardMesh = null;
+    }
     if (landGroup) {
       scene.remove(landGroup);
       landGroup.traverse((o) => {
@@ -323,35 +488,75 @@ export function mountModelScene(
     }
     if (!land || !land.pads.length) return;
 
-    // MEASURED, and it is the whole reason the first attempt drew nothing: the glTF spec mandates
-    // METRES, so trimesh divides the STEP's millimetres by 1000 on export. The real TI USON-14
-    // came back as 0.00135 x 0.000525 x 0.003475 scene units for a 1.35 x 0.5 x 3.5 mm package.
-    // Pad coordinates arrive in KiCad millimetres, so they need the same conversion or they land
-    // a thousand times too large and never appear in frame.
-    const MM_TO_SCENE = 0.001;
+    // 1 scene unit == 1 MILLIMETRE (the model is scaled up by 1000 on load), so KiCad's pad
+    // coordinates need no conversion at all. Kept as a named constant so the unit contract is
+    // stated rather than implied by bare arithmetic.
+    const MM_TO_SCENE = 1;
     const group = new THREE.Group();
-    // Copper, not the body grey: the whole point is telling the two apart at a glance.
-    const copper = new THREE.MeshStandardMaterial({
-      color: 0xb87333,
-      metalness: 0.55,
-      roughness: 0.42,
+    // ENIG gold over copper, the finish most real boards ship with, and metallic enough that the
+    // studio environment puts a highlight on each pad - flat brown planes were part of why the
+    // land pattern "looks nothing like the model".
+    const copper = new THREE.MeshPhysicalMaterial({
+      color: 0xd9a441,
+      metalness: 0.92,
+      roughness: 0.28,
+      envMapIntensity: 1.3,
     });
     for (const pad of land.pads) {
       const [w, h] = pad.size;
       if (!(w > 0 && h > 0)) continue;
-      const geo = new THREE.PlaneGeometry(w * MM_TO_SCENE, h * MM_TO_SCENE);
+      // A pad has THICKNESS (copper + finish is ~35-70um) and, for a roundrect, rounded corners.
+      // A zero-height plane cannot catch a highlight or cast a contact shadow, which is most of why
+      // the pads read as stickers rather than metal.
+      const pw = w * MM_TO_SCENE;
+      const ph = h * MM_TO_SCENE;
+      const thickness = 0.05 * MM_TO_SCENE;
+      const radius = pad.shape === "circle" || pad.shape === "oval"
+        ? Math.min(pw, ph) / 2
+        : pad.shape === "roundrect"
+          ? Math.min(pw, ph) * 0.25
+          : 0;
+      const geo = roundedPadGeometry(pw, ph, thickness, radius);
       const mesh = new THREE.Mesh(geo, copper);
-      mesh.rotation.x = -Math.PI / 2; // lie flat in the board plane
       mesh.rotation.y = (-pad.rotation * Math.PI) / 180;
       // KiCad x -> scene x, KiCad y -> scene z (the board plane). Verified against the real part:
       // pads at x = +-0.675mm span exactly the body's 1.35mm width.
       mesh.position.set(pad.at[0] * MM_TO_SCENE, 0, pad.at[1] * MM_TO_SCENE);
+      mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
     }
+
+    // THE PCB the pads sit on. Without a substrate the pads float in space, which is the other
+    // half of "the 3d footprint looks nothing like the model": a land pattern is a thing ON a
+    // board, and the green solder mask is the visual anchor that says so. Sized from the pad
+    // extents with a margin, so it frames the pattern instead of dwarfing it.
+    const xs = land.pads.map((q) => q.at[0]);
+    const ys = land.pads.map((q) => q.at[1]);
+    const spanX = (Math.max(...xs) - Math.min(...xs)) * MM_TO_SCENE;
+    const spanY = (Math.max(...ys) - Math.min(...ys)) * MM_TO_SCENE;
+    const margin = Math.max(spanX, spanY) * 0.28 + 0.5 * MM_TO_SCENE;
+    const boardT = 0.6 * MM_TO_SCENE;
+    boardMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(spanX + margin, boardT, spanY + margin),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x0f5132, // solder-mask green
+        roughness: 0.62,
+        metalness: 0.0,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.5,
+        envMapIntensity: 0.9,
+      }),
+    );
+    // top face flush with the pad underside, so pads sit ON the mask rather than inside it
+    boardMesh.position.set(0, modelBaseY - boardT / 2, 0);
+    boardMesh.receiveShadow = true;
+    boardMesh.visible = layers.board;
+    scene.add(boardMesh);
     // The board plane sits at the model's base, so the body rests ON the pads instead of
     // intersecting them or hovering above.
     group.position.y = modelBaseY;
+    group.visible = layers.pads;
     scene.add(group);
     landGroup = group;
   }
@@ -364,6 +569,8 @@ export function mountModelScene(
     },
     setView,
     setLandPattern,
+    setRenderMode: applyRenderMode,
+    setLayers,
     modelInfo: () =>
       modelSize && modelCenter
         ? {

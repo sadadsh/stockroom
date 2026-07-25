@@ -96,6 +96,14 @@ const KNOWN_DERIVED: readonly string[] = [
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
 const KNOWN_PROP_PASSED: readonly string[] = [
+  // Glb3DView.tsx LayerToggle: the layer + shading buttons take devId as a prop and render
+  // data-dev-id={devId}; each id is spelled out in full at the call site or in the SHADING table.
+  "detail.model-board",
+  "detail.model-show-model",
+  "detail.model-show-board",
+  "detail.model-shade-realistic",
+  "detail.model-shade-studio",
+  "detail.model-shade-xray",
   // Glb3DView.tsx ViewControls: the canonical-view buttons render data-dev-id={v.devId} from a
   // VIEWS table that spells each id out in full, so the string is greppable even though the
   // attribute is an expression.

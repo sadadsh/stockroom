@@ -9,11 +9,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 237 as of Batch 4d (+rail.collapse, +shell.profile-switch, +shell.profile-menu).
 // 241 as of Batch 5 (+detail.model-views and the three canonical-view buttons: iso/top/front).
 // 242 with +detail.model-board, the Footprint toggle that puts the land pattern under the body.
+// 249 with the layer + shading bar: model/PCB toggles and the realistic/studio/x-ray modes.
 // Deliberate re-baseline, which is what this gate exists for.
 // 234 as of Batch 3: +detail.spec-family (repeated spec keys collapsed into one row),
 // +detail.alternates (the other sources for a value), +detail.trade (the procurement facts that
 // used to be discarded). All three are new controls in this commit.
-const EXPECTED_ENTRIES = 242;
+const EXPECTED_ENTRIES = 249;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
