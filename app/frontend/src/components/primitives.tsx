@@ -286,15 +286,34 @@ export function PanelTitle({
 }
 
 // A small uppercase section eyebrow: the mockup's .sec / .srcsub label.
+/**
+ * The DENSE eyebrow: the small uppercase group label used inside a property grid or a packed
+ * column (SPECIFICATIONS, VOLUME PRICING, TRADE AND COMPLIANCE, CAD).
+ *
+ * Exported as a class string, not only as a component, because these labels land on a `span`, a
+ * `div` and a `dt` depending on where they sit, and a polymorphic component would buy nothing but
+ * type gymnastics. The point is that the DECISION lives in one place: DetailPanel previously carried
+ * ten hand-written variants of this string with FOUR different letter-spacings, so no two eyebrows
+ * in the app matched (punch 14). 0.07em is the canonical tracking - the plurality of the old
+ * strings, and the right amount of air for 10px uppercase.
+ *
+ * Deliberately TYPE ONLY: no background, no border, no sticky. The spec group header used to carry
+ * a filled sticky bar while its siblings were bare, which is exactly the "box behind the header"
+ * the owner asked to remove. Separation comes from spacing.
+ */
+export const EYEBROW_DENSE =
+  "text-2xs font-semibold uppercase tracking-[0.07em] text-t3";
+
 export function Eyebrow({
+  dense = false,
   className,
   children,
   ...rest
-}: HTMLAttributes<HTMLDivElement>) {
+}: { dense?: boolean } & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cx(
-        "text-xs font-semibold text-t3",
+        dense ? EYEBROW_DENSE : "text-xs font-semibold text-t3",
         className,
       )}
       {...rest}

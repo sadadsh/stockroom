@@ -70,6 +70,8 @@ import {
   WarnIcon,
 } from "./icons";
 import {
+  EYEBROW_DENSE,
+  Eyebrow,
   IconButton,
   TabStrip,
   tabButtonId,
@@ -344,7 +346,7 @@ export function DetailPanel({
           onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
           busy={busy}
         />
-        <span className="ml-auto flex-none truncate text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+        <span className={`ml-auto flex-none truncate ${EYEBROW_DENSE}`}>
           {detail.category}
         </span>
       </div>
@@ -958,7 +960,7 @@ function ReadinessBlock({
         ) : (
           <WarnIcon className="h-3.5 w-3.5 flex-none text-warn" />
         )}
-        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">CAD</span>
+        <span className={EYEBROW_DENSE}>CAD</span>
         <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">
           {allReady ? "Complete" : "Incomplete"}
         </span>
@@ -1004,7 +1006,7 @@ function ReadinessBlock({
           ) : null}
           {onRemove && removable.length > 0 ? (
             <div className="mt-3 border-t border-line pt-2.5">
-              <div className="mb-1.5 text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+              <div className={`mb-1.5 ${EYEBROW_DENSE}`}>
                 <Text id="detail.remove-eyebrow">Remove</Text>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -1295,7 +1297,7 @@ function Filing({
         }
       >
         <Icon id="detail.filing-folder" className="h-3.5 w-3.5 flex-none text-t3" />
-        <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+        <span className={EYEBROW_DENSE}>
           <Text id="detail.filing">Filing</Text>
         </span>
         <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">{category}</span>
@@ -1455,6 +1457,24 @@ function AssetTile({
 // two-column definition list - the key in quiet sans on the left, the value in the mono readout
 // face on the right - so a long value wraps in place. The tab owns the scroll, so however many
 // specs a part carries, they never grow the page.
+// The property grid's column tracks, defined ONCE. A spec row and the alternates nested under it
+// must put their values at the same x or the comparison is unreadable, and the alternates drifted
+// the moment the parent row changed - so the label-track width is a shared constant, and the nested
+// list subtracts its own 7px indent from the label track rather than adding padding that would
+// shift every column right.
+// WRITTEN OUT IN FULL, never assembled from a variable. Tailwind generates utilities by scanning
+// source TEXT, so an arbitrary value interpolated into a template literal yields a class attribute
+// with NO CSS behind it. That failure is invisible to a class-name assertion: `display:grid` still
+// applies (it is a literal) while `grid-template-columns` silently does not exist, and the grid
+// collapses to one cell per line. It shipped green tests and a broken layout until a shot showed it.
+//
+// The 10.5rem label track appears in both strings, and a test in eyebrowConsistency holds the two in
+// sync - a child's value must land at the same x as its parent's or the comparison is unreadable.
+const SPEC_ROW_GRID =
+  "grid grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
+const ALT_ROW_GRID =
+  "grid grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
+
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
 // because most fields have one answer and a wall of vendor attributions would drown the data.
@@ -1491,34 +1511,30 @@ function AlternatesDisclosure({
         // Indented under a left rule, exactly like a family row's members: both are children of
         // the row above them, and giving the same relationship two different treatments made the
         // panel look like it had two unrelated kinds of nesting.
-        <ul className="mb-0.5 ml-[7px] flex flex-col border-l border-line pl-2.5">
+        <ul className="mb-0.5 ml-[7px] flex flex-col border-l border-line">
           {distinct.map((entry, i) => {
             const value = String(entry.value ?? "");
             const inForce = same(value, current);
             const label = entry.source ? distributorLabel(entry.source) : "On Record";
             return (
-              <li
-                key={`${entry.source}-${i}`}
-                className="flex items-baseline justify-between gap-2 py-[2px]"
-              >
+              <li key={`${entry.source}-${i}`} className={`${ALT_ROW_GRID} py-[2px]`}>
                 {/* one line per answer: who said it, what they said, and the action. The value used
                     to sit on its own second line, which orphaned it from its source label. */}
-                <span className="flex-none text-2xs uppercase tracking-[0.04em] text-t3">
-                  {label}
-                </span>
+                {/* inset inside its own cell, so the indent never moves the value column */}
+                <span className={`min-w-0 truncate pl-2.5 ${EYEBROW_DENSE}`}>{label}</span>
                 {/* The answer IN FORCE reads strongest. It was the quietest thing in the block
                     while the alternative carried a bordered button, so the panel emphasised the
                     value it was not using over the one it was. */}
                 <span
                   className={
-                    "min-w-0 flex-1 truncate text-right text-xs " +
+                    "tnum min-w-0 truncate font-mono text-xs " +
                     (inForce ? "font-semibold text-t1" : "text-t2")
                   }
                 >
                   {value}
                 </span>
                 {inForce ? (
-                  <span className="flex-none text-2xs uppercase tracking-[0.04em] text-t3">
+                  <span className={`flex-none ${EYEBROW_DENSE}`}>
                     In Use
                   </span>
                 ) : onUse ? (
@@ -1596,7 +1612,7 @@ function SpecFamilyRow({ row }: { row: SpecRow }) {
               key={m.key}
               className="flex items-baseline justify-between gap-3 py-[2px]"
             >
-              <dt className="min-w-0 flex-1 truncate text-2xs uppercase tracking-[0.04em] text-t3">
+              <dt className={`min-w-0 flex-1 truncate ${EYEBROW_DENSE}`}>
                 {m.label}
               </dt>
               <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
@@ -1631,15 +1647,17 @@ function SpecificationsSection({
     <div data-dev-id="detail.specs" className="flex flex-col gap-3.5">
       {groups.map((group) => (
         <section key={group.title} data-dev-id="detail.spec-group">
-          {/* Altium property-grid feel: the group name sits on a divider band, then clean rows with
-              no per-row hairline (that ledger look is gone) - separation is the divider + a live
-              row hover, and the value reads in the mono data face. The header is STICKY, so a part
-              with far more specs than fit scrolls the pane while the group name stays in view. */}
-          <div className="sticky top-0 z-[1] mb-1 flex items-center gap-2 border-b border-line bg-surface pb-1 pt-0.5">
-            <span className="text-2xs font-semibold uppercase tracking-[0.08em] text-t3">
-              {group.title}
-            </span>
-          </div>
+          {/* Altium property-grid feel: clean rows with no per-row hairline (that ledger look is
+              gone) - separation is spacing plus a live row hover, and the value reads in the mono
+              data face.
+              The group name is TYPE ONLY, matching every other eyebrow in the panel. It used to be a
+              filled sticky bar with a bottom border while its siblings (VOLUME PRICING, LINKS) were
+              bare, which is the box the owner asked to remove (punch 14). The fill existed only to
+              stop rows showing through while it was sticky, so the fill and the stickiness went
+              together: nothing here scrolls far enough for a pinned group label to earn a box. */}
+          <Eyebrow dense className="mb-1">
+            {group.title}
+          </Eyebrow>
           <SpecRowList
             rows={group.rows}
             alternates={alternates}
@@ -1671,15 +1689,23 @@ function SpecRowList({
           <div key={row.key} className="-mx-1.5 px-1.5">
             {/* The hover fill belongs to the row HEADER, not to the row plus everything it opened:
                 on the outer element it highlighted a four-line region in an otherwise flat property
-                grid, which read as a raised card rather than as a hovered row. */}
-            <div className="-mx-1.5 flex items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]">
+                grid, which read as a raised card rather than as a hovered row.
+
+                A GRID rather than justify-between: pushing the label left and the value hard right
+                made the eye cross a long empty gap to pair them on a wide column ("Applications
+                ......... HDMI"), which the owner flagged in their own shot critique. A bounded label
+                track puts every value in a group at the SAME x, immediately beside its label, which
+                is what a property grid is for. */}
+            <div className={`-mx-1.5 ${SPEC_ROW_GRID} rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]`}>
               <dt
-                className="min-w-0 flex-1 truncate text-xs text-t2"
+                className="min-w-0 truncate text-xs text-t2"
                 title={typeof row.label === "string" ? row.label : undefined}
               >
                 {row.label}
               </dt>
-              <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
+              {/* left-aligned in its own track: a single part sheet has nothing to compare down the
+                  column, so tabular right-alignment only bought distance from the label */}
+              <dd className="tnum min-w-0 truncate font-mono text-xs text-t1">
                 {row.unit ? `${row.value} ${row.unit}` : row.value}
               </dd>
             </div>
@@ -1716,7 +1742,7 @@ function TradeCompliance({
 }) {
   return (
     <section data-dev-id="detail.trade" className="mt-5 border-t border-line pt-3.5">
-      <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.05em] text-t3">
+      <div className={`mb-0.5 ${EYEBROW_DENSE}`}>
         Trade And Compliance
       </div>
       {/* Says WHOSE facts these are. Sitting directly under the last distributor's price ladder,
@@ -1817,7 +1843,7 @@ function Sourcing({
             </div>
             {tiers.length > 0 ? (
               <div className="mt-3">
-                <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.05em] text-t3">
+                <div className={`mb-2 ${EYEBROW_DENSE}`}>
                   Volume Pricing
                 </div>
                 {/* The qty-1 unit price is already the headline beside the stock, so the ladder
