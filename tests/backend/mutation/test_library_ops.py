@@ -685,3 +685,34 @@ def test_move_category_of_a_file_less_part_is_a_field_change(tmp_path, fixtures_
     assert rec.category == "Modules"
     assert rec.symbol is None and rec.footprint is None
     assert repo.is_clean()
+
+
+def test_symbol_only_add_does_not_write_a_dangling_footprint_property(tmp_path, fixtures_dir):
+    """A symbol-only add must not stamp a Footprint property pointing at a footprint
+    that was never placed.
+
+    add_part supports attaching the footprint later, so `footprint_source=None` is a
+    legitimate add. But the symbol's `Footprint` property was written whenever a SYMBOL
+    existed, guarded only by `staged.symbol_source is not None`. That shipped a symbol
+    claiming `SR-<slug>:<entry_name>` while the .pretty holds no such footprint and the
+    record's own `footprint` field is None: placing it in KiCad yields a broken footprint
+    link, and the schematic reads as "has a footprint" while the library says otherwise.
+
+    The sibling attach path (ingest/pipeline.py) gets this right by guarding on
+    `record.footprint is not None`; this locks the same invariant for add_part.
+    """
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.footprint_source = None  # symbol now, footprint attached later
+
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+
+    assert record.footprint is None  # nothing was placed...
+
+    sym_lib = SymbolLib.load(profile.library.symbol_lib_path("ICs"))
+    sym = sym_lib.get_symbol(staged.entry_name)
+    footprint_prop = sym.get_property("Footprint")
+    # ...so the symbol must not claim one. Empty or absent are both acceptable.
+    assert not footprint_prop, (
+        f"symbol-only add stamped a dangling footprint link: {footprint_prop!r}"
+    )
