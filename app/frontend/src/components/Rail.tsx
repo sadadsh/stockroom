@@ -5,7 +5,7 @@
  * theme toggle. Icons are the artifact's own set, inline, so the rail matches the
  * north-star 1:1.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
@@ -29,8 +29,29 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   settings: <Icon id="nav.settings" className="h-full w-full" />,
 };
 
+// Whether the rail is collapsed to icons. A WORKSPACE preference, so it persists the same
+// best-effort way the theme does (punch 13a) - a rail that reopened on every launch would be a
+// setting you re-apply forever. Read lazily so the first paint is already correct.
+const RAIL_STORAGE_KEY = "stockroom.rail.collapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(RAIL_STORAGE_KEY) === "1";
+  } catch {
+    return false; // localStorage may be unavailable; expanded is the default
+  }
+}
+
 export function Rail() {
   const { route, navigate } = useRouter();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  useEffect(() => {
+    try {
+      localStorage.setItem(RAIL_STORAGE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* persistence is best-effort, exactly as in ThemeProvider */
+    }
+  }, [collapsed]);
   const { toggle } = useTheme();
   const items = railNav();
   const primary = items.filter((item) => item.group === "primary");
@@ -67,21 +88,30 @@ export function Rail() {
     <nav
       aria-label="Primary"
       data-dev-id="rail.root"
-      className="flex w-[190px] flex-none flex-col border-r border-line bg-rail px-3 py-4"
+      className={
+        "flex flex-none flex-col border-r border-line bg-rail py-4 transition-[width] duration-150 " +
+        "motion-reduce:transition-none " +
+        (collapsed ? "w-[52px] px-2" : "w-[190px] px-3")
+      }
     >
       {/* wordmark (north-star .wm): the rail's panel-title bar - same band + bottom hairline as every
           other docked panel header (Components list, the opened component), so the three panes read
           as one Altium workspace. Full-bleed to the rail edges via negative margins. */}
       <div
         data-dev-id="rail.wordmark"
-        className="-mx-3 -mt-4 mb-3 flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-band px-3.5"
+        className={
+          "-mt-4 mb-3 flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-band " +
+          (collapsed ? "-mx-2 justify-center px-0" : "-mx-3 px-3.5")
+        }
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
         <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
-        <span className="text-base font-semibold tracking-[-0.01em] text-t1">
-          <Text id="nav.brand">Stockroom</Text>
-        </span>
+        {collapsed ? null : (
+          <span className="text-base font-semibold tracking-[-0.01em] text-t1">
+            <Text id="nav.brand">Stockroom</Text>
+          </span>
+        )}
       </div>
 
       <div data-dev-id="rail.nav" className="flex flex-col gap-0.5">
@@ -90,6 +120,7 @@ export function Rail() {
             key={item.route}
             item={item}
             selected={active === item.route}
+            collapsed={collapsed}
             onSelect={() => navigate(item.route)}
           />
         ))}
@@ -106,32 +137,69 @@ export function Rail() {
             key={item.route}
             item={item}
             selected={active === item.route}
+            collapsed={collapsed}
             onSelect={() => navigate(item.route)}
           />
         ))}
         <button
           type="button"
           data-dev-id="rail.about"
+          aria-label={collapsed ? "About" : undefined}
+          title={collapsed ? "About" : undefined}
           onClick={() => setAboutOpen(true)}
-          className="flex h-[34px] items-center gap-2.5 rounded-control px-2.5 text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
+          className={
+            "flex h-[34px] items-center gap-2.5 rounded-control text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
+            (collapsed ? "justify-center px-0" : "px-2.5")
+          }
         >
           <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
             <Icon id="nav.about" className="h-full w-full" />
           </span>
-          <Text id="nav.about">About</Text>
+          {collapsed ? null : <Text id="nav.about">About</Text>}
         </button>
-        <div data-dev-id="rail.utility" className="mt-1.5 flex items-center gap-1.5">
+        {/* The collapse control sits at the FOOT of the rail, not in the wordmark bar: the wordmark
+            is the rail's panel title and gains nothing from an action, and the foot is where the
+            other workspace controls (theme, update) already live. Its label names what the click
+            WILL do, not the current state, so it is never ambiguous. */}
+        <button
+          type="button"
+          data-dev-id="rail.collapse"
+          aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
+          title={collapsed ? "Expand Rail" : "Collapse Rail"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((v) => !v)}
+          className={
+            "flex h-[28px] items-center gap-2.5 rounded-control text-left text-2xs font-medium text-t3 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
+            (collapsed ? "justify-center px-0" : "px-2.5")
+          }
+        >
+          <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center font-mono text-base">
+            {collapsed ? "\u00bb" : "\u00ab"}
+          </span>
+          {collapsed ? null : "Collapse"}
+        </button>
+        <div
+          data-dev-id="rail.utility"
+          className={
+            "mt-1.5 flex gap-1.5 " +
+            (collapsed ? "flex-col items-stretch" : "items-center")
+          }
+        >
           {hasUpdate ? (
             <button
               type="button"
               data-dev-id="rail.update"
               title="A new version is available"
+              aria-label={collapsed ? "Update" : undefined}
               onClick={onApplyUpdate}
               disabled={apply.isPending}
-              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raise"
+              className={
+                "flex h-[32px] items-center gap-2 rounded-control border border-line bg-raise text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raise " +
+                (collapsed ? "justify-center px-0" : "flex-1 px-2.5")
+              }
             >
               <Icon id="nav.update" className="h-4 w-4 flex-none" />
-              {apply.isPending ? (
+              {collapsed ? null : apply.isPending ? (
                 <Text id="nav.update-busy">Updating...</Text>
               ) : (
                 <Text id="nav.update">Update</Text>
@@ -140,7 +208,10 @@ export function Rail() {
           ) : (
             <div
               data-dev-id="rail.update"
-              className="flex h-[32px] flex-1 items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2"
+              className={
+                "flex h-[32px] items-center gap-2 rounded-control border border-line bg-raise text-xs font-medium text-t2 " +
+                (collapsed ? "justify-center px-0" : "flex-1 px-2.5")
+              }
               title="You have the latest version"
             >
               {/* The registry stores the plain check (currentColor); the --c-ok tint was a call-site
@@ -149,7 +220,7 @@ export function Rail() {
               <span className="flex flex-none" style={{ color: "var(--c-ok)" }}>
                 <Icon id="nav.up-to-date" className="h-4 w-4 flex-none" />
               </span>
-              <Text id="nav.up-to-date">Up to Date!</Text>
+              {collapsed ? null : <Text id="nav.up-to-date">Up to Date!</Text>}
             </div>
           )}
           <button
@@ -235,10 +306,12 @@ function AboutModal({ onClose }: { onClose: () => void }) {
 function RailItem({
   item,
   selected,
+  collapsed,
   onSelect,
 }: {
   item: NavEntry;
   selected: boolean;
+  collapsed: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -246,9 +319,14 @@ function RailItem({
       type="button"
       data-dev-id={`rail.nav-${item.route}`}
       aria-current={selected ? "page" : undefined}
+      // Collapsed, the glyph is all there is, so the name has to come from aria-label (and `title`
+      // gives the pointer the same thing). Without it every nav item reads as an unlabelled button.
+      aria-label={collapsed ? item.title : undefined}
+      title={collapsed ? item.title : undefined}
       onClick={onSelect}
       className={
-        "flex h-[32px] items-center gap-2.5 rounded-control px-2.5 text-left text-base transition " +
+        "flex h-[32px] items-center gap-2.5 rounded-control text-left text-base transition " +
+        (collapsed ? "justify-center px-0 " : "px-2.5 ") +
         (selected
           ? "bg-acc-soft font-semibold text-t1 shadow-[inset_2px_0_0_var(--c-acc)]"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
@@ -257,7 +335,7 @@ function RailItem({
       <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
         {NAV_ICONS[item.route] ?? null}
       </span>
-      <Text id={`nav.${item.route}`}>{item.title}</Text>
+      {collapsed ? null : <Text id={`nav.${item.route}`}>{item.title}</Text>}
     </button>
   );
 }

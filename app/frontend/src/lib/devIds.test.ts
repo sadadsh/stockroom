@@ -6,10 +6,11 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // by-id map — the four ways the hand-authored list could silently rot.
 // Bump this when a dev id is deliberately added or removed. It is a drift alarm, not a target: a
 // change here should always accompany a real catalogue change in the same commit.
+// 237 as of Batch 4d (+rail.collapse, +shell.profile-switch, +shell.profile-menu).
 // 234 as of Batch 3: +detail.spec-family (repeated spec keys collapsed into one row),
 // +detail.alternates (the other sources for a value), +detail.trade (the procurement facts that
 // used to be discarded). All three are new controls in this commit.
-const EXPECTED_ENTRIES = 234;
+const EXPECTED_ENTRIES = 237;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
