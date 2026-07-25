@@ -118,11 +118,17 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
 # Bump when the footprint render changes (layers, hidden text, ...): the SVG cache is keyed by
 # the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
 # be served forever without this token. (C1: copper-only render -> "c1".)
-_FP_RENDER_VERSION = "c2"
+_FP_RENDER_VERSION = "c3"  # C3: refit the viewBox to the drawn art, so the tile stops showing a speck.
 # Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
 # the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
 # fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
-_SYM_RENDER_VERSION = "c1"
+_SYM_RENDER_VERSION = "c2"  # C2: the viewBox refit applies to every preview, symbols included.
+# Bump when the MODEL conversion changes: the GLB cache is keyed on the source model file
+# hash, which does NOT change when the converter does. Both GLB keys had no such token at
+# all, so a converter fix reached only a machine with a cold cache while every test passed.
+# (C1: STEP converted by cascadio directly instead of round-tripped through trimesh, which
+# was merging away every material past the first and dropping NORMAL attributes -> "c1".)
+_MODEL_CONVERT_VERSION = "c1"
 
 
 def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:
@@ -203,6 +209,94 @@ def scalable_svg(text: str) -> str:
     return text[: match.start()] + stripped + text[match.end() :]
 
 
+# Fraction of the drawn content's larger dimension left as breathing room around a refit
+# viewBox, so the art does not touch the tile edge. Small on purpose: the whole point is to
+# fill the tile, and a generous margin re-creates the problem being fixed.
+_REFIT_MARGIN = 0.04
+
+
+def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:
+    """Bounding box of everything the SVG actually DRAWS, or None if it draws nothing.
+
+    kicad-cli emits only `M`/`L`/`Z` paths plus `<circle>` (arcs and rounded pads arrive
+    already tessellated into segments), so scraping coordinate pairs is exact rather than
+    approximate. Taking every number as a coordinate pair stays CORRECT if a future KiCad
+    emits curves too: a bezier is contained by its control points, so the box would be
+    generous rather than wrong, and a generous box only under-zooms."""
+    xs: list[float] = []
+    ys: list[float] = []
+
+    def add(px: list[float], py: list[float], pad: float) -> None:
+        xs.extend(v - pad for v in px)
+        xs.extend(v + pad for v in px)
+        ys.extend(v - pad for v in py)
+        ys.extend(v + pad for v in py)
+
+    for element in re.finditer(r"<(path|circle)\b([^>]*)>", text, re.S):
+        kind, attrs = element.group(1), element.group(2)
+        # a stroke straddles its path, so half of it lies OUTSIDE the geometry. Refitting to bare
+        # coordinates would shave the outer half off every courtyard line at the frame edge.
+        stroke = re.search(r"stroke-width:\s*([\d.]+)", attrs)
+        half = float(stroke.group(1)) / 2 if stroke and "stroke:none" not in attrs else 0.0
+        if kind == "circle":
+            cx = re.search(r'\bcx="(-?[\d.eE+]+)"', attrs)
+            cy = re.search(r'\bcy="(-?[\d.eE+]+)"', attrs)
+            cr = re.search(r'\br="(-?[\d.eE+]+)"', attrs)
+            if cx and cy and cr:
+                add([float(cx.group(1))], [float(cy.group(1))], float(cr.group(1)) + half)
+            continue
+        d = re.search(r'\bd="([^"]*)"', attrs, re.S)
+        if not d:
+            continue
+        nums = [float(n) for n in re.findall(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?", d.group(1))]
+        if len(nums) >= 2:
+            add(nums[0::2], nums[1::2], half)
+
+    if not xs or not ys:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def refit_viewbox(text: str) -> str:
+    """Shrink the root `viewBox` to what the SVG actually draws.
+
+    kicad-cli sizes a footprint's viewBox from the footprint's WHOLE extent - every layer and
+    every text item, including ones the preview deliberately does not draw. The preview renders
+    only `F.Cu,B.Cu,F.CrtYd,B.CrtYd` and hides the Reference/Value, so the drawn copper ends up
+    as a speck inside a box sized for things nobody sees. MEASURED on the owner's real
+    TPD6E05U06RVZR: geometry spans about 1.7x4.9mm while the viewBox is 11.049x6.4008mm, so the
+    art covered under a tenth of the frame and the tile rendered a tiny stamp - the
+    "near-invisible footprint preview" complaint. The inflation there came from a vendor
+    `(fp_text user "Designator156")`, 13 characters of text at roughly 11mm wide.
+
+    Hiding more text would NOT have been enough, which is why this works on the OUTPUT instead:
+    the same footprint carries F.SilkS and F.Fab line work that is equally undrawn and equally
+    counted. Refitting to what was actually emitted is correct for any cause, present or future.
+
+    `scalable_svg` is the necessary companion, not a substitute: it makes the box SCALE to the
+    tile, while this decides what the box CONTAINS. An oversized box scales an oversized margin.
+    """
+    match = re.search(r"<svg\b[^>]*>", text)
+    if not match:
+        return text
+    root = match.group(0)
+    if not re.search(r'viewBox="[^"]*"', root):
+        return text
+    box = _svg_content_bbox(text)
+    if box is None:
+        return text  # nothing drawn: never invent a degenerate box
+    x0, y0, x1, y1 = box
+    width, height = x1 - x0, y1 - y0
+    if width <= 0 or height <= 0:
+        return text
+    margin = max(width, height) * _REFIT_MARGIN
+    fitted = (
+        f'viewBox="{x0 - margin:.6f} {y0 - margin:.6f} '
+        f'{width + 2 * margin:.6f} {height + 2 * margin:.6f}"'
+    )
+    return text[: match.start()] + re.sub(r'viewBox="[^"]*"', fitted, root) + text[match.end() :]
+
+
 def _resolve_footprint_file(ctx, part_id: str):
     """(record, .kicad_mod path, its .pretty dir) for a part, or an honest FileNotFoundError.
 
@@ -236,8 +330,10 @@ def previews_router(require_token) -> APIRouter:
 
     def _svg_response(text: str) -> Response:
         # every preview goes through here, so a scalable SVG cannot be applied to one kind and
-        # forgotten on the other
-        return Response(content=scalable_svg(text), media_type="image/svg+xml")
+        # forgotten on the other. Refit FIRST (decide what the box contains), then strip the
+        # physical width/height (let that box drive the tile) - the two are complementary, and
+        # scaling an oversized box only scales the empty margin with it.
+        return Response(content=scalable_svg(refit_viewbox(text)), media_type="image/svg+xml")
 
     @r.get("/symbol/{part_id}.svg")
     def symbol_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
@@ -382,7 +478,7 @@ def previews_router(require_token) -> APIRouter:
         src = stock_model_file(lib, name)
         if src is None:
             raise FileNotFoundError(f"KiCad stock 3D model for {lib}:{name} is not installed")
-        key = f"stockmodel_{lib}_{name}_{_hash_file(src)}.glb"
+        key = f"stockmodel_{lib}_{name}_{_MODEL_CONVERT_VERSION}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             data = cached.read_bytes()
@@ -423,7 +519,7 @@ def previews_router(require_token) -> APIRouter:
             src = ctx.profile.library.root / kicad.model.file
             if not src.exists():
                 raise FileNotFoundError(f"3D model file is missing: {kicad.model.file}")
-        key = f"model_{part_id}_{_hash_file(src)}.glb"
+        key = f"model_{part_id}_{_MODEL_CONVERT_VERSION}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():
             data = cached.read_bytes()

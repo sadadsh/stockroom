@@ -297,11 +297,13 @@ export function mountModelScene(
         mesh.material = neutral;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        // A STEP tessellated to glTF frequently arrives with NO vertex normals. Without them every
-        // face shades identically (measured: three separate points on the body all exactly
-        // 181,182,186 - a perfectly flat surface, which is most of "looks cartoony and fake"), and
-        // any screen-space AO reconstructs garbage normals and occludes the whole part to BLACK.
-        // Computing them is cheap and is the difference between a lit solid and a paper cutout.
+        // Without vertex normals every face shades identically (measured: three separate points on
+        // the body all exactly 181,182,186 - a perfectly flat surface, which is most of "looks
+        // cartoony and fake"), and any screen-space AO reconstructs garbage normals and occludes
+        // the whole part to BLACK. This was blamed on STEP tessellation; the real cause was our own
+        // converter round-tripping through trimesh, which dropped NORMAL attributes OpenCASCADE had
+        // written. The guard STAYS regardless: it is cheap, and a mesh from any other format may
+        // genuinely arrive without them. It should now be a no-op for every STEP.
         if (mesh.geometry && !mesh.geometry.getAttribute("normal")) {
           mesh.geometry.computeVertexNormals();
         }
@@ -424,10 +426,9 @@ export function mountModelScene(
     renderMode = mode;
     if (!realisticMaterial) {
       realisticMaterial = new THREE.MeshStandardMaterial({
-        // MEASURED from the real STEP's own COLOUR_RGB records: the epoxy body is
-        // (0.148, 0.145, 0.145) - near black. The converter drops STEP colour, so the GLB's single
-        // cream material is an artifact of the conversion rather than the part; this is the colour
-        // the downloaded file actually specifies.
+        // The FALLBACK surface, used only by a mesh that arrives with no material at all.
+        // MEASURED from a real STEP's own COLOUR_RGB records: a moulded epoxy body is
+        // (0.148, 0.145, 0.145), near black - the most likely thing an unstated package is.
         color: 0x262525,
         roughness: 0.38,
         metalness: 0.1,
@@ -448,16 +449,16 @@ export function mountModelScene(
     if (mode === "realistic") {
       // REALISTIC == the colours the model actually ships with, lit properly. Substituting an
       // invented "epoxy" colour was not realism, it was a different guess: the vendor already
-      // said what the part looks like. A model with no material of its own falls back to the
-      // epoxy surface so it still reads as a part rather than as nothing.
-      // The STEP carries real per-face colour, but our converter collapses it to ONE default
-      // material - so "the model's own colour" is a conversion artifact, not the part. Until the
-      // converter preserves it, a single-material model gets the epoxy black the STEP states.
-      const singleMaterialModel = new Set([...originalMaterials.values()].map((m) => m)).size <= 1;
+      // said what the part looks like. Only a mesh with NO material of its own falls back to the
+      // epoxy surface, so it still reads as a part rather than as nothing.
+      // This USED TO override any model carrying one material, on the belief that the GLB's single
+      // material was a conversion artifact. It was - but the artifact was ours: the converter
+      // round-tripped STEP through trimesh, which merged every material past the first away. With
+      // the converter handing cascadio's bytes through, a one-material model is genuinely a
+      // one-colour part (a bare metal battery clip measures exactly one), and painting it black
+      // epoxy would be the lie the override was meant to prevent.
       for (const m of modelMeshes) {
-        const own = originalMaterials.get(m);
-        m.material =
-          own && !singleMaterialModel ? own : (realisticMaterial as THREE.Material);
+        m.material = originalMaterials.get(m) ?? (realisticMaterial as THREE.Material);
       }
     } else {
       const next = mode === "xray" ? xrayMaterial : studioMaterial;
