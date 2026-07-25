@@ -34,6 +34,7 @@ const STATUS: AltiumStatus = {
   dblib_dir: "/home/x/git/stockroom/libraries/Main/altium/",
   ready: 3,
   total: 88,
+  datasource_present: true,
   rows: [
     { id: "a", display_name: "BQ24074 Charger", category: "ICs", mpn: "BQ24074RGTT", value: "BQ24074RGTT", symbol: "BQ24074RGTT", footprint: "VQFN-16", ready: true },
     { id: "b", display_name: "Mystery", category: "ICs", mpn: "", value: "", symbol: "", footprint: "", ready: false },
@@ -171,5 +172,21 @@ describe("AltiumDbLibSection", () => {
 
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Altium Setup" })).toBeNull();
+  });
+
+  it("says when the derived data source has not been built on this machine yet", async () => {
+    // It is no longer shared through git (Batch 2 item 3), so a fresh clone legitimately has
+    // none. Silence here means Altium fails later with an ODBC error against a file nobody
+    // mentioned, which reads as a broken library rather than an unbuilt one.
+    mockApi.altiumStatus.mockResolvedValue({ ...STATUS, datasource_present: false });
+    renderSection();
+    expect(await screen.findByTestId("altium-datasource-missing")).toBeInTheDocument();
+  });
+
+  it("says nothing about the data source once it is built", async () => {
+    mockApi.altiumStatus.mockResolvedValue(STATUS);
+    renderSection();
+    await screen.findByText(/parts ready to place/);
+    expect(screen.queryByTestId("altium-datasource-missing")).toBeNull();
   });
 });
