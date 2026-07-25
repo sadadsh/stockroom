@@ -2,8 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from stockroom.kicad.errors import KiCadFileError
 from stockroom.sexp.document import SexpDocument, quote_kicad
+
+
+@dataclass(frozen=True)
+class ModelPlacement:
+    """Where a footprint's 3D model sits relative to the footprint origin.
+
+    KiCad's units, unconverted, because converting here would hide which frame a caller is in:
+    `offset` is millimetres, `rotate` is DEGREES about x/y/z, `scale` is unitless. A viewer that
+    ignores this draws the body at the origin unrotated, which is what Stockroom did - and it is
+    silently wrong rather than visibly broken, since a centred part looks plausible either way.
+    """
+
+    offset: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    rotate: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    @property
+    def is_identity(self) -> bool:
+        return (
+            self.offset == (0.0, 0.0, 0.0)
+            and self.scale == (1.0, 1.0, 1.0)
+            and self.rotate == (0.0, 0.0, 0.0)
+        )
 
 
 class Footprint:
@@ -32,6 +57,43 @@ class Footprint:
     def model_path(self) -> str | None:
         node = self._model_node()
         return node.children[1].value if node else None
+
+    @property
+    def model_placement(self) -> "ModelPlacement | None":
+        """The model's placement transform, or None when the footprint links no model at all.
+
+        A `(model ...)` that OMITS a sub-block is not unknown - KiCad treats it as identity - so the
+        missing parts default rather than returning None, which would make every caller invent the
+        same default itself. Read-only: this never touches the document, so the byte-preserving
+        guarantee holds.
+        """
+        node = self._model_node()
+        if node is None:
+            return None
+
+        def xyz(key: str, default: tuple[float, float, float]) -> tuple[float, float, float]:
+            sub = node.find(key)
+            if sub is None:
+                return default
+            triple = sub.find("xyz")
+            if triple is None:
+                return default
+            # children[0] is the `xyz` token itself; the three numbers follow it.
+            values = triple.children[1:4]
+            if len(values) != 3:
+                return default
+            try:
+                return (float(values[0].value), float(values[1].value), float(values[2].value))
+            except (TypeError, ValueError):
+                # A malformed number is not worth crashing a preview over, and guessing a
+                # different default would misplace the body without saying so.
+                return default
+
+        return ModelPlacement(
+            offset=xyz("offset", (0.0, 0.0, 0.0)),
+            scale=xyz("scale", (1.0, 1.0, 1.0)),
+            rotate=xyz("rotate", (0.0, 0.0, 0.0)),
+        )
 
     def set_model_path(self, path: str) -> None:
         node = self._model_node()
