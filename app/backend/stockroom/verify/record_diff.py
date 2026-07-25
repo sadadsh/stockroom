@@ -22,7 +22,9 @@ from typing import Any
 # Internal / derived keys the timeline diff never shows a human: the id never
 # changes, content hashes are noise, and enrichment is per-key provenance already
 # implied by the spec/field it annotates.
-DEFAULT_EXCLUDE: frozenset[str] = frozenset({"id", "hashes", "enrichment"})
+# `schema_version` is bookkeeping: a record silently upgrading from 1 to 2 on its next write
+# is not a change a human wants narrated in the timeline.
+DEFAULT_EXCLUDE: frozenset[str] = frozenset({"id", "hashes", "enrichment", "schema_version"})
 
 
 @dataclass

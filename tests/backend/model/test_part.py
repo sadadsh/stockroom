@@ -1,9 +1,9 @@
 import json
 
 from stockroom.model.part import (
+    AssetRef,
     Datasheet,
-    LibRef,
-    ModelRef,
+    EdaAssets,
     PartRecord,
     Provenance,
     Purchase,
@@ -22,8 +22,10 @@ def _sample() -> PartRecord:
         manufacturer="Texas Instruments",
         datasheet=Datasheet(file="tps62130rgtr.pdf", source_url="https://ti.com/x.pdf", fetched_at="2026-07-12T00:00:00Z"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/x", price_breaks=[[1, "3.21"]], stock=42, currency="USD", fetched_at="2026-07-12T00:00:00Z")],
-        symbol=LibRef(lib="SR-ICs", name="TPS62130RGTR"),
-        footprint=LibRef(lib="SR-ICs", name="VQFN-16"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-ICs", name="TPS62130RGTR"),
+            footprint=AssetRef(lib="SR-ICs", name="VQFN-16"),
+        )},
         provenance=Provenance(source="samacsys", source_url="https://componentsearchengine.com/x", original_zip_sha256="abc123", ingested_at="2026-07-12T00:00:00Z"),
     )
 
@@ -40,8 +42,10 @@ def _passive_sample() -> PartRecord:
         mpn="ERJ-P03F1101V",
         manufacturer="Panasonic",
         passive=True,
-        symbol=LibRef(lib="Device", name="R"),
-        footprint=LibRef(lib="Resistor_SMD", name="R_0603_1608Metric"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="Device", name="R"),
+            footprint=AssetRef(lib="Resistor_SMD", name="R_0603_1608Metric"),
+        )},
         datasheet=Datasheet(source_url="https://mouser.com/erj.pdf"),
         purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V")],
         specs={"Resistance": "1.1 kOhm", "Tolerance": "1%", "Package": "0603", "Power": "0.2 W"},
@@ -50,7 +54,7 @@ def _passive_sample() -> PartRecord:
 
 def test_passive_is_complete_with_stock_refs_url_datasheet_and_no_owned_model():
     p = _passive_sample()
-    assert p.model is None  # no owned 3D file; the stock footprint carries its own
+    assert p.assets_for("kicad").model is None  # the stock footprint carries its own 3D
     assert p.missing_fields() == []
     assert p.is_complete()
 
@@ -73,18 +77,19 @@ def test_assets_no_longer_gate_a_non_passive_part():
     # with full identity + datasheet + purchase is COMPLETE even with no owned model,
     # and missing_assets() reports what can still be attached after the fact.
     p = _sample()
-    p.model = None
+    p.assets_for("kicad").model = None
     assert p.passive is False
     assert p.missing_fields() == []
     assert p.is_complete()
-    assert p.missing_assets() == ["3D model"]  # symbol+footprint present, model not
+    # symbol+footprint present for KiCad, model not
+    assert p.missing_assets("kicad") == ["3D model"]
 
 
 def test_missing_assets_lists_every_unattached_asset():
     p = PartRecord(id="x", display_name="X", category="ICs")
-    assert p.missing_assets() == ["symbol", "footprint", "3D model"]
-    p.symbol = LibRef(lib="SR-ICs", name="X")
-    assert p.missing_assets() == ["footprint", "3D model"]
+    assert p.missing_assets("kicad") == ["symbol", "footprint", "3D model"]
+    p.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="X")
+    assert p.missing_assets("kicad") == ["footprint", "3D model"]
 
 
 def test_round_trip_preserves_every_field():
@@ -107,14 +112,14 @@ def test_is_complete_true_without_owned_assets():
     # a part with identity + description + datasheet + purchase is complete even with
     # no symbol/footprint/3D model (assets are attached after entry now).
     p = _sample()
-    assert p.model is None
+    assert p.assets_for("kicad").model is None
     assert p.missing_fields() == []
     assert p.is_complete()
 
 
 def test_is_complete_true_with_full_passport():
     p = _sample()
-    p.model = ModelRef(file="models/TPS62130RGTR.step")
+    p.assets_for("kicad").model = AssetRef(file="models/TPS62130RGTR.step")
     assert p.missing_fields() == []
     assert p.is_complete()
 
@@ -142,7 +147,7 @@ def test_defaults_are_empty_not_none():
     assert d["tags"] == []
     assert d["purchase"] == []
     assert d["datasheet"] is None
-    assert d["model"] is None
+    assert d["eda"] == {}  # empty per-tool bundles are omitted, not serialized as nulls
     assert d["enrichment"] == {}
 
 
@@ -164,7 +169,7 @@ def test_specs_is_not_a_gate_field():
     # a pinout (or any spec) is optional: adding it never changes completeness, and
     # a complete part with no specs stays complete.
     p = _sample()
-    p.model = ModelRef(file="models/x.step")
+    p.assets_for("kicad").model = AssetRef(file="models/x.step")
     assert p.is_complete()
     p.specs = {"pinout": [{"pin": "1", "name": "VIN"}]}
     assert p.is_complete()

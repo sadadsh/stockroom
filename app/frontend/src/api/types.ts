@@ -115,22 +115,23 @@ export interface PurchaseRef {
   fetched_at: string;
 }
 
-export interface LibRef {
+// One EDA asset reference (stockroom.model.part.AssetRef). `lib` names the container (a
+// KiCad library nickname, an Altium .SchLib/.PcbLib filename), `name` the entry inside it,
+// and `file` the repo-relative path for a file-shaped asset such as a 3D model. A kind fills
+// the fields it needs and leaves the rest blank -- nothing here is tool-specific.
+export interface AssetRef {
   lib: string;
   name: string;
-  // The EDA tool this symbol/footprint reference targets ("kicad" today; "altium"
-  // later, so a part can carry a reference per tool). Optional so older fixtures/
-  // records without it still type-check; the backend always emits it, defaulting to
-  // "kicad", and the panel renders it as a small tool pill.
-  tool?: string;
+  file: string;
 }
 
-export interface ModelRef {
-  file: string;
-  // The EDA tool the 3D model targets. A model is largely tool-neutral, but it is
-  // tagged too so a future Altium import can carry its own model. Optional, defaults
-  // to "kicad" on the backend.
-  tool?: string;
+// Everything ONE EDA tool holds for a part (stockroom.model.part.EdaAssets). Every tool gets
+// the same symmetric bundle, which is what makes readiness a single generic check instead of
+// a per-tool branch. Slots are absent when the tool has no such asset.
+export interface EdaAssets {
+  symbol: AssetRef | null;
+  footprint: AssetRef | null;
+  model: AssetRef | null;
 }
 
 export interface Provenance {
@@ -162,13 +163,10 @@ export interface PartDetail {
   passive?: boolean;
   datasheet: DatasheetRef | null;
   purchase: PurchaseRef[];
-  symbol: LibRef | null;
-  footprint: LibRef | null;
-  model: ModelRef | null;
-  // Altium DbLib bindings (the stored .SchLib/.PcbLib + the bound entry names); null
-  // until the capture attaches them. Optional so older fixtures still type-check.
-  altium_symbol?: { lib: string; name: string } | null;
-  altium_footprint?: { lib: string; name: string } | null;
+  // The CAD assets, one symmetric bundle per EDA tool key ("kicad", "altium", ...). Tools
+  // with nothing attached are omitted by the backend, so read it through
+  // `assetsFor(detail, tool)` in lib/edaTarget.ts rather than indexing it directly.
+  eda: Record<string, EdaAssets>;
   provenance: Provenance | null;
   hashes: Record<string, string> | null;
   enrichment: Record<string, { source: string; confidence: string }>;

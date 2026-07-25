@@ -469,8 +469,9 @@ export const api = {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
   },
 
-  // Remove ONE element from a part (symbol / footprint / model / datasheet /
-  // altium_symbol / altium_footprint): the file goes, the ref nulls, one scoped commit.
+  // Remove ONE element from a part: "datasheet", or a `<tool>_<asset kind>` pair from the
+  // EDA registry (kicad_symbol, kicad_footprint, kicad_model, altium_symbol,
+  // altium_footprint). The file goes, the ref nulls, one scoped commit.
   detachAsset(id: string, kind: string): Promise<PartDetail> {
     return request<PartDetail>(
       "DELETE",

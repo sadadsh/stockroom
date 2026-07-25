@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from stockroom.model.part import Datasheet, LibRef, PartRecord
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
 from stockroom.projects import fill
 from stockroom.sexp.document import SexpDocument
 from stockroom.verify.semdiff import assert_only_changed
@@ -83,15 +83,19 @@ def _parts():
     opamp = PartRecord(
         id="lm358", display_name="LM358 Op-Amp", category="ICs",
         description="Dual op-amp", mpn="LM358DR", manufacturer="TI",
-        symbol=LibRef(lib="SR-ICs", name="LM358"),
-        footprint=LibRef(lib="SR-ICs", name="SOIC-8"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-ICs", name="LM358"),
+            footprint=AssetRef(lib="SR-ICs", name="SOIC-8"),
+        )},
         datasheet=Datasheet(file="lm358.pdf", source_url="https://ti.com/lm358.pdf"),
     )
     res = PartRecord(
         id="r10k", display_name="10k 0402", category="Resistors",
         description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-        symbol=LibRef(lib="SR-Resistors", name="R_10k"),
-        footprint=LibRef(lib="SR-Resistors", name="R_0402"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
+            footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
+        )},
         datasheet=Datasheet(file="r.pdf", source_url="https://yageo.com/r.pdf"),
     )
     return [opamp, res]
@@ -303,7 +307,7 @@ def test_proposed_changes_does_not_re_add_mpn_under_an_alternate_key():
 def test_datasheet_falls_back_to_file_when_no_source_url():
     part = PartRecord(
         id="d", display_name="D", category="ICs", description="x", mpn="M1", manufacturer="ACME",
-        symbol=LibRef(lib="SR-ICs", name="D"),
+        eda={"kicad": EdaAssets(symbol=AssetRef(lib="SR-ICs", name="D"))},
         datasheet=Datasheet(file="datasheets/d.pdf", source_url=""),  # file present, URL empty
     )
     rec = fill.library_match_records([part])[0]
@@ -314,7 +318,7 @@ def test_bad_category_part_kept_for_identity_but_drops_symbol_footprint():
     part = PartRecord(
         id="w", display_name="Widget", category="Widgets",  # not in the taxonomy
         description="x", mpn="WMPN", manufacturer="ACME",
-        symbol=LibRef(lib="X", name="WSYM"), footprint=LibRef(lib="X", name="WFP"),
+        eda={"kicad": EdaAssets(symbol=AssetRef(lib="X", name="WSYM"), footprint=AssetRef(lib="X", name="WFP"))},
     )
     rec = fill.library_match_records([part])
     assert len(rec) == 1  # not dropped

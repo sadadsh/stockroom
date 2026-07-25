@@ -258,9 +258,9 @@ def test_commit_lands_a_file_less_candidate_from_a_pulled_link(client):
     })
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["symbol"] is None
-    assert body["footprint"] is None
-    assert body["model"] is None
+    # A file-less add carries NO assets for any tool, and an empty bundle is omitted from
+    # the wire format entirely rather than serialized as a wall of nulls.
+    assert body["eda"] == {}
     assert body["mpn"] == "TPD6E05U06RVZR"
     detail = client.get(f"/api/library/parts/{body['id']}").json()
-    assert detail["symbol"] is None and detail["footprint"] is None
+    assert detail["eda"] == {}

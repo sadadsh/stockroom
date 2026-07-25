@@ -46,8 +46,9 @@ def _price(record) -> str:
 
 
 def row_for(record) -> dict[str, str]:
-    sym = record.altium_symbol
-    fp = record.altium_footprint
+    altium = record.assets_for("altium")
+    sym = altium.symbol
+    fp = altium.footprint
     p = _first_purchase(record)
     return {
         "MPN": record.mpn or "",

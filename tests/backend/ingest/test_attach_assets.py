@@ -55,7 +55,8 @@ def _add_bare_part(pipe, category="ICs") -> PartRecord:
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/p/1")],
     )
     landed = pipe.ops.add_reference_part(record)
-    assert landed.symbol is None and landed.footprint is None and landed.model is None
+    k = landed.assets_for("kicad")
+    assert k.symbol is None and k.footprint is None and k.model is None
     return landed
 
 
@@ -69,16 +70,16 @@ def test_attach_assets_lands_symbol_footprint_and_model_on_a_bare_part(tmp_path,
     head_before = pipe.repo.head()
     rec = pipe.attach_assets(bare.id, c)
 
-    assert rec.symbol is not None and rec.symbol.name == "TESTPART"
-    assert rec.footprint is not None and rec.footprint.name == "TESTPART"
-    assert rec.model is not None  # the snapeda fixture zip carries a .step file
+    assert rec.assets_for("kicad").symbol is not None and rec.assets_for("kicad").symbol.name == "TESTPART"
+    assert rec.assets_for("kicad").footprint is not None and rec.assets_for("kicad").footprint.name == "TESTPART"
+    assert rec.assets_for("kicad").model is not None  # the snapeda fixture zip carries a .step file
 
     sym_lib = SymbolLib.load(pipe.profile.library.symbol_lib_path("ICs"))
     assert "TESTPART" in sym_lib.symbol_names
     fp_path = pipe.profile.library.footprint_lib_path("ICs") / "TESTPART.kicad_mod"
     assert fp_path.exists()
     assert "models/" in (Footprint.load(fp_path).model_path or "")
-    model_path = pipe.profile.library.root / rec.model.file
+    model_path = pipe.profile.library.root / rec.assets_for("kicad").model.file
     assert model_path.exists()
 
     # the record's identity mirrored onto the freshly-placed symbol
@@ -90,8 +91,8 @@ def test_attach_assets_lands_symbol_footprint_and_model_on_a_bare_part(tmp_path,
     # persisted to the JSON record too
     json_path = pipe.profile.library.parts_dir / f"{bare.id}.json"
     saved = PartRecord.loads(json_path.read_text(encoding="utf-8"))
-    assert saved.symbol.name == "TESTPART" and saved.footprint.name == "TESTPART"
-    assert saved.model is not None
+    assert saved.assets_for("kicad").symbol.name == "TESTPART" and saved.assets_for("kicad").footprint.name == "TESTPART"
+    assert saved.assets_for("kicad").model is not None
 
     # one atomic commit, zero trace of the staging tempdir
     assert pipe.repo.head() != head_before
@@ -112,8 +113,8 @@ def test_attach_assets_only_touches_what_the_candidate_carries(tmp_path, fixture
     model_path = c.model_path
     c.model_path = None
     rec = pipe.attach_assets(bare.id, c)
-    assert rec.symbol is not None and rec.footprint is not None
-    assert rec.model is None
+    assert rec.assets_for("kicad").symbol is not None and rec.assets_for("kicad").footprint is not None
+    assert rec.assets_for("kicad").model is None
 
     # now attach the 3D model on its own, mirroring attach_model's contract
     partial = StagingCandidate(
@@ -121,9 +122,9 @@ def test_attach_assets_only_touches_what_the_candidate_carries(tmp_path, fixture
         footprint_variants=[], model_path=model_path,
     )
     updated = pipe.attach_assets(bare.id, partial)
-    assert updated.model is not None
-    assert updated.symbol.name == "TESTPART"  # untouched, not re-merged
-    assert updated.footprint.name == "TESTPART"
+    assert updated.assets_for("kicad").model is not None
+    assert updated.assets_for("kicad").symbol.name == "TESTPART"  # untouched, not re-merged
+    assert updated.assets_for("kicad").footprint.name == "TESTPART"
 
 
 def test_attach_assets_rejects_a_candidate_with_nothing_to_attach(tmp_path, fixtures_dir):
@@ -160,6 +161,6 @@ def test_attach_assets_leaves_zero_trace_on_a_failed_symbol_merge(tmp_path, fixt
     saved = PartRecord.loads(
         (pipe.profile.library.parts_dir / f"{bare.id}.json").read_text(encoding="utf-8")
     )
-    assert saved.symbol is None and saved.footprint is None and saved.model is None
+    assert saved.assets_for("kicad").symbol is None and saved.assets_for("kicad").footprint is None and saved.assets_for("kicad").model is None
     assert (pipe.profile.library.parts_dir / f"{bare.id}.json").read_text(encoding="utf-8") == json_before
     assert pipe.repo.status_porcelain() == []

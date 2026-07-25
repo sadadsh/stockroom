@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
-import type { PartDetail, PartSummary } from "../api/types";
+import type { AssetRef, PartDetail, PartSummary } from "../api/types";
 import {
   assetReadiness,
-  EDA_TOOLS,
+  assetsFor,
+  assetPresent,
+  DEFAULT_EDA_TOOL,
+  EDA_TOOL_OPTIONS,
   libraryReadiness,
   summaryReadiness,
 } from "./edaTarget";
+
+function ref(lib: string, name: string): AssetRef {
+  return { lib, name, file: "" };
+}
+
+function modelRef(file: string): AssetRef {
+  return { lib: "", name: "", file };
+}
 
 // A minimal PartDetail whose assets the test overrides per case. Everything not under
 // test is a benign empty value so the readiness math is the only thing exercised.
@@ -20,9 +31,7 @@ function detail(over: Partial<PartDetail> = {}): PartDetail {
     manufacturer: "Acme",
     datasheet: null,
     purchase: [],
-    symbol: null,
-    footprint: null,
-    model: null,
+    eda: {},
     provenance: null,
     hashes: null,
     enrichment: {},
@@ -44,137 +53,179 @@ function summary(over: Partial<PartSummary> = {}): PartSummary {
   };
 }
 
-describe("EDA_TOOLS", () => {
-  it("lists KiCad and Altium with display labels, KiCad first (the default)", () => {
-    expect(EDA_TOOLS.map((t) => t.tool)).toEqual(["kicad", "altium"]);
-    expect(EDA_TOOLS.map((t) => t.label)).toEqual(["KiCad", "Altium"]);
+const FULL_KICAD = {
+  kicad: { symbol: ref("SR-ICs", "S"), footprint: ref("SR-ICs", "F"), model: modelRef("m.step") },
+};
+const FULL_ALTIUM = {
+  altium: { symbol: ref("p.SchLib", "S"), footprint: ref("p.PcbLib", "F"), model: null },
+};
+
+describe("EDA_TOOL_OPTIONS", () => {
+  it("offers KiCad first, because it is the default target", () => {
+    expect(EDA_TOOL_OPTIONS.map((t) => t.tool)).toEqual(["kicad", "altium"]);
+    expect(DEFAULT_EDA_TOOL).toBe("kicad");
+  });
+
+  it("labels every tool from the generated registry", () => {
+    expect(EDA_TOOL_OPTIONS.map((t) => t.label)).toEqual(["KiCad", "Altium Designer"]);
+  });
+});
+
+describe("assetsFor", () => {
+  it("returns an empty bundle for a tool the part carries nothing for", () => {
+    expect(assetsFor(detail(), "altium")).toEqual({
+      symbol: null,
+      footprint: null,
+      model: null,
+    });
+  });
+
+  it("never reads one tool's assets as another's", () => {
+    const part = detail({ eda: FULL_KICAD });
+    expect(assetsFor(part, "kicad").symbol?.name).toBe("S");
+    expect(assetsFor(part, "altium").symbol).toBeNull();
+  });
+});
+
+describe("assetPresent", () => {
+  it("counts an entry-shaped asset by name and a file-shaped one by file", () => {
+    expect(assetPresent(ref("L", "S"))).toBe(true);
+    expect(assetPresent(modelRef("m.step"))).toBe(true);
+  });
+
+  it("does not count a container with no entry, or nothing at all", () => {
+    expect(assetPresent(ref("L", ""))).toBe(false);
+    expect(assetPresent(null)).toBe(false);
+    expect(assetPresent(undefined)).toBe(false);
   });
 });
 
 describe("assetReadiness", () => {
-  it("a part with only kicad symbol+footprint is ready for kicad, model reported missing", () => {
-    const part = detail({
-      symbol: { lib: "L", name: "S" }, // tool absent -> defaults kicad
-      footprint: { lib: "L", name: "F" },
-      model: null,
-    });
-    const r = assetReadiness(part, "kicad");
-    expect(r.symbol).toBe(true);
-    expect(r.footprint).toBe(true);
-    expect(r.model).toBe(false);
-    expect(r.ready).toBe(true); // symbol+footprint present; model optional
-    expect(r.missing).toEqual(["3D Model"]);
-  });
-
-  it("a kicad-only part is NOT ready for altium (its altium_* fields are empty)", () => {
-    // Altium readiness reads altium_symbol/altium_footprint, NOT the KiCad symbol/footprint.
-    // Reading the KiCad fields for altium made altium ALWAYS not-ready, so every part showed
-    // "CAD Incomplete" forever even with the Altium libraries attached (live 2026-07-24).
-    const part = detail({
-      symbol: { lib: "L", name: "S" },
-      footprint: { lib: "L", name: "F" },
-      model: null,
-      altium_symbol: null,
-      altium_footprint: null,
-    });
-    const r = assetReadiness(part, "altium");
-    expect(r.symbol).toBe(false);
-    expect(r.footprint).toBe(false);
-    expect(r.ready).toBe(false);
-    // the 3D model is shared and never a separate Altium requirement
-    expect(r.missing).toEqual(["Symbol", "Footprint"]);
-  });
-
-  it("a part with altium_symbol+altium_footprint IS ready for altium (regardless of kicad)", () => {
-    const part = detail({
-      symbol: { lib: "SR-Diodes", name: "TPD" }, // KiCad refs present
-      footprint: { lib: "SR-Diodes", name: "TPD" },
-      model: { file: "m.step" },
-      altium_symbol: { lib: "tpd.SchLib", name: "TPD" },
-      altium_footprint: { lib: "tpd.PcbLib", name: "RVZ" },
-    });
-    const alt = assetReadiness(part, "altium");
-    expect(alt.symbol).toBe(true);
-    expect(alt.footprint).toBe(true);
-    expect(alt.ready).toBe(true);
-    expect(alt.missing).toEqual([]);
-    // and it is independently ready for kicad from its own kicad fields
-    expect(assetReadiness(part, "kicad").ready).toBe(true);
-  });
-
-  it("altium is not ready when only one of altium_symbol/altium_footprint is attached", () => {
-    const symOnly = detail({ altium_symbol: { lib: "l", name: "S" }, altium_footprint: null });
-    expect(assetReadiness(symOnly, "altium").ready).toBe(false);
-    expect(assetReadiness(symOnly, "altium").missing).toEqual(["Footprint"]);
-    const fpOnly = detail({ altium_symbol: null, altium_footprint: { lib: "l", name: "F" } });
-    expect(assetReadiness(fpOnly, "altium").ready).toBe(false);
-    expect(assetReadiness(fpOnly, "altium").missing).toEqual(["Symbol"]);
-  });
-
-  it("defaults a ref with no tool to kicad", () => {
-    const part = detail({
-      symbol: { lib: "L", name: "S" },
-      footprint: { lib: "L", name: "F", tool: "kicad" },
-      model: { file: "m.step" }, // tool absent -> kicad
-    });
-    const r = assetReadiness(part, "kicad");
+  it("is ready for a tool once that tool's symbol and footprint are attached", () => {
+    const r = assetReadiness(detail({ eda: FULL_KICAD }), "kicad");
     expect(r.ready).toBe(true);
-    expect(r.model).toBe(true);
     expect(r.missing).toEqual([]);
+    expect(r.present).toEqual({ symbol: true, footprint: true, model: true });
   });
 
-  it("is not ready when the footprint is missing even though the symbol is present", () => {
-    const part = detail({ symbol: { lib: "L", name: "S" }, footprint: null });
-    const r = assetReadiness(part, "kicad");
-    expect(r.symbol).toBe(true);
-    expect(r.footprint).toBe(false);
+  it("reports a missing 3D model without blocking readiness", () => {
+    const r = assetReadiness(
+      detail({ eda: { kicad: { symbol: ref("L", "S"), footprint: ref("L", "F"), model: null } } }),
+      "kicad",
+    );
+    expect(r.ready).toBe(true);
+    expect(r.missing).toEqual(["3D Model"]);
+    expect(r.present.model).toBe(false);
+  });
+
+  it("is not ready when the footprint is missing", () => {
+    const r = assetReadiness(
+      detail({ eda: { kicad: { symbol: ref("L", "S"), footprint: null, model: null } } }),
+      "kicad",
+    );
     expect(r.ready).toBe(false);
     expect(r.missing).toEqual(["Footprint", "3D Model"]);
+  });
+
+  // THE regression this whole per-EDA record exists to prevent. Before the cutover the
+  // Altium branch read `part.symbol` (the KiCad ref) and asserted `model = true`, so a part
+  // with Altium assets attached still showed "CAD Incomplete" forever, and a part with only
+  // KiCad assets could read as Altium-ready. Both directions are pinned here.
+  describe("cross-tool independence", () => {
+    it("a full KiCad set does NOT make the part Altium-ready", () => {
+      const r = assetReadiness(detail({ eda: FULL_KICAD }), "altium");
+      expect(r.ready).toBe(false);
+      expect(r.missing).toEqual(["Symbol", "Footprint"]);
+    });
+
+    it("a full Altium set DOES make the part Altium-ready", () => {
+      const r = assetReadiness(detail({ eda: FULL_ALTIUM }), "altium");
+      expect(r.ready).toBe(true);
+      expect(r.missing).toEqual([]);
+    });
+
+    it("a full Altium set does NOT make the part KiCad-ready", () => {
+      expect(assetReadiness(detail({ eda: FULL_ALTIUM }), "kicad").ready).toBe(false);
+    });
+
+    it("each tool reads its own assets when both are attached", () => {
+      const part = detail({ eda: { ...FULL_KICAD, ...FULL_ALTIUM } });
+      expect(assetReadiness(part, "kicad").ready).toBe(true);
+      expect(assetReadiness(part, "altium").ready).toBe(true);
+    });
+  });
+
+  it("never reports a 3D model as missing for Altium, which cannot take one by reference", () => {
+    // Altium stores 3D as a body inside the footprint's .PcbLib binary. Listing it as a gap
+    // would be a gap no user could ever close.
+    const r = assetReadiness(detail({ eda: FULL_ALTIUM }), "altium");
+    expect(r.missing).not.toContain("3D Model");
+    expect(r.unsupported.model).toMatch(/PcbLib/);
+    expect(r.present.model).toBeUndefined();
+  });
+
+  it("treats a passive as having its 3D model, which the stock footprint carries", () => {
+    const r = assetReadiness(
+      detail({
+        passive: true,
+        eda: { kicad: { symbol: ref("Device", "R"), footprint: ref("Resistor_SMD", "R_0603_1608Metric"), model: null } },
+      }),
+      "kicad",
+    );
+    expect(r.missing).toEqual([]);
+    expect(r.ready).toBe(true);
+  });
+
+  it("reports every gap for a part with nothing attached", () => {
+    expect(assetReadiness(detail(), "kicad").missing).toEqual([
+      "Symbol",
+      "Footprint",
+      "3D Model",
+    ]);
+  });
+
+  it("does not count a reference whose entry name is blank", () => {
+    const r = assetReadiness(
+      detail({ eda: { kicad: { symbol: ref("L", ""), footprint: ref("L", "F"), model: null } } }),
+      "kicad",
+    );
+    expect(r.ready).toBe(false);
+    expect(r.missing).toContain("Symbol");
   });
 });
 
 describe("summaryReadiness", () => {
-  it("uses is_complete/missing for the default kicad tool", () => {
-    expect(summaryReadiness(summary({ is_complete: true, missing: [] }), "kicad")).toEqual({
+  it("uses the row's own completeness for the default tool", () => {
+    expect(summaryReadiness(summary({ is_complete: true }), "kicad")).toEqual({
       ready: true,
       missing: [],
     });
-    expect(
-      summaryReadiness(summary({ is_complete: false, missing: ["Footprint"] }), "kicad"),
-    ).toEqual({ ready: false, missing: ["Footprint"] });
   });
 
-  it("treats a non-default tool conservatively as not-ready (summary carries no per-tool detail)", () => {
-    // even a kicad-complete summary is not confirmed ready for altium
-    const r = summaryReadiness(summary({ is_complete: true, missing: [] }), "altium");
-    expect(r.ready).toBe(false);
-    expect(r.missing).toEqual(["Symbol", "Footprint"]);
+  it("is conservative for a non-default tool a summary cannot speak to", () => {
+    expect(summaryReadiness(summary({ is_complete: true }), "altium")).toEqual({
+      ready: false,
+      missing: ["Symbol", "Footprint"],
+    });
   });
 });
 
 describe("libraryReadiness", () => {
-  it("rolls up complete/incomplete counts and the not-ready ids for the kicad tool", () => {
+  it("rolls up the parts not ready for the selected tool", () => {
     const parts = [
-      summary({ id: "a", is_complete: true, missing: [] }),
-      summary({ id: "b", is_complete: false, missing: ["Symbol"] }),
-      summary({ id: "c", is_complete: true, missing: [] }),
+      summary({ id: "a", is_complete: true }),
+      summary({ id: "b", is_complete: false, missing: ["MPN"] }),
     ];
-    const roll = libraryReadiness(parts, "kicad");
-    expect(roll.total).toBe(3);
-    expect(roll.complete).toBe(2);
-    expect(roll.incomplete).toBe(1);
-    expect(roll.notReadyIds).toEqual(["b"]);
+    expect(libraryReadiness(parts, "kicad")).toEqual({
+      total: 2,
+      complete: 1,
+      incomplete: 1,
+      notReadyIds: ["b"],
+    });
   });
 
-  it("counts every part not-ready for a non-default tool (nothing is confirmed altium-ready)", () => {
-    const parts = [
-      summary({ id: "a", is_complete: true, missing: [] }),
-      summary({ id: "b", is_complete: true, missing: [] }),
-    ];
-    const roll = libraryReadiness(parts, "altium");
-    expect(roll.total).toBe(2);
-    expect(roll.complete).toBe(0);
-    expect(roll.incomplete).toBe(2);
-    expect(roll.notReadyIds).toEqual(["a", "b"]);
+  it("flags every part for a tool no summary can confirm", () => {
+    const parts = [summary({ id: "a" }), summary({ id: "b" })];
+    expect(libraryReadiness(parts, "altium").notReadyIds).toEqual(["a", "b"]);
   });
 });

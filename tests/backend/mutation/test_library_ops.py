@@ -67,7 +67,7 @@ def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):
     record = ops.add_part(staged)
 
     assert record.id == "tps62130rgtr"
-    assert record.symbol == PartRecord.from_dict(record.to_dict()).symbol  # round-trips
+    assert record.eda == PartRecord.from_dict(record.to_dict()).eda  # round-trips
 
     lib = profile.library
     # JSON written
@@ -124,7 +124,7 @@ def test_add_part_partial_allowed_when_gate_bypassed(tmp_path, fixtures_dir):
     staged.datasheet_source = None
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged, require_complete=False)
-    assert record.model is None
+    assert record.assets_for("kicad").model is None
     fp = Footprint.load(profile.library.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod")
     assert fp.model_path is None  # no (model ...) block written
 
@@ -206,9 +206,9 @@ def test_add_reference_part_lands_asset_less_record_json_only(tmp_path, fixtures
     jp = profile.library.parts_dir / "stm32h753zit6.json"
     assert jp.exists()
     saved = PartRecord.loads(jp.read_text(encoding="utf-8"))
-    assert saved.symbol is None and saved.footprint is None and saved.model is None
+    assert saved.assets_for("kicad").symbol is None and saved.assets_for("kicad").footprint is None and saved.assets_for("kicad").model is None
     assert saved.is_complete()  # complete without assets under the new gate
-    assert saved.missing_assets() == ["symbol", "footprint", "3D model"]
+    assert saved.missing_assets("kicad") == ["symbol", "footprint", "3D model"]
     # no symbol lib / .pretty file was created (reference-only, no assets)
     assert repo.head() != before and repo.is_clean()
 
@@ -246,14 +246,14 @@ def test_attach_symbol_and_footprint_tag_the_tool_and_commit(tmp_path, fixtures_
     ops = LibraryOps(profile, repo)
     ops.add_reference_part(_refless_record())
     rec = ops.attach_symbol("stm32h753zit6", "SR-ICs", "STM32H753ZIT6")
-    assert rec.symbol.lib == "SR-ICs" and rec.symbol.name == "STM32H753ZIT6"
-    assert rec.symbol.tool == "kicad"  # default EDA tool tag, ready for altium later
+    assert rec.assets_for("kicad").symbol.lib == "SR-ICs" and rec.assets_for("kicad").symbol.name == "STM32H753ZIT6"
+    assert rec.assets_for("altium").symbol is None  # filed for KiCad only
     rec = ops.attach_footprint("stm32h753zit6", "SR-ICs", "LQFP-144", tool="kicad")
-    assert rec.footprint.name == "LQFP-144" and rec.footprint.tool == "kicad"
+    assert rec.assets_for("kicad").footprint.name == "LQFP-144"
     # persisted + still just the JSON touched, tree clean after each atomic commit
     saved = PartRecord.loads((profile.library.parts_dir / "stm32h753zit6.json").read_text())
-    assert saved.symbol.tool == "kicad" and saved.footprint.tool == "kicad"
-    assert saved.missing_assets() == ["3D model"]
+    assert saved.assets_for("altium").symbol is None and saved.assets_for("altium").footprint is None
+    assert saved.missing_assets("kicad") == ["3D model"]
     assert repo.is_clean()
 
 
@@ -402,7 +402,7 @@ def test_move_category_relocates_symbol_and_footprint(tmp_path, fixtures_dir):
     rec = ops.move_category("tps62130rgtr", "Modules")
 
     assert rec.category == "Modules"
-    assert rec.symbol.lib == "SR-Modules"
+    assert rec.assets_for("kicad").symbol.lib == "SR-Modules"
     # gone from ICs, present in Modules
     assert "TPS62130RGTR" not in SymbolLib.load(profile.library.symbol_lib_path("ICs")).symbol_names
     assert "TPS62130RGTR" in SymbolLib.load(profile.library.symbol_lib_path("Modules")).symbol_names
@@ -521,9 +521,9 @@ def test_add_part_lands_file_less_on_identity_alone(tmp_path, fixtures_dir):
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged)
 
-    assert record.symbol is None
-    assert record.footprint is None
-    assert record.model is None
+    assert record.assets_for("kicad").symbol is None
+    assert record.assets_for("kicad").footprint is None
+    assert record.assets_for("kicad").model is None
     # identity + sourcing landed intact
     assert record.mpn == "TPS62130RGTR"
     assert record.purchase and record.purchase[0].vendor == "Mouser"
@@ -536,7 +536,7 @@ def test_add_part_lands_file_less_on_identity_alone(tmp_path, fixtures_dir):
     assert repo.is_clean()
     # the JSON round-trips with null assets
     again = PartRecord.loads((lib.parts_dir / f"{record.id}.json").read_text(encoding="utf-8"))
-    assert again.symbol is None and again.footprint is None
+    assert again.assets_for("kicad").symbol is None and again.assets_for("kicad").footprint is None
 
 
 def test_add_part_with_symbol_but_no_entry_name_fails_loud(tmp_path, fixtures_dir):
@@ -559,16 +559,16 @@ def test_detach_asset_removes_each_element_and_nulls_its_ref(tmp_path, fixtures_
     record = ops.add_part(staged)
     lib = profile.library
 
-    r = ops.detach_asset(record.id, "model")
-    assert r.model is None
+    r = ops.detach_asset(record.id, "kicad_model")
+    assert r.assets_for("kicad").model is None
     assert not (lib.models_dir / "TPS62130RGTR.step").exists()
 
-    r = ops.detach_asset(record.id, "footprint")
-    assert r.footprint is None
+    r = ops.detach_asset(record.id, "kicad_footprint")
+    assert r.assets_for("kicad").footprint is None
     assert not (lib.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod").exists()
 
-    r = ops.detach_asset(record.id, "symbol")
-    assert r.symbol is None
+    r = ops.detach_asset(record.id, "kicad_symbol")
+    assert r.assets_for("kicad").symbol is None
     sym_lib = SymbolLib.load(lib.symbol_lib_path("ICs"))
     assert "TPS62130RGTR" not in sym_lib.symbol_names
 
@@ -596,12 +596,12 @@ def test_detach_asset_altium_sides(tmp_path, fixtures_dir):
     ops.attach_altium_assets("d", FIXA / "sample.SchLib", FIXA / "sample.PcbLib")
 
     r = ops.detach_asset("d", "altium_symbol")
-    assert r.altium_symbol is None
+    assert r.assets_for("altium").symbol is None
     assert not (ops.lib.parts_dir.parent / "altium" / "d.SchLib").exists()
-    assert r.altium_footprint is not None  # the other side stands
+    assert r.assets_for("altium").footprint is not None  # the other side stands
 
     r = ops.detach_asset("d", "altium_footprint")
-    assert r.altium_footprint is None
+    assert r.assets_for("altium").footprint is None
     assert not (ops.lib.parts_dir.parent / "altium" / "d.PcbLib").exists()
 
 
@@ -611,14 +611,14 @@ def test_detach_asset_unknown_kind_or_absent_asset_fails_loud(tmp_path, fixtures
     record = ops.add_part(staged)
     with pytest.raises(ValueError):
         ops.detach_asset(record.id, "bogus")
-    ops.detach_asset(record.id, "model")
+    ops.detach_asset(record.id, "kicad_model")
     with pytest.raises(ValueError):
-        ops.detach_asset(record.id, "model")  # already gone: honest, never a silent no-op
+        ops.detach_asset(record.id, "kicad_model")  # already gone: honest, never a silent no-op
 
 
 def test_delete_part_handles_a_file_less_part(tmp_path, fixtures_dir):
     """A part added file-less from a purchase link (symbol/footprint/model all None)
-    deletes cleanly - live 2026-07-24: delete crashed on record.symbol.name, so the
+    deletes cleanly - live 2026-07-24: delete crashed on record.assets_for("kicad").symbol.name, so the
     primary add flow produced parts that could never be deleted."""
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     staged.symbol_source = None
@@ -639,7 +639,7 @@ def test_delete_part_survives_a_detached_symbol(tmp_path, fixtures_dir):
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged)
-    ops.detach_asset(record.id, "symbol")
+    ops.detach_asset(record.id, "kicad_symbol")
     fp_path = profile.library.footprint_lib_path("ICs") / "TPS62130RGTR.kicad_mod"
     assert fp_path.exists()
     ops.delete_part(record.id)
@@ -661,9 +661,13 @@ def test_delete_part_removes_the_altium_libs_it_owns(tmp_path, fixtures_dir):
     sch.write_bytes(b"SCH")
     pcb.write_bytes(b"PCB")
     repo.commit("Attach Altium assets (test)", [sch, pcb])
-    from stockroom.model.part import LibRef
+    from stockroom.model.part import AssetRef, EdaAssets
 
-    ops.edit_field(record.id, "altium_symbol", LibRef(lib="altium", name=record.id))
+    ops.edit_field(
+        record.id,
+        "eda",
+        {"altium": EdaAssets(symbol=AssetRef(lib="altium", name=record.id))},
+    )
     ops.delete_part(record.id)
     assert not sch.exists()
     assert not pcb.exists()
@@ -672,7 +676,7 @@ def test_delete_part_removes_the_altium_libs_it_owns(tmp_path, fixtures_dir):
 
 def test_move_category_of_a_file_less_part_is_a_field_change(tmp_path, fixtures_dir):
     """Moving a file-less part between categories is just the category field - there is
-    no symbol/footprint to relocate, and it must not crash on record.symbol.name."""
+    no symbol/footprint to relocate, and it must not crash on record.assets_for("kicad").symbol.name."""
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     staged.symbol_source = None
     staged.symbol_source_name = ""
@@ -683,7 +687,7 @@ def test_move_category_of_a_file_less_part_is_a_field_change(tmp_path, fixtures_
     record = ops.add_part(staged)
     rec = ops.move_category(record.id, "Modules")
     assert rec.category == "Modules"
-    assert rec.symbol is None and rec.footprint is None
+    assert rec.assets_for("kicad").symbol is None and rec.assets_for("kicad").footprint is None
     assert repo.is_clean()
 
 
@@ -699,7 +703,7 @@ def test_symbol_only_add_does_not_write_a_dangling_footprint_property(tmp_path, 
     link, and the schematic reads as "has a footprint" while the library says otherwise.
 
     The sibling attach path (ingest/pipeline.py) gets this right by guarding on
-    `record.footprint is not None`; this locks the same invariant for add_part.
+    `record.assets_for("kicad").footprint is not None`; this locks the same invariant for add_part.
     """
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     staged.footprint_source = None  # symbol now, footprint attached later
@@ -707,7 +711,7 @@ def test_symbol_only_add_does_not_write_a_dangling_footprint_property(tmp_path, 
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged)
 
-    assert record.footprint is None  # nothing was placed...
+    assert record.assets_for("kicad").footprint is None  # nothing was placed...
 
     sym_lib = SymbolLib.load(profile.library.symbol_lib_path("ICs"))
     sym = sym_lib.get_symbol(staged.entry_name)
@@ -724,31 +728,29 @@ def test_attaching_a_reference_for_a_non_kicad_tool_is_rejected_not_silently_mis
     """`attach_symbol`/`attach_footprint` must refuse a tool they cannot file, instead of
     writing it into the KiCad slot.
 
-    `_attach_libref` did `setattr(record, "symbol"|"footprint", LibRef(..., tool=tool))`,
-    so the `tool` string only ever landed INSIDE the LibRef while the target field stayed
-    the KiCad one. The Altium refs are a different field AND a different type
-    (`altium_symbol`/`altium_footprint`, `AltiumRef`), so a `tool="altium"` attach did two
-    wrong things at once: it silently clobbered the part's real KiCad reference, and it
-    filed nothing for Altium. `tool` is unvalidated caller input straight from the API
-    body (routers/library.py), so this was reachable from a plain HTTP call.
-
-    Altium assets have their own path (`attach_altium_assets`, POST /api/altium/parts/{id}/attach)
-    because they copy real files and gate readiness. Until a reference-only Altium attach is
-    designed, refusing loudly is the honest behaviour -- never a silent overwrite.
+    Historically `_attach_libref` wrote `LibRef(..., tool=tool)` into the KiCad slot, so a
+    `tool="altium"` attach clobbered the part's real KiCad reference AND filed nothing for
+    Altium. The per-EDA record removed that failure mode structurally (each tool owns its
+    own slot), but the refusal STANDS for a different and still-valid reason: this path
+    files a reference only, and a non-KiCad reference is unresolvable without its library
+    files actually sitting in the profile. Altium assets go through `attach_altium_assets`
+    (POST /api/altium/parts/{id}/attach), which copies the real files. `tool` is unvalidated
+    caller input straight from the API body, so this is reachable from a plain HTTP call.
     """
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     record = ops.add_part(staged)
-    kicad_symbol_before = record.symbol
-    assert kicad_symbol_before is not None and kicad_symbol_before.tool == "kicad"
+    kicad_symbol_before = record.assets_for("kicad").symbol
+    assert kicad_symbol_before is not None
 
     with pytest.raises(ValueError, match="altium"):
         ops.attach_symbol(record.id, "SomeAltiumLib", "SOME_PART", tool="altium")
 
     # The KiCad reference must be untouched on disk, not just in memory.
     reloaded = ops.load_record(record.id)
-    assert reloaded.symbol == kicad_symbol_before
-    assert reloaded.altium_symbol is None  # and nothing was misfiled for Altium either
+    assert reloaded.assets_for("kicad").symbol == kicad_symbol_before
+    # and nothing was misfiled for Altium either
+    assert reloaded.assets_for("altium").symbol is None
 
 
 def test_add_part_derives_a_human_name_when_the_name_is_only_the_mpn(tmp_path, fixtures_dir):

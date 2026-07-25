@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from stockroom.altium.odbc import odbc_status
 from stockroom.api.errors import ApiError
 from stockroom.ingest.component_naming import derive_display_value
-from stockroom.model.part import PartRecord, altium_place_ready
+from stockroom.model.part import PartRecord, tool_place_ready
 
 # regenerate + attach both commit to the one git repo and write the shared .db/.DbLib, and
 # FastAPI runs these sync handlers in the threadpool, so two triggers (the Settings Regenerate,
@@ -27,9 +27,9 @@ def _row(record) -> dict:
     """One status row per part: its identity + the human-facing display Value (a resistor keeps
     its Ω, unlike the schematic-convention value the DbLib emitter writes) + the resolved Altium
     symbol/footprint names, and whether it is place-ready. Uses the SAME predicate the emitter
-    uses (altium_place_ready), so the count can never disagree with what is emitted."""
-    sym = record.altium_symbol
-    fp = record.altium_footprint
+    uses (tool_place_ready), so the count can never disagree with what is emitted."""
+    sym = record.assets_for("altium").symbol
+    fp = record.assets_for("altium").footprint
     return {
         "id": record.id,
         "display_name": record.display_name,
@@ -38,7 +38,7 @@ def _row(record) -> dict:
         "value": record.value or derive_display_value(record),
         "symbol": sym.name if sym else "",
         "footprint": fp.name if fp else "",
-        "ready": altium_place_ready(record),
+        "ready": tool_place_ready(record, "altium"),
     }
 
 

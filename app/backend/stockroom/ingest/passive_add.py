@@ -22,7 +22,7 @@ from stockroom.enrich.passive import (
     resolve_passive_assets,
 )
 from stockroom.ingest.errors import IngestError
-from stockroom.model.part import Datasheet, LibRef, PartRecord, Provenance, Purchase
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Provenance, Purchase
 
 _KIND_CATEGORY: dict[str, str] = {
     "resistor": "Resistors",
@@ -304,9 +304,10 @@ def build_passive_record(
         mpn=mpn,
         manufacturer=mfr,
         passive=True,
-        symbol=LibRef(lib=sym_lib, name=sym_name),
-        footprint=LibRef(lib=fp_lib, name=fp_name),
-        model=None,
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib=sym_lib, name=sym_name),
+            footprint=AssetRef(lib=fp_lib, name=fp_name),
+        )},
         datasheet=datasheet,
         purchase=[Purchase(
             vendor="Mouser",

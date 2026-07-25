@@ -18,7 +18,13 @@ import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
 import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
 import { useCapture } from "../lib/capture";
 import { groupSpecs, type SpecGroup } from "../lib/specSchema";
-import { assetReadiness, type AssetReadiness } from "../lib/edaTarget";
+import {
+  assetReadiness,
+  assetsFor,
+  assetTitleLabel,
+  type AssetReadiness,
+} from "../lib/edaTarget";
+import { EDA_TOOLS } from "../lib/edaRegistry.generated";
 import { useInlineEdit } from "../lib/useInlineEdit";
 import { Text } from "../lib/copy";
 import { EditableText } from "./EditableText";
@@ -149,7 +155,10 @@ export function DetailPanel({
   // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
   // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
-  const hasModel = detail?.passive ? !!detail.footprint?.name : !!detail?.model?.file;
+  const kicadAssets = detail ? assetsFor(detail, "kicad") : null;
+  const hasModel = detail?.passive
+    ? !!kicadAssets?.footprint?.name
+    : !!kicadAssets?.model?.file;
   // The pulled product photo (specs["Image"]): hidden behind a click-to-view chip
   // (owner 2026-07-24: "hidden until someone clicks to view it and like a card opens").
   const heroPhotoUrl = productPhotoUrl(detail?.specs);
@@ -201,8 +210,8 @@ export function DetailPanel({
 
   // What the part still needs, files + data, for the one Complete-Part window and its trigger.
   const missingAssets = [
-    !detail.symbol?.name ? "symbol" : null,
-    !detail.footprint?.name ? "footprint" : null,
+    !kicadAssets?.symbol?.name ? "symbol" : null,
+    !kicadAssets?.footprint?.name ? "footprint" : null,
     !hasModel ? "3D model" : null,
   ].filter((x): x is string => x !== null);
   // Altium gaps read straight off the part RECORD (altium.missing from assetReadiness), so an
@@ -343,28 +352,28 @@ export function DetailPanel({
               <AssetTile
                 devId="detail.asset-symbol"
                 name="Symbol"
-                present={!!detail.symbol?.name}
+                present={!!kicadAssets?.symbol?.name}
                 className="h-[142px]"
                 art={<SymbolArt />}
                 thumb={
-                  detail.symbol?.name ? (
+                  kicadAssets?.symbol?.name ? (
                     <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
                   ) : undefined
                 }
-                onOpen={detail.symbol?.name ? () => setPreview("symbol") : undefined}
+                onOpen={kicadAssets?.symbol?.name ? () => setPreview("symbol") : undefined}
               />
               <AssetTile
                 devId="detail.asset-footprint"
                 name="Footprint"
-                present={!!detail.footprint?.name}
+                present={!!kicadAssets?.footprint?.name}
                 className="h-[142px]"
                 art={<FootprintArt />}
                 thumb={
-                  detail.footprint?.name ? (
+                  kicadAssets?.footprint?.name ? (
                     <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
                   ) : undefined
                 }
-                onOpen={detail.footprint?.name ? () => setPreview("footprint") : undefined}
+                onOpen={kicadAssets?.footprint?.name ? () => setPreview("footprint") : undefined}
               />
             </div>
           </div>
@@ -383,14 +392,22 @@ export function DetailPanel({
                 // element removal applies to owned files only
                 onEditField && !detail.passive
                   ? ([
-                      detail.symbol ? { kind: "symbol", label: "KiCad Symbol" } : null,
-                      detail.footprint ? { kind: "footprint", label: "KiCad Footprint" } : null,
-                      detail.model ? { kind: "model", label: "3D Model" } : null,
+                      // Every tool's attached assets, from the registry: a third EDA tool
+                      // becomes removable by being registered, with no edit here. `kind` is
+                      // the `<tool>_<asset kind>` vocabulary LibraryOps.detach_asset speaks.
+                      ...EDA_TOOLS.flatMap((tool) =>
+                        tool.assetKinds
+                          .filter((k) => !(k in tool.unsupportedAssets))
+                          .map((k) => {
+                            const ref = assetsFor(detail, tool.key)[k as "symbol"];
+                            if (!ref || !(ref.name || ref.file)) return null;
+                            return {
+                              kind: `${tool.key}_${k}`,
+                              label: `${tool.label} ${assetTitleLabel(k)}`,
+                            };
+                          }),
+                      ),
                       detail.datasheet ? { kind: "datasheet", label: "Datasheet" } : null,
-                      detail.altium_symbol ? { kind: "altium_symbol", label: "Altium Symbol" } : null,
-                      detail.altium_footprint
-                        ? { kind: "altium_footprint", label: "Altium Footprint" }
-                        : null,
                     ].filter(Boolean) as { kind: string; label: string }[])
                   : []
               }
@@ -536,8 +553,8 @@ export function DetailPanel({
         partName={detail.display_name}
         available={{
           model: hasModel,
-          symbol: !!detail.symbol?.name,
-          footprint: !!detail.footprint?.name,
+          symbol: !!kicadAssets?.symbol?.name,
+          footprint: !!kicadAssets?.footprint?.name,
         }}
         initialKind={preview ?? "symbol"}
         onClose={() => setPreview(null)}

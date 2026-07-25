@@ -99,8 +99,13 @@ def library_match_records(parts: Iterable) -> list[dict]:
             # corrupt category is a library-side problem the doctor surfaces; it must not silently
             # discard the whole part nor crash the Prepare.
             nickname = ""
-        symbol = getattr(p, "symbol", None)
-        footprint = getattr(p, "footprint", None)
+        # The KiCad bundle explicitly: a project fill writes KiCad lib_ids into a
+        # `.kicad_sch`, so it must read the KiCad assets, not whatever the record happens
+        # to carry first. (This was `getattr(p, "symbol", None)`, which after the per-EDA
+        # cutover would return None forever and silently match NOTHING.)
+        kicad = p.assets_for("kicad")
+        symbol = kicad.symbol
+        footprint = kicad.footprint
         datasheet = getattr(p, "datasheet", None)
         # The schematic Datasheet property holds a URL or a local file path; prefer the source URL,
         # falling back to the on-disk file name (what the complete-to-add gate actually requires) so

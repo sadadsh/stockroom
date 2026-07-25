@@ -3,7 +3,7 @@ read from git blobs with no working-tree checkout."""
 
 from __future__ import annotations
 
-from stockroom.model.part import LibRef, PartRecord
+from stockroom.model.part import AssetRef, EdaAssets, PartRecord
 
 
 def _history(client, part_id):
@@ -36,7 +36,7 @@ def test_history_is_empty_for_an_uncommitted_part(client, app_ctx):
     # a part present in the index but never committed has no timeline yet: an honest
     # empty list, not an error.
     rec = PartRecord(id="ghost", display_name="GHOST", category="ICs")
-    rec.symbol = LibRef(lib="SR-ICs", name="GHOST")
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="GHOST")
     (app_ctx.profile.library.parts_dir / "ghost.json").write_text(rec.dumps(), encoding="utf-8")
     app_ctx.rebuild_index()
     body = _history(client, "ghost")
