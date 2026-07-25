@@ -208,6 +208,10 @@
       "confidence": "medium",
       "source": "mouser_web"
     },
+    "Package": {
+      "confidence": "high",
+      "source": "mouser_web"
+    },
     "Pppm - Peak Pulse Power Dissipation": {
       "confidence": "medium",
       "source": "mouser_web"
@@ -425,7 +429,7 @@
     "Number of Channels": "6",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "1",
-    "Package": "USON-14(1.4x3.5)",
+    "Package": "USON-14",
     "Package / Case": "14-UFDFN",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
