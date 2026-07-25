@@ -569,6 +569,9 @@ export function mountModelScene(
     // checked against. Drawn a hair above the mask so they are not z-fighting with it.
     const silkY = 0.012;
     for (const g of land.graphics ?? []) {
+      // F.Fab is a DOCUMENTATION layer - it never exists on a physical board, so drawing it here
+      // would show something the real part does not have.
+      if (g.layer.endsWith("Fab")) continue;
       const isCourtyard = g.layer.endsWith("CrtYd");
       const mat = new THREE.LineBasicMaterial({
         color: isCourtyard ? 0xff8fb1 : 0xf2f4f7,
@@ -595,11 +598,14 @@ export function mountModelScene(
     boardMesh = new THREE.Mesh(
       new THREE.BoxGeometry(spanX + margin, boardT, spanY + margin),
       new THREE.MeshPhysicalMaterial({
-        color: 0x0f5132, // solder-mask green
-        roughness: 0.62,
+        // Neutral GRAPHITE mask rather than the classic green: the board here is a backdrop for
+        // checking a part, and a saturated green competes with the gold pads and tints the body's
+        // reflections. Grey stays out of the way and keeps the copper reading as copper.
+        color: 0x3a3d42,
+        roughness: 0.58,
         metalness: 0.0,
-        clearcoat: 0.4,
-        clearcoatRoughness: 0.5,
+        clearcoat: 0.35,
+        clearcoatRoughness: 0.55,
         envMapIntensity: 0.9,
       }),
     );
