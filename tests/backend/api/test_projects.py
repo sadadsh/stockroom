@@ -2021,3 +2021,43 @@ def test_workspace_hygiene_endpoints_preview_then_apply(client, tmp_path):
     # ...and it is idempotent, so re-syncing does not churn the project's history.
     again = client.post(f"/api/projects/{proj['id']}/hygiene")
     assert again.json()["committed"] is None
+
+
+def test_library_pin_endpoints_read_then_pin(client, tmp_path, app_ctx):
+    """Batch 2 item 2, reachable from the app: an unpinned project says so, pinning writes the pin
+    into the PROJECT's own repo, and reading it back reports a match against this machine."""
+    root = _make_project(tmp_path / "ext" / "pinned")
+    _git_init_commit(root)
+    proj = _register(client, root)
+
+    before = client.get(f"/api/projects/{proj['id']}/library-pin")
+    assert before.status_code == 200, before.text
+    body = before.json()
+    assert body["status"] == "unpinned"
+    assert body["pinned"] is None
+    # the surface is told HOW this tool's paths stay portable, rather than hardcoding SR_LIB
+    assert body["path_contract"]["variable"] == "SR_LIB"
+
+    applied = client.post(f"/api/projects/{proj['id']}/library-pin")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["pinned"]["commit"] == app_ctx.repo.head()
+    assert (root / "stockroom-library.json").exists()
+
+    after = client.get(f"/api/projects/{proj['id']}/library-pin")
+    assert after.json()["status"] == "match"
+    # re-pinning an unchanged library commits nothing
+    assert client.post(f"/api/projects/{proj['id']}/library-pin").json()["committed"] is None
+
+
+def test_library_pin_on_a_project_with_no_git_is_a_400_not_a_silent_write(client, tmp_path):
+    root = _make_project(tmp_path / "ext" / "loose")
+    proj = _register(client, root)
+    assert client.get(f"/api/projects/{proj['id']}/library-pin").json()["under_git"] is False
+    resp = client.post(f"/api/projects/{proj['id']}/library-pin")
+    assert resp.status_code == 400, resp.text
+    assert not (root / "stockroom-library.json").exists()
+
+
+def test_library_pin_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/library-pin").status_code == 404
+    assert client.post("/api/projects/nope/library-pin").status_code == 404

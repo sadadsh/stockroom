@@ -79,6 +79,32 @@ class EmbeddedAsset:
 
 
 @dataclass(frozen=True)
+class PathContract:
+    """How this tool makes a library reference resolve to the same asset on every machine.
+
+    A project stores references to library symbols, footprints and 3D models, and a library lives
+    at a different absolute path on every peer's disk. Whether a stored reference survives that is
+    a fact about the TOOL, not about any one surface, so it belongs here: KiCad resolves through a
+    path VARIABLE it holds in its own config, while an Altium DbLib names its data source by a path
+    relative to its own folder and needs nothing set up at all.
+
+    Generic code (the library-version pin surface, the doctor, onboarding) reads this instead of
+    knowing that `SR_LIB` is a KiCad concept.
+    """
+
+    # "env_var": the tool resolves through a named variable that must be set on each machine.
+    # "relative": references are relative to the library folder, so nothing has to be set.
+    kind: str = "relative"
+    # The variable's name, and the tool config file Stockroom writes it into, for an honest
+    # message when it is missing. Empty for a relative contract.
+    variable: str = ""
+    config_file: str = ""
+    # What a portable reference literally starts with, so a surface can SHOW the shape.
+    prefix: str = ""
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class EdaTool:
     """Everything generic code needs to know about one EDA tool.
 
@@ -109,6 +135,8 @@ class EdaTool:
     embedded_assets: dict[str, EmbeddedAsset] = field(default_factory=dict)
     # How a placed component carries the library part it is bound to (see PlacementBinding).
     placement_binding: PlacementBinding = PlacementBinding()
+    # How this tool's stored library references stay portable across machines (see PathContract).
+    path_contract: PathContract = PathContract()
 
     def capturable_assets(self) -> tuple[str, ...]:
         """Kinds a CAPTURE session can fetch by reference, in registered order.
@@ -161,6 +189,21 @@ _KICAD = EdaTool(
     # lives in the schematic itself: written in the SAME transaction as the fill it records,
     # untouched by annotation, and carried to a peer by the project's own git.
     placement_binding=PlacementBinding(field="Stockroom ID", writable=True),
+    # KiCad stores library references as `${SR_LIB}/...`, and resolves SR_LIB from its own
+    # kicad_common.json, which `kicad/wiring.py` points at the active profile folder. That is what
+    # makes a schematic committed on one machine resolve on a peer's, so a peer whose SR_LIB is
+    # unset or stale gets broken symbols with no error from git.
+    path_contract=PathContract(
+        kind="env_var",
+        variable="SR_LIB",
+        config_file="kicad_common.json",
+        prefix="${SR_LIB}/",
+        description=(
+            "KiCad resolves every Stockroom library reference through the SR_LIB path variable, "
+            "which Stockroom writes into kicad_common.json to point at the active profile folder. "
+            "A peer whose SR_LIB is unset or points elsewhere resolves different files, or none."
+        ),
+    ),
 )
 
 _ALTIUM = EdaTool(
@@ -221,6 +264,18 @@ _ALTIUM = EdaTool(
         reason=(
             "A .SchDoc is an OLE2 binary that Stockroom reads but never writes, so an "
             "assignment is recorded by Stockroom rather than stamped into the schematic."
+        ),
+    ),
+    # The generated .DbLib names its SQLite data source as `.\stockroom-parts.db`, relative to the
+    # .DbLib's own folder (see altium/dblib.py), so the Altium library folder is portable as it
+    # stands and there is no machine-specific variable a peer can get wrong.
+    path_contract=PathContract(
+        kind="relative",
+        prefix=".\\",
+        description=(
+            "The generated .DbLib names its data source by a path relative to its own folder, so "
+            "an Altium library folder resolves on any machine with no variable to set. What a peer "
+            "still needs is the SQLite ODBC driver Altium reads it through."
         ),
     ),
 )
