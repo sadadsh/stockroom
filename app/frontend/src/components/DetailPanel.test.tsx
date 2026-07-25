@@ -850,3 +850,57 @@ describe("DetailPanel delete action", () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 });
+
+// -- The spec row's label/value pairing (found in the owner's own shot critique): the label was
+// left-aligned and the value right-aligned, so on a wide column the eye had to cross a long empty
+// gap to pair "Applications" with "HDMI".
+describe("DetailPanel spec row pairing", () => {
+  it("puts the value in its own column next to the label, not flung to the far edge", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({ category: "ICs", specs: { "Operating Temperature": "-40 ~ 85 C" } })}
+        {...BASE}
+      />,
+    );
+    const row = screen.getByText("Operating Temperature").closest("div")!;
+    // a grid with a bounded label track, so every value in the group starts at the same x and sits
+    // adjacent to its label - not `justify-between`, which pushes them to opposite edges
+    expect(row.className).toContain("grid");
+    expect(row.className).not.toContain("justify-between");
+  });
+});
+
+describe("DetailPanel alternates alignment", () => {
+  it("lines an alternate's value up with the row it belongs to", async () => {
+    // The alternates were justify-between while their PARENT row had just been changed to a grid,
+    // so a child's value flew to the far edge while the parent's sat beside its label. On the very
+    // rows whose job is to be compared, that is the original complaint made worse. Both use the
+    // same track definition, so they cannot drift apart again.
+    const user = userEvent.setup();
+    wrap(
+      <DetailPanel
+        detail={detail({
+          specs: { Tolerance: "1%" },
+          alternates: {
+            Tolerance: [
+              { value: "1%", source: "mouser", confidence: "high" },
+              { value: "2%", source: "digikey", confidence: "high" },
+            ],
+          },
+        })}
+        {...BASE}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    // the label is uppercased by CSS, so the DOM text is still "DigiKey"; the vendor also appears
+    // in the Sourcing column, so pick the occurrence inside the alternates list
+    const entry = screen
+      .getAllByText("DigiKey")
+      .map((el) => el.closest("li"))
+      .find((li): li is HTMLLIElement => li !== null)!;
+    expect(entry.className).toContain("grid");
+    expect(entry.className).not.toContain("justify-between");
+    // the same label-track width the parent row uses, so the value columns coincide
+    expect(entry.className).toContain("10.5rem");
+  });
+});
