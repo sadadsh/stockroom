@@ -173,11 +173,43 @@ def _clean_footprint_svg(cli, fp_file: Path, name: str, bw: bool, td: Path) -> s
     return Path(svg).read_text(encoding="utf-8")
 
 
+def scalable_svg(text: str) -> str:
+    """Drop the ROOT `<svg>` element's physical width/height so the `viewBox` drives sizing.
+
+    `kicad-cli` writes real-world dimensions - a 1.4x3.5mm part exports as
+    `width="2.641600mm" height="4.114800mm"` - which gives the browser an INTRINSIC SIZE of about
+    10x16 CSS pixels. In a 127x110 preview tile with `object-fit: contain` that is the
+    near-invisible sliver users reported as a broken footprint render; nothing had failed, the
+    drawing was simply being shown at its true physical size. Measured on the same file: stripping
+    the two attributes takes the intrinsic size to 96x150, correctly proportioned, and the tile
+    fills.
+
+    Only the ROOT element is touched, and only when a `viewBox` exists to size from - without one
+    the physical dimensions are the ONLY sizing information present, and removing them would
+    collapse the image to nothing.
+    """
+    # SEARCH, not match: a real kicad-cli export opens with an XML declaration and a DOCTYPE, so
+    # the root element is never at offset 0. Anchoring here silently did nothing on every real file
+    # while passing fixtures that began with `<svg` - the reason this needs a real-preamble test.
+    match = re.search(r"<svg\b[^>]*>", text)
+    if not match:
+        return text
+    root = match.group(0)
+    if "viewBox" not in root:
+        return text
+    stripped = re.sub(r'\s(?:width|height)="[^"]*"', "", root)
+    if stripped == root:
+        return text
+    return text[: match.start()] + stripped + text[match.end() :]
+
+
 def previews_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/previews", dependencies=[Depends(require_token)])
 
     def _svg_response(text: str) -> Response:
-        return Response(content=text, media_type="image/svg+xml")
+        # every preview goes through here, so a scalable SVG cannot be applied to one kind and
+        # forgotten on the other
+        return Response(content=scalable_svg(text), media_type="image/svg+xml")
 
     @r.get("/symbol/{part_id}.svg")
     def symbol_svg(request: Request, part_id: str, bw: bool = False, rev: str = "") -> Response:
