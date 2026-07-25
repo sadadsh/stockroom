@@ -24,6 +24,7 @@ function errMsg(err: unknown): string {
 // to fill the identical 17px container (appearance preserved; the parent span stays).
 const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   components: <Icon id="nav.components" className="h-full w-full" />,
+  stm: <Icon id="nav.stm" className="h-full w-full" />,
   projects: <Icon id="nav.projects" className="h-full w-full" />,
   settings: <Icon id="nav.settings" className="h-full w-full" />,
 };

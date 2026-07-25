@@ -25,8 +25,9 @@ import {
   pinMapGeometry,
   type PadLayout,
 } from "../../lib/pinMapGeometry";
-import { Button } from "../primitives";
+import { Button, SegmentedControl } from "../primitives";
 import { useModalDismiss } from "../../lib/useModalDismiss";
+import { PinoutTable } from "./PinoutTable";
 import { categoryFill, isFiveVoltTolerant, roleStroke } from "./pinEncoding";
 
 const VIEW = 460;
@@ -46,8 +47,14 @@ interface Camera {
 }
 const IDENTITY: Camera = { k: 1, x: 0, y: 0 };
 
+const MAX_VIEWS = [
+  { id: "map", label: "Map" },
+  { id: "table", label: "Table" },
+] as const;
+
 export function PinoutMap(props: Props) {
   const [maximized, setMaximized] = useState(false);
+  const [maxView, setMaxView] = useState<"map" | "table">("map");
   const close = useCallback(() => setMaximized(false), []);
   const dialogRef = useModalDismiss(maximized, close);
 
@@ -77,12 +84,29 @@ export function PinoutMap(props: Props) {
                 </span>
                 <span className="font-mono text-xs text-t3">{props.pinout.package}</span>
               </div>
-              <Button type="button" small onClick={close}>
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <SegmentedControl
+                  options={MAX_VIEWS}
+                  value={maxView}
+                  onChange={setMaxView}
+                  size="small"
+                  aria-label="Maximized pinout view"
+                />
+                <Button type="button" small onClick={close}>
+                  Close
+                </Button>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col">
-              <PinoutMapView {...props} />
+              {maxView === "map" ? (
+                <PinoutMapView {...props} />
+              ) : (
+                <PinoutTable
+                  pinout={props.pinout}
+                  selectedPosition={props.selectedPosition}
+                  onSelectPosition={props.onSelectPosition}
+                />
+              )}
             </div>
           </div>
         </div>

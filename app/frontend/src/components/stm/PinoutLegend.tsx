@@ -6,9 +6,9 @@
  *   a real toggle that highlights its pins on the map (dimming the rest) - the legend is a lens,
  *   not just a caption. Empty buckets stay listed but quiet (an honest zero).
  * - Role / 5V / Selection: the three neutral channels, with live counts where they apply.
- * - Key Pins: the board-bring-up facts the build cards worry about - boot straps, reset, debug
- *   access, oscillator pins, and the power domains present - each with its count, computed from
- *   the same pinout the map draws (no fetch).
+ * - Bring-Up Pins: the board-bring-up facts the build cards worry about - boot straps, reset,
+ *   debug access, oscillator pins, and the power domains present - each with its count, computed
+ *   from the same pinout the map draws (no fetch).
  *
  * Without a pinout (nothing selected) it falls back to the plain static key.
  */
@@ -139,7 +139,7 @@ export function PinoutLegend({ pinout, highlight, onToggleHighlight }: LegendPro
       {/* The board-bring-up facts the build cards worry about, for the loaded part */}
       {facts ? (
         <section data-testid="legend-key-pins">
-          <Eyebrow className="mb-1.5">Key Pins</Eyebrow>
+          <Eyebrow className="mb-1.5">Bring-Up Pins</Eyebrow>
           <div className="flex flex-col gap-0.5">
             <KeyFact label="Boot straps" count={facts.boot} />
             <KeyFact label="Reset" count={facts.reset} />
