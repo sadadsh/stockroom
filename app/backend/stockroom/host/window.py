@@ -1358,8 +1358,18 @@ def run_window(base_url: str, token: str) -> None:
         except Exception:  # noqa: BLE001 - a bad value/old pywebview must never block launch
             pass
 
+    # min_size is a MEASURED floor, not a guess. Driving the real OS window across widths on
+    # 2026-07-25 showed the sheet degrading cleanly (three columns -> two -> one, zero overflow) down
+    # to an 884px viewport, then GARBLING at 744px: eight elements overflowed horizontally, because
+    # the rail (190px) and the picker (320px) are fixed and leave the detail pane under 200px. No
+    # responsive rule can rescue a pane with no room left, so the window must not reach that size.
     window = webview.create_window(
-        "Stockroom", url=base_url, width=1400, height=900, js_api=_HostApi()
+        "Stockroom",
+        url=base_url,
+        width=1400,
+        height=900,
+        min_size=(960, 640),
+        js_api=_HostApi(),
     )
     _ACTIVE_WINDOW = window
 
