@@ -8,6 +8,7 @@ import pytest
 
 from stockroom.eda.registry import (
     EdaTool,
+    PlacementBinding,
     all_tools,
     get_tool,
     workspace_gitattributes,
@@ -82,3 +83,33 @@ def test_generated_files_are_self_identifying():
     for text in (workspace_gitignore(["kicad"]), workspace_gitattributes(["kicad"])):
         assert "Stockroom" in text
         assert text.endswith("\n")
+
+
+# -- placement bindings: which field carries a Stockroom part id on a placement ----
+
+
+def test_every_tool_declares_how_a_placement_carries_its_stockroom_binding():
+    """A durable assignment needs somewhere to live. That is per-tool DATA, never a branch:
+    the field name a placement carries it in, and whether Stockroom can WRITE that field."""
+    for tool in all_tools():
+        pb = tool.placement_binding
+        assert pb.field, f"{tool.key} declares no placement binding field"
+
+
+def test_kicad_placements_are_writable_and_altium_placements_are_not():
+    """The asymmetry that decides where a binding is STORED. Stockroom writes .kicad_sch
+    byte-preservingly, so a KiCad binding lives in the design itself; it never writes Altium
+    binary, so an Altium binding must live on the project record instead."""
+    assert get_tool("kicad").placement_binding.writable is True
+    assert get_tool("altium").placement_binding.writable is False
+    assert get_tool("altium").placement_binding.reason
+
+
+def test_a_third_tool_declares_its_binding_as_data_too():
+    eagle = EdaTool(key="eagle", label="EAGLE",
+                    placement_binding=PlacementBinding(field="SR_ID", writable=True))
+    assert eagle.placement_binding.field == "SR_ID"
+    assert eagle.placement_binding.writable is True
+    # A tool that says nothing still has a usable default rather than None, so generic code
+    # never has to test for absence.
+    assert EdaTool(key="x", label="X").placement_binding.field

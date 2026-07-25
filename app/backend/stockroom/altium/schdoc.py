@@ -11,7 +11,8 @@ stream with no header record indexes from its first record).
 The records this reader uses:
 
 - RECORD=1  SchComponent: LIBREFERENCE (the symbol entry), DESIGNITEMID (the DbLib
-  item, i.e. the MPN for a Stockroom-placed part), PARTCOUNT/CURRENTPARTID.
+  item, i.e. the MPN for a Stockroom-placed part), PARTCOUNT/CURRENTPARTID,
+  UNIQUEID (Altium's own stable per-placement id; may be absent).
 - RECORD=34 Designator: NAME=Designator, TEXT=<ref>, owned by the component.
 - RECORD=41 Parameter: NAME/TEXT pairs, owned by the component (a DbLib placement
   carries every Stockroom column here: MPN, Manufacturer, Description, ...).
@@ -104,7 +105,7 @@ def _owner_component(objects: list[dict], start: int, comp_indices: set[int]) ->
 
 def _components_from_stream(raw: bytes) -> list[dict]:
     """Every physical placed component in a FileHeader stream:
-    [{designator, lib_ref, design_item_id, params, footprint}]. Multi-part unit
+    [{designator, lib_ref, design_item_id, unique_id, params, footprint}]. Multi-part unit
     placements sharing a designator collapse to one entry (params merged, first
     unit's identity wins)."""
     objects = _object_records(_parse_records(raw))
@@ -115,6 +116,10 @@ def _components_from_stream(raw: bytes) -> list[dict]:
             "designator": "",
             "lib_ref": objects[i].get("LIBREFERENCE", ""),
             "design_item_id": objects[i].get("DESIGNITEMID", ""),
+            # Altium's own per-placement identity, the key a durable Stockroom binding is stored
+            # against. Absent on an old or hand-built document, in which case the binding layer
+            # falls back to a key that says it is weak rather than pretending otherwise.
+            "unique_id": objects[i].get("UNIQUEID", ""),
             "_part_id": objects[i].get("CURRENTPARTID", ""),
             "params": {},
             "footprint": "",
@@ -161,6 +166,8 @@ def _components_from_stream(raw: bytes) -> list[dict]:
                     merged["params"].setdefault(k, v)
                 if not merged["footprint"]:
                     merged["footprint"] = c["footprint"]
+                if not merged["unique_id"]:
+                    merged["unique_id"] = c["unique_id"]
                 continue
             # same unit id again: a distinct physical copy, falls through to append
         if c["designator"]:

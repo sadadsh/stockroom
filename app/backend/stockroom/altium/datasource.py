@@ -15,6 +15,8 @@ ALTIUM_COLUMNS: list[str] = [
     "ComponentLink1Description", "ComponentLink1URL",
     "Supplier", "SupplierPartNumber", "SupplierURL",
     "Price", "Stock", "Lifecycle", "Category",
+    # The durable placement binding Altium copies onto every component placed from this library.
+    "Stockroom ID",
 ]
 
 
@@ -74,6 +76,7 @@ def row_for(record) -> dict[str, str]:
         "Stock": "" if (p is None or p.stock is None) else str(p.stock),
         "Lifecycle": str(record.specs.get("Lifecycle", "") or "") if getattr(record, "specs", None) else "",
         "Category": record.category or "",
+        "Stockroom ID": record.id or "",
     }
 
 

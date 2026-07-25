@@ -26,7 +26,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from stockroom.projects import kibom
+from stockroom.projects import binding, kibom
 from stockroom.projects.identity import _PLACEHOLDERS, part_identity, strict_mpn
 from stockroom.sexp.document import SexpDocument, SexpNode
 
@@ -221,7 +221,7 @@ def _token_is_yes(node: SexpNode | None) -> bool:
     return val != "no"
 
 
-def _bom_components(sch_path) -> list:
+def _bom_components(sch_path, bindings=None) -> list:
     """Every real BOM component (ref, lib_id, props) in one .kicad_sch. Skips power / virtual
     symbols, in_bom=no / exclude_from_bom / dnp=yes parts, and the KiBoM exclude set
     (testpoints, fiducials, mounting holes, do-not-fit). [] for a non-schematic file. lib_id is
@@ -259,21 +259,29 @@ def _bom_components(sch_path) -> list:
             continue
         if kibom.is_do_not_fit(props):
             continue
-        out.append((ref, lib_id, props))
+        uuid_node = node.find("uuid")
+        uuid = (uuid_node.children[1].value
+                if uuid_node is not None and len(uuid_node.children) > 1 else "")
+        out.append((ref, lib_id, props, uuid))
     # A multi-unit symbol (an op-amp's A and B units) appears as SEPARATE (symbol)
     # nodes sharing one Reference. That is ONE physical part: keep the first node per
     # ref so qty counts components, never units (units carry identical properties).
     seen_refs: set = set()
     deduped = []
-    for ref, lib_id, props in out:
+    for ref, lib_id, props, uuid in out:
         if ref in seen_refs:
             continue
         seen_refs.add(ref)
-        deduped.append((ref, lib_id, props))
-    return deduped
+        deduped.append({"ref": ref, "uuid": uuid, "lib_id": lib_id, "props": props})
+    # Resolve each placement's durable binding into its props BEFORE anything downstream tries to
+    # identify it, so `library_enrich` reads a decision the user already made rather than guessing
+    # again. The (ref, lib_id, props) triple the rest of the BOM speaks in has no room for a uuid,
+    # which is exactly why `binding.resolve` stamps the placement key into props.
+    binding.resolve(deduped, "kicad", stored=bindings)
+    return [(c["ref"], c["lib_id"], c["props"]) for c in deduped]
 
 
-def _altium_bom_components(sch_path) -> list:
+def _altium_bom_components(sch_path, bindings=None) -> list:
     """Every real BOM component (ref, lib_id, props) in one Altium .SchDoc, through the
     same exclusion rules as the KiCad reader. The schdoc reader already collapses
     multi-part unit placements to one physical component. Props carry the placed
@@ -301,17 +309,21 @@ def _altium_bom_components(sch_path) -> list:
             continue
         if kibom.is_do_not_fit(props):
             continue
-        out.append((ref, lib_id, props))
-    return out
+        out.append({"ref": ref, "uuid": c.get("unique_id", ""), "lib_id": lib_id, "props": props})
+    # Stockroom never writes a .SchDoc, so an Altium binding lives on the project record and is
+    # passed in; a component placed from Stockroom's own DbLib already carries it as a parameter.
+    binding.resolve(out, "altium", stored=bindings)
+    return [(c["ref"], c["lib_id"], c["props"]) for c in out]
 
 
-def _components_for_sheet(sch_path) -> list:
+def _components_for_sheet(sch_path, bindings=None) -> list:
     """Dispatch a sheet to its EDA's reader by extension: .SchDoc reads through the
     Altium binary reader, everything else through the KiCad sexp reader (which
-    honestly returns [] for a non-schematic)."""
+    honestly returns [] for a non-schematic). `bindings` is the project record's stored
+    placement bindings for tools whose design files Stockroom cannot write."""
     if str(sch_path).lower().endswith(".schdoc"):
-        return _altium_bom_components(sch_path)
-    return _bom_components(sch_path)
+        return _altium_bom_components(sch_path, bindings)
+    return _bom_components(sch_path, bindings)
 
 
 # -- grouping (the app's MPN-primary logic + KiBoM value-normalization) --------
@@ -563,7 +575,7 @@ def combined_price_lookup(library_parts, enrich_lookup=None):
 
 def bom_from_project(sch_paths, lookup=None,
                      enrich_fields=("manufacturer", "datasheet", "description"),
-                     price_lookup=None, library_index=None) -> dict:
+                     price_lookup=None, library_index=None, bindings=None) -> dict:
     """A single BOM merged across EVERY sheet of a project (not just the root),
     grouping identical parts with summed quantity. Priced when `price_lookup` is given.
     When `library_index` is given, each component's blank identity fields are first filled
@@ -571,7 +583,7 @@ def bom_from_project(sch_paths, lookup=None,
     comps = []
     for p in (sch_paths or []):
         try:
-            comps.extend(_components_for_sheet(p))
+            comps.extend(_components_for_sheet(p, bindings))
         except Exception:  # noqa: BLE001 - an unreadable sheet drops out, never crashes the build
             continue
     # Units of one multi-unit component can live on DIFFERENT pages; references are
@@ -1219,7 +1231,7 @@ def _bom_state(line_count: int, priced: bool, summary: dict) -> str:
 
 
 def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
-                price_lookup=None, progress=None, library_parts=None) -> dict:
+                price_lookup=None, progress=None, library_parts=None, bindings=None) -> dict:
     """Build a grouped, optionally priced BOM for a registered project (M7c), combining the KiCad
     schematic with the Stockroom library (M7c library-combining).
 
@@ -1259,7 +1271,8 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
         return wrapped
 
     lookup = _priced_progress(combined) if priced else None
-    built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index)
+    built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index,
+                             bindings=bindings)
     rows = built["rows"]
 
     # Fill each line's still-blank wide-BOM columns (package / rohs / category) from its matching

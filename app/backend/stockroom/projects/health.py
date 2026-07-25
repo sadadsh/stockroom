@@ -391,6 +391,10 @@ def _collect_altium(root, sheet_paths) -> tuple[list[dict], list[dict], int]:
                 props["MPN"] = c["design_item_id"]
             comps.append({
                 "ref": ref,
+                # Altium's own stable per-placement id, the durable key a binding is stored
+                # against. Named `uuid` so a placement reads identically whichever EDA it came
+                # from and the binding layer needs no per-tool branch.
+                "uuid": c.get("unique_id", ""),
                 "value": props.get("Value", ""),
                 "footprint": props.get("Footprint", ""),
                 "lib_id": f"altium:{c['lib_ref']}" if c["lib_ref"] else "",

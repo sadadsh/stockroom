@@ -126,7 +126,8 @@ def _write_schdoc(path, *component_blocks):
     for block in component_blocks:
         comp_idx = idx
         stream += rec("RECORD=1", f"LIBREFERENCE={block['lib_ref']}",
-                      f"DESIGNITEMID={block.get('design_item_id', '')}", "OWNERPARTID=-1")
+                      f"DESIGNITEMID={block.get('design_item_id', '')}",
+                      f"UNIQUEID={block.get('unique_id', '')}", "OWNERPARTID=-1")
         idx += 1
         stream += rec("RECORD=34", f"OWNERINDEX={comp_idx}", "NAME=Designator",
                       f"TEXT={block['designator']}")
@@ -1075,3 +1076,83 @@ def test_reprice_bom_refolds_procurement_risk():
     out4 = reprice_bom(cached, boards=4, tax_rate=0)
     assert out4["lines"][0]["stock_risk"]["kind"] == "warn"
     assert out4["risks"]["insufficient_stock"] == 1
+
+
+# -- the BOM READS a durable binding instead of re-deriving a match ------------
+#
+# A bound placement is a decision the user already made. Re-guessing it every build is how the
+# BOM ended up attributing a wrong MPN, manufacturer, price and stock to generic passives.
+
+
+def _bound_library():
+    from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
+
+    def res(pid, mpn, value, package, metric):
+        return PartRecord(
+            id=pid, display_name=f"{value} {package}", category="Resistors",
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
+            )},
+            datasheet=Datasheet(source_url=f"https://yageo.com/{mpn}.pdf"),
+            specs={"Resistance": value, "Package": package},
+        )
+    return [res("r10k", "RC0402FR-0710KL", "10 kOhm", "0402", "1005Metric"),
+            res("r47k", "RC0402FR-0747KL", "47 kOhm", "0402", "1005Metric")]
+
+
+def test_a_bound_placement_is_enriched_from_its_bound_part_not_from_a_guess(tmp_path):
+    from stockroom.projects.binding import field_for
+    from stockroom.projects.bom import library_match_index
+
+    # Two library resistors carry the same stock Device:R symbol, so NOTHING about this placement
+    # identifies it: without the binding it stays unmatched and the BOM line has no MPN.
+    field = field_for("kicad")
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", fp="Resistor_SMD:R_0402_1005Metric",
+                        extra=f'(property "{field}" "r47k" (at 0 0 0))'))
+    index = library_match_index(_bound_library())
+    rows = bom_from_project([str(f)], library_index=index)["rows"]
+    assert [r["mpn"] for r in rows] == ["RC0402FR-0747KL"]
+    assert rows[0]["manufacturer"] == "Yageo"
+
+
+def test_an_unbound_generic_passive_still_gets_no_guessed_mpn(tmp_path):
+    from stockroom.projects.bom import library_match_index
+
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", fp="Resistor_SMD:R_0402_1005Metric"))
+    index = library_match_index(_bound_library())
+    rows = bom_from_project([str(f)], library_index=index)["rows"]
+    assert rows[0]["mpn"] == ""
+
+
+def test_an_altium_binding_reaches_the_bom_from_the_project_record(tmp_path):
+    # Stockroom cannot write a .SchDoc, so the record is the only place the binding can live, and
+    # the BOM has to read it from there.
+    from stockroom.projects.bom import library_match_index
+
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "R1", "lib_ref": "RES", "unique_id": "AAAAAAAA",
+         "params": {"Value": "10k"}, "footprint": "RESC1005X40"},
+    )
+    index = library_match_index(_bound_library())
+    plain = bom_from_project([str(sheet)], library_index=index)["rows"]
+    assert plain[0]["mpn"] == ""
+    bound = bom_from_project([str(sheet)], library_index=index,
+                             bindings={"AAAAAAAA": "r10k"})["rows"]
+    assert bound[0]["mpn"] == "RC0402FR-0710KL"
+
+
+def test_the_binding_field_never_leaks_into_a_bom_row(tmp_path):
+    """A Stockroom bookkeeping field is not part of the user's bill of materials."""
+    from stockroom.projects.binding import BOUND_PART, PLACEMENT_KEY, field_for
+
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", extra=f'(property "{field_for("kicad")}" "r10k" (at 0 0 0))'))
+    built = bom_from_project([str(f)])
+    for reserved in (field_for("kicad"), BOUND_PART, PLACEMENT_KEY):
+        assert reserved not in built["csv"]
+        assert all(reserved not in row for row in built["rows"])

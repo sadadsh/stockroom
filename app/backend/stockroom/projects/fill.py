@@ -35,6 +35,7 @@ from typing import Iterable
 
 from stockroom.component_value import parse_component_value, same_component_value
 from stockroom.kicad.schematic import Schematic
+from stockroom.projects import binding
 from stockroom.library_core import symbol_name_ref
 from stockroom.model.category import category_nickname
 from stockroom.sexp.document import SexpDocument, SexpNode
@@ -211,11 +212,20 @@ def match_component(comp: dict, index: list[dict]) -> dict:
     """Match one placed project component against the library index.
 
     Returns {"ref", "part": dict|None, "confidence"}:
-      - "symbol" - the component's lib_id symbol name equals the symbol name of a library part that
-                   IDENTIFIES itself by that name (see `symbol_is_identity`);
-      - "mpn"    - else its strict MPN equals a library part's MPN;
-      - "none"   - otherwise (part is None).
-    A symbol match wins over an MPN match (a placed instance's symbol identity is the strongest link).
+      - "binding"         - the placement carries a DURABLE binding to a library part (see
+                            projects/binding.py). A recorded human decision, so it outranks every
+                            inference below;
+      - "binding_missing" - it carries a binding naming a part that is no longer in the library
+                            (part is None). Deliberately NOT a fall-through to the guessing tiers:
+                            silently substituting whatever the guesser finds for a deleted part is
+                            the exact class of bug this matcher was fixed for. The surface reports
+                            it so the user can repair the binding;
+      - "symbol"          - the component's lib_id symbol name equals the symbol name of a library
+                            part that IDENTIFIES itself by that name (see `symbol_is_identity`);
+      - "mpn"             - else its strict MPN equals a library part's MPN;
+      - "none"            - otherwise (part is None).
+    A symbol match wins over an MPN match (a placed instance's symbol identity is the strongest
+    inferred link), and a binding wins over both.
 
     The symbol tier deliberately compares the BARE name across libraries, not the whole lib_id, so a
     component still placed from an older library is matched and its `(lib_id ...)` repointed at the
@@ -225,6 +235,12 @@ def match_component(comp: dict, index: list[dict]) -> dict:
     through `bom.library_enrich`, a wrong manufacturer, price and stock into the BOM).
     """
     ref = comp.get("ref", "")
+    bound = binding.bound_part_id(comp)
+    if bound:
+        for part in index:
+            if part["id"] == bound:
+                return {"ref": ref, "part": part, "confidence": "binding"}
+        return {"ref": ref, "part": None, "confidence": "binding_missing"}
     sym_name = symbol_name_ref(comp.get("lib_id") or "")
     if sym_name:
         for part in index:
@@ -504,11 +520,15 @@ def _is_power(ref: str, lib_id: str) -> bool:
 
 
 def read_components(doc: SexpDocument, *, include_power: bool = False) -> list[dict]:
-    """Every PLACED symbol instance in one parsed `.kicad_sch` as {ref, lib_id, value, footprint,
-    props}. A placed instance carries a `(lib_id ...)` child; the `(lib_symbols ...)` cache symbols do
-    not, so they are never returned (they must never be filled). Power/flag pseudo-symbols are excluded
-    unless `include_power` (annotation may still want to see them, though their `#` refs are not
-    numbered)."""
+    """Every PLACED symbol instance in one parsed `.kicad_sch` as {ref, uuid, lib_id, value,
+    footprint, props}. A placed instance carries a `(lib_id ...)` child; the `(lib_symbols ...)` cache
+    symbols do not, so they are never returned (they must never be filled). Power/flag pseudo-symbols
+    are excluded unless `include_power` (annotation may still want to see them, though their `#` refs
+    are not numbered).
+
+    `uuid` is the symbol node's own `(uuid ...)`, read from DIRECT children so a pin's uuid can never
+    be mistaken for the symbol's. It is the durable placement identity a binding is keyed by: KiCad
+    rewrites the reference on every annotate but never the uuid."""
     out: list[dict] = []
     for sym in doc.root.find_all("symbol"):
         lib_node = sym.find("lib_id")
@@ -523,7 +543,9 @@ def read_components(doc: SexpDocument, *, include_power: bool = False) -> list[d
         ref = props.get("Reference", "")
         if not include_power and _is_power(ref, lib_id):
             continue
-        out.append({"ref": ref, "lib_id": lib_id, "value": props.get("Value", ""),
+        uuid_node = sym.find("uuid")
+        uuid = uuid_node.children[1].value if uuid_node is not None and len(uuid_node.children) > 1 else ""
+        out.append({"ref": ref, "uuid": uuid, "lib_id": lib_id, "value": props.get("Value", ""),
                     "footprint": props.get("Footprint", ""), "props": props})
     return out
 
@@ -623,15 +645,18 @@ def annotate_document(doc: SexpDocument, used: set[str]) -> int:
 
 
 def fill_document(doc: SexpDocument, changes_by_ref: dict[str, dict[str, str]],
-                  lib_id_by_ref: dict[str, str] | None = None) -> int:
+                  lib_id_by_ref: dict[str, str] | None = None,
+                  hidden_props: frozenset[str] | set[str] = frozenset()) -> int:
     """Write property changes (and, optionally, a repointed `(lib_id ...)`) onto the placed instances
     of one parsed `.kicad_sch`, byte-preservingly.
 
     `changes_by_ref` = {ref: {prop: new_value}}. `lib_id_by_ref` = {ref: lib_id} repoints a placed
     instance's symbol link. Only an atom whose current value actually differs is rewritten (so a
     re-fill is a byte-identical no-op), and a property absent on the instance is inserted (via the
-    schematic seam). Returns the count of instances that changed. The `(lib_symbols ...)` cache is
-    never touched: `Schematic.instances` yields only nodes carrying a `(lib_id ...)`.
+    schematic seam). `hidden_props` names the properties that are INSERTED hidden: Stockroom's own
+    bookkeeping fields (the placement binding), which must not print on the user's sheet. Returns
+    the count of instances that changed. The `(lib_symbols ...)` cache is never touched:
+    `Schematic.instances` yields only nodes carrying a `(lib_id ...)`.
     """
     lib_id_by_ref = lib_id_by_ref or {}
     sch = Schematic(doc)
@@ -646,7 +671,7 @@ def fill_document(doc: SexpDocument, changes_by_ref: dict[str, dict[str, str]],
             did = True
         for prop, val in (props or {}).items():
             if (inst.get_property(prop) or "") != val:
-                inst.set_property(prop, val)
+                inst.set_property(prop, val, hidden=prop in hidden_props)
                 did = True
         if did:
             changed += 1

@@ -30,6 +30,11 @@ FIELD_MAP: list[tuple[str, str, bool]] = [
     ("Stock", "Stock", False),
     ("Lifecycle", "Lifecycle", False),
     ("Category", "Category", False),
+    # The durable placement binding. Altium copies a DbLib column onto the component it places,
+    # so a part placed from this library arrives in the schematic already bound to its Stockroom
+    # record with nothing recorded on Stockroom's side. The RECORD id, never the MPN: a binding
+    # must survive an MPN correction, and two records can legitimately share an MPN.
+    ("Stockroom ID", "Stockroom ID", False),
 ]
 
 

@@ -34,13 +34,23 @@ class SymbolInstance:
         prop = self._property_node(name)
         return prop.children[2].value if prop else None
 
-    def set_property(self, name: str, value: str) -> None:
+    def set_property(self, name: str, value: str, *, hidden: bool = False) -> None:
+        """Set (or insert) a property on this placed instance.
+
+        `hidden` applies only to an INSERT, and only to a field Stockroom itself owns (the
+        placement binding): a bookkeeping field must not print on the user's schematic sheet.
+        `(hide yes)` is a direct child of `(property ...)` in the KiCad file format this repo
+        targets, verified against a real KiCad V10 sheet, not nested inside `(effects ...)` as
+        it was in KiCad 6/7. An EXISTING property keeps whatever visibility the user gave it,
+        because visibility is their decision once the field is on the sheet.
+        """
         prop = self._property_node(name)
         if prop is not None:
             prop.children[2].set_value(value, quote=True)
         else:
+            hide = " (hide yes)" if hidden else ""
             self._node.insert_child_text(
-                f"(property {quote_kicad(name)} {quote_kicad(value)} (at 0 0 0))"
+                f"(property {quote_kicad(name)} {quote_kicad(value)} (at 0 0 0){hide})"
             )
 
     def set_lib_id(self, lib_id: str) -> None:

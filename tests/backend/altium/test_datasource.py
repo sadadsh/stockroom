@@ -67,7 +67,7 @@ def test_row_comment_is_mpn_for_actives_and_value_for_passives():
 def test_columns_carry_comment_after_description():
     i = ALTIUM_COLUMNS.index("Description")
     assert ALTIUM_COLUMNS[i + 1] == "Comment"
-    assert len(ALTIUM_COLUMNS) == 18
+    assert len(ALTIUM_COLUMNS) == 19  # 18 data columns + the durable "Stockroom ID" binding
 
 
 def test_emit_writes_parts_table_sorted(tmp_path):
@@ -97,3 +97,14 @@ def test_emit_overwrites_a_previous_larger_file(tmp_path):
     assert n == 1
     _, rows = _select_all(out)
     assert len(rows) == 1
+
+
+def test_the_row_carries_the_stockroom_part_id_so_a_placement_is_born_bound():
+    """The id is the RECORD id, not the MPN: a binding must survive an MPN correction, and two
+    records can legitimately share an MPN."""
+    from stockroom.projects.binding import field_for
+
+    rec = _part()
+    row = row_for(rec)
+    assert row[field_for("altium")] == rec.id
+    assert field_for("altium") in ALTIUM_COLUMNS

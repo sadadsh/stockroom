@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
-from stockroom.projects import fill
+from stockroom.projects import binding, fill
 from stockroom.sexp.document import SexpDocument
 from stockroom.verify.semdiff import assert_only_changed
 
@@ -645,3 +645,74 @@ def test_read_and_fill_roundtrip_on_real_sheet_is_byte_identical_when_noop():
     before = doc.serialize()
     fill.fill_document(doc, changes)
     assert doc.serialize() == before
+
+
+# -- the binding tier: a recorded assignment outranks every guess ---------------
+
+
+def test_read_components_carries_the_placements_uuid():
+    # The durable placement identity. Without it every binding would be keyed by a designator
+    # that annotation rewrites.
+    doc = SexpDocument.parse(_sheet())
+    comps = {c["ref"]: c for c in fill.read_components(doc)}
+    assert comps["U1"]["uuid"] == "u-u"
+
+
+def test_a_bound_placement_matches_its_bound_part_over_the_symbol_tier():
+    """The binding is the user's explicit decision, so it outranks the symbol tier's inference.
+    Proven with a placement whose symbol WOULD identify a different part."""
+    index = fill.library_match_records(_parts())
+    comp = {"ref": "U1", "uuid": "u-u", "lib_id": "SR-ICs:LM358",
+            "props": {"Reference": "U1", binding.BOUND_PART: "r10k"}}
+    m = fill.match_component(comp, index)
+    assert m["confidence"] == "binding"
+    assert m["part"]["id"] == "r10k"
+
+
+def test_a_bound_generic_passive_is_matched_where_nothing_else_could_match_it():
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "lib_id": "Device:R", "props": {"Reference": "R5", "Value": "47k"}}
+    assert fill.match_component(comp, index)["part"] is None
+    comp["props"][binding.BOUND_PART] = "r10k"
+    m = fill.match_component(comp, index)
+    assert m["confidence"] == "binding"
+    assert m["part"]["id"] == "r10k"
+
+
+def test_a_binding_naming_a_part_that_no_longer_exists_never_falls_back_to_a_GUESS():
+    """Silently substituting whatever the guesser finds for a deleted part is exactly the class
+    of bug this slice exists to remove. A dangling binding reports itself instead."""
+    index = fill.library_match_records(_parts())
+    comp = {"ref": "U1", "uuid": "u-u", "lib_id": "SR-ICs:LM358",
+            "props": {"Reference": "U1", binding.BOUND_PART: "deleted-part"}}
+    m = fill.match_component(comp, index)
+    assert m["part"] is None
+    assert m["confidence"] == "binding_missing"
+
+
+def test_a_bound_placement_offers_no_candidates_because_it_is_already_decided():
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "lib_id": "Device:R",
+            "props": {"Reference": "R5", "Value": "47k", binding.BOUND_PART: "r47k"}}
+    assert fill.candidate_matches(comp, index) == []
+
+
+def test_a_DANGLING_binding_still_offers_candidates_so_the_user_can_repair_it():
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "lib_id": "Device:R",
+            "props": {"Reference": "R5", "Value": "47k", binding.BOUND_PART: "deleted-part"}}
+    assert [c["part_id"] for c in fill.candidate_matches(comp, index)] == ["r47k"]
+
+
+def test_a_bound_placement_survives_a_reannotate_and_a_value_edit():
+    """The property the whole slice exists for, exercised end to end on the pure layer: the
+    binding still resolves to the same part after the reference is renumbered and the Value is
+    changed, both of which break every other tier."""
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "uuid": "u-r5", "lib_id": "Device:R",
+            "props": {"Reference": "R5", "Value": "10k", binding.BOUND_PART: "r10k"}}
+    assert fill.match_component(comp, index)["part"]["id"] == "r10k"
+    comp["ref"] = "R91"
+    comp["props"]["Reference"] = "R91"
+    comp["props"]["Value"] = "47k"
+    assert fill.match_component(comp, index)["part"]["id"] == "r10k"
