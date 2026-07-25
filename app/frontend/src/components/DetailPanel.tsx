@@ -1475,7 +1475,10 @@ function AlternatesDisclosure({
         {distinct.length} Sources
       </button>
       {open ? (
-        <ul className="mt-1 flex flex-col">
+        // Indented under a left rule, exactly like a family row's members: both are children of
+        // the row above them, and giving the same relationship two different treatments made the
+        // panel look like it had two unrelated kinds of nesting.
+        <ul className="mb-0.5 ml-[7px] flex flex-col border-l border-line pl-2.5">
           {distinct.map((entry, i) => {
             const value = String(entry.value ?? "");
             const inForce = same(value, current);
@@ -1490,9 +1493,21 @@ function AlternatesDisclosure({
                 <span className="flex-none text-2xs uppercase tracking-[0.04em] text-t3">
                   {label}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-right text-xs text-t2">{value}</span>
+                {/* The answer IN FORCE reads strongest. It was the quietest thing in the block
+                    while the alternative carried a bordered button, so the panel emphasised the
+                    value it was not using over the one it was. */}
+                <span
+                  className={
+                    "min-w-0 flex-1 truncate text-right text-xs " +
+                    (inForce ? "font-semibold text-t1" : "text-t2")
+                  }
+                >
+                  {value}
+                </span>
                 {inForce ? (
-                  <span className="flex-none text-2xs text-t3">In Use</span>
+                  <span className="flex-none text-2xs uppercase tracking-[0.04em] text-t3">
+                    In Use
+                  </span>
                 ) : onUse ? (
                   <button
                     type="button"
@@ -1640,11 +1655,11 @@ function SpecRowList({
         row.members ? (
           <SpecFamilyRow key={row.key} row={row} />
         ) : (
-          <div
-            key={row.key}
-            className="-mx-1.5 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]"
-          >
-            <div className="flex items-baseline justify-between gap-3">
+          <div key={row.key} className="-mx-1.5 px-1.5">
+            {/* The hover fill belongs to the row HEADER, not to the row plus everything it opened:
+                on the outer element it highlighted a four-line region in an otherwise flat property
+                grid, which read as a raised card rather than as a hovered row. */}
+            <div className="-mx-1.5 flex items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]">
               <dt
                 className="min-w-0 flex-1 truncate text-xs text-t2"
                 title={typeof row.label === "string" ? row.label : undefined}
