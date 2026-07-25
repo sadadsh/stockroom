@@ -24,6 +24,16 @@ function source(name: string): string {
   return hit[1];
 }
 
+/** Source with comments removed, for gates that must read what the code DOES rather than what it
+ *  says about itself. A gate that scans raw text cannot tell a class being USED from the same class
+ *  being CITED in a comment explaining why it was removed - and the comments here deliberately name
+ *  the exact classes that must never come back, so the citation would fail the gate forever. */
+function code(name: string): string {
+  return source(name)
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+}
+
 describe("eyebrow consistency", () => {
   it("DetailPanel declares no ad-hoc uppercase eyebrow class strings", () => {
     const offenders = source("DetailPanel.tsx")
@@ -76,6 +86,21 @@ describe("property-grid tracks", () => {
     const viewportTracks = [...sheet[1].matchAll(/(?<!@)\b(?:sm|md|lg|xl|2xl):grid-cols-/g)];
     expect(viewportTracks.map((m) => m[0])).toEqual([]);
     expect(sheet[1]).toMatch(/@[\w[\]]+:grid-cols-/);
+  });
+
+  it("places the sheet's COLUMNS on the same container query as its tracks", () => {
+    // Placement and track definition are ONE decision. Converting the tracks to container queries
+    // while leaving `lg:col-start-2 xl:col-start-auto` on a child desynchronised them instantly: at
+    // a 1384px viewport the `xl:` rule won and put the Sourcing column into the 288px FIRST track
+    // instead of under Specifications, both rows were stretched to an equal 328px, and the asset
+    // tiles were sliced in half. Half-converting is worse than not converting, because the two
+    // halves then disagree about how many columns exist.
+    const stray = [
+      ...code("DetailPanel.tsx").matchAll(
+        /(?<!@)\b(?:sm|md|lg|xl|2xl):(?:col-start-|col-span-|grid-rows-)/g,
+      ),
+    ];
+    expect(stray.map((m) => m[0])).toEqual([]);
   });
 
   it("keeps a spec row and its alternates on the SAME label track at EVERY breakpoint", () => {

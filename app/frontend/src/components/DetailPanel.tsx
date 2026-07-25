@@ -415,14 +415,27 @@ export function DetailPanel({
           // Each column keeps its own scroller, and `grid-rows` is only pinned in the 3-column
           // case - once columns wrap, the rows must size to content or a stacked column is
           // unreachable.
+          // STACKED vs THREE-COLUMN also changes WHERE the scrolling happens, and getting that
+          // wrong is what sliced the asset tiles in half: with the row track left implicit, the
+          // grid's default stretch split the height into two EQUAL 328px rows, so the specimen
+          // column was cut mid-tile and every block grew its own scrollbar. Stacked, the rows size
+          // to their content (`content-start`) and the SHEET is the single scroller; at three
+          // columns the row is pinned to the pane height again so each column scrolls in place.
           className={
             "mt-3 grid min-h-0 flex-1 gap-y-5 " +
+            "content-start overflow-y-auto " +
             "grid-cols-1 " +
             "@xl:grid-cols-[288px_minmax(16rem,1fr)] " +
-            "@4xl:grid-cols-[288px_minmax(16rem,1fr)_320px] @4xl:grid-rows-[minmax(0,1fr)]"
+            "@4xl:grid-cols-[288px_minmax(16rem,1fr)_320px] @4xl:grid-rows-[minmax(0,1fr)] " +
+            "@4xl:content-normal @4xl:overflow-hidden"
           }
         >
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
+          {/* COLUMN 1 - the specimen rail. Stacked (two columns), it SPANS BOTH ROWS: the right
+              track carries Specifications above Sourcing, and without the span this column would be
+              trapped in a half-height first row - measured, that clipped the symbol and footprint
+              tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
+              columns there is only one row, so the span is released. */}
+          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5 @xl:row-span-2 @4xl:row-span-1">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
               flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
               the column beside a tall specs pane, and still scrolls when content genuinely
@@ -536,11 +549,19 @@ export function DetailPanel({
           </div>
 
           {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note.
-              Below 1280 it drops onto a second row UNDER the Specifications column (col-start-2), so
-              it stays beside the specimen rail rather than under it; below 1024 it simply follows in
-              the single column. The left hairline is a COLUMN divider, so it only applies while this
-              really is a third column - kept at a wrap it would draw a rule across a stacked block. */}
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto lg:col-start-2 xl:col-start-auto xl:border-l xl:border-line xl:pl-5">
+              Once the sheet stacks it drops onto a second row UNDER the Specifications column
+              (col-start-2), so it lands in the WIDE track rather than in the 288px specimen rail;
+              in the single-column case it simply follows. The left hairline is a COLUMN divider, so
+              it applies only while this really is a third column - kept at a wrap it would draw a
+              rule across a stacked block.
+
+              THESE MUST BE CONTAINER VARIANTS, matching the sheet's own tracks. Left on `lg:`/`xl:`
+              they desynchronised from the grid the moment the grid became container-driven: at a
+              1384px viewport `xl:col-start-auto` won, so this column auto-placed into the 288px
+              FIRST track instead of under Specifications, both rows were forced to an equal 328px,
+              and the asset tiles were sliced in half with a scrollbar on every box. Placement and
+              track definition are one decision and have to move together. */}
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line @4xl:pl-5">
             <DetailSection
               title={<Text id="detail.sourcing-head">Sourcing</Text>}
               action={
@@ -1536,16 +1557,20 @@ function AssetTile({
 // sheet stacks into a ~250px column it ate two thirds of the row and forced "100 nF" to wrap
 // mid-value. It narrows to 7rem there, which is still enough for the labels and leaves the value
 // whole. Same widths on both levels, asserted by a gate.
-// The label track widens only when the sheet is at its full three-column width, so it keys off
-// the SAME container query as the sheet (@4xl), never the viewport. As `xl:` it widened the label
-// to 10.5rem inside a column that was only 205px wide, which is part of why a value had nowhere
-// left to go and wrapped one word per line.
+// The label track keys off the SHEET's container query, never the viewport. As `xl:` it widened the
+// label to 10.5rem inside a column only 205px wide, which is part of why a value had nowhere left to
+// go and wrapped one word per line.
+//
+// The widening threshold is @2xl (672px), NOT the three-column @4xl: once the sheet stacks, the
+// Specifications track is the WIDE one (537px measured at an 825px container), and holding the
+// narrow 7rem track there truncated real labels - "Operating Tempera...", "Moisture Sensitivit...".
+// A label clipped to an ellipsis has lost the same information a clipped value would.
 const SPEC_ROW_GRID =
   "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] " +
-  "@4xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
+  "@2xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
 const ALT_ROW_GRID =
   "grid grid-cols-[minmax(0,calc(7rem-7px))_minmax(0,1fr)_auto] " +
-  "@4xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
+  "@2xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
 
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
