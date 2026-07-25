@@ -485,11 +485,21 @@ describe("DetailPanel spec sheet + identity", () => {
     // the real spec shows (unit prettified for display)
     expect(screen.getByText("Resistance")).toBeInTheDocument();
     expect(screen.getByText("1.1 kΩ")).toBeInTheDocument();
-    // the distributor-page metadata never reaches the physical spec sheet
-    expect(screen.queryByText("Country of Origin")).not.toBeInTheDocument();
-    expect(screen.queryByText("Malaysia")).not.toBeInTheDocument();
-    expect(screen.queryByText("Reel")).not.toBeInTheDocument();
-    expect(screen.queryByText("US Tariff %")).not.toBeInTheDocument();
+    // The distributor-page metadata never reaches the PHYSICAL spec sheet. Scoped to the sheet
+    // rather than the whole document since Batch 3: the procurement facts (origin, tariff,
+    // packaging) are real vendor data the owner asked to stop discarding, so they now render in the
+    // commercial column's Trade And Compliance block instead of being dropped on the floor. The
+    // rule this test protects is "the spec sheet is physical parameters", and that still holds.
+    const sheet = document.querySelector('[data-dev-id="detail.specs"]')!;
+    for (const label of ["Country of Origin", "Malaysia", "Reel", "US Tariff %"]) {
+      expect(sheet.textContent).not.toContain(label);
+    }
+    // ...and they are NOT lost: the same values are in the trade block
+    const trade = document.querySelector('[data-dev-id="detail.trade"]')!;
+    expect(trade.textContent).toContain("Country of Origin");
+    expect(trade.textContent).toContain("Malaysia");
+    expect(trade.textContent).toContain("US Tariff %");
+    expect(trade.textContent).toContain("Reel");
   });
 
   it("headlines an opaque part (IC) by its display name, not its bare MPN, and reads the MPN once", () => {
@@ -688,5 +698,114 @@ describe("Altium 3D embed (punch 16)", () => {
     await openReadiness({ passive: true, eda: ALTIUM_READY });
     expect(byDevId("detail.embed3d")).toBeNull();
     expect(byDevId("detail.embed3d-done")).toBeNull();
+  });
+});
+
+// -- Alternates (punch 9 + punch 2): every value a source offered and lost with is on the record
+// now, so the panel has to SHOW it and let the user swap which one is in force. Before this the
+// loser was never persisted at all, so there was nothing to show.
+describe("DetailPanel alternates", () => {
+  const withTwoDescriptions = () =>
+    detail({
+      description: "3A buck",
+      alternates: {
+        description: [
+          { value: "3A buck", source: "mouser", confidence: "high" },
+          { value: "Step-Down Regulator, 3 A", source: "digikey", confidence: "high" },
+        ],
+      },
+    });
+
+  it("says how many answers a field has, without spending space until asked", async () => {
+    wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
+    expect(screen.getByRole("button", { name: /2 Sources/i })).toBeTruthy();
+    // the other distributor's wording stays out of the way until the disclosure is opened
+    expect(screen.queryByText("Step-Down Regulator, 3 A")).toBeNull();
+  });
+
+  it("shows each answer with the distributor that gave it once opened", async () => {
+    const user = userEvent.setup();
+    wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    expect(screen.getByText("Step-Down Regulator, 3 A")).toBeTruthy();
+    expect(screen.getByText("DigiKey")).toBeTruthy();
+    expect(screen.getAllByText("Mouser").length).toBeGreaterThan(0);
+  });
+
+  it("swaps the stored description to the answer the user picks", async () => {
+    const user = userEvent.setup();
+    const onEditField = vi.fn();
+    wrap(
+      <DetailPanel detail={withTwoDescriptions()} {...BASE} onEditField={onEditField} />,
+    );
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    await user.click(screen.getByRole("button", { name: /Use DigiKey/i }));
+    expect(onEditField).toHaveBeenCalledWith("description", "Step-Down Regulator, 3 A");
+  });
+
+  it("offers no swap for the answer already in force", async () => {
+    const user = userEvent.setup();
+    wrap(
+      <DetailPanel detail={withTwoDescriptions()} {...BASE} onEditField={vi.fn()} />,
+    );
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    expect(screen.queryByRole("button", { name: /Use Mouser/i })).toBeNull();
+  });
+
+  it("shows nothing at all for a part whose sources agreed", () => {
+    wrap(<DetailPanel detail={detail({ description: "3A buck" })} {...BASE} />);
+    expect(screen.queryByRole("button", { name: /Sources/i })).toBeNull();
+  });
+
+  it("swaps a SPEC value through the specs seam, not the field seam", async () => {
+    const user = userEvent.setup();
+    const onUseSpecValue = vi.fn();
+    wrap(
+      <DetailPanel
+        detail={detail({
+          specs: { Tolerance: "1%" },
+          alternates: {
+            Tolerance: [
+              { value: "1%", source: "mouser", confidence: "high" },
+              { value: "5%", source: "digikey", confidence: "high" },
+            ],
+          },
+        })}
+        {...BASE}
+        onUseSpecValue={onUseSpecValue}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    await user.click(screen.getByRole("button", { name: /Use DigiKey/i }));
+    expect(onUseSpecValue).toHaveBeenCalledWith("Tolerance", "5%", "digikey");
+  });
+});
+
+describe("DetailPanel alternates comparison", () => {
+  it("does not offer to use the value it is already using, even when presentation rewrote it", async () => {
+    // Tolerance "1%" RENDERS as "±1%" (applySign). Comparing the alternate against the presented
+    // string made the in-force value look like a different answer, so the panel offered "Use
+    // Mouser" for the value Mouser had already won with. Caught in a real screenshot, not by a
+    // passing test - the description case that the other tests cover is never prettified.
+    const user = userEvent.setup();
+    wrap(
+      <DetailPanel
+        detail={detail({
+          specs: { Tolerance: "1%" },
+          alternates: {
+            Tolerance: [
+              { value: "1%", source: "mouser", confidence: "high" },
+              { value: "2%", source: "digikey", confidence: "high" },
+            ],
+          },
+        })}
+        {...BASE}
+        onUseSpecValue={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("±1%")).toBeTruthy();  // the prettifier really did run
+    await user.click(screen.getByRole("button", { name: /2 Sources/i }));
+    expect(screen.queryByRole("button", { name: /Use Mouser/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Use DigiKey/i })).toBeTruthy();
   });
 });

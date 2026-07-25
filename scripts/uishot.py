@@ -98,6 +98,63 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
         "specs": {"Capacitance": "100 nF", "Package": "0402"},
     }, indent=2), encoding="utf-8")
 
+    # A part carrying the data Batch 3 stopped discarding, so the surfaces that show it can actually
+    # be SEEN. Nothing in a real library has any of this yet (no part has been re-enriched since),
+    # and a screenshot of a surface with no data proves nothing.
+    #   - two distributors' descriptions and a spec they disagree about -> the alternates disclosure
+    #   - six HTS codes -> the repeated-family row that collapses them
+    #   - DigiKey stored FIRST with a full ladder, Mouser second -> proves the Mouser-first reorder
+    #     is doing the work rather than the record order happening to be right
+    #   - a SIX-tier ladder -> five bulk tiers is ODD, which is the case that used to leave a hole
+    (parts / "vendordata.json").write_text(json.dumps({
+        "id": "vendordata", "display_name": "AAA Vendor Data Probe",
+        "category": "ICs",
+        "description": "3A step-down converter, WSON-8",
+        "mpn": "TPS62130RGTR", "manufacturer": "Texas Instruments",
+        "datasheet": {"file": "", "source_url": "https://ti.com/lit/ds/symlink/tps62130.pdf",
+                      "fetched_at": ""},
+        "purchase": [
+            {"vendor": "DigiKey", "url": "https://www.digikey.com/en/products/detail/x",
+             "part_number": "296-35116-1-ND",
+             "price_breaks": [{"qty": q, "price": p} for q, p in
+                              ((1, 2.41), (10, 2.15), (25, 1.98), (100, 1.72),
+                               (250, 1.55), (500, 1.41))],
+             "stock": 4821, "currency": "USD", "fetched_at": ""},
+            {"vendor": "Mouser", "url": "https://www.mouser.com/ProductDetail/y",
+             "part_number": "595-TPS62130RGTR",
+             "price_breaks": [{"qty": q, "price": p} for q, p in
+                              ((1, 2.38), (10, 2.11), (100, 1.69), (1000, 1.32))],
+             "stock": 12750, "currency": "USD", "fetched_at": ""},
+        ],
+        "specs": {
+            "Package": "WSON-8", "Product Category": "Buck Converters",
+            "Output Current": "3 A", "Tolerance": "1%",
+            "Lifecycle": "Active", "Lead Time": "16 Weeks",
+            "Country of Origin": "Japan", "US Tariff %": 0.0,
+            "ECCN": "3A991",
+            "HTS Code (US)": "8542.39.0001", "HTS Code (CN)": "8542330000",
+            "HTS Code (CA)": "8542.39.00.01", "HTS Code (JP)": "854239",
+            "HTS Code (MX)": "85423901", "HTS Code (EU TARIC)": "8542390000",
+        },
+        "enrichment": {
+            "Product Category": {"source": "mouser", "confidence": "high"},
+            "Lead Time": {"source": "digikey", "confidence": "high"},
+            "US Tariff %": {"source": "mouser", "confidence": "high"},
+        },
+        "alternates": {
+            "description": [
+                {"value": "3A step-down converter, WSON-8", "source": "mouser",
+                 "confidence": "high"},
+                {"value": "Buck Switching Regulator IC Positive Adjustable 3A",
+                 "source": "digikey", "confidence": "high"},
+            ],
+            "Tolerance": [
+                {"value": "1%", "source": "mouser", "confidence": "high"},
+                {"value": "2%", "source": "digikey", "confidence": "high"},
+            ],
+        },
+    }, indent=2), encoding="utf-8")
+
     # The in-repo library is backed by the ENCLOSING app repo, so a copy in a temp directory has no
     # git at all and registering a project (which commits the project record) fails. Give the seeded
     # library its own repo so every library-side mutation behaves as it does for real.
@@ -238,11 +295,49 @@ def _goto_surface(page, surface: str) -> bool:
         section.first.scroll_into_view_if_needed()
         page.wait_for_timeout(800)
         return True
-    if surface == "components":
-        rows = page.locator('[data-dev-id^="list.row"]')
-        if rows.count():
+    if surface in {"components", "part-vendor-data"}:
+        # Navigate EXPLICITLY, never assume the app is still where it booted: when the run seeds a
+        # project it registers it through the real Projects surface, so by the time a surface driver
+        # runs the app is sitting on Projects. Without this, `--surface components --seed` produced a
+        # screenshot of the PROJECTS page and reported success.
+        nav = page.locator('[data-dev-id="rail.nav-components"]')
+        if not nav.count():
+            return False
+        nav.first.click()
+        page.wait_for_timeout(1500)
+        # The row id is `components.row`. This used to look for `list.row`, which matches NOTHING, so
+        # the click never happened and the driver returned True regardless - a selector that cannot
+        # fail, reporting a shot it never took. Now an empty list is a failure, loudly.
+        rows = page.locator('[data-dev-id="components.row"]')
+        if not rows.count():
+            print("  components: the parts list is empty, so a shot would prove nothing")
+            return False
+        if surface == "components":
             rows.first.click()
             page.wait_for_timeout(1200)
+            return True
+        # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
+        # family, and it is named to sort first. Both disclosures are OPENED, because what is behind
+        # them is the entire point of the shot.
+        probe = rows.filter(has_text="AAA Vendor Data Probe")
+        if not probe.count():
+            print("  part-vendor-data: the seeded probe part is not in the list")
+            return False
+        probe.first.click()
+        page.wait_for_timeout(1200)
+        missing = []
+        for dev_id in ("detail.spec-family", "detail.alternates"):
+            control = page.locator(f'[data-dev-id="{dev_id}"] button').first
+            if not control.count():
+                missing.append(dev_id)
+                continue
+            control.click()
+            page.wait_for_timeout(400)
+        if missing:
+            # Name WHICH control is absent: "1/2 present" sends the next reader hunting, and the
+            # whole reason this surface exists is to make the new controls observable.
+            print(f"  part-vendor-data: these controls are not on the page: {', '.join(missing)}")
+            return False
         return True
     if surface == "search":
         page.keyboard.press("Control+k")
@@ -311,8 +406,12 @@ def run(args) -> int:
     # workspace hygiene rules and committed them to the real repository. A screenshot tool must not
     # be able to mutate the thing it is photographing. The seed COPIES the real library, so the shot
     # still shows real content; only the writes are thrown away.
+    # `part-vendor-data` implies the seed for the same reason a project surface does: the data it
+    # exists to show (alternates, an HTS family) is on the seeded probe part and nowhere in a real
+    # library, so without the seed the shot would silently photograph an ordinary part.
     clicking = bool(args.click)
-    seed = args.seed or clicking or any(s.startswith("project-") for s in surfaces)
+    seed = (args.seed or clicking
+            or any(s.startswith("project-") or s == "part-vendor-data" for s in surfaces))
     if clicking and not args.seed:
         print("  --click implies --seed: clicks can mutate, and the default library is the real one")
     scratch: tempfile.TemporaryDirectory | None = None
@@ -410,7 +509,7 @@ def main() -> int:
     )
     ap.add_argument("--surface", default="components",
                     choices=["components", "search", "projects", "project-health", "project-hygiene",
-                             "project-library-pin", "settings", "all"])
+                             "project-library-pin", "part-vendor-data", "settings", "all"])
     ap.add_argument("--seed", action="store_true",
                     help="seed a throwaway library + KiCad project (implied by a project-* surface)")
     ap.add_argument("--themes", default="dark,light", help="comma list: dark,light")

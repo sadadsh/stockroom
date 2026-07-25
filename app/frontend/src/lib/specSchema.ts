@@ -41,14 +41,25 @@ export type SpecGroupName =
   | "Electrical"
   | "Physical"
   | "Ratings & Compliance"
+  | "Trade & Compliance"
   | "Other";
 
 export const SPEC_GROUP_ORDER: readonly SpecGroupName[] = [
   "Electrical",
   "Physical",
   "Ratings & Compliance",
+  "Trade & Compliance",
   "Other",
 ];
+
+// The procurement group, rendered by the SOURCING tab rather than the Specs sheet.
+//
+// These keys are real vendor data the owner asked to stop discarding (origin, the page's own
+// tariff rate, export classification, order quantities) but they are NOT physical parameters, and
+// `derive.isReferenceOnlySpecKey` deliberately keeps them off the spec sheet so it does not read
+// as a distributor page dump. Both rules hold at once by giving them a group of their own: a buyer
+// looks for an import classification next to the prices, not next to the propagation delay.
+export const TRADE_GROUP: SpecGroupName = "Trade & Compliance";
 
 // The fallback group + a large default order so unknown keys sort AFTER every known
 // key while keeping their own insertion order among themselves (a stable sort).
@@ -86,6 +97,10 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "voltage rating dc", group: "Electrical", label: "Voltage Rating", order: 31 },
   { match: "current", group: "Electrical", label: "Current", order: 40 },
   { match: "current rating", group: "Electrical", label: "Current Rating", order: 41 },
+  { match: "output current", group: "Electrical", label: "Output Current", order: 41 },
+  { match: "input current", group: "Electrical", label: "Input Current", order: 42 },
+  { match: "output voltage", group: "Electrical", label: "Output Voltage", order: 33 },
+  { match: "input voltage", group: "Electrical", label: "Input Voltage", order: 34 },
   { match: "power", group: "Electrical", label: "Power", unit: "W", order: 50 },
   { match: "power rating", group: "Electrical", label: "Power Rating", unit: "W", order: 50 },
   { match: "frequency", group: "Electrical", label: "Frequency", order: 60 },
@@ -157,8 +172,82 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "flammability rating", group: "Ratings & Compliance", label: "Flammability Rating", order: 45 },
   { match: "ul rating", group: "Ratings & Compliance", label: "UL Rating", order: 46 },
   { match: "aec q200", group: "Ratings & Compliance", label: "AEC-Q200", order: 51 },
-  { match: "eccn", group: "Ratings & Compliance", label: "ECCN", order: 60 },
+
+  // --- Trade & Compliance (procurement, not physics; see TRADE_GROUP) ----------
+  { match: "eccn", group: TRADE_GROUP, label: "ECCN", order: 10 },
+  { match: "country of origin", group: TRADE_GROUP, label: "Country of Origin", order: 20 },
+  { match: "assembly country of origin", group: TRADE_GROUP, label: "Assembly Country", order: 21 },
+  { match: "country of diffusion", group: TRADE_GROUP, label: "Country of Diffusion", order: 22 },
+  // unit "%" so a bare 0.0 reads as "0%": the value is the page's OWN measured rate, and 0.0 means
+  // "checked, no tariff" - printed as a bare "0" it is indistinguishable from an empty cell.
+  { match: "us tariff", group: TRADE_GROUP, label: "US Tariff %", unit: "%", order: 30 },
+  { match: "minimum order quantity", group: TRADE_GROUP, label: "Minimum Order Quantity", order: 40 },
+  { match: "order multiple", group: TRADE_GROUP, label: "Order Multiple", order: 41 },
+  { match: "maximum order quantity", group: TRADE_GROUP, label: "Maximum Order Quantity", order: 42 },
+  { match: "standard package", group: TRADE_GROUP, label: "Standard Package", order: 43 },
+  { match: "packaging", group: TRADE_GROUP, label: "Packaging", order: 44 },
+  { match: "factory pack quantity", group: TRADE_GROUP, label: "Factory Pack Quantity", order: 45 },
+  { match: "standard pack quantity", group: TRADE_GROUP, label: "Standard Pack Quantity", order: 46 },
+  { match: "unit weight kg", group: TRADE_GROUP, label: "Unit Weight", unit: "kg", order: 50 },
 ];
+
+// A FAMILY of spec keys that are the same fact stated once per jurisdiction, variant or
+// channel, and therefore belong in ONE row with a member each rather than N rows of their own.
+//
+// This needs a pattern rather than N registry rows because the key space is open: Mouser emits
+// six fixed HTS keys, but LCSC emits `HTS Code (<country name>)` for whatever countries a part
+// has codes for, so a hand-listed set would silently miss the seventh country and go back to
+// shouting a wall of near-identical rows over the specs that matter.
+//
+// A family is NOT a disagreement. Two sources contradicting each other is a different thing
+// entirely and lives in the part's `alternates`; this is one source stating many related facts.
+export interface SpecFamily {
+  // The family's own display label - the collapsed row's name.
+  family: string;
+  // Matched against the NORMALIZED key (see normalizeSpecKey). Capture group 1, when present,
+  // names the member ("us", "eu taric", "vietnam"); a match with no capture is the unqualified
+  // form of the same fact and becomes a member with no name of its own.
+  match: RegExp;
+  group: SpecGroupName;
+  order: number;
+}
+
+export const SPEC_FAMILIES: readonly SpecFamily[] = [
+  {
+    family: "HTS Code",
+    // "HTS Code (US)", "HTS Code (EU TARIC)", LCSC's "HTS Code (Vietnam)", or a bare "HTS Code".
+    match: /^hts code(?:\s+(.+))?$/,
+    group: TRADE_GROUP,
+    // just below ECCN: both are export classification, and ECCN is the single-value one.
+    order: 11,
+  },
+];
+
+// The member's own label, recovered from the raw key so it reads as the source wrote it
+// ("US", "EU TARIC", "Vietnam") rather than as the normalized lowercase form. Falls back to the
+// family name for the unqualified key, which has no member name of its own.
+function memberLabel(rawKey: string, family: SpecFamily, captured: string | undefined): string {
+  if (!captured) return family.family;
+  // find the captured run inside the raw key, case-insensitively, so the source's own casing and
+  // punctuation survive: normalizeSpecKey stripped the parentheses to match, and reading the
+  // label back off the raw key avoids having to reconstruct them.
+  const stripped = rawKey.trim().replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
+  const at = stripped.toLowerCase().lastIndexOf(captured.toLowerCase());
+  return at >= 0 ? stripped.slice(at, at + captured.length).trim() : captured;
+}
+
+/** The family a raw spec key belongs to, with the member's label, or null when it is an
+ * ordinary standalone spec. */
+export function resolveFamily(
+  rawKey: string,
+): { family: SpecFamily; member: string } | null {
+  const norm = normalizeSpecKey(rawKey);
+  for (const family of SPEC_FAMILIES) {
+    const m = family.match.exec(norm);
+    if (m) return { family, member: memberLabel(rawKey, family, m[1]) };
+  }
+  return null;
+}
 
 // A resolved spec: raw key + where the registry (or the fallback) places it.
 interface ResolvedSpec {
@@ -175,7 +264,16 @@ export interface SpecRow {
   key: string;
   label: string;
   value: string;
+  // The value as STORED, before prettifying / unit-splitting / the ± prefix. A consumer comparing
+  // this row against another source's answer must compare stored-to-stored: "1%" renders as "±1%",
+  // so comparing the presented string made the value already in force look like a different
+  // answer, and the panel offered to "use" what it was already using.
+  raw: string;
   unit?: string;
+  // Present only on a FAMILY row (see SPEC_FAMILIES): the individual per-jurisdiction values,
+  // sorted by member label. The family row itself carries no value of its own - `value` is the
+  // member count, so the collapsed row still says how much is behind it.
+  members?: SpecRow[];
 }
 
 export interface SpecGroup {
@@ -340,10 +438,26 @@ export function groupSpecs(
 ): SpecGroup[] {
   // Bucket resolved rows by group, preserving insertion order within each bucket.
   const buckets = new Map<SpecGroupName, Array<{ row: SpecRow; order: number; seq: number }>>();
+  // One accumulator per family encountered, so N per-jurisdiction keys become one row.
+  const families = new Map<string, { family: SpecFamily; rows: SpecRow[]; seq: number }>();
   let seq = 0;
   for (const [key, value] of Object.entries(specs)) {
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
     if (!isPresentableValue(value)) continue;
+    const inFamily = resolveFamily(key);
+    if (inFamily) {
+      const bucket = families.get(inFamily.family.family) ?? {
+        family: inFamily.family, rows: [], seq: seq++,
+      };
+      bucket.rows.push({
+        key,
+        label: inFamily.member,
+        value: prettifyValue(coerceValue(value)),
+        raw: coerceValue(value),
+      });
+      families.set(inFamily.family.family, bucket);
+      continue;
+    }
     const resolved = resolveSpec(key, category);
     const split = splitValueUnit(coerceValue(value));
     const prettyUnit = split.unit ? prettifyValue(split.unit) : undefined;
@@ -361,11 +475,34 @@ export function groupSpecs(
       key: resolved.key,
       label: resolved.label,
       value: dispValue,
+      raw: coerceValue(value),
       unit: dispUnit,
     };
     const list = buckets.get(resolved.group) ?? [];
     list.push({ row, order: resolved.order, seq: seq++ });
     buckets.set(resolved.group, list);
+  }
+
+  // Fold each family into a single row. Members sort by their own label so the list reads the
+  // same on every part regardless of the order the distributor's payload happened to arrive in.
+  for (const { family, rows, seq: familySeq } of families.values()) {
+    rows.sort((a, b) => a.label.localeCompare(b.label));
+    const list = buckets.get(family.group) ?? [];
+    list.push({
+      row: {
+        key: family.family,
+        label: family.family,
+        raw: "",  // a family row is a count of its members, not a value any source offered
+        // The collapsed row states HOW MANY facts are behind it rather than picking one
+        // jurisdiction to stand for the rest - which region is "the" region depends on who is
+        // reading, and the panel must not decide that for them.
+        value: String(rows.length),
+        members: rows,
+      },
+      order: family.order,
+      seq: familySeq,
+    });
+    buckets.set(family.group, list);
   }
 
   const groups: SpecGroup[] = [];

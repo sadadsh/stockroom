@@ -173,6 +173,20 @@ export interface PartDetail {
   // Persisted canonical spec data (M6i). A free-form value bag keyed by spec name;
   // specs.pinout is a list of {pin, name}. Per-key provenance lives in `enrichment`.
   specs: Record<string, unknown>;
+  // Every value a source offered for a field and did NOT win with, keyed exactly like
+  // `enrichment` (a canonical field name in lower_snake, or a spec label). The value in force is
+  // repeated as the first entry, so a reader sees which answer is stored beside the ones set
+  // aside. Optional because the backend omits the key entirely for a part whose sources never
+  // disagreed - most parts carry no alternates at all.
+  alternates?: Record<string, SourcedAlternate[]>;
+}
+
+// One value a source offered for a field. `value` is unknown, not string: a tariff rate is a
+// number whose 0.0 means "confirmed no tariff", not a missing value.
+export interface SourcedAlternate {
+  value: unknown;
+  source: string;
+  confidence: string;
 }
 
 // POST /api/library/passive/preview -> either a decoded, not-yet-committed passive
@@ -315,6 +329,10 @@ export interface EnrichmentResult {
   // origins (merge-only-identical, owner 2026-07-24). Optional so fixtures/older
   // payloads without it still type-check.
   spec_conflicts?: Record<string, SourcedField[]>;
+  // The same, for the single-valued canonical fields: both descriptions, both packages, both
+  // datasheet links. Keyed by the field name in lower_snake ("description"). Optional for the
+  // same reason.
+  field_conflicts?: Record<string, SourcedField[]>;
   // The backend always emits this; optional so fixtures/older payloads without it
   // still type-check. null (or absent) means the part is not a file-less passive.
   add_plan?: PassiveAddPlan | null;

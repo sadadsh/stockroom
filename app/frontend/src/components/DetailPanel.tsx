@@ -14,10 +14,22 @@
  * honestly when a field is absent, and no data is fabricated.
  */
 import { useEffect, useState, type HTMLAttributes, type ReactNode } from "react";
-import type { PartDetail, PurchaseRef, SourcedField } from "../api/types";
+import type {
+  PartDetail,
+  PurchaseRef,
+  SourcedAlternate,
+  SourcedField,
+} from "../api/types";
 import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
 import { useCapture } from "../lib/capture";
-import { groupSpecs, type SpecGroup } from "../lib/specSchema";
+import {
+  groupSpecs,
+  TRADE_GROUP,
+  type SpecGroup,
+  type SpecRow,
+} from "../lib/specSchema";
+import { ladderRows, orderPurchases } from "../lib/sourcingOrder";
+import { distributorLabel } from "../lib/sourced";
 import {
   assetReadiness,
   assetsFor,
@@ -123,6 +135,10 @@ interface Props {
   // missing-asset tiles offer no Attach affordance.
   onAttachSymbol?: (lib: string, name: string) => void;
   onAttachFootprint?: (lib: string, name: string) => void;
+  // Putting a DIFFERENT source's answer in force for a spec. It routes through the specs seam
+  // (which carries provenance per key), not onEditField, because a spec is not a record field
+  // and the swap must record WHICH distributor the new value came from.
+  onUseSpecValue?: (key: string, value: string, source: string) => void;
   busy?: boolean;
 }
 
@@ -138,6 +154,7 @@ export function DetailPanel({
   onApplyPinout,
   onAttachSymbol,
   onAttachFootprint,
+  onUseSpecValue,
   busy = false,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -274,12 +291,19 @@ export function DetailPanel({
   // Grouped, extensible spec sheet (Electrical / Physical / Ratings / Other) from lib/specSchema,
   // with catalog metadata (manufacturer, country, packaging, ...) dropped so the sheet is the
   // physical parameters, not a distributor page. Groups emptied by the filter fall away.
-  const specGroups = groupSpecs(detail.category, detail.specs)
+  const allSpecGroups = groupSpecs(detail.category, detail.specs);
+  const specGroups = allSpecGroups
+    .filter((group) => group.title !== TRADE_GROUP)
     .map((group) => ({
       ...group,
       rows: group.rows.filter((row) => !isReferenceOnlySpecKey(row.key)),
     }))
     .filter((group) => group.rows.length > 0);
+  // The procurement facts (origin, the page's own tariff rate, export classification, order
+  // quantities) go to SOURCING, not here. They are real vendor data the owner asked to stop
+  // losing, but they are not physical parameters - and this is the one place the reference-only
+  // filter must NOT run, because reference data is exactly what the block is for.
+  const tradeGroup = allSpecGroups.find((group) => group.title === TRADE_GROUP) ?? null;
   // The persisted pinout (M6i) reads from the record's specs, its provenance from
   // the enrichment map. Shown when present, in both read-only and editable modes.
   const pinout = parsePinout(detail.specs);
@@ -465,7 +489,11 @@ export function DetailPanel({
           {/* COLUMN 2 - the specifications, the technical heart, in one clean single column. */}
           <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-5">
             <DetailSection title={<Text id="detail.specifications">Specifications</Text>}>
-              <SpecificationsSection groups={specGroups} />
+              <SpecificationsSection
+                groups={specGroups}
+                alternates={detail.alternates ?? {}}
+                onUseSpecValue={onUseSpecValue}
+              />
             </DetailSection>
           </div>
 
@@ -495,11 +523,19 @@ export function DetailPanel({
               }
             >
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+              {tradeGroup ? (
+                <TradeCompliance
+                  group={tradeGroup}
+                  alternates={detail.alternates ?? {}}
+                  onUseSpecValue={onUseSpecValue}
+                />
+              ) : null}
             </DetailSection>
             <RailReference
               datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
               datasheetHref={detail.datasheet?.source_url || undefined}
               description={detail.description}
+              descriptionAlternates={detail.alternates?.description ?? []}
               onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
               onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
               busy={busy}
@@ -1166,6 +1202,7 @@ function RailReference({
   datasheetUrl,
   datasheetHref,
   description,
+  descriptionAlternates,
   onEditDatasheet,
   onEditDescription,
   busy,
@@ -1173,6 +1210,7 @@ function RailReference({
   datasheetUrl: string;
   datasheetHref?: string;
   description: string;
+  descriptionAlternates: SourcedAlternate[];
   onEditDatasheet?: (value: string) => void;
   onEditDescription?: (value: string) => void;
   busy?: boolean;
@@ -1204,6 +1242,13 @@ function RailReference({
         ) : (
           <span className="text-xs italic text-t3">None</span>
         )}
+        {/* Two distributors describing the same part differently is normal and useful; the one
+            in force stays above, and the other is a click away with its vendor named. */}
+        <AlternatesDisclosure
+          entries={descriptionAlternates}
+          current={description}
+          onUse={onEditDescription ? (value) => onEditDescription(value) : undefined}
+        />
       </DetailSection>
     </div>
   );
@@ -1397,7 +1442,152 @@ function AssetTile({
 // two-column definition list - the key in quiet sans on the left, the value in the mono readout
 // face on the right - so a long value wraps in place. The tab owns the scroll, so however many
 // specs a part carries, they never grow the page.
-function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
+// Where two sources disagreed, the panel says so and lets the reader put the other answer in
+// force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
+// because most fields have one answer and a wall of vendor attributions would drown the data.
+//
+// Deliberately the SAME expand-in-place shape as SpecFamilyRow, so the panel has one language
+// for "there is more behind this" instead of a popover here and a disclosure there.
+function AlternatesDisclosure({
+  entries,
+  current,
+  onUse,
+}: {
+  entries: SourcedAlternate[];
+  current: string;
+  onUse?: (value: string, source: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // Only worth showing when a source actually offered something ELSE; the value in force is
+  // repeated as the first entry, so a one-entry list is not a disagreement.
+  const distinct = entries.filter((e) => String(e.value ?? "").trim() !== "");
+  if (distinct.length < 2) return null;
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  return (
+    <div data-dev-id="detail.alternates" className="mt-0.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-2xs text-t3 transition-colors hover:text-t1"
+      >
+        <Chevron open={open} />
+        {distinct.length} Sources
+      </button>
+      {open ? (
+        <ul className="mt-1 flex flex-col">
+          {distinct.map((entry, i) => {
+            const value = String(entry.value ?? "");
+            const inForce = same(value, current);
+            const label = entry.source ? distributorLabel(entry.source) : "On Record";
+            return (
+              <li
+                key={`${entry.source}-${i}`}
+                className="flex items-baseline justify-between gap-2 py-[2px]"
+              >
+                {/* one line per answer: who said it, what they said, and the action. The value used
+                    to sit on its own second line, which orphaned it from its source label. */}
+                <span className="flex-none text-2xs uppercase tracking-[0.04em] text-t3">
+                  {label}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-right text-xs text-t2">{value}</span>
+                {inForce ? (
+                  <span className="flex-none text-2xs text-t3">In Use</span>
+                ) : onUse ? (
+                  <button
+                    type="button"
+                    onClick={() => onUse(value, entry.source)}
+                    className="flex-none rounded-control border border-line px-1 py-[1px] text-2xs font-semibold text-t2 transition-colors hover:border-acc hover:text-t1"
+                  >
+                    Use {label}
+                  </button>
+                ) : (
+                  <span className="flex-none text-2xs text-t3">&nbsp;</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+// The one disclosure marker the panel uses. A rotating chevron rather than a `+`/`-`: this app has
+// a real icon system, and an ASCII plus in a dense property grid reads as a minus sign or a stray
+// character, not as something you can open.
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className={
+        "h-2.5 w-2.5 flex-none transition-transform " + (open ? "rotate-90" : "")
+      }
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+// One fact stated once per jurisdiction (six HTS codes, one per region) collapses to a single
+// row that says how many it holds, and opens IN PLACE to show each one (punch 3). It expands
+// rather than opening a popover on purpose: these are not competing answers to compare, they are
+// facets of one fact, and a reader wants them listed under their own heading.
+function SpecFamilyRow({ row }: { row: SpecRow }) {
+  const [open, setOpen] = useState(false);
+  const members = row.members ?? [];
+  return (
+    <div data-dev-id="detail.spec-family">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="-mx-1.5 flex w-full items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] text-left transition-colors hover:bg-[var(--c-hover)]"
+      >
+        <dt className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-xs text-t2">
+          <Chevron open={open} />
+          {row.label}
+        </dt>
+        <dd className="tnum flex-none font-mono text-xs text-t3">
+          {members.length} {members.length === 1 ? "Region" : "Regions"}
+        </dd>
+      </button>
+      {open ? (
+        <div className="mb-0.5 ml-[7px] border-l border-line pl-2.5">
+          {members.map((m) => (
+            <div
+              key={m.key}
+              className="flex items-baseline justify-between gap-3 py-[2px]"
+            >
+              <dt className="min-w-0 flex-1 truncate text-2xs uppercase tracking-[0.04em] text-t3">
+                {m.label}
+              </dt>
+              <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
+                {m.value}
+              </dd>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SpecificationsSection({
+  groups,
+  alternates,
+  onUseSpecValue,
+}: {
+  groups: SpecGroup[];
+  alternates: Record<string, SourcedAlternate[]>;
+  onUseSpecValue?: (key: string, value: string, source: string) => void;
+}) {
   if (groups.length === 0) {
     return (
       <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
@@ -1419,27 +1609,94 @@ function SpecificationsSection({ groups }: { groups: SpecGroup[] }) {
               {group.title}
             </span>
           </div>
-          <dl className="flex flex-col">
-            {group.rows.map((row) => (
-              <div
-                key={row.key}
-                className="-mx-1.5 flex items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]"
-              >
-                <dt
-                  className="min-w-0 flex-1 truncate text-xs text-t2"
-                  title={typeof row.label === "string" ? row.label : undefined}
-                >
-                  {row.label}
-                </dt>
-                <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
-                  {row.unit ? `${row.value} ${row.unit}` : row.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <SpecRowList
+            rows={group.rows}
+            alternates={alternates}
+            onUseSpecValue={onUseSpecValue}
+          />
         </section>
       ))}
     </div>
+  );
+}
+
+// The rows of one spec group. Shared by the Specs sheet and the Sourcing tab's Trade block, so
+// a family disclosure and a vendor disagreement look and behave identically wherever they appear.
+function SpecRowList({
+  rows,
+  alternates,
+  onUseSpecValue,
+}: {
+  rows: SpecRow[];
+  alternates: Record<string, SourcedAlternate[]>;
+  onUseSpecValue?: (key: string, value: string, source: string) => void;
+}) {
+  return (
+    <dl className="flex flex-col">
+      {rows.map((row) =>
+        row.members ? (
+          <SpecFamilyRow key={row.key} row={row} />
+        ) : (
+          <div
+            key={row.key}
+            className="-mx-1.5 rounded-[2px] px-1.5 py-[3px] transition-colors hover:bg-[var(--c-hover)]"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <dt
+                className="min-w-0 flex-1 truncate text-xs text-t2"
+                title={typeof row.label === "string" ? row.label : undefined}
+              >
+                {row.label}
+              </dt>
+              <dd className="tnum flex-none truncate text-right font-mono text-xs text-t1">
+                {row.unit ? `${row.value} ${row.unit}` : row.value}
+              </dd>
+            </div>
+            {/* a spec two distributors disagree about keeps both answers, swappable. `raw` and not
+                `value`: "1%" renders as "±1%", and comparing the presented string made the answer
+                already in force look like a different one. */}
+            <AlternatesDisclosure
+              entries={alternates[row.key] ?? []}
+              current={row.raw}
+              onUse={
+                onUseSpecValue
+                  ? (value, source) => onUseSpecValue(row.key, value, source)
+                  : undefined
+              }
+            />
+          </div>
+        ),
+      )}
+    </dl>
+  );
+}
+
+// Where a part comes from and how it is classified for import, next to the prices rather than
+// buried in the physical spec sheet (punch 2 + 3). Every value here was already being pulled from
+// the distributor and, until Batch 3, thrown away before it ever reached a record.
+function TradeCompliance({
+  group,
+  alternates,
+  onUseSpecValue,
+}: {
+  group: SpecGroup;
+  alternates: Record<string, SourcedAlternate[]>;
+  onUseSpecValue?: (key: string, value: string, source: string) => void;
+}) {
+  return (
+    <section data-dev-id="detail.trade" className="mt-5 border-t border-line pt-3.5">
+      <div className="mb-0.5 text-2xs font-semibold uppercase tracking-[0.05em] text-t3">
+        Trade And Compliance
+      </div>
+      {/* Says WHOSE facts these are. Sitting directly under the last distributor's price ladder,
+          the block read as that distributor's tariff rather than the part's own classification. */}
+      <p className="mb-2 text-2xs text-t3">Part-level, from the distributor pages.</p>
+      <SpecRowList
+        rows={group.rows}
+        alternates={alternates}
+        onUseSpecValue={onUseSpecValue}
+      />
+    </section>
   );
 }
 
@@ -1450,7 +1707,10 @@ function Sourcing({
   purchase: PurchaseRef[];
   hasMpn: boolean;
 }) {
-  const orderable = purchase.filter((p) => p.url);
+  // Mouser leads, then DigiKey, then the rest (punch 4). The record's own order is whatever the
+  // add flow stored - the pasted vendor led it - so a part bought once from DigiKey listed
+  // DigiKey first forever, regardless of where the owner actually buys.
+  const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
     return (
       <div data-dev-id="detail.sourcing" className="text-sm text-t2">
@@ -1469,6 +1729,7 @@ function Sourcing({
       {orderable.map((p, i) => {
         const breaks = normalizePriceBreaks(p.price_breaks);
         const unit = breaks[0] ?? null;
+        const tiers = ladderRows(breaks);
         const isBest = orderable.length > 1 && unit != null && unit.price === cheapest;
         const name = vendorLabel(p.vendor, p.url);
         return (
@@ -1523,20 +1784,21 @@ function Sourcing({
               </a>
             </div>
             </div>
-            {breaks.length > 1 ? (
+            {tiers.length > 0 ? (
               <div className="mt-3">
                 <div className="mb-2 text-2xs font-semibold uppercase tracking-[0.05em] text-t3">
                   Volume Pricing
                 </div>
-                {/* the qty-1 unit price is already shown next to the stock above, so the ladder
-                    starts at the FIRST bulk tier (10+, 100+, ...) - no redundant "1+" row */}
+                {/* The qty-1 unit price is already the headline beside the stock, so the ladder
+                    normally starts at the first bulk tier (10+, 100+, ...). It reads from 1+
+                    instead whenever that is what keeps the count EVEN, because this is a
+                    two-column flow and an odd count leaves a hole in the bottom-right cell
+                    (punch 5). Parity is reached by showing MORE, never by hiding a price. */}
                 <div
                   className="grid grid-flow-col gap-x-10"
-                  style={{
-                    gridTemplateRows: `repeat(${Math.ceil((breaks.length - 1) / 2)}, auto)`,
-                  }}
+                  style={{ gridTemplateRows: `repeat(${tiers.length / 2}, auto)` }}
                 >
-                  {breaks.slice(1).map((b) => (
+                  {tiers.map((b) => (
                     <div
                       key={b.qty}
                       className="tnum flex items-baseline justify-between py-[3.5px] font-mono text-xs"

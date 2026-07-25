@@ -240,3 +240,147 @@ describe("shared constants", () => {
     expect(EMPTY_SPEC_VALUES.has("not available")).toBe(true);
   });
 });
+
+// -- Spec families (punch 3: "specification dropdowns for repeated info, e.g. HTS code").
+// Mouser alone emits six HTS keys (US / CN / CA / JP / MX / EU TARIC) and LCSC emits one per
+// arbitrary country name, so six-plus near-identical rows shouted over the specs that matter.
+// They are ONE fact per jurisdiction, so they collapse to one row with a member per region.
+
+describe("groupSpecs spec families", () => {
+  const hts = {
+    "HTS Code (US)": "8542.39.0001",
+    "HTS Code (CN)": "8542330000",
+    "HTS Code (EU TARIC)": "8542390000",
+    ECCN: "3A991",
+    Tolerance: "1%",
+  };
+
+  it("collapses every HTS code into a single row with one member per region", () => {
+    // the family lives in the procurement group (see TRADE_GROUP), not beside the physical ratings
+    const groups = groupSpecs("ICs", hts);
+    const ratings = groups.find((g) => g.title === "Trade & Compliance")!;
+    const labels = ratings.rows.map((r) => r.label);
+    expect(labels).toContain("HTS Code");
+    expect(labels.filter((l) => String(l).startsWith("HTS Code"))).toHaveLength(1);
+    const family = ratings.rows.find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.label)).toEqual(["CN", "EU TARIC", "US"]);
+    expect(family.members?.map((m) => m.value)).toEqual([
+      "8542330000", "8542390000", "8542.39.0001",
+    ]);
+  });
+
+  it("keeps ECCN as its own row: a different fact, not another HTS jurisdiction", () => {
+    const ratings = groupSpecs("ICs", hts).find((g) => g.title === "Trade & Compliance")!;
+    const eccn = ratings.rows.find((r) => r.label === "ECCN")!;
+    expect(eccn.value).toBe("3A991");
+    expect(eccn.members).toBeUndefined();
+  });
+
+  it("folds a region nobody has registered, because LCSC emits one key per country", () => {
+    const groups = groupSpecs("ICs", {
+      "HTS Code (Vietnam)": "8542.39",
+      "HTS Code (US)": "8542.31",
+    });
+    const family = groups.flatMap((g) => g.rows).find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.label)).toEqual(["US", "Vietnam"]);
+  });
+
+  it("a lone family member still reads as the family row, not a bare key", () => {
+    const family = groupSpecs("ICs", { "HTS Code (US)": "8542.39" })
+      .flatMap((g) => g.rows)
+      .find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.label)).toEqual(["US"]);
+  });
+
+  it("an unqualified HTS key with no region still lands in the family", () => {
+    const family = groupSpecs("ICs", { "HTS Code": "8542.39" })
+      .flatMap((g) => g.rows)
+      .find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.value)).toEqual(["8542.39"]);
+  });
+
+  it("never drops a spec: folding a family changes the SHAPE, not the count of facts", () => {
+    // Counted on the leaves rather than compared value-by-value, because presentation legitimately
+    // rewrites some values on the way out ("1%" reads as "±1%"), and a count catches a dropped
+    // spec without pinning this test to the prettifier.
+    const leaves = groupSpecs("ICs", hts).flatMap((g) =>
+      g.rows.flatMap((r) => r.members ?? [r]),
+    );
+    expect(leaves).toHaveLength(Object.keys(hts).length);
+    // and the family's own values are carried through verbatim (no prettifier applies to a code)
+    const family = groupSpecs("ICs", hts)
+      .flatMap((g) => g.rows)
+      .find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.value).sort()).toEqual(
+      ["8542.39.0001", "8542330000", "8542390000"].sort(),
+    );
+  });
+});
+
+// -- Trade & Compliance (punch 2 + 3). These keys are real vendor data the owner asked to stop
+// losing (origin, the page's own tariff rate, export classification, order quantities), but they
+// are NOT physical parameters, and `derive.isReferenceOnlySpecKey` deliberately keeps them out of
+// the Specs sheet so it does not read like a distributor page dump. Both rules hold at once by
+// giving them their own group, which the Sourcing tab renders - that is where a buyer looks for
+// an import classification anyway.
+
+describe("groupSpecs trade group", () => {
+  const specs = {
+    Resistance: "10 kOhm",
+    "Country of Origin": "Japan",
+    "US Tariff %": 0.0,
+    ECCN: "3A991",
+    "HTS Code (US)": "8542.39.0001",
+    "HTS Code (CN)": "8542330000",
+    "Minimum Order Quantity": "1",
+    Packaging: "Cut Tape",
+  };
+
+  it("routes procurement facts to Trade & Compliance, not to the physical groups", () => {
+    const groups = groupSpecs("ICs", specs);
+    const trade = groups.find((g) => g.title === "Trade & Compliance")!;
+    const labels = trade.rows.map((r) => r.label);
+    expect(labels).toContain("Country of Origin");
+    expect(labels).toContain("US Tariff %");
+    expect(labels).toContain("ECCN");
+    expect(labels).toContain("HTS Code");
+    expect(labels).toContain("Minimum Order Quantity");
+    // and a real electrical spec is untouched by any of it
+    const electrical = groups.find((g) => g.title === "Electrical")!;
+    expect(electrical.rows.map((r) => r.label)).toEqual(["Resistance"]);
+  });
+
+  it("folds the HTS family inside the trade group, not outside it", () => {
+    const trade = groupSpecs("ICs", specs).find((g) => g.title === "Trade & Compliance")!;
+    const family = trade.rows.find((r) => r.label === "HTS Code")!;
+    expect(family.members?.map((m) => m.label)).toEqual(["CN", "US"]);
+  });
+
+  it("keeps a zero tariff, because 0% is a confirmed rate and not a missing one", () => {
+    const trade = groupSpecs("ICs", specs).find((g) => g.title === "Trade & Compliance")!;
+    // "0%", not a bare "0": the registry gives the row a % unit, which groupSpecs folds into the
+    // value. A lone 0 in a value column is indistinguishable from an empty cell.
+    expect(trade.rows.find((r) => r.label === "US Tariff %")?.value).toBe("0%");
+  });
+
+  it("omits the group entirely for a part with no trade data", () => {
+    const groups = groupSpecs("ICs", { Resistance: "10 kOhm" });
+    expect(groups.find((g) => g.title === "Trade & Compliance")).toBeUndefined();
+  });
+});
+
+describe("groupSpecs zero-valued rates", () => {
+  it("renders a confirmed 0% tariff as 0%, not a bare 0 that reads as missing", () => {
+    // The page's own DecTariffUnitPrice ratio: 0.0 means "we checked, there is no tariff". A bare
+    // "0" in a value column is indistinguishable from an empty cell, which turns a real
+    // measurement into what looks like a gap.
+    const trade = groupSpecs("ICs", { "US Tariff %": 0.0 })
+      .find((g) => g.title === "Trade & Compliance")!;
+    const row = trade.rows.find((r) => r.label === "US Tariff %")!;
+    expect(`${row.value}${row.unit ?? ""}`).toBe("0%");
+  });
+
+  it("still drops a genuinely absent value rather than printing a zero", () => {
+    expect(groupSpecs("ICs", { "US Tariff %": "" })).toEqual([]);
+  });
+});

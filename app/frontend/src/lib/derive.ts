@@ -351,6 +351,10 @@ const _ATTR_GROUP_SCORE: Record<SpecGroupName, number> = {
   Electrical: 400,
   Physical: 250,
   "Ratings & Compliance": 120,
+  // A glance-chip states what the part IS. An origin country or a tariff rate never does, and
+  // `isReferenceOnlySpecKey` already keeps these keys off the chips - this only makes the ranking
+  // agree with that instead of leaving a hole in the map.
+  "Trade & Compliance": 0,
   Other: 0,
 };
 
