@@ -127,6 +127,15 @@ export const DEV_TOKENS: DevToken[] = [
     themed: true,
     default: { dark: "#d0564e", light: "#cf4a40" },
   },
+  {
+    cssVar: "--c-band",
+    label: "Chrome band",
+    group: "Status",
+    kind: "color",
+    themed: true,
+    // Opaque by contract: it backs sticky headers that rows scroll beneath.
+    default: { dark: "#2b2b30", light: "#e2e4e9" },
+  },
   // --- Shape (theme-agnostic radii) ---------------------------------------
   {
     cssVar: "--r-card",
@@ -134,7 +143,10 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    default: { dark: "3px" },
+    // The rounder north-star (owner decision 2026-07-17, docs/design/design-rules.md),
+    // superseding the earlier 8/6 lock. Must match styles/index.css: a stale default here
+    // makes the panel's reset button write the pre-north-star radius back.
+    default: { dark: "14px" },
   },
   {
     cssVar: "--r-control",
@@ -142,7 +154,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    default: { dark: "2px" },
+    default: { dark: "8px" },
   },
   // --- Type (theme-agnostic type scale; px size only, line-heights stay bundled in tailwind) ---
   {
