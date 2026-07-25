@@ -237,6 +237,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "hashes",
         "enrichment",
         "specs",
+        "alternates",
     }
     | {legacy for legacy, _, _ in _LEGACY_ASSET_FIELDS}
 )
@@ -290,6 +291,43 @@ class EnrichmentField:
 
 
 @dataclass
+class SourcedValue:
+    """One value a source offered for a field, with where it came from.
+
+    `value` is deliberately untyped: a tariff rate is a float whose 0.0 is MEANINGFUL (a
+    confirmed no-tariff part, not a missing one), while a description is a string.
+    """
+
+    value: object = ""
+    source: str = ""
+    confidence: str = ""
+    # Keys a newer build put on this entry that we do not understand, kept verbatim and
+    # re-emitted. The same guarantee `PartRecord.extra` gives the record as a whole, applied one
+    # level down: peers share these files through git and BOTH write them, so rewriting a
+    # neighbour's entry must not quietly strip the half of it we could not read.
+    extra: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        # Unknown keys first so a known one can never be shadowed by a stale preserved copy.
+        return {
+            **self.extra,
+            "value": self.value,
+            "source": self.source,
+            "confidence": self.confidence,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SourcedValue":
+        known = {"value", "source", "confidence"}
+        return cls(
+            value=d.get("value", ""),
+            source=d.get("source", ""),
+            confidence=d.get("confidence", ""),
+            extra={k: v for k, v in d.items() if k not in known},
+        )
+
+
+@dataclass
 class PartRecord:
     id: str
     display_name: str
@@ -324,6 +362,17 @@ class PartRecord:
     # lives in `enrichment`. NOT a completion-gate field (spec section 6): a part
     # without a pinout is still complete.
     specs: dict = field(default_factory=dict)
+    # Every value a source offered for a field that it did NOT win, with its origin (Batch 3,
+    # punch 2/9). The winning value stays in its own slot (`description`, `specs[key]`, ...) and
+    # is repeated as the FIRST entry here, so a reader always sees which answer is in force
+    # beside the ones set aside, and the user can swap between two distributors' descriptions.
+    #
+    # The key space is shared with `enrichment`, which is the convention already shipped: a
+    # canonical field name in lower_snake ("description", "package", "tariff_rate") or a spec
+    # label exactly as stored ("Package", "HTS Code (US)"). Empty for a part whose sources never
+    # disagreed, and then omitted from the JSON entirely - a part must not gain a key just
+    # because this feature exists.
+    alternates: dict[str, list[SourcedValue]] = field(default_factory=dict)
     # The schema version this record was WRITTEN at. A record read from disk keeps its own
     # value (never downgraded to ours), so a build that does not fully understand a newer
     # record cannot claim otherwise to the next reader. See SCHEMA_VERSION.
@@ -387,6 +436,12 @@ class PartRecord:
             "hashes": asdict(self.hashes) if self.hashes else None,
             "enrichment": {k: asdict(v) for k, v in self.enrichment.items()},
             "specs": normalize_specs(self.specs),
+            # Omitted when empty, like `eda`: adopting this must not rewrite every part in a
+            # real library to add a `{}`.
+            **(
+                {"alternates": {k: [a.to_dict() for a in v] for k, v in self.alternates.items()}}
+                if self.alternates else {}
+            ),
         }
 
     @classmethod
@@ -418,6 +473,10 @@ class PartRecord:
                 k: EnrichmentField(**v) for k, v in d.get("enrichment", {}).items()
             },
             specs=dict(d.get("specs", {})),
+            alternates={
+                k: [SourcedValue.from_dict(a) for a in (v or []) if isinstance(a, dict)]
+                for k, v in (d.get("alternates") or {}).items()
+            },
         )
 
     def dumps(self) -> str:

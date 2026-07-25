@@ -115,12 +115,92 @@ def test_lifecycle_only_result_writes_the_spec_without_a_purchase():
 
 
 def test_first_vendor_with_a_lifecycle_wins_even_when_it_matches_the_stored_value():
-    # leader (Mouser) reports "Active" == stored, so nothing changes; a later vendor's disagreeing
-    # lifecycle must NOT override the leader. First-reports-wins, not first-differs-wins.
+    # leader (Mouser) reports "Active" == stored; a later vendor's disagreeing lifecycle must
+    # NOT override the leader. First-reports-wins, not first-differs-wins.
+    #
+    # DELIBERATELY RE-BASELINED for Batch 3: this used to assert `changed is False`, because
+    # DigiKey's "Obsolete" was DISCARDED and so nothing happened at all. A distributor calling a
+    # part obsolete while another calls it active is exactly the vendor disagreement the owner
+    # asked to stop losing, so it is now KEPT as an alternate - which is a real change to the
+    # record, hence changed is True. The no-empty-commit invariant that assertion was protecting
+    # is proven by the second call below instead: once recorded, re-checking is a true no-op.
     rec = PartRecord(id="p", display_name="P", category="ICs", mpn="X", purchase=[])
     rec.specs["Lifecycle"] = "Active"
-    changed = apply_procurement_refresh(
-        rec, [("Mouser", _result(lifecycle="Active")),
-              ("DigiKey", _result(lifecycle="Obsolete"))], "T")
-    assert changed is False
+    per_vendor = [("Mouser", _result(lifecycle="Active")),
+                  ("DigiKey", _result(lifecycle="Obsolete"))]
+    assert apply_procurement_refresh(rec, per_vendor, "T") is True
     assert rec.specs["Lifecycle"] == "Active"          # DigiKey never overrode the leader
+    # (the shared _result fixture stamps every value "mouser", so only the VALUES vary here)
+    assert [a.value for a in rec.alternates["Lifecycle"]] == ["Active", "Obsolete"]
+    # the same re-check again learns nothing new, so it must not churn a commit
+    assert apply_procurement_refresh(rec, per_vendor, "T") is False
+
+
+# -- What a rescan stops throwing away (Batch 3, punch 2). Measured before this: the refresh
+# lane kept price_breaks / stock / part_number / currency and the Lifecycle spec, and DISCARDED
+# every parametric spec, HTS code, lead time, origin, tariff, description, datasheet and product
+# URL on every single re-check - even when the record had none of them.
+
+
+def _rich(vendor="mouser"):
+    r = EnrichmentResult()
+    r.mpn = Sourced("X", vendor, "high")
+    r.price_breaks = [PriceBreak(1, 0.5)]
+    r.lifecycle = Sourced("Active", vendor, "high")
+    r.lead_time = Sourced("16 Weeks", vendor, "high")
+    r.country_of_origin = Sourced("Japan", vendor, "high")
+    r.tariff_rate = Sourced(0.0, vendor, "high")
+    r.description = Sourced("3A Buck Converter", vendor, "high")
+    r.specs["HTS Code (US)"] = Sourced("8542.39.0001", vendor, "high")
+    return r
+
+
+def _record(**kw):
+    return PartRecord(id="p1", display_name="P", category="ICs", **kw)
+
+
+def test_a_refresh_fills_the_procurement_fields_a_record_lacks():
+    rec = _record()
+    assert apply_procurement_refresh(rec, [("Mouser", _rich())], "NOW") is True
+    assert rec.specs["Lead Time"] == "16 Weeks"
+    assert rec.specs["Country of Origin"] == "Japan"
+    assert rec.specs["US Tariff %"] == 0.0  # 0.0 is a confirmed no-tariff, not a gap
+    assert rec.specs["HTS Code (US)"] == "8542.39.0001"
+    assert rec.enrichment["Lead Time"].source == "mouser"
+
+
+def test_a_refresh_never_overwrites_a_spec_already_on_the_record():
+    """A rescan is a re-check of VOLATILE data. A parametric spec on the record may have been
+    corrected by hand, so filling a gap is right and clobbering is not."""
+    rec = _record(specs={"HTS Code (US)": "corrected-by-hand"})
+    apply_procurement_refresh(rec, [("Mouser", _rich())], "NOW")
+    assert rec.specs["HTS Code (US)"] == "corrected-by-hand"
+
+
+def test_a_refresh_keeps_a_second_vendors_description_instead_of_dropping_it():
+    """punch 9 for a part that is ALREADY in the library: the rescan is where a second
+    distributor's description shows up, and it was thrown away with no record at all."""
+    rec = _record(description="3A buck, WSON-8")
+    changed = apply_procurement_refresh(
+        rec, [("DigiKey", _rich("digikey"))], "NOW")
+    assert changed is True
+    assert rec.description == "3A buck, WSON-8"  # the stored value still stands
+    assert [(a.value, a.source) for a in rec.alternates["description"]] == [
+        ("3A buck, WSON-8", ""), ("3A Buck Converter", "digikey"),
+    ]
+
+
+def test_a_refresh_that_agrees_with_the_record_records_no_alternate_and_no_change():
+    rec = _record(description="3A Buck Converter")
+    changed = apply_procurement_refresh(rec, [("Mouser", _rich())], "NOW")
+    assert rec.alternates.get("description") is None
+    # price/stock still changed, so `changed` is True overall; the point is the description
+    # produced no phantom disagreement
+    assert changed is True
+
+
+def test_a_refresh_fills_a_missing_description_rather_than_only_recording_it():
+    rec = _record()
+    apply_procurement_refresh(rec, [("Mouser", _rich())], "NOW")
+    assert rec.description == "3A Buck Converter"
+    assert rec.alternates.get("description") is None

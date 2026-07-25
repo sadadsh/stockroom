@@ -43,6 +43,14 @@ class StagingCandidate:
     # tolerances, compliance, ...). A plain str->str bag so the whole set a distributor
     # page exposes reaches the record, not just the handful of identity fields.
     specs: dict = field(default_factory=dict)
+    # Where each of those values came from: {key: {"source": ..., "confidence": ...}}. Parallel
+    # to `specs` rather than folded into it, so the review UI keeps editing a plain bag while the
+    # provenance still reaches the record's `enrichment` map (which was empty on every real part).
+    enrichment: dict = field(default_factory=dict)
+    # Every value a source offered and lost with: {key: [{"value","source","confidence"}, ...]},
+    # keyed like the record's `alternates`. Without this the candidate was where a kept
+    # disagreement died - the enrich layer computed it and nothing downstream could hold it.
+    alternates: dict = field(default_factory=dict)
 
     @property
     def chosen_footprint(self) -> Path | None:
@@ -78,6 +86,8 @@ class StagingCandidate:
             datasheet_meta=datasheet_meta,
             purchase=list(self.purchase),
             specs=dict(self.specs),
+            enrichment=dict(self.enrichment),
+            alternates={k: list(v) for k, v in self.alternates.items()},
         )
 
 

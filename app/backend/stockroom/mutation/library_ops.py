@@ -27,6 +27,7 @@ from stockroom.model.part import (
     PartRecord,
     Provenance,
     Purchase,
+    SourcedValue,
     asset_label,
     missing_from_presence,
     new_part_id,
@@ -103,6 +104,11 @@ class StagedPart:
     datasheet_meta: Datasheet | None = None
     purchase: list[Purchase] = field(default_factory=list)
     specs: dict = field(default_factory=dict)
+    # Where each spec came from, and every value a source offered and lost with. Carried
+    # through so add_part can persist both onto the record (see PartRecord.alternates); the
+    # candidate computes them, this is only the hop between.
+    enrichment: dict = field(default_factory=dict)
+    alternates: dict = field(default_factory=dict)
 
 
 class IncompleteError(ValueError):
@@ -396,6 +402,15 @@ class LibraryOps:
                 provenance=staged.provenance,
                 purchase=list(staged.purchase),
                 specs=dict(staged.specs),
+                enrichment={
+                    k: EnrichmentField(source=v.get("source", ""),
+                                       confidence=v.get("confidence", ""))
+                    for k, v in staged.enrichment.items() if isinstance(v, dict)
+                },
+                alternates={
+                    k: [SourcedValue.from_dict(a) for a in entries if isinstance(a, dict)]
+                    for k, entries in staged.alternates.items()
+                },
             )
             if staged.symbol_source is not None:
                 sym_lib = SymbolLib.load(sym_lib_path)

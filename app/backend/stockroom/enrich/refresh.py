@@ -6,8 +6,15 @@ lookup DIRECTLY (not EnrichmentPipeline.enrich, which caches per-MPN and often n
 the API legs), and keep the results PER VENDOR so each maps onto its own Purchase row."""
 from __future__ import annotations
 
+from stockroom.enrich.apply import conflict_entries, spec_updates
 from stockroom.enrich.schema import EnrichmentResult
-from stockroom.model.part import Purchase
+from stockroom.model.part import Datasheet, EnrichmentField, Purchase, SourcedValue
+from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
+
+# The specs a rescan RE-READS rather than merely gap-fills: they are the volatile procurement
+# values the lane exists to keep current. Everything else a vendor returns is a stable
+# parametric fact, so an existing one stands and a differing answer becomes an alternate.
+_REFRESHED_SPECS: frozenset[str] = frozenset({"Lifecycle", "Lead Time", "US Tariff %"})
 
 
 def _has_data(result: EnrichmentResult) -> bool:
@@ -70,13 +77,107 @@ def apply_procurement_refresh(record, per_vendor, now_iso: str) -> bool:
         if vendor_changed:
             purchase.fetched_at = now_iso
             changed = True
-    # lifecycle: the FIRST vendor that reports one wins (a Sourced field the candidate mapping
-    # drops). Break on the first vendor that HAS a lifecycle - not the first that differs - so a
-    # later vendor can never override the leader just because the leader happened to agree with
-    # what was already stored.
-    for _vendor, result in per_vendor:
-        if result.lifecycle is not None:
-            if record.specs.get("Lifecycle") != result.lifecycle.value:
-                record.specs["Lifecycle"], changed = result.lifecycle.value, True
-            break
+    # Everything else the vendors returned. This block is what the audit found missing: the
+    # refresh used to apply the Lifecycle spec and NOTHING else, so a re-check discarded every
+    # parametric spec, HTS code, lead time, origin, tariff, description and datasheet the API
+    # had just handed it - even for a record that held none of them.
+    # `written` carries across vendors: the FIRST vendor to answer for a key wins its slot for
+    # this pass, and a later vendor's differing answer is kept as an alternate rather than
+    # overriding the leader (first-reports-wins, not first-differs-wins).
+    written: set[str] = set()
+    for vendor, result in per_vendor:
+        if _apply_pulled_detail(record, vendor, result, now_iso, written):
+            changed = True
     return changed
+
+
+def _apply_pulled_detail(record, vendor: str, result: EnrichmentResult, now_iso: str,
+                         written: set[str]) -> bool:
+    """Fold one vendor's non-purchase data onto the record, non-destructively.
+
+    The rule differs from an ADD on purpose. A rescan re-checks a part that may have been
+    corrected by hand, so a value already on the record STANDS: a spec is only filled when the
+    record lacks it, and a differing answer is recorded as an alternate rather than written over
+    the top. That way a second distributor's description is kept (punch 9) instead of being
+    dropped, and nothing a human fixed is silently undone.
+
+    Volatile procurement values ARE refreshed, because re-checking them is the whole point of
+    the lane: Lifecycle, Lead Time and the tariff are re-read from the vendor each pass.
+    """
+    changed = False
+    for label, value, sourced in spec_updates(result):
+        key = normalize_spec_key(label)
+        if not key:
+            continue
+        value = normalize_spec_value(value)
+        current = record.specs.get(key)
+        # A key an earlier vendor already answered for in this pass is settled: only its
+        # DISAGREEMENT is still interesting, never an override.
+        refreshable = key in _REFRESHED_SPECS and key not in written
+        if current is None or (refreshable and current != value):
+            if current != value:
+                record.specs[key] = value
+                changed = True
+            record.enrichment[key] = EnrichmentField(
+                source=sourced.source, confidence=sourced.confidence
+            )
+            written.add(key)
+        elif current == value:
+            written.add(key)  # this vendor agrees; the slot is settled for the pass
+        else:
+            # A stable spec the record already holds AND the vendor disagrees about: keep both,
+            # stored value first, so the disagreement is visible instead of discarded.
+            if _remember_alternate(record, key, current, value, sourced.source):
+                changed = True
+
+    # The description is a top-level record field, not a spec, so it gets the same treatment by
+    # hand: fill it when blank, otherwise keep both answers.
+    if result.description is not None:
+        pulled = str(result.description.value).strip()
+        if pulled and not record.description.strip():
+            record.description, changed = pulled, True
+        elif pulled and pulled != record.description.strip():
+            if _remember_alternate(
+                record, "description", record.description, pulled, result.description.source
+            ):
+                changed = True
+
+    # A datasheet link the record does not have is pure gain (the passport counts a URL), and a
+    # link it already has is never replaced.
+    if result.datasheet_url is not None:
+        url = str(result.datasheet_url.value).strip()
+        if url and (record.datasheet is None or not (
+            record.datasheet.file or record.datasheet.source_url
+        )):
+            record.datasheet = record.datasheet or Datasheet()
+            record.datasheet.source_url = url
+            record.datasheet.fetched_at = now_iso
+            changed = True
+
+    # Every disagreement the enrich layer itself kept (two APIs answering one lookup).
+    for key, entries in conflict_entries(result).items():
+        for entry in entries:
+            if _remember_alternate(
+                record, key, record.specs.get(key), entry.value, entry.source
+            ):
+                changed = True
+    return changed
+
+
+def _remember_alternate(record, key: str, kept, value, source: str) -> bool:
+    """Record `value` as another answer for `key`, seeding the list with the value currently in
+    force so a reader always sees which one is stored. Returns True only when something was
+    actually added, so an unchanged re-check still produces no commit."""
+    entries = record.alternates.setdefault(key, [])
+    if not entries and kept is not None and str(kept).strip():
+        entries.append(SourcedValue(value=kept, source="", confidence=""))
+    if any(_same(e.value, value) for e in entries):
+        return False
+    entries.append(SourcedValue(value=value, source=source, confidence=""))
+    return True
+
+
+def _same(a, b) -> bool:
+    """Values agree when they match after trimming and case-folding, so formatting noise never
+    fakes a disagreement (the same comparison the enrich merge uses)."""
+    return str(a).strip().casefold() == str(b).strip().casefold()
