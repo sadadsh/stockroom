@@ -351,7 +351,10 @@ export function DetailPanel({
           {detail.category}
         </span>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+      {/* @container: the query root every `@`-prefixed breakpoint inside this sheet resolves
+          against. It must sit here, on the pane, so the sheet reacts to the room it actually has
+          (the rail collapsing 190px -> 52px changes it by 138px at an unchanged window size). */}
+      <div className="@container flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
         {/* sub-header: the part number + maker lead on the left, the view tabs on the right, on
             one bordered band - the sheet gets a real head instead of a flat wall of sections. */}
         <div
@@ -387,25 +390,36 @@ export function DetailPanel({
           // column, so a long specs list grew the whole sheet instead of scrolling inside its
           // own pane. Pinning the row to the container height lets each column's own
           // overflow-y-auto engage.
-          // RESPONSIVE, because the three-column form needs 1166px of fixed width before the
-          // Specifications track gets a single pixel (190 rail + 320 picker + 48 padding + 288 + 320).
-          // Below that, `minmax(0,1fr)` let the middle column collapse to ZERO and its content was
-          // drawn ON TOP of the Sourcing column: "Sourcing" and the spec sheet superimposed into
-          // "Sparcing", a stray "PHY" under Links, and the datasheet row running off the window edge.
-          // The pane is overflow-hidden with no overflow-x, so none of it was even reachable.
+          // RESPONSIVE ON THE CONTAINER, never the viewport. The three-column form needs
+          // 288 + 256(the middle track's own minimum) + 320 = 864px, and what it actually gets is
+          // the PANE's width, not the window's.
           //
-          // So the layout now STACKS instead of overlapping. The DOM order never changes; only the
-          // track count does, and grid auto-placement flows the third column onto a second row:
-          //   >=1280  three columns, as designed
-          //   >=1024  two columns; Sourcing drops beneath Specifications (col-start-2)
-          //   <1024   one column; the specimen rail sits on top
-          // Each column keeps its own scroller, and `grid-rows` is only pinned in the 3-column case -
-          // once columns wrap, the rows must size to content or the stacked column is unreachable.
+          // This was a VIEWPORT media query (`lg:`/`xl:`) and it was wrong by construction.
+          // MEASURED in the real WebView2 window at the host's own default 1400x900 (2026-07-25):
+          // rail 190 + picker 320 + padding 48 left the sheet 825px while `xl:` (1280px viewport)
+          // had already switched three tracks on, so the middle track pinned at its 256px minimum
+          // and Specifications rendered 205px wide by 5885px tall - one word per line. Even at
+          // exactly 1280px viewport the sheet only gets ~722px, so the threshold could never be
+          // right: it was short by 142px at its own breakpoint.
+          //
+          // The decisive proof: COLLAPSING THE RAIL fixed it at an UNCHANGED viewport
+          // (grid 825 -> 963, specs 205 -> 304 wide, 5885 -> 1916 tall). The rail is collapsible,
+          // so no media query can ever know how much room this sheet has. A container query
+          // measures the box the columns must fit inside, which is the only honest question.
+          //
+          // The layout STACKS rather than overlapping. DOM order never changes; only the track
+          // count does, and grid auto-placement flows the third column onto a second row:
+          //   container >=896px (@4xl)  three columns, as designed
+          //   container >=576px (@xl)   two columns; Sourcing drops beneath Specifications
+          //   below                     one column; the specimen rail sits on top
+          // Each column keeps its own scroller, and `grid-rows` is only pinned in the 3-column
+          // case - once columns wrap, the rows must size to content or a stacked column is
+          // unreachable.
           className={
             "mt-3 grid min-h-0 flex-1 gap-y-5 " +
             "grid-cols-1 " +
-            "lg:grid-cols-[288px_minmax(16rem,1fr)] " +
-            "xl:grid-cols-[288px_minmax(16rem,1fr)_320px] xl:grid-rows-[minmax(0,1fr)]"
+            "@xl:grid-cols-[288px_minmax(16rem,1fr)] " +
+            "@4xl:grid-cols-[288px_minmax(16rem,1fr)_320px] @4xl:grid-rows-[minmax(0,1fr)]"
           }
         >
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
@@ -1522,12 +1536,16 @@ function AssetTile({
 // sheet stacks into a ~250px column it ate two thirds of the row and forced "100 nF" to wrap
 // mid-value. It narrows to 7rem there, which is still enough for the labels and leaves the value
 // whole. Same widths on both levels, asserted by a gate.
+// The label track widens only when the sheet is at its full three-column width, so it keys off
+// the SAME container query as the sheet (@4xl), never the viewport. As `xl:` it widened the label
+// to 10.5rem inside a column that was only 205px wide, which is part of why a value had nowhere
+// left to go and wrapped one word per line.
 const SPEC_ROW_GRID =
   "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] " +
-  "xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
+  "@4xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
 const ALT_ROW_GRID =
   "grid grid-cols-[minmax(0,calc(7rem-7px))_minmax(0,1fr)_auto] " +
-  "xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
+  "@4xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
 
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,

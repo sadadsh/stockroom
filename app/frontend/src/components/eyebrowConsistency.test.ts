@@ -58,6 +58,26 @@ describe("property-grid tracks", () => {
     expect(interpolated.map((m) => m[0])).toEqual([]);
   });
 
+  it("switches the SHEET's column count on the CONTAINER's width, never the viewport's", () => {
+    // MEASURED in the real WebView2 window at the host's own default 1400x900 (2026-07-25):
+    // the sheet grid gets the DETAIL PANE's width, not the window's. Rail 190 + picker 320 +
+    // padding 48 leave it 825px, while `xl:` (a VIEWPORT media query) had already switched on
+    // three tracks needing 288+256+320 = 864px. The middle track pinned at its 256px minimum,
+    // so Specifications rendered 205px wide and 5885px tall - one word per line.
+    //
+    // The proof that a viewport query is the wrong instrument: COLLAPSING THE RAIL fixed it at
+    // an UNCHANGED viewport (grid 825 -> 963, specs 205 -> 304 wide, 5885 -> 1916 tall). A media
+    // query cannot see the rail state, so no threshold can ever be right. Only a container query
+    // measures the box the columns actually have to fit inside.
+    const sheet = /id="specs"[\s\S]*?className=\{([\s\S]*?)\}\n/.exec(source("DetailPanel.tsx"));
+    if (!sheet) throw new Error("could not find the specs WorkbenchPanel className");
+    // (?<!@) so the CONTAINER form `@xl:` is not mistaken for the viewport form `xl:` - the
+    // container variants embed the same breakpoint names, and a bare \b matches after the `@`.
+    const viewportTracks = [...sheet[1].matchAll(/(?<!@)\b(?:sm|md|lg|xl|2xl):grid-cols-/g)];
+    expect(viewportTracks.map((m) => m[0])).toEqual([]);
+    expect(sheet[1]).toMatch(/@[\w[\]]+:grid-cols-/);
+  });
+
   it("keeps a spec row and its alternates on the SAME label track at EVERY breakpoint", () => {
     // Different widths would put a child's value at a different x from its parent's - the long-gap
     // complaint reintroduced one level down, on exactly the rows meant to be compared. The track is
