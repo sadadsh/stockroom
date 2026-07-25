@@ -446,7 +446,13 @@ export function DetailPanel({
               stageDevId="detail.asset-stage"
               name="3D Model"
               present={hasModel}
-              className="min-h-[300px] flex-1"
+              // The hero EARNS its size by having something to show. `min-h-[300px] flex-1` was
+              // unconditional, so an absent model still claimed a 300px floor AND all the column's
+              // slack: measured, a featureless "No 3D Model" placeholder rendered ~420px tall above
+              // 142px Symbol and Footprint tiles, making the emptiest thing on the sheet the most
+              // prominent. Empty, it now sits as a PEER of its siblings at the same 142px; present,
+              // it keeps the full hero treatment because then the space is carrying a render.
+              className={hasModel ? "min-h-[300px] flex-1" : "h-[142px]"}
               art={<CubeArt />}
               thumb={
                 hasModel ? (
