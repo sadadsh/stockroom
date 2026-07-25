@@ -106,12 +106,47 @@ export function Rail() {
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
-        <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
+        {collapsed ? null : (
+          <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
+        )}
         {collapsed ? null : (
           <span className="text-base font-semibold tracking-[-0.01em] text-t1">
             <Text id="nav.brand">Stockroom</Text>
           </span>
         )}
+        {/* The rail's collapse control lives HERE, in its panel-title bar, because that is where a
+            docked panel's own controls belong - the same place Altium puts them. It used to sit at
+            the foot as 10px t3 text beside a raw mono guillemet, which made the one control that
+            reshapes the workspace the faintest thing in the rail.
+
+            COLLAPSED, this button REPLACES the wordmark rather than crowding it: 52px of rail holds
+            exactly one 17px control, and the brand is already stated by the OS title bar, while the
+            toggle is the only thing here anyone can act on.
+
+            One glyph serves both directions, mirrored on the x axis, so "collapse" and "expand" can
+            never drift out of sync. */}
+        <button
+          type="button"
+          data-dev-id="rail.collapse"
+          aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
+          title={collapsed ? "Expand Rail" : "Collapse Rail"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((v) => !v)}
+          className={
+            "flex h-[24px] w-[24px] flex-none items-center justify-center rounded-control " +
+            "text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
+            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 " +
+            "focus-visible:outline-acc " +
+            (collapsed ? "mx-auto" : "ml-auto -mr-1")
+          }
+        >
+          <span aria-hidden className="flex h-[17px] w-[17px] items-center justify-center">
+            <Icon
+              id="nav.collapse-rail"
+              className={"h-full w-full" + (collapsed ? " -scale-x-100" : "")}
+            />
+          </span>
+        </button>
       </div>
 
       <div data-dev-id="rail.nav" className="flex flex-col gap-0.5">
@@ -156,27 +191,6 @@ export function Rail() {
             <Icon id="nav.about" className="h-full w-full" />
           </span>
           {collapsed ? null : <Text id="nav.about">About</Text>}
-        </button>
-        {/* The collapse control sits at the FOOT of the rail, not in the wordmark bar: the wordmark
-            is the rail's panel title and gains nothing from an action, and the foot is where the
-            other workspace controls (theme, update) already live. Its label names what the click
-            WILL do, not the current state, so it is never ambiguous. */}
-        <button
-          type="button"
-          data-dev-id="rail.collapse"
-          aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
-          title={collapsed ? "Expand Rail" : "Collapse Rail"}
-          aria-expanded={!collapsed}
-          onClick={() => setCollapsed((v) => !v)}
-          className={
-            "flex h-[28px] items-center gap-2.5 rounded-control text-left text-2xs font-medium text-t3 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
-            (collapsed ? "justify-center px-0" : "px-2.5")
-          }
-        >
-          <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center font-mono text-base">
-            {collapsed ? "\u00bb" : "\u00ab"}
-          </span>
-          {collapsed ? null : "Collapse"}
         </button>
         <div
           data-dev-id="rail.utility"

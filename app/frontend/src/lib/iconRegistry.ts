@@ -222,6 +222,18 @@ export const ICON_REGISTRY: IconEntry[] = [
     body: '<path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/>',
   },
   {
+    // Collapse the rail. A PANEL glyph (the rail's own edge, plus a chevron moving toward it), not a
+    // bare chevron: this is a docked panel closing against the window edge, which is the same thing
+    // Altium and every other workspace shell draws here, and a lone chevron would read as "go back".
+    // ONE asset serves both directions - the call site mirrors it on the x axis to mean "expand" -
+    // so the two states can never drift apart the way two hand-drawn glyphs would.
+    id: "nav.collapse-rail",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 2,
+    body: '<path d="M4 5v14"/><path d="m15 8-4 4 4 4"/>',
+  },
+  {
     // The idle "Up to Date" check. Its --c-ok tint is a call-site inline style (color), not glyph
     // geometry, so the registry stores the plain check; the tint is reapplied where it is placed.
     id: "nav.up-to-date",
