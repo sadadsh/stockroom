@@ -749,3 +749,39 @@ def test_attaching_a_reference_for_a_non_kicad_tool_is_rejected_not_silently_mis
     reloaded = ops.load_record(record.id)
     assert reloaded.symbol == kicad_symbol_before
     assert reloaded.altium_symbol is None  # and nothing was misfiled for Altium either
+
+
+def test_add_part_derives_a_human_name_when_the_name_is_only_the_mpn(tmp_path, fixtures_dir):
+    """An added IC must get a readable name, not its bare MPN.
+
+    The owner reported adding an IC and getting the MPN as its display name. The chain:
+    the frontend seeds `display_name: ""`, candidateFromResult falls back to
+    `display_name || mpn`, and `add_part` writes that verbatim -- it never calls the
+    namer. `propose_component_name` already produces "<Product Type> <MPN> <package>" and
+    is well tested, but its ONLY caller was `rebuild_part` via the rescan, so a part only
+    got a good name if it was later rescanned. Passives looked better purely because
+    `add_passive_part` takes a different path (`apply_clean_identity`), whose
+    `clean_display_name` has branches for R/C/L/ferrite/LED and returns None for ICs.
+    """
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.display_name = staged.mpn  # what the UI sends when the user types no name
+    staged.specs = {"Product Type": "Buck Converters", "Package": "16-VQFN"}
+
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+
+    assert record.display_name != staged.mpn, "still just the MPN"
+    assert "Buck Converter" in record.display_name  # singularized functional descriptor
+    assert record.mpn in record.display_name  # the MPN is kept, not thrown away
+
+
+def test_add_part_never_overwrites_a_name_the_user_actually_typed(tmp_path, fixtures_dir):
+    """Deriving a name must only fill a BLANK, never replace a real one."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.display_name = "TPS62130 buck"  # a deliberate human name
+    staged.specs = {"Product Type": "Buck Converters", "Package": "16-VQFN"}
+
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+
+    assert record.display_name == "TPS62130 buck"

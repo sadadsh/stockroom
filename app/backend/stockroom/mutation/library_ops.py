@@ -278,10 +278,28 @@ class LibraryOps:
                 datasheet = staged.datasheet_meta or Datasheet()
                 datasheet.file = ds_name
 
+            # A part added with no human name arrives here with display_name == "" or the
+            # bare MPN (the UI seeds "" and candidateFromResult falls back to the MPN), which
+            # shipped ICs named "TPS62130RGTR". The namer that produces
+            # "<Product Type> <MPN> <package>" already existed but was only reachable via the
+            # rescan's rebuild_part, so a name was only fixed if the part happened to be
+            # rescanned later. Derive at ADD time. Only ever fills a blank-or-MPN name; a name
+            # the user actually typed is never overwritten.
+            from stockroom.ingest.component_naming import propose_component_name
+
+            display_name = staged.display_name
+            if not display_name.strip() or display_name.strip() == staged.mpn.strip():
+                display_name = (
+                    propose_component_name(
+                        staged.category, staged.specs, staged.mpn, staged.description
+                    )
+                    or staged.display_name
+                )
+
             # 5. the symbol's Footprint property, then mirror KiCad-visible fields
             record = PartRecord(
                 id=part_id,
-                display_name=staged.display_name,
+                display_name=display_name,
                 category=staged.category,
                 description=staged.description,
                 tags=list(staged.tags),
