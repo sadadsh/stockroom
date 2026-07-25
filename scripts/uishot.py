@@ -158,6 +158,9 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
             "Lifecycle": "Active", "Lead Time": "16 Weeks",
             "Country of Origin": "Japan", "US Tariff %": 0.0,
             "ECCN": "3A991",
+            # a product photo, so the Sourcing column's Product Photo affordance is actually
+            # reachable in a shot (punch 7 moved it there from a floating chip)
+            "Image": "https://example.invalid/tps62130.jpg",
             "HTS Code (US)": "8542.39.0001", "HTS Code (CN)": "8542330000",
             "HTS Code (CA)": "8542.39.00.01", "HTS Code (JP)": "854239",
             "HTS Code (MX)": "85423901", "HTS Code (EU TARIC)": "8542390000",

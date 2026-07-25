@@ -11,9 +11,12 @@ import {
 // outside src/ - the inventory JSON lives under the gitignored .planning/ and is not present in CI.
 
 describe("iconRegistry", () => {
-  it("has 60 entries with a matching by-id map", () => {
-    expect(ICON_REGISTRY).toHaveLength(60);
-    expect(ICON_BY_ID.size).toBe(60);
+  it("has 62 entries with a matching by-id map", () => {
+    // 62 as of Batch 4c: +action.view (an eye, replacing the literal word "View" on an asset tile)
+    // and +detail.datasheet-link (the document glyph that lets the datasheet row carry the same
+    // anatomy as Filing). Deliberate re-baseline, which is what this gate is for.
+    expect(ICON_REGISTRY).toHaveLength(62);
+    expect(ICON_BY_ID.size).toBe(62);
     for (const entry of ICON_REGISTRY) {
       expect(ICON_BY_ID.get(entry.id), entry.id).toBe(entry);
     }
@@ -30,12 +33,12 @@ describe("iconRegistry", () => {
     }
   });
 
-  it("has the expected per-category counts (primary 22 / bespoke 32 / art 3 / brand 3)", () => {
+  it("has the expected per-category counts (primary 22 / bespoke 34 / art 3 / brand 3)", () => {
     const counts = ICON_REGISTRY.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(counts).toEqual({ primary: 22, bespoke: 32, art: 3, brand: 3 });
+    expect(counts).toEqual({ primary: 22, bespoke: 34, art: 3, brand: 3 });
   });
 
   it("only uses the four declared categories", () => {

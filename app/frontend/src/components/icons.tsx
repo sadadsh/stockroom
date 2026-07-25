@@ -35,6 +35,10 @@ export function ExternalIcon({ className }: { className?: string }) {
   return <Icon id="action.external" className={className} />;
 }
 
+export function EyeIcon({ className }: { className?: string }) {
+  return <Icon id="action.view" className={className} />;
+}
+
 // Line art for the Symbol, Footprint and 3D Model file cards. Now registry glyphs; the wrappers
 // gain a `{ className }` prop for uniformity, but existing prop-less call sites are unaffected.
 export function SymbolArt({ className }: { className?: string }) {

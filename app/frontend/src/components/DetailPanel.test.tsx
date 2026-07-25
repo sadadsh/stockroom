@@ -491,14 +491,14 @@ describe("DetailPanel spec sheet + identity", () => {
     // commercial column's Trade And Compliance block instead of being dropped on the floor. The
     // rule this test protects is "the spec sheet is physical parameters", and that still holds.
     const sheet = document.querySelector('[data-dev-id="detail.specs"]')!;
-    for (const label of ["Country of Origin", "Malaysia", "Reel", "US Tariff %"]) {
+    for (const label of ["Country of Origin", "Malaysia", "Reel", "US Tariff"]) {
       expect(sheet.textContent).not.toContain(label);
     }
     // ...and they are NOT lost: the same values are in the trade block
     const trade = document.querySelector('[data-dev-id="detail.trade"]')!;
     expect(trade.textContent).toContain("Country of Origin");
     expect(trade.textContent).toContain("Malaysia");
-    expect(trade.textContent).toContain("US Tariff %");
+    expect(trade.textContent).toContain("US Tariff");
     expect(trade.textContent).toContain("Reel");
   });
 
@@ -902,5 +902,49 @@ describe("DetailPanel alternates alignment", () => {
     expect(entry.className).not.toContain("justify-between");
     // the same label-track width the parent row uses, so the value columns coincide
     expect(entry.className).toContain("10.5rem");
+  });
+});
+
+// -- punch 8 + 11: the Links row read as a bordered pill beside a bare pencil (two shapes, two
+// heights, reading as unrelated things), and the asset tiles spelled out the word "View" where a
+// glyph says it in less space.
+describe("DetailPanel links row anatomy", () => {
+  const withDatasheet = () =>
+    detail({
+      datasheet: { file: "", source_url: "https://ti.com/ds.pdf", fetched_at: "" },
+    });
+
+  it("gives the datasheet the same row anatomy as Filing, so the two read as siblings", () => {
+    wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={vi.fn()} />);
+    const row = document.querySelector('[data-dev-id="detail.datasheet-row"]')!;
+    const frame = row.querySelector(".h-\\[34px\\]");
+    expect(frame, "the datasheet should sit in the same 34px flat row Filing uses").toBeTruthy();
+  });
+
+  it("still opens the datasheet and still allows editing the link", async () => {
+    const user = userEvent.setup();
+    const onEditField = vi.fn();
+    wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={onEditField} />);
+    expect(screen.getByRole("link", { name: /Datasheet/i })).toHaveAttribute(
+      "href",
+      "https://ti.com/ds.pdf",
+    );
+    await user.click(screen.getByRole("button", { name: "Edit datasheet link" }));
+    const input = screen.getByLabelText("Datasheet link");
+    await user.clear(input);
+    await user.type(input, "https://x/y.pdf{Enter}");
+    expect(onEditField).toHaveBeenCalledWith("datasheet", "https://x/y.pdf");
+  });
+
+  it("says a missing datasheet plainly rather than showing an empty control", () => {
+    wrap(<DetailPanel detail={detail({ datasheet: null })} {...BASE} />);
+    expect(screen.getByText("None on file")).toBeTruthy();
+  });
+
+  it("shows an eye glyph instead of spelling out View on an asset tile", () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    // the word is gone; the affordance is the tile's own aria-label plus a glyph
+    expect(screen.queryByText("View")).toBeNull();
+    expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toBeTruthy();
   });
 });
