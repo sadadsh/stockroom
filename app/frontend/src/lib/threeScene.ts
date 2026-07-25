@@ -158,13 +158,11 @@ export function mountModelScene(
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
-  // alpha:false + an explicit background. A TRANSPARENT backdrop leaves the colour buffer
-  // undefined where nothing is drawn, which is what broke GTAO: the pass reads that buffer for
-  // its depth/normal reconstruction and rendered the model pure black. The scene now paints its
-  // own background instead of letting the page show through, so the AO pass has real pixels to
-  // work from. `sceneBackground` is read from the host element, so the viewer still matches the
-  // theme it sits in.
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  // TRANSPARENT, so the viewer sits in whatever panel hosts it and matches the theme with no
+  // colour of its own. This was briefly switched to alpha:false while hunting the black-model bug;
+  // that turned out to be missing vertex normals, so the opaque backdrop bought nothing and only
+  // painted a colour over the app's own.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height);
   // Filmic tone mapping so the bright metal highlights + deep shadow sides don't clip: this is
@@ -176,18 +174,6 @@ export function mountModelScene(
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  {
-    // take the tile's own background so light and dark themes both look native
-    const bg = getComputedStyle(container).backgroundColor;
-    const probe = new THREE.Color();
-    try {
-      if (bg && !bg.includes("rgba(0, 0, 0, 0)")) probe.setStyle(bg);
-      else probe.setStyle(getComputedStyle(document.body).backgroundColor || "#111214");
-    } catch {
-      probe.setStyle("#111214");
-    }
-    scene.background = probe;
-  }
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
 
   // IMAGE-BASED LIGHTING: a neutral studio room supplies realistic reflections + soft occlusion,
@@ -438,7 +424,11 @@ export function mountModelScene(
     renderMode = mode;
     if (!realisticMaterial) {
       realisticMaterial = new THREE.MeshStandardMaterial({
-        color: 0x2b2d33, // moulded epoxy, not light grey
+        // MEASURED from the real STEP's own COLOUR_RGB records: the epoxy body is
+        // (0.148, 0.145, 0.145) - near black. The converter drops STEP colour, so the GLB's single
+        // cream material is an artifact of the conversion rather than the part; this is the colour
+        // the downloaded file actually specifies.
+        color: 0x262525,
         roughness: 0.38,
         metalness: 0.1,
         envMapIntensity: 1.25,
@@ -460,9 +450,14 @@ export function mountModelScene(
       // invented "epoxy" colour was not realism, it was a different guess: the vendor already
       // said what the part looks like. A model with no material of its own falls back to the
       // epoxy surface so it still reads as a part rather than as nothing.
+      // The STEP carries real per-face colour, but our converter collapses it to ONE default
+      // material - so "the model's own colour" is a conversion artifact, not the part. Until the
+      // converter preserves it, a single-material model gets the epoxy black the STEP states.
+      const singleMaterialModel = new Set([...originalMaterials.values()].map((m) => m)).size <= 1;
       for (const m of modelMeshes) {
         const own = originalMaterials.get(m);
-        m.material = own ?? (realisticMaterial as THREE.Material);
+        m.material =
+          own && !singleMaterialModel ? own : (realisticMaterial as THREE.Material);
       }
     } else {
       const next = mode === "xray" ? xrayMaterial : studioMaterial;
@@ -552,6 +547,7 @@ export function mountModelScene(
   // the scene's is +Y up, so pad Y is negated once, here, where the conversion is visible.
   let landGroup: THREE.Group | null = null;
   let boardMesh: THREE.Mesh | null = null;
+
   let groundPlane: THREE.Mesh | null = null;
 
   /**
@@ -587,7 +583,9 @@ export function mountModelScene(
     if (boardMesh) {
       scene.remove(boardMesh);
       boardMesh.geometry.dispose();
-      (boardMesh.material as THREE.Material).dispose();
+      const bm = boardMesh.material as THREE.Material | THREE.Material[];
+      if (Array.isArray(bm)) bm.forEach((m) => m.dispose());
+      else bm.dispose();
       boardMesh = null;
     }
     if (landGroup) {
@@ -690,19 +688,33 @@ export function mountModelScene(
     const spanY = (Math.max(...ys) - Math.min(...ys)) * MM_TO_SCENE;
     const margin = Math.max(spanX, spanY) * 0.28 + 0.5 * MM_TO_SCENE;
     const boardT = boardThickness;
+    // A REAL BLACK PCB, not a tinted backdrop. Black solder mask is a very dark, slightly
+    // blue-grey resin with a soft sheen rather than a flat black - the clearcoat is what stops it
+    // reading as a hole cut in the screen. The ROUTED EDGE is different material: the bare FR4
+    // substrate underneath, which stays lighter and browner than the mask on a real board. A box
+    // takes six materials, so the four sides get the substrate and the faces get the mask.
+    const maskMat = new THREE.MeshPhysicalMaterial({
+      // A glossy near-black surface under a bright studio environment reflects most of it and
+      // reads GREY, which is what the first attempt did. Black mask needs the environment turned
+      // DOWN, not just a darker base colour: the mask is matte resin, and only a thin clearcoat
+      // sheen survives on a real board.
+      color: 0x08090b,
+      roughness: 0.55,
+      metalness: 0.0,
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.45,
+      envMapIntensity: 0.28,
+    });
+    const substrateMat = new THREE.MeshPhysicalMaterial({
+      color: 0x241f19,
+      roughness: 0.88,
+      metalness: 0.0,
+      envMapIntensity: 0.35,
+    });
     boardMesh = new THREE.Mesh(
       new THREE.BoxGeometry(spanX + margin, boardT, spanY + margin),
-      new THREE.MeshPhysicalMaterial({
-        // Neutral GRAPHITE mask rather than the classic green: the board here is a backdrop for
-        // checking a part, and a saturated green competes with the gold pads and tints the body's
-        // reflections. Grey stays out of the way and keeps the copper reading as copper.
-        color: 0x3a3d42,
-        roughness: 0.58,
-        metalness: 0.0,
-        clearcoat: 0.35,
-        clearcoatRoughness: 0.55,
-        envMapIntensity: 0.9,
-      }),
+      // BoxGeometry material order: +x, -x, +y(top), -y(bottom), +z, -z
+      [substrateMat, substrateMat, maskMat, maskMat, substrateMat, substrateMat],
     );
     // top face flush with the pad underside, so pads sit ON the mask rather than inside it
     boardMesh.position.set(0, modelBaseY - boardT / 2, 0);
