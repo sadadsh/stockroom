@@ -300,7 +300,16 @@ class LibraryOps:
             if staged.symbol_source is not None:
                 sym_lib = SymbolLib.load(sym_lib_path)
                 sym = sym_lib.get_symbol(staged.entry_name)
-                sym.set_property("Footprint", f"{nickname}:{staged.entry_name}")
+                # Guard on the FOOTPRINT, not the symbol. A symbol-only add is legitimate
+                # (the footprint is attached later), and stamping the property off symbol
+                # presence shipped a symbol claiming a footprint the .pretty does not hold
+                # while record.footprint stayed None -- a broken link on placement, and a
+                # schematic that reads as "has a footprint" when the library disagrees.
+                # Mirrors the attach path's guard in ingest/pipeline.py.
+                if record.footprint is not None:
+                    sym.set_property(
+                        "Footprint", f"{record.footprint.lib}:{record.footprint.name}"
+                    )
                 mirror_fields_to_symbol(sym, record)
                 sym_lib.save(sym_lib_path)
 
