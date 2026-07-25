@@ -162,3 +162,24 @@ def test_detach_asset_removes_one_element_and_400s_when_absent(client):
     # a bare kind with no tool is no longer a valid vocabulary word either
     assert client.delete("/api/library/parts/tps62130/assets/symbol").status_code == 400
     assert client.delete("/api/library/parts/nope/assets/kicad_symbol").status_code == 404
+
+
+def test_library_hygiene_endpoints_preview_then_apply(client, app_ctx):
+    """The library is what a peer CLONES, so a per-user file committed here reaches everyone. The
+    endpoints preview and then apply the union of every registered tool's rules."""
+    cache = app_ctx.repo.root / "fp-info-cache"
+    cache.write_text("machine cache\n", encoding="utf-8")
+    app_ctx.repo.commit("add a cache file the way a KiCad user would", [cache])
+
+    preview = client.get("/api/library/hygiene")
+    assert preview.status_code == 200, preview.text
+    assert "fp-info-cache" in preview.json()["untracked"]
+
+    applied = client.post("/api/library/hygiene")
+    assert applied.status_code == 200, applied.text
+    assert "fp-info-cache" in applied.json()["untracked"]
+    ignore = (app_ctx.repo.root / ".gitignore").read_text(encoding="utf-8")
+    assert "fp-info-cache" in ignore and "History/" in ignore  # both adapters contributed
+    # the file is still on disk; only git stopped sharing it
+    assert cache.exists()
+    assert client.post("/api/library/hygiene").json()["committed"] is None

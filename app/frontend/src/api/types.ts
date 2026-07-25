@@ -1502,6 +1502,27 @@ export interface AssignResult {
   bound: number;
 }
 
+// GET/POST /api/projects/{id}/hygiene and /api/library/hygiene -- workspace sync hygiene.
+//
+// Two peers conflict on every pull when an EDA tool's PER-USER files (KiCad's `.kicad_prl` window
+// state, the regenerated `fp-info-cache`) are committed. Syncing writes the ignore rules AND
+// untracks the files already committed, because an ignore rule does nothing to a file git already
+// tracks. Untracking leaves the file on disk; only git stops sharing it.
+export interface HygieneRead {
+  // present on the project endpoint only; the library covers every tool at once
+  eda?: string;
+  under_git?: boolean;
+  // the hygiene files whose content would change
+  writes: string[];
+  // repo-relative paths that would stop being shared
+  untracked: string[];
+}
+
+export interface HygieneResult extends HygieneRead {
+  project?: string;
+  committed: string | null;
+}
+
 // POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)
 export interface RestoreResult {
   project: string;

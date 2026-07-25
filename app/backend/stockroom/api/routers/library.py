@@ -379,6 +379,21 @@ def library_router(require_token) -> APIRouter:
         url = resolve_digikey_cad_source(record.mpn, digikey)
         return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
 
+    @r.get("/hygiene")
+    def get_library_hygiene(request: Request) -> dict:
+        # What syncing the LIBRARY's workspace hygiene would change. The library holds assets for
+        # every registered EDA tool, so it takes the union of their rules. Read-only, no git.
+        ctx = request.app.state.ctx
+        return ctx.ops.hygiene_read()
+
+    @r.post("/hygiene")
+    def sync_library_hygiene(request: Request) -> dict:
+        # Write the rules AND untrack the per-user files, as ONE commit on the library repo. Both
+        # halves are required: an ignore rule has no effect on a file git already tracks, and a peer
+        # cloning the library is exactly who inherits a committed `fp-info-cache`.
+        ctx = request.app.state.ctx
+        return ctx.ops.hygiene_apply()
+
     @r.post("/rescan")
     def rescan_library(request: Request, force: bool = False) -> dict:
         ctx = request.app.state.ctx

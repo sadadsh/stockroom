@@ -48,6 +48,8 @@ import type {
   PrepareRead,
   AssignGroupBody,
   AssignRead,
+  HygieneRead,
+  HygieneResult,
   AssignResult,
   ManualFillBody,
   ManualFillResult,
@@ -1022,6 +1024,16 @@ export const api = {
       `/api/projects/${encodeURIComponent(id)}/assign`,
       { body },
     );
+  },
+
+  // What syncing this project's workspace hygiene would change. Read-only.
+  getProjectHygiene(id: string): Promise<HygieneRead> {
+    return apiGet<HygieneRead>(`/api/projects/${encodeURIComponent(id)}/hygiene`);
+  },
+
+  // Write the ignore rules and untrack the per-user files they cover, as ONE commit.
+  syncProjectHygiene(id: string): Promise<HygieneResult> {
+    return request<HygieneResult>("POST", `/api/projects/${encodeURIComponent(id)}/hygiene`);
   },
 
   // Undo the project's last Prepare / Fill by git-reverting that commit as a new commit (M7f-D).
