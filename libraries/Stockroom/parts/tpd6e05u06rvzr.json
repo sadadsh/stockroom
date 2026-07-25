@@ -170,7 +170,25 @@
   },
   "description": "14VC Clamp 2.5A@8/20us Ipp ESD DIODE USON-14(1.4x3.5)",
   "display_name": "Steering TPD6E05U06RVZR USON-14",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TPD6E05U06RVZ"
+      },
+      "model": {
+        "file": "models/TPD6E05U06RVZ.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TPD6E05U06RVZ"
+      }
+    }
+  },
   "enrichment": {
     "Brand": {
       "confidence": "medium",
