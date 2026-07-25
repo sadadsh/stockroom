@@ -18,6 +18,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { orientUpright } from "./modelOrient";
+import { type Box, fitDistance as computeFitDistance, visibleBounds } from "./cameraFit";
 
 /** The canonical viewing directions. `iso` is the default 3/4; `top` looks straight down at the
  *  land pattern; `front` is the side elevation, which is how a datasheet draws package height. */
@@ -208,6 +209,9 @@ export function mountModelScene(
   // Captured once the model is framed, so a view change re-uses the SAME fit distance and the
   // part cannot appear to grow or shrink when you merely look at it from a different side.
   let fitDistance = 0;
+  // The point the camera orbits: the centre of whatever is VISIBLE, not a fixed origin. Held here
+  // so a canonical view change re-uses the same target the fit chose.
+  const fitTarget = new THREE.Vector3();
   let viewTween = 0;
   // The Y of the model's underside, captured when it is framed, so the land pattern lands exactly
   // under the body rather than at an arbitrary y=0.
@@ -368,21 +372,12 @@ export function mountModelScene(
       kd.updateProjectionMatrix();
       fill.position.set(-radius * 1.4, -radius * 0.3, -radius);
 
-      // The frame is usually wider than tall; fit the sphere to the SHORTER (vertical)
-      // extent so the model reads large, and account for aspect so a portrait frame still
-      // fits horizontally.
-      const vfov = (camera.fov * Math.PI) / 180;
-      const fitH = radius / Math.sin(vfov / 2);
-      const fitW = radius / Math.sin(vfov / 2) / Math.min(1, camera.aspect);
-      const dist = Math.max(fitH, fitW) * 0.98;
-      fitDistance = dist;
-      const dir = new THREE.Vector3(...VIEW_DIRECTIONS.iso).normalize();
-      camera.position.copy(dir.multiplyScalar(dist));
-      camera.near = radius / 100;
-      camera.far = radius * 100;
-      camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0);
-      controls.update();
+      // Point the camera down the canonical 3/4 direction, then let the SHARED fit decide how
+      // far along it to sit. One fit path, not two: a second copy of this arithmetic beside
+      // refitCamera would be free to disagree with it, and the disagreement would show up only
+      // as a model that changes size when a layer is toggled.
+      camera.position.set(...VIEW_DIRECTIONS.iso);
+      refitCamera();
     },
     () => {
       // GLTFLoader rejected the GLB (a format three does not accept, or a truncated
@@ -469,11 +464,54 @@ export function mountModelScene(
     for (const l of outlineSegments) l.visible = mode === "studio";
   }
 
+  /**
+   * Re-frame the camera around whatever is currently VISIBLE, keeping the direction it is
+   * already looking from.
+   *
+   * The fit used to be computed once, from the model alone, at load. The board and the land
+   * pattern are built later and are far larger than the part, so switching the PCB on shoved it
+   * out of frame; and a thin part alone in a tall stage came out at about a tenth of the
+   * viewport. Only the DISTANCE changes here - moving the camera's angle when someone toggles a
+   * layer would read as the viewer wrestling them for control.
+   */
+  function refitCamera() {
+    const boxes: Box[] = [];
+    const add = (object: THREE.Object3D | null) => {
+      if (!object || !object.visible) return;
+      const b = new THREE.Box3().setFromObject(object);
+      if (b.isEmpty()) return;
+      boxes.push({ min: b.min.toArray(), max: b.max.toArray() });
+    };
+    add(root.visible ? root : null);
+    add(landGroup);
+    add(boardMesh);
+    const bounds = visibleBounds(boxes);
+    if (!bounds || bounds.radius <= 0) return; // all hidden: hold the last good frame, don't lurch
+    const centre = new THREE.Vector3(...bounds.centre);
+    fitDistance = computeFitDistance(bounds.radius, camera.fov, camera.aspect);
+    // preserve the current viewing DIRECTION relative to the target; only the distance moves.
+    const direction = camera.position.clone().sub(controls.target);
+    if (direction.lengthSq() === 0) direction.set(...VIEW_DIRECTIONS.iso);
+    direction.normalize();
+    // Orbit the CENTRE of what is visible, not the origin. The part is centred on the origin but
+    // the board and pads hang below it, so an origin-locked target framed the subject low with a
+    // large empty band above it.
+    fitTarget.copy(centre);
+    controls.target.copy(centre);
+    camera.position.copy(centre).add(direction.multiplyScalar(fitDistance));
+    camera.near = Math.max(bounds.radius / 100, 1e-4);
+    camera.far = bounds.radius * 100;
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
+
   function setLayers(v: Partial<LayerVisibility>) {
     Object.assign(layers, v);
     root.visible = layers.model;
     if (landGroup) landGroup.visible = layers.pads;
     if (boardMesh) boardMesh.visible = layers.board;
+    // the visible set just changed, so the frame that fitted the old set no longer fits this one
+    refitCamera();
   }
 
   /** Tween the camera to a canonical direction. Short and ease-OUT, because the user is watching
@@ -486,16 +524,19 @@ export function mountModelScene(
     // it made the control look broken. The FIXED views (top/front) are the ones that must hold
     // still, because a "top" view that rotates away from top is not a top view.
     controls.autoRotate = mode === "iso";
+    // orbit whatever the fit chose as the centre, so a canonical view frames the same subject the
+    // free view does instead of snapping back to a fixed origin the content may not sit on.
     const target = new THREE.Vector3(...VIEW_DIRECTIONS[mode])
       .normalize()
-      .multiplyScalar(fitDistance);
+      .multiplyScalar(fitDistance)
+      .add(fitTarget);
     cancelAnimationFrame(viewTween);
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
       camera.position.copy(target);
-      controls.target.set(0, 0, 0);
+      controls.target.copy(fitTarget);
       controls.update();
       return;
     }
@@ -507,7 +548,7 @@ export function mountModelScene(
       // easeOutQuint: a strong ease-out, the curve family the built-in `ease-out` is too weak for
       const e = 1 - Math.pow(1 - t, 5);
       camera.position.lerpVectors(from, target, e);
-      controls.target.set(0, 0, 0);
+      controls.target.copy(fitTarget);
       controls.update();
       if (t < 1) viewTween = requestAnimationFrame(step);
     };
@@ -601,7 +642,11 @@ export function mountModelScene(
     }
     placement = land ? land.model_placement : null;
     applyPlacement();
-    if (!land || !land.pads.length) return;
+    if (!land || !land.pads.length) {
+      // the board and pads have just been REMOVED; the frame that held them is now far too wide
+      refitCamera();
+      return;
+    }
 
     // 1 scene unit == 1 MILLIMETRE (the model is scaled up by 1000 on load), so KiCad's pad
     // coordinates need no conversion at all. Kept as a named constant so the unit contract is
@@ -732,6 +777,10 @@ export function mountModelScene(
     group.visible = layers.pads;
     scene.add(group);
     landGroup = group;
+    // the board and the pads are BIGGER than the part and only exist from here on, so the frame
+    // that fitted the bare model would push them off screen. This is the moment the visible set
+    // grows, so it is the moment to re-fit.
+    refitCamera();
   }
 
   return {
