@@ -25,6 +25,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.footer", label: "Rail footer", area: "rail" },
   { id: "rail.nav-settings", label: "Settings nav item", area: "rail" },
   { id: "rail.about", label: "About button", area: "rail" },
+  { id: "rail.collapse", label: "Collapse rail toggle", area: "rail" },
   { id: "rail.utility", label: "Update + theme utility row", area: "rail" },
   { id: "rail.update", label: "Update / up-to-date control", area: "rail" },
   { id: "rail.theme-toggle", label: "Theme toggle", area: "rail" },
@@ -250,6 +251,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "shell.root", label: "App frame", area: "shell" },
   { id: "shell.content", label: "Page content column", area: "shell" },
   { id: "shell.drop-overlay", label: "Drag-and-drop overlay", area: "shell" },
+  { id: "shell.profile-switch", label: "Active profile switcher", area: "shell" },
+  { id: "shell.profile-menu", label: "Profile switch menu", area: "shell" },
   { id: "shell.statusbar", label: "Bottom status bar", area: "shell" },
 ];
 
