@@ -504,3 +504,178 @@ class TestScalablePreviewSvg:
         assert 'viewBox="0.000000 0.000000 2.641600 4.114800"' in out
         assert "<!DOCTYPE svg" in out, "the preamble must survive untouched"
         assert "<rect/>" in out
+
+
+def test_every_preview_cache_key_carries_a_render_version_token():
+    """GATE. A preview cache key is content-addressed on the SOURCE file, which does not
+    change when the RENDER or CONVERSION code does. Without a version token in the key, a
+    fix ships green and is never seen: every machine with a warm cache keeps serving the
+    old blob. Both GLB keys were built that way and the 3D model conversion fix was
+    invisible until this gate existed. Scans the built key expressions rather than a
+    hand-listed set, so a NEW cache key cannot quietly omit its token."""
+    import ast
+    import inspect
+
+    from stockroom.api.routers import previews
+
+    source = inspect.getsource(previews)
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        # every cache key in this module is `key = f"..."` / `cached = _cache_dir(...) / f"..."`
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.JoinedStr):
+            continue
+        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if "key" not in names:
+            continue
+        literal = "".join(
+            part.value for part in node.value.values if isinstance(part, ast.Constant)
+        )
+        if not literal.endswith((".svg", ".glb")):
+            continue
+        referenced = {
+            n.id
+            for part in node.value.values
+            if isinstance(part, ast.FormattedValue)
+            for n in ast.walk(part)
+            if isinstance(n, ast.Name)
+        }
+        if not any(name.endswith("_VERSION") for name in referenced):
+            offenders.append((literal, sorted(referenced)))
+    assert offenders == [], (
+        "these preview cache keys carry no *_VERSION token, so a render/conversion change "
+        f"will never reach a warm cache: {offenders}"
+    )
+
+
+class TestRefitViewBox:
+    """kicad-cli sizes a footprint's viewBox from the footprint's FULL extent - including the
+    Reference/Value text and layers the preview deliberately does not draw. MEASURED on the real
+    TPD6E05U06RVZR: the viewBox is `0 0 11.049 6.4008` mm and is BYTE-IDENTICAL whether the text
+    is hidden or not and whether `--layers` is restricted or not, so it is not content-derived at
+    all. The drawn copper then occupies a few percent of it and the tile shows a tiny stamp in a
+    sea of empty space - which is what "the footprint preview looks broken" actually is. Stripping
+    width/height (scalable_svg) does not help: it makes the OVERSIZED box scale, not shrink."""
+
+    def _refit(self, src):
+        from stockroom.api.routers.previews import refit_viewbox
+
+        return refit_viewbox(src)
+
+    def _box(self, svg):
+        import re
+
+        m = re.search(r'viewBox="([^"]*)"', svg)
+        return [float(v) for v in m.group(1).replace(",", " ").split()]
+
+    def test_a_viewbox_far_larger_than_its_content_is_refit_to_the_content(self):
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<path style="fill:#c00;stroke:none;" d="M 40,40 42,40 42,42 40,42 Z"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        # the content is a 2x2 square at (40,40); the refit must bound it closely, never keep 100x100
+        assert w < 10 and h < 10, f"viewBox was not refit: {(x, y, w, h)}"
+        assert x <= 40 and y <= 40 and x + w >= 42 and y + h >= 42, "content fell outside the box"
+
+    def test_the_refit_keeps_a_stroked_edge_inside_the_box(self):
+        # a stroke straddles its path, so half of it sits OUTSIDE the geometric bbox. Refitting to
+        # the bare coordinates would shave the outer half of every courtyard line off the preview.
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<path style="fill:none;stroke:#000;stroke-width:2.000000;" d="M 40,40 60,40"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert x <= 39.0 and x + w >= 61.0, f"stroke half-width not accounted for: {(x, y, w, h)}"
+
+    def test_a_circle_counts_as_content(self):
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<circle cx="50" cy="50" r="5"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert x <= 45 and y <= 45 and x + w >= 55 and y + h >= 55
+        assert w < 30 and h < 30
+
+    def test_an_svg_with_no_geometry_is_left_alone(self):
+        # never emit a degenerate or inverted viewBox; an empty drawing keeps whatever it had.
+        src = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><title>x</title></svg>'
+        assert self._refit(src) == src
+
+    def test_an_svg_with_no_viewbox_is_left_alone(self):
+        src = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M 1,1 2,2"/></svg>'
+        assert self._refit(src) == src
+
+    def test_content_already_filling_its_box_is_barely_changed(self):
+        # the refit must not ZOOM a symbol that kicad already framed sensibly.
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+            '<path style="stroke:none;" d="M 0,0 10,0 10,10 0,10 Z"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert w >= 10 and h >= 10 and w < 13 and h < 13
+
+
+@requires_kicad_cli
+def test_footprint_preview_fills_its_frame_rather_than_stamping_a_speck(app_ctx):
+    """END TO END, through the real endpoint and the REAL kicad-cli: the served SVG's drawn
+    content must occupy a real fraction of its viewBox. The condition is reproduced exactly as
+    the owner's part hits it - small pads plus a Reference text far larger than them - because
+    kicad-cli sizes the viewBox from the text too, then the preview hides the text and draws
+    only copper. Measured on the real TPD6E05U06RVZR before the refit: under 10%."""
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
+
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        # a 2mm-tall refdes parked 6mm away: this is what inflates the viewBox, and it is
+        # hidden before anything is drawn, so nothing in the output accounts for it.
+        '\t(property "Reference" "REF**" (at 0 -6 0) (layer "F.SilkS") (effects (font (size 2 2))))\n'
+        '\t(property "Value" "TPS62130" (at 0 6 0) (layer "F.Fab") (effects (font (size 2 2))))\n'
+        # F.SilkS line work far outside the pads. The preview restricts itself to copper and
+        # courtyard, so this is NOT drawn - yet kicad-cli still counts it when sizing the
+        # viewBox. This is the half that hiding text could never fix, and it is why the refit
+        # works on the emitted SVG rather than on the footprint.
+        '\t(fp_line (start -8 -5) (end 8 -5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))\n'
+        '\t(fp_line (start -8 5) (end 8 5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))\n'
+        '\t(pad "1" smd rect (at -0.5 0) (size 0.6 0.3) (layers "F.Cu"))\n'
+        '\t(pad "2" smd rect (at 0.5 0) (size 0.6 0.3) (layers "F.Cu"))\n'
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+    with TestClient(
+        create_app(app_ctx),
+        base_url="http://test",
+        raise_server_exceptions=False,
+        headers={"X-Stockroom-Token": "testtoken"},
+    ) as client:
+        response = client.get("/api/previews/footprint/tps62130.svg")
+    if response.status_code != 200:
+        pytest.skip(f"footprint preview unavailable here ({response.status_code})")
+    body = response.text
+    box = re.search(r'viewBox="([^"]*)"', body)
+    assert box, "the served footprint SVG has no viewBox"
+    vx, vy, vw, vh = (float(v) for v in box.group(1).replace(",", " ").split())
+    xs, ys = [], []
+    for d in re.findall(r'\sd="([^"]*)"', body):
+        nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", d)]
+        xs += nums[0::2]
+        ys += nums[1::2]
+    for cx, cy, cr in re.findall(r'<circle[^>]*cx="([\d.-]+)"[^>]*cy="([\d.-]+)"[^>]*r="([\d.-]+)"', body):
+        xs += [float(cx) - float(cr), float(cx) + float(cr)]
+        ys += [float(cy) - float(cr), float(cy) + float(cr)]
+    assert xs and ys, "the footprint SVG drew no geometry at all"
+    coverage = ((max(xs) - min(xs)) * (max(ys) - min(ys))) / (vw * vh)
+    assert coverage > 0.4, (
+        f"the footprint art fills only {coverage:.1%} of its viewBox "
+        f"(box {vw:.3f}x{vh:.3f}), so the tile renders a speck"
+    )

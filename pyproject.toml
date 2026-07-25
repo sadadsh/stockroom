@@ -54,6 +54,10 @@ dev = [
     # Adopted only after proving the parallel run reports the SAME pass count as the serial one,
     # because a faster suite that quietly loses tests is worse than a slow one.
     "pytest-xdist>=3.6",
+    # scripts/pixelprobe.py reads what a screenshot ACTUALLY contains. The standing rule is to
+    # critique a shot by measuring it, never by eye, and every visual slice was hand-rolling the
+    # same throwaway Pillow snippet to do it.
+    "pillow>=10.0",
 ]
 
 [tool.hatch.build.targets.wheel]

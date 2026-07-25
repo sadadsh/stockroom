@@ -2,15 +2,32 @@
 
 The library stores each part's 3D model as the KiCad file the user dropped in, which
 is normally STEP (a footprint may instead carry a WRL/VRML mesh). The browser's
-three.js viewer wants GLB, so this shells STEP through trimesh (which reads it via
-cascadio) and emits a single binary glTF. trimesh has no VRML loader, so WRL/VRML
-models are not convertible yet and are reported honestly (never a "install cascadio"
-misdirection). The stack is OPTIONAL tooling: when trimesh/cascadio are not installed
-the caller surfaces an honest 502, never a crash, and the symbol/footprint SVG
-previews still work without it."""
+three.js viewer wants GLB, so a STEP is converted by cascadio (OpenCASCADE) and its
+bytes are handed straight through; anything else trimesh loads natively is exported by
+trimesh. trimesh has no VRML loader, so WRL/VRML models are not convertible yet and are
+reported honestly (never a "install cascadio" misdirection). The stack is OPTIONAL
+tooling: when trimesh/cascadio are not installed the caller surfaces an honest 502,
+never a crash, and the symbol/footprint SVG previews still work without it.
+
+**STEP does NOT go through trimesh, deliberately.** It used to, and the round trip
+through trimesh's scene model silently destroyed two things the viewer needs, because
+trimesh re-exports its own idea of the scene rather than passing the bytes on:
+  * every material past the first was MERGED AWAY. Measured: the owner's part declares
+    three colours (grey leads / orange pin-1 marker / black epoxy) and arrived with two;
+    a stock `PinHeader_2x31` and `DIP-4_W7.62mm_SMDSocket` each declare two and arrived
+    with one. The surviving colour was also requantised to 8 bits.
+  * `NORMAL` attributes were DROPPED from primitives that had them, so the model shaded
+    flat and a screen-space ambient-occlusion pass reconstructed garbage from the
+    missing normals and rendered it black.
+A single-colour model survived either path intact, which is why the loss went unseen.
+Both outputs are in glTF's mandated METRES (verified: a 3.5mm part measures 0.0035 on
+both paths), so the viewer's millimetre normalisation is unaffected by the route taken."""
 
 from __future__ import annotations
 
+import json
+import struct
+import tempfile
 from pathlib import Path
 
 # GLB (binary glTF) starts with the ASCII magic "glTF"; named here so the converter
@@ -21,6 +38,10 @@ GLB_MAGIC = b"glTF"
 # WRL, so it gets an honest "not convertible yet" message, not a tooling-missing one.
 _UNSUPPORTED_SUFFIXES = {".wrl", ".vrml", ".x3d"}
 
+# STEP is converted by cascadio directly rather than through trimesh (see the module
+# docstring). Both spellings are in real use in KiCad libraries.
+_STEP_SUFFIXES = {".step", ".stp"}
+
 
 class ModelToolingMissing(RuntimeError):
     """trimesh (and cascadio for STEP) are not installed, so 3D previews cannot be
@@ -30,6 +51,59 @@ class ModelToolingMissing(RuntimeError):
 class ModelConversionError(RuntimeError):
     """The model file is present but could not be turned into a GLB (an unreadable
     STEP, an empty mesh, a format trimesh has no loader for). Honest, not a crash."""
+
+
+def _glb_mesh_count(data: bytes) -> int:
+    """How many meshes the GLB declares, read from its JSON chunk.
+
+    An empty conversion is a real outcome (a STEP that carries only assembly structure,
+    or geometry OpenCASCADE could not tessellate), and it must be an honest 502 rather
+    than a valid-looking GLB the viewer renders as a blank canvas. A JSON chunk we
+    cannot parse counts as no meshes for the same reason."""
+    if data[:4] != GLB_MAGIC:
+        return 0
+    offset = 12
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from("<II", data, offset)
+        if kind == 0x4E4F534A:  # 'JSON'
+            try:
+                return len(json.loads(data[offset + 8 : offset + 8 + length]).get("meshes", []))
+            except Exception:
+                return 0
+        offset += 8 + length
+    return 0
+
+
+def _step_to_glb(src: Path) -> bytes:
+    """Convert a STEP with cascadio and return its bytes UNTOUCHED.
+
+    Passing the bytes through is the whole point: cascadio writes one material per STEP
+    colour and a NORMAL attribute per primitive, and re-encoding the result through any
+    scene model risks losing exactly those (which is what trimesh did). cascadio only
+    writes to a path, so it goes to a temp file that is read back and discarded."""
+    try:
+        import cascadio
+    except Exception as exc:  # ImportError, or a broken partial install
+        raise ModelToolingMissing(
+            "3D preview needs the 'cascadio' package to read STEP files; install it to "
+            "enable 3D model previews"
+        ) from exc
+
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "model.glb"
+        try:
+            cascadio.step_to_glb(str(src), str(out))
+        except Exception as exc:
+            raise ModelConversionError(f"could not read the 3D model: {exc}") from exc
+        if not out.exists():
+            raise ModelConversionError("the 3D exporter did not produce a valid GLB")
+        data = out.read_bytes()
+
+    if not data.startswith(GLB_MAGIC):
+        raise ModelConversionError("the 3D exporter did not produce a valid GLB")
+    if _glb_mesh_count(data) == 0:
+        raise ModelConversionError("the 3D model has no geometry to show")
+    return data
 
 
 def model_to_glb(src: Path) -> bytes:
@@ -45,6 +119,8 @@ def model_to_glb(src: Path) -> bytes:
             f"3D preview supports STEP models; {src.suffix.lower()} models are not "
             "convertible yet"
         )
+    if src.suffix.lower() in _STEP_SUFFIXES:
+        return _step_to_glb(src)
     try:
         import trimesh
     except Exception as exc:  # ImportError, or a broken partial install
