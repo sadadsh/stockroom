@@ -65,10 +65,12 @@ import {
   FootprintArt,
   RefreshIcon,
   SymbolArt,
+  TrashIcon,
   UploadIcon,
   WarnIcon,
 } from "./icons";
 import {
+  IconButton,
   TabStrip,
   tabButtonId,
   tabPanelId,
@@ -135,6 +137,10 @@ interface Props {
   // missing-asset tiles offer no Attach affordance.
   onAttachSymbol?: (lib: string, name: string) => void;
   onAttachFootprint?: (lib: string, name: string) => void;
+  // TRUE only while the delete itself is in flight. Distinct from `busy`, which is the panel's
+  // aggregate write flag: spinning the delete control because a symbol is attaching would claim an
+  // action the user never started.
+  deleting?: boolean;
   // Putting a DIFFERENT source's answer in force for a spec. It routes through the specs seam
   // (which carries provenance per key), not onEditField, because a spec is not a record field
   // and the swap must record WHICH distributor the new value came from.
@@ -155,6 +161,7 @@ export function DetailPanel({
   onAttachSymbol,
   onAttachFootprint,
   onUseSpecValue,
+  deleting = false,
   busy = false,
 }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -592,18 +599,24 @@ export function DetailPanel({
         </WorkbenchPanel>
 
       {/* footer: filing moved into the part pane; a destructive action never earns prime real
-          estate, so Delete stays as the quiet text link at the far edge. */}
+          estate, so Delete sits at the far edge - but as a GLYPH that states its consequence when
+          you approach it, not as dim text that reads like a caption (punch 15). The shared
+          IconButton carries the reveal, the tone and the running state, so every other destructive
+          action in the app inherits the same language for free. */}
       <footer data-dev-id="detail.footer" className="mt-3 flex flex-none items-center justify-end border-t border-line pt-2.5">
         {onDelete ? (
-          <button
+          <IconButton
             data-dev-id="detail.delete"
-            type="button"
+            compact
+            small
+            variant="ghost-danger"
+            icon={<TrashIcon />}
+            label="Delete Part?"
+            pending={deleting}
+            pendingLabel="Deleting"
             onClick={() => setConfirmDelete(true)}
             disabled={busy}
-            className="text-xs text-t3 transition-colors hover:text-err disabled:opacity-50"
-          >
-            <Text id="detail.delete">Delete Part</Text>
-          </button>
+          />
         ) : null}
       </footer>
       </div>

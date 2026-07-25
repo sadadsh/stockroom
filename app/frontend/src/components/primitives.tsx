@@ -3,6 +3,7 @@
  * Interactive labels are Title Case, and there are no em dashes in any copy
  * (owner rules). Radii use the 8/6 tokens (rounded-card / rounded-control).
  */
+import { useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
@@ -37,6 +38,34 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
 }
 
+// Flat, bordered controls (Altium): hover is a colour shift, not a lift + shadow. The press
+// scale in the base string keeps them tactile; separation comes from the border, not elevation.
+//
+// Module scope, not local to Button, because IconButton's compact mode reads the SAME table. It
+// used to hardcode its own neutral treatment and ignore `variant` entirely, so a compact
+// destructive action could not read as destructive and the two controls' tones could drift apart.
+const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
+  default:
+    "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1",
+  accent:
+    "border-transparent bg-acc text-acc-on hover:brightness-110 font-semibold",
+  danger:
+    "border-transparent bg-err text-white hover:brightness-110 font-semibold",
+  // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
+  // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
+  // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
+  // token is mixed against transparent so the tint adapts to both themes; text stays full err
+  // (>=3:1 both themes). Hover is a colour shift only (flat idiom); 6px radius from `base`.
+  "ghost-danger":
+    "border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
+    "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err font-semibold " +
+    "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
+    "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
+  // A neutral action tile (north-star .addbtn), flat: a bordered fill that brightens on hover.
+  soft:
+    "border-line2 bg-raise2 text-t1 font-semibold hover:brightness-125",
+};
+
 export function Button({
   variant = "default",
   small = false,
@@ -53,32 +82,9 @@ export function Button({
     "focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-50 " +
     "disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none";
   const size = small ? "h-[27px] px-2.5 text-xs" : "h-[31px] px-3 text-sm";
-  // Flat, bordered controls (Altium): hover is a colour shift, not a lift + shadow. The press
-  // scale in `base` keeps them tactile; separation comes from the border, not elevation.
-  const variants: Record<ButtonVariant, string> = {
-    default:
-      "border-line bg-raise text-t2 hover:bg-raise2 hover:text-t1",
-    accent:
-      "border-transparent bg-acc text-acc-on hover:brightness-110 font-semibold",
-    danger:
-      "border-transparent bg-err text-white hover:brightness-110 font-semibold",
-    // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
-    // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
-    // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
-    // token is mixed against transparent so the tint adapts to both themes; text stays full err
-    // (>=3:1 both themes). Hover is a colour shift only (flat idiom); 6px radius from `base`.
-    "ghost-danger":
-      "border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
-      "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err font-semibold " +
-      "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
-      "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
-    // A neutral action tile (north-star .addbtn), flat: a bordered fill that brightens on hover.
-    soft:
-      "border-line2 bg-raise2 text-t1 font-semibold hover:brightness-125",
-  };
   return (
     <button
-      className={cx(base, size, variants[variant], className)}
+      className={cx(base, size, BUTTON_VARIANTS[variant], className)}
       {...rest}
     >
       {icon}
@@ -97,6 +103,9 @@ export function IconButton({
   compact = false,
   variant = "default",
   small = false,
+  pending = false,
+  pendingLabel,
+  disabled = false,
   className,
   ...rest
 }: {
@@ -105,43 +114,147 @@ export function IconButton({
   compact?: boolean;
   variant?: ButtonVariant;
   small?: boolean;
+  // An action that is RUNNING says so in the control itself: the glyph becomes a spinner, the label
+  // becomes `pendingLabel`, and the control is pinned open and refuses further clicks. Putting the
+  // state here rather than in a modal or a toast is the point - it is the thing the user pressed.
+  pending?: boolean;
+  // The same verb as `label`, in the present progressive ("Deleting"), and the same verb the
+  // resulting toast should use ("Deleted"). One vocabulary through the whole flow.
+  pendingLabel?: string;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const active = pending && !!pendingLabel;
+  const shown = active ? pendingLabel! : label;
   if (!compact) {
     return (
-      <Button variant={variant} small={small} icon={icon} className={className} {...rest}>
-        {label}
+      <Button
+        {...rest}
+        variant={variant}
+        small={small}
+        icon={active ? <ButtonSpinner /> : icon}
+        className={className}
+        aria-busy={active || undefined}
+        // computed props sit AFTER the spread: with the spread last, a caller's `disabled={false}`
+        // silently overwrote the pending lock and a running action stayed clickable.
+        disabled={active || disabled}
+      >
+        {shown}
       </Button>
     );
   }
+  return (
+    <CompactIconButton
+      {...rest}
+      icon={active ? <ButtonSpinner /> : icon}
+      shown={shown}
+      variant={variant}
+      small={small}
+      active={active}
+      disabled={active || disabled}
+      className={className}
+    />
+  );
+}
+
+/**
+ * The compact form: a glyph at rest that states its consequence when approached.
+ *
+ * Hover/focus is tracked in state rather than with `group-hover:` utilities because the TONE has to
+ * arrive WITH the label. At rest the control wears no border and no tint - a permanently bordered
+ * red box in the corner is louder than the dim text it replaced, and contradicts the repo's own rule
+ * that a ghost-danger trigger "reads as available without shouting" (caught in a screenshot, not by
+ * a test). Prefixing a whole variant string with `hover:` would have meant a second copy of every
+ * tone decision, which is the duplication hoisting BUTTON_VARIANTS just removed.
+ */
+function CompactIconButton({
+  icon,
+  shown,
+  variant,
+  small,
+  active,
+  className,
+  ...rest
+}: {
+  icon: ReactNode;
+  shown: string;
+  variant: ButtonVariant;
+  small: boolean;
+  active: boolean;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  // Focus counts as approaching, so a keyboard user is told the consequence too instead of being
+  // asked to press an unlabelled glyph. `active` pins it open: a control that collapsed halfway
+  // through its own action would leave the user watching an unlabelled spinner.
+  const revealed = hovered || focused || active;
   const size = small ? "h-[27px] px-2" : "h-[31px] px-2.5";
   return (
     <button
+      {...rest}
       type="button"
-      aria-label={label}
-      title={label}
+      aria-label={shown}
+      title={shown}
+      aria-busy={active || undefined}
+      data-revealed={revealed ? "true" : "false"}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       className={cx(
-        "group inline-flex items-center gap-1.5 rounded-control border border-line bg-raise " +
-          "font-medium text-t2 transition-[color,background-color,box-shadow,transform] duration-150 " +
-          "ease-spring will-change-transform active:scale-[0.96] hover:bg-raise2 hover:text-t1 hover:shadow-card " +
+        "group inline-flex items-center gap-1.5 rounded-control border " +
+          "font-medium transition-[color,background-color,border-color,box-shadow,transform] " +
+          "duration-150 ease-spring will-change-transform active:scale-[0.96] " +
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
           "focus-visible:outline-acc disabled:cursor-not-allowed disabled:opacity-50",
+        revealed
+          ? BUTTON_VARIANTS[variant]
+          // At rest: the glyph alone. Muted for a neutral action, tinted for a destructive one, so
+          // a delete still reads as a delete before you touch it - just without a box around it.
+          : cx(
+              "border-transparent bg-transparent",
+              variant === "ghost-danger" || variant === "danger"
+                ? "text-[color-mix(in_srgb,var(--c-err)_70%,transparent)]"
+                : "text-t3",
+            ),
         size,
         className,
       )}
-      {...rest}
     >
       {icon}
       <span
-        className={
-          "max-w-0 overflow-hidden whitespace-nowrap text-xs opacity-0 transition-all duration-150 " +
-          "group-hover:ml-0.5 group-hover:max-w-[10rem] group-hover:opacity-100 " +
-          "group-focus-visible:ml-0.5 group-focus-visible:max-w-[10rem] group-focus-visible:opacity-100 " +
-          "motion-reduce:transition-none"
-        }
+        className={cx(
+          "overflow-hidden whitespace-nowrap text-xs transition-all duration-150 " +
+            "motion-reduce:transition-none",
+          revealed ? "ml-0.5 max-w-[10rem] opacity-100" : "max-w-0 opacity-0",
+        )}
       >
-        {label}
+        {shown}
       </span>
     </button>
+  );
+}
+
+// The one in-control running indicator. Reduced motion is handled globally by the app's
+// <MotionConfig reducedMotion="user"> plus this class, so a user who asked for stillness gets a
+// static ring rather than a spin.
+function ButtonSpinner() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5 flex-none animate-spin motion-reduce:animate-none"
+    >
+      <circle
+        cx="8"
+        cy="8"
+        r="6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="28"
+        strokeDashoffset="10"
+      />
+    </svg>
   );
 }
 

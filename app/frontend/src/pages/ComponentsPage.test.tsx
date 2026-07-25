@@ -234,7 +234,7 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Delete Part" }));
+    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
     const dialog = await screen.findByRole("dialog");
     // Nothing deleted until the dialog's own confirm is clicked.
     expect(mockApi.deletePart).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe("ComponentsPage", () => {
     await screen.findByText("Dual Operational Amplifier");
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
 
-    await user.click(await screen.findByRole("button", { name: "Delete Part" }));
+    await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
     await user.click(
       within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }),
     );

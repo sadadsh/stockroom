@@ -306,6 +306,7 @@ export function ComponentsPage() {
               onDelete={handleDelete}
               onApplyPinout={handleApplyPinout}
               onUseSpecValue={handleUseSpecValue}
+              deleting={deletePart.isPending}
               onAttachSymbol={handleAttachSymbol}
               onAttachFootprint={handleAttachFootprint}
               busy={detailBusy}
