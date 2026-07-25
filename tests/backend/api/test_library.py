@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 
 def test_list_all_parts(client):
     r = client.get("/api/library/parts")
@@ -183,3 +185,39 @@ def test_library_hygiene_endpoints_preview_then_apply(client, app_ctx):
     # the file is still on disk; only git stopped sharing it
     assert cache.exists()
     assert client.post("/api/library/hygiene").json()["committed"] is None
+
+
+def test_library_lfs_endpoints_report_then_adopt(client, app_ctx):
+    """Batch 2 item 4, reachable from the app: the status is honest before adoption, adopting
+    writes the rules AND wires the filter, and the next binary is stored as a pointer."""
+    import shutil as _shutil
+    import subprocess as _subprocess
+
+    if _shutil.which("git") is None or _subprocess.run(
+        ["git", "lfs", "version"], capture_output=True
+    ).returncode != 0:
+        pytest.skip("git-lfs not installed")
+
+    before = client.get("/api/library/lfs")
+    assert before.status_code == 200, before.text
+    body = before.json()
+    assert body["installed"] is True
+    assert body["adopted"] is False
+    # the offer is concrete: it names what WOULD be routed through LFS
+    assert any("PcbLib" in p for p in body["covers"])
+    assert any(".step" in p for p in body["covers"])
+
+    applied = client.post("/api/library/lfs")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["adopted"] is True
+
+    after = client.get("/api/library/lfs").json()
+    assert after["adopted"] is True
+    assert any("PcbLib" in p for p in after["tracked_patterns"])
+
+    root = app_ctx.repo.root
+    payload = root / "part.PcbLib"
+    payload.write_bytes(b"OLE2 compound bytes" * 200)
+    app_ctx.repo.commit("capture a part", [payload])
+    stored = app_ctx.repo._run("cat-file", "-p", "HEAD:part.PcbLib").stdout
+    assert stored.startswith("version https://git-lfs.github.com/spec/v1")

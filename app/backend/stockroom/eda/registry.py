@@ -124,6 +124,21 @@ class EdaTool:
     # Formats that ARE text and must not be misdetected as binary (they diff and merge
     # normally, and we want that).
     text: tuple[str, ...] = ()
+    # Patterns whose CONTENT belongs in git-lfs rather than in the git object database. Every
+    # captured part otherwise adds a permanent, un-GC-able copy to history for every future cloner,
+    # so a growing binary library makes every clone slower forever. Must be a SUBSET of `binary`:
+    # a text format sent to LFS would stop diffing, which is the opposite of what it is for.
+    lfs: tuple[str, ...] = ()
+    # The subset of `lfs` that also gets git-lfs's check-out semantics (`lockable`): the file is
+    # checked out READ-ONLY and only becomes writable to whoever holds the lock, which is the real
+    # answer to "two people, never any errors" on a format nothing can merge.
+    #
+    # MEASURED 2026-07-25, and it decides what may appear here: a lockable file really is
+    # `-r--r--r--` on disk, and `git lfs lock` FAILS outright (`missing protocol: ""`) on a repo
+    # with no remote. So only files STOCKROOM ITSELF NEVER WRITES may be listed, or the app would
+    # break its own operations (the Altium 3D embed writes into the .PcbLib), and emitting it at
+    # all is gated on a live probe rather than assumed.
+    lockable: tuple[str, ...] = ()
     # Files STOCKROOM ITSELF generates from the library records for this tool, and can regenerate
     # at any time. Kept apart from `ignore` because the two are different facts with different
     # remedies: a per-user file is somebody's window state and is gone for good, while a derived
@@ -202,6 +217,10 @@ _KICAD = EdaTool(
         "*.net",
     ),
     binary=("*.wrl", "*.step", "*.stp"),
+    # The 3D models are the only KiCad payload that is genuinely binary and genuinely grows: a
+    # STEP file is megabytes and every captured part adds one. Nothing here is lockable, because
+    # Stockroom writes the models itself (ingest, doctor repair, capture).
+    lfs=("*.wrl", "*.step", "*.stp"),
     # Stockroom edits .kicad_sch through the byte-preserving sexp layer, so a KiCad binding
     # lives in the schematic itself: written in the SAME transaction as the fill it records,
     # untouched by annotation, and carried to a peer by the project's own git.
@@ -256,6 +275,20 @@ _ALTIUM = EdaTool(
         "*.SchDoc",
         "*.PcbLib3D",
     ),
+    # Every Altium payload is an OLE2 compound document, so all of them belong in LFS.
+    lfs=(
+        "*.PcbLib",
+        "*.SchLib",
+        "*.IntLib",
+        "*.PcbDoc",
+        "*.SchDoc",
+        "*.PcbLib3D",
+    ),
+    # Only the DESIGN documents. They are the files two people genuinely fight over, and Stockroom
+    # only ever READS them. The libraries are deliberately absent: Stockroom writes a .PcbLib when
+    # it embeds a 3D body and a .SchLib when it attaches captured assets, and a read-only checkout
+    # would make its own operations fail with a permission error.
+    lockable=("*.PcbDoc", "*.SchDoc"),
     # INI-style text -- the DbLib is emitted as deterministic INI by altium/dblib.py, so
     # marking it binary would destroy the diffability that makes review possible.
     text=("*.DbLib", "*.PrjPcb", "*.PrjScr", "*.OutJob"),
@@ -384,13 +417,32 @@ def workspace_gitignore(keys=(), *, extra_tools=()) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def workspace_gitattributes(keys=(), *, extra_tools=()) -> str:
+def workspace_gitattributes(keys=(), *, extra_tools=(), lfs: bool = False,
+                            lockable: bool = False) -> str:
     """The `.gitattributes` for a workspace holding files for `keys`.
 
     `binary` (= `-diff -merge -text`) both protects the bytes and makes git refuse to
     auto-merge a format that cannot be merged, which turns silent corruption into a
     conflict a human can actually resolve.
+
+    `lfs=True` additionally stores the declared binary payloads in git-lfs, so a growing library
+    stops adding a permanent copy of every captured part to every future clone. The line emitted is
+    `filter=lfs binary`, deliberately NOT the ecosystem's canned
+    `filter=lfs diff=lfs merge=lfs -text`. MEASURED 2026-07-25: git-lfs registers no `lfs` merge
+    driver, so `merge=lfs` falls back to git's TEXT merge on the POINTER file and writes conflict
+    markers inside it, leaving a corrupt pointer that a careless `git add` would commit. Keeping the
+    `binary` macro gives LFS storage AND take-ours-and-conflict semantics; `git check-attr` confirms
+    the combination resolves to `filter: lfs` with diff/merge/text unset.
+
+    `lockable=True` also marks the tools' declared design documents lockable, which checks them out
+    READ-ONLY until the holder takes a lock. It requires `lfs=True` and raises otherwise, because a
+    lockable attribute without the filter is inert and would hand back a file that looks configured
+    and does nothing.
     """
+    if lockable and not lfs:
+        raise ValueError(
+            "lockable requires lfs: a lockable attribute does nothing without the git-lfs filter"
+        )
     tools = _resolve(keys, extra_tools)
     lines = [GENERATED_HEADER]
     for tool in tools:
@@ -399,7 +451,14 @@ def workspace_gitattributes(keys=(), *, extra_tools=()) -> str:
         lines.append(f"# {tool.label}")
         for pattern in _dedupe(tool.text):
             lines.append(f"{pattern} text eol=lf")
+        lfs_patterns = set(tool.lfs) if lfs else set()
+        lockable_patterns = set(tool.lockable) if lockable else set()
         for pattern in _dedupe(tool.binary):
-            lines.append(f"{pattern} binary")
+            if pattern not in lfs_patterns:
+                lines.append(f"{pattern} binary")
+            elif pattern in lockable_patterns:
+                lines.append(f"{pattern} filter=lfs binary lockable")
+            else:
+                lines.append(f"{pattern} filter=lfs binary")
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"

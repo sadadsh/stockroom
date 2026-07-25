@@ -24,6 +24,7 @@ from pathlib import Path
 from stockroom.eda import workspace
 from stockroom.eda.registry import _resolve, workspace_gitattributes, workspace_gitignore
 from stockroom.mutation.transaction import Transaction
+from stockroom.vcs import lfs as lfs_backend
 from stockroom.vcs.repo import GitRepo
 
 IGNORE_FILE = ".gitignore"
@@ -43,7 +44,23 @@ def _rules_for(tool_keys) -> list[str]:
     return out
 
 
-def _planned(root: Path, tool_keys, repo: GitRepo):
+def detect_lfs(root) -> tuple[bool, bool]:
+    """Whether this workspace has already adopted git-lfs, and whether it uses `lockable`, read
+    from its own `.gitattributes`.
+
+    Adoption is a property OF THE REPO, not a setting stored somewhere else that could disagree
+    with it. Reading it back means a routine hygiene sync PRESERVES an adoption instead of silently
+    reverting the attributes to the non-LFS form the next time anything re-syncs, which is the
+    quiet way a feature gets turned off for someone.
+    """
+    path = Path(root) / ATTRIBUTES_FILE
+    if not path.exists():
+        return False, False
+    text = path.read_text(encoding="utf-8")
+    return ("filter=lfs" in text), ("lockable" in text)
+
+
+def _planned(root: Path, tool_keys, repo: GitRepo, lfs: bool = False, lockable: bool = False):
     """(writes, untrack, rendered) without touching anything.
 
     `writes` names the files whose content would change, `untrack` the tracked paths the ignore rules
@@ -52,7 +69,7 @@ def _planned(root: Path, tool_keys, repo: GitRepo):
     root = Path(root)
     rendered = {
         IGNORE_FILE: workspace_gitignore(tool_keys),
-        ATTRIBUTES_FILE: workspace_gitattributes(tool_keys),
+        ATTRIBUTES_FILE: workspace_gitattributes(tool_keys, lfs=lfs, lockable=lockable),
     }
     writes: list[str] = []
     merged: dict[str, str] = {}
@@ -73,26 +90,42 @@ def _planned(root: Path, tool_keys, repo: GitRepo):
     return sorted(writes), sorted(untrack), merged
 
 
-def hygiene_preview(root, tool_keys, repo: GitRepo | None = None) -> dict:
+def _lfs_flags(root, lfs, lockable) -> tuple[bool, bool]:
+    """Resolve the LFS flags, defaulting to whatever this workspace has ALREADY adopted."""
+    detected_lfs, detected_lockable = detect_lfs(root)
+    return (detected_lfs if lfs is None else lfs,
+            detected_lockable if lockable is None else lockable)
+
+
+def hygiene_preview(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockable=None) -> dict:
     """What `apply_hygiene` would do: {writes, untracked}. Read-only, no git, no writes."""
     root = Path(root)
     repo = repo or GitRepo(root)
-    writes, untrack, _merged = _planned(root, tool_keys, repo)
+    use_lfs, use_lockable = _lfs_flags(root, lfs, lockable)
+    writes, untrack, _merged = _planned(root, tool_keys, repo, use_lfs, use_lockable)
     return {"writes": writes, "untracked": untrack}
 
 
-def apply_hygiene(root, tool_keys, repo: GitRepo | None = None) -> dict:
+def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockable=None) -> dict:
     """Write the managed blocks and untrack the per-user files, as ONE commit on `repo`.
 
     Returns {writes, untracked, committed}. A run that would change nothing is an honest no-commit
     no-op ({committed: None}), so re-syncing does not churn history.
 
+    `lfs` / `lockable` default to whatever this workspace has ALREADY adopted (read back from its
+    own `.gitattributes`), so a routine sync never silently un-adopts LFS. Passing `lfs=True` is
+    what ADOPTS it, and that path also runs `git lfs install --local` in the same operation:
+    attributes naming `filter=lfs` with no filter configured are INERT, and git stores the file
+    normally while reporting nothing, so writing one without the other would look like success and
+    do nothing.
+
     Raises ValueError for a tree with uncommitted changes (a hygiene commit stages whole paths, so an
-    in-progress user edit must never be swept into it) or for a hygiene file whose managed block was
-    left unterminated by a hand edit.
+    in-progress user edit must never be swept into it), for a hygiene file whose managed block was
+    left unterminated by a hand edit, or when `lockable` is asked for without `lfs`.
     """
     root = Path(root)
     repo = repo or GitRepo(root)
+    use_lfs, use_lockable = _lfs_flags(root, lfs, lockable)
     # Two PRECISE guards rather than one blunt "is the tree clean".
     #
     # A blunt clean check would be wrong in both directions. Too strict: the library repo always has
@@ -117,7 +150,12 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None) -> dict:
             f"{IGNORE_FILE} or {ATTRIBUTES_FILE} has uncommitted changes; commit or discard them "
             "before syncing workspace hygiene"
         )
-    writes, untrack, merged = _planned(root, tool_keys, repo)
+    writes, untrack, merged = _planned(root, tool_keys, repo, use_lfs, use_lockable)
+    # The filter has to exist BEFORE the attributes are committed, or the very commit that adopts
+    # LFS stores its own payloads as ordinary blobs. Idempotent, and it only touches this repo's
+    # config, never the user's global git.
+    if use_lfs and not lfs_backend.repo_enabled(repo):
+        lfs_backend.enable(repo)
     if not writes and not untrack:
         return {"writes": [], "untracked": [], "committed": None}
 

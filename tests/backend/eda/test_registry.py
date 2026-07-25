@@ -179,3 +179,71 @@ def test_derived_patterns_join_the_ignore_set_used_to_untrack():
 def test_a_tool_with_nothing_derived_emits_no_derived_section():
     text = workspace_gitignore(["kicad"])
     assert "Derived" not in text
+
+
+# -- git-lfs: where a binary payload's CONTENT lives, and who may write it ----
+
+
+def test_the_unmergeable_binaries_are_the_ones_declared_for_lfs():
+    """LFS keeps clone size flat as the library grows: every captured part otherwise adds a
+    permanent copy to history for every future cloner. Only BINARY payloads qualify; the text
+    design sources must keep diffing and merging normally."""
+    altium, kicad = get_tool("altium"), get_tool("kicad")
+    assert "*.PcbLib" in altium.lfs and "*.SchLib" in altium.lfs
+    assert "*.step" in kicad.lfs and "*.wrl" in kicad.lfs
+    # never a text format, for either tool
+    for tool in (altium, kicad):
+        assert not (set(tool.lfs) & set(tool.text))
+        # and everything sent to LFS must also be declared binary, or the attributes would
+        # disagree with themselves about what the file is
+        assert set(tool.lfs) <= set(tool.binary)
+
+
+def test_only_files_stockroom_never_writes_are_declared_lockable():
+    """`lockable` checks the file out READ-ONLY (measured), so declaring a file Stockroom itself
+    writes would break its own operations: the Altium 3D embed writes into the .PcbLib."""
+    altium = get_tool("altium")
+    assert "*.PcbDoc" in altium.lockable and "*.SchDoc" in altium.lockable
+    assert "*.PcbLib" not in altium.lockable
+    assert "*.SchLib" not in altium.lockable
+    assert set(altium.lockable) <= set(altium.lfs)
+
+
+def test_without_lfs_the_attributes_are_exactly_what_they_were():
+    """The default must not change silently for anyone who has not adopted LFS."""
+    text = workspace_gitattributes(["altium"])
+    assert "*.PcbLib binary" in text
+    assert "filter=lfs" not in text
+
+
+def test_with_lfs_the_binary_macro_is_KEPT_alongside_the_filter():
+    """MEASURED 2026-07-25: the canned `filter=lfs diff=lfs merge=lfs -text` line text-merges the
+    POINTER file and writes conflict markers INSIDE it, producing a corrupt pointer. `filter=lfs
+    binary` resolves to filter=lfs with diff/merge/text unset, which is LFS storage PLUS git's
+    take-ours-and-conflict binary semantics."""
+    text = workspace_gitattributes(["altium"], lfs=True)
+    assert "*.PcbLib filter=lfs binary" in text
+    assert "merge=lfs" not in text
+    # a text format is untouched by LFS
+    assert "*.DbLib text eol=lf" in text
+
+
+def test_lockable_is_off_even_when_lfs_is_on_unless_asked_for():
+    text = workspace_gitattributes(["altium"], lfs=True)
+    assert "lockable" not in text
+
+
+def test_lockable_marks_only_the_declared_designs():
+    text = workspace_gitattributes(["altium"], lfs=True, lockable=True)
+    assert "*.PcbDoc filter=lfs binary lockable" in text
+    assert "*.PcbLib filter=lfs binary" in text
+    assert "*.PcbLib filter=lfs binary lockable" not in text
+
+
+def test_lockable_without_lfs_is_refused_rather_than_silently_ignored():
+    """A lockable attribute means nothing without the LFS filter, so accepting the combination
+    would hand back a file that looks configured and does nothing."""
+    import pytest
+
+    with pytest.raises(ValueError):
+        workspace_gitattributes(["altium"], lfs=False, lockable=True)
