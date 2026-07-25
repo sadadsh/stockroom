@@ -49,6 +49,11 @@ dev = [
     "httpx>=0.27",
     "pytest-timeout>=2.4.0",
     "ty>=0.0.63",
+    # The backend suite is ~2700 tests dominated by git subprocess I/O, so it ran 8-9 minutes
+    # serially and that cost was paid on every single slice. xdist spreads it across cores.
+    # Adopted only after proving the parallel run reports the SAME pass count as the serial one,
+    # because a faster suite that quietly loses tests is worse than a slow one.
+    "pytest-xdist>=3.6",
 ]
 
 [tool.hatch.build.targets.wheel]
