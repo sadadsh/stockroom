@@ -359,6 +359,19 @@ export function usePreviewGlb(id: string, enabled: boolean) {
   });
 }
 
+// The land pattern behind the viewer's Footprint toggle. Fetched only alongside an open 3D view,
+// and never retried: a part with no footprint legitimately 404s, and that is a hidden toggle, not
+// an error worth three round trips.
+export function useLandPattern(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["land-pattern", id],
+    queryFn: () => api.landPattern(id),
+    enabled: enabled && !!id,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
 // The pulled product photo through the backend proxy (the ProductPhoto fallback lane).
 // Keyed by the vendor URL; a proxied miss (400/404) is an honest "no image" - do not
 // hammer the vendor CDN with retries, and keep the answer for the session.

@@ -25,8 +25,30 @@ const VIEW_DIRECTIONS: Record<ViewMode, [number, number, number]> = {
   front: [0, 0.0001, 1],
 };
 
+export interface LandPadInput {
+  at: [number, number];
+  size: [number, number];
+  rotation: number;
+}
+
+export interface LandPatternInput {
+  pads: LandPadInput[];
+  model_placement: {
+    offset: [number, number, number];
+    scale: [number, number, number];
+    rotate: [number, number, number];
+  } | null;
+}
+
 export interface ModelSceneHandle {
   dispose: () => void;
+  /** The framed model's bounding size and the offset applied to centre it, in SCENE units. The
+   *  land pattern must land in that same frame, and a mismatch here is invisible on screen - the
+   *  pads simply do not appear - so it is reported rather than inferred. */
+  modelInfo: () => { size: [number, number, number]; center: [number, number, number] } | null;
+  /** Show or hide the land pattern the body sits on. This is what makes a wrong orientation
+   *  VISIBLE: a body alone looks fine at any rotation, a body over its own pads does not. */
+  setLandPattern: (land: LandPatternInput | null) => void;
   /** Move to a canonical view. Stops the idle spin, because a chosen view that then rotates away
    *  from itself is worse than no control at all. */
   setView: (mode: ViewMode) => void;
@@ -87,6 +109,11 @@ export function mountModelScene(
   // part cannot appear to grow or shrink when you merely look at it from a different side.
   let fitDistance = 0;
   let viewTween = 0;
+  // The Y of the model's underside, captured when it is framed, so the land pattern lands exactly
+  // under the body rather than at an arbitrary y=0.
+  let modelBaseY = 0;
+  let modelSize: THREE.Vector3 | null = null;
+  let modelCenter: THREE.Vector3 | null = null;
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -152,6 +179,9 @@ export function mountModelScene(
       // key light, grounding the object and adding depth (a floating monochrome shape reads as flat;
       // a grounded one reads as solid). Sized + placed relative to the model so it works at any scale.
       const bottomY = -size.y / 2;
+      modelBaseY = bottomY;
+      modelSize = size.clone();
+      modelCenter = center.clone();
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(radius * 8, radius * 8),
         new THREE.ShadowMaterial({ opacity: 0.28 }),
@@ -219,7 +249,10 @@ export function mountModelScene(
    *  snaps - reduced motion means less movement, not a missing feature. */
   function setView(mode: ViewMode) {
     if (!fitDistance) return;
-    controls.autoRotate = false;
+    // 3D IS the spinning view - it is the free orbit, and stopping the spin when the user asks for
+    // it made the control look broken. The FIXED views (top/front) are the ones that must hold
+    // still, because a "top" view that rotates away from top is not a top view.
+    controls.autoRotate = mode === "iso";
     const target = new THREE.Vector3(...VIEW_DIRECTIONS[mode])
       .normalize()
       .multiplyScalar(fitDistance);
@@ -271,11 +304,72 @@ export function mountModelScene(
     }
   };
 
+  // ---- the land pattern -------------------------------------------------------------------
+  // Drawn from the footprint's own pad table rather than the rendered SVG, so it carries real mm
+  // geometry that can sit under the body at the same scale. KiCad's frame is +Y DOWN on screen and
+  // the scene's is +Y up, so pad Y is negated once, here, where the conversion is visible.
+  let landGroup: THREE.Group | null = null;
+
+  function setLandPattern(land: LandPatternInput | null) {
+    if (landGroup) {
+      scene.remove(landGroup);
+      landGroup.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        const mat = m.material as THREE.Material | undefined;
+        mat?.dispose();
+      });
+      landGroup = null;
+    }
+    if (!land || !land.pads.length) return;
+
+    // MEASURED, and it is the whole reason the first attempt drew nothing: the glTF spec mandates
+    // METRES, so trimesh divides the STEP's millimetres by 1000 on export. The real TI USON-14
+    // came back as 0.00135 x 0.000525 x 0.003475 scene units for a 1.35 x 0.5 x 3.5 mm package.
+    // Pad coordinates arrive in KiCad millimetres, so they need the same conversion or they land
+    // a thousand times too large and never appear in frame.
+    const MM_TO_SCENE = 0.001;
+    const group = new THREE.Group();
+    // Copper, not the body grey: the whole point is telling the two apart at a glance.
+    const copper = new THREE.MeshStandardMaterial({
+      color: 0xb87333,
+      metalness: 0.55,
+      roughness: 0.42,
+    });
+    for (const pad of land.pads) {
+      const [w, h] = pad.size;
+      if (!(w > 0 && h > 0)) continue;
+      const geo = new THREE.PlaneGeometry(w * MM_TO_SCENE, h * MM_TO_SCENE);
+      const mesh = new THREE.Mesh(geo, copper);
+      mesh.rotation.x = -Math.PI / 2; // lie flat in the board plane
+      mesh.rotation.y = (-pad.rotation * Math.PI) / 180;
+      // KiCad x -> scene x, KiCad y -> scene z (the board plane). Verified against the real part:
+      // pads at x = +-0.675mm span exactly the body's 1.35mm width.
+      mesh.position.set(pad.at[0] * MM_TO_SCENE, 0, pad.at[1] * MM_TO_SCENE);
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    // The board plane sits at the model's base, so the body rests ON the pads instead of
+    // intersecting them or hovering above.
+    group.position.y = modelBaseY;
+    scene.add(group);
+    landGroup = group;
+  }
+
   return {
     dispose: () => {
       cancelAnimationFrame(viewTween);
+      setLandPattern(null);
       disposeScene();
     },
     setView,
+    setLandPattern,
+    modelInfo: () =>
+      modelSize && modelCenter
+        ? {
+            size: [modelSize.x, modelSize.y, modelSize.z],
+            center: [modelCenter.x, modelCenter.y, modelCenter.z],
+          }
+        : null,
   };
 }

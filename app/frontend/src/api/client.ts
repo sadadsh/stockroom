@@ -249,6 +249,26 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+export interface LandPad {
+  number: string;
+  /** millimetres from the footprint origin, KiCad's frame (+Y down) */
+  at: [number, number];
+  size: [number, number];
+  shape: string;
+  /** degrees */
+  rotation: number;
+}
+
+export interface LandPattern {
+  units: string;
+  pads: LandPad[];
+  model_placement: {
+    offset: [number, number, number];
+    scale: [number, number, number];
+    rotate: [number, number, number];
+  } | null;
+}
+
 export interface ListPartsArgs {
   q?: string;
   category?: string | null;
@@ -384,6 +404,12 @@ export const api = {
       `/api/previews/${kind}/${encodeURIComponent(id)}.svg?${params.toString()}`,
       "image/svg+xml",
     );
+  },
+
+  /** The footprint's pads + the 3D model's placement, for the viewer's board mode. Both travel in
+   *  ONE response so the body and the land pattern it must line up with cannot disagree. */
+  landPattern(id: string): Promise<LandPattern> {
+    return apiGet<LandPattern>(`/api/previews/land/${encodeURIComponent(id)}.json`);
   },
 
   async modelGlb(id: string): Promise<ArrayBuffer> {

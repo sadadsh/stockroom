@@ -53,6 +53,7 @@ import {
   useAltiumEmbedModel,
   useCadSourceQuery,
   useDetachAsset,
+  useLandPattern,
   usePreviewGlb,
   useRefreshSourcing,
 } from "../api/queries";
@@ -200,6 +201,7 @@ export function DetailPanel({
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
   const modelGlb = usePreviewGlb(detail?.id ?? "", hasModel);
+  const landPattern = useLandPattern(detail?.id ?? "", hasModel);
   // Warm the cad-source (DigiKey URL) cache so the Complete Part window opens instantly; its
   // result is NOT used for readiness anymore. Readiness (incl. Altium) reads the part RECORD via
   // assetReadiness, so it refreshes on the clean ["part", id] invalidation after an attach - the
@@ -462,6 +464,7 @@ export function DetailPanel({
                       isLoading={modelGlb.isLoading}
                       isError={modelGlb.isError}
                       error={modelGlb.error}
+                      land={landPattern.data ?? null}
                     />
                   </div>
                 ) : undefined

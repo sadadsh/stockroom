@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ModelSceneHandle, ViewMode } from "../lib/threeScene";
+import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -22,18 +23,25 @@ export function Glb3DView({
   isLoading,
   isError,
   error,
+  land,
 }: {
   data: ArrayBuffer | undefined;
   isLoading: boolean;
   isError: boolean;
   error?: unknown;
+  /** The part's land pattern, when one could be read. Absent simply hides the Board toggle:
+   *  a part with no footprint has nothing to check the body against. */
+  land?: LandPattern | null;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState(false);
   const sceneRef = useRef<ModelSceneHandle | null>(null);
+  // read inside the mount effect without making the scene remount when the toggle flips
+  const showLandRef = useRef(false);
   // Which canonical view is in force. Tracked in React (not read back off the camera) so the
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>(null);
+  const [showLand, setShowLand] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -50,6 +58,7 @@ export function Glb3DView({
           if (!disposed) setRenderError(true);
         });
         sceneRef.current = handle;
+        if (showLandRef.current && land) handle.setLandPattern(land);
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
         if (!disposed) setRenderError(true);
@@ -79,6 +88,30 @@ export function Glb3DView({
   return (
     <div className="relative h-full w-full">
       <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />
+      {land && land.pads.length > 0 ? (
+        <button
+          type="button"
+          data-dev-id="detail.model-board"
+          aria-pressed={showLand}
+          title="Show the land pattern under the body, to check the model is oriented correctly"
+          onClick={(e) => {
+            e.stopPropagation();
+            const next = !showLand;
+            setShowLand(next);
+            showLandRef.current = next;
+            sceneRef.current?.setLandPattern(next ? land : null);
+          }}
+          className={
+            "pointer-events-auto absolute bottom-2 left-2 rounded-control border border-line px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+            (showLand
+              ? "bg-raise2 text-t1"
+              : "bg-[var(--c-popover)]/85 text-t3 backdrop-blur-sm hover:text-t1")
+          }
+        >
+          Footprint
+        </button>
+      ) : null}
       <ViewControls
         active={view}
         onPick={(mode) => {

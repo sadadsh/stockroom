@@ -68,6 +68,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.asset-footprint", label: "Footprint file card", area: "detail" },
   { id: "detail.asset-stage", label: "Asset tile stage / chamber", area: "detail" },
   { id: "detail.model-views", label: "3D canonical view switcher", area: "detail" },
+  { id: "detail.model-board", label: "3D land-pattern (footprint) toggle", area: "detail" },
   { id: "detail.model-view-iso", label: "3D view: three-quarter", area: "detail" },
   { id: "detail.model-view-top", label: "3D view: top down", area: "detail" },
   { id: "detail.model-view-front", label: "3D view: front elevation", area: "detail" },
