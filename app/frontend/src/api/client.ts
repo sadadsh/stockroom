@@ -52,6 +52,8 @@ import type {
   AssignRead,
   HygieneRead,
   HygieneResult,
+  LibraryLfsResult,
+  LibraryLfsStatus,
   LibraryPinRead,
   LibraryPinResult,
   AssignResult,
@@ -1028,6 +1030,26 @@ export const api = {
       `/api/projects/${encodeURIComponent(id)}/assign`,
       { body },
     );
+  },
+
+  // Where the LIBRARY's binary payloads are stored (git-lfs). Read-only, no network.
+  getLibraryLfs(): Promise<LibraryLfsStatus> {
+    return apiGet<LibraryLfsStatus>("/api/library/lfs");
+  },
+
+  // Route the library's binary payloads through git-lfs, as one hygiene commit.
+  adoptLibraryLfs(): Promise<LibraryLfsResult> {
+    return request<LibraryLfsResult>("POST", "/api/library/lfs");
+  },
+
+  // What syncing the LIBRARY repo's workspace hygiene would change (the union of every tool's
+  // rules, because the library holds assets for all of them and is what a peer clones).
+  getLibraryHygiene(): Promise<HygieneRead> {
+    return apiGet<HygieneRead>("/api/library/hygiene");
+  },
+
+  syncLibraryHygiene(): Promise<HygieneResult> {
+    return request<HygieneResult>("POST", "/api/library/hygiene");
   },
 
   // Which library version this project is pinned to, versus the library on this machine.

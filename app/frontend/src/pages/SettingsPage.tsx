@@ -13,6 +13,7 @@ import { useJob } from "../lib/useJob";
 import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { SettingsDisclosure } from "../components/SettingsDisclosure";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
+import { LibrarySyncSection } from "../components/LibrarySyncSection";
 import { RescanSection } from "../components/RescanSection";
 import {
   useActivateProfile,
@@ -335,6 +336,15 @@ export function SettingsPage() {
                     data-dev-id="settings.health"
                   >
                     <LibraryHealthSection />
+                  </SettingsDisclosure>
+                  <SettingsDisclosure
+                    title="Library Sync" titleId="settings.librarysync.title"
+                    hint="What this library carries to whoever else clones it. Binaries can live in Git LFS so clone size stays flat as the library grows, and per-user or regenerated files can stop being shared at all."
+                    hintId="settings.librarysync.hint"
+                    open={open("librarysync")} onToggle={() => toggle("librarysync")}
+                    data-dev-id="settings.librarysync"
+                  >
+                    <LibrarySyncSection />
                   </SettingsDisclosure>
                 </>
               ) : group === "kicad" ? (
