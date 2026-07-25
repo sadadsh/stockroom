@@ -58,13 +58,21 @@ describe("property-grid tracks", () => {
     expect(interpolated.map((m) => m[0])).toEqual([]);
   });
 
-  it("keeps a spec row and its alternates on the SAME label track", () => {
+  it("keeps a spec row and its alternates on the SAME label track at EVERY breakpoint", () => {
     // Different widths would put a child's value at a different x from its parent's - the long-gap
-    // complaint reintroduced one level down, on exactly the rows meant to be compared.
-    const tracks = [
-      ...source("DetailPanel.tsx").matchAll(/grid-cols-\[minmax\(0,(?:calc\()?([0-9.]+rem)/g),
-    ].map((m) => m[1]);
-    expect(tracks.length).toBeGreaterThanOrEqual(2);
-    expect([...new Set(tracks)]).toEqual(["10.5rem"]);
+    // complaint reintroduced one level down, on exactly the rows meant to be compared. The track is
+    // responsive (it narrows once the sheet stacks into a single column), so the two must agree at
+    // each breakpoint, not merely use the same number somewhere.
+    const src = source("DetailPanel.tsx");
+    const widths = (name: string): string[] => {
+      const decl = new RegExp(`const ${name} =([\\s\\S]*?);\\n`).exec(src);
+      if (!decl) throw new Error(`could not find ${name}`);
+      return [...decl[1].matchAll(/grid-cols-\[minmax\(0,(?:calc\()?([0-9.]+rem)/g)].map(
+        (m) => m[1],
+      );
+    };
+    const rowTracks = widths("SPEC_ROW_GRID");
+    expect(rowTracks.length).toBeGreaterThanOrEqual(2); // a base width and an xl width
+    expect(widths("ALT_ROW_GRID")).toEqual(rowTracks);
   });
 });
