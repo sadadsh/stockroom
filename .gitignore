@@ -86,3 +86,6 @@ tests/backend/api/test_gitshim.py
 
 .planning/
 .gsd/
+
+# headless UI shot output
+build/shots/
