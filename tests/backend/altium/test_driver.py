@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from stockroom.altium.driver import AltiumDriver, RunOutcome, find_x2
 
 

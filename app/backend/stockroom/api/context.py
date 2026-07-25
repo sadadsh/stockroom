@@ -134,6 +134,24 @@ class AppContext:
         self.project_index.close()
         self.project_index = ProjectIndex.build(self.libraries_root / ".projects")
 
+    def ensure_derived_artifacts(self) -> None:
+        """Rebuild the per-tool DERIVED artifacts this library needs on disk, committing nothing.
+
+        Today that is Altium's SQLite data source, which stopped being committed on 2026-07-25 (see
+        `eda.registry` `_ALTIUM.derived`). Committing it had bought "a fresh clone is placeable with
+        no regenerate step"; rebuilding it here buys the same thing without sharing a binary two
+        peers can never merge. Called on boot and on every profile/library switch, so the file is
+        already there and current before anyone opens Altium.
+
+        Never raises: a library that cannot produce a data source (an unreadable record, a
+        read-only disk) must not stop the app from booting. The Altium surface reports the file's
+        absence honestly, which is a better failure than a dead launch.
+        """
+        try:
+            self.ops.ensure_altium_datasource()
+        except Exception:  # noqa: BLE001 - best-effort; the surface reports the gap instead
+            pass
+
     def rewire_kicad(self) -> None:
         """Repoint KiCad at the active profile (SR_LIB + table rows + category libs),
         never raising: auto_wire skips when KiCad is absent and captures failures
@@ -170,6 +188,9 @@ class AppContext:
         self.config.save()
         self.rebuild_index()
         self.rewire_kicad()
+        # Each profile has its own parts and therefore its own derived data source; without this
+        # a switch would leave Altium reading the PREVIOUS profile's parts.
+        self.ensure_derived_artifacts()
 
     def switch_library(self, new_root: Path) -> None:
         """Repoint the whole engine at a different library root (M9b onboarding / switch),
@@ -199,6 +220,7 @@ class AppContext:
         self.config.libraries_root = str(new_root)
         self.config.save()
         self.rewire_kicad()
+        self.ensure_derived_artifacts()
 
 
 def build_context(
@@ -267,6 +289,10 @@ def build_context(
         github_auth.configure(repo, getattr(config, "github_token", ""))
     except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
         pass
+    # Build any DERIVED per-tool artifact this library needs on disk but does not share through
+    # git (today: Altium's SQLite data source). Doing it at boot is what keeps a fresh clone
+    # placeable now that the file is no longer committed.
+    ctx.ensure_derived_artifacts()
     # Lazy STM index load: unlike `index`, no source is synced at launch, so this only picks
     # up whatever derived index already sits on disk (default_index_path()). When nothing
     # valid is on disk, the committed baked seed (stm/seed.py) is restored once and the load

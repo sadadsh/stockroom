@@ -111,3 +111,33 @@ def test_switch_library_rewires_sr_lib(tmp_path):
 
     assert read_env_var(kdir / "kicad_common.json", "SR_LIB") == str(ctx.profile.root.resolve())
     assert str(b) in read_env_var(kdir / "kicad_common.json", "SR_LIB")
+
+
+def test_a_fresh_clone_gets_its_derived_altium_data_source_built_at_boot(tmp_path):
+    """The property that PAID for committing the derived .db until 2026-07-25: a fresh clone must
+    be placeable with no regenerate step. It is now bought by building the file at boot instead of
+    sharing an unmergeable binary, so this is the test that keeps that promise honest."""
+    root = _library(tmp_path / "fresh")
+    db = root / "Main" / "altium" / "stockroom-parts.db"
+    assert not db.exists()
+
+    build_context(root, kicad_dir=tmp_path / "k", config=MachineConfig(active_profile="Main"),
+                  token="T")
+
+    assert db.exists()
+
+
+def test_switching_profile_rebuilds_the_data_source_for_the_new_profile(tmp_path):
+    """Each profile holds different parts, so leaving the previous profile's data source in place
+    would have Altium placing parts from a library the user is no longer looking at."""
+    root = _library(tmp_path / "multi")
+    repo = GitRepo(root)
+    ProfileStore(root, repo).create("Second")
+    ctx = build_context(root, kicad_dir=tmp_path / "k",
+                        config=MachineConfig(active_profile="Main"), token="T")
+    second_db = root / "Second" / "altium" / "stockroom-parts.db"
+    assert not second_db.exists()
+
+    ctx.switch_profile("Second")
+
+    assert second_db.exists()

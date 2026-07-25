@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from stockroom.model.part import AssetRef, PartRecord
 
 FIX = Path(__file__).parent / "fixtures"

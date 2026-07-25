@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 import pytest
+
 from stockroom.altium.driver import RunOutcome
 from stockroom.altium.embed3d import (
     delphi_quote,

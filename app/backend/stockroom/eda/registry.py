@@ -124,6 +124,14 @@ class EdaTool:
     # Formats that ARE text and must not be misdetected as binary (they diff and merge
     # normally, and we want that).
     text: tuple[str, ...] = ()
+    # Files STOCKROOM ITSELF generates from the library records for this tool, and can regenerate
+    # at any time. Kept apart from `ignore` because the two are different facts with different
+    # remedies: a per-user file is somebody's window state and is gone for good, while a derived
+    # file is rebuilt on demand. Sharing a derived artifact through git is worse than useless when
+    # it is BINARY: two peers who each add a different part produce two unmergeable files carrying
+    # no information the records do not already hold, so every such conflict is pure noise on a
+    # file that can be recreated in milliseconds.
+    derived: tuple[str, ...] = ()
     # Asset kinds this tool consumes. Generic readiness/capture code iterates these rather
     # than hardcoding "symbol, footprint, model".
     asset_kinds: tuple[str, ...] = ("symbol", "footprint", "model")
@@ -137,6 +145,15 @@ class EdaTool:
     placement_binding: PlacementBinding = PlacementBinding()
     # How this tool's stored library references stay portable across machines (see PathContract).
     path_contract: PathContract = PathContract()
+
+    def ignored_patterns(self) -> tuple[str, ...]:
+        """Every pattern this tool contributes to a workspace `.gitignore`, per-user AND derived.
+
+        Generic code must read THIS rather than `ignore`, or a derived file that is already
+        committed stays committed forever while the generated rules claim it is ignored (an ignore
+        rule has no effect on a tracked file, which is the whole reason hygiene untracks).
+        """
+        return tuple(self.ignore) + tuple(self.derived)
 
     def capturable_assets(self) -> tuple[str, ...]:
         """Kinds a CAPTURE session can fetch by reference, in registered order.
@@ -218,6 +235,18 @@ _ALTIUM = EdaTool(
         "*.PcbDoc.bak*",
         "*.SchDoc.bak*",
     ),
+    # The SQLite data source the .DbLib reads is emitted from the JSON records by
+    # altium/datasource.py. It was committed until 2026-07-25 so a fresh clone was placeable with
+    # no regenerate step; that traded one real benefit for a worse one. MEASURED: SQLite stamps its
+    # own library version into the file header, so two peers on different SQLite builds emit
+    # DIFFERENT BYTES for identical content (Windows py 3.14.6 ships SQLite 3.50.4, this WSL venv
+    # 3.45.1, and the two files differ at offsets 98-99). And even a perfectly deterministic emit
+    # would still conflict, because two peers adding DIFFERENT parts genuinely produce different
+    # content in a binary git cannot merge. The clone stays placeable because
+    # LibraryOps.ensure_altium_datasource rebuilds it whenever it is missing or stale.
+    # The .DbLib itself is NOT derived in this sense: deterministic INI text that changes only when
+    # the column map does, and a human reviews it, so it stays shared.
+    derived=("stockroom-parts.db",),
     # OLE2 compound documents: unmergeable, and a line-ending rewrite is unrecoverable.
     binary=(
         "*.PcbLib",
@@ -338,11 +367,20 @@ def workspace_gitignore(keys=(), *, extra_tools=()) -> str:
     tools = _resolve(keys, extra_tools)
     lines = [GENERATED_HEADER]
     for tool in tools:
-        if not tool.ignore:
-            continue
-        lines.append(f"# {tool.label}: per-user and generated files (never design sources)")
-        lines.extend(_dedupe(tool.ignore))
-        lines.append("")
+        if tool.ignore:
+            lines.append(f"# {tool.label}: per-user and generated files (never design sources)")
+            lines.extend(_dedupe(tool.ignore))
+            lines.append("")
+        # Derived artifacts get their OWN section rather than being folded in above, because the
+        # two have different remedies and a person reading the file has to be able to tell them
+        # apart: a per-user file is somebody's local state, a derived file is rebuilt on demand.
+        if tool.derived:
+            lines.append(
+                f"# {tool.label}: derived from the library records and regenerated on demand, "
+                "so it is never shared"
+            )
+            lines.extend(_dedupe(tool.derived))
+            lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
