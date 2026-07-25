@@ -25,7 +25,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "app" / "backend"))
 
-from stockroom.eda.registry import all_tools, default_tool  # noqa: E402
+from stockroom.eda.registry import all_tools, data_field_union, default_tool  # noqa: E402
 from stockroom.model.part import ASSET_LABELS  # noqa: E402
 
 OUT_PATH = REPO_ROOT / "app" / "frontend" / "src" / "lib" / "edaRegistry.generated.ts"
@@ -73,6 +73,48 @@ def render() -> str:
         "   * than silently doing nothing.",
         "   */",
         "  embeddedAssets: Record<string, EmbeddedAssetSpec>;",
+        "  /**",
+        "   * Record data this tool RECEIVES when a part is placed from the library, in the order",
+        "   * the tool's own artifact declares it. This is what the detail sheet's handoff band",
+        "   * renders, and it differs per tool: an Altium DbLib row carries price and stock",
+        "   * columns a KiCad schematic has no property for.",
+        "   */",
+        "  dataFields: DataFieldSpec[];",
+        "}",
+        "",
+        "// One piece of record data a tool receives (mirrors stockroom.eda.registry.DataField).",
+        "export interface DataFieldSpec {",
+        "  /** The record-derived value this carries. The stable key to join on. */",
+        "  key: string;",
+        "  /** What a person calls it. */",
+        "  label: string;",
+        "  /** What THIS tool calls it: a KiCad property name, or an Altium Design Parameter. */",
+        "  toolField: string;",
+        "  /** Whether the tool shows this on the placed component by default. */",
+        "  visible: boolean;",
+        "  /**",
+        "   * Whether a placed component can be measured as MISSING this. False for a field the",
+        "   * tool receives structurally rather than as a fillable property (a KiCad symbol",
+        "   * arrives as the component's lib_id, and no component can exist without one).",
+        "   */",
+        "  passport: boolean;",
+        "}",
+        "",
+        "// One row of the handoff band: a field, and every tool that receives it.",
+        "export interface UnionFieldSpec {",
+        "  key: string;",
+        "  label: string;",
+        "  /** Registry declaration order, so the tools read in a stable order. */",
+        "  tools: string[];",
+        "  /**",
+        "   * Who owns this value:",
+        "   *  - \"curated\": a PERSON maintains it. The handoff band shows exactly these.",
+        "   *  - \"vendor\": a distributor refresh supplies it; it is the Sourcing column's",
+        "   *    subject, carries a vendor attribution there, and changes on its own.",
+        "   *  - \"derived\": computed from other fields when the artifact is emitted and never",
+        "   *    stored, so there is no value to show and re-deriving it here would fork the rule.",
+        "   */",
+        "  origin: \"curated\" | \"vendor\" | \"derived\";",
         "}",
         "",
         "// How one asset kind gets embedded (mirrors stockroom.eda.registry.EmbeddedAsset).",
@@ -126,7 +168,34 @@ def render() -> str:
             lines.append("    },")
         else:
             lines.append("    embeddedAssets: {},")
+        lines.append("    dataFields: [")
+        for f in tool.data_fields:
+            lines.append(
+                f"      {{ key: {_ts_string(f.key)}, label: {_ts_string(f.label)}, "
+                f"toolField: {_ts_string(f.tool_field)}, "
+                f"visible: {'true' if f.visible else 'false'}, "
+                f"passport: {'true' if f.passport else 'false'} }},"
+            )
+        lines.append("    ],")
         lines.append("  },")
+    lines += [
+        "];",
+        "",
+        "/**",
+        " * Every record field ANY registered tool consumes, deduplicated, each naming its",
+        " * consumers. The handoff band renders exactly this, so a third EDA tool joins that band",
+        " * by declaring `data_fields` in the Python registry - with no edit here and none in the",
+        " * component. Order is registry declaration order, never alphabetical: the band must open",
+        " * on the part number, not on \"Category\".",
+        " */",
+        "export const EDA_DATA_FIELDS: UnionFieldSpec[] = [",
+    ]
+    for uf in data_field_union():
+        tools = ", ".join(_ts_string(t) for t in uf.tools)
+        lines.append(
+            f"  {{ key: {_ts_string(uf.key)}, label: {_ts_string(uf.label)}, "
+            f"tools: [{tools}], origin: {_ts_string(uf.origin)} }},"
+        )
     lines += [
         "];",
         "",

@@ -406,6 +406,18 @@ export function mountModelScene(
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
+    // REFIT, do not just restretch. The required distance is a function of the ASPECT
+    // (`computeFitDistance(radius, fov, aspect)`), because a perspective fov is VERTICAL and a
+    // wide frame is therefore width-limited while a tall one is height-limited. Updating the
+    // aspect without recomputing the distance leaves the camera at the distance the OLD shape
+    // needed, so the subject is mis-framed until something else happens to refit.
+    //
+    // MEASURED 2026-07-25, which is how this was found: when the detail sheet's stage went from
+    // 266x540 (portrait) to 494x240 (landscape), the model kept the far distance the portrait fit
+    // had required and rendered at ~28% of the frame width, with FIT_MARGIN saying it should fill
+    // ~87%. Pre-existing rather than new - it fires on any real window resize too, which is
+    // exactly the case no test covered and no screenshot had ever been taken across.
+    refitCamera();
   };
   const resizeObserver =
     typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;

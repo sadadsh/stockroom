@@ -39,14 +39,14 @@ import {
 import { EDA_TOOLS } from "../lib/edaRegistry.generated";
 import { useInlineEdit } from "../lib/useInlineEdit";
 import { Text } from "../lib/copy";
-import { EditableText } from "./EditableText";
 import { Icon } from "./Icon";
 import { EnrichPanel } from "./EnrichPanel";
 import { PinoutViewer, parsePinout } from "./PinoutViewer";
 import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
-import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
+import { HandoffBand } from "./HandoffBand";
+import { PhotoTrigger, partPhotos } from "./ProductPhoto";
 import { Glb3DView } from "./Glb3DView";
 import {
   useAltiumEmbedCapability,
@@ -194,9 +194,12 @@ export function DetailPanel({
   const hasModel = detail?.passive
     ? !!kicadAssets?.footprint?.name
     : !!kicadAssets?.model?.file;
-  // The pulled product photo (specs["Image"]): hidden behind a click-to-view chip
-  // (owner 2026-07-24: "hidden until someone clicks to view it and like a card opens").
-  const heroPhotoUrl = productPhotoUrl(detail?.specs);
+  // EVERY product photo on record, not just the one that won the specs slot (owner 2026-07-25).
+  // Both distributor adapters write specs["Image"] with setdefault, so a second vendor's genuinely
+  // different photograph was preserved in `alternates["Image"]` by the Batch 3 machinery and then
+  // shown to nobody. Still hidden until clicked (owner 2026-07-24: "hidden until someone clicks to
+  // view it and like a card opens") - it is the trigger that got bigger, not the default state.
+  const partPhotoSet = partPhotos(detail?.specs, detail?.alternates);
   // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
@@ -341,7 +344,7 @@ export function DetailPanel({
           so the three panes read as one workspace. Then the padded body. */}
       <div
         data-dev-id="detail.title-strip"
-        className="flex h-[34px] flex-none items-center gap-3 border-b border-line bg-band px-6"
+        className="flex h-[38px] flex-none items-center gap-4 border-b border-line bg-band px-6"
       >
         <TitleBlock
           headline={headline}
@@ -349,29 +352,13 @@ export function DetailPanel({
           onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
           busy={busy}
         />
-        <span className={`ml-auto flex-none truncate ${EYEBROW_DENSE}`}>
-          {detail.category}
-        </span>
-      </div>
-      {/* @container: the query root every `@`-prefixed breakpoint inside this sheet resolves
-          against. It must sit here, on the pane, so the sheet reacts to the room it actually has
-          (the rail collapsing 190px -> 52px changes it by 138px at an unchanged window size). */}
-      <div className="@container flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
-        {/* sub-header: the part number + maker lead on the left, the view tabs on the right, on
-            one bordered band - the sheet gets a real head instead of a flat wall of sections. */}
-        <div
-          data-dev-id="detail.identity"
-          className="flex flex-none items-center justify-between gap-4 border-b border-line pb-2.5"
-        >
-          <IdentityLine
-            mpn={detail.mpn}
-            manufacturer={detail.manufacturer}
-            onEditMpn={onEditField ? (v) => onEditField("mpn", v) : undefined}
-            onEditManufacturer={
-              onEditField ? (v) => onEditField("manufacturer", v) : undefined
-            }
-            busy={busy}
-          />
+        {/* The view tabs share this band rather than owning a second one below it, and the
+            category eyebrow that used to sit at the far right is gone - the punch list called it
+            an orphan ~700px from the title it qualified, and it is an EDA handoff field with one
+            home in the band now. What is left is a real header: the part on the left, the views
+            on the right, nothing floating in between. Two nearly-empty full-width rows stacked
+            was ~40px of pure waste that read as two headers for one thing. */}
+        <div data-dev-id="detail.identity" className="ml-auto flex-none">
           <TabStrip
             tabs={tabs}
             active={activeTab}
@@ -381,6 +368,44 @@ export function DetailPanel({
             aria-label="Part views"
           />
         </div>
+      </div>
+      {/* @container: the query root every `@`-prefixed breakpoint inside this sheet resolves
+          against. It must sit here, on the pane, so the sheet reacts to the room it actually has
+          (the rail collapsing 190px -> 52px changes it by 138px at an unchanged window size). */}
+      <div className="@container flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+
+        {/* THE HANDOFF BAND - the fields an EDA tool actually receives, at the top, because that
+            is what this whole application is for (owner 2026-07-25: "thats the most important
+            info"). It sits OUTSIDE the column grid deliberately: these fields are the subject of
+            the sheet, not one of three competing topics, and putting them in a column would make
+            their importance depend on how wide that column happened to be. */}
+        {activeTab === "specs" ? (
+          <div className="flex-none">
+            <HandoffBand
+              detail={detail}
+              onEditField={onEditField}
+              onMoveCategory={onMoveCategory}
+              categories={categories}
+              busy={busy}
+              slots={{
+                // Two distributors describing the same part differently is normal and useful, so
+                // the disagreement follows the value it is about. It used to sit at the very
+                // bottom of the third column, below Links, where the punch list recorded that
+                // "2 Sources" on a description was easy to miss; here it is under the description
+                // itself, at the top of the sheet.
+                description: (
+                  <AlternatesDisclosure
+                    entries={detail.alternates?.description ?? []}
+                    current={detail.description}
+                    onUse={
+                      onEditField ? (value) => onEditField("description", value) : undefined
+                    }
+                  />
+                ),
+              }}
+            />
+          </div>
+        ) : null}
 
         {/* The default view is a three-pane sheet, bordered like docked panels: the PART (its
             embodiments + CAD readiness), the SPECIFICATIONS (one clean column), and the COMMERCIAL
@@ -423,26 +448,22 @@ export function DetailPanel({
           // column was cut mid-tile and every block grew its own scrollbar. Stacked, the rows size
           // to their content (`content-start`) and the SHEET is the single scroller; at three
           // columns the row is pinned to the pane height again so each column scrolls in place.
-          className={
-            "mt-3 grid min-h-0 flex-1 gap-y-5 " +
-            "content-start overflow-y-auto " +
-            "grid-cols-1 " +
-            "@xl:grid-cols-[288px_minmax(16rem,1fr)] " +
-            "@4xl:grid-cols-[288px_minmax(16rem,1fr)_320px] @4xl:grid-rows-[minmax(0,1fr)] " +
-            "@4xl:content-normal @4xl:overflow-hidden"
-          }
+          className="mt-3 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto @4xl:overflow-hidden"
         >
           {/* COLUMN 1 - the specimen rail. Stacked (two columns), it SPANS BOTH ROWS: the right
               track carries Specifications above Sourcing, and without the span this column would be
               trapped in a half-height first row - measured, that clipped the symbol and footprint
               tiles to 17 visible pixels and left ~288x330px of dead space beneath them. At three
               columns there is only one row, so the span is released. */}
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5 @xl:row-span-2 @4xl:row-span-1">
+          <div
+            data-dev-id="detail.embodiments"
+            className="flex flex-none flex-col gap-2.5 @2xl:h-[272px] @2xl:flex-row"
+          >
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
               flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
               the column beside a tall specs pane, and still scrolls when content genuinely
               overflows (min-height:auto keeps it from compressing below its content). */}
-          <div data-dev-id="detail.canvas" className="flex flex-1 flex-col gap-2.5">
+          <div data-dev-id="detail.canvas" className="flex min-w-0 flex-1 gap-2.5">
             <AssetTile
               devId="detail.asset-hero"
               stageDevId="detail.asset-stage"
@@ -469,7 +490,25 @@ export function DetailPanel({
               // proportion is therefore part of the COLUMN BALANCE slice (the owner's "sourcing is
               // squished, specifications is too large" and "do not look cramped"), not a change
               // that can be made on its own. See the Batch Plan.
-              className={hasModel ? "min-h-[300px] flex-1" : "h-[142px]"}
+              // WHY flex-[2.2] and no aspect/min-height: the strip fixes the HEIGHT, so a tile's
+              // proportion is decided by the width it takes. 2.2 against two 1s makes the stage
+              // roughly 2.4:1 - landscape, which is the proportion a part viewed at three-quarters
+              // actually has. Measured before this: a 266x540 PORTRAIT stage, which made the
+              // perspective fit width-limited and left the spare height unfillable by any camera.
+              //
+              // This is the change that was TRIED AND REVERTED on its own (see the Batch Plan). It
+              // failed alone for two reasons, both now removed rather than worked around: the stage
+              // controls were absolutely positioned over the subject and landed on the model once
+              // the stage got short (they are a reserved bar under the canvas now), and ~300px of
+              // dead column opened beneath the tiles because `flex-1` here was the only thing
+              // absorbing the column's slack (there IS no tall column any more - the specimen rail
+              // became this horizontal strip, and its slack went to Specifications and Sourcing).
+              // The hero EARNS its size by having something to show. In the horizontal strip the tiles
+              // share one height, so the axis that makes a tile prominent is now WIDTH - and an empty
+              // "No 3D Model" placeholder taking 1.9x its siblings' width would be the same defect the
+              // old `min-h-[300px] flex-1` caused vertically: the most featureless thing on the sheet
+              // as the most prominent. Empty, it is a true peer at flex-1.
+              className={hasModel ? "min-w-0 flex-[1.9]" : "min-w-0 flex-1"}
               art={<CubeArt />}
               thumb={
                 hasModel ? (
@@ -486,12 +525,12 @@ export function DetailPanel({
               }
               onOpen={hasModel ? () => setPreview("model") : undefined}
             />
-            <div className="grid grid-cols-2 gap-2.5">
+            <>
               <AssetTile
                 devId="detail.asset-symbol"
                 name="Symbol"
                 present={!!kicadAssets?.symbol?.name}
-                className="h-[142px]"
+                className="min-w-0 flex-1"
                 art={<SymbolArt />}
                 thumb={
                   kicadAssets?.symbol?.name ? (
@@ -504,7 +543,7 @@ export function DetailPanel({
                 devId="detail.asset-footprint"
                 name="Footprint"
                 present={!!kicadAssets?.footprint?.name}
-                className="h-[142px]"
+                className="min-w-0 flex-1"
                 art={<FootprintArt />}
                 thumb={
                   kicadAssets?.footprint?.name ? (
@@ -513,11 +552,21 @@ export function DetailPanel({
                 }
                 onOpen={kicadAssets?.footprint?.name ? () => setPreview("footprint") : undefined}
               />
-            </div>
+            </>
+          </div>
           </div>
 
-          {/* the CAD status + Filing as ONE tight cluster of matching property rows */}
-          <div className="flex flex-col gap-1.5">
+          {/* CAD readiness is a FULL-WIDTH row under the embodiments it reports on, not a fourth
+              column beside them.
+              It WAS a column, and that put a single 34px row inside a 286x250px box - measured, and
+              that is the same dead space the old specimen rail had, merely relocated. Relocating
+              slack is not removing it. As a row it takes its own height and nothing more, and the
+              three tiles get the whole strip width, which is also what lets the 3D stage be
+              genuinely wide.
+              Filing is gone from here deliberately: the category is an EDA handoff field and now
+              has exactly one home, in the band above. Two controls for one value is how a sheet
+              starts disagreeing with itself. */}
+          <div className="flex flex-none flex-col gap-1.5">
             <ReadinessBlock
               kicad={kicad}
               altium={altium}
@@ -552,17 +601,24 @@ export function DetailPanel({
               }
               onRemove={(kind, label) => setPendingDetach({ kind, label })}
             />
-            <Filing
-              category={detail.category}
-              categories={categories}
-              onMoveCategory={onMoveCategory}
-              busy={busy}
-            />
-          </div>
           </div>
 
-          {/* COLUMN 2 - the specifications, the technical heart, in one clean single column. */}
-          <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-5">
+          {/* REGISTER 3 - THE EVIDENCE. Two columns of EQUAL weight, replacing three unequal ones.
+              The owner's report was "the sourcing tab is like kinda squished and the specifications
+              tab is so large", and the cause was structural rather than a bad width: the specimen
+              rail held a fixed 288px track for tiles that were mostly empty vertically, so the two
+              columns carrying actual content split what was left, and Sourcing was pinned at a
+              fixed 320px while Specifications took `1fr`. Measured at a 1600px window: specs 392px,
+              sourcing 299px, with a 540px-tall 3D stage above.
+              With the rail promoted to the horizontal strip above, that 288px comes back to the
+              content and both columns take `1fr` - so neither is squished and neither is oversized.
+              Below @4xl they stack, Sourcing beneath Specifications, exactly as before. */}
+          <div
+            data-dev-id="detail.evidence"
+            className="grid min-h-0 flex-1 grid-cols-1 content-start gap-x-5 gap-y-5 overflow-y-auto @4xl:grid-cols-2 @4xl:content-normal @4xl:overflow-hidden @4xl:[grid-template-rows:minmax(0,1fr)]"
+          >
+          {/* the specifications, the technical heart, in one clean single column. */}
+          <div className="flex min-h-0 flex-col overflow-y-auto">
             <DetailSection title={<Text id="detail.specifications">Specifications</Text>}>
               <SpecificationsSection
                 groups={specGroups}
@@ -572,20 +628,16 @@ export function DetailPanel({
             </DetailSection>
           </div>
 
-          {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note.
-              Once the sheet stacks it drops onto a second row UNDER the Specifications column
-              (col-start-2), so it lands in the WIDE track rather than in the 288px specimen rail;
-              in the single-column case it simply follows. The left hairline is a COLUMN divider, so
-              it applies only while this really is a third column - kept at a wrap it would draw a
-              rule across a stacked block.
+          {/* the commercial column: where to buy. The datasheet and the description USED to sit
+              below this, at the very bottom of the sheet - they are EDA handoff fields and now have
+              exactly one home, in the band at the top. That also fixes the punch item about the
+              description's alternates being easy to miss down here.
 
-              THESE MUST BE CONTAINER VARIANTS, matching the sheet's own tracks. Left on `lg:`/`xl:`
-              they desynchronised from the grid the moment the grid became container-driven: at a
-              1384px viewport `xl:col-start-auto` won, so this column auto-placed into the 288px
-              FIRST track instead of under Specifications, both rows were forced to an equal 328px,
-              and the asset tiles were sliced in half with a scrollbar on every box. Placement and
-              track definition are one decision and have to move together. */}
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto @xl:col-start-2 @4xl:col-start-auto @4xl:border-l @4xl:border-line @4xl:pl-5">
+              The divider must stay a CONTAINER variant, matching the sheet's own tracks: a left
+              hairline is a COLUMN divider, and once the columns stack it would draw a rule across
+              the middle of a block. A viewport variant here desynchronised from the grid once the
+              grid became container-driven, which sliced the asset tiles in half. */}
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto @4xl:border-l @4xl:border-line @4xl:pl-5">
             <DetailSection
               title={<Text id="detail.sourcing-head">Sourcing</Text>}
               action={
@@ -611,16 +663,19 @@ export function DetailPanel({
             >
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
               {/* The product photo belongs WITH the distributor data: it is the distributor's own
-                  image of the part, pulled from the same page as the price. It used to float
-                  between the MPN line and the tab strip, anchored to nothing (punch 7). */}
-              {heroPhotoUrl ? (
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
+                  image of the part, pulled from the same page as the price (punch 7).
+                  The TRIGGER is now a real control rather than a 24px chip (owner 2026-07-25:
+                  "the view product photo button should be bigger"), showing the photograph itself
+                  and how many there are, and it opens EVERY photo on record as a carousel instead
+                  of only the one that happened to win the specs slot. */}
+              {partPhotoSet.length ? (
+                <div className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3">
                   <Eyebrow dense>Product Photo</Eyebrow>
                   <PhotoTrigger
                     devId="detail.photo"
-                    url={heroPhotoUrl}
+                    variant="panel"
+                    photos={partPhotoSet}
                     partName={detail.display_name}
-                    label="View"
                   />
                 </div>
               ) : null}
@@ -632,15 +687,7 @@ export function DetailPanel({
                 />
               ) : null}
             </DetailSection>
-            <RailReference
-              datasheetUrl={detail.datasheet?.source_url || detail.datasheet?.file || ""}
-              datasheetHref={detail.datasheet?.source_url || undefined}
-              description={detail.description}
-              descriptionAlternates={detail.alternates?.description ?? []}
-              onEditDatasheet={onEditField ? (v) => onEditField("datasheet", v) : undefined}
-              onEditDescription={onEditField ? (v) => onEditField("description", v) : undefined}
-              busy={busy}
-            />
+          </div>
           </div>
         </WorkbenchPanel>
 
@@ -889,58 +936,6 @@ function TitleBlock({
           <Icon id="detail.rename" className="h-3 w-3" />
         </button>
       ) : null}
-    </div>
-  );
-}
-
-// The identity serial line: a category dot, the MPN as the mono stamp (a part IS its part
-// number, editable in place), then the manufacturer. Each piece drops out honestly when the
-// record does not carry it, and stays editable so a mistyped MPN is a click to fix.
-function IdentityLine({
-  mpn,
-  manufacturer,
-  onEditMpn,
-  onEditManufacturer,
-  busy,
-}: {
-  mpn: string;
-  manufacturer: string;
-  onEditMpn?: (value: string) => void;
-  onEditManufacturer?: (value: string) => void;
-  busy?: boolean;
-}) {
-  return (
-    <div data-dev-id="detail.identity-line" className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-      {onEditMpn ? (
-        <EditableText
-          value={mpn}
-          onSave={onEditMpn}
-          label="Part Number"
-          placeholder="No Part Number"
-          mono
-          disabled={busy}
-          displayClassName="text-sm"
-        />
-      ) : (
-        <span className="tnum px-1.5 font-mono text-sm text-t1">
-          {mpn || <span className="font-sans italic text-t3">No Part Number</span>}
-        </span>
-      )}
-      <span className="text-t3" aria-hidden="true">
-        ·
-      </span>
-      {onEditManufacturer ? (
-        <EditableText
-          value={manufacturer}
-          onSave={onEditManufacturer}
-          label="Manufacturer"
-          placeholder="Add manufacturer"
-          disabled={busy}
-          displayClassName="text-sm"
-        />
-      ) : (
-        <span className="px-1.5 text-sm text-t2">{manufacturer}</span>
-      )}
     </div>
   );
 }
@@ -1228,208 +1223,6 @@ function ReadinessRow({
 // The datasheet as a real BUTTON carrying a human label (owner's call - not a raw URL): it opens
 // the datasheet in a new tab, with a quiet pencil that swaps in an inline field to paste a new
 // link. Falls back to an honest "None on file" when there is no datasheet.
-function DatasheetField({
-  url,
-  href,
-  onEdit,
-  busy,
-}: {
-  url: string;
-  href?: string;
-  onEdit?: (value: string) => void;
-  busy?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(url);
-  if (editing && onEdit) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        disabled={busy}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          onEdit(draft.trim());
-          setEditing(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            onEdit(draft.trim());
-            setEditing(false);
-          } else if (e.key === "Escape") {
-            setDraft(url);
-            setEditing(false);
-          }
-        }}
-        placeholder="Paste a datasheet link"
-        aria-label="Datasheet link"
-        className="w-full rounded-control border border-line2 bg-field px-2.5 py-1.5 font-mono text-xs text-t1 outline-none focus:border-acc"
-      />
-    );
-  }
-  // ONE flat 34px row, the exact anatomy Filing uses ([icon] LABEL [value] [affordance]) - because
-  // Filing sits directly below it and the two are the same kind of thing: a single fact about the
-  // part with one control. It used to be a bordered pill NEXT TO a bare 24px pencil, two shapes at
-  // two heights with a gap between them, which is what "the datasheet button and its edit look out
-  // of place / uneven" meant (punch 8).
-  return (
-    <div className="flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field px-3">
-      <Icon id="detail.datasheet-link" className="h-3.5 w-3.5 flex-none text-t3" />
-      <span className={EYEBROW_DENSE}>
-        <Text id="detail.datasheet">Datasheet</Text>
-      </span>
-      {href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          // "Open" alone is a useless accessible name out of context - the row's LABEL carries the
-          // noun visually, but a screen reader reads the link on its own.
-          aria-label="Open Datasheet"
-          className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-t1 transition-colors hover:text-acc"
-        >
-          <span className="truncate">Open</span>
-          <ExternalIcon className="flex-none text-t3" />
-        </a>
-      ) : (
-        <span className="ml-auto text-xs italic text-t3">None on file</span>
-      )}
-      {onEdit ? (
-        <button
-          type="button"
-          onClick={() => {
-            setDraft(url);
-            setEditing(true);
-          }}
-          disabled={busy}
-          aria-label="Edit datasheet link"
-          title="Edit datasheet link"
-          className="grid h-5 w-5 flex-none place-items-center rounded-control text-t3 transition-colors hover:text-t1 disabled:opacity-50"
-        >
-          <Icon id="detail.rename" className="h-3.5 w-3.5" />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-// The outbound links + free-form notes, as the foot of the identity rail. "Links" gathers the
-// datasheet and the vendor product page into one obvious place (the owner asked for a clear home
-// for links); both the datasheet and the note stay editable so a part is completed here. All
-// microcopy avoids the lowercase letter y (owner rule).
-function RailReference({
-  datasheetUrl,
-  datasheetHref,
-  description,
-  descriptionAlternates,
-  onEditDatasheet,
-  onEditDescription,
-  busy,
-}: {
-  datasheetUrl: string;
-  datasheetHref?: string;
-  description: string;
-  descriptionAlternates: SourcedAlternate[];
-  onEditDatasheet?: (value: string) => void;
-  onEditDescription?: (value: string) => void;
-  busy?: boolean;
-}) {
-  return (
-    <div data-dev-id="detail.reference" className="flex flex-col gap-4">
-      <DetailSection title={<Text id="detail.links">Links</Text>} data-dev-id="detail.datasheet-row">
-        <DatasheetField
-          url={datasheetUrl}
-          href={datasheetHref}
-          onEdit={onEditDatasheet}
-          busy={busy}
-        />
-      </DetailSection>
-      <DetailSection title={<Text id="detail.notes">Description</Text>} data-dev-id="detail.notes-row">
-        {onEditDescription ? (
-          <EditableText
-            value={description}
-            onSave={onEditDescription}
-            label="Description"
-            placeholder="Add a description"
-            multiline
-            clampLines={3}
-            disabled={busy}
-            displayClassName="text-xs"
-          />
-        ) : description ? (
-          <span className="text-xs text-t2">{description}</span>
-        ) : (
-          <span className="text-xs italic text-t3">None</span>
-        )}
-        {/* Two distributors describing the same part differently is normal and useful; the one
-            in force stays above, and the other is a click away with its vendor named. */}
-        <AlternatesDisclosure
-          entries={descriptionAlternates}
-          current={description}
-          onUse={onEditDescription ? (value) => onEditDescription(value) : undefined}
-        />
-      </DetailSection>
-    </div>
-  );
-}
-
-// The filing (category) control: moving a part between category libraries is organization,
-// not identity, so it sits in the footer as a quiet inline select, not in the masthead.
-function Filing({
-  category,
-  categories,
-  onMoveCategory,
-  busy,
-}: {
-  category: string;
-  categories?: string[];
-  onMoveCategory?: (category: string) => void;
-  busy?: boolean;
-}) {
-  // Filing shares the CAD row's exact anatomy (icon + uppercase label + value + chevron): the
-  // visual row is one flat control, and in editable mode a transparent native <select> overlays
-  // it so clicking still opens the real category dropdown.
-  const editable = !!(onMoveCategory && categories && categories.length > 0);
-  return (
-    <div className="group relative" data-dev-id="detail.filing">
-      <div
-        aria-hidden={editable || undefined}
-        className={
-          "flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field px-3 transition-colors " +
-          (editable ? "group-hover:bg-raise2 " : "") +
-          (busy ? "opacity-50" : "")
-        }
-      >
-        <Icon id="detail.filing-folder" className="h-3.5 w-3.5 flex-none text-t3" />
-        <span className={EYEBROW_DENSE}>
-          <Text id="detail.filing">Filing</Text>
-        </span>
-        <span className="ml-auto min-w-0 truncate text-xs font-medium text-t1">{category}</span>
-        {editable ? (
-          <Icon id="detail.select-chevron" className="h-3 w-3 flex-none text-t3" />
-        ) : null}
-      </div>
-      {editable ? (
-        <select
-          aria-label="Category"
-          value={category}
-          disabled={busy}
-          onChange={(e) => {
-            if (e.target.value !== category) onMoveCategory!(e.target.value);
-          }}
-          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
-        >
-          {categories!.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      ) : null}
-    </div>
-  );
-}
-
 
 // One Part Canvas tile. `hero` is the big physical (3D) stage; `tile` is a compact
 // embodiment (symbol / footprint). Present -> the whole tile is a button that expands

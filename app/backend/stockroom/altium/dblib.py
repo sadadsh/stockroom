@@ -37,6 +37,22 @@ FIELD_MAP: list[tuple[str, str, bool]] = [
     ("Stockroom ID", "Stockroom ID", False),
 ]
 
+# Columns that are NOT record data fields, and why. Everything else in FIELD_MAP must be declared
+# in the Altium tool's `data_fields` (eda/registry.py), which is what the detail sheet's handoff
+# band renders; `tests/backend/eda/test_data_fields.py` fails on a column that is neither.
+#
+# These four exist because a .DbLib column layout is a wire format, not a record-field list: an
+# asset reference splits into a Ref + a Path, a datasheet into a link Description + a URL, and the
+# placement binding is already registry data on `EdaTool.placement_binding`. Each is the SECOND
+# half of a pair whose first half is the declared field, or a value derived from one.
+NON_FIELD_COLUMNS: dict[str, str] = {
+    "Library Path": "the path half of the symbol reference; the Ref half is the `symbol` field",
+    "Footprint Path": "the path half of the footprint reference; the Ref half is the `footprint` field",
+    "Comment": "the placed symbol's display value, derived from `value` (spec 2026-07-23)",
+    "ComponentLink1Description": "the label half of the datasheet link; the URL half is `datasheet`",
+    "Stockroom ID": "the placement binding, declared by EdaTool.placement_binding",
+}
+
 
 def _connection_string(data_filename: str) -> str:
     return (

@@ -96,6 +96,11 @@ const KNOWN_DERIVED: readonly string[] = [
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
 const KNOWN_PROP_PASSED: readonly string[] = [
+  // ProductPhoto.tsx CarouselArrow: the pager buttons take devId as a prop and render
+  // data-dev-id={devId}. Spelled out in full at the call site rather than built as
+  // `preview.photo-${side}` - an interpolated id is invisible to this gate and to grep.
+  "preview.photo-prev",
+  "preview.photo-next",
   // Glb3DView.tsx LayerToggle: the layer + shading buttons take devId as a prop and render
   // data-dev-id={devId}; each id is spelled out in full at the call site or in the SHADING table.
   "detail.model-board",

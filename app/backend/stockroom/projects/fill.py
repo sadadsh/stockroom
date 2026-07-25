@@ -50,17 +50,30 @@ FILL_PROPERTY: dict[str, str] = {
     "footprint": "Footprint",
 }
 
-# The identity properties a placed component needs to be "complete" for the completion passport, in
-# passport order. Footprint + the four identity fields; the 3D-model / footprint-file DISK resolution
-# is a library concern (the audit measures it), so the schematic passport measures the directly
-# readable set, mirroring the retired reference's M0 passport.
-COMPLETION_FIELDS: tuple[tuple[str, str], ...] = (
-    ("Footprint", "Footprint"),
-    ("MPN", "MPN"),
-    ("Manufacturer", "Manufacturer"),
-    ("Datasheet", "Datasheet"),
-    ("Description", "Description"),
-)
+def _completion_fields() -> tuple[tuple[str, str], ...]:
+    """The properties a placed component needs to be "complete", DERIVED from the EDA registry.
+
+    It is the registry's KiCad `data_fields` and nothing else, so this passport can never measure a
+    different set from the one `proposed_changes` actually writes. It was a hand-typed literal, and
+    a hand-typed mirror of a field list is the exact shape that silently dropped two fields at two
+    layers before Batch 3.
+
+    ORDER is a stated rule rather than the registry's: asset references lead, because a component
+    with no footprint cannot be laid out at all, while one with no description is merely
+    under-documented. Within each group, registry declaration order holds.
+
+    The 3D-model / footprint-file DISK resolution stays out of scope: that is a library concern the
+    audit measures, so this passport reports only what is directly readable from the schematic.
+    """
+    from stockroom.eda.registry import get_tool
+
+    fields = tuple(f for f in get_tool("kicad").data_fields if f.passport)
+    assets = tuple(f for f in fields if f.key in ("symbol", "footprint", "model"))
+    rest = tuple(f for f in fields if f not in assets)
+    return tuple((f.tool_field, f.label) for f in assets + rest)
+
+
+COMPLETION_FIELDS: tuple[tuple[str, str], ...] = _completion_fields()
 
 # A value counts as "blank" (so filling it is a fill, not an overwrite) when it is empty or one of
 # KiCad's placeholder tokens. Mirrors identity._PLACEHOLDERS + the retired _BLANKS.

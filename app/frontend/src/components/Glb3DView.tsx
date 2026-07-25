@@ -89,14 +89,25 @@ export function Glb3DView({
     return <Centered>This device could not render the 3D preview.</Centered>;
   }
   return (
-    <div className="relative h-full w-full">
-      <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />
+    // The controls sit in a RESERVED BAR beneath the canvas, not floating over it.
+    //
+    // They used to be two chip stacks pinned bottom-left plus the view cluster bottom-right, which
+    // was fine only while the stage was 540px tall and mostly empty. The moment the stage took the
+    // landscape proportion a part actually has (2026-07-25, the composition slice), those stacks
+    // landed ON the model - measured, and the exact reason an earlier attempt at the aspect was
+    // reverted. Overlaying controls on the subject is a bet that the subject will stay small, and
+    // that bet is what the camera-fit work exists to lose.
+    //
+    // A bar costs ~28px of stage height and can never collide. It also means the model can be
+    // framed edge to edge without a chip covering a lead.
+    <div className="flex h-full w-full flex-col">
+      <div ref={mountRef} className="min-h-0 w-full flex-1" data-testid="model-canvas" />
       <div
-        data-dev-id="detail.model-layers"
         onClick={(e) => e.stopPropagation()}
-        className="pointer-events-auto absolute bottom-2 left-2 flex flex-col items-start gap-1"
+        className="flex flex-none flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-1.5 py-1"
       >
-        <div className="flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm">
+      <div data-dev-id="detail.model-layers" className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5">
           <LayerToggle
             devId="detail.model-show-model"
             label="Model"
@@ -138,7 +149,7 @@ export function Glb3DView({
         </div>
         <div
           data-dev-id="detail.model-shading"
-          className="flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm"
+          className="flex items-center gap-0.5"
         >
           {SHADING.map((r) => (
             <LayerToggle
@@ -162,6 +173,7 @@ export function Glb3DView({
           sceneRef.current?.setView(mode);
         }}
       />
+      </div>
     </div>
   );
 }
@@ -260,7 +272,7 @@ function ViewControls({
       data-dev-id="detail.model-views"
       // the whole strip swallows the tile's open-on-click, not just the buttons
       onClick={(e) => e.stopPropagation()}
-      className="pointer-events-auto absolute bottom-2 right-2 flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm"
+      className="flex items-center gap-0.5"
     >
       {VIEWS.map((v) => (
         <button
