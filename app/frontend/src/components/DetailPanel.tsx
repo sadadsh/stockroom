@@ -452,8 +452,23 @@ export function DetailPanel({
               // unconditional, so an absent model still claimed a 300px floor AND all the column's
               // slack: measured, a featureless "No 3D Model" placeholder rendered ~420px tall above
               // 142px Symbol and Footprint tiles, making the emptiest thing on the sheet the most
-              // prominent. Empty, it now sits as a PEER of its siblings at the same 142px; present,
-              // it keeps the full hero treatment because then the space is carrying a render.
+              // prominent. Empty, it now sits as a PEER of its siblings at the same 142px.
+              //
+              // Present, it keeps the full hero treatment because then the space is carrying a
+              // render.
+              //
+              // TRIED AND REVERTED 2026-07-25, deliberately, so it is not re-attempted blind:
+              // `aspect-[3/2] min-h-[180px]`. The reasoning was sound - `flex-1` gives the hero
+              // whatever slack the column has, so beside a tall specs pane it measured a 530x965
+              // PORTRAIT stage for a subject that is landscape, and a portrait stage makes the
+              // camera fit width-limited so the spare height can never be filled without running
+              // the pads off the sides. But shipping it ALONE made two things worse, both seen in
+              // the shot: the layer and shading chips are absolutely positioned bottom-left and
+              // landed ON the model once the stage was short, and roughly 300px of dead column
+              // opened below the Footprint tile because nothing else absorbs the slack. The tile's
+              // proportion is therefore part of the COLUMN BALANCE slice (the owner's "sourcing is
+              // squished, specifications is too large" and "do not look cramped"), not a change
+              // that can be made on its own. See the Batch Plan.
               className={hasModel ? "min-h-[300px] flex-1" : "h-[142px]"}
               art={<CubeArt />}
               thumb={
