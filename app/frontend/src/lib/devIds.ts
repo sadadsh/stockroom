@@ -73,7 +73,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.model-shading", label: "3D shading mode group", area: "detail" },
   { id: "detail.model-show-model", label: "3D layer: model", area: "detail" },
   { id: "detail.model-show-board", label: "3D layer: PCB substrate", area: "detail" },
-  { id: "detail.model-shade-original", label: "3D shading: the model own materials", area: "detail" },
   { id: "detail.model-shade-realistic", label: "3D shading: realistic", area: "detail" },
   { id: "detail.model-shade-studio", label: "3D shading: studio", area: "detail" },
   { id: "detail.model-shade-xray", label: "3D shading: x-ray", area: "detail" },

@@ -261,6 +261,10 @@ export interface LandPad {
   drill: number;
   /** thru_hole / smd / np_thru_hole */
   pad_type: string;
+  /** front / back / both, from the pad's declared copper layer */
+  side: string;
+  /** KiCad's roundrect corner ratio */
+  rratio: number;
 }
 
 export interface LandGraphic {
