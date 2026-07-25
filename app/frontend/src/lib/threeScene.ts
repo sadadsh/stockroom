@@ -56,6 +56,9 @@ export interface LandPadInput {
   rotation: number;
   /** KiCad pad shape: rect / roundrect / oval / circle. Drives the corner radius. */
   shape?: string;
+  /** hole diameter in mm; 0 for SMD */
+  drill?: number;
+  pad_type?: string;
 }
 
 export interface LandGraphicInput {
@@ -101,12 +104,20 @@ function roundedPadGeometry(
   h: number,
   thickness: number,
   radius: number,
+  drill = 0,
 ): THREE.BufferGeometry {
   const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2 - 1e-9));
-  if (r <= 0) return new THREE.BoxGeometry(w, thickness, h);
+  if (r <= 0 && drill <= 0) return new THREE.BoxGeometry(w, thickness, h);
   const shape = new THREE.Shape();
   const x = -w / 2;
   const y = -h / 2;
+  if (r <= 0) {
+    shape.moveTo(x, y);
+    shape.lineTo(x + w, y);
+    shape.lineTo(x + w, y + h);
+    shape.lineTo(x, y + h);
+    shape.closePath();
+  } else {
   shape.moveTo(x + r, y);
   shape.lineTo(x + w - r, y);
   shape.quadraticCurveTo(x + w, y, x + w, y + r);
@@ -116,6 +127,14 @@ function roundedPadGeometry(
   shape.quadraticCurveTo(x, y + h, x, y + h - r);
   shape.lineTo(x, y + r);
   shape.quadraticCurveTo(x, y, x + r, y);
+  }
+  // A THROUGH-HOLE pad is an annulus, not a disc. 44% of real pads are through-hole, and drawing
+  // them solid is not what the footprint says. ExtrudeGeometry treats a shape's holes as holes.
+  if (drill > 0) {
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, Math.min(drill / 2, Math.min(w, h) / 2 - 1e-6), 0, Math.PI * 2, false);
+    shape.holes.push(hole);
+  }
   const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
   // extruded in +Z; lay it flat in the board plane and sit it on the surface
   // rotateX(-90) maps (x,y,z) -> (x,z,-y), so the extrusion's z range 0..thickness becomes the
@@ -204,6 +223,8 @@ export function mountModelScene(
   // under the body rather than at an arbitrary y=0.
   let modelBaseY = 0;
   let modelSize: THREE.Vector3 | null = null;
+  let modelRoot: THREE.Object3D | null = null;
+  let placement: LandPatternInput["model_placement"] = null;
   let modelCenter: THREE.Vector3 | null = null;
 
   // POST-PROCESSING, the half of "looks ray traced" that lighting alone cannot give you. GTAO is
@@ -249,6 +270,7 @@ export function mountModelScene(
     "",
     (gltf) => {
       root.add(gltf.scene);
+      modelRoot = gltf.scene;
       // Render every part in ONE neutral surface (the app's 3D renders are monochrome - no
       // per-material colour), so a model reads by its lit form, not by the GLB's arbitrary
       // colour. Disposed with the scene below (all meshes share this one material).
@@ -302,6 +324,7 @@ export function mountModelScene(
       // materials are swapped by setRenderMode; hold the studio pair so it can swap BACK
       studioMaterial = neutral;
       applyRenderMode(renderMode);
+      applyPlacement();
       // THE SCENE WORKS IN MILLIMETRES. glTF mandates METRES, so a 3.5mm package arrives as 0.0035
       // units - and every effect with a world-space radius is tuned for human-scale numbers. GTAO's
       // default radius alone is ~70x that whole model, so it computed the part as fully occluded
@@ -506,6 +529,34 @@ export function mountModelScene(
   let landGroup: THREE.Group | null = null;
   let boardMesh: THREE.Mesh | null = null;
 
+  /**
+   * APPLY THE FOOTPRINT'S MODEL PLACEMENT. `(model ...)` carries offset/scale/rotate saying where
+   * the body sits relative to the footprint origin. Ignoring it draws a vendor part in the wrong
+   * place while looking perfectly plausible - which is exactly the silent failure the placement
+   * reader was built for, and until now nothing consumed it.
+   *
+   * Applied to the wrapper `root`, not the model itself, because the model's own transform is
+   * already carrying the metres->millimetres normalisation and the upright orientation. KiCad's
+   * rotation is in DEGREES and its Y axis points down the screen, so Y and Z trade places and the
+   * angles are negated coming into a Y-up scene.
+   */
+  function applyPlacement() {
+    if (!modelRoot) return;
+    if (!placement) {
+      root.position.set(0, 0, 0);
+      root.rotation.set(0, 0, 0);
+      root.scale.set(1, 1, 1);
+      return;
+    }
+    const [ox, oy, oz] = placement.offset;
+    const [sx, sy, sz] = placement.scale;
+    const [rx, ry, rz] = placement.rotate;
+    root.rotation.set((-rx * Math.PI) / 180, (-rz * Math.PI) / 180, (ry * Math.PI) / 180);
+    root.scale.set(sx || 1, sy || 1, sz || 1);
+    // offset is millimetres in KiCad's frame; the scene is millimetres, Y-up
+    root.position.set(ox, oz, -oy);
+  }
+
   function setLandPattern(land: LandPatternInput | null) {
     if (boardMesh) {
       scene.remove(boardMesh);
@@ -523,6 +574,8 @@ export function mountModelScene(
       });
       landGroup = null;
     }
+    placement = land ? land.model_placement : null;
+    applyPlacement();
     if (!land || !land.pads.length) return;
 
     // 1 scene unit == 1 MILLIMETRE (the model is scaled up by 1000 on load), so KiCad's pad
@@ -553,7 +606,7 @@ export function mountModelScene(
         : pad.shape === "roundrect"
           ? Math.min(pw, ph) * 0.25
           : 0;
-      const geo = roundedPadGeometry(pw, ph, thickness, radius);
+      const geo = roundedPadGeometry(pw, ph, thickness, radius, (pad.drill ?? 0) * MM_TO_SCENE);
       const mesh = new THREE.Mesh(geo, copper);
       mesh.rotation.y = (-pad.rotation * Math.PI) / 180;
       // KiCad x -> scene x, KiCad y -> scene z (the board plane). Verified against the real part:

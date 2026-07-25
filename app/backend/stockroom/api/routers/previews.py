@@ -304,6 +304,8 @@ def previews_router(require_token) -> APIRouter:
                     "size": [p.size[0], p.size[1]],
                     "shape": p.shape,
                     "rotation": p.rotation,
+                    "drill": p.drill,
+                    "pad_type": p.pad_type,
                 }
                 for p in fp.pads
             ],

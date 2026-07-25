@@ -257,6 +257,10 @@ export interface LandPad {
   shape: string;
   /** degrees */
   rotation: number;
+  /** hole diameter in mm; 0 for SMD */
+  drill: number;
+  /** thru_hole / smd / np_thru_hole */
+  pad_type: string;
 }
 
 export interface LandGraphic {

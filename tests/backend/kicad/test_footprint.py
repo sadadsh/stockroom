@@ -308,3 +308,45 @@ class TestGraphics:
         assert len(g) >= 4 + 32 + 3, "rect + circle tessellation + closed triangle"
         # the polygon must CLOSE: some segment ends back at the first point
         assert any(x.end == (0.0, 0.0) for x in g), "the polygon was not closed"
+
+    def test_an_arc_becomes_a_curve_through_its_mid_point(self, tmp_path):
+        """KiCad stores an arc as THREE POINTS on the curve, not a centre and angles, so the centre
+        is the circumcentre of that triangle. A semicircle of radius 1 centred on the origin must
+        come back as segments that all sit on radius 1."""
+        fp = self._fp(
+            tmp_path,
+            '\t(fp_arc (start -1 0) (mid 0 1) (end 1 0) '
+            '(stroke (width 0.1) (type solid)) (layer "F.SilkS"))\n',
+        )
+        g = fp.graphics
+        assert len(g) >= 6, "an arc must tessellate into several segments"
+        for seg in g:
+            for pt in (seg.start, seg.end):
+                r = (pt[0] ** 2 + pt[1] ** 2) ** 0.5
+                assert abs(r - 1.0) < 1e-6, f"point {pt} is not on the arc's radius"
+        assert any(p[1] > 0.9 for p in [s.start for s in g]), "the arc went the wrong way round"
+
+    def test_collinear_arc_points_degrade_to_a_straight_line(self, tmp_path):
+        # Three points on a line have NO circumcentre; solving for one divides by zero.
+        fp = self._fp(
+            tmp_path,
+            '\t(fp_arc (start 0 0) (mid 1 0) (end 2 0) '
+            '(stroke (width 0.1) (type solid)) (layer "F.SilkS"))\n',
+        )
+        assert len(fp.graphics) == 1
+        assert fp.graphics[0].start == (0.0, 0.0)
+        assert fp.graphics[0].end == (2.0, 0.0)
+
+    def test_reads_the_drill_and_type_of_a_through_hole_pad(self, tmp_path):
+        # 44% of pads in the real KiCad library are through-hole; drawing them as solid copper is
+        # not what was downloaded.
+        fp = self._fp(
+            tmp_path,
+            '\t(pad "1" thru_hole circle (at 0 0) (size 1.7 1.7) (drill 1) (layers "*.Cu"))\n'
+            '\t(pad "2" smd roundrect (at 2 0) (size 1 0.5) (layers "F.Cu"))\n',
+        )
+        p1, p2 = fp.pads
+        assert p1.pad_type == "thru_hole"
+        assert p1.drill == 1.0
+        assert p2.pad_type == "smd"
+        assert p2.drill == 0.0

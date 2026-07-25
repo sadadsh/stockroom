@@ -46,6 +46,12 @@ class Pad:
     size: tuple[float, float]
     shape: str = "rect"
     rotation: float = 0.0
+    # Hole diameter in mm for a through-hole pad, 0 for SMD. MEASURED: 44% of pads in the real
+    # KiCad library are through-hole, and drawing them as solid copper with no hole is simply not
+    # what was downloaded.
+    drill: float = 0.0
+    # "thru_hole" / "smd" / "np_thru_hole" - a non-plated hole has no copper at all.
+    pad_type: str = "smd"
 
 
 @dataclass(frozen=True)
@@ -183,6 +189,49 @@ class Footprint:
                     )
                 )
 
+        # ARCS (9% of real footprints). KiCad stores THREE POINTS on the curve (start/mid/end), not
+        # a centre and angles, so the centre is solved as the circumcentre of that triangle. Three
+        # collinear points have no circumcentre - that is a straight line, so it is emitted as one.
+        for node in self._doc.root.find_all("fp_arc"):
+            a, m, b = _pt(node, "start"), _pt(node, "mid"), _pt(node, "end")
+            if a is None or m is None or b is None:
+                continue
+            layer, width = _layer_width(node)
+            d = 2 * (a[0] * (m[1] - b[1]) + m[0] * (b[1] - a[1]) + b[0] * (a[1] - m[1]))
+            if abs(d) < 1e-12:
+                out.append(GraphicLine(start=a, end=b, layer=layer, width=width))
+                continue
+            ux = (
+                (a[0] ** 2 + a[1] ** 2) * (m[1] - b[1])
+                + (m[0] ** 2 + m[1] ** 2) * (b[1] - a[1])
+                + (b[0] ** 2 + b[1] ** 2) * (a[1] - m[1])
+            ) / d
+            uy = (
+                (a[0] ** 2 + a[1] ** 2) * (b[0] - m[0])
+                + (m[0] ** 2 + m[1] ** 2) * (a[0] - b[0])
+                + (b[0] ** 2 + b[1] ** 2) * (m[0] - a[0])
+            ) / d
+            r = math.hypot(a[0] - ux, a[1] - uy)
+            a0 = math.atan2(a[1] - uy, a[0] - ux)
+            a1 = math.atan2(m[1] - uy, m[0] - ux)
+            a2 = math.atan2(b[1] - uy, b[0] - ux)
+            # walk start -> mid -> end so the arc goes the way KiCad drew it, not the short way
+            def _norm(x: float) -> float:
+                while x <= -math.pi:
+                    x += 2 * math.pi
+                while x > math.pi:
+                    x -= 2 * math.pi
+                return x
+
+            sweep = _norm(a1 - a0) + _norm(a2 - a1)
+            steps = max(6, int(abs(sweep) / (math.pi / 16)) + 1)
+            prev = a
+            for i in range(1, steps + 1):
+                ang = a0 + sweep * (i / steps)
+                cur = (ux + r * math.cos(ang), uy + r * math.sin(ang))
+                out.append(GraphicLine(start=prev, end=cur, layer=layer, width=width))
+                prev = cur
+
         for node in self._doc.root.find_all("fp_line"):
 
             def pt(key: str) -> tuple[float, float] | None:
@@ -228,6 +277,7 @@ class Footprint:
             kids = node.children
             # (pad "<number>" <type> <shape> ...)
             number = kids[1].value if len(kids) > 1 else ""
+            pad_type = kids[2].value if len(kids) > 2 else "smd"
             shape = kids[3].value if len(kids) > 3 else "rect"
 
             def pair(key: str, default: tuple[float, float]) -> tuple[float, float]:
@@ -247,6 +297,14 @@ class Footprint:
                 except (TypeError, ValueError):
                     rotation = 0.0
 
+            drill = 0.0
+            drill_node = node.find("drill")
+            if drill_node is not None and len(drill_node.children) > 1:
+                try:
+                    drill = float(drill_node.children[1].value)
+                except (TypeError, ValueError):
+                    drill = 0.0
+
             out.append(
                 Pad(
                     number=str(number),
@@ -254,6 +312,8 @@ class Footprint:
                     size=pair("size", (0.0, 0.0)),
                     shape=str(shape),
                     rotation=rotation,
+                    drill=drill,
+                    pad_type=str(pad_type),
                 )
             )
         return out
