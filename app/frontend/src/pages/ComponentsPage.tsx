@@ -23,6 +23,7 @@ import {
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
+import { distributorLabel } from "../lib/sourced";
 import { useAddPart } from "../lib/addPart";
 import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
@@ -126,6 +127,20 @@ export function ComponentsPage() {
       {
         onSuccess: () => toast("Pinout saved", "ok"),
         onError: (err) => toastError(err, "Could not save the pinout"),
+      },
+    );
+  }
+
+  // Put a different source's answer in force for one spec. It goes through the specs seam with
+  // overwrite, so the record keeps WHICH distributor the chosen value came from (set_specs writes
+  // record.enrichment[key]) instead of silently becoming an anonymous manual edit.
+  function handleUseSpecValue(key: string, value: string, source: string) {
+    if (!selectedId) return;
+    setSpecs.mutate(
+      { id: selectedId, specs: { [key]: { value, source, confidence: "high" } }, overwrite: true },
+      {
+        onSuccess: () => toast(`${key} set from ${distributorLabel(source)}`, "ok"),
+        onError: (err) => toastError(err, `Could not set ${key}`),
       },
     );
   }
@@ -287,6 +302,7 @@ export function ComponentsPage() {
               categories={categories}
               onDelete={handleDelete}
               onApplyPinout={handleApplyPinout}
+              onUseSpecValue={handleUseSpecValue}
               onAttachSymbol={handleAttachSymbol}
               onAttachFootprint={handleAttachFootprint}
               busy={detailBusy}

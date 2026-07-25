@@ -382,6 +382,9 @@ const _GROUP_SCORE: Record<SpecGroupName, number> = {
   Electrical: 400,
   Physical: 250,
   "Ratings & Compliance": 120,
+  // The procurement group IS the commercial/logistics noise this score exists to keep out of the
+  // columns (origin, tariff, packaging, order quantities), so it can never earn one.
+  "Trade & Compliance": -1,
   Other: -1,
 };
 
@@ -490,6 +493,9 @@ function _railScore(facet: ParametricFacet, category: string): number {
     Physical: 3,
     "Ratings & Compliance": 2,
     Other: 1,
+    // sunk below every parameter dimension, never hidden - the rail's stated rule for a
+    // commercial / provenance dimension
+    "Trade & Compliance": 0,
   };
   const r = resolveSpec(facet.key, category);
   const kindBoost = facet.kind === "range" ? 0.5 : 0; // a quantitative dimension is a prime filter
