@@ -139,7 +139,10 @@ export function ComponentsPage() {
     setSpecs.mutate(
       { id: selectedId, specs: { [key]: { value, source, confidence: "high" } }, overwrite: true },
       {
-        onSuccess: () => toast(`${key} set from ${distributorLabel(source)}`, "ok"),
+        onSuccess: () =>
+          // an alternate seeded from the record itself carries no source, so the message must not
+          // trail off into "set from "
+          toast(source ? `${key} set from ${distributorLabel(source)}` : `${key} set`, "ok"),
         onError: (err) => toastError(err, `Could not set ${key}`),
       },
     );
