@@ -1966,3 +1966,24 @@ def test_post_assign_non_git_is_400(client, app_ctx, tmp_path):
     rec = _register(client, _make_project(tmp_path / "ext" / "asg2", _ASSIGN_SHEET))
     assert client.post(f"/api/projects/{rec['id']}/assign",
                        json={"refs": ["R1"], "part_id": "r10k"}).status_code == 400
+
+
+def test_assign_is_a_capability_of_every_eda_stockroom_can_read_placements_for(client, tmp_path):
+    """Bulk assign is registry-generic, so it is NOT in the KiCad-only set. Gating it on `prepare`
+    (a KiCad-only writer) hid the whole surface from an Altium project that can be assigned."""
+    kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    for proj in (kicad, altium):
+        caps = client.get(f"/api/projects/{proj['id']}").json()["capabilities"]
+        assert "assign" in caps, caps
+
+
+def test_the_assign_endpoint_serves_an_altium_project(client, tmp_path):
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    body = client.get(f"/api/projects/{altium['id']}/assign")
+    assert body.status_code == 200, body.text
+    data = body.json()
+    assert data["eda"] == "altium"
+    # The surface states where an assignment LANDS, because for this tool it is not the schematic.
+    assert data["binding"]["writable"] is False
+    assert data["binding"]["reason"]

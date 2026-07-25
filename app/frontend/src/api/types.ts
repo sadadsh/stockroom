@@ -1447,11 +1447,42 @@ export interface AssignGroup {
   candidates: AssignCandidate[];
 }
 
+// A placement Stockroom already knows the library part for, because someone assigned it. The point
+// of recording it is that it can be CHECKED later: `drift` is the fields this placement would still
+// receive from the part it is bound to, so an empty list means the schematic and the library agree
+// and a non-empty one means something changed under it.
+export interface AssignBound {
+  ref: string;
+  sheet: string;
+  // The durable key the binding is stored against (a KiCad symbol uuid, an Altium UNIQUEID).
+  key: string;
+  // True when the key had to fall back to the reference designator, which annotation rewrites. Such
+  // a binding is real but not durable, and saying so is the difference between the two.
+  weak_key: boolean;
+  part_id: string;
+  display_name: string;
+  mpn: string;
+  // The bound part is no longer in the library. Never silently re-guessed: it is shown as broken.
+  missing: boolean;
+  drift: FillChange[];
+}
+
+// How this project's EDA tool carries a binding. KiCad's schematics are written by Stockroom, so the
+// binding rides on the placement; Altium's are read-only here, so Stockroom records it instead.
+export interface AssignBinding {
+  field: string;
+  writable: boolean;
+  reason: string;
+}
+
 export interface AssignRead {
   project: string;
+  eda: string;
   under_git: boolean;
+  binding: AssignBinding;
   components: number;
   unassigned: number;
+  bound: AssignBound[];
   groups: AssignGroup[];
 }
 
@@ -1466,6 +1497,9 @@ export interface AssignResult {
   committed: string | null;
   refs: string[];
   part_id: string;
+  // How many placements now carry a durable binding to this part. For a tool Stockroom cannot
+  // write, `committed` is null (no design file changed) while this is still the full count.
+  bound: number;
 }
 
 // POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)

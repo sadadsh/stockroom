@@ -109,29 +109,52 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
     proj.mkdir(parents=True, exist_ok=True)
     (proj / "SeedBoard.kicad_pro").write_text("{}", encoding="utf-8")
 
-    def sym(ref, lib_id, value, footprint, uid):
+    # The field a KiCad placement carries its durable Stockroom binding in. Read from the registry so
+    # the seed cannot drift from the app it is shooting.
+    sys.path.insert(0, str(REPO / "app" / "backend"))
+    from stockroom.projects.binding import field_for  # noqa: E402
+
+    bind_field = field_for("kicad")
+
+    def sym(ref, lib_id, value, footprint, uid, *, bound="", mpn=""):
+        """One placed symbol. `bound` stamps the durable binding an earlier assignment would have
+        left; `mpn` writes an MPN property, so a bound placement whose MPN disagrees with its part
+        renders the DRIFT state. `uid=""` omits the uuid entirely, which is the legacy file that can
+        only be bound by designator (the weak-link state)."""
+        extra = ""
+        if bound:
+            extra += f'\t\t(property "{bind_field}" "{bound}" (at 0 0 0) (hide yes))\n'
+        if mpn:
+            extra += f'\t\t(property "MPN" "{mpn}" (at 0 0 0) (hide yes))\n'
         return (
             "\t(symbol\n"
             f'\t\t(lib_id "{lib_id}")\n\t\t(at 10 10 0)\n\t\t(unit 1)\n'
             "\t\t(in_bom yes)\n\t\t(dnp no)\n"
-            f'\t\t(uuid "{uid}")\n'
-            f'\t\t(property "Reference" "{ref}" (at 10 8 0))\n'
+            + (f'\t\t(uuid "{uid}")\n' if uid else "")
+            + f'\t\t(property "Reference" "{ref}" (at 10 8 0))\n'
             f'\t\t(property "Value" "{value}" (at 12 10 0))\n'
             f'\t\t(property "Footprint" "{footprint}" (at 10 10 0))\n'
             '\t\t(property "Datasheet" "~" (at 10 10 0))\n'
-            '\t\t(instances\n\t\t\t(project "SeedBoard"\n'
+            + extra
+            + '\t\t(instances\n\t\t\t(project "SeedBoard"\n'
             f'\t\t\t\t(path "/seed"\n\t\t\t\t\t(reference "{ref}")\n\t\t\t\t\t(unit 1)\n'
             "\t\t\t\t)\n\t\t\t)\n\t\t)\n\t)\n"
         )
 
     r_fp, c_fp = "Resistor_SMD:R_0402_1005Metric", "Capacitor_SMD:C_0402_1005Metric"
     body = "".join([
-        # Five 10k resistors: one group, two indistinguishable candidates.
-        *[sym(f"R{n}", "Device:R", "10k", r_fp, f"s-r{n}") for n in (1, 2, 3, 9, 10)],
+        # Three unassigned 10k resistors: one group, two indistinguishable candidates.
+        *[sym(f"R{n}", "Device:R", "10k", r_fp, f"s-r{n}") for n in (1, 2, 3)],
         # A 47k group nothing in the library matches, so the honest no-candidate state renders too.
         sym("R11", "Device:R", "47k", r_fp, "s-r11"),
-        # Three 100nF capacitors: a second kind, proving groups do not bleed across symbols.
-        *[sym(f"C{n}", "Device:C", "100n", c_fp, f"s-c{n}") for n in (1, 2, 3)],
+        # Already assigned, and the four states the record has to tell apart. Without these the
+        # bound ledger could only ever be shot empty, which would prove nothing about it.
+        sym("R9", "Device:R", "10k", r_fp, "s-r9", bound="r10k1", mpn="RC0402FR-0710KL"),
+        sym("R10", "Device:R", "10k", r_fp, "s-r10", bound="r10k1", mpn="WRONG-MPN"),
+        sym("R12", "Device:R", "10k", r_fp, "", bound="r10k1", mpn="RC0402FR-0710KL"),
+        *[sym(f"C{n}", "Device:C", "100n", c_fp, f"s-c{n}",
+              bound="c100n", mpn="CL05B104KO5NNNC") for n in (1, 2)],
+        sym("C3", "Device:C", "100n", c_fp, "s-c3", bound="c100n-deleted"),
     ])
     (proj / "SeedBoard.kicad_sch").write_text(
         "(kicad_sch\n\t(version 20260306)\n" + body + ")\n", encoding="utf-8")

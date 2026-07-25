@@ -46,6 +46,12 @@ KICAD_ONLY_CAPABILITIES = ("checks", "fab", "setup", "netclasses", "prepare", "v
 
 def project_capabilities(rec: ProjectRecord) -> list[str]:
     caps = ["audit", "bom", "revisions", "restore", "file"]
+    # Bulk assign is registry-generic: it needs a placement READER, not a design writer, because a
+    # tool Stockroom cannot write records its bindings on the project record instead. Gating it on
+    # `prepare` (a KiCad-only writer, as its name says) hid the whole surface from every Altium
+    # project that could in fact be assigned.
+    if placements.supported(rec.eda or "kicad"):
+        caps.append("assign")
     if rec.eda == "kicad":
         caps += list(KICAD_ONLY_CAPABILITIES)
     return caps
@@ -1452,12 +1458,20 @@ class ProjectOps:
                     "display_name": (part or {}).get("display_name", ""),
                     "mpn": (part or {}).get("mpn", ""),
                     "missing": part is None,
-                    # What re-verification MEANS: the fields this placement would still receive from
-                    # the part it is bound to. Empty is agreement; non-empty is drift a human edit
-                    # (or a library change) introduced after the assignment.
-                    "drift": fill.proposed_changes(part, comp.get("props") or {}) if part else [],
+                    # What re-verification MEANS: the fields whose schematic value CONTRADICTS the
+                    # part this placement is bound to. Overwrites only, never fills. A field the
+                    # placement simply does not carry yet is Prepare's job and says nothing about the
+                    # binding, and counting those as drift flagged every healthy assignment, which is
+                    # the same as flagging none.
+                    "drift": [c for c in fill.proposed_changes(part, comp.get("props") or {})
+                              if c["kind"] == "overwrite"] if part else [],
                 })
-                continue
+                if part is not None:
+                    continue
+                # A DANGLING binding is reported above AND falls through to the assignable groups,
+                # because the placement really does carry no library part. Reporting it without
+                # offering the repair left it fixable only through the one-by-one fallback, which is
+                # a dead end dressed up as a diagnosis.
             if match["part"] is None:
                 unmatched.append(comp)
         groups = []
