@@ -96,3 +96,102 @@ def test_status_resistor_value_keeps_ohm_unit(client, app_ctx):
     row = next(x for x in client.get("/api/altium/status").json()["rows"] if x["id"] == "res1")
     assert row["value"].endswith("Ω")
     assert row["value"] == "5.05kΩ"
+
+
+def test_embed_capability_requires_token(anon_client):
+    assert anon_client.get("/api/altium/embed-capability").status_code == 401
+
+
+def test_embed_capability_explains_itself_on_a_machine_without_altium(client, monkeypatch):
+    # A KiCad-only peer must get an EXPLAINED unavailable state, never a button that silently does
+    # nothing. The requirement is registry data, so the reason comes from there rather than from a
+    # string in the router.
+    monkeypatch.setattr("stockroom.altium.driver.find_x2", lambda env=None: None)
+    r = client.get("/api/altium/embed-capability")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["installed"] is False
+    assert body["available"] is False
+    assert body["requires_tool_installed"] is True
+    assert "Altium installed" in body["reason"]
+    assert body["binary"] == ""
+
+
+def test_embed_capability_is_available_when_altium_is_installed_and_idle(client, monkeypatch, tmp_path):
+    exe = tmp_path / "AD99" / "X2.EXE"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"MZ")
+    monkeypatch.setattr("stockroom.altium.driver.find_x2", lambda env=None: exe)
+    monkeypatch.setattr("stockroom.altium.driver.AltiumDriver.busy_titles", lambda self: [])
+    body = client.get("/api/altium/embed-capability").json()
+    assert body["installed"] is True and body["available"] is True
+    assert body["binary"] == exe.as_posix()  # never str(Path): backslashes would break a consumer
+    assert body["busy"] == ""
+
+
+def test_embed_capability_reports_a_held_license_seat_rather_than_hanging_later(
+    client, monkeypatch, tmp_path
+):
+    # A windowed Altium holds the single On-Demand seat, so a scripted run would wait forever.
+    # Saying so up front is the alternative to discovering it via a run that never returns.
+    exe = tmp_path / "AD99" / "X2.EXE"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"MZ")
+    monkeypatch.setattr("stockroom.altium.driver.find_x2", lambda env=None: exe)
+    monkeypatch.setattr(
+        "stockroom.altium.driver.AltiumDriver.busy_titles", lambda self: ["Altium Designer"]
+    )
+    body = client.get("/api/altium/embed-capability").json()
+    assert body["installed"] is True
+    assert body["available"] is False
+    assert body["busy"] == "Altium Designer"
+
+
+def test_embed_model_requires_token(anon_client):
+    assert anon_client.post("/api/altium/parts/tps62130/embed-model").status_code == 401
+
+
+def test_embed_model_404s_an_unknown_part(client):
+    assert client.post("/api/altium/parts/nope/embed-model").status_code == 404
+
+
+def test_embed_model_400s_with_the_reason_when_the_part_cannot_take_one(client):
+    # The fixture parts have no Altium footprint, and a 3D body lives inside the footprint's
+    # .PcbLib, so this is a refusal WITH a reason rather than a silent no-op.
+    r = client.post("/api/altium/parts/tps62130/embed-model")
+    assert r.status_code == 400
+    assert "no Altium footprint" in r.text
+
+
+def test_embed_model_returns_the_verified_result_and_rebuilds_the_index(client, monkeypatch):
+    # The route's own contract: it reports what `embed_altium_model` verified, and the index is
+    # rebuilt so the surface the user reads stops showing the gap.
+    calls = {}
+
+    def fake_embed(part_id, *, replace=False, driver=None):
+        calls["part_id"] = part_id
+        calls["replace"] = replace
+        return {"part_id": part_id, "status": "ok", "detail": "done", "embedded": 1,
+                "payload_bytes": 65536, "orphaned": 0, "pcblib": f"{part_id}.PcbLib",
+                "model": "models/x.step", "commit": "abc123"}
+
+    ctx = client.app.state.ctx
+    monkeypatch.setattr(ctx.ops, "embed_altium_model", fake_embed)
+    r = client.post("/api/altium/parts/tps62130/embed-model", json={"replace": True})
+    assert r.status_code == 200
+    assert r.json()["payload_bytes"] == 65536
+    assert calls == {"part_id": "tps62130", "replace": True}
+
+
+def test_embed_model_defaults_replace_to_false(client, monkeypatch):
+    # Default-off matters: a replace leaves a superseded payload in the container, so it must be
+    # asked for rather than assumed.
+    seen = {}
+    ctx = client.app.state.ctx
+    monkeypatch.setattr(
+        ctx.ops,
+        "embed_altium_model",
+        lambda part_id, *, replace=False, driver=None: seen.setdefault("replace", replace) or {},
+    )
+    client.post("/api/altium/parts/tps62130/embed-model")
+    assert seen["replace"] is False

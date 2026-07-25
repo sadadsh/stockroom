@@ -7,6 +7,7 @@ import {
   DEFAULT_EDA_TOOL,
   EDA_TOOL_OPTIONS,
   libraryReadiness,
+  reportableKinds,
   summaryReadiness,
 } from "./edaTarget";
 
@@ -135,13 +136,15 @@ describe("assetReadiness", () => {
     it("a full KiCad set does NOT make the part Altium-ready", () => {
       const r = assetReadiness(detail({ eda: FULL_KICAD }), "altium");
       expect(r.ready).toBe(false);
-      expect(r.missing).toEqual(["Symbol", "Footprint"]);
+      expect(r.missing).toEqual(["Symbol", "Footprint", "3D Model"]);
     });
 
     it("a full Altium set DOES make the part Altium-ready", () => {
+      // The 3D model is REPORTED but never blocks readiness: a footprint places fine without
+      // one, and the fixture has `model: null` because embedding is a separate action.
       const r = assetReadiness(detail({ eda: FULL_ALTIUM }), "altium");
       expect(r.ready).toBe(true);
-      expect(r.missing).toEqual([]);
+      expect(r.missing).toEqual(["3D Model"]);
     });
 
     it("a full Altium set does NOT make the part KiCad-ready", () => {
@@ -155,13 +158,48 @@ describe("assetReadiness", () => {
     });
   });
 
-  it("never reports a 3D model as missing for Altium, which cannot take one by reference", () => {
-    // Altium stores 3D as a body inside the footprint's .PcbLib binary. Listing it as a gap
-    // would be a gap no user could ever close.
+  it("reports an Altium 3D model as missing, because embedding CAN close that gap", () => {
+    // RE-BASELINED 2026-07-25, and the inverted assertion it replaces was right at the time:
+    // Altium cannot take a 3D model by reference and there was no other route, so listing it
+    // named a gap no user could ever close.
+    //
+    // `stockroom.altium.embed3d` is that route now, verified end to end against a real .PcbLib.
+    // So the kind stays in `unsupported` (still not referenceable) and ALSO appears in
+    // `embedded`, which is what makes it a reportable, closable gap. Hiding it is how Altium
+    // parts silently shipped with no 3D at all.
     const r = assetReadiness(detail({ eda: FULL_ALTIUM }), "altium");
-    expect(r.missing).not.toContain("3D Model");
+    expect(r.missing).toContain("3D Model");
     expect(r.unsupported.model).toMatch(/PcbLib/);
-    expect(r.present.model).toBeUndefined();
+    expect(r.present.model).toBe(false);
+    expect(r.embedded.model.container).toBe("footprint");
+    expect(r.embedded.model.requiresToolInstalled).toBe(true);
+    expect(r.embedded.model.reason).toMatch(/Altium installed/);
+  });
+
+  it("still hides a kind with no embed route, so no gap is ever unclosable", () => {
+    // The guard against re-introducing "CAD Incomplete forever". Driven through a SYNTHETIC spec
+    // because the live registry cannot express the case today: KiCad has nothing unsupported and
+    // Altium's only unsupported kind is embeddable, so asserting this against the real tools would
+    // be a test whose loop body never runs.
+    const kinds = ["symbol", "footprint", "model", "panel"];
+    expect(
+      reportableKinds({
+        assetKinds: kinds,
+        unsupportedAssets: { model: "not by reference", panel: "impossible, no route at all" },
+        embeddedAssets: {
+          model: { container: "footprint", source: "model", requiresToolInstalled: true, reason: "" },
+        },
+      }),
+    ).toEqual(["symbol", "footprint", "model"]);
+    // And with the embed route removed the kind disappears again, which is what proves the
+    // assertion above is reading the embed route and not just the kind list.
+    expect(
+      reportableKinds({
+        assetKinds: kinds,
+        unsupportedAssets: { model: "not by reference", panel: "impossible, no route at all" },
+        embeddedAssets: {},
+      }),
+    ).toEqual(["symbol", "footprint"]);
   });
 
   it("treats a passive as having its 3D model, which the stock footprint carries", () => {

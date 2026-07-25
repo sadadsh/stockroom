@@ -20,6 +20,26 @@ export interface EdaToolSpec {
    * one of these as a missing asset: it names a gap that can never be closed.
    */
   unsupportedAssets: Record<string, string>;
+  /**
+   * Asset kinds this tool takes only by EMBEDDING: the tool itself writes the payload
+   * into a binary container the part already owns (an Altium 3D body goes inside the
+   * footprint's .PcbLib). A kind may be BOTH unsupported-by-reference and embeddable,
+   * and that combination is a real, closable gap that MUST be reported. `reason`
+   * explains what embedding needs, so a machine without the tool can say why rather
+   * than silently doing nothing.
+   */
+  embeddedAssets: Record<string, EmbeddedAssetSpec>;
+}
+
+// How one asset kind gets embedded (mirrors stockroom.eda.registry.EmbeddedAsset).
+export interface EmbeddedAssetSpec {
+  /** The asset whose file receives the payload. */
+  container: string;
+  /** The asset kind that supplies the payload. */
+  source: string;
+  /** Whether embedding needs the EDA tool installed on this machine. */
+  requiresToolInstalled: boolean;
+  reason: string;
 }
 
 // Human labels for the asset kinds, keyed as the registry keys them.
@@ -36,6 +56,7 @@ export const EDA_TOOLS: EdaToolSpec[] = [
     label: "KiCad",
     assetKinds: ["symbol", "footprint", "model"],
     unsupportedAssets: {},
+    embeddedAssets: {},
   },
   {
     key: "altium",
@@ -44,6 +65,14 @@ export const EDA_TOOLS: EdaToolSpec[] = [
     unsupportedAssets: {
       model:
         "Altium stores 3D as a 3D Body inside the footprint's .PcbLib (an OLE2 binary), so it cannot be attached by reference; it must be embedded.",
+    },
+    embeddedAssets: {
+      model: {
+        container: "footprint",
+        source: "model",
+        requiresToolInstalled: true,
+        reason: "A 3D body is written into the footprint's .PcbLib by Altium itself, so embedding needs Altium installed on this machine.",
+      },
     },
   },
 ];
