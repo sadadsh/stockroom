@@ -1415,6 +1415,59 @@ export interface ManualFillResult {
   part_id: string;
 }
 
+// GET /api/projects/{id}/assign -- the bulk-assign surface.
+//
+// A project full of default-library passives cannot be auto-filled: every one of them carries a
+// generic stock symbol like "Device:R", which is shared by every resistor that has ever existed and so
+// identifies no library part. Assigning one automatically would write a coin-flip MPN into the user's
+// schematic. Instead the placements are GROUPED (identical symbol + Value + Footprint is one row) and
+// each row offers the library parts whose value actually matches, for the user to pick once.
+export interface AssignCandidate {
+  part_id: string;
+  display_name: string;
+  mpn: string;
+  description: string;
+  // Strongest first: the value matches and so does the exact footprint reference / the EIA case /
+  // only the value. Never an identity claim, always a ranked suggestion.
+  confidence: "value+footprint" | "value+package" | "value";
+  // The ratings that DIFFER between this group's candidates, already filtered to the ones that vary.
+  // When several parts are equally good matches on value and package, the evidence tier is the same on
+  // every row and this is the only thing that makes the choice possible: "1%" against "5%".
+  distinguish: string[];
+}
+
+export interface AssignGroup {
+  key: string;
+  lib_id: string;
+  value: string;
+  footprint: string;
+  refs: string[];
+  count: number;
+  sheets: string[];
+  candidates: AssignCandidate[];
+}
+
+export interface AssignRead {
+  project: string;
+  under_git: boolean;
+  components: number;
+  unassigned: number;
+  groups: AssignGroup[];
+}
+
+// POST /api/projects/{id}/assign -- assign one library part to a whole group, one atomic commit.
+export interface AssignGroupBody {
+  refs: string[];
+  part_id: string;
+}
+
+export interface AssignResult {
+  project: string;
+  committed: string | null;
+  refs: string[];
+  part_id: string;
+}
+
 // POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)
 export interface RestoreResult {
   project: string;

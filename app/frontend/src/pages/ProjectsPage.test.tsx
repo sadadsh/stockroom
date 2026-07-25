@@ -16,6 +16,7 @@ import type {
   BoardSettings,
   StackupRead,
   PrepareRead,
+  AssignRead,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -60,6 +61,8 @@ vi.mock("../api/client", async (importActual) => {
       getPrepare: vi.fn(),
       runPrepare: vi.fn(),
       manualFill: vi.fn(),
+      getAssign: vi.fn(),
+      assignGroup: vi.fn(),
       restore: vi.fn(),
       listParts: vi.fn(),
     },
@@ -616,6 +619,56 @@ const PREPARE: PrepareRead = {
   },
 };
 
+// The bulk-assign surface: three identical 10k resistors placed from the default library (one group,
+// one exact-footprint candidate) plus a 47k group nothing in the library matches.
+const ASSIGN: AssignRead = {
+  project: "Netdeck",
+  under_git: true,
+  components: 5,
+  unassigned: 4,
+  groups: [
+    {
+      key: "Device:R␟10k␟Resistor_SMD:R_0402_1005Metric",
+      lib_id: "Device:R",
+      value: "10k",
+      footprint: "Resistor_SMD:R_0402_1005Metric",
+      refs: ["R1", "R2", "R10"],
+      count: 3,
+      sheets: ["root.kicad_sch"],
+      candidates: [
+        {
+          part_id: "r10k",
+          display_name: "10k 0402",
+          mpn: "RC0402FR-0710KL",
+          description: "10k 1% 0402",
+          confidence: "value+footprint",
+          // Both candidates are equally good matches on value and package, so the evidence tier is
+          // identical and the tolerance is the only thing that lets the user choose.
+          distinguish: ["1%"],
+        },
+        {
+          part_id: "r10k5",
+          display_name: "10k 0402 5%",
+          mpn: "RC0402JR-0710KL",
+          description: "10k 5% 0402",
+          confidence: "value+package",
+          distinguish: ["5%"],
+        },
+      ],
+    },
+    {
+      key: "Device:R␟47k␟Resistor_SMD:R_0402_1005Metric",
+      lib_id: "Device:R",
+      value: "47k",
+      footprint: "Resistor_SMD:R_0402_1005Metric",
+      refs: ["R3"],
+      count: 1,
+      sheets: ["root.kicad_sch"],
+      candidates: [],
+    },
+  ],
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -748,6 +801,13 @@ beforeEach(() => {
     changed: true,
   });
   mockApi.getPrepare.mockResolvedValue(PREPARE);
+  mockApi.getAssign.mockResolvedValue(ASSIGN);
+  mockApi.assignGroup.mockResolvedValue({
+    project: "Netdeck",
+    committed: "9999aaaa8888",
+    refs: ["R1", "R2", "R10"],
+    part_id: "r10k",
+  });
   mockApi.runPrepare.mockResolvedValue({ job_id: "prep-1" });
   mockApi.manualFill.mockResolvedValue({
     project: "Netdeck",
@@ -2415,6 +2475,13 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     return await screen.findByTestId("prepare-form");
   }
 
+  // The per-component link panel is the FALLBACK for what the grouped assign surface cannot offer, so
+  // it renders below that surface rather than inside the prepare form. Looked up by its own test id so
+  // these tests assert the control's behaviour without pinning where the page places it.
+  function linkPanel() {
+    return screen.findByTestId("manual-fill-panel");
+  }
+
   it("previews the annotate + fill counts and the completion residual", async () => {
     renderPage();
     const user = userEvent.setup();
@@ -2426,8 +2493,8 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     const residual = within(form).getByTestId("prepare-residual");
     expect(residual).toHaveTextContent("0 / 3 Complete");
     expect(residual).toHaveTextContent("3 Missing MPN");
-    // the unmatched refs offer a manual link
-    expect(within(form).getByTestId("manual-fill-panel")).toBeInTheDocument();
+    // the unmatched refs offer a manual link, as the fallback below the grouped assign surface
+    expect(await linkPanel()).toBeInTheDocument();
   });
 
   it("runs Prepare as a job and shows the prepared result", async () => {
@@ -2476,15 +2543,16 @@ describe("Prepare / Complete-All (M7f-D)", () => {
   it("manually links an unmatched component to a chosen library part", async () => {
     renderPage();
     const user = userEvent.setup();
-    const form = await openPrepare(user);
+    await openPrepare(user);
+    const panel = within(await linkPanel());
     // pick the ref, search + select the library part, then Link
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    await user.click(within(form).getByTestId("manual-fill-link"));
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    await user.click(panel.getByTestId("manual-fill-link"));
     await waitFor(() =>
       expect(mockApi.manualFill).toHaveBeenCalledWith("netdeck", { ref: "R51", part_id: "r10k" }),
     );
@@ -2493,17 +2561,18 @@ describe("Prepare / Complete-All (M7f-D)", () => {
   it("clears the armed library part when the target component changes", async () => {
     renderPage();
     const user = userEvent.setup();
-    const form = await openPrepare(user);
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await openPrepare(user);
+    const panel = within(await linkPanel());
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("r10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    expect((panel.getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("r10k");
     // switching the target component must disarm the part (never Link a part chosen for another ref)
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "C22");
-    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "C22");
+    expect((panel.getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("");
   });
 
   it("re-reads the residual from the live query after a manual link (not the frozen job result)", async () => {
@@ -2517,14 +2586,15 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     const form = await openPrepare(user);
+    const panel = within(await linkPanel());
     expect(within(form).getByTestId("prepare-residual")).toHaveTextContent("0 / 3 Complete");
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    await user.click(within(form).getByTestId("manual-fill-link"));
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    await user.click(panel.getByTestId("manual-fill-link"));
     await waitFor(() => expect(mockApi.manualFill).toHaveBeenCalled());
     // the residual follows the refetched query, not a frozen result
     await waitFor(() =>
@@ -2828,5 +2898,121 @@ describe("EDA-neutral projects", () => {
     await waitFor(() =>
       expect(mockApi.registerProject).toHaveBeenLastCalledWith("/x", "altium"),
     );
+  });
+});
+
+// -- Assign Components (bulk assign) -----------------------------------------
+//
+// The correctness property this surface exists to protect: a generic placement is never assigned
+// automatically. Everything here asserts that the user's single click is what commits, that the click
+// covers the WHOLE group, and that the evidence behind each suggestion is visible.
+describe("ProjectsPage assign components", () => {
+  async function openAssign(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    return await screen.findByTestId("assign-section");
+  }
+
+  it("groups identical placements and names every designator in the group", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-summary")).toHaveTextContent(
+      "4 of 5 components carry no library part, in 2 groups",
+    );
+    const groups = within(section).getAllByTestId("assign-group");
+    expect(groups).toHaveLength(2);
+    const tenk = within(groups[0]);
+    expect(tenk.getByTestId("assign-group-count")).toHaveTextContent("3");
+    // The refs are shown, not just counted: a bulk write is only trustworthy if the user can see
+    // exactly which components it will touch.
+    const refs = within(tenk.getByTestId("assign-group-refs"));
+    for (const ref of ["R1", "R2", "R10"]) expect(refs.getByText(ref)).toBeInTheDocument();
+  });
+
+  it("ranks candidates strongest first and labels what actually matched", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    const cands = within(groups[0]).getAllByTestId("assign-candidate");
+    expect(cands).toHaveLength(2);
+    expect(cands[0]).toHaveTextContent("10k 0402");
+    expect(cands[0]).toHaveTextContent("Value + Footprint");
+    expect(cands[1]).toHaveTextContent("Value + Package");
+  });
+
+  it("assigns the whole group from one click on the chosen candidate", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    const cands = within(groups[0]).getAllByTestId("assign-candidate");
+    // Nothing is armed or committed before the click.
+    expect(mockApi.assignGroup).not.toHaveBeenCalled();
+    await user.click(cands[0]);
+    await waitFor(() =>
+      expect(mockApi.assignGroup).toHaveBeenCalledWith("netdeck", {
+        refs: ["R1", "R2", "R10"],
+        part_id: "r10k",
+      }),
+    );
+  });
+
+  it("assigns the second-ranked candidate when that is the one clicked", async () => {
+    // The ranking must be a suggestion, never a forced choice: picking the weaker-evidence part has
+    // to send THAT part, or the ranking would be silently overriding the user.
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    await user.click(within(groups[0]).getAllByTestId("assign-candidate")[1]);
+    await waitFor(() =>
+      expect(mockApi.assignGroup).toHaveBeenCalledWith("netdeck", {
+        refs: ["R1", "R2", "R10"],
+        part_id: "r10k5",
+      }),
+    );
+  });
+
+  it("tells the user what to do when the library has nothing matching", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    expect(within(groups[1]).getByTestId("assign-no-candidates")).toHaveTextContent(
+      "No component in your library has this value. Add one, then assign these here.",
+    );
+    expect(within(groups[1]).queryAllByTestId("assign-candidate")).toHaveLength(0);
+  });
+
+  it("confirms completion instead of showing an empty list", async () => {
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, components: 5, unassigned: 0, groups: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-all-assigned")).toBeInTheDocument();
+    expect(within(section).queryByTestId("assign-groups")).not.toBeInTheDocument();
+  });
+
+  it("explains the git requirement rather than offering a control that cannot work", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-no-git")).toBeInTheDocument();
+    expect(within(section).queryAllByTestId("assign-candidate")).toHaveLength(0);
+  });
+
+  it("surfaces a failed assignment honestly", async () => {
+    mockApi.assignGroup.mockRejectedValue(new ApiError(400, "no component R9 in this project"));
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    await user.click(within(groups[0]).getAllByTestId("assign-candidate")[0]);
+    expect(await screen.findByText("no component R9 in this project")).toBeInTheDocument();
   });
 });

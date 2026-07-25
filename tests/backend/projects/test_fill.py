@@ -314,7 +314,11 @@ def test_datasheet_falls_back_to_file_when_no_source_url():
     assert rec["datasheet"] == "datasheets/d.pdf"
 
 
-def test_bad_category_part_kept_for_identity_but_drops_symbol_footprint():
+def test_bad_category_part_keeps_its_references_but_forfeits_the_symbol_tier():
+    # A category outside the taxonomy has no Stockroom library, so the part cannot OWN its symbol and
+    # must not be reachable at the identity tier. Its stored references are still carried verbatim
+    # (they do not depend on the category), so a manual fill still lands a resolvable link, and its
+    # identity fields still fill.
     part = PartRecord(
         id="w", display_name="Widget", category="Widgets",  # not in the taxonomy
         description="x", mpn="WMPN", manufacturer="ACME",
@@ -323,7 +327,239 @@ def test_bad_category_part_kept_for_identity_but_drops_symbol_footprint():
     rec = fill.library_match_records([part])
     assert len(rec) == 1  # not dropped
     r = rec[0]
-    assert r["mpn"] == "WMPN" and r["name"] == "" and r["footprint_stem"] == "" and r["nickname"] == ""
+    assert r["mpn"] == "WMPN" and r["nickname"] == ""
+    assert r["symbol_is_identity"] is False
+    assert r["symbol_lib_id"] == "X:WSYM" and r["footprint_lib_id"] == "X:WFP"
+    # ...and the untaxonomised category can no longer reach the identity tier through its symbol name.
+    m = fill.match_component({"ref": "W1", "lib_id": "X:WSYM", "props": {}}, rec)
+    assert m["confidence"] == "none"
+
+
+# -- generic stock symbols must never identify a library part -------------------
+#
+# A Stockroom passive does NOT own copied symbol/footprint files: `resolve_passive_assets` files it
+# against the INSTALLED KiCad stock libraries ("Device:R", "Resistor_SMD:R_0402_1005Metric"), which is
+# why `previews.py` resolves a passive's symbol out of the KiCad share directory. So every Stockroom
+# resistor carries the same symbol name "R", and a project's generic `Device:R` cannot possibly
+# identify one of them.
+
+
+def _passive_parts():
+    """Two Stockroom resistors exactly as `add_passive_part` files them: the symbol and footprint are
+    KiCad STOCK references, not Stockroom-owned entries."""
+    def res(pid, mpn, value, package, metric):
+        return PartRecord(
+            id=pid, display_name=f"{value} {package}", category="Resistors",
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
+            )},
+            specs={"Resistance": value, "Package": package},
+        )
+    return [res("r10k", "RC0402FR-0710KL", "10 kOhm", "0402", "1005Metric"),
+            res("r47k", "RC0603FR-0747KL", "47 kOhm", "0603", "1608Metric")]
+
+
+def test_generic_stock_symbol_is_never_an_identity_match():
+    # The owner's scenario: a project full of default-library passives. A placed "Device:R" whose Value
+    # is 47k must NOT be handed the FIRST resistor in the index at the highest confidence tier, which
+    # is what silently wrote a wrong MPN into the schematic.
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "lib_id": "Device:R", "props": {"Reference": "R5", "Value": "47k"}}
+    m = fill.match_component(comp, index)
+    assert m["confidence"] != "symbol", "a generic stock symbol name is not a part identity"
+    assert m["part"] is None or m["part"]["id"] != "r10k", "must not pick the first index entry"
+
+
+def test_generic_stock_symbol_contributes_no_plan_item():
+    # Asserted positively (items == [], no_match == 1) rather than by looping over items and checking
+    # `default_selected`, which would pass vacuously the moment the plan is empty. A headless
+    # Complete-All must propose NOTHING for a generic placement it cannot identify. When the
+    # value+package tier lands, this becomes an assertion that the item is present and NOT preselected.
+    index = fill.library_match_records(_passive_parts())
+    comps = [{"ref": "R5", "lib_id": "Device:R", "props": {"Reference": "R5", "Value": "47k"}}]
+    plan = fill.build_fill_plan(comps, index, {"R5": "root.kicad_sch"})
+    assert plan["items"] == []
+    assert plan["summary"]["no_match"] == 1
+
+
+def test_fill_writes_the_records_own_lib_id_not_a_requalified_one():
+    # A fill/manual-fill repoints the placed instance's (lib_id ...) and writes the Footprint link. Both
+    # must be the reference the record ACTUALLY holds. Re-qualifying a passive's stock reference to
+    # "SR-Resistors:..." points the schematic at the Stockroom category library, which does not contain
+    # the stock symbol or footprint, so KiCad can no longer resolve either.
+    part = next(p for p in fill.library_match_records(_passive_parts()) if p["id"] == "r10k")
+    assert fill.lib_id_for(part) == "Device:R"
+    fp = {c["prop"]: c["new"] for c in fill.proposed_changes(part, {})}
+    assert fp["Footprint"] == "Resistor_SMD:R_0402_1005Metric"
+
+
+# -- candidate tier: value-matched picks for a generic placement ----------------
+
+
+def test_candidates_are_value_matched_parts_carrying_the_same_symbol():
+    # The owner's scenario made safe: a placed Device:R valued 47k offers the 47k part as a CANDIDATE
+    # (not an auto-assignment). Candidates are restricted to records carrying the SAME symbol
+    # reference, so accepting one never repoints the schematic's symbol, it only fills fields.
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R5", "lib_id": "Device:R",
+            "props": {"Reference": "R5", "Value": "47k",
+                      "Footprint": "Resistor_SMD:R_0603_1608Metric"}}
+    cands = fill.candidate_matches(comp, index)
+    assert [c["part_id"] for c in cands] == ["r47k"]
+    assert cands[0]["confidence"] == "value+footprint"
+
+
+def test_candidate_value_notations_match_across_spellings():
+    # The schematic's terse form against the record's spelled-out spec, through the one shared parser.
+    index = fill.library_match_records(_passive_parts())
+    for value in ("10k", "10K", "10 kOhm", "10k 1%"):
+        comp = {"ref": "R1", "lib_id": "Device:R", "props": {"Value": value}}
+        assert [c["part_id"] for c in fill.candidate_matches(comp, index)] == ["r10k"], value
+
+
+def test_candidate_ranks_footprint_agreement_above_value_alone():
+    index = fill.library_match_records(_passive_parts())
+    # Both library parts are 10k in this variant, differing only in package.
+    index[1]["value"] = "10 kOhm"
+    comp = {"ref": "R1", "lib_id": "Device:R",
+            "props": {"Value": "10k", "Footprint": "Resistor_SMD:R_0402_1005Metric"}}
+    cands = fill.candidate_matches(comp, index)
+    assert [c["part_id"] for c in cands] == ["r10k", "r47k"]
+    assert cands[0]["confidence"] == "value+footprint" and cands[1]["confidence"] == "value"
+
+
+def test_candidate_matches_package_when_the_footprint_variant_differs():
+    # A schematic often carries a pad-variant footprint the library does not use verbatim. The EIA case
+    # still agrees, which is a real (weaker) signal, and must rank between exact and value-only.
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R1", "lib_id": "Device:R",
+            "props": {"Value": "10k",
+                      "Footprint": "Resistor_SMD:R_0402_1005Metric_Pad0.72x0.64mm_HandSolder"}}
+    cands = fill.candidate_matches(comp, index)
+    assert [c["part_id"] for c in cands] == ["r10k"]
+    assert cands[0]["confidence"] == "value+package"
+
+
+def test_candidates_surface_only_the_ratings_that_differ_between_them():
+    # Two library parts that are BOTH genuinely "10k 0402" and differ only in tolerance. The evidence
+    # tier is identical on both rows, so the tier alone tells the user nothing; what makes the choice
+    # possible is seeing the rating that actually differs. A rating they SHARE is noise and is omitted.
+    def res(pid, mpn, tol):
+        return PartRecord(
+            id=pid, display_name="10k 0402 Thick Film", category="Resistors",
+            description=f"10k {tol} 0402", mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name="R_0402_1005Metric"),
+            )},
+            specs={"Resistance": "10 kOhm", "Package": "0402",
+                   "Tolerance": tol, "Power": "1/16 W"},
+        )
+    index = fill.library_match_records([res("a", "RC-1", "1%"), res("b", "RC-5", "5%")])
+    comp = {"ref": "R1", "lib_id": "Device:R",
+            "props": {"Value": "10k", "Footprint": "Resistor_SMD:R_0402_1005Metric"}}
+    cands = fill.candidate_matches(comp, index)
+    assert [c["confidence"] for c in cands] == ["value+footprint", "value+footprint"]
+    assert [c["distinguish"] for c in cands] == [["1%"], ["5%"]]  # Power is shared, so it is omitted
+
+
+def test_a_rating_the_name_already_states_is_not_repeated():
+    # A row reading "10k 0402 1%" beside a separate "1%" chip says the same thing twice. Suppression is
+    # by whole TOKEN, never substring, so an "11%" part does not swallow a "1%" rating.
+    def res(pid, mpn, tol, name):
+        return PartRecord(
+            id=pid, display_name=name, category="Resistors", description="10k",
+            mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name="R_0402_1005Metric"),
+            )},
+            specs={"Resistance": "10 kOhm", "Package": "0402", "Tolerance": tol},
+        )
+    comp = {"ref": "R1", "lib_id": "Device:R", "props": {"Value": "10k"}}
+
+    named = fill.library_match_records([res("a", "RC-1", "1%", "10k 0402 1%"),
+                                       res("b", "RC-5", "5%", "10k 0402 5%")])
+    assert [c["distinguish"] for c in fill.candidate_matches(comp, named)] == [[], []]
+
+    # The near-miss that a substring test would get wrong: "11%" as a name token must NOT suppress a
+    # "1%" rating on the OTHER candidate.
+    tricky = fill.library_match_records([res("a", "RC-1", "1%", "10k 0402 11% marked"),
+                                        res("b", "RC-5", "5%", "10k 0402 Thick Film")])
+    assert [c["distinguish"] for c in fill.candidate_matches(comp, tricky)] == [["1%"], ["5%"]]
+
+
+def test_a_lone_candidate_has_nothing_to_distinguish_it_from():
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "R1", "lib_id": "Device:R", "props": {"Value": "10k"}}
+    assert fill.candidate_matches(comp, index)[0]["distinguish"] == []
+
+
+def test_no_candidates_for_an_unreadable_value():
+    index = fill.library_match_records(_passive_parts())
+    for value in ("", "DNP", "~", "10k 0402"):
+        comp = {"ref": "R1", "lib_id": "Device:R", "props": {"Value": value}}
+        assert fill.candidate_matches(comp, index) == [], value
+
+
+def test_candidates_exclude_a_part_whose_symbol_is_a_different_reference():
+    # A capacitor record must never be a candidate for a placed resistor symbol, whatever the numbers
+    # say. The symbol reference is the hard filter.
+    index = fill.library_match_records(_passive_parts())
+    comp = {"ref": "C1", "lib_id": "Device:C", "props": {"Value": "10k"}}
+    assert fill.candidate_matches(comp, index) == []
+
+
+def test_candidates_are_never_offered_for_an_identified_component():
+    # A component the identity tiers already matched is not a guessing problem.
+    index = fill.library_match_records(_parts())
+    comp = {"ref": "U1", "lib_id": "SR-ICs:LM358", "props": {"Reference": "U1"}}
+    assert fill.candidate_matches(comp, index) == []
+
+
+# -- grouping: "a bunch of passives" is ONE decision ---------------------------
+
+
+def test_group_placements_collapses_identical_placements():
+    comps = [
+        {"ref": "R1", "lib_id": "Device:R", "props": {"Value": "10k", "Footprint": "F:R_0402"}},
+        {"ref": "R2", "lib_id": "Device:R", "props": {"Value": "10k", "Footprint": "F:R_0402"}},
+        {"ref": "R3", "lib_id": "Device:R", "props": {"Value": "47k", "Footprint": "F:R_0402"}},
+        {"ref": "C1", "lib_id": "Device:C", "props": {"Value": "100n", "Footprint": "F:C_0402"}},
+    ]
+    groups = fill.group_placements(comps)
+    assert [(g["value"], g["refs"]) for g in groups] == [
+        ("100n", ["C1"]), ("10k", ["R1", "R2"]), ("47k", ["R3"]),
+    ]
+    tenk = next(g for g in groups if g["value"] == "10k")
+    assert tenk["count"] == 2 and tenk["lib_id"] == "Device:R"
+
+
+def test_group_placements_keeps_differing_footprints_apart():
+    comps = [
+        {"ref": "R1", "lib_id": "Device:R", "props": {"Value": "10k", "Footprint": "F:R_0402"}},
+        {"ref": "R2", "lib_id": "Device:R", "props": {"Value": "10k", "Footprint": "F:R_0603"}},
+    ]
+    assert [g["refs"] for g in fill.group_placements(comps)] == [["R1"], ["R2"]]
+
+
+def test_group_placements_is_deterministic_and_sorts_refs_naturally():
+    # R10 must sort after R9, not between R1 and R2: the group's ref list is shown to the user and
+    # written into a commit message, so a lexicographic order would read as scrambled.
+    comps = [{"ref": r, "lib_id": "Device:R", "props": {"Value": "10k", "Footprint": "F:R_0402"}}
+             for r in ("R10", "R2", "R1", "R9")]
+    assert fill.group_placements(comps)[0]["refs"] == ["R1", "R2", "R9", "R10"]
+
+
+def test_owned_symbol_still_identifies_its_part():
+    # The guard must not cost the real case: a part that OWNS its symbol in its Stockroom category
+    # library is still an identity match at the "symbol" tier.
+    index = fill.library_match_records(_parts())
+    comp = {"ref": "U1", "lib_id": "SR-ICs:LM358", "props": {"Reference": "U1"}}
+    m = fill.match_component(comp, index)
+    assert m["confidence"] == "symbol" and m["part"]["id"] == "lm358"
 
 
 def test_annotate_is_project_wide_unique_across_sheets():

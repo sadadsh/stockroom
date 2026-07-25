@@ -440,3 +440,157 @@ def test_restore_ignores_a_user_commit_that_merely_starts_with_prepare(tmp_path)
     prepo.commit("Prepare the board for fab", [sch])
     with pytest.raises(ValueError):
         ops.restore(rec.id)  # no Stockroom Prepare/Fill commit exists yet
+
+
+# --- bulk assign (assign_read / assign_refs) ----------------------------------
+#
+# The owner's scenario end to end: a project holding a pile of default-library passives. Every one
+# carries a generic stock symbol, so none of them can be IDENTIFIED, and the safe path is to group the
+# identical ones and assign each group in one decision and one commit.
+
+
+def _stock_passives():
+    """A library of passives as `add_passive_part` really files them: the symbol and footprint are
+    KiCad STOCK references, so none of these parts can be reached by the symbol identity tier."""
+    def res(pid, mpn, value, package, metric):
+        return PartRecord(
+            id=pid, display_name=f"{value} {package}", category="Resistors",
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
+            )},
+            datasheet=Datasheet(source_url=f"https://yageo.com/{mpn}.pdf"),
+            specs={"Resistance": value, "Package": package},
+        )
+    return [res("r10k", "RC0402FR-0710KL", "10 kOhm", "0402", "1005Metric"),
+            res("r47k", "RC0402FR-0747KL", "47 kOhm", "0402", "1005Metric")]
+
+
+_FP_0402 = "Resistor_SMD:R_0402_1005Metric"
+
+
+def _passive_sheet():
+    # Four placed resistors: three identical 10k and one 47k, all on the generic Device:R symbol.
+    return _sheet([
+        _symbol(lib_id="Device:R", ref="R1", value="10k", footprint=_FP_0402, uuid="p-1"),
+        _symbol(lib_id="Device:R", ref="R2", value="10k", footprint=_FP_0402, uuid="p-2"),
+        _symbol(lib_id="Device:R", ref="R10", value="10k", footprint=_FP_0402, uuid="p-10"),
+        _symbol(lib_id="Device:R", ref="R3", value="47k", footprint=_FP_0402, uuid="p-3"),
+    ])
+
+
+def test_assign_read_groups_identical_passives_with_candidates(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    head = prepo.head()
+
+    r = ops.assign_read(rec.id, library_parts=_stock_passives())
+    assert r["components"] == 4 and r["unassigned"] == 4
+    assert [g["refs"] for g in r["groups"]] == [["R1", "R2", "R10"], ["R3"]]
+    tenk = r["groups"][0]
+    assert tenk["count"] == 3 and tenk["value"] == "10k" and tenk["footprint"] == _FP_0402
+    assert tenk["sheets"] == ["proj.kicad_sch"]
+    # Each group offers the value-matched part, and ONLY that one, at the exact-footprint tier.
+    assert [c["part_id"] for c in tenk["candidates"]] == ["r10k"]
+    assert tenk["candidates"][0]["confidence"] == "value+footprint"
+    assert [c["part_id"] for c in r["groups"][1]["candidates"]] == ["r47k"]
+    # A read writes nothing and commits nothing.
+    assert prepo.head() == head
+
+
+def test_assign_refs_fills_a_whole_group_in_one_commit(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    before = prepo.head()
+
+    result = ops.assign_refs(rec.id, ["R1", "R2", "R10"], "r10k",
+                             library_parts=_stock_passives())
+    after = (proj / "proj.kicad_sch").read_text(encoding="utf-8")
+    assert result["committed"] == prepo.head()
+    assert result["committed"] != before
+    # ONE commit for the whole group, not one per component, and its subject says so.
+    log = prepo.log_paths([proj / "proj.kicad_sch"], max_count=2)
+    assert log[0].subject == f"Fill {rec.name}: 3 components from library"
+    assert log[0].sha == result["committed"] and log[1].sha == before
+    assert after.count('(property "MPN" "RC0402FR-0710KL"') == 3
+    # ...and the untouched 47k component keeps no MPN at all.
+    assert '"RC0402FR-0747KL"' not in after
+
+
+def test_assign_refs_writes_the_stock_reference_kicad_can_resolve(tmp_path):
+    # The regression that made this whole slice necessary: the fill used to requalify a passive's
+    # stock reference to the Stockroom category library, which holds no such symbol or footprint, so
+    # KiCad could resolve neither afterwards.
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p",
+                           sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+    after = (proj / "proj.kicad_sch").read_text(encoding="utf-8")
+    assert '(lib_id "Device:R")' in after
+    assert f'(property "Footprint" "{_FP_0402}"' in after
+    assert "SR-Resistors" not in after
+
+
+def test_assign_refs_rejects_a_stale_selection_without_writing_anything(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    head = prepo.head()
+    before = (proj / "proj.kicad_sch").read_text(encoding="utf-8")
+    with pytest.raises(ValueError) as err:
+        ops.assign_refs(rec.id, ["R1", "Z98", "Z99"], "r10k", library_parts=_stock_passives())
+    # Every missing ref is named at once, so a stale UI selection is fixed in one round trip.
+    assert "Z98" in str(err.value) and "Z99" in str(err.value)
+    # Nothing written, nothing committed: the group is all or nothing.
+    assert prepo.head() == head
+    assert (proj / "proj.kicad_sch").read_text(encoding="utf-8") == before
+
+
+def test_assign_refs_rejects_an_empty_selection(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p")
+    rec = ops.register(proj)
+    with pytest.raises(ValueError):
+        ops.assign_refs(rec.id, [], "r10k", library_parts=_stock_passives())
+
+
+def test_assign_refs_is_idempotent(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1", "R2", "R10"], "r10k", library_parts=_stock_passives())
+    head = prepo.head()
+    again = ops.assign_refs(rec.id, ["R1", "R2", "R10"], "r10k", library_parts=_stock_passives())
+    assert again["committed"] is None and prepo.head() == head
+
+
+def test_assign_read_drops_a_group_once_it_is_assigned(tmp_path):
+    # After assigning, those components carry a real MPN, so the strict-MPN identity tier matches them
+    # and they leave the unassigned surface. That is what makes the surface a shrinking work list.
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p",
+                           sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1", "R2", "R10"], "r10k", library_parts=_stock_passives())
+    r = ops.assign_read(rec.id, library_parts=_stock_passives())
+    assert r["unassigned"] == 1
+    assert [g["refs"] for g in r["groups"]] == [["R3"]]
+
+
+def test_assign_refs_refuses_a_dirty_sheet(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p",
+                           sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    sch = proj / "proj.kicad_sch"
+    sch.write_text(sch.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="uncommitted"):
+        ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())

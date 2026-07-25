@@ -45,6 +45,8 @@ import {
   useProjectFields,
   useSetFields,
   useManualFill,
+  useProjectAssign,
+  useAssignGroup,
   useRestore,
   usePartsQuery,
   useBomDiff,
@@ -78,6 +80,8 @@ import type {
   StackupPreview,
   StackupRead,
   PrepareRead,
+  AssignCandidate,
+  AssignGroup,
   PrepareResult,
   CompletionRoll,
   DesignResult,
@@ -97,6 +101,7 @@ import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
 import {
   Badge,
+  type BadgeTone,
   Button,
   Card,
   Dot,
@@ -652,6 +657,7 @@ function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }
 
       {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
       {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
+      {caps.has("prepare") ? <AssignSection projectId={projectId} /> : null}
     </>
   );
 }
@@ -4983,12 +4989,204 @@ function PrepareForm({ projectId, data }: { projectId: string; data: PrepareRead
       ) : null}
 
       <CompletionResidual roll={residual} />
-      {residual.incomplete_refs.length > 0 ? (
-        <ManualFillPanel projectId={projectId} incompleteRefs={residual.incomplete_refs} />
-      ) : (
+      {residual.incomplete_refs.length === 0 ? (
         <p className="text-xs text-ok" data-testid="prepare-all-complete">
           Every component carries a full identity.
         </p>
+      ) : null}
+      {/* The per-component link panel is NOT rendered here. It is the fallback for what the grouped
+          assign surface cannot offer, so it belongs after that surface, not above it. */}
+    </div>
+  );
+}
+
+// Assign Components: the surface for placements that carry a GENERIC symbol.
+//
+// A component placed from KiCad's default library carries a symbol like "Device:R", which every
+// resistor in existence shares, so it identifies no library part and Prepare correctly refuses to
+// guess at it. What Prepare cannot do automatically, a person can do quickly, as long as the work is
+// arranged as decisions rather than as a form: identical placements collapse into one row, and each
+// row shows the candidates whose value actually matches, ranked by how much evidence backs them.
+//
+// The interaction is the point: each candidate row IS the assign action. There is no select-then-
+// confirm, because the confirmation carries no information the row does not already show, and this is
+// a reversible atomic commit (Restore Last reverts it). The strongest candidate is listed first but
+// never pre-armed, since ranking a suggestion and committing it are different acts.
+function AssignSection({ projectId }: { projectId: string }) {
+  const q = useProjectAssign(projectId);
+  const data = q.data;
+  // The same cached query PrepareSection reads (TanStack dedupes it, so this costs no extra request).
+  // The per-component link fallback lives at the bottom of THIS section, below the grouped surface it
+  // is a fallback for, and it needs the current on-disk incomplete refs to offer.
+  const prepare = useProjectPrepare(projectId);
+  const incompleteRefs = prepare.data?.completion.incomplete_refs ?? [];
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="assign-section" data-dev-id="projects.assign">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Assign Components</Eyebrow>
+        <p className="text-xs text-t3">
+          Components placed from a default library carry a generic symbol, so no single component in
+          your library matches them on their own. Identical ones are grouped here, so assigning a
+          whole group of passives is one decision and one commit.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the unassigned components...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the unassigned components.")}</p>
+      ) : !data ? null : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="assign-no-git">
+          This project is not under git. Initialize a git repository for it to assign components, so
+          each assignment is committed atomically and can be undone.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {data.groups.length === 0 ? (
+            <p className="text-xs text-ok" data-testid="assign-all-assigned">
+              Every placed component already matches a component in your library.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2" data-testid="assign-groups">
+              <p className="text-sm text-t2" data-testid="assign-summary">
+                {data.unassigned} of {data.components} components carry no library part, in{" "}
+                {data.groups.length} {data.groups.length === 1 ? "group" : "groups"}.
+              </p>
+              {data.groups.map((group) => (
+                <AssignGroupCard key={group.key} projectId={projectId} group={group} />
+              ))}
+            </div>
+          )}
+          {incompleteRefs.length > 0 ? (
+            <ManualFillPanel projectId={projectId} incompleteRefs={incompleteRefs} />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// How much evidence backs a candidate. Ranked, and labelled with what actually matched, so the
+// weakest suggestion cannot be mistaken for a confident one.
+const ASSIGN_TIERS: Record<AssignCandidate["confidence"], { label: string; tone: BadgeTone }> = {
+  "value+footprint": { label: "Value + Footprint", tone: "ok" },
+  "value+package": { label: "Value + Package", tone: "neutral" },
+  value: { label: "Value Only", tone: "warn" },
+};
+
+// Enough designators to recognise the group at a glance without turning the card into a wall of
+// chips. The remainder is COUNTED rather than dropped: a silent truncation would read as "this is all
+// of them" while a bulk write touched more.
+const REF_CHIPS = 8;
+
+function AssignGroupCard({ projectId, group }: { projectId: string; group: AssignGroup }) {
+  const assign = useAssignGroup();
+  const { toast } = useToast();
+  const [pending, setPending] = useState<string | null>(null);
+  const shownRefs = group.refs.slice(0, REF_CHIPS);
+  const hiddenRefs = group.refs.length - shownRefs.length;
+
+  function onAssign(candidate: AssignCandidate) {
+    setPending(candidate.part_id);
+    assign.mutate(
+      { id: projectId, refs: group.refs, part_id: candidate.part_id },
+      {
+        onSuccess: (r) =>
+          toast(
+            r.committed
+              ? `Assigned ${r.refs.length} ${r.refs.length === 1 ? "component" : "components"} to ${candidate.display_name}.`
+              : "Those components already match; nothing changed.",
+            r.committed ? "ok" : "neutral",
+          ),
+        onError: (e) => toast(errMsg(e, "Could not assign the components."), "err"),
+        onSettled: () => setPending(null),
+      },
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-line2" data-testid="assign-group">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 bg-raise px-3 py-2">
+        {/* The count leads, because collapsing N identical placements into one decision IS the point
+            of this surface. It is dropped at one, where a multiplier is noise. */}
+        {group.count > 1 ? (
+          <span className="tnum text-sm font-semibold text-t1" data-testid="assign-group-count">
+            &times;{group.count}
+          </span>
+        ) : null}
+        <span className="text-sm text-t1">{group.value || "No value"}</span>
+        <span className="truncate font-mono text-2xs text-t3" title={group.footprint}>
+          {group.lib_id}
+          {group.footprint ? ` · ${group.footprint}` : ""}
+        </span>
+        {/* The designators are shown, not just counted: an engineer will not accept a bulk write
+            without seeing exactly which components it touches. */}
+        <span className="ml-auto flex flex-wrap items-baseline gap-1" data-testid="assign-group-refs">
+          {shownRefs.map((ref) => (
+            <span key={ref} className="rounded-control bg-raise2 px-1.5 py-0.5 font-mono text-2xs text-t2">
+              {ref}
+            </span>
+          ))}
+          {hiddenRefs > 0 ? (
+            <span className="text-2xs text-t3">and {hiddenRefs} more</span>
+          ) : null}
+          {group.sheets.length > 0 ? (
+            <span className="ml-1 font-mono text-2xs text-t3">{group.sheets.join(", ")}</span>
+          ) : null}
+        </span>
+      </div>
+
+      {group.candidates.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs text-t3" data-testid="assign-no-candidates">
+          No component in your library has this value. Add one, then assign these here.
+        </p>
+      ) : (
+        <div data-testid="assign-candidates">
+          {group.candidates.map((candidate) => {
+            const tier = ASSIGN_TIERS[candidate.confidence];
+            const busy = pending === candidate.part_id;
+            return (
+              <button
+                key={candidate.part_id}
+                type="button"
+                onClick={() => onAssign(candidate)}
+                disabled={assign.isPending}
+                data-testid="assign-candidate"
+                className="group/cand flex w-full items-center gap-3 border-t border-line2 px-3 py-2 text-left hover:bg-raise focus-visible:bg-raise disabled:opacity-60 disabled:hover:bg-transparent"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className="truncate text-sm text-t1">{candidate.display_name}</span>
+                    {/* Only the ratings that DIFFER between these candidates. When every row shows the
+                        same evidence tier, this is the whole basis for choosing. */}
+                    {candidate.distinguish.map((spec) => (
+                      <span key={spec} className="tnum flex-none text-2xs text-t2">
+                        {spec}
+                      </span>
+                    ))}
+                  </span>
+                  {candidate.mpn ? (
+                    <span className="block truncate font-mono text-2xs text-t3">{candidate.mpn}</span>
+                  ) : null}
+                </span>
+                <Badge tone={tier.tone} size="sm">
+                  {tier.label}
+                </Badge>
+                {/* The row is the action, so the label stays short: the count is stated once in the
+                    group header, and repeating it on every row was pure noise. The chevron is what
+                    makes a row read as actionable at rest. */}
+                <span className="flex flex-none items-center gap-1 text-xs font-medium text-t2 group-hover/cand:text-t1">
+                  {busy ? "Assigning..." : "Assign"}
+                  {busy ? null : (
+                    /* A bespoke registry entry carries no intrinsic size, so the class must supply
+                       it or the glyph renders at zero and the affordance silently disappears. */
+                    <Icon id="detail.chevron-right" className="h-3 w-3" />
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -5057,12 +5255,15 @@ function ManualFillPanel({
       data-testid="manual-fill-panel"
       className="rounded-control border border-line2 p-3"
     >
-      <h3 className="mb-2 text-sm font-medium text-t1">Link a Component</h3>
+      <h3 className="mb-2 text-sm font-medium text-t1">Link One Component</h3>
       <p className="mb-3 text-xs text-t3">
-        Pick a component the search could not match, then a part to link it to. Its symbol,
-        footprint, and identity fields are set from that part in one commit.
+        For anything the groups above cannot offer, pick a single component and search your whole
+        library for the part to link it to. Its symbol, footprint, and identity fields are set from
+        that part in one commit.
       </p>
       <div className="flex flex-wrap items-end gap-2">
+        {/* Three controls in a row, and two of them used to be labelled "Component", which named the
+            system's noun twice instead of each control's actual job. */}
         <label className="flex flex-col gap-1 text-xs text-t3">
           Component
           <select
@@ -5079,7 +5280,7 @@ function ManualFillPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Search Components
+          Search Your Library
           <input
             data-testid="manual-fill-search"
             className="rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
@@ -5089,7 +5290,7 @@ function ManualFillPanel({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Component
+          Link To
           <select
             data-testid="manual-fill-part"
             className="min-w-[12rem] rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"

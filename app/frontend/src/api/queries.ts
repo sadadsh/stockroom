@@ -16,6 +16,7 @@ import type {
   DesignRules,
   EnrichmentResult,
   FieldEdit,
+  AssignGroupBody,
   ManualFillBody,
   NetClass,
   PartDetail,
@@ -908,6 +909,9 @@ function useInvalidateAfterPrepare() {
   return useCallback(
     (id: string) => {
       qc.invalidateQueries({ queryKey: ["project-prepare", id] });
+      // The bulk-assign work list shrinks as groups are assigned (and as a Prepare fills refs), so it
+      // is invalidated by every one of these writes, not only by an assign.
+      qc.invalidateQueries({ queryKey: ["project-assign", id] });
       qc.invalidateQueries({ queryKey: ["project", id] });
       qc.invalidateQueries({ queryKey: ["project-checks", id] });
       qc.invalidateQueries({ queryKey: ["project-bom", id] });
@@ -927,6 +931,29 @@ export function useManualFill() {
     mutationFn: (vars: { id: string } & ManualFillBody) => {
       const { id, ...body } = vars;
       return api.manualFill(id, body);
+    },
+    onSuccess: (_data, vars) => invalidate(vars.id),
+  });
+}
+
+// The bulk-assign surface for one project: unidentified placements grouped, each with ranked
+// value-matched candidates. Disabled until a project is selected.
+export function useProjectAssign(id: string | null) {
+  return useQuery({
+    queryKey: ["project-assign", id],
+    queryFn: () => api.getAssign(id as string),
+    enabled: !!id,
+  });
+}
+
+// Assign one library part to a whole group of identical placements. Invalidates the same derived
+// caches a fill does, plus the assign surface itself so the assigned group leaves the work list.
+export function useAssignGroup() {
+  const invalidate = useInvalidateAfterPrepare();
+  return useMutation({
+    mutationFn: (vars: { id: string } & AssignGroupBody) => {
+      const { id, ...body } = vars;
+      return api.assignGroup(id, body);
     },
     onSuccess: (_data, vars) => invalidate(vars.id),
   });

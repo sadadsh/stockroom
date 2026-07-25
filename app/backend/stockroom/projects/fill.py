@@ -6,11 +6,13 @@ module, which is why its ~25 name/text helpers were re-homed into `library_core`
 re-homed onto Stockroom's own layers, with two faithful changes the rewrite forces:
 
   1. The match library is Stockroom's one-JSON-per-part `PartRecord` set (via `library_match_records`),
-     NOT the retired flat `MySymbols` symbol file. Every complete Stockroom part carries an MPN and a
-     symbol name (the complete-to-add gate), so a component matches EXACTLY by its lib_id symbol name
-     or by a real MPN. (Fuzzy value+footprint auto-matching, which the retired flat library supported
-     via a symbol Value that Stockroom does not store on the record, is intentionally out of the auto
-     pass; the per-ref manual fill covers that residual by letting the user pick the library part.)
+     NOT the retired flat `MySymbols` symbol file. A component matches by its lib_id symbol name, but
+     ONLY when that name identifies exactly one part (see `library_match_records`), else by a real MPN.
+     A part that reuses a shared KiCad stock symbol -- every passive does, because
+     `resolve_passive_assets` files passives against the installed stock libraries rather than copying
+     files -- therefore matches by MPN only. Value+package matching for those generic placements is a
+     separate tier, not yet built; until it is, such a component is an honest `no_match` that the
+     per-ref manual fill covers by letting the user pick the library part.
   2. Every `.kicad_sch` write routes through Stockroom's byte-preserving `SexpDocument` (via the
      existing `kicad.schematic` `Schematic`/`SymbolInstance` seam and, for annotation, a direct node
      walk), never `LM.set_symbol_*` + `os.replace`. Only the atoms that actually change are rewritten,
@@ -31,8 +33,9 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
+from stockroom.component_value import parse_component_value, same_component_value
 from stockroom.kicad.schematic import Schematic
-from stockroom.library_core import qualify_footprint, qualify_symbol, symbol_name_ref
+from stockroom.library_core import symbol_name_ref
 from stockroom.model.category import category_nickname
 from stockroom.sexp.document import SexpDocument, SexpNode
 
@@ -77,27 +80,85 @@ def _is_blank(val) -> bool:
 # -- shared library match index (from Stockroom PartRecords) -------------------
 
 
+def _lib_id(ref) -> str:
+    """The `<lib>:<name>` reference a record's `AssetRef` actually holds, or "" when it does not hold
+    a container-plus-entry reference (a file-shaped asset such as a 3D model, or an empty slot).
+
+    Never re-derived from the part's category: a passive's symbol and footprint are KiCad STOCK
+    references (`Device:R`, `Resistor_SMD:R_0402_1005Metric`) that live in the installed KiCad
+    libraries, NOT in Stockroom's `SR-<slug>` category libraries, so qualifying them with the category
+    nickname produced a reference KiCad cannot resolve at all. Building the reference here from the
+    ref's own `lib` + `name` also makes a bogus `":name"` structurally impossible, which is what the
+    old nickname-dropping guard existed to prevent.
+    """
+    if ref is None:
+        return ""
+    lib = (ref.lib or "").strip()
+    name = (ref.name or "").strip()
+    return f"{lib}:{name}" if lib and name else ""
+
+
+# The spec rows a passive's value can live under, most specific first. These are the exact Title Case
+# labels `PassiveSpec.to_specs` emits, so the reader and the writer cannot drift apart.
+_VALUE_SPEC_KEYS: tuple[str, ...] = ("Resistance", "Capacitance", "Inductance", "Value")
+
+
+def _value_spec(specs) -> str:
+    for key in _VALUE_SPEC_KEYS:
+        val = str((specs or {}).get(key, "") or "").strip()
+        if val:
+            return val
+    return ""
+
+
+# The ratings that separate two parts of the SAME value and package. Two library resistors can both be
+# genuinely "10k 0402" and differ only here, which is why value plus package can never be an identity;
+# it is also the information a person needs in order to choose between them, so the candidate list
+# carries it and shows whichever of these actually differ.
+_DISCRIMINATING_SPEC_KEYS: tuple[str, ...] = (
+    "Tolerance", "Power", "Voltage", "Dielectric", "Temperature Coefficient",
+)
+
+
+def _discriminating_specs(specs) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for key in _DISCRIMINATING_SPEC_KEYS:
+        val = str((specs or {}).get(key, "") or "").strip()
+        if val:
+            out[key] = val
+    return out
+
+
 def library_match_records(parts: Iterable) -> list[dict]:
     """Build the fill match index from the shared library's `PartRecord`s.
 
     Each record is flattened to what matching + filling need: the symbol name a placed instance's
-    lib_id resolves against, the real MPN, and the identity values a match would write. The footprint
-    is carried as its bare stem plus the category nickname so a fill can qualify it to
-    `SR-<slug>:<stem>` (the KiCad-correct link into Stockroom's per-category footprint library). The
-    datasheet value is the source URL (what a schematic Datasheet property should hold), never the
-    on-disk file name. A part missing a symbol name is still indexed for MPN matching.
+    lib_id resolves against, the real MPN, the identity values a match would write, and the exact
+    `<lib>:<name>` references the record holds for its symbol and footprint (what a fill writes into
+    the schematic verbatim). The datasheet value is the source URL (what a schematic Datasheet
+    property should hold), never the on-disk file name. A part missing a symbol name is still indexed
+    for MPN matching.
+
+    `symbol_is_identity` is the flag matching turns on: True only when this part's symbol name
+    genuinely names THIS part. That needs two things at once, and the first is the one that matters:
+
+      - OWNERSHIP: the symbol lives in the Stockroom category library this part's own assets are
+        filed into (`SR-<slug>`). A stock library entry such as `Device:R` is shared by every
+        resistor in existence, so it cannot identify a part no matter how the library is populated.
+      - UNIQUENESS: no other part in this library carries the same symbol name. A secondary guard
+        only; uniqueness alone is naive, because a library holding exactly one resistor makes the
+        stock name `R` unique and would restore the wrong-part match.
     """
     out: list[dict] = []
     for p in parts:
         try:
             nickname = category_nickname(p.category)
         except ValueError:
-            # A record with a category outside the fixed taxonomy cannot yield a valid KiCad library
-            # link (the nickname qualifies the footprint + lib_id). Keep the part for its identity
-            # fills (MPN/Manufacturer/Datasheet/Description, which do NOT need the nickname) but drop
-            # its symbol/footprint so a fill never writes a bogus ":name" lib_id or footprint. A
-            # corrupt category is a library-side problem the doctor surfaces; it must not silently
-            # discard the whole part nor crash the Prepare.
+            # A category outside the fixed taxonomy has no Stockroom library, so this part cannot own
+            # its symbol and forfeits the symbol tier (it still matches by MPN and still fills every
+            # identity field, and its stored references are still written verbatim, because they do
+            # not depend on the category). A corrupt category is a library-side problem the doctor
+            # surfaces; it must not silently discard the part nor crash the Prepare.
             nickname = ""
         # The KiCad bundle explicitly: a project fill writes KiCad lib_ids into a
         # `.kicad_sch`, so it must read the KiCad assets, not whatever the record happens
@@ -115,18 +176,34 @@ def library_match_records(parts: Iterable) -> list[dict]:
             ds = (datasheet.source_url or datasheet.file or "").strip()
         out.append({
             "id": p.id,
-            # Without a nickname the symbol cannot be qualified into a valid lib_id, so drop it (an
-            # MPN match + identity fills still work); the footprint stem is dropped for the same reason.
-            "name": ((symbol.name if symbol else "") or "") if nickname else "",
+            "name": (symbol.name if symbol else "") or "",
             "mpn": (p.mpn or "").strip(),
             "manufacturer": (p.manufacturer or "").strip(),
             "datasheet": ds,
             "description": (p.description or "").strip(),
-            "footprint_stem": ((footprint.name if footprint else "") or "") if nickname else "",
+            "symbol_lib_id": _lib_id(symbol),
+            "footprint_lib_id": _lib_id(footprint),
+            # A record has no dedicated value field: a passive's value is a display spec row that
+            # `PassiveSpec.to_specs` writes ("Resistance": "10 kOhm"), so the candidate tier reads it
+            # from there. "Value" is accepted last for a record whose specs came from a vendor pull.
+            "value": _value_spec(getattr(p, "specs", None)),
+            "package": _eia_case((getattr(p, "specs", None) or {}).get("Package", "")),
+            "specs": _discriminating_specs(getattr(p, "specs", None)),
+            # Ownership on its own; uniqueness is folded in below, once the whole index is known.
+            "symbol_is_identity": bool(nickname and symbol and (symbol.lib or "").strip() == nickname),
             "nickname": nickname,
             "category": p.category,
+            "passive": bool(getattr(p, "passive", False)),
             "display_name": p.display_name,
         })
+    # UNIQUENESS, library-wide: a symbol name carried by more than one owning part names none of them.
+    owned: dict[str, int] = {}
+    for rec in out:
+        if rec["symbol_is_identity"]:
+            owned[rec["name"]] = owned.get(rec["name"], 0) + 1
+    for rec in out:
+        if rec["symbol_is_identity"] and owned.get(rec["name"], 0) > 1:
+            rec["symbol_is_identity"] = False
     return out
 
 
@@ -134,16 +211,24 @@ def match_component(comp: dict, index: list[dict]) -> dict:
     """Match one placed project component against the library index.
 
     Returns {"ref", "part": dict|None, "confidence"}:
-      - "symbol" - the component's lib_id symbol name equals a library part's symbol name;
+      - "symbol" - the component's lib_id symbol name equals the symbol name of a library part that
+                   IDENTIFIES itself by that name (see `symbol_is_identity`);
       - "mpn"    - else its strict MPN equals a library part's MPN;
       - "none"   - otherwise (part is None).
     A symbol match wins over an MPN match (a placed instance's symbol identity is the strongest link).
+
+    The symbol tier deliberately compares the BARE name across libraries, not the whole lib_id, so a
+    component still placed from an older library is matched and its `(lib_id ...)` repointed at the
+    Stockroom entry. That is only safe because the tier now requires the library part to own its
+    symbol: matching bare names alone gave every generic `Device:R` in a project the first Stockroom
+    resistor at the highest confidence tier, which silently wrote a wrong MPN into the schematic (and,
+    through `bom.library_enrich`, a wrong manufacturer, price and stock into the BOM).
     """
     ref = comp.get("ref", "")
     sym_name = symbol_name_ref(comp.get("lib_id") or "")
     if sym_name:
         for part in index:
-            if part["name"] and part["name"] == sym_name:
+            if part["symbol_is_identity"] and part["name"] == sym_name:
                 return {"ref": ref, "part": part, "confidence": "symbol"}
     props = comp.get("props") or {}
     smpn = _strict_mpn(props)
@@ -152,6 +237,127 @@ def match_component(comp: dict, index: list[dict]) -> dict:
             if part["mpn"] and part["mpn"] == smpn:
                 return {"ref": ref, "part": part, "confidence": "mpn"}
     return {"ref": ref, "part": None, "confidence": "none"}
+
+
+# -- candidate tier (a filtered PICK list, never an auto-assignment) -----------
+#
+# A generic placement cannot be identified, but it can be NARROWED, and that is what turns the owner's
+# scenario ("a bunch of passives from the default library") into one safe decision instead of dozens of
+# manual picks. Value plus package is deliberately NOT promoted to an identity: a library can hold
+# several parts that are all genuinely "10k 0402" and differ only in tolerance, power rating or
+# manufacturer, so any auto-pick among them is a coin flip written into the user's schematic.
+
+# Ranked strongest first. The rank is the tier's index, so ordering and naming cannot drift apart.
+CANDIDATE_TIERS: tuple[str, ...] = ("value+footprint", "value+package", "value")
+
+# A standalone 4-digit run in a footprint name or package spec is the EIA case code
+# ("Resistor_SMD:R_0402_1005Metric" -> "0402"). Anchored on non-digits so the 5-digit 01005 case is not
+# silently truncated to a wrong 4-digit code, and taken leftmost so the EIA code wins over the metric
+# code that follows it. Both sides of a comparison run through this same extractor, so they cannot
+# disagree about what "the package" means.
+_EIA_CASE = re.compile(r"(?<!\d)(\d{4})(?!\d)")
+
+
+def _eia_case(text: str) -> str:
+    m = _EIA_CASE.search(str(text or ""))
+    return m.group(1) if m else ""
+
+
+def candidate_matches(comp: dict, index: list[dict]) -> list[dict]:
+    """Ranked library parts a user could reasonably assign to a placement the identity tiers could not
+    match, as [{part_id, display_name, mpn, description, confidence}] strongest first.
+
+    Empty for a component that IS identified (there is nothing to guess), for an unreadable Value, and
+    for every part whose symbol reference differs from the one the schematic already places. That last
+    filter is the safety property: a candidate carries the SAME symbol, so accepting it repoints
+    nothing and only fills identity fields, and it cannot offer a capacitor for a resistor symbol
+    however well the numbers happen to line up.
+    """
+    if match_component(comp, index)["part"] is not None:
+        return []
+    lib_id = (comp.get("lib_id") or "").strip()
+    props = comp.get("props") or {}
+    value = props.get("Value", "")
+    if not lib_id or parse_component_value(value) is None:
+        return []
+    placed_fp = str(props.get("Footprint") or comp.get("footprint") or "").strip()
+    placed_case = _eia_case(placed_fp)
+    out: list[dict] = []
+    for part in index:
+        if part["symbol_lib_id"] != lib_id:
+            continue
+        if not same_component_value(value, part.get("value")):
+            continue
+        part_fp = part.get("footprint_lib_id") or ""
+        if placed_fp and part_fp and placed_fp == part_fp:
+            tier = "value+footprint"
+        elif placed_case and placed_case == (part.get("package") or _eia_case(part_fp)):
+            tier = "value+package"
+        else:
+            tier = "value"
+        out.append({
+            "part_id": part["id"], "display_name": part["display_name"], "mpn": part["mpn"],
+            "description": part["description"], "confidence": tier,
+            "_specs": part.get("specs") or {},
+        })
+    # Tier first, then display name, so the list is stable across runs and across machines (never
+    # insertion order, which follows whatever order the store happened to yield records in).
+    out.sort(key=lambda c: (CANDIDATE_TIERS.index(c["confidence"]), c["display_name"], c["part_id"]))
+    # What DISTINGUISHES these candidates from each other. Several library parts can be equally good
+    # matches on value and package (all genuinely "10k 0402") and differ only in tolerance or power
+    # rating, in which case the evidence tier is identical on every row and tells the user nothing.
+    # Surfacing exactly the ratings that DIFFER is what makes the choice possible rather than a
+    # coin flip: a rating every candidate shares is noise and is left out.
+    varying = [key for key in _DISCRIMINATING_SPEC_KEYS
+               if len({c["_specs"].get(key, "") for c in out}) > 1]
+    for cand in out:
+        specs = cand.pop("_specs")
+        # A rating the part's own name already states is not repeated: a row reading "10k 0402 1%" next
+        # to a separate "1%" says the same thing twice. Compared as whole whitespace-separated tokens,
+        # never as a substring, so a "1%" rating is not swallowed by a name containing "11%".
+        shown = {tok.casefold() for tok in str(cand["display_name"] or "").split()}
+        cand["distinguish"] = [specs[key] for key in varying
+                               if specs.get(key) and specs[key].casefold() not in shown]
+    return out
+
+
+# -- grouping: identical placements are ONE decision ---------------------------
+
+# A designator splits into its letter prefix and its number so R10 sorts after R9. A plain string sort
+# would interleave them, and these ref lists are shown to the user and written into commit messages.
+_REF_PARTS = re.compile(r"^([A-Za-z_#]*)(\d*)")
+
+
+def ref_sort_key(ref: str) -> tuple[str, int, str]:
+    m = _REF_PARTS.match(str(ref or ""))
+    prefix, digits = (m.group(1), m.group(2)) if m else ("", "")
+    return prefix, int(digits) if digits else -1, str(ref or "")
+
+
+def group_placements(components: list[dict]) -> list[dict]:
+    """Collapse placements that are the same part into one group, as [{key, lib_id, value, footprint,
+    refs, count}] in a deterministic order.
+
+    Two placements group together only when their symbol, Value and Footprint all agree, because those
+    three are exactly what a user reads as "the same component". Differing footprints stay apart even
+    at the same value: they are different physical parts.
+    """
+    groups: dict[tuple[str, str, str], dict] = {}
+    for comp in components or []:
+        props = comp.get("props") or {}
+        lib_id = (comp.get("lib_id") or "").strip()
+        value = str(props.get("Value", "") or "")
+        footprint = str(props.get("Footprint") or comp.get("footprint") or "")
+        key = (lib_id, value, footprint)
+        group = groups.get(key)
+        if group is None:
+            group = groups[key] = {"key": "␟".join(key), "lib_id": lib_id, "value": value,
+                                   "footprint": footprint, "refs": [], "count": 0}
+        group["refs"].append(comp.get("ref", ""))
+        group["count"] += 1
+    for group in groups.values():
+        group["refs"].sort(key=ref_sort_key)
+    return sorted(groups.values(), key=lambda g: (g["lib_id"], g["value"], g["footprint"]))
 
 
 def _strict_mpn(props: dict) -> str | None:
@@ -167,16 +373,15 @@ def proposed_changes(part: dict, props: dict) -> list[dict]:
 
     A change is proposed for each identity field the library carries whose value differs from the
     component's current property value. `kind` is "fill" when the current value is blank/placeholder,
-    else "overwrite". The footprint is qualified to `SR-<slug>:<stem>` so the fill lands the KiCad
-    library link, not a bare stem.
+    else "overwrite". The Footprint is the `<lib>:<name>` reference the record actually holds, written
+    verbatim so the schematic points at the library that really contains that footprint.
     """
     proposed = {
         "MPN": part.get("mpn"),
         "Manufacturer": part.get("manufacturer"),
         "Datasheet": part.get("datasheet"),
         "Description": part.get("description"),
-        "Footprint": (qualify_footprint(part["footprint_stem"], part["nickname"])
-                      if part.get("footprint_stem") else ""),
+        "Footprint": part.get("footprint_lib_id") or "",
     }
     # A component may already carry its part number under an ALTERNATE KiCad field (e.g. "Manufacturer
     # Part Number" instead of "MPN"). Completion measures MPN via the strict multi-key rule, so the
@@ -449,6 +654,11 @@ def fill_document(doc: SexpDocument, changes_by_ref: dict[str, dict[str, str]],
 
 
 def lib_id_for(part: dict) -> str:
-    """The qualified schematic `(lib_id ...)` for a matched library part: `SR-<slug>:<symbol name>`,
-    or "" when the part carries no symbol name (only an MPN)."""
-    return qualify_symbol(part["name"], part["nickname"]) if part.get("name") else ""
+    """The schematic `(lib_id ...)` a fill repoints a matched component at: the `<lib>:<name>`
+    reference the library record actually holds, or "" when it holds no symbol reference (MPN only).
+
+    Verbatim, never re-qualified with the category nickname: a passive's symbol is the KiCad stock
+    `Device:R`, and `SR-Resistors` contains no symbol named `R`, so re-qualifying pointed the placed
+    instance at an entry that does not exist and KiCad could no longer resolve the symbol.
+    """
+    return part.get("symbol_lib_id") or ""

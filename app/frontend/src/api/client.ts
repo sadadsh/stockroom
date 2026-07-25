@@ -46,6 +46,9 @@ import type {
   StackupRead,
   StackupResult,
   PrepareRead,
+  AssignGroupBody,
+  AssignRead,
+  AssignResult,
   ManualFillBody,
   ManualFillResult,
   RestoreResult,
@@ -1001,6 +1004,22 @@ export const api = {
     return request<ManualFillResult>(
       "POST",
       `/api/projects/${encodeURIComponent(id)}/prepare/fill`,
+      { body },
+    );
+  },
+
+  // The bulk-assign surface: every placed component with no identified library part, grouped so
+  // identical placements are one row, each with its ranked value-matched candidates. Read-only.
+  getAssign(id: string): Promise<AssignRead> {
+    return apiGet<AssignRead>(`/api/projects/${encodeURIComponent(id)}/assign`);
+  },
+
+  // Assign one library part to a whole group of identical placements, as ONE atomic commit. Either
+  // every ref is written or none is. `committed` is null when nothing changed.
+  assignGroup(id: string, body: AssignGroupBody): Promise<AssignResult> {
+    return request<AssignResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(id)}/assign`,
       { body },
     );
   },
