@@ -1550,13 +1550,16 @@ function SpecFamilyRow({ row }: { row: SpecRow }) {
         onClick={() => setOpen((v) => !v)}
         className="-mx-1.5 flex w-full items-baseline justify-between gap-3 rounded-[2px] px-1.5 py-[3px] text-left transition-colors hover:bg-[var(--c-hover)]"
       >
-        <dt className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-xs text-t2">
+        {/* spans, not dt/dd: a definition term is only valid as a child of a dl (or a div in one),
+            and nesting one inside a button reads as neither to a screen reader. The list semantics
+            live on the member rows below, which are real dt/dd pairs. */}
+        <span className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate text-xs text-t2">
           <Chevron open={open} />
           {row.label}
-        </dt>
-        <dd className="tnum flex-none font-mono text-xs text-t3">
+        </span>
+        <span className="tnum flex-none font-mono text-xs text-t3">
           {members.length} {members.length === 1 ? "Region" : "Regions"}
-        </dd>
+        </span>
       </button>
       {open ? (
         <div className="mb-0.5 ml-[7px] border-l border-line pl-2.5">
