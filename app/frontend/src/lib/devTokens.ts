@@ -143,10 +143,8 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    // The rounder north-star (owner decision 2026-07-17, docs/design/design-rules.md),
-    // superseding the earlier 8/6 lock. Must match styles/index.css: a stale default here
-    // makes the panel's reset button write the pre-north-star radius back.
-    default: { dark: "14px" },
+    // The Altium regrounding (204b921) value. Must match styles/index.css.
+    default: { dark: "3px" },
   },
   {
     cssVar: "--r-control",
@@ -154,7 +152,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Shape",
     kind: "length",
     themed: false,
-    default: { dark: "8px" },
+    default: { dark: "2px" },
   },
   // --- Type (theme-agnostic type scale; px size only, line-heights stay bundled in tailwind) ---
   {

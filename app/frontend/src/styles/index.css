@@ -120,11 +120,13 @@
     --c-icon-faint: #cbcbcb;
 
     /* --- Shape (theme-agnostic) -------------------------------------------------
-       The rounder north-star adopted 2026-07-17 (docs/design/design-rules.md): card 14
-       / control 8, superseding the earlier 8/6 lock. Exactly two radii; nothing else
-       rounds. Referenced by tailwind.config.js as rounded-card / rounded-control. */
-    --r-card: 14px;
-    --r-control: 8px;
+       The Altium Dark/Light Gray regrounding (204b921, 2026-07-23) is the CURRENT
+       direction: near-square chrome, card 3 / control 2. It supersedes BOTH the 8/6
+       lock and the rounder card-14 / control-8 north-star that docs/design/design-rules.md
+       still describes -- that note predates the Altium switch by six days and is stale.
+       Do not "restore" 14/8 from it; a rounded card reads as a different application. */
+    --r-card: 3px;
+    --r-control: 2px;
 
     /* --- Type scale (theme-agnostic) --------------------------------------------
        The compact desktop scale. Only the px size is a token: the line-heights are

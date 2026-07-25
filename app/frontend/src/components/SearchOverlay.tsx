@@ -131,7 +131,13 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const shown = rows.length;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-surface" data-dev-id="search.root">
+    // bg-canvas, not bg-surface: --c-surface is a ~1.6%-alpha WASH meant to sit on top of
+    // an opaque parent inside the normal flow. This element is position:fixed, so it paints
+    // above all app content with nothing opaque behind it -- the wash let the components
+    // list and detail panel show straight through, which is why the overlay was unusable.
+    // Every other modal escapes this by pairing an opaque popover card with a scrim; this
+    // is the one full-screen surface with neither, so it needs a real opaque base.
+    <div className="fixed inset-0 z-[100] flex flex-col bg-canvas" data-dev-id="search.root">
       {/* top band: the overlay's title strip with the docked query field + the close affordance,
           the same band + hairline family as every other panel header so the overlay reads as a
           docked workspace, not a floating spotlight */}
