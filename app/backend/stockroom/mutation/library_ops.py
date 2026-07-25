@@ -411,6 +411,17 @@ class LibraryOps:
     def _attach_libref(self, part_id: str, field: str, lib: str, name: str, tool: str) -> PartRecord:
         if not name.strip():
             raise ValueError(f"a {field} reference needs a name")
+        # `field` is the KiCad slot ("symbol"/"footprint"), and the Altium refs are a
+        # DIFFERENT field of a DIFFERENT type (altium_symbol/altium_footprint, AltiumRef).
+        # Filing a non-KiCad tool here would silently clobber the part's real KiCad
+        # reference AND store nothing usable for that tool. `tool` is unvalidated caller
+        # input from the API body, so refuse it loudly rather than corrupt the record.
+        if tool != "kicad":
+            raise ValueError(
+                f"cannot attach a {field} reference for tool {tool!r}: this path files the "
+                f"KiCad reference only. Altium assets attach through "
+                f"POST /api/altium/parts/{{id}}/attach, which copies the real files."
+            )
         record = self.load_record(part_id)
         setattr(record, field, LibRef(lib=lib, name=name, tool=tool))
         json_path = self.lib.parts_dir / f"{part_id}.json"

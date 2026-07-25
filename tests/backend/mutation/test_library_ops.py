@@ -716,3 +716,36 @@ def test_symbol_only_add_does_not_write_a_dangling_footprint_property(tmp_path, 
     assert not footprint_prop, (
         f"symbol-only add stamped a dangling footprint link: {footprint_prop!r}"
     )
+
+
+def test_attaching_a_reference_for_a_non_kicad_tool_is_rejected_not_silently_misfiled(
+    tmp_path, fixtures_dir
+):
+    """`attach_symbol`/`attach_footprint` must refuse a tool they cannot file, instead of
+    writing it into the KiCad slot.
+
+    `_attach_libref` did `setattr(record, "symbol"|"footprint", LibRef(..., tool=tool))`,
+    so the `tool` string only ever landed INSIDE the LibRef while the target field stayed
+    the KiCad one. The Altium refs are a different field AND a different type
+    (`altium_symbol`/`altium_footprint`, `AltiumRef`), so a `tool="altium"` attach did two
+    wrong things at once: it silently clobbered the part's real KiCad reference, and it
+    filed nothing for Altium. `tool` is unvalidated caller input straight from the API
+    body (routers/library.py), so this was reachable from a plain HTTP call.
+
+    Altium assets have their own path (`attach_altium_assets`, POST /api/altium/parts/{id}/attach)
+    because they copy real files and gate readiness. Until a reference-only Altium attach is
+    designed, refusing loudly is the honest behaviour -- never a silent overwrite.
+    """
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+    kicad_symbol_before = record.symbol
+    assert kicad_symbol_before is not None and kicad_symbol_before.tool == "kicad"
+
+    with pytest.raises(ValueError, match="altium"):
+        ops.attach_symbol(record.id, "SomeAltiumLib", "SOME_PART", tool="altium")
+
+    # The KiCad reference must be untouched on disk, not just in memory.
+    reloaded = ops.load_record(record.id)
+    assert reloaded.symbol == kicad_symbol_before
+    assert reloaded.altium_symbol is None  # and nothing was misfiled for Altium either
