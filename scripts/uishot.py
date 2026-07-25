@@ -411,6 +411,30 @@ def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
     return missing
 
 
+def _hover_dev_ids(page, dev_ids: list[str]) -> list[str]:
+    """Hover each `data-dev-id`, so a shot can show a control's REVEALED state.
+
+    The app's destructive/pending language (the shared compact `IconButton`) is a glyph at rest that
+    expands to state its consequence on hover or keyboard focus. A static shot therefore only ever
+    photographed the collapsed glyph, which is the half that needed no review. Hovering is not a
+    detail here: it IS the state under test.
+
+    Returns the ids that were NOT found, for the same reason `_click_dev_ids` does - a shot that
+    silently misses reads as evidence.
+    """
+    missing: list[str] = []
+    for dev_id in dev_ids:
+        target = page.locator(f'[data-dev-id="{dev_id}"]')
+        if not target.count():
+            missing.append(dev_id)
+            continue
+        target.first.hover()
+        # The reveal is a 150ms width transition, so this waits for the ANIMATION to land rather
+        # than for an unknown condition - a legitimate settle, not a detector.
+        page.wait_for_timeout(350)
+    return missing
+
+
 def _close_surface(page, surface: str) -> None:
     if surface == "search":
         page.keyboard.press("Escape")
@@ -500,6 +524,14 @@ def run(args) -> int:
                         "t => document.documentElement.setAttribute('data-theme', t)", theme
                     )
                     page.wait_for_timeout(600)
+                    # Hover LAST and per theme, unlike --click: a theme switch does not unmount
+                    # anything, but moving the pointer is not sticky the way an open popover is, and
+                    # the hovered state is what needs to appear in BOTH shots.
+                    if args.hover:
+                        gone = _hover_dev_ids(page, args.hover)
+                        if gone:
+                            print(f"  !! no such data-dev-id to hover: {', '.join(gone)}")
+                            failures.append(f"{surface}:hover")
                     path = out / f"{surface}-{theme}-{args.width}w.png"
                     page.screenshot(path=str(path), full_page=args.full_page)
                     print(f"  shot {path.name}")
@@ -546,6 +578,12 @@ def main() -> int:
     ap.add_argument("--surface", default="components",
                     choices=["components", "search", "projects", "project-health", "project-hygiene",
                              "project-library-pin", "part-vendor-data", "settings", "all"])
+    ap.add_argument(
+        "--hover", action="append", default=[], metavar="DEV_ID",
+        help="hover this data-dev-id before each capture, so a control whose label only appears on "
+             "hover/focus (the destructive + pending IconButton language) is actually visible in "
+             "the shot. Repeatable. An id that does not exist is reported, never silently skipped.",
+    )
     ap.add_argument("--seed", action="store_true",
                     help="seed a throwaway library + KiCad project (implied by a project-* surface)")
     ap.add_argument("--themes", default="dark,light", help="comma list: dark,light")

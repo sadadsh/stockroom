@@ -809,3 +809,44 @@ describe("DetailPanel alternates comparison", () => {
     expect(screen.getByRole("button", { name: /Use DigiKey/i })).toBeTruthy();
   });
 });
+
+// -- punch 15: the destructive action's interaction language. It was dim text in a corner reading
+// "Delete Part"; the owner asked for a red X that expands to "Delete Part?" on hover with a loading
+// state, and generalised the philosophy to the whole app - so it is the shared IconButton primitive
+// (which already had the reveal behaviour, zero tests and zero callers) rather than a one-off.
+describe("DetailPanel delete action", () => {
+  it("reads as a destructive action that names its consequence as a question", () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} />);
+    const del = screen.getByRole("button", { name: "Delete Part?" });
+    // Reads as destructive at rest via the err token, but MUTED - no border, no fill. The full
+    // ghost-danger treatment arrives with the label when the control is approached, because a
+    // permanently bordered red box in the corner shouts louder than the text it replaced.
+    expect(del.className).toContain("--c-err");
+    expect(del.className).toContain("border-transparent");
+    expect(del.getAttribute("data-revealed")).toBe("false");
+  });
+
+  it("shows the running state ON the control, not only in a toast", () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} deleting />);
+    const del = screen.getByRole("button", { name: "Deleting" });
+    expect(del).toBeDisabled();
+    expect(del).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("spins for a DELETE, not for any other write in flight", () => {
+    // `busy` is the panel's aggregate write flag, so using it would make the delete control spin
+    // while a symbol was attaching - claiming an action the user never started.
+    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={vi.fn()} busy />);
+    expect(screen.queryByRole("button", { name: "Deleting" })).toBeNull();
+  });
+
+  it("still asks for confirmation, because the explanation is worth more than a slick two-click", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    wrap(<DetailPanel detail={detail()} {...BASE} onDelete={onDelete} />);
+    await user.click(screen.getByRole("button", { name: "Delete Part?" }));
+    // the dialog that says it commits and can be restored from git history
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+});
