@@ -62,6 +62,7 @@ import { CompletePartModal } from "./CompletePartModal";
 import {
   CubeArt,
   ExternalIcon,
+  EyeIcon,
   FootprintArt,
   RefreshIcon,
   SymbolArt,
@@ -366,11 +367,6 @@ export function DetailPanel({
             }
             busy={busy}
           />
-          <PhotoTrigger
-            devId="detail.photo"
-            url={heroPhotoUrl}
-            partName={detail.display_name}
-          />
           <TabStrip
             tabs={tabs}
             active={activeTab}
@@ -532,6 +528,20 @@ export function DetailPanel({
               }
             >
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
+              {/* The product photo belongs WITH the distributor data: it is the distributor's own
+                  image of the part, pulled from the same page as the price. It used to float
+                  between the MPN line and the tab strip, anchored to nothing (punch 7). */}
+              {heroPhotoUrl ? (
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
+                  <Eyebrow dense>Product Photo</Eyebrow>
+                  <PhotoTrigger
+                    devId="detail.photo"
+                    url={heroPhotoUrl}
+                    partName={detail.display_name}
+                    label="View"
+                  />
+                </div>
+              ) : null}
               {tradeGroup ? (
                 <TradeCompliance
                   group={tradeGroup}
@@ -1175,20 +1185,32 @@ function DatasheetField({
       />
     );
   }
+  // ONE flat 34px row, the exact anatomy Filing uses ([icon] LABEL [value] [affordance]) - because
+  // Filing sits directly below it and the two are the same kind of thing: a single fact about the
+  // part with one control. It used to be a bordered pill NEXT TO a bare 24px pencil, two shapes at
+  // two heights with a gap between them, which is what "the datasheet button and its edit look out
+  // of place / uneven" meant (punch 8).
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex h-[34px] items-center gap-2.5 rounded-control border border-line bg-field px-3">
+      <Icon id="detail.datasheet-link" className="h-3.5 w-3.5 flex-none text-t3" />
+      <span className={EYEBROW_DENSE}>
+        <Text id="detail.datasheet">Datasheet</Text>
+      </span>
       {href ? (
         <a
           href={href}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-control border border-line bg-field px-2.5 py-1.5 text-xs font-medium text-t1 transition hover:border-line2 hover:bg-raise2"
+          // "Open" alone is a useless accessible name out of context - the row's LABEL carries the
+          // noun visually, but a screen reader reads the link on its own.
+          aria-label="Open Datasheet"
+          className="ml-auto inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-t1 transition-colors hover:text-acc"
         >
-          <Text id="detail.datasheet">Datasheet</Text>
-          <ExternalIcon className="text-t3" />
+          <span className="truncate">Open</span>
+          <ExternalIcon className="flex-none text-t3" />
         </a>
       ) : (
-        <span className="text-xs italic text-t3">None on file</span>
+        <span className="ml-auto text-xs italic text-t3">None on file</span>
       )}
       {onEdit ? (
         <button
@@ -1200,7 +1222,7 @@ function DatasheetField({
           disabled={busy}
           aria-label="Edit datasheet link"
           title="Edit datasheet link"
-          className="grid h-6 w-6 flex-none place-items-center rounded-control text-t3 transition hover:bg-raise2 hover:text-t1 disabled:opacity-50"
+          className="grid h-5 w-5 flex-none place-items-center rounded-control text-t3 transition-colors hover:text-t1 disabled:opacity-50"
         >
           <Icon id="detail.rename" className="h-3.5 w-3.5" />
         </button>
@@ -1394,8 +1416,11 @@ function AssetTile({
       <span className="text-2xs font-semibold text-t1">{name}</span>
       <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
         {present ? (
-          // no green "present" dot (owner's call - the render itself already reads as present)
-          <>{onOpen ? "View" : "Linked"}</>
+          // no green "present" dot (owner's call - the render itself already reads as present).
+          // An openable tile shows an EYE rather than spelling out "View" (punch 11): the tile is
+          // already a button whose aria-label says "Open <name> Preview", so the word was carrying
+          // no information a glyph could not, in a strip that has no room to spare.
+          onOpen ? <EyeIcon className="h-3.5 w-3.5" /> : <>Linked</>
         ) : onAttach ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />

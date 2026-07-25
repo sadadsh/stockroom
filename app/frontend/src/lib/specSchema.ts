@@ -180,7 +180,8 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "country of diffusion", group: TRADE_GROUP, label: "Country of Diffusion", order: 22 },
   // unit "%" so a bare 0.0 reads as "0%": the value is the page's OWN measured rate, and 0.0 means
   // "checked, no tariff" - printed as a bare "0" it is indistinguishable from an empty cell.
-  { match: "us tariff", group: TRADE_GROUP, label: "US Tariff %", unit: "%", order: 30 },
+  // label WITHOUT the percent sign: the unit supplies it, and "US Tariff %  0%" printed it twice.
+  { match: "us tariff", group: TRADE_GROUP, label: "US Tariff", unit: "%", order: 30 },
   { match: "minimum order quantity", group: TRADE_GROUP, label: "Minimum Order Quantity", order: 40 },
   { match: "order multiple", group: TRADE_GROUP, label: "Order Multiple", order: 41 },
   { match: "maximum order quantity", group: TRADE_GROUP, label: "Maximum Order Quantity", order: 42 },

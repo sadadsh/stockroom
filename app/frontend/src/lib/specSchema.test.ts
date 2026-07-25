@@ -341,7 +341,7 @@ describe("groupSpecs trade group", () => {
     const trade = groups.find((g) => g.title === "Trade & Compliance")!;
     const labels = trade.rows.map((r) => r.label);
     expect(labels).toContain("Country of Origin");
-    expect(labels).toContain("US Tariff %");
+    expect(labels).toContain("US Tariff");
     expect(labels).toContain("ECCN");
     expect(labels).toContain("HTS Code");
     expect(labels).toContain("Minimum Order Quantity");
@@ -360,7 +360,7 @@ describe("groupSpecs trade group", () => {
     const trade = groupSpecs("ICs", specs).find((g) => g.title === "Trade & Compliance")!;
     // "0%", not a bare "0": the registry gives the row a % unit, which groupSpecs folds into the
     // value. A lone 0 in a value column is indistinguishable from an empty cell.
-    expect(trade.rows.find((r) => r.label === "US Tariff %")?.value).toBe("0%");
+    expect(trade.rows.find((r) => r.label === "US Tariff")?.value).toBe("0%");
   });
 
   it("omits the group entirely for a part with no trade data", () => {
@@ -376,7 +376,7 @@ describe("groupSpecs zero-valued rates", () => {
     // measurement into what looks like a gap.
     const trade = groupSpecs("ICs", { "US Tariff %": 0.0 })
       .find((g) => g.title === "Trade & Compliance")!;
-    const row = trade.rows.find((r) => r.label === "US Tariff %")!;
+    const row = trade.rows.find((r) => r.label === "US Tariff")!;
     expect(`${row.value}${row.unit ?? ""}`).toBe("0%");
   });
 

@@ -69,10 +69,16 @@ export function PhotoTrigger({
   url,
   partName,
   devId,
+  // The visible text. Defaults to the noun, because in the Add flows this chip stands alone and has
+  // to say WHAT it opens. Where a label already supplies the noun (the detail panel's PRODUCT PHOTO
+  // row), the caller passes the verb instead, so the label labels and the button acts - rather than
+  // the two of them saying "photo" twice.
+  label = "Photo",
 }: {
   url: string;
   partName: string;
   devId?: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (!url) return null;
@@ -90,7 +96,7 @@ export function PhotoTrigger({
           <circle cx="9" cy="11" r="2" />
           <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
         </svg>
-        <Text id="photo.trigger">Photo</Text>
+        {label}
       </button>
       <PhotoCard open={open} url={url} partName={partName} onClose={() => setOpen(false)} />
     </>

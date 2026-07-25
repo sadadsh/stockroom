@@ -317,6 +317,19 @@ export const ICON_REGISTRY: IconEntry[] = [
     body: '<path d="m15 18-6-6 6-6"/>',
   },
   {
+    // "this can be opened for a look". Replaces the literal word "View" on an asset tile, where the
+    // tile is already a button whose aria-label says "Open <name> Preview" (punch 11).
+    id: "action.view",
+    category: "bespoke",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    body: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  },
+  {
     id: "action.external",
     category: "bespoke",
     viewBox: "0 0 24 24",
@@ -550,6 +563,20 @@ export const ICON_REGISTRY: IconEntry[] = [
     strokeLinecap: "round",
     strokeLinejoin: "round",
     body: '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
+  },
+  {
+    // The datasheet row's leading glyph: a document. It exists so the row can carry the SAME anatomy
+    // as Filing directly below it ([icon] LABEL [value] [affordance]) - before this the datasheet was
+    // a bordered pill beside a bare pencil, two shapes at two heights (punch 8).
+    id: "detail.datasheet-link",
+    category: "bespoke",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    body: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h6"/><path d="M8 13h8"/><path d="M8 17h5"/>',
   },
   {
     id: "detail.tag-remove",
