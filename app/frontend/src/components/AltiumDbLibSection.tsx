@@ -93,6 +93,15 @@ export function AltiumDbLibSection() {
                 Install it into Altium once as an Installed library, not in the project folder.
               </Text>
             </p>
+            {!data.datasource_present ? (
+              // The data source is derived and is not shared through git, so a clone that has
+              // never been opened here has none. Saying so beats letting Altium fail with an ODBC
+              // error against a file nobody mentioned.
+              <p className="text-xs text-warn" data-testid="altium-datasource-missing">
+                The data source this library reads has not been built on this machine yet.
+                Regenerate to build it.
+              </p>
+            ) : null}
           </div>
         ) : null}
 

@@ -1627,6 +1627,10 @@ export interface AltiumStatus {
   dblib_dir: string;
   ready: number;
   total: number;
+  // Whether the SQLite data source the .DbLib reads exists on disk. It is DERIVED from the JSON
+  // records and no longer shared through git, so a fresh clone legitimately has none until
+  // Stockroom rebuilds it (which it does at boot). False means "not built yet", never "broken".
+  datasource_present: boolean;
   rows: AltiumStatusRow[];
 }
 

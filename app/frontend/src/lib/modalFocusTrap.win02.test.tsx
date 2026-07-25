@@ -22,6 +22,7 @@ const STATUS: AltiumStatus = {
   profile: "default",
   dblib: "Stockroom.DbLib",
   dblib_dir: "/tmp",
+  datasource_present: true,
   ready: 0,
   total: 0,
   rows: [],
