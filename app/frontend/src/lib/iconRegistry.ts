@@ -186,6 +186,19 @@ export const ICON_REGISTRY: IconEntry[] = [
       '<circle cx="15" cy="15" r="2"/>',
   },
   {
+    // The STM Viewer rail glyph. Its siblings all carried an icon and it did not, which read as an
+    // unfinished nav entry; a chip with its four pin rows is the same visual family as nav.components.
+    id: "nav.stm",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 2,
+    body:
+      '<rect x="6" y="6" width="12" height="12" rx="1.5"/>' +
+      '<circle cx="9.5" cy="9.5" r="0.6" fill="currentColor"/>' +
+      '<path d="M9 6V3"/><path d="M15 6V3"/><path d="M9 21v-3"/><path d="M15 21v-3"/>' +
+      '<path d="M6 9H3"/><path d="M6 15H3"/><path d="M21 9h-3"/><path d="M21 15h-3"/>',
+  },
+  {
     id: "nav.settings",
     category: "primary",
     viewBox: "0 0 24 24",

@@ -112,7 +112,7 @@ export function StmViewerPage() {
       </div>
 
       {tab === "explorer" ? (
-        <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 flex-1">
+        <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 min-w-0 flex-1">
           {/* scope */}
           <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
             <FamilyPicker scope={scope} onScopeChange={setScope} />
@@ -148,7 +148,7 @@ export function StmViewerPage() {
           </aside>
         </TabPanel>
       ) : (
-        <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 flex-1">
+        <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 min-w-0 flex-1">
           <CompatibilityWorkbench />
         </TabPanel>
       )}
@@ -244,19 +244,24 @@ function PinoutRegion({
               />
             )}
           </div>
-          <div className="flex-none border-b border-line pb-3">
-            <PinoutLegend
-              pinout={pinout}
-              highlight={highlight}
-              onToggleHighlight={toggleHighlight}
-            />
-          </div>
+          {/* ONE scroller for legend + inspector: the legend grew live counts and the
+              bring-up section, so pinning it flex-none clipped its tail (and the whole
+              inspector) with no way to scroll onto them. */}
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {inspectedPin ? (
-              <PinInspector pin={inspectedPin} part={activePart} />
-            ) : (
-              <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
-            )}
+            <div className="border-b border-line pb-3">
+              <PinoutLegend
+                pinout={pinout}
+                highlight={highlight}
+                onToggleHighlight={toggleHighlight}
+              />
+            </div>
+            <div className="pt-2">
+              {inspectedPin ? (
+                <PinInspector pin={inspectedPin} part={activePart} />
+              ) : (
+                <p className="px-1 py-4 text-sm text-t3">Select a pin to inspect its facts.</p>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
