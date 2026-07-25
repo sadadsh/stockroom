@@ -387,7 +387,26 @@ export function DetailPanel({
           // column, so a long specs list grew the whole sheet instead of scrolling inside its
           // own pane. Pinning the row to the container height lets each column's own
           // overflow-y-auto engage.
-          className="mt-3 grid min-h-0 flex-1 grid-cols-[288px_minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)]"
+          // RESPONSIVE, because the three-column form needs 1166px of fixed width before the
+          // Specifications track gets a single pixel (190 rail + 320 picker + 48 padding + 288 + 320).
+          // Below that, `minmax(0,1fr)` let the middle column collapse to ZERO and its content was
+          // drawn ON TOP of the Sourcing column: "Sourcing" and the spec sheet superimposed into
+          // "Sparcing", a stray "PHY" under Links, and the datasheet row running off the window edge.
+          // The pane is overflow-hidden with no overflow-x, so none of it was even reachable.
+          //
+          // So the layout now STACKS instead of overlapping. The DOM order never changes; only the
+          // track count does, and grid auto-placement flows the third column onto a second row:
+          //   >=1280  three columns, as designed
+          //   >=1024  two columns; Sourcing drops beneath Specifications (col-start-2)
+          //   <1024   one column; the specimen rail sits on top
+          // Each column keeps its own scroller, and `grid-rows` is only pinned in the 3-column case -
+          // once columns wrap, the rows must size to content or the stacked column is unreachable.
+          className={
+            "mt-3 grid min-h-0 flex-1 gap-y-5 " +
+            "grid-cols-1 " +
+            "lg:grid-cols-[288px_minmax(16rem,1fr)] " +
+            "xl:grid-cols-[288px_minmax(16rem,1fr)_320px] xl:grid-rows-[minmax(0,1fr)]"
+          }
         >
           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-5">
           {/* the physical object as the hero, its symbol + footprint as supporting embodiments.
@@ -502,8 +521,12 @@ export function DetailPanel({
             </DetailSection>
           </div>
 
-          {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note. */}
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto border-l border-line pl-5">
+          {/* COLUMN 3 - commercial + reference: where to buy, then the datasheet + a note.
+              Below 1280 it drops onto a second row UNDER the Specifications column (col-start-2), so
+              it stays beside the specimen rail rather than under it; below 1024 it simply follows in
+              the single column. The left hairline is a COLUMN divider, so it only applies while this
+              really is a third column - kept at a wrap it would draw a rule across a stacked block. */}
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto lg:col-start-2 xl:col-start-auto xl:border-l xl:border-line xl:pl-5">
             <DetailSection
               title={<Text id="detail.sourcing-head">Sourcing</Text>}
               action={
@@ -1495,10 +1518,16 @@ function AssetTile({
 //
 // The 10.5rem label track appears in both strings, and a test in eyebrowConsistency holds the two in
 // sync - a child's value must land at the same x as its parent's or the comparison is unreadable.
+// The label track is RESPONSIVE: a fixed 10.5rem is right in the three-column layout, but once the
+// sheet stacks into a ~250px column it ate two thirds of the row and forced "100 nF" to wrap
+// mid-value. It narrows to 7rem there, which is still enough for the labels and leaves the value
+// whole. Same widths on both levels, asserted by a gate.
 const SPEC_ROW_GRID =
-  "grid grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
+  "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] " +
+  "xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
 const ALT_ROW_GRID =
-  "grid grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
+  "grid grid-cols-[minmax(0,calc(7rem-7px))_minmax(0,1fr)_auto] " +
+  "xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
 
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
@@ -1728,9 +1757,12 @@ function SpecRowList({
               >
                 {row.label}
               </dt>
-              {/* left-aligned in its own track: a single part sheet has nothing to compare down the
-                  column, so tabular right-alignment only bought distance from the label */}
-              <dd className="tnum min-w-0 truncate font-mono text-xs text-t1">
+              {/* Left-aligned in its own track: a single part sheet has nothing to compare down the
+                  column, so tabular right-alignment only bought distance from the label.
+                  WRAPS rather than truncates - the owner's complaint is that specs get CUT OFF, and a
+                  value clipped to "100 …" has lost the data. Two lines costs nothing; a hidden value
+                  costs the whole point of the row. */}
+              <dd className="tnum min-w-0 break-words font-mono text-xs text-t1">
                 {row.unit ? `${row.value} ${row.unit}` : row.value}
               </dd>
             </div>
