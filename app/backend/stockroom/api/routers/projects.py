@@ -534,6 +534,23 @@ def projects_router(require_token) -> APIRouter:
         ctx.bom_cache.pop(project_id, None)
         return result
 
+    @r.get("/{project_id}/hygiene")
+    def get_hygiene(request: Request, project_id: str) -> dict:
+        # What syncing this project's workspace hygiene would change: the ignore/attributes rules its
+        # EDA tool declares, plus the already-tracked per-user files those rules now cover. Read-only,
+        # no git. Unknown id -> 404.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.hygiene_read(project_id)
+
+    @r.post("/{project_id}/hygiene")
+    def sync_hygiene(request: Request, project_id: str) -> dict:
+        # Write the rules AND untrack the per-user files, as ONE commit on the project's own git.
+        # Both halves are required: an ignore rule has no effect on a file that is already tracked,
+        # and those files being tracked is exactly why two peers conflict on them. Unknown id -> 404;
+        # not under git, a dirty tree, or a hand-broken managed block -> 400; a GitError -> 503.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.hygiene_apply(project_id)
+
     @r.post("/{project_id}/restore")
     def restore(request: Request, project_id: str) -> dict:
         # Undo the project's last Prepare / Fill by git-reverting that commit as a new commit

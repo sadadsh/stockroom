@@ -67,6 +67,17 @@ class Transaction:
         self._committed = True
         return sha
 
+    def commit_staged(self, message: str) -> str:
+        """Commit what the body of this transaction STAGED, rather than re-deriving the commit from
+        the tracked paths' working-tree contents. Needed when a change cannot be expressed as "the
+        current state of these files": staging a `git rm --cached` while deliberately keeping the
+        file on disk is one (see GitRepo.commit_staged). Rollback is unchanged: the same tracked
+        paths are restored if this is never reached."""
+        self.validate()
+        sha = self.repo.commit_staged(message)
+        self._committed = True
+        return sha
+
     def __enter__(self) -> "Transaction":
         return self
 

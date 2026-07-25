@@ -38,6 +38,17 @@ def _register(client, root) -> dict:
     return r.json()
 
 
+def _git_init_commit(root):
+    """Give an external project dir its OWN git repo with everything committed, which is the state
+    every project write requires (the commit-time gate refuses a project with no git_root)."""
+    from stockroom.vcs.repo import GitRepo
+
+    repo = GitRepo(root)
+    repo.init()
+    repo.commit("seed", sorted(p for p in root.iterdir() if p.is_file()))
+    return repo
+
+
 # ---- list -------------------------------------------------------------------
 
 
@@ -1987,3 +1998,26 @@ def test_the_assign_endpoint_serves_an_altium_project(client, tmp_path):
     # The surface states where an assignment LANDS, because for this tool it is not the schematic.
     assert data["binding"]["writable"] is False
     assert data["binding"]["reason"]
+
+
+def test_workspace_hygiene_endpoints_preview_then_apply(client, tmp_path):
+    """The measured cause of the owner's KiCad peer-sync failures, reachable from the app. Preview is
+    read-only; apply writes the ignore rules AND untracks the per-user files they now cover, because
+    an ignore rule does nothing to a file that is already tracked."""
+    root = _make_project(tmp_path / "ext" / "board")
+    (root / "board.kicad_prl").write_text('{"window":{}}\n', encoding="utf-8")
+    _git_init_commit(root)
+    proj = _register(client, root)
+
+    preview = client.get(f"/api/projects/{proj['id']}/hygiene")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["untracked"] == ["board.kicad_prl"]
+
+    applied = client.post(f"/api/projects/{proj['id']}/hygiene")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["untracked"] == ["board.kicad_prl"]
+    assert "*.kicad_prl" in (root / ".gitignore").read_text(encoding="utf-8")
+
+    # ...and it is idempotent, so re-syncing does not churn the project's history.
+    again = client.post(f"/api/projects/{proj['id']}/hygiene")
+    assert again.json()["committed"] is None

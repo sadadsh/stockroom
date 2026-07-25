@@ -163,6 +163,16 @@ class GitRepo:
         # abort `git add` with "did not match any files". Its change is already staged, so
         # --only below still carries it into the commit.
         addable = [p for p in paths if Path(p).exists() or self._is_tracked(p)]
+        if not force:
+            # A path that is IGNORED and no longer tracked must not be handed to `git add`: git
+            # aborts the whole invocation with "The following paths are ignored by one of your
+            # .gitignore files", which would fail a commit whose real content is elsewhere. This is
+            # the workspace-hygiene case: the same commit adds the new ignore rules AND untracks the
+            # per-user files those rules now cover, so by the time we stage, the untracked paths are
+            # ignored but still present on disk. They stay in `committable` below, which is what
+            # carries their already-staged deletion into the commit. `force=True` keeps its old
+            # meaning (commit a path an ignore rule would skip) and is left alone.
+            addable = [p for p in addable if not (self._is_ignored(p) and not self._is_tracked(p))]
         if addable:
             # force=True (-f) commits paths a .gitignore would skip. Used for engine bookkeeping
             # that MUST be tracked regardless of a user/library ignore rule (a profile's structural
@@ -187,6 +197,45 @@ class GitRepo:
             return self.head()
         self._run("commit", "-m", message, "--only", "--", *[str(p) for p in committable])
         return self.head()
+
+    def commit_staged(self, message: str) -> str:
+        """Commit exactly what is in the INDEX, with no pathspec. Returns the new head, or the
+        current head when nothing is staged.
+
+        `commit(message, paths)` cannot express this. Git implies `--only` whenever a pathspec is
+        given, and `--only` takes the WORKING TREE content of those paths, so a file whose deletion
+        was staged by `git rm --cached` but which still exists on disk is silently RE-ADDED. That is
+        exactly the workspace-hygiene case: the same commit adds ignore rules and untracks the
+        per-user files those rules cover, while deliberately leaving those files on disk.
+
+        The caller MUST have verified the tree was clean before staging, or this sweeps foreign work
+        into what is supposed to be a scoped commit. `mutation/hygiene.apply_hygiene` enforces that
+        with an explicit refuse.
+        """
+        if not message.strip():
+            raise GitError("commit message must not be empty")
+        self._set_test_identity_if_missing()
+        if self._run("diff", "--cached", "--quiet", check=False).returncode == 0:
+            return self.head()
+        self._run("commit", "-m", message)
+        return self.head()
+
+    def untrack(self, paths) -> None:
+        """Stop tracking `paths` while LEAVING them on disk (`git rm --cached`).
+
+        This is what actually stops two peers conflicting on a per-user file. Verified against git:
+        adding an ignore rule has no effect on a file that is already tracked, so the rule alone
+        changes nothing observable. Staged only; the caller commits.
+        """
+        rel = [str(p) for p in (paths or [])]
+        if rel:
+            self._run("rm", "--cached", "--quiet", "--", *rel)
+
+    def _is_ignored(self, path: Path) -> bool:
+        """Whether a .gitignore rule covers this path. `check-ignore` exits 0 on a match, 1 on no
+        match, and >1 on a real error; only an exact 0 counts, so an error can never be read as
+        "ignored" and silently drop a path out of a commit."""
+        return self._run("check-ignore", "-q", "--", str(path), check=False).returncode == 0
 
     def _is_tracked(self, path: Path) -> bool:
         return (
