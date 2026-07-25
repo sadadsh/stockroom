@@ -47,6 +47,21 @@ class Pad:
     rotation: float = 0.0
 
 
+@dataclass(frozen=True)
+class GraphicLine:
+    """One drawn segment of the footprint - silkscreen outline, pin-1 marker, courtyard.
+
+    Millimetres in KiCad's frame, like Pad. The LAYER is kept rather than filtered here, because
+    what a viewer wants to draw differs by context: silkscreen is the human-readable outline,
+    the courtyard is a keep-out, and a caller should decide which it needs.
+    """
+
+    start: tuple[float, float]
+    end: tuple[float, float]
+    layer: str
+    width: float = 0.12
+
+
 class Footprint:
     def __init__(self, doc: SexpDocument):
         self._doc = doc
@@ -73,6 +88,43 @@ class Footprint:
     def model_path(self) -> str | None:
         node = self._model_node()
         return node.children[1].value if node else None
+
+    @property
+    def graphics(self) -> list["GraphicLine"]:
+        """Every `fp_line` the footprint draws, with its layer - the silkscreen and courtyard that
+        make a land pattern recognisable. Pads are NOT included; they come from `pads`."""
+        out: list[GraphicLine] = []
+        for node in self._doc.root.find_all("fp_line"):
+
+            def pt(key: str) -> tuple[float, float] | None:
+                sub = node.find(key)
+                if sub is None or len(sub.children) < 3:
+                    return None
+                try:
+                    return (float(sub.children[1].value), float(sub.children[2].value))
+                except (TypeError, ValueError):
+                    return None
+
+            start, end = pt("start"), pt("end")
+            if start is None or end is None:
+                continue
+            layer_node = node.find("layer")
+            layer = (
+                str(layer_node.children[1].value)
+                if layer_node is not None and len(layer_node.children) > 1
+                else ""
+            )
+            width = 0.12
+            stroke = node.find("stroke")
+            if stroke is not None:
+                w = stroke.find("width")
+                if w is not None and len(w.children) > 1:
+                    try:
+                        width = float(w.children[1].value)
+                    except (TypeError, ValueError):
+                        width = 0.12
+            out.append(GraphicLine(start=start, end=end, layer=layer, width=width))
+        return out
 
     @property
     def pads(self) -> list["Pad"]:

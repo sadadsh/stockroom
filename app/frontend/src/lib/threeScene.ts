@@ -58,8 +58,16 @@ export interface LandPadInput {
   shape?: string;
 }
 
+export interface LandGraphicInput {
+  start: [number, number];
+  end: [number, number];
+  layer: string;
+  width: number;
+}
+
 export interface LandPatternInput {
   pads: LandPadInput[];
+  graphics?: LandGraphicInput[];
   model_placement: {
     offset: [number, number, number];
     scale: [number, number, number];
@@ -554,6 +562,24 @@ export function mountModelScene(
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
+    }
+
+    // SILKSCREEN + COURTYARD. Pads alone are not the land pattern: the silk outline and the pin-1
+    // marker are how a person recognises the part, and the courtyard is the keep-out it gets
+    // checked against. Drawn a hair above the mask so they are not z-fighting with it.
+    const silkY = 0.012;
+    for (const g of land.graphics ?? []) {
+      const isCourtyard = g.layer.endsWith("CrtYd");
+      const mat = new THREE.LineBasicMaterial({
+        color: isCourtyard ? 0xff8fb1 : 0xf2f4f7,
+        transparent: true,
+        opacity: isCourtyard ? 0.5 : 0.95,
+      });
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(g.start[0] * MM_TO_SCENE, silkY, g.start[1] * MM_TO_SCENE),
+        new THREE.Vector3(g.end[0] * MM_TO_SCENE, silkY, g.end[1] * MM_TO_SCENE),
+      ]);
+      group.add(new THREE.Line(geo, mat));
     }
 
     // THE PCB the pads sit on. Without a substrate the pads float in space, which is the other

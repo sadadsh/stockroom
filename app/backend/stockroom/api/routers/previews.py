@@ -307,6 +307,15 @@ def previews_router(require_token) -> APIRouter:
                 }
                 for p in fp.pads
             ],
+            "graphics": [
+                {
+                    "start": [g.start[0], g.start[1]],
+                    "end": [g.end[0], g.end[1]],
+                    "layer": g.layer,
+                    "width": g.width,
+                }
+                for g in fp.graphics
+            ],
             "model_placement": (
                 None
                 if place is None
