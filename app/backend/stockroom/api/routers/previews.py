@@ -118,11 +118,11 @@ def _split_lib_id(fp: str) -> tuple[str, str]:
 # Bump when the footprint render changes (layers, hidden text, ...): the SVG cache is keyed by
 # the .kicad_mod file hash, which does NOT change when the RENDER code does, so a stale blob would
 # be served forever without this token. (C1: copper-only render -> "c1".)
-_FP_RENDER_VERSION = "c3"  # C3: refit the viewBox to the drawn art, so the tile stops showing a speck.
+_FP_RENDER_VERSION = "c4"  # C4: refit the viewBox to the drawn art, at a 2% margin.
 # Bump when the symbol render changes (hidden fields, ...): the cache is content-hashed on
 # the .kicad_sym, which does NOT change when the RENDER code does. (C1: hide the property
 # fields so the body + pins show, not a smudge of overlapping Value/Footprint/Datasheet -> "c1".)
-_SYM_RENDER_VERSION = "c2"  # C2: the viewBox refit applies to every preview, symbols included.
+_SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, symbols included.
 # Bump when the MODEL conversion changes: the GLB cache is keyed on the source model file
 # hash, which does NOT change when the converter does. Both GLB keys had no such token at
 # all, so a converter fix reached only a machine with a cold cache while every test passed.
@@ -211,8 +211,9 @@ def scalable_svg(text: str) -> str:
 
 # Fraction of the drawn content's larger dimension left as breathing room around a refit
 # viewBox, so the art does not touch the tile edge. Small on purpose: the whole point is to
-# fill the tile, and a generous margin re-creates the problem being fixed.
-_REFIT_MARGIN = 0.04
+# fill the tile, and a generous margin re-creates the problem being fixed. Halved from 0.04
+# after the owner said the footprint was still too small to read.
+_REFIT_MARGIN = 0.02
 
 
 def _svg_content_bbox(text: str) -> tuple[float, float, float, float] | None:

@@ -34,15 +34,15 @@ export function PreviewImage({
       alt={`${kind} preview`}
       draggable={false}
       // Fit-to-box and object-contain so the small-intrinsic KiCad SVG upscales without
-      // clipping. The padding is the SAME for both kinds and deliberately small: the backend
-      // refits every preview's viewBox to the art it actually draws and bakes a 4% margin in,
-      // so the SVG arrives already framed and the tile only owes it a hairline of separation.
+      // clipping. The backend refits every preview's viewBox to the art it actually draws and
+      // bakes a 2% margin in, so the SVG arrives already framed and the tile owes it very little.
       // The footprint used to carry `p-10` on the belief that its box hugged the pads and would
       // otherwise fill the tile. The box did NOT hug the pads (kicad-cli sized it from undrawn
       // silkscreen and text), and 80px of padding inside a 111px tile left 31px to draw in - so
       // the "footprint preview is a near-invisible sliver" complaint was mostly THIS, not the
-      // render. Measured after: the land pattern went from 28px to 87px tall in the same tile.
-      className="h-full w-full object-contain p-3"
+      // render. It keeps LESS padding than the symbol because a land pattern is sparse line-and-pad
+      // art that needs every pixel to read, while a symbol carries its own internal whitespace.
+      className={"h-full w-full object-contain " + (kind === "footprint" ? "p-1" : "p-3")}
       // The KiCad SVGs are black line-art; invert(0.66) turns black -> the SAME neutral gray
       // (~#a8a8ac) the 3D model renders in, so the symbol / footprint / 3D read as one set on
       // both themes (a mid gray shows on the light card AND the dark card).

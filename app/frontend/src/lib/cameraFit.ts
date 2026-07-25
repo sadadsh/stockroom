@@ -9,6 +9,16 @@
  * that changes.
  */
 
+/**
+ * How much further back than the exact fit the camera sits, as a multiplier.
+ *
+ * This was 0.98 - INSIDE the exact fit, so the subject touched the frame edges and, at some
+ * auto-rotate angles, crossed them. The owner's words: the model "should be zoomed out to show the
+ * whole thing". A margin above 1 is what guarantees the whole subject stays visible through a full
+ * rotation instead of only at the angle it was fitted from.
+ */
+export const FIT_MARGIN = 1.15;
+
 /** An axis-aligned box in scene units, as plain numbers. */
 export type Box = { min: [number, number, number]; max: [number, number, number] };
 
@@ -61,7 +71,7 @@ export function visibleBounds(boxes: Box[]): Bounds | null {
  * The floor matters: a camera sitting exactly on its target has no view direction and renders
  * nothing, so a degenerate scene still gets a usable distance rather than 0.
  */
-export function fitDistance(radius: number, fovDeg: number, aspect: number, pad = 0.98): number {
+export function fitDistance(radius: number, fovDeg: number, aspect: number, pad = FIT_MARGIN): number {
   const halfFov = (fovDeg * Math.PI) / 180 / 2;
   const vertical = radius / Math.sin(halfFov);
   const horizontal = vertical / Math.min(1, aspect || 1);
