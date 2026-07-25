@@ -989,6 +989,37 @@ export function useSyncProjectHygiene() {
   });
 }
 
+// Where the LIBRARY's binary payloads are stored, and what the library repo is still sharing that
+// it should not. Both are library-repo facts, so they invalidate together after either action.
+export function useLibraryLfs() {
+  return useQuery({ queryKey: ["library-lfs"], queryFn: () => api.getLibraryLfs() });
+}
+
+export function useLibraryHygiene() {
+  return useQuery({ queryKey: ["library-hygiene"], queryFn: () => api.getLibraryHygiene() });
+}
+
+function useInvalidateLibrarySync() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: ["library-lfs"] });
+    qc.invalidateQueries({ queryKey: ["library-hygiene"] });
+    // both commit to the library repo, so its history and sync state move too
+    qc.invalidateQueries({ queryKey: ["sync-status"] });
+    qc.invalidateQueries({ queryKey: ["library-history"] });
+  };
+}
+
+export function useAdoptLibraryLfs() {
+  const invalidate = useInvalidateLibrarySync();
+  return useMutation({ mutationFn: () => api.adoptLibraryLfs(), onSuccess: invalidate });
+}
+
+export function useSyncLibraryHygiene() {
+  const invalidate = useInvalidateLibrarySync();
+  return useMutation({ mutationFn: () => api.syncLibraryHygiene(), onSuccess: invalidate });
+}
+
 // Which library version this project is pinned to (Batch 2 item 2). Read-only, so it is safe to
 // fetch whenever the Health tab is open.
 export function useLibraryPin(id: string | null) {

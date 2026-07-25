@@ -1523,6 +1523,37 @@ export interface HygieneResult extends HygieneRead {
   committed: string | null;
 }
 
+// GET/POST /api/library/lfs -- where the library's BINARY payloads are stored.
+//
+// Without git-lfs every captured part adds a permanent, un-GC-able copy of its .PcbLib / .SchLib /
+// .step to history for everyone who will ever clone the library, so clone size only ever grows.
+export interface LibraryLfsStatus {
+  // is the `git lfs` binary reachable at all, and which version
+  installed: boolean;
+  version: string;
+  // is the filter wired into THIS repository. Attributes naming `filter=lfs` are INERT without it:
+  // git stores the file normally and reports nothing, so this is the flag that decides truth.
+  enabled: boolean;
+  // patterns git-lfs believes it is handling, read from git-lfs rather than parsed out of a file
+  tracked_patterns: string[];
+  // files currently stored as pointers
+  objects: number;
+  // tracked files matching an LFS pattern that are STILL ordinary blobs, i.e. committed before
+  // adoption. Converting them needs a history rewrite plus a force-push, which this project
+  // forbids, so the number is reported and never silently "fixed".
+  legacy_blobs: number;
+  // what adoption WOULD route through LFS, so the offer is concrete rather than a promise
+  covers: string[];
+  adopted: boolean;
+  reason: string;
+}
+
+export interface LibraryLfsResult extends LibraryLfsStatus {
+  writes: string[];
+  untracked: string[];
+  committed: string | null;
+}
+
 // GET/POST /api/projects/{id}/library-pin -- the library-version pin.
 //
 // A project and the library are two SEPARATE git repos, so two peers can sit on the identical

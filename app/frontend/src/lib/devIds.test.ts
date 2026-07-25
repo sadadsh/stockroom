@@ -6,7 +6,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // by-id map — the four ways the hand-authored list could silently rot.
 // Bump this when a dev id is deliberately added or removed. It is a drift alarm, not a target: a
 // change here should always accompany a real catalogue change in the same commit.
-const EXPECTED_ENTRIES = 226;
+const EXPECTED_ENTRIES = 231;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
