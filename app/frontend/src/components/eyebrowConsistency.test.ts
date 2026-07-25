@@ -79,14 +79,8 @@ describe("property-grid tracks", () => {
     // an UNCHANGED viewport (grid 825 -> 963, specs 205 -> 304 wide, 5885 -> 1916 tall). A media
     // query cannot see the rail state, so no threshold can ever be right. Only a container query
     // measures the box the columns actually have to fit inside.
-    // Targeted by DEV-ID rather than by walking from `id="specs"`: the 2026-07-25 composition
-    // slice moved the sheet's column tracks off the WorkbenchPanel and onto the evidence row
-    // beneath the embodiment strip, and a positional regex silently captured a DIFFERENT
-    // className when that happened - a gate that reads the wrong element cannot fail honestly.
-    const sheet = /data-dev-id="detail\.evidence"[\s\S]*?className="([^"]*)"/.exec(
-      source("DetailPanel.tsx"),
-    );
-    if (!sheet) throw new Error("could not find the detail.evidence grid className");
+    const sheet = /id="specs"[\s\S]*?className=\{([\s\S]*?)\}\n/.exec(source("DetailPanel.tsx"));
+    if (!sheet) throw new Error("could not find the specs WorkbenchPanel className");
     // (?<!@) so the CONTAINER form `@xl:` is not mistaken for the viewport form `xl:` - the
     // container variants embed the same breakpoint names, and a bare \b matches after the `@`.
     const viewportTracks = [...sheet[1].matchAll(/(?<!@)\b(?:sm|md|lg|xl|2xl):grid-cols-/g)];

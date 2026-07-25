@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitDistance, visibleBounds } from "./cameraFit";
+import { fitDistanceForBox, halfExtents, fitDistance, visibleBounds } from "./cameraFit";
 
 /**
  * The 3D viewer framed itself from the MODEL's bounds alone, captured once at load. The board and
@@ -89,5 +89,117 @@ describe("fitDistance", () => {
     expect(portrait).toBeGreaterThan(landscape);
     // and the gap is large enough to be plainly visible, not a rounding difference
     expect(portrait / landscape).toBeGreaterThan(1.5);
+  });
+});
+
+describe("fitDistanceForBox", () => {
+  const ISO: [number, number, number] = [0.55, 0.42, 1];
+  // The owner's real part: a 3.5 x 1.4mm USON-14, about 0.6mm tall. Half-extents.
+  const PART: [number, number, number] = [1.75, 0.3, 0.7];
+
+  it("frames a flat part far closer than its enclosing sphere does", () => {
+    // THE POINT OF THE FUNCTION. The sphere radius is set by the part's LONG diagonal while the
+    // silhouette is set by the short one, so a sphere fit backs off for space nothing occupies.
+    // Measured on screen before this: ~37% of frame height at a 494x240 stage.
+    const sphere = fitDistance(Math.hypot(3.5, 0.6, 1.4) / 2, 45, 494 / 240);
+    const box = fitDistanceForBox(PART, ISO, 45, 494 / 240);
+    expect(box).toBeLessThan(sphere);
+    // ~1.27x closer, so the part reads about a quarter larger. NOT the ~2.2x an ORTHOGRAPHIC
+    // projection of the same box suggests: the first version of this function assumed every corner
+    // sat at the target's depth, promised that 2.2x, and rendered the part cropped on two edges.
+    // The honest figure is smaller because the box is deep relative to the viewing distance.
+    expect(sphere / box).toBeGreaterThan(1.2);
+    expect(sphere / box).toBeLessThan(1.4);
+  });
+
+  it("backs off further for a DEEP box than a flat one with the same silhouette", () => {
+    // The perspective property itself, stated directly. Two boxes with the same width and height
+    // but different depth along the view axis do NOT fit at the same distance, because the nearer
+    // face of the deep one projects larger. An orthographic fit returns the same answer for both,
+    // which is exactly the bug this replaced.
+    const flat = fitDistanceForBox([1.75, 0.3, 0.05], ISO, 45, 2);
+    const deep = fitDistanceForBox([1.75, 0.3, 1.75], ISO, 45, 2);
+    expect(deep).toBeGreaterThan(flat);
+  });
+
+  it("is safe through a full turn of the idle spin", () => {
+    // The property the enclosing sphere existed to provide, and the one a naive tight box fit
+    // loses. Asserted on the REAL geometry: rotate the eight corners about Y, project them onto
+    // the camera's screen axes at the fitted distance, and require every corner to land inside
+    // the frustum at every angle.
+    //
+    // (An earlier version of this test rotated the AXIS-ALIGNED box and fed it back through the
+    // function. That double-counts - the function already sweeps the footprint internally - so it
+    // failed against a fit that was actually correct. Test the projection, not the helper.)
+    const fov = 45;
+    const aspect = 2.0;
+    const d = fitDistanceForBox(PART, ISO, fov, aspect);
+    const t = Math.tan((fov * Math.PI) / 180 / 2);
+
+    // camera basis for ISO, mirroring the module
+    const L = Math.hypot(...ISO);
+    const dir = ISO.map((v) => v / L) as [number, number, number];
+    const horiz = Math.hypot(dir[0], dir[2]);
+    const right: [number, number, number] = [dir[2] / horiz, 0, -dir[0] / horiz];
+    const up: [number, number, number] = [
+      dir[1] * right[2] - dir[2] * right[1],
+      dir[2] * right[0] - dir[0] * right[2],
+      dir[0] * right[1] - dir[1] * right[0],
+    ];
+    const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+    // The half-frame at each corner's OWN depth. A perspective frustum widens with distance, so a
+    // corner nearer the camera has less room than one further away - checking every corner against
+    // the frame at the target's depth is the orthographic mistake this test exists to catch.
+
+    for (let deg = 0; deg < 360; deg += 5) {
+      const th = (deg * Math.PI) / 180;
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            const x0 = sx * PART[0];
+            const z0 = sz * PART[2];
+            // rotate the corner about the vertical axis
+            const corner = [
+              x0 * Math.cos(th) + z0 * Math.sin(th),
+              sy * PART[1],
+              -x0 * Math.sin(th) + z0 * Math.cos(th),
+            ];
+            const depth = d - dot(corner, dir);
+            expect(Math.abs(dot(corner, up))).toBeLessThanOrEqual(depth * t + 1e-9);
+            expect(Math.abs(dot(corner, right))).toBeLessThanOrEqual(depth * t * aspect + 1e-9);
+          }
+        }
+      }
+    }
+  });
+
+  it("backs off further for a narrower frame, never closer", () => {
+    const wide = fitDistanceForBox(PART, ISO, 45, 2.5);
+    const square = fitDistanceForBox(PART, ISO, 45, 1);
+    const tall = fitDistanceForBox(PART, ISO, 45, 0.5);
+    expect(tall).toBeGreaterThan(square);
+    expect(square).toBeGreaterThanOrEqual(wide);
+  });
+
+  it("handles a straight-down view without producing NaN", () => {
+    // The Top view makes the direction parallel to world up, so the camera basis is degenerate.
+    const d = fitDistanceForBox(PART, [0, 1, 0.0001], 45, 1.6);
+    expect(Number.isFinite(d)).toBe(true);
+    expect(d).toBeGreaterThan(0);
+  });
+
+  it("never returns 0 for a degenerate box", () => {
+    expect(fitDistanceForBox([0, 0, 0], ISO, 45, 1)).toBeGreaterThan(0);
+  });
+
+  it("halfExtents measures the union about its centre", () => {
+    const h = halfExtents([
+      { min: [-1, 0, -2], max: [1, 1, 2] },
+      { min: [-3, -1, 0], max: [0, 0, 1] },
+    ]);
+    // x spans -3..1 => half 2; y spans -1..1 => half 1; z spans -2..2 => half 2
+    expect(h).toEqual([2, 1, 2]);
+    expect(halfExtents([])).toBeNull();
   });
 });

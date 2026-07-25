@@ -18,7 +18,12 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { orientUpright } from "./modelOrient";
-import { type Box, fitDistance as computeFitDistance, visibleBounds } from "./cameraFit";
+import {
+  type Box,
+  fitDistanceForBox,
+  halfExtents,
+  visibleBounds,
+} from "./cameraFit";
 
 /** The canonical viewing directions. `iso` is the default 3/4; `top` looks straight down at the
  *  land pattern; `front` is the side elevation, which is how a datasheet draws package height. */
@@ -254,7 +259,13 @@ export function mountModelScene(
   const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   let realisticMaterial: THREE.MeshPhysicalMaterial | null = null;
   let xrayMaterial: THREE.MeshPhysicalMaterial | null = null;
-  const layers: LayerVisibility = { model: true, pads: true, board: true };
+  // Pads and board default OFF, and the CONTROL's defaults must match these or the chips report a
+  // state the scene is not in. Both layers are BUILT as soon as a land pattern is available (see
+  // setLandPattern) and these flags only decide visibility, so either can be switched on
+  // independently. Before this, the board mesh was only ever CONSTRUCTED inside setLandPattern, and
+  // setLandPattern was only called by the Pads toggle - so at load the PCB chip read "on" while no
+  // board existed at all, and turning PCB on by itself did nothing.
+  const layers: LayerVisibility = { model: true, pads: false, board: false };
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -407,7 +418,7 @@ export function mountModelScene(
     renderer.setSize(w, h);
     composer.setSize(w, h);
     // REFIT, do not just restretch. The required distance is a function of the ASPECT
-    // (`computeFitDistance(radius, fov, aspect)`), because a perspective fov is VERTICAL and a
+    // (`fitDistanceForBox(half, dir, fov, aspect)`), because a perspective fov is VERTICAL and a
     // wide frame is therefore width-limited while a tall one is height-limited. Updating the
     // aspect without recomputing the distance leaves the camera at the distance the OLD shape
     // needed, so the subject is mis-framed until something else happens to refit.
@@ -500,11 +511,20 @@ export function mountModelScene(
     const bounds = visibleBounds(boxes);
     if (!bounds || bounds.radius <= 0) return; // all hidden: hold the last good frame, don't lurch
     const centre = new THREE.Vector3(...bounds.centre);
-    fitDistance = computeFitDistance(bounds.radius, camera.fov, camera.aspect);
     // preserve the current viewing DIRECTION relative to the target; only the distance moves.
     const direction = camera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(...VIEW_DIRECTIONS.iso);
     direction.normalize();
+    // Fit the BOX, not its enclosing sphere. A sphere fit is exact for a sphere and wasteful for a
+    // component package: its radius comes from the long diagonal while the on-screen silhouette
+    // comes from the short one, so the camera backed off for space nothing occupied. MEASURED on
+    // the owner's 3.5x1.4x0.6mm part at a 494x240 stage: the part covered ~37% of the frame height
+    // at a correct sphere fit. The box fit is still safe through the whole idle spin - it projects
+    // the footprint's SWEPT circle, so no angle can grow out of the frame.
+    const half = halfExtents(boxes);
+    fitDistance = half
+      ? fitDistanceForBox(half, direction.toArray(), camera.fov, camera.aspect)
+      : bounds.radius * 4;
     // Orbit the CENTRE of what is visible, not the origin. The part is centred on the origin but
     // the board and pads hang below it, so an origin-locked target framed the subject low with a
     // large empty band above it.

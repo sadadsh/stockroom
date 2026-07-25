@@ -134,16 +134,22 @@ export function HandoffBand({
     .join(" and ");
 
   return (
+    // `@container`: the cell count must react to THIS BAND's width, not the sheet's. The band
+    // lives at the top of the Specifications COLUMN (~392px), while the sheet container is the
+    // whole pane (~1041px) - so sheet-relative breakpoints put four cells in a 392px column, at
+    // ~95px each, and "TPD6E05U06RVZR" broke mid-word while "MANUFACTURER" truncated to
+    // "MANUFACT...". Measured. This is the same lesson the sheet grid already learned: query the
+    // box the content actually has, never an ancestor that happens to be wider.
     <section
       data-dev-id="detail.handoff"
       aria-label="EDA Handoff"
-      className="flex flex-none flex-col rounded-card border border-line bg-surface"
+      className="@container flex flex-none flex-col rounded-card border border-line bg-surface"
     >
       <header className="flex items-center gap-3 border-b border-line px-3 py-1.5">
         <span className={EYEBROW_DENSE}>
           <Text id="detail.handoff">EDA Handoff</Text>
         </span>
-        <span className="ml-auto truncate text-2xs text-t3">
+        <span className="ml-auto min-w-0 truncate text-2xs text-t3">
           {/* States the SET, so the band is answerable at a glance without reading every cell.
               The count is of curated fields actually filled - it is the sentence a person needs
               before placing the part, and nothing on the sheet used to say it. */}
@@ -153,12 +159,16 @@ export function HandoffBand({
           >
             {ready} of {total} ready
           </span>
-          <span className="text-t3"> for {toolNames}</span>
+          {/* hidden in a narrow band: the COUNT is the load-bearing half, and the tool names
+              are what push the header into a truncation nobody can read */}
+          <span className="hidden text-t3 @sm:inline"> for {toolNames}</span>
         </span>
       </header>
       {/* Two rows of four at full width, collapsing with the sheet. Description spans the last two
           cells because it is prose and a 200px cell would show three words of it. */}
-      <div className="grid grid-cols-1 gap-px bg-line @xl:grid-cols-2 @4xl:grid-cols-4">
+      {/* Two cells across in a normal Specifications column, three only when it is genuinely
+          wide. Container-relative: @sm is 24rem, @2xl is 42rem, measured against the band. */}
+      <div className="grid grid-cols-1 gap-px bg-line @sm:grid-cols-2 @2xl:grid-cols-3">
         {resolved.map(({ field, value }) => (
           <HandoffCell
             key={field.key}
@@ -168,7 +178,7 @@ export function HandoffBand({
             // A field only ONE tool receives is the exception worth marking. Marking every cell
             // with both tools would be eight identical badges saying nothing.
             only={field.tools.length === 1 ? (edaTool(field.tools[0])?.label ?? "") : ""}
-            className={field.key === "description" ? "@4xl:col-span-2" : ""}
+            className={field.key === "description" ? "col-span-full" : ""}
             edit={
               field.key === "category"
                 ? onMoveCategory && categories?.length

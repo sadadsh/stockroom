@@ -77,3 +77,106 @@ export function fitDistance(radius: number, fovDeg: number, aspect: number, pad 
   const horizontal = vertical / Math.min(1, aspect || 1);
   return Math.max(Math.max(vertical, horizontal) * pad, 1e-3);
 }
+
+/**
+ * How far back the camera must sit for a BOX to fit the frame, from a given viewing direction,
+ * and still fit through a full turn of the idle spin.
+ *
+ * WHY this exists beside `fitDistance`. That one fits the enclosing SPHERE, which is exact for a
+ * sphere and wasteful for anything else - and a component package is about as far from spherical
+ * as a subject gets. Measured on the owner's part (a 3.5 x 1.4 x 0.6mm USON-14) at a 494x240 stage:
+ * the sphere fit put the camera at 5.74 scene units and the part's silhouette covered ~37% of the
+ * frame height. The part is not small; the SPHERE AROUND IT is big, because its radius is set by
+ * the long diagonal while the silhouette is set by the short one.
+ *
+ * The bound is still rotation-safe, which is the property the sphere was there to provide. The idle
+ * spin turns the subject about the VERTICAL axis only, so:
+ *   - the vertical half-extent `hy` never changes;
+ *   - the horizontal footprint sweeps a circle of radius `hypot(hx, hz)`, whatever the angle.
+ * Projecting that swept cylinder onto the screen axes gives a worst case over every rotation, so
+ * the frame is computed once and the subject cannot grow out of it mid-spin.
+ *
+ * Returns the distance from the box centre along `dir`.
+ */
+export function fitDistanceForBox(
+  half: [number, number, number],
+  dir: [number, number, number],
+  fovDeg: number,
+  aspect: number,
+  pad = FIT_MARGIN,
+): number {
+  const [hx, hy, hz] = half.map(Math.abs) as [number, number, number];
+
+  // Camera basis. `right` is perpendicular to the view direction and to world up; `up` completes
+  // it. Looking straight down (the Top view) makes `dir` parallel to world up and the cross
+  // product degenerate, so fall back to a fixed right vector - at that angle the swept footprint
+  // is symmetric about the view axis, so any choice gives the same answer.
+  const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+  const d: [number, number, number] = [dir[0] / len, dir[1] / len, dir[2] / len];
+  const horiz = Math.hypot(d[0], d[2]);
+  const right: [number, number, number] =
+    horiz < 1e-6 ? [1, 0, 0] : [d[2] / horiz, 0, -d[0] / horiz];
+  const up: [number, number, number] = [
+    d[1] * right[2] - d[2] * right[1],
+    d[2] * right[0] - d[0] * right[2],
+    d[0] * right[1] - d[1] * right[0],
+  ];
+
+  const halfFov = (fovDeg * Math.PI) / 180 / 2;
+  const t = Math.tan(halfFov);
+  const a = aspect > 0 ? aspect : 1;
+  const dot = (p: number[], q: number[]) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+
+  // PERSPECTIVE, not orthographic. This is where the first version of this function was wrong and
+  // the error was invisible in the maths: it projected the box as though every corner sat at the
+  // TARGET's depth. Under perspective a corner nearer the camera projects larger, and a component
+  // package is deep relative to how far away it is - MEASURED on the owner's part, the box reached
+  // 1.75mm toward a camera only 2.5mm out, so the near corners overflowed a frame the flat
+  // projection called a comfortable fit, and the part rendered cropped on two edges.
+  //
+  // For a corner `p` (about the box centre) the camera at distance `d` along `dir` sees it at
+  // depth `d - dot(p, dir)`, so it stays inside the frustum when
+  //     |dot(p, up)|    <= (d - dot(p, dir)) * t
+  //     |dot(p, right)| <= (d - dot(p, dir)) * t * aspect
+  // Solving each for `d` and taking the largest over every corner gives the exact fit.
+  let needed = 0;
+  // Rotation samples: the idle spin turns the subject about the vertical axis, so the frame has to
+  // hold at EVERY angle, not just the one it was fitted from. Sampling beats a closed form here
+  // because the binding corner changes with angle; 72 steps is every 5 degrees, and the function
+  // runs once per refit rather than per frame.
+  const STEPS = 72;
+  for (let i = 0; i < STEPS; i++) {
+    const th = (i / STEPS) * Math.PI * 2;
+    const c = Math.cos(th);
+    const s = Math.sin(th);
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const x0 = sx * hx;
+          const z0 = sz * hz;
+          const p = [x0 * c + z0 * s, sy * hy, -x0 * s + z0 * c];
+          const depthOffset = dot(p, d);
+          const vertical = depthOffset + Math.abs(dot(p, up)) / t;
+          const horizontal = depthOffset + Math.abs(dot(p, right)) / (t * a);
+          needed = Math.max(needed, vertical, horizontal);
+        }
+      }
+    }
+  }
+  return Math.max(needed * pad, 1e-3);
+}
+
+/** The half-extents of a set of boxes about their common centre, for `fitDistanceForBox`. */
+export function halfExtents(boxes: Box[]): [number, number, number] | null {
+  if (boxes.length === 0) return null;
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  for (const { min, max } of boxes) {
+    for (let axis = 0; axis < 3; axis++) {
+      lo[axis] = Math.min(lo[axis], min[axis], max[axis]);
+      hi[axis] = Math.max(hi[axis], min[axis], max[axis]);
+    }
+  }
+  if (!lo.every(Number.isFinite) || !hi.every(Number.isFinite)) return null;
+  return [(hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2];
+}
