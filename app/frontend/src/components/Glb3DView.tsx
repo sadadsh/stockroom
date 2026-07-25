@@ -42,7 +42,7 @@ export function Glb3DView({
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>(null);
   const [showLand, setShowLand] = useState(false);
-  const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
+  const [renderMode, setRenderMode] = useState<RenderMode>("original");
   const [showModel, setShowModel] = useState(true);
   const [showBoard, setShowBoard] = useState(true);
 
@@ -169,6 +169,12 @@ export function Glb3DView({
 // The dev-id is written out in FULL rather than built as `detail.model-view-${mode}`: the parity
 // gate scans source text, so an interpolated id is invisible to it and to anyone grepping for it.
 const SHADING: { mode: RenderMode; label: string; hint: string; devId: string }[] = [
+  {
+    mode: "original",
+    label: "Original",
+    hint: "The colours the downloaded model actually ships with",
+    devId: "detail.model-shade-original",
+  },
   {
     mode: "realistic",
     label: "Realistic",

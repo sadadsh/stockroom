@@ -101,6 +101,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.model-board",
   "detail.model-show-model",
   "detail.model-show-board",
+  "detail.model-shade-original",
   "detail.model-shade-realistic",
   "detail.model-shade-studio",
   "detail.model-shade-xray",
