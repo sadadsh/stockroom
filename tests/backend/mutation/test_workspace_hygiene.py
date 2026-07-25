@@ -284,6 +284,25 @@ def test_adopting_lfs_writes_the_rules_AND_wires_the_filter_in_one_operation(tmp
 
 
 @needs_lfs
+def test_adoption_writes_the_filter_into_THIS_repo_even_when_git_lfs_is_installed_globally(
+    tmp_path,
+):
+    """A real bug, found by reading `.git/config` after an adoption that reported success.
+
+    `git lfs install` writes to the GLOBAL config by default, and a config lookup resolves global
+    too, so on any machine where the developer has ever run it the "is it enabled" check passed and
+    the repo-LOCAL config was never written. The adoption then depended on a per-machine global
+    that a fresh clone, a CI runner or a colleague does not have.
+    """
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n"})
+    apply_hygiene(root, ["altium"], repo=repo, lfs=True)
+
+    # asserted against the repo's OWN config file, never through a lookup that global can satisfy
+    local = (root / ".git" / "config").read_text(encoding="utf-8")
+    assert "lfs" in local
+
+
+@needs_lfs
 def test_a_later_routine_sync_does_not_silently_un_adopt_lfs(tmp_path):
     """The quiet way a feature gets turned off: someone syncs hygiene for an unrelated reason and
     the attributes revert to the non-LFS form. Adoption is read back from the repo itself."""

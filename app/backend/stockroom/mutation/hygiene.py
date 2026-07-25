@@ -154,7 +154,14 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
     # The filter has to exist BEFORE the attributes are committed, or the very commit that adopts
     # LFS stores its own payloads as ordinary blobs. Idempotent, and it only touches this repo's
     # config, never the user's global git.
-    if use_lfs and not lfs_backend.repo_enabled(repo):
+    #
+    # UNCONDITIONAL on purpose, and this was a real bug: `repo_enabled` resolves git config, which
+    # includes the GLOBAL file, and `git lfs install` writes there by default. So on any machine
+    # where the developer has ever run `git lfs install`, the check passed and the repo-LOCAL
+    # config was never written, leaving the adoption dependent on a per-machine global that a
+    # clone, a CI runner or a colleague does not have. Caught on 2026-07-25 by looking at
+    # `.git/config` after an adoption that reported success.
+    if use_lfs:
         lfs_backend.enable(repo)
     if not writes and not untrack:
         return {"writes": [], "untracked": [], "committed": None}
