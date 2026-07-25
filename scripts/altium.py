@@ -36,12 +36,50 @@ No em dashes anywhere (standing owner rule).
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-X2 = Path("/mnt/c/Program Files/Altium/AD26/X2.EXE")
+def _find_x2() -> Path | None:
+    """The newest installed Altium `X2.EXE`, DISCOVERED rather than hardcoded.
+
+    `AD26` is one version on one machine (owner's rule, 2026-07-25: build for the general case, not
+    your machine). Every install root and both Program Files locations are globbed and the highest
+    version wins; `ALTIUM_X2` overrides for an install somewhere unusual.
+    """
+    override = os.environ.get("ALTIUM_X2")
+    if override:
+        return Path(override)
+    found: list[tuple[tuple[int, ...], Path]] = []
+    for root in ("/mnt/c/Program Files/Altium", "/mnt/c/Program Files (x86)/Altium"):
+        base = Path(root)
+        if not base.is_dir():
+            continue
+        for child in base.iterdir():
+            exe = child / "X2.EXE"
+            if exe.exists():
+                digits = "".join(ch for ch in child.name if ch.isdigit())
+                found.append(((int(digits) if digits else 0,), exe))
+    if not found:
+        return None
+    return sorted(found)[-1][1]
+
+
+X2 = _find_x2() or Path("/mnt/c/Program Files/Altium/AD26/X2.EXE")
+
+
+def _scratch_dir() -> Path:
+    """A Windows-visible scratch dir for the generated .bat, taken from the real TEMP rather than a
+    literal. Falls back only if TEMP cannot be read."""
+    win_temp = _powershell("$env:TEMP").strip()
+    if win_temp:
+        out = subprocess.run(["wslpath", "-u", win_temp], capture_output=True, text=True)
+        cand = Path(out.stdout.strip() or "")
+        if cand and cand.is_dir():
+            return cand
+    return Path("/mnt/c/Windows/Temp")
 
 _PS_LIST = (
     "Get-Process X2 -ErrorAction SilentlyContinue | "
@@ -111,6 +149,7 @@ def processes() -> list[tuple[int, str]]:
 
 
 def cmd_status(_args) -> int:
+    print(f"Altium binary: {X2.as_posix()}" + ("" if X2.exists() else "   (NOT FOUND)"))
     procs = processes()
     if not procs:
         print("Altium: not running (the license seat is free)")
@@ -217,12 +256,10 @@ def cmd_run(args) -> int:
     #
     # A native-Windows caller does not have this problem (CreateProcess has no `|` and does not
     # re-escape quotes), so this is specifically about crossing the WSL boundary.
-    bat = Path("/mnt/c/srtmp"); bat.mkdir(parents=True, exist_ok=True)
-    bat_file = bat / "sr-altium-run.bat"
+    bat_file = _scratch_dir() / "sr-altium-run.bat"
     bat_file.write_text(
         "@echo off\r\n"
-        f'"{X2.as_posix().replace("/mnt/c/", "C:/").replace("/", chr(92))}" '
-        f'{invocation.replace("|", "^|")}\r\n',
+        f'"{_win_path(str(X2))}" {invocation.replace("|", "^|")}\r\n',
         encoding="utf-8",
     )
     proc = subprocess.Popen(["cmd.exe", "/c", _win_path(str(bat_file))],
