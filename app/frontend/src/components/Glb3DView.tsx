@@ -104,7 +104,7 @@ export function Glb3DView({
       <div ref={mountRef} className="min-h-0 w-full flex-1" data-testid="model-canvas" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex flex-none flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-1.5 py-1"
+        className="flex flex-none flex-wrap items-center justify-start gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
       >
       <div data-dev-id="detail.model-layers" className="flex items-center gap-2">
         <div className="flex items-center gap-0.5">
