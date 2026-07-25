@@ -566,7 +566,7 @@ export function DetailPanel({
               Filing is gone from here deliberately: the category is an EDA handoff field and now
               has exactly one home, in the band above. Two controls for one value is how a sheet
               starts disagreeing with itself. */}
-          <div className="flex flex-none flex-col gap-1.5">
+          <div className="flex w-full flex-none flex-col gap-1.5 @2xl:max-w-[420px]">
             <ReadinessBlock
               kicad={kicad}
               altium={altium}
@@ -1382,12 +1382,22 @@ function AssetTile({
 // Specifications track is the WIDE one (537px measured at an 825px container), and holding the
 // narrow 7rem track there truncated real labels - "Operating Tempera...", "Moisture Sensitivit...".
 // A label clipped to an ellipsis has lost the same information a clipped value would.
+//
+// A THIRD tier at @4xl (2026-07-25). The composition slice took the Specifications column from 392
+// to 511px, but the label track did not move with it, so real labels were STILL truncated in the
+// wider column - "Current - Peak Pulse (10/100...", "Voltage - Clamping (Max) @ I..." - while the
+// value beside them ("40 W", "HDMI", "3000") left most of its track empty. Widening the column
+// without widening the label track fixed nothing a reader can see: the parameter NAME is what the
+// ellipsis was eating, and two parameters that differ only past the cut are indistinguishable.
+// 14rem is measured against the longest real labels on this part rather than guessed.
 const SPEC_ROW_GRID =
   "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] " +
-  "@2xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] items-baseline gap-3";
+  "@2xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] " +
+  "@4xl:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] items-baseline gap-3";
 const ALT_ROW_GRID =
   "grid grid-cols-[minmax(0,calc(7rem-7px))_minmax(0,1fr)_auto] " +
-  "@2xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
+  "@2xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] " +
+  "@4xl:grid-cols-[minmax(0,calc(14rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
 
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
