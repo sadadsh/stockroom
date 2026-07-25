@@ -59,6 +59,32 @@ PROBE_JS = """() => {
 }"""
 
 
+# How long a real UI transition is allowed to take before we call it a failure. A ceiling, never a
+# detector: every wait below polls for the element it actually needs and returns the instant it is
+# there, so this only bounds how long a genuine failure takes to report. A fixed sleep in its place
+# reported "the parts list is empty" on any machine slower than the sleep - a WRONG answer, not a
+# slow one, which is exactly what a clock-as-detector produces.
+_UI_TIMEOUT_MS = 10_000
+
+
+def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
+    """True once `locator` is actually visible, polled. False if it never shows within the ceiling.
+
+    This is the success signal a `wait_for_timeout` was standing in for. It returns as soon as the
+    element is there (usually far under the ceiling), and a False here means the element genuinely
+    never rendered - so the caller's failure message is a diagnosis rather than a guess.
+    """
+    # imported here, not at module scope: playwright is a dev-only dependency and the rest of this
+    # script's helpers must stay importable without it (the same reason `main` defers its import).
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    try:
+        locator.wait_for(state="visible", timeout=timeout_ms)
+        return True
+    except PlaywrightTimeoutError:
+        return False
+
+
 def _seed_workspace(base: Path) -> tuple[Path, Path]:
     """Build a throwaway library + KiCad project so the PROJECT surfaces can actually be shot.
 
@@ -304,17 +330,19 @@ def _goto_surface(page, surface: str) -> bool:
         if not nav.count():
             return False
         nav.first.click()
-        page.wait_for_timeout(1500)
+        # WAIT ON THE THING, not on a clock. A fixed sleep here reported "the parts list is empty"
+        # on any machine slower than the sleep, which is a wrong diagnosis rather than a slow one:
+        # `_appears` polls for the row itself and returns the moment it is there.
         # The row id is `components.row`. This used to look for `list.row`, which matches NOTHING, so
         # the click never happened and the driver returned True regardless - a selector that cannot
-        # fail, reporting a shot it never took. Now an empty list is a failure, loudly.
+        # fail, reporting a shot it never took. Now an absent list is a failure, loudly.
         rows = page.locator('[data-dev-id="components.row"]')
-        if not rows.count():
-            print("  components: the parts list is empty, so a shot would prove nothing")
+        if not _appears(rows.first):
+            print("  components: no part rows ever rendered, so a shot would prove nothing")
             return False
         if surface == "components":
             rows.first.click()
-            page.wait_for_timeout(1200)
+            _appears(page.locator('[data-dev-id="detail.root"]'))
             return True
         # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
         # family, and it is named to sort first. Both disclosures are OPENED, because what is behind
@@ -324,15 +352,23 @@ def _goto_surface(page, surface: str) -> bool:
             print("  part-vendor-data: the seeded probe part is not in the list")
             return False
         probe.first.click()
-        page.wait_for_timeout(1200)
         missing = []
         for dev_id in ("detail.spec-family", "detail.alternates"):
             control = page.locator(f'[data-dev-id="{dev_id}"] button').first
-            if not control.count():
+            if not _appears(control):
                 missing.append(dev_id)
                 continue
             control.click()
-            page.wait_for_timeout(400)
+            # the SUCCESS signal for a disclosure is its own aria-expanded, not a settle delay
+            from playwright.sync_api import expect as _expect
+
+            try:
+                _expect(control).to_have_attribute(
+                    "aria-expanded", "true", timeout=_UI_TIMEOUT_MS
+                )
+            except AssertionError:
+                print(f"  part-vendor-data: {dev_id} did not open when clicked")
+                return False
         if missing:
             # Name WHICH control is absent: "1/2 present" sends the next reader hunting, and the
             # whole reason this surface exists is to make the new controls observable.
