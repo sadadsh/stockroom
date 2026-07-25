@@ -20,11 +20,22 @@ from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import binding, conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, placements, settings_ops, standards
-from stockroom.sexp.document import SexpDocument
+from stockroom.projects import (
+    binding,
+    conform_ops,
+    fab_ops,
+    fill,
+    library_pin,
+    placements,
+    settings_ops,
+    standards,
+)
+from stockroom.projects import fab_export as fab_export_mod
+from stockroom.projects import fields as fields_mod
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_altium_project, audit_project
+from stockroom.sexp.document import SexpDocument
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
 
@@ -1528,6 +1539,92 @@ class ProjectOps:
         tool = rec.eda or "kicad"
         result = apply_hygiene(Path(rec.root), [tool], repo=GitRepo(Path(rec.git_root)))
         return {"project": rec.name, "eda": tool, **result}
+
+    def library_pin_read(self, project_id: str, *, profile: str) -> dict:
+        """Which library version this project is pinned to, and how that compares with the library
+        on THIS machine (Batch 2 item 2).
+
+        Read-only. Raises FileNotFoundError for an unknown id, and ValueError only when the pin file
+        exists but cannot be parsed, which is a real problem to report rather than a state to guess
+        past.
+
+        The tool's path contract rides along because the answer "your library is at the right
+        commit" is only half the peer-sync question: KiCad still has to have SR_LIB pointing at that
+        library, and knowing that is registry data, never something the surface should hardcode.
+        """
+        rec = self._require(project_id)
+        tool = get_tool(rec.eda or "kicad")
+        pc = tool.path_contract
+        pin = library_pin.read_pin(Path(rec.root))
+        verdict = library_pin.evaluate(pin, self.store.repo, profile=profile)
+        return {
+            "project": rec.name,
+            "eda": tool.key,
+            "under_git": bool(rec.git_root),
+            "pinned": pin.to_dict() if pin is not None else None,
+            "path_contract": {
+                "kind": pc.kind,
+                "variable": pc.variable,
+                "config_file": pc.config_file,
+                "prefix": pc.prefix,
+                "description": pc.description,
+            },
+            **verdict.to_dict(),
+        }
+
+    def library_pin_apply(self, project_id: str, *, profile: str, project_repo=None) -> dict:
+        """Record the library's CURRENT commit as this project's pin, as one commit on the
+        project's own git.
+
+        Returns {project, pinned, committed}; `committed` is None when the pin already named this
+        exact version, so re-running never churns the project's history.
+
+        Raises FileNotFoundError (unknown id); ValueError when the project is not under git (a pin
+        that cannot be committed can never reach a peer, which is the only thing it is for), when
+        the library is not under git or has no commit yet (there is no version to pin), or when the
+        pin on disk was written by a NEWER Stockroom (overwriting it would silently discard fields
+        this build does not understand).
+        """
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git, so a library pin could never reach a peer; "
+                "initialize a git repo for it first"
+            )
+        library_repo = self.store.repo
+        if not library_repo.is_git_repo():
+            raise ValueError("the active library is not under git, so it has no version to pin")
+        head = library_repo.head()
+        if not head:
+            raise ValueError("the active library has no commit yet, so there is no version to pin")
+
+        root = Path(rec.root)
+        existing = library_pin.read_pin(root)
+        if existing is not None and existing.is_future_schema():
+            raise ValueError(
+                f"{library_pin.PIN_FILENAME} was written by a newer version of Stockroom "
+                f"(schema {existing.schema}); update Stockroom rather than overwriting it"
+            )
+        pin = library_pin.LibraryPin(
+            profile=profile,
+            remote=library_repo.remote_url(),
+            commit=head,
+            pinned_at=library_pin.now_iso(),
+        )
+        path = library_pin.pin_path(root)
+        # An unchanged pin is a no-op: compare everything EXCEPT the timestamp, which would
+        # otherwise make every read-and-repin a fresh commit saying nothing.
+        if existing is not None and (existing.profile, existing.remote, existing.commit) == (
+            pin.profile, pin.remote, pin.commit
+        ):
+            return {"project": rec.name, "pinned": existing.to_dict(), "committed": None}
+
+        repo = project_repo or GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            txn.track(path)
+            path.write_text(pin.dumps(), encoding="utf-8")
+            sha = txn.commit(f"Pin {rec.name} to library {head[:7]}")
+        return {"project": rec.name, "pinned": pin.to_dict(), "committed": sha}
 
     def restore(self, project_id: str) -> dict:
         """Undo the project's last Prepare / Fill by git-reverting that commit as a new commit

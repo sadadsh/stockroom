@@ -26,8 +26,8 @@ from stockroom.api.schemas import (
     RegisterProjectBody,
     SetDesignRulesBody,
     SetFieldsBody,
-    SetNetclassPatternsBody,
     SetNetClassesBody,
+    SetNetclassPatternsBody,
     SetSettingsBody,
     StackupBody,
 )
@@ -550,6 +550,23 @@ def projects_router(require_token) -> APIRouter:
         # not under git, a dirty tree, or a hand-broken managed block -> 400; a GitError -> 503.
         ctx = request.app.state.ctx
         return ctx.project_ops.hygiene_apply(project_id)
+
+    @r.get("/{project_id}/library-pin")
+    def get_library_pin(request: Request, project_id: str) -> dict:
+        # Which library version this project is pinned to, versus the library on THIS machine
+        # (Batch 2 item 2). Read-only. Unknown id -> 404; an unreadable pin file -> 400. The active
+        # profile comes from the context because a pin is taken against a specific profile, and two
+        # profiles hold different parts inside the same repository.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.library_pin_read(project_id, profile=ctx.profile.name)
+
+    @r.post("/{project_id}/library-pin")
+    def set_library_pin(request: Request, project_id: str) -> dict:
+        # Record the library's current commit as this project's pin, as one commit on the PROJECT's
+        # own git so it travels with the project. Unknown id -> 404; a project or library not under
+        # git, or a pin written by a newer build -> 400; a GitError -> 503.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.library_pin_apply(project_id, profile=ctx.profile.name)
 
     @r.post("/{project_id}/restore")
     def restore(request: Request, project_id: str) -> dict:

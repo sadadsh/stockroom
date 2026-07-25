@@ -113,3 +113,35 @@ def test_a_third_tool_declares_its_binding_as_data_too():
     # A tool that says nothing still has a usable default rather than None, so generic code
     # never has to test for absence.
     assert EdaTool(key="x", label="X").placement_binding.field
+
+
+# -- path contracts: how a library reference resolves the same on a peer's machine ----
+
+
+def test_every_tool_declares_how_its_library_paths_stay_portable():
+    """A project references library assets by path. Whether that path means the same thing on a
+    peer's machine is a fact ABOUT THE TOOL, so it is data here rather than a branch in whatever
+    surface happens to be explaining it."""
+    for tool in all_tools():
+        pc = tool.path_contract
+        assert pc.kind in ("env_var", "relative"), f"{tool.key} declares no path contract kind"
+        assert pc.description, f"{tool.key} declares no path contract description"
+
+
+def test_kicad_resolves_through_an_env_var_and_altium_resolves_relatively():
+    """The concrete asymmetry the pin surface has to explain. KiCad needs SR_LIB set on every
+    machine; an Altium DbLib names its data source relative to its own folder and needs nothing."""
+    kicad = get_tool("kicad").path_contract
+    assert kicad.kind == "env_var"
+    assert kicad.variable == "SR_LIB"
+    assert kicad.config_file == "kicad_common.json"
+    assert kicad.prefix == "${SR_LIB}/"
+
+    altium = get_tool("altium").path_contract
+    assert altium.kind == "relative"
+    assert altium.variable == ""
+
+
+def test_a_tool_that_needs_no_variable_still_has_a_contract():
+    """Generic code must never have to test for absence; an unset contract is still an answer."""
+    assert EdaTool(key="x", label="X").path_contract.kind == "relative"

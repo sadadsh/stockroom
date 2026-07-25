@@ -85,3 +85,11 @@ target-version = "py312"
 # to the formatter, and a couple of pragmatic ignores keep it out of the way.
 select = ["F", "I"]
 ignore = ["F401"]   # an unused import is often a deliberate re-export; ruff-format keeps it tidy
+
+[tool.ruff.lint.isort]
+# `stockroom` lives under app/backend, not at the repo root, so ruff cannot infer that it is OURS
+# and was sorting it into the THIRD-PARTY block. Every existing test in this repo puts a blank line
+# between `import pytest` and the `from stockroom...` imports, so without this declaration `ruff
+# --fix` silently reformats each file it touches AWAY from the repo's own convention, and the
+# reformat looks like a real finding. Declaring it is the fix; reformatting 200 files is not.
+known-first-party = ["stockroom"]

@@ -122,6 +122,41 @@ class GitRepo:
         proc = self._run("rev-parse", "HEAD", check=False)
         return proc.stdout.strip() if proc.returncode == 0 else ""
 
+    def has_commit(self, sha: str) -> bool:
+        """Whether this repo holds `sha` as a real commit object. `cat-file -e <sha>^{commit}`
+        is the cheap existence probe, and the `^{commit}` peel matters: without it a 40-hex string
+        that happens to name a blob or a tag would answer yes and then break every ancestry query
+        built on top of it."""
+        if not (sha or "").strip():
+            return False
+        return self._run("cat-file", "-e", f"{sha}^{{commit}}", check=False).returncode == 0
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool:
+        """Whether `ancestor` is reachable from `descendant`. Exit 0 means yes, 1 means no, and
+        anything else is a real error (a missing object), which must NOT read as "no" -- callers
+        check `has_commit` first so an unknown commit gets its own honest status instead of being
+        silently reported as a divergence."""
+        return self._run(
+            "merge-base", "--is-ancestor", ancestor, descendant, check=False
+        ).returncode == 0
+
+    def count_commits(self, base: str, tip: str) -> int:
+        """How many commits `tip` has that `base` does not (`git rev-list --count base..tip`).
+        Returns 0 when either end is unknown, so a count can never invent distance."""
+        proc = self._run("rev-list", "--count", f"{base}..{tip}", check=False)
+        if proc.returncode != 0:
+            return 0
+        try:
+            return int(proc.stdout.strip())
+        except ValueError:
+            return 0
+
+    def remote_url(self, name: str = "origin") -> str:
+        """The configured URL for `name`, or "" when there is no such remote. This is the only
+        machine-independent IDENTITY a git repo has; a filesystem path is different on every peer."""
+        proc = self._run("remote", "get-url", name, check=False)
+        return proc.stdout.strip() if proc.returncode == 0 else ""
+
     def status_porcelain(self) -> list[str]:
         out = self._run("status", "--porcelain").stdout
         return [line for line in out.splitlines() if line.strip()]
