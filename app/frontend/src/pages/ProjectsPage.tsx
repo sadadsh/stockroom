@@ -115,6 +115,7 @@ import {
   TabStrip,
   type TabItem,
 } from "../components/primitives";
+import { LibraryVersionSection } from "../components/LibraryVersionSection";
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ExternalIcon } from "../components/icons";
@@ -662,6 +663,7 @@ function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }
       {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
       {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
       {caps.has("assign") ? <AssignSection projectId={projectId} /> : null}
+      <LibraryVersionSection projectId={projectId} />
       <SyncHygieneSection projectId={projectId} />
     </>
   );

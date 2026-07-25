@@ -1523,6 +1523,71 @@ export interface HygieneResult extends HygieneRead {
   committed: string | null;
 }
 
+// GET/POST /api/projects/{id}/library-pin -- the library-version pin.
+//
+// A project and the library are two SEPARATE git repos, so two peers can sit on the identical
+// project commit while their libraries differ, and the same footprint reference then resolves to
+// different geometry with nothing in either history saying so. The pin is a lockfile committed into
+// the PROJECT's repo, naming the library commit the project was resolved against.
+export type LibraryPinStatus =
+  | "unpinned"
+  | "match"
+  | "library_ahead"
+  | "library_behind"
+  | "diverged"
+  | "unknown_commit"
+  | "different_library"
+  | "different_profile"
+  | "library_not_git";
+
+// What is recorded in the project's `stockroom-library.json`.
+export interface LibraryPinRecord {
+  schema: number;
+  profile: string;
+  remote: string;
+  commit: string;
+  pinned_at: string;
+}
+
+// How this EDA tool keeps a stored library reference resolving to the same asset on every machine.
+// Registry data, so the surface never hardcodes that `SR_LIB` is a KiCad concept.
+export interface LibraryPathContract {
+  // "env_var": a named variable must be set on each machine. "relative": nothing to set.
+  kind: "env_var" | "relative";
+  variable: string;
+  config_file: string;
+  prefix: string;
+  description: string;
+}
+
+export interface LibraryPinRead {
+  project: string;
+  eda: string;
+  under_git: boolean;
+  pinned: LibraryPinRecord | null;
+  path_contract: LibraryPathContract;
+  status: LibraryPinStatus;
+  // The sentence explaining the status and the one naming the remedy. Both come from the backend
+  // so the two layers can never describe the same state differently.
+  detail: string;
+  remedy: string;
+  // "ok" | "notice" | "problem" -- decided by the backend, never re-derived from the status here.
+  severity: string;
+  ahead: number;
+  behind: number;
+  library_commit: string;
+  library_short: string;
+  library_remote: string;
+  library_profile: string;
+}
+
+export interface LibraryPinResult {
+  project: string;
+  pinned: LibraryPinRecord;
+  // null when the pin already named this exact version, so re-pinning never churns history
+  committed: string | null;
+}
+
 // POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)
 export interface RestoreResult {
   project: string;

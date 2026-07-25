@@ -448,6 +448,9 @@ export function useActivateProfile() {
       // the Altium DbLib status is per-profile (path, counts, profile name), so a switch must
       // refetch it or the section shows the previous profile's data
       qc.invalidateQueries({ queryKey: ["altium-status"] });
+      // a pin is taken against a specific PROFILE, so every project's pin verdict changes on a
+      // switch; without this the Health tab keeps asserting a match against the old profile
+      qc.invalidateQueries({ queryKey: ["library-pin"] });
     },
   });
 }
@@ -480,6 +483,9 @@ export function useDoSync() {
         qc.invalidateQueries({ queryKey: ["parts"] });
         qc.invalidateQueries({ queryKey: ["facets"] });
         qc.invalidateQueries({ queryKey: ["altium-status"] });
+        // a pull moves the library HEAD, which is the one value every pin verdict is compared
+        // against, so a pinned project would otherwise keep reporting the pre-pull answer
+        qc.invalidateQueries({ queryKey: ["library-pin"] });
       }
     },
   });
@@ -977,6 +983,30 @@ export function useSyncProjectHygiene() {
     mutationFn: (id: string) => api.syncProjectHygiene(id),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: ["project-hygiene", id] });
+      qc.invalidateQueries({ queryKey: ["project-revisions", id] });
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+  });
+}
+
+// Which library version this project is pinned to (Batch 2 item 2). Read-only, so it is safe to
+// fetch whenever the Health tab is open.
+export function useLibraryPin(id: string | null) {
+  return useQuery({
+    queryKey: ["library-pin", id],
+    queryFn: () => api.getLibraryPin(id as string),
+    enabled: !!id,
+  });
+}
+
+// Pin the project to the library's current commit. It COMMITS to the project's own git, so the
+// project's git timeline and its record are stale afterwards, as is this query's own verdict.
+export function useSetLibraryPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.setLibraryPin(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["library-pin", id] });
       qc.invalidateQueries({ queryKey: ["project-revisions", id] });
       qc.invalidateQueries({ queryKey: ["project", id] });
     },

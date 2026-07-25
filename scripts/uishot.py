@@ -216,6 +216,7 @@ def _register_seed(page, proj: Path) -> bool:
 _HEALTH_SECTIONS = {
     "project-health": "projects.assign",
     "project-hygiene": "projects.hygiene",
+    "project-library-pin": "projects.library-pin",
 }
 
 
@@ -286,9 +287,9 @@ def _close_surface(page, surface: str) -> None:
 
 
 def run(args) -> int:
-    from playwright.sync_api import sync_playwright
-
     import tempfile
+
+    from playwright.sync_api import sync_playwright
 
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -399,7 +400,7 @@ def main() -> int:
     )
     ap.add_argument("--surface", default="components",
                     choices=["components", "search", "projects", "project-health", "project-hygiene",
-                             "settings", "all"])
+                             "project-library-pin", "settings", "all"])
     ap.add_argument("--seed", action="store_true",
                     help="seed a throwaway library + KiCad project (implied by a project-* surface)")
     ap.add_argument("--themes", default="dark,light", help="comma list: dark,light")
