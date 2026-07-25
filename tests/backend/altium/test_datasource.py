@@ -1,7 +1,7 @@
 import sqlite3
 
 from stockroom.altium.datasource import ALTIUM_COLUMNS, emit_db, row_for
-from stockroom.model.part import AltiumRef, Datasheet, PartRecord, Purchase
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Purchase
 
 
 def _part():
@@ -11,8 +11,10 @@ def _part():
         description="Li-Ion charger, VQFN-16",
         datasheet=Datasheet(source_url="https://ti.com/ds.pdf"),
         purchase=[Purchase(vendor="DigiKey", part_number="296-1", url="https://dk/1", stock=42)],
-        altium_symbol=AltiumRef(lib="BQ24074RGTT.SchLib", name="BQ24074RGTT"),
-        altium_footprint=AltiumRef(lib="BQ24074RGTT.PcbLib", name="VQFN-16"),
+        eda={"altium": EdaAssets(
+            symbol=AssetRef(lib="BQ24074RGTT.SchLib", name="BQ24074RGTT"),
+            footprint=AssetRef(lib="BQ24074RGTT.PcbLib", name="VQFN-16"),
+        )},
     )
 
 
@@ -22,8 +24,10 @@ def _passive():
         mpn="RC0603FR-0710KL", manufacturer="Yageo", value="",
         description="10 kOhm 1% 0603",
         specs={"Resistance": "10 kOhms"},
-        altium_symbol=AltiumRef(lib="rc0603.SchLib", name="RC0603"),
-        altium_footprint=AltiumRef(lib="rc0603.PcbLib", name="R0603"),
+        eda={"altium": EdaAssets(
+            symbol=AssetRef(lib="rc0603.SchLib", name="RC0603"),
+            footprint=AssetRef(lib="rc0603.PcbLib", name="R0603"),
+        )},
     )
 
 

@@ -27,7 +27,7 @@ def _healthy(tmp_path, fixtures_dir):
 
 
 def _fp_path(profile, record):
-    return profile.library.footprint_lib_path(record.category) / f"{record.footprint.name}.kicad_mod"
+    return profile.library.footprint_lib_path(record.category) / f"{record.assets_for("kicad").footprint.name}.kicad_mod"
 
 
 # ---------------------------------------------------------------- scan
@@ -46,7 +46,7 @@ def test_scan_finds_drift_as_fixable(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
     sp = profile.library.symbol_lib_path("ICs")
     lib = SymbolLib.load(sp)
-    lib.get_symbol(record.symbol.name).set_property("Manufacturer", "WRONG")
+    lib.get_symbol(record.assets_for("kicad").symbol.name).set_property("Manufacturer", "WRONG")
     lib.save(sp)
 
     plan = ops.scan_repairs()
@@ -61,7 +61,7 @@ def test_scan_finds_non_portable_model_path_as_fixable(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
     fp_path = _fp_path(profile, record)
     fp = Footprint.load(fp_path)
-    basename = record.model.file.split("/")[-1]
+    basename = record.assets_for("kicad").model.file.split("/")[-1]
     fp.set_model_path(f"C:\\Users\\someone\\models\\{basename}")  # absolute, non-portable
     fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
 
@@ -74,7 +74,7 @@ def test_scan_finds_non_portable_model_path_as_fixable(tmp_path, fixtures_dir):
 
 def test_scan_finds_dangling_model_and_datasheet_as_manual(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
-    (profile.library.root / record.model.file).unlink()
+    (profile.library.root / record.assets_for("kicad").model.file).unlink()
     (profile.library.datasheets_dir / record.datasheet.file).unlink()
 
     plan = ops.scan_repairs()
@@ -112,13 +112,13 @@ def test_apply_heals_drift_to_the_json_source_of_truth(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
     sp = profile.library.symbol_lib_path("ICs")
     lib = SymbolLib.load(sp)
-    lib.get_symbol(record.symbol.name).set_property("Manufacturer", "WRONG")
+    lib.get_symbol(record.assets_for("kicad").symbol.name).set_property("Manufacturer", "WRONG")
     lib.save(sp)
 
     result = ops.apply_repairs()
     assert result.healed_drift == 1
     # the symbol now matches the record (JSON is the source of truth)
-    healed = SymbolLib.load(sp).get_symbol(record.symbol.name).get_property("Manufacturer")
+    healed = SymbolLib.load(sp).get_symbol(record.assets_for("kicad").symbol.name).get_property("Manufacturer")
     assert healed == "TI"
     # and a fresh scan is drift-free
     assert not [a for a in ops.scan_repairs().fixable if a.kind == "drift"]
@@ -128,7 +128,7 @@ def test_apply_rewrites_non_portable_model_path(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
     fp_path = _fp_path(profile, record)
     fp = Footprint.load(fp_path)
-    basename = record.model.file.split("/")[-1]
+    basename = record.assets_for("kicad").model.file.split("/")[-1]
     fp.set_model_path(f"/home/someone/models/{basename}")
     fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
 
@@ -144,7 +144,7 @@ def test_apply_commits_the_repair_and_stray_assets(tmp_path, fixtures_dir):
     (profile.library.datasheets_dir / "stray.pdf").write_bytes(b"%PDF-1.4\n")
     sp = profile.library.symbol_lib_path("ICs")
     lib = SymbolLib.load(sp)
-    lib.get_symbol(record.symbol.name).set_property("Description", "SCRIBBLE")
+    lib.get_symbol(record.assets_for("kicad").symbol.name).set_property("Description", "SCRIBBLE")
     lib.save(sp)
 
     result = ops.apply_repairs()
@@ -154,14 +154,14 @@ def test_apply_commits_the_repair_and_stray_assets(tmp_path, fixtures_dir):
 
 def test_apply_leaves_manual_findings_untouched(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
-    (profile.library.root / record.model.file).unlink()
+    (profile.library.root / record.assets_for("kicad").model.file).unlink()
 
     result = ops.apply_repairs()
     assert any(f.kind == "dangling_model" for f in result.manual)
     # a dangling file is never silently "fixed" by deleting the reference
     assert PartRecord.loads(
         (profile.library.parts_dir / f"{record.id}.json").read_text(encoding="utf-8")
-    ).model is not None
+    ).assets_for("kicad").model is not None
 
 
 def test_apply_on_healthy_library_is_a_no_op(tmp_path, fixtures_dir):
@@ -178,7 +178,7 @@ def test_apply_model_path_repair_is_idempotent(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
     fp_path = _fp_path(profile, record)
     fp = Footprint.load(fp_path)
-    basename = record.model.file.split("/")[-1]
+    basename = record.assets_for("kicad").model.file.split("/")[-1]
     fp.set_model_path(f"/abs/{basename}")
     fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
 
@@ -189,7 +189,7 @@ def test_apply_model_path_repair_is_idempotent(tmp_path, fixtures_dir):
 
 def test_scan_reports_a_missing_model_once_not_twice(tmp_path, fixtures_dir):
     repo, profile, ops, record = _healthy(tmp_path, fixtures_dir)
-    (profile.library.root / record.model.file).unlink()  # the footprint link now dangles too
+    (profile.library.root / record.assets_for("kicad").model.file).unlink()  # the footprint link now dangles too
     plan = ops.scan_repairs()
     model_findings = [f for f in plan.manual if f.part_id == record.id and "model" in f.kind]
     assert len(model_findings) == 1  # the record-level dangling_model owns it, not double-reported
@@ -209,7 +209,7 @@ def test_apply_does_not_commit_another_profiles_uncommitted_files(tmp_path, fixt
     # a real defect to repair in the ACTIVE profile
     sp = profile.library.symbol_lib_path("ICs")
     sl = SymbolLib.load(sp)
-    sl.get_symbol(record.symbol.name).set_property("Description", "SCRIBBLE")
+    sl.get_symbol(record.assets_for("kicad").symbol.name).set_property("Description", "SCRIBBLE")
     sl.save(sp)
 
     ops.apply_repairs()
@@ -242,7 +242,7 @@ def test_apply_skips_and_reports_an_unparseable_stray_file(tmp_path, fixtures_di
     # a real drift to heal (committed value, so healing produces a real change)
     sp = profile.library.symbol_lib_path("ICs")
     sl = SymbolLib.load(sp)
-    sl.get_symbol(record.symbol.name).set_property("Manufacturer", "WRONG")
+    sl.get_symbol(record.assets_for("kicad").symbol.name).set_property("Manufacturer", "WRONG")
     sl.save(sp)
     repo.commit("commit the drifted symbol", [sp])
     # a malformed KiCad file dropped into the library
@@ -252,7 +252,7 @@ def test_apply_skips_and_reports_an_unparseable_stray_file(tmp_path, fixtures_di
     result = ops.apply_repairs()
     # the legitimate heal is NOT rolled back by the bad stray file
     assert result.healed_drift == 1
-    assert SymbolLib.load(sp).get_symbol(record.symbol.name).get_property("Manufacturer") == "TI"
+    assert SymbolLib.load(sp).get_symbol(record.assets_for("kicad").symbol.name).get_property("Manufacturer") == "TI"
     # the malformed file is surfaced honestly and never committed
     assert any(f.kind == "unparseable_file" for f in ops.scan_repairs().manual)
     assert any("broken.kicad_mod" in line for line in repo.status_porcelain())
@@ -299,7 +299,7 @@ def test_repair_hides_a_visible_metadata_property(tmp_path, fixtures_dir):
     assert "(hide yes)" in text[start:start + 400]
     # the value survived the hide
     lib = SymbolLib.load(sp)
-    assert lib.get_symbol(record.symbol.name).get_property("MPN") == record.mpn
+    assert lib.get_symbol(record.assets_for("kicad").symbol.name).get_property("MPN") == record.mpn
     assert ops.scan_repairs().is_healthy
     assert repo.is_clean()
 
@@ -308,6 +308,6 @@ def test_add_part_writes_metadata_properties_hidden(tmp_path, fixtures_dir):
     _, profile, _, record = _healthy(tmp_path, fixtures_dir)
     sp = profile.library.symbol_lib_path("ICs")
     lib = SymbolLib.load(sp)
-    sym = lib.get_symbol(record.symbol.name)
+    sym = lib.get_symbol(record.assets_for("kicad").symbol.name)
     assert sym.property_hidden("MPN") is True
     assert sym.property_hidden("Manufacturer") is True

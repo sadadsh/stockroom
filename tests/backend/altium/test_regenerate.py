@@ -1,6 +1,6 @@
 import sqlite3
 
-from stockroom.model.part import AltiumRef, PartRecord
+from stockroom.model.part import AssetRef, EdaAssets, PartRecord
 
 
 def _db_rows(db_path):
@@ -16,8 +16,10 @@ def _place_ready(pid, mpn):
     return PartRecord(
         id=pid, display_name=pid, category="ICs", mpn=mpn, manufacturer="TI",
         description="d", value=mpn,
-        altium_symbol=AltiumRef(lib=f"{pid}.SchLib", name=mpn),
-        altium_footprint=AltiumRef(lib=f"{pid}.PcbLib", name="FP"),
+        eda={"altium": EdaAssets(
+            symbol=AssetRef(lib=f"{pid}.SchLib", name=mpn),
+            footprint=AssetRef(lib=f"{pid}.PcbLib", name="FP"),
+        )},
     )
 
 
@@ -57,8 +59,10 @@ def test_place_ready_does_not_require_a_persisted_value(library_ops):
     rec = PartRecord(
         id="c", display_name="c", category="ICs", mpn="CCC", manufacturer="TI",
         description="a chip", value="",  # NOT populated by the real pipeline
-        altium_symbol=AltiumRef(lib="c.SchLib", name="CCC"),
-        altium_footprint=AltiumRef(lib="c.PcbLib", name="FP"),
+        eda={"altium": EdaAssets(
+            symbol=AssetRef(lib="c.SchLib", name="CCC"),
+            footprint=AssetRef(lib="c.PcbLib", name="FP"),
+        )},
     )
     (ops.lib.parts_dir / "c.json").write_text(rec.dumps(), encoding="utf-8")
 

@@ -208,10 +208,13 @@ describe("api client", () => {
 
   it("POSTs a symbol reference with lib, name and the default kicad tool", async () => {
     fetchMock.mockResolvedValueOnce(
-      okJson({ id: "r1", symbol: { lib: "Device", name: "R", tool: "kicad" } }),
+      okJson({
+        id: "r1",
+        eda: { kicad: { symbol: { lib: "Device", name: "R", file: "" }, footprint: null, model: null } },
+      }),
     );
     const res = await api.attachSymbol("r1", "Device", "R");
-    expect(res.symbol?.name).toBe("R");
+    expect(res.eda.kicad.symbol?.name).toBe("R");
     const [url, init] = fetchMock.mock.calls[0];
     expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/symbol");
     expect((init as RequestInit).method).toBe("POST");

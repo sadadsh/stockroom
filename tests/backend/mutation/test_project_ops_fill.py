@@ -10,7 +10,7 @@ import shutil
 
 import pytest
 
-from stockroom.model.part import Datasheet, LibRef, PartRecord
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
 from stockroom.mutation.project_ops import ProjectOps
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
@@ -68,15 +68,19 @@ def _parts():
         PartRecord(
             id="lm358", display_name="LM358 Op-Amp", category="ICs",
             description="Dual op-amp", mpn="LM358DR", manufacturer="TI",
-            symbol=LibRef(lib="SR-ICs", name="LM358"),
-            footprint=LibRef(lib="SR-ICs", name="SOIC-8"),
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="SR-ICs", name="LM358"),
+                footprint=AssetRef(lib="SR-ICs", name="SOIC-8"),
+            )},
             datasheet=Datasheet(file="lm358.pdf", source_url="https://ti.com/lm358.pdf"),
         ),
         PartRecord(
             id="r10k", display_name="10k 0402", category="Resistors",
             description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-            symbol=LibRef(lib="SR-Resistors", name="R_10k"),
-            footprint=LibRef(lib="SR-Resistors", name="R_0402"),
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
+                footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
+            )},
             datasheet=Datasheet(file="r.pdf", source_url="https://yageo.com/r.pdf"),
         ),
     ]

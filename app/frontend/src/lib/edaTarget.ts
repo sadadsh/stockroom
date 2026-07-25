@@ -1,74 +1,107 @@
 /**
- * EDA-target readiness model. Settings picks a target EDA tool (KiCad or Altium); the
- * library then flags parts that are not ready for THAT tool. An asset counts toward a tool
- * only when its reference exists AND targets that tool (a ref with no `tool` defaults to
- * "kicad", matching the backend), so a part carrying only KiCad symbol/footprint reads as
- * ready for KiCad but not for Altium. Pure functions, no React: the panel and the Settings
+ * EDA-target readiness model. Settings picks a target EDA tool; the library then flags parts
+ * that are not ready for THAT tool. Pure functions, no React: the panel and the Settings
  * rollup read readiness through this one module instead of each re-deriving it.
+ *
+ * Readiness is now GENERIC. A part carries one symmetric asset bundle per tool
+ * (`detail.eda[tool]`, matching `stockroom.model.part.EdaAssets`), and the tool's facts come
+ * from `edaRegistry.generated.ts`, which is generated from the Python registry and gated by a
+ * pytest. So "is this part ready for tool X" is the same check for every tool, and adding a
+ * third tool changes nothing here.
+ *
+ * That symmetry is the fix, not a refactor. This module used to branch:
+ * `if (tool === "altium")` read `part.altium_symbol`, while the KiCad path read `part.symbol`
+ * -- and because Altium had no 3D-model slot at all, the branch simply asserted
+ * `model = true`. Any part whose Altium assets were attached still read "CAD Incomplete"
+ * forever (live 2026-07-24, reported ~10 times). A branch per tool is how that happens; a
+ * uniform lookup is how it cannot.
  */
-import type { LibRef, ModelRef, PartDetail, PartSummary } from "../api/types";
+import { ASSET_LABELS, DEFAULT_EDA_TOOL, EDA_TOOLS, edaTool } from "./edaRegistry.generated";
+import type { AssetRef, EdaAssets, PartDetail, PartSummary } from "../api/types";
 
-export type EdaTool = "kicad" | "altium";
+export type EdaTool = string;
 
-// The default tool a reference with no explicit `tool` targets (the backend default).
-const DEFAULT_TOOL: EdaTool = "kicad";
+export { DEFAULT_EDA_TOOL };
 
-// The selectable tools with their display labels (KiCad first: it is the default).
-export const EDA_TOOLS: readonly { tool: EdaTool; label: string }[] = [
-  { tool: "kicad", label: "KiCad" },
-  { tool: "altium", label: "Altium" },
-] as const;
+// The selectable tools with their display labels, in the registry's own order (KiCad first:
+// it is the default and the library Stockroom itself writes).
+export const EDA_TOOL_OPTIONS: readonly { tool: EdaTool; label: string }[] = EDA_TOOLS.map(
+  (t) => ({ tool: t.key, label: t.label }),
+);
 
-// The human labels for the three asset kinds, in the order the readiness UI reports them.
-const SYMBOL_LABEL = "Symbol";
-const FOOTPRINT_LABEL = "Footprint";
-const MODEL_LABEL = "3D Model";
+// Title Case labels for the readiness UI (the design contract: Title Case for interactive
+// labels and headings). The registry's lower-case kind labels are the record-level wording.
+const TITLE_LABELS: Record<string, string> = {
+  symbol: "Symbol",
+  footprint: "Footprint",
+  model: "3D Model",
+};
 
-// True when a reference exists and targets `tool` (an absent `tool` reads as the default).
-function targets(ref: LibRef | ModelRef | null, tool: EdaTool): boolean {
-  return ref != null && (ref.tool ?? DEFAULT_TOOL) === tool;
+/** The Title Case name of an asset kind, for interactive labels and headings (the
+ * design contract: Title Case for controls, sentence case for body prose). */
+export function assetTitleLabel(kind: string): string {
+  return TITLE_LABELS[kind] ?? ASSET_LABELS[kind] ?? kind;
+}
+
+const EMPTY_ASSETS: EdaAssets = { symbol: null, footprint: null, model: null };
+
+/** A part's asset bundle for one tool. Absent tools read as an empty bundle, never as
+ * another tool's assets. */
+export function assetsFor(part: Pick<PartDetail, "eda">, tool: EdaTool): EdaAssets {
+  return part.eda?.[tool] ?? EMPTY_ASSETS;
+}
+
+/** True when a reference actually resolves: an entry-shaped asset by `name`, a file-shaped
+ * one (a 3D model) by `file`. A container with no entry is NOT present. Mirrors
+ * `stockroom.model.part.asset_present`. */
+export function assetPresent(ref: AssetRef | null | undefined): boolean {
+  return !!ref && !!(ref.name || ref.file);
 }
 
 export interface AssetReadiness {
-  symbol: boolean;
-  footprint: boolean;
-  model: boolean;
-  // The human labels of the assets absent for `tool`, in Symbol/Footprint/3D Model order.
+  /** Per-kind presence, e.g. `{ symbol: true, footprint: false, model: false }`. */
+  present: Record<string, boolean>;
+  /** The Title Case labels of the assets absent for `tool`, in the tool's kind order. */
   missing: string[];
-  // Ready when the symbol AND footprint are present for `tool`; the 3D model is optional
-  // (reported in `missing` when absent, but never blocks readiness).
+  /**
+   * Asset kinds this tool cannot be given by reference at all, mapped to why (Altium's 3D
+   * model lives inside the footprint's .PcbLib binary). These are NEVER counted as missing:
+   * reporting a gap that can never be closed is what "CAD Incomplete forever" looked like.
+   */
+  unsupported: Record<string, string>;
+  /** Ready when the symbol AND footprint are present; a 3D model is reported when absent but
+   * never blocks readiness (a footprint places fine without one). */
   ready: boolean;
 }
 
 // The per-tool asset readiness of one part detail.
-//
-// Altium assets live in their OWN record fields (altium_symbol / altium_footprint), which carry
-// no `tool` discriminator; the part.symbol / part.footprint fields are the KiCad refs. Reading
-// part.symbol for the Altium tool made altium.ready ALWAYS false - so EVERY part showed "CAD
-// Incomplete" no matter what was attached, and a captured Altium set never flipped it to Complete
-// (live 2026-07-24). So the Altium tool reads the altium_* fields; KiCad reads the tool-tagged
-// symbol/footprint/model. The 3D model is shared (KiCad's STEP serves Altium too) and is never a
-// separate Altium requirement, matching the backend's capture_needs.
 export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness {
-  let symbol: boolean;
-  let footprint: boolean;
-  let model: boolean;
-  if (tool === "altium") {
-    symbol = !!part.altium_symbol?.name;
-    footprint = !!part.altium_footprint?.name;
-    model = true; // no separate Altium 3D-model requirement
-  } else {
-    symbol = targets(part.symbol, tool);
-    footprint = targets(part.footprint, tool);
-    model = targets(part.model, tool);
+  const spec = edaTool(tool);
+  const assets = assetsFor(part, tool);
+  const kinds = spec?.assetKinds ?? ["symbol", "footprint", "model"];
+  const unsupported = spec?.unsupportedAssets ?? {};
+
+  const present: Record<string, boolean> = {};
+  const missing: string[] = [];
+  for (const kind of kinds) {
+    if (kind in unsupported) continue;
+    // A passive references the stock footprint, which carries its own 3D body, so it needs
+    // no owned model. Mirrors PartRecord.missing_assets.
+    if (kind === "model" && part.passive) {
+      present[kind] = true;
+      continue;
+    }
+    const ok = assetPresent(assets[kind as keyof EdaAssets]);
+    present[kind] = ok;
+    if (!ok) missing.push(assetTitleLabel(kind));
   }
 
-  const missing: string[] = [];
-  if (!symbol) missing.push(SYMBOL_LABEL);
-  if (!footprint) missing.push(FOOTPRINT_LABEL);
-  if (!model) missing.push(MODEL_LABEL);
-
-  return { symbol, footprint, model, missing, ready: symbol && footprint };
+  return {
+    present,
+    missing,
+    unsupported,
+    ready: !!present.symbol && !!present.footprint,
+  };
 }
 
 export interface SummaryReadiness {
@@ -77,15 +110,14 @@ export interface SummaryReadiness {
 }
 
 // The readiness of a list-row summary. A PartSummary carries no per-tool asset detail, so
-// only the default (kicad) tool can be judged from it (its is_complete/missing flags). For
-// any non-default tool the summary cannot confirm the tool's assets exist, so it is treated
-// conservatively as not-ready (missing that tool's symbol + footprint) until a summary
-// grows per-tool fields to say otherwise.
+// only the default tool can be judged from it (its is_complete/missing flags). For any other
+// tool the summary cannot confirm that tool's assets exist, so it is treated conservatively
+// as not-ready until a summary grows per-tool fields to say otherwise.
 export function summaryReadiness(part: PartSummary, tool: EdaTool): SummaryReadiness {
-  if (tool === DEFAULT_TOOL) {
+  if (tool === DEFAULT_EDA_TOOL) {
     return { ready: part.is_complete, missing: part.missing };
   }
-  return { ready: false, missing: [SYMBOL_LABEL, FOOTPRINT_LABEL] };
+  return { ready: false, missing: [assetTitleLabel("symbol"), assetTitleLabel("footprint")] };
 }
 
 export interface LibraryReadiness {

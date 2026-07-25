@@ -116,12 +116,22 @@ _ALTIUM = EdaTool(
     },
 )
 
+# Declaration order is MEANINGFUL: it is the order tools are offered and reported in, and the
+# first entry is the default target. KiCad leads because it is the library Stockroom itself
+# writes. Do NOT sort this -- generated FILES are made deterministic by sorting at the point of
+# emission (see `_resolve`), which is a separate concern from presentation order.
 _REGISTRY: dict[str, EdaTool] = {t.key: t for t in (_KICAD, _ALTIUM)}
 
 
 def all_tools() -> tuple[EdaTool, ...]:
-    """Every registered tool, in a stable order."""
-    return tuple(_REGISTRY[k] for k in sorted(_REGISTRY))
+    """Every registered tool, in declaration order (see `_REGISTRY`)."""
+    return tuple(_REGISTRY.values())
+
+
+def default_tool() -> EdaTool:
+    """The tool the app targets when the user has not chosen one. Explicit rather than
+    "whichever sorts first", which silently made Altium the default once."""
+    return next(iter(_REGISTRY.values()))
 
 
 def get_tool(key: str) -> EdaTool:

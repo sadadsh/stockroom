@@ -788,7 +788,7 @@ def test_consolidated_bom_sums_across_boards(tmp_path):
 
 # -- library combining (schematic + library) -----------------------------------
 
-from stockroom.model.part import Datasheet, LibRef, PartRecord, Purchase  # noqa: E402
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Purchase  # noqa: E402
 from stockroom.projects.bom import (  # noqa: E402
     _bom_from_components,
     combined_price_lookup,
@@ -806,8 +806,10 @@ def _lib_resistor():
     return PartRecord(
         id="r10k", display_name="10k 0402", category="Resistors",
         description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-        symbol=LibRef(lib="SR-Resistors", name="R_10k"),
-        footprint=LibRef(lib="SR-Resistors", name="R_0402"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
+            footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
+        )},
         datasheet=Datasheet(file="r.pdf", source_url="https://yageo.com/r.pdf"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/r10k",
                            price_breaks=[{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.02}],

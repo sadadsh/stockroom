@@ -69,14 +69,14 @@ def test_inspect_and_commit_assets_onto_an_existing_part(client, app_ctx, tmp_pa
     r = client.post(f"/api/parts/{part_id}/assets/commit", json=candidate)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["symbol"]["name"] == "TESTPART"
-    assert body["footprint"]["name"] == "TESTPART"
-    assert body["model"] is not None  # the snapeda fixture zip carries a .step file
+    assert body["eda"]["kicad"]["symbol"]["name"] == "TESTPART"
+    assert body["eda"]["kicad"]["footprint"]["name"] == "TESTPART"
+    assert body["eda"]["kicad"]["model"] is not None  # the snapeda fixture zip carries a .step file
 
     persisted = app_ctx.ops.load_record(part_id)
-    assert persisted.symbol is not None and persisted.symbol.name == "TESTPART"
-    assert persisted.footprint is not None and persisted.footprint.name == "TESTPART"
-    assert persisted.model is not None
+    assert persisted.assets_for("kicad").symbol is not None and persisted.assets_for("kicad").symbol.name == "TESTPART"
+    assert persisted.assets_for("kicad").footprint is not None and persisted.assets_for("kicad").footprint.name == "TESTPART"
+    assert persisted.assets_for("kicad").model is not None
 
     sym_path = app_ctx.profile.library.symbol_lib_path("ICs")
     fp_path = app_ctx.profile.library.footprint_lib_path("ICs") / "TESTPART.kicad_mod"

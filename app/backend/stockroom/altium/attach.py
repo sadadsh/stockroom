@@ -36,8 +36,15 @@ def main(argv=None) -> int:
 
     ctx = build_context()
     record = ctx.ops.attach_altium_assets(part_id, *sources)
-    sym, fp = record.altium_symbol, record.altium_footprint
-    print(f"Attached to {part_id}: symbol {sym.name} ({sym.lib}), footprint {fp.name} ({fp.lib})")
+    altium = record.assets_for("altium")
+    sym, fp = altium.symbol, altium.footprint
+    # Either half can be absent: the command accepts a lone .SchLib or a lone .PcbLib.
+    parts = []
+    if sym is not None:
+        parts.append(f"symbol {sym.name} ({sym.lib})")
+    if fp is not None:
+        parts.append(f"footprint {fp.name} ({fp.lib})")
+    print(f"Attached to {part_id}: {', '.join(parts) if parts else 'nothing'}")
     print("Run `python -m stockroom.altium.emit` to regenerate the DbLib.")
     return 0
 

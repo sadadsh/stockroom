@@ -18,17 +18,18 @@ from stockroom.sexp.document import SexpDocument
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.eda.registry import get_tool
 from stockroom.model.category import category_nickname
 from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.model.part import (
-    AltiumRef,
+    AssetRef,
     Datasheet,
+    EdaAssets,
     EnrichmentField,
-    LibRef,
-    ModelRef,
     PartRecord,
     Provenance,
     Purchase,
+    asset_label,
     missing_from_presence,
     new_part_id,
 )
@@ -56,6 +57,23 @@ _MIRROR_ON_EDIT = {
 # whole transaction is caught (and reported) up front instead.
 _SEXP_SUFFIXES = {".kicad_sym", ".kicad_mod", ".kicad_sch", ".kicad_pcb"}
 _SEXP_TABLE_NAMES = {"sym-lib-table", "fp-lib-table"}
+
+
+def _kicad(record: PartRecord):
+    """The record's LIVE KiCad asset bundle.
+
+    LibraryOps owns the KiCad side of the library (it merges `.kicad_sym` entries, places
+    `.kicad_mod` files and links `${SR_LIB}` models), so its asset reads are EXPLICITLY
+    KiCad rather than implicitly so. Naming the tool at every read is the point of the
+    per-EDA record: the old flat `record.symbol` read as tool-neutral while behaving as
+    KiCad-only, which is how Altium assets ended up filed over KiCad references.
+    """
+    return record.assets_for("kicad")
+
+
+def _altium(record: PartRecord):
+    """The record's LIVE Altium asset bundle (see `_kicad`)."""
+    return record.assets_for("altium")
 
 
 @dataclass
@@ -98,9 +116,6 @@ def staged_missing_fields(staged: "StagedPart") -> list[str]:
         "manufacturer": bool(staged.manufacturer.strip()),
         "category": bool(staged.category.strip()),
         "description": bool(staged.description.strip()),
-        "symbol": staged.symbol_source is not None and bool(staged.entry_name),
-        "footprint": staged.footprint_source is not None,
-        "model": staged.model_source is not None,
         # A datasheet is satisfied by a downloaded PDF OR a known link (the same
         # rule PartRecord.is_complete uses), so a pulled datasheet URL is enough to
         # add a part; the two completeness checks can never disagree.
@@ -116,10 +131,11 @@ def _reference_commit_message(record: PartRecord) -> str:
     the record already carries (a passive lands with stock lib_ids; an asset-less part
     lands with none, to be attached later)."""
     refs = []
-    if record.symbol is not None and record.symbol.name:
-        refs.append(f"{record.symbol.lib}:{record.symbol.name} symbol")
-    if record.footprint is not None and record.footprint.name:
-        refs.append(f"{record.footprint.lib}:{record.footprint.name} footprint")
+    k = _kicad(record)
+    if k.symbol is not None and k.symbol.name:
+        refs.append(f"{k.symbol.lib}:{k.symbol.name} symbol")
+    if k.footprint is not None and k.footprint.name:
+        refs.append(f"{k.footprint.lib}:{k.footprint.name} footprint")
     kind = "passive" if record.passive else record.category
     detail = (", ".join(refs) + " reference, ") if refs else ""
     return f"Add {record.display_name} ({kind}): {detail}record"
@@ -264,7 +280,7 @@ class LibraryOps:
                     fp = Footprint.load(fp_path)
                     fp.set_model_path(f"${{SR_LIB}}/models/{model_name}")
                     fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
-                model_ref = ModelRef(file=f"models/{model_name}")
+                model_ref = AssetRef(file=f"models/{model_name}")
 
             # 4. datasheet: a downloaded PDF, a known link, or both. A URL-only
             # datasheet still lands on the record (the link is a first-class field),
@@ -306,11 +322,15 @@ class LibraryOps:
                 mpn=staged.mpn,
                 manufacturer=staged.manufacturer,
                 datasheet=datasheet,
-                symbol=LibRef(lib=nickname, name=staged.entry_name)
-                if staged.symbol_source is not None else None,
-                footprint=LibRef(lib=nickname, name=staged.entry_name)
-                if staged.footprint_source is not None else None,
-                model=model_ref,
+                eda={
+                    "kicad": EdaAssets(
+                        symbol=AssetRef(lib=nickname, name=staged.entry_name)
+                        if staged.symbol_source is not None else None,
+                        footprint=AssetRef(lib=nickname, name=staged.entry_name)
+                        if staged.footprint_source is not None else None,
+                        model=model_ref,
+                    )
+                },
                 provenance=staged.provenance,
                 purchase=list(staged.purchase),
                 specs=dict(staged.specs),
@@ -321,13 +341,12 @@ class LibraryOps:
                 # Guard on the FOOTPRINT, not the symbol. A symbol-only add is legitimate
                 # (the footprint is attached later), and stamping the property off symbol
                 # presence shipped a symbol claiming a footprint the .pretty does not hold
-                # while record.footprint stayed None -- a broken link on placement, and a
-                # schematic that reads as "has a footprint" when the library disagrees.
+                # while the record's footprint stayed None -- a broken link on placement, and
+                # a schematic that reads as "has a footprint" when the library disagrees.
                 # Mirrors the attach path's guard in ingest/pipeline.py.
-                if record.footprint is not None:
-                    sym.set_property(
-                        "Footprint", f"{record.footprint.lib}:{record.footprint.name}"
-                    )
+                fp_ref = _kicad(record).footprint
+                if fp_ref is not None:
+                    sym.set_property("Footprint", f"{fp_ref.lib}:{fp_ref.name}")
                 mirror_fields_to_symbol(sym, record)
                 sym_lib.save(sym_lib_path)
 
@@ -372,8 +391,8 @@ class LibraryOps:
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
         self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
         json_path = self.lib.parts_dir / f"{part_id}.json"
-        sym = record.symbol
-        fp = record.footprint
+        sym = _kicad(record).symbol
+        fp = _kicad(record).footprint
         with Transaction(self.repo) as txn:
             txn.track_dir(*fresh_dirs)
             json_path.write_text(record.dumps(), encoding="utf-8")
@@ -429,19 +448,22 @@ class LibraryOps:
     def _attach_libref(self, part_id: str, field: str, lib: str, name: str, tool: str) -> PartRecord:
         if not name.strip():
             raise ValueError(f"a {field} reference needs a name")
-        # `field` is the KiCad slot ("symbol"/"footprint"), and the Altium refs are a
-        # DIFFERENT field of a DIFFERENT type (altium_symbol/altium_footprint, AltiumRef).
-        # Filing a non-KiCad tool here would silently clobber the part's real KiCad
-        # reference AND store nothing usable for that tool. `tool` is unvalidated caller
-        # input from the API body, so refuse it loudly rather than corrupt the record.
+        # Storage is symmetric now (every tool has its own symbol/footprint/model slot), so
+        # this no longer risks clobbering the KiCad reference. It is still KiCad-only for a
+        # REAL reason: a KiCad lib_id resolves against a library KiCad already knows, while
+        # an Altium [Library Ref] only resolves if the .SchLib/.PcbLib actually sits in the
+        # profile -- which only the attach path that COPIES those files can guarantee.
+        # Filing a bare Altium reference here would produce a DbLib row pointing at nothing.
+        # `tool` is unvalidated caller input from the API body, so refuse loudly.
         if tool != "kicad":
             raise ValueError(
-                f"cannot attach a {field} reference for tool {tool!r}: this path files the "
-                f"KiCad reference only. Altium assets attach through "
+                f"cannot attach a {field} reference for tool {tool!r}: this path files a "
+                f"reference only, and a non-KiCad reference is unresolvable without its "
+                f"library files. Altium assets attach through "
                 f"POST /api/altium/parts/{{id}}/attach, which copies the real files."
             )
         record = self.load_record(part_id)
-        setattr(record, field, LibRef(lib=lib, name=name, tool=tool))
+        record.assets_for(tool).set(field, AssetRef(lib=lib, name=name))
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
             json_path.write_text(record.dumps(), encoding="utf-8")
@@ -457,7 +479,7 @@ class LibraryOps:
         byte-deterministic, so an unchanged library produces no commit."""
         from stockroom.altium.datasource import emit_db
         from stockroom.altium.dblib import emit_dblib
-        from stockroom.model.part import altium_place_ready
+        from stockroom.model.part import tool_place_ready
 
         altium_dir = self.lib.parts_dir.parent / "altium"
         altium_dir.mkdir(parents=True, exist_ok=True)
@@ -476,8 +498,8 @@ class LibraryOps:
         for json_path in sorted(self.lib.parts_dir.glob("*.json")):
             record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
             # value is intentionally NOT required (nothing persists it; the emitter derives the
-            # Value column). altium_place_ready is the shared predicate the status view also uses.
-            if altium_place_ready(record):
+            # Value column). tool_place_ready is the shared predicate the status view also uses.
+            if tool_place_ready(record, "altium"):
                 ready.append(record)
             else:
                 skipped.append(record.id)
@@ -534,13 +556,15 @@ class LibraryOps:
                     sch_dst = altium_dir / f"{part_id}.SchLib"
                     shutil.copyfile(sch_src, sch_dst)
                     txn.track(sch_dst)
-                    record.altium_symbol = AltiumRef(lib=sch_dst.name, name=sym_name)
+                    # pick_entry returns None when the library names no entry; an AssetRef holds
+                    # strings, and a None name would read as "attached but unnamed".
+                    _altium(record).symbol = AssetRef(lib=sch_dst.name, name=sym_name or "")
                     landed.append(sym_name or sch_dst.name)
                 if pcb_src is not None:
                     pcb_dst = altium_dir / f"{part_id}.PcbLib"
                     shutil.copyfile(pcb_src, pcb_dst)
                     txn.track(pcb_dst)
-                    record.altium_footprint = AltiumRef(lib=pcb_dst.name, name=fp_name)
+                    _altium(record).footprint = AssetRef(lib=pcb_dst.name, name=fp_name or "")
                     landed.append(fp_name or pcb_dst.name)
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
@@ -549,91 +573,114 @@ class LibraryOps:
 
     def detach_asset(self, part_id: str, kind: str) -> PartRecord:
         """Remove ONE element from a part (owner 2026-07-24): the file goes, the record
-        ref nulls, one scoped commit; everything else on the part stands. `kind` is one of
-        symbol / footprint / model / datasheet / altium_symbol / altium_footprint. A kind
-        the part does not carry is a loud ValueError, never a silent no-op (so the UI can
-        never pretend to remove something that was not there)."""
+        ref nulls, one scoped commit; everything else on the part stands.
+
+        `kind` is "datasheet" or a `<tool>_<asset kind>` pair drawn from the EDA registry
+        ("kicad_symbol", "altium_footprint", ...) -- the same vocabulary
+        `stockroom.capture.requirements` speaks, so a third tool becomes detachable by
+        registering it. A kind the part does not carry is a loud ValueError, never a silent
+        no-op, so the UI can never pretend to remove something that was not there.
+        """
         record = self.load_record(part_id)
         json_path = self.lib.parts_dir / f"{part_id}.json"
-        altium_dir = self.lib.parts_dir.parent / "altium"
-
-        def _missing(what: str):
-            return ValueError(f"{part_id} has no {what} to remove")
 
         with Transaction(self.repo) as txn:
-            if kind == "symbol":
-                if record.symbol is None:
-                    raise _missing("symbol")
-                sym_lib_path = self.lib.symbol_lib_path(record.category)
-                if sym_lib_path.exists():
-                    sym_lib = SymbolLib.load(sym_lib_path)
-                    if record.symbol.name in sym_lib.symbol_names:
-                        sym_lib.remove_symbol(record.symbol.name)
-                        sym_lib.save(sym_lib_path)
-                        txn.track(sym_lib_path)
-                record.symbol = None
-            elif kind == "footprint":
-                if record.footprint is None:
-                    raise _missing("footprint")
-                fp_path = (
-                    self.lib.footprint_lib_path(record.category)
-                    / f"{record.footprint.name}.kicad_mod"
-                )
-                if fp_path.exists():
-                    txn.track(fp_path)
-                    fp_path.unlink()
-                record.footprint = None
-            elif kind == "model":
-                if record.model is None:
-                    raise _missing("3D model")
-                model_path = self.lib.parts_dir.parent / record.model.file
-                if model_path.exists():
-                    txn.track(model_path)
-                    model_path.unlink()
-                # strip the dangling (model ...) link from the footprint, if one stands
-                if record.footprint is not None:
-                    fp_path = (
-                        self.lib.footprint_lib_path(record.category)
-                        / f"{record.footprint.name}.kicad_mod"
-                    )
-                    if fp_path.exists():
-                        fp = Footprint.load(fp_path)
-                        if fp.model_path:
-                            fp.set_model_path("")
-                            fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
-                            txn.track(fp_path)
-                record.model = None
-            elif kind == "datasheet":
+            if kind == "datasheet":
                 if record.datasheet is None:
-                    raise _missing("datasheet")
+                    raise ValueError(f"{part_id} has no datasheet to remove")
                 if record.datasheet.file:
                     ds_path = self.lib.datasheets_dir / record.datasheet.file
                     if ds_path.exists():
                         txn.track(ds_path)
                         ds_path.unlink()
                 record.datasheet = None
-            elif kind == "altium_symbol":
-                if record.altium_symbol is None:
-                    raise _missing("Altium symbol")
-                sch = altium_dir / f"{part_id}.SchLib"
-                if sch.exists():
-                    txn.track(sch)
-                    sch.unlink()
-                record.altium_symbol = None
-            elif kind == "altium_footprint":
-                if record.altium_footprint is None:
-                    raise _missing("Altium footprint")
-                pcb = altium_dir / f"{part_id}.PcbLib"
-                if pcb.exists():
-                    txn.track(pcb)
-                    pcb.unlink()
-                record.altium_footprint = None
             else:
-                raise ValueError(f"unknown asset kind: {kind!r}")
+                self._detach_eda_asset(record, kind, txn)
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
             txn.commit(f"Remove {kind.replace('_', ' ')} from {part_id}")
         return record
+
+    def _detach_eda_asset(self, record: PartRecord, kind: str, txn) -> None:
+        """Remove one tool's asset: its on-disk file(s) and its record reference.
+
+        The on-disk half is genuinely per-tool -- a KiCad symbol is one entry INSIDE a
+        shared category `.kicad_sym`, while an Altium symbol is a whole `.SchLib` file of
+        its own -- so file removal dispatches on the tool. Everything around it (parsing the
+        kind, validating it against the registry, nulling the ref, the commit) is generic.
+        """
+        tool, _, asset_kind = kind.partition("_")
+        try:
+            spec = get_tool(tool) if tool else None
+        except KeyError:
+            spec = None
+        if spec is None or asset_kind not in spec.asset_kinds:
+            raise ValueError(f"unknown asset kind: {kind!r}")
+
+        assets = record.assets_for(tool)
+        ref = assets.get(asset_kind)
+        if ref is None:
+            raise ValueError(
+                f"{record.id} has no {spec.label} {asset_label(asset_kind)} to remove"
+            )
+
+        remove = getattr(self, f"_remove_{tool}_asset", None)
+        if remove is None:
+            raise ValueError(
+                f"{spec.label} assets cannot be removed through Stockroom yet "
+                f"(no file-removal adapter is registered for {tool!r})"
+            )
+        remove(record, asset_kind, ref, txn)
+        assets.set(asset_kind, None)
+
+    def _remove_kicad_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
+        """KiCad file removal: a symbol is an entry inside the category `.kicad_sym`, a
+        footprint is one `.kicad_mod`, a model is a file under `models/` whose `(model ...)`
+        link must also be stripped from the footprint so nothing dangles."""
+        if asset_kind == "symbol":
+            sym_lib_path = self.lib.symbol_lib_path(record.category)
+            if sym_lib_path.exists():
+                sym_lib = SymbolLib.load(sym_lib_path)
+                if ref.name in sym_lib.symbol_names:
+                    sym_lib.remove_symbol(ref.name)
+                    sym_lib.save(sym_lib_path)
+                    txn.track(sym_lib_path)
+        elif asset_kind == "footprint":
+            fp_path = self.lib.footprint_lib_path(record.category) / f"{ref.name}.kicad_mod"
+            if fp_path.exists():
+                txn.track(fp_path)
+                fp_path.unlink()
+        elif asset_kind == "model":
+            model_path = self.lib.parts_dir.parent / ref.file
+            if model_path.exists():
+                txn.track(model_path)
+                model_path.unlink()
+            # strip the now-dangling (model ...) link from the footprint, if one stands
+            fp_ref = _kicad(record).footprint
+            if fp_ref is not None:
+                fp_path = (
+                    self.lib.footprint_lib_path(record.category) / f"{fp_ref.name}.kicad_mod"
+                )
+                if fp_path.exists():
+                    fp = Footprint.load(fp_path)
+                    if fp.model_path:
+                        fp.set_model_path("")
+                        fp_path.write_text(fp.serialize(), encoding="utf-8", newline="")
+                        txn.track(fp_path)
+
+    def _remove_altium_asset(self, record: PartRecord, asset_kind: str, ref, txn) -> None:
+        """Altium file removal: each asset is its own OLE2 compound file in the profile's
+        `altium/` directory, named for the part."""
+        altium_dir = self.lib.parts_dir.parent / "altium"
+        suffix = {"symbol": "SchLib", "footprint": "PcbLib"}.get(asset_kind)
+        if suffix is None:
+            # A 3D body lives INSIDE the .PcbLib, so there is no standalone file to unlink;
+            # clearing the reference is the whole removal.
+            return
+        path = altium_dir / f"{record.id}.{suffix}"
+        if path.exists():
+            txn.track(path)
+            path.unlink()
 
     def load_record(self, part_id: str) -> PartRecord:
         path = self.lib.parts_dir / f"{part_id}.json"
@@ -657,7 +704,7 @@ class LibraryOps:
             prop = _MIRROR_ON_EDIT.get(field)
             if prop is not None or field == "tags":
                 sym_lib = SymbolLib.load(sym_lib_path)
-                sym = sym_lib.get_symbol(record.symbol.name)
+                sym = sym_lib.get_symbol(_kicad(record).symbol.name)
                 if field == "tags":
                     sym.set_property("ki_keywords", " ".join(record.tags))
                 else:
@@ -820,23 +867,23 @@ class LibraryOps:
         # (Device:R, Resistor_SMD:...) do not depend on the category, so moving it is
         # just a category field change on the record. A FILE-LESS part (the link-add
         # path: symbol and footprint both None, capture pending) moves the same way -
-        # there is nothing category-placed to relocate, and reading record.symbol.name
+        # there is nothing category-placed to relocate, and reading _kicad(record).symbol.name
         # here crashed the move (same defect as delete, 2026-07-24).
-        if record.passive or (record.symbol is None and record.footprint is None):
+        if record.passive or (_kicad(record).symbol is None and _kicad(record).footprint is None):
             with Transaction(self.repo) as txn:
                 record.category = new_category
                 json_path.write_text(record.dumps(), encoding="utf-8")
                 txn.track(json_path)
                 txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
             return record
-        if record.symbol is None or record.footprint is None:
+        if _kicad(record).symbol is None or _kicad(record).footprint is None:
             # a partially-detached part would need a per-asset relocation this move does
             # not model; refuse loud rather than half-move (re-attach or detach the rest)
             raise ValueError(
                 f"{part_id} has only one of symbol/footprint; detach it or complete the "
                 "part before moving categories"
             )
-        name = record.symbol.name
+        name = _kicad(record).symbol.name
         old_sym = self.lib.symbol_lib_path(old_cat)
         new_sym = self.lib.symbol_lib_path(new_category)
         old_fp = self.lib.footprint_lib_path(old_cat) / f"{name}.kicad_mod"
@@ -860,8 +907,8 @@ class LibraryOps:
             sym_lib.get_symbol(name).set_property("Footprint", f"{new_nickname}:{name}")
             sym_lib.save(new_sym)
             record.category = new_category
-            record.symbol = LibRef(lib=new_nickname, name=name)
-            record.footprint = LibRef(lib=new_nickname, name=name)
+            _kicad(record).symbol = AssetRef(lib=new_nickname, name=name)
+            _kicad(record).footprint = AssetRef(lib=new_nickname, name=name)
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
             txn.commit(f"Move {part_id}: {old_cat} -> {new_category}")
@@ -873,20 +920,20 @@ class LibraryOps:
         with Transaction(self.repo) as txn:
             # Each owned asset is removed off ITS OWN ref, independently: a passive
             # references KiCad stock lib_ids (nothing to remove), a file-less link-add
-            # carries None refs (live 2026-07-24: reading record.symbol.name here crashed
+            # carries None refs (live 2026-07-24: reading _kicad(record).symbol.name here crashed
             # every delete of the primary add flow's parts), and a detach_asset may have
             # nulled one side already - so no ref may ever be derived from another.
-            if not record.passive and record.symbol is not None:
-                name = record.symbol.name
+            if not record.passive and _kicad(record).symbol is not None:
+                name = _kicad(record).symbol.name
                 sym_lib_path = self.lib.symbol_lib_path(record.category)
                 sym_lib_path.write_text(
                     self._remove_symbol_node(sym_lib_path, name), encoding="utf-8", newline=""
                 )
                 txn.track(sym_lib_path)
-            if not record.passive and record.footprint is not None:
+            if not record.passive and _kicad(record).footprint is not None:
                 fp_path = (
                     self.lib.footprint_lib_path(record.category)
-                    / f"{record.footprint.name}.kicad_mod"
+                    / f"{_kicad(record).footprint.name}.kicad_mod"
                 )
                 if fp_path.exists():
                     fp_path.unlink()
@@ -894,8 +941,8 @@ class LibraryOps:
             if json_path.exists():
                 json_path.unlink()
                 txn.track(json_path)
-            if record.model and record.model.file:
-                mp = self.lib.root / record.model.file
+            if _kicad(record).model and _kicad(record).model.file:
+                mp = self.lib.root / _kicad(record).model.file
                 if mp.exists():
                     mp.unlink()
                     txn.track(mp)
@@ -923,7 +970,7 @@ class LibraryOps:
             return report
         for json_path in sorted(parts_dir.glob("*.json")):
             record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
-            if record.symbol is None:
+            if _kicad(record).symbol is None:
                 continue
             # A passive owns no symbol in the category lib (it references KiCad stock,
             # which Stockroom never mutates), so it can never drift and must not be
@@ -932,7 +979,7 @@ class LibraryOps:
                 continue
             sym_lib_path = self.lib.symbol_lib_path(record.category)
             try:
-                sym = SymbolLib.load(sym_lib_path).get_symbol(record.symbol.name)
+                sym = SymbolLib.load(sym_lib_path).get_symbol(_kicad(record).symbol.name)
             except Exception:
                 report.missing_symbol.append(record.id)
                 continue
@@ -948,9 +995,9 @@ class LibraryOps:
         """The on-disk .kicad_mod for a part's footprint (or None if the record has no
         footprint reference). Footprints live under the category .pretty keyed on the
         footprint entry name, mirroring how add_part places them."""
-        if record.footprint is None or not record.footprint.name:
+        if _kicad(record).footprint is None or not _kicad(record).footprint.name:
             return None
-        return self.lib.footprint_lib_path(record.category) / f"{record.footprint.name}.kicad_mod"
+        return self.lib.footprint_lib_path(record.category) / f"{_kicad(record).footprint.name}.kicad_mod"
 
     def _load_records(self) -> dict[str, PartRecord]:
         parts_dir = self.lib.parts_dir
@@ -997,12 +1044,12 @@ class LibraryOps:
         canonical = f"${{SR_LIB}}/models/{basename}"
         model_present = bool(basename) and (self.lib.models_dir / basename).exists()
         if not model_present:
-            # The record's own model reference (record.model.file) is checked separately
+            # The record's own model reference (_kicad(record).model.file) is checked separately
             # and reports the SAME missing file as a dangling_model. When both point at
             # that file, let the record-level finding own it rather than double-reporting.
             record_basename = (
-                re.split(r"[\\/]", record.model.file)[-1]
-                if record.model and record.model.file
+                re.split(r"[\\/]", _kicad(record).model.file)[-1]
+                if _kicad(record).model and _kicad(record).model.file
                 else None
             )
             if record_basename == basename:
@@ -1033,7 +1080,7 @@ class LibraryOps:
         in-memory SymbolLib instances so earlier heals are not lost."""
         cache: dict = dict(libs) if libs else {}
         for record in records.values():
-            if record.symbol is None:
+            if _kicad(record).symbol is None:
                 continue
             sym_lib_path = self.lib.symbol_lib_path(record.category)
             if not sym_lib_path.exists():
@@ -1046,7 +1093,7 @@ class LibraryOps:
                     continue
                 cache[sym_lib_path] = sym_lib
             try:
-                sym = sym_lib.get_symbol(record.symbol.name)
+                sym = sym_lib.get_symbol(_kicad(record).symbol.name)
             except Exception:  # noqa: BLE001 - a missing symbol is its own finding
                 continue
             for prop in kicad_visible_properties(record):
@@ -1094,12 +1141,12 @@ class LibraryOps:
             )
 
         for record in records.values():
-            if record.model and record.model.file and not (self.lib.root / record.model.file).exists():
+            if _kicad(record).model and _kicad(record).model.file and not (self.lib.root / _kicad(record).model.file).exists():
                 plan.manual.append(
                     RepairFinding(
                         kind="dangling_model",
                         part_id=record.id,
-                        detail=f"3D model file is missing: {record.model.file}",
+                        detail=f"3D model file is missing: {_kicad(record).model.file}",
                         how_to_fix="re-import the 3D model for this part",
                     )
                 )
@@ -1158,14 +1205,14 @@ class LibraryOps:
             touched_libs: dict[Path, SymbolLib] = {}
             for it in self.detect_drift().items:
                 record = records.get(it.part_id)
-                if record is None or record.symbol is None:
+                if record is None or _kicad(record).symbol is None:
                     continue
                 sym_lib_path = self.lib.symbol_lib_path(record.category)
                 sym_lib = touched_libs.get(sym_lib_path)
                 if sym_lib is None:
                     sym_lib = SymbolLib.load(sym_lib_path)
                     touched_libs[sym_lib_path] = sym_lib
-                sym_lib.get_symbol(record.symbol.name).set_property(it.property, it.json_value)
+                sym_lib.get_symbol(_kicad(record).symbol.name).set_property(it.property, it.json_value)
                 result.healed_drift += 1
             # 1b. hide mirrored metadata properties still rendering as schematic text
             for record, prop in self._iter_visible_metadata(records, touched_libs):
@@ -1174,7 +1221,7 @@ class LibraryOps:
                 if sym_lib is None:
                     sym_lib = SymbolLib.load(sym_lib_path)
                     touched_libs[sym_lib_path] = sym_lib
-                sym = sym_lib.get_symbol(record.symbol.name)
+                sym = sym_lib.get_symbol(_kicad(record).symbol.name)
                 sym.set_property(prop, sym.get_property(prop) or "", hide=True)
                 result.hidden_metadata += 1
 

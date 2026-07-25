@@ -37,7 +37,7 @@ def test_part_detail_returns_full_record(client):
     assert r.status_code == 200
     body = r.json()
     assert body["mpn"] == "TPS62130"
-    assert body["symbol"]["name"] == "TPS62130"
+    assert body["eda"]["kicad"]["symbol"]["name"] == "TPS62130"
 
 
 def test_missing_part_detail_is_404(client):
@@ -127,15 +127,18 @@ def test_set_specs_rejects_a_malformed_specs_body(client):
 # -- BOM match: paste a BOM, see what the library already has --------------------
 
 
-def test_attach_footprint_endpoint_tags_kicad_tool(client):
+def test_attach_footprint_endpoint_files_it_under_kicad_and_nowhere_else(client):
     r = client.post("/api/library/parts/mystery/footprint",
                     json={"lib": "Package_SO", "name": "SOIC-8"})
     assert r.status_code == 200
-    fp = r.json()["footprint"]
-    assert fp["name"] == "SOIC-8" and fp["lib"] == "Package_SO"
-    assert fp["tool"] == "kicad"  # default EDA tag, altium-ready
+    eda = r.json()["eda"]
+    assert eda["kicad"]["footprint"] == {"lib": "Package_SO", "name": "SOIC-8", "file": ""}
+    # A reference can no longer carry a `tool` tag that disagrees with the slot it sits in,
+    # so "which tool got this" is answered by the slot: nothing was filed for Altium.
+    assert "altium" not in eda
     # persisted through the index rebuild
-    assert client.get("/api/library/parts/mystery").json()["footprint"]["name"] == "SOIC-8"
+    detail = client.get("/api/library/parts/mystery").json()
+    assert detail["eda"]["kicad"]["footprint"]["name"] == "SOIC-8"
 
 
 def test_attach_symbol_endpoint_requires_a_name(client):
@@ -146,12 +149,16 @@ def test_attach_symbol_endpoint_requires_a_name(client):
 def test_detach_asset_removes_one_element_and_400s_when_absent(client):
     # the fixture library's tps62130 carries a symbol; removing it nulls the ref
     detail = client.get("/api/library/parts/tps62130").json()
-    assert detail["symbol"] is not None
-    r = client.delete("/api/library/parts/tps62130/assets/symbol")
+    assert detail["eda"]["kicad"]["symbol"] is not None
+    # The kind names WHOSE symbol: `<tool>_<asset kind>` from the EDA registry, the same
+    # vocabulary capture requirements speak.
+    r = client.delete("/api/library/parts/tps62130/assets/kicad_symbol")
     assert r.status_code == 200
-    assert r.json()["symbol"] is None
+    assert r.json()["eda"]["kicad"]["symbol"] is None
     # removing it again is an honest 400, never a silent no-op
-    assert client.delete("/api/library/parts/tps62130/assets/symbol").status_code == 400
+    assert client.delete("/api/library/parts/tps62130/assets/kicad_symbol").status_code == 400
     # unknown kind -> 400; unknown part -> 404
     assert client.delete("/api/library/parts/tps62130/assets/bogus").status_code == 400
-    assert client.delete("/api/library/parts/nope/assets/symbol").status_code == 404
+    # a bare kind with no tool is no longer a valid vocabulary word either
+    assert client.delete("/api/library/parts/tps62130/assets/symbol").status_code == 400
+    assert client.delete("/api/library/parts/nope/assets/kicad_symbol").status_code == 404

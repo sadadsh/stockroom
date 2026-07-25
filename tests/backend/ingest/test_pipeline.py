@@ -217,7 +217,7 @@ def test_attach_model_to_existing_part(tmp_path, fixtures_dir):
     # Commit WITHOUT a model (archive is grandfathered, so this is allowed).
     c.model_path = None
     record = pipe.commit(c)
-    assert record.model is None
+    assert record.assets_for("kicad").model is None
 
     model = tmp_path / "late.step"
     model.write_bytes(b"ISO-10303-21;\n")
@@ -226,7 +226,7 @@ def test_attach_model_to_existing_part(tmp_path, fixtures_dir):
         footprint_variants=[], model_path=model,
     )
     updated = pipe.attach_model(record.id, partial)
-    assert updated.model is not None
+    assert updated.assets_for("kicad").model is not None
     fp_path = archive.library.footprint_lib_path("ICs") / "TESTPART.kicad_mod"
     assert "models/" in (Footprint.load(fp_path).model_path or "")
 

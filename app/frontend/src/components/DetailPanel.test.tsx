@@ -61,9 +61,7 @@ function detail(over: Partial<PartDetail> = {}): PartDetail {
     manufacturer: "TI",
     datasheet: null,
     purchase: [],
-    symbol: { lib: "SR-ICs", name: "LM358" },
-    footprint: { lib: "SR-ICs", name: "SOIC-8" },
-    model: { file: "models/lm358.step" },
+    eda: { kicad: { symbol: SYM, footprint: FP, model: MODEL } },
     provenance: null,
     hashes: null,
     enrichment: {},
@@ -71,6 +69,11 @@ function detail(over: Partial<PartDetail> = {}): PartDetail {
     ...over,
   };
 }
+
+// The default KiCad asset set the fixture carries; cases override one slot at a time.
+const SYM = { lib: "SR-ICs", name: "LM358", file: "" };
+const FP = { lib: "SR-ICs", name: "SOIC-8", file: "" };
+const MODEL = { lib: "", name: "", file: "models/lm358.step" };
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -124,7 +127,7 @@ describe("DetailPanel files previews (M6d)", () => {
   });
 
   it("does not make a missing file's card clickable", () => {
-    wrap(<DetailPanel detail={detail({ model: null })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ eda: { kicad: { symbol: SYM, footprint: FP, model: null } } })} {...BASE} />);
     expect(
       screen.queryByRole("button", { name: "Open 3D Model Preview" }),
     ).not.toBeInTheDocument();
@@ -172,8 +175,9 @@ describe("DetailPanel files previews (M6d)", () => {
       <DetailPanel
         detail={detail({
           passive: true,
-          model: null,
-          footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric" },
+          eda: {
+            kicad: { symbol: null, footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric", file: "" }, model: null },
+          },
         })}
         {...BASE}
       />,
@@ -265,7 +269,7 @@ describe("DetailPanel attach-after affordance", () => {
     const onAttachSymbol = vi.fn();
     wrap(
       <DetailPanel
-        detail={detail({ symbol: null })}
+        detail={detail({ eda: { kicad: { symbol: null, footprint: FP, model: MODEL } } })}
         {...BASE}
         onAttachSymbol={onAttachSymbol}
         onAttachFootprint={vi.fn()}
@@ -286,7 +290,7 @@ describe("DetailPanel attach-after affordance", () => {
   it("disables the attach action until a footprint lib + name are entered", async () => {
     wrap(
       <DetailPanel
-        detail={detail({ footprint: null })}
+        detail={detail({ eda: { kicad: { symbol: SYM, footprint: null, model: MODEL } } })}
         {...BASE}
         onAttachSymbol={vi.fn()}
         onAttachFootprint={vi.fn()}
@@ -304,7 +308,7 @@ describe("DetailPanel attach-after affordance", () => {
   });
 
   it("offers no Complete Part affordance in a read-only panel (no handlers)", () => {
-    wrap(<DetailPanel detail={detail({ symbol: null })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ eda: { kicad: { symbol: null, footprint: FP, model: MODEL } } })} {...BASE} />);
     expect(
       screen.queryByRole("button", { name: /Complete Part/ }),
     ).not.toBeInTheDocument();
@@ -327,8 +331,14 @@ describe("DetailPanel attach-after affordance", () => {
     // the regression the owner hit: a part with its Altium libraries attached stayed on
     // "CAD Incomplete" forever because readiness read the KiCad fields for Altium.
     const complete = detail({
-      altium_symbol: { lib: "p.SchLib", name: "P" },
-      altium_footprint: { lib: "p.PcbLib", name: "P" },
+      eda: {
+        kicad: { symbol: SYM, footprint: FP, model: MODEL },
+        altium: {
+          symbol: { lib: "p.SchLib", name: "P", file: "" },
+          footprint: { lib: "p.PcbLib", name: "P", file: "" },
+          model: null,
+        },
+      },
     });
     wrap(<DetailPanel detail={complete} {...BASE} onAttachSymbol={vi.fn()} />);
     expect(screen.getByText("Complete")).toBeInTheDocument();
@@ -525,12 +535,14 @@ describe("DetailPanel element removal", () => {
     const chips = container.querySelectorAll('[data-dev-id="detail.remove-asset"]');
     expect(chips.length).toBeGreaterThan(0);
     await user.click(
-      [...chips].find((c) => c.textContent?.includes("3D Model")) as HTMLElement,
+      // the chip appends a close glyph, and the label names WHOSE 3D model it is
+      [...chips].find((c) => c.textContent?.startsWith("KiCad 3D Model")) as HTMLElement,
     );
-    // in-window confirm, then the detach fires
+    // in-window confirm, then the detach fires. The kind is the `<tool>_<asset kind>`
+    // vocabulary from the EDA registry, so the 3D model chip names WHOSE model it is.
     await user.click(await screen.findByRole("button", { name: /^remove$/i }));
     await waitFor(() =>
-      expect(mockApi.detachAsset).toHaveBeenCalledWith("lm358", "model"),
+      expect(mockApi.detachAsset).toHaveBeenCalledWith("lm358", "kicad_model"),
     );
   });
 });

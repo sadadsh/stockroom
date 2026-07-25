@@ -227,11 +227,11 @@ def test_symbol_preview_at_rev_rejects_a_garbage_rev_as_400(app_ctx):
 
 
 def test_symbol_preview_at_rev_404_when_part_absent_at_that_rev(app_ctx):
-    from stockroom.model.part import LibRef, PartRecord
+    from stockroom.model.part import AssetRef, EdaAssets, PartRecord
 
     seed = _seed_sha(app_ctx)  # before the latecomer existed
     rec = PartRecord(id="latecomer", display_name="LATECOMER", category="ICs")
-    rec.symbol = LibRef(lib="SR-ICs", name="LATECOMER")
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="LATECOMER")
     parts_dir = app_ctx.profile.library.parts_dir
     (parts_dir / "latecomer.json").write_text(rec.dumps(), encoding="utf-8")
     app_ctx.repo.commit("add latecomer", [parts_dir / "latecomer.json"])

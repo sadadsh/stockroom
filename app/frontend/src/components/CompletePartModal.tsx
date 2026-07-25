@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { assetsFor } from "../lib/edaTarget";
 import type { PartDetail, Requirement } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
@@ -243,8 +244,9 @@ export function CompletePartModal({
   onEditField,
   busy,
 }: Props) {
-  const hasSymbol = !!detail.symbol?.name;
-  const hasFootprint = !!detail.footprint?.name;
+  const kicadAssets = assetsFor(detail, "kicad");
+  const hasSymbol = !!kicadAssets.symbol?.name;
+  const hasFootprint = !!kicadAssets.footprint?.name;
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);

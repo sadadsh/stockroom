@@ -41,9 +41,9 @@ def test_build_from_the_owners_mouser_url_references_stock_assets():
     assert rec.category == "Resistors"
     assert rec.description == "Resistor, 1.1 kOhm, 1%, 0603"
     # symbol/footprint reference KiCad stock, no owned model
-    assert (rec.symbol.lib, rec.symbol.name) == ("Device", "R")
-    assert (rec.footprint.lib, rec.footprint.name) == ("Resistor_SMD", "R_0603_1608Metric")
-    assert rec.model is None
+    assert (rec.assets_for("kicad").symbol.lib, rec.assets_for("kicad").symbol.name) == ("Device", "R")
+    assert (rec.assets_for("kicad").footprint.lib, rec.assets_for("kicad").footprint.name) == ("Resistor_SMD", "R_0603_1608Metric")
+    assert rec.assets_for("kicad").model is None
     # the pasted Mouser link is the buy-link verbatim
     assert rec.purchase[0].vendor == "Mouser"
     assert rec.purchase[0].url == _OWNER_URL
@@ -176,9 +176,9 @@ def test_manual_kind_and_package_build_a_passive_from_the_stock_footprint():
     assert rec.mpn == "560112116151"
     assert rec.manufacturer == "Wurth Elektronik"
     assert rec.category == "Inductors"
-    assert (rec.symbol.lib, rec.symbol.name) == ("Device", "L")
-    assert (rec.footprint.lib, rec.footprint.name) == ("Inductor_SMD", "L_1210_3225Metric")
-    assert rec.model is None
+    assert (rec.assets_for("kicad").symbol.lib, rec.assets_for("kicad").symbol.name) == ("Device", "L")
+    assert (rec.assets_for("kicad").footprint.lib, rec.assets_for("kicad").footprint.name) == ("Inductor_SMD", "L_1210_3225Metric")
+    assert rec.assets_for("kicad").model is None
     # the user-supplied value/tolerance are carried on the record
     assert rec.specs["Inductance"] == "4.7 µH"
     assert rec.specs["Tolerance"] == "20%"
@@ -205,7 +205,7 @@ def test_manual_package_overrides_a_wrong_decode():
     build = build_passive_record("RC0603FR-0710KL", package="0805",
                                  datasheet_url="https://x/y.pdf")
     rec = build.record
-    assert (rec.footprint.lib, rec.footprint.name) == ("Resistor_SMD", "R_0805_2012Metric")
+    assert (rec.assets_for("kicad").footprint.lib, rec.assets_for("kicad").footprint.name) == ("Resistor_SMD", "R_0805_2012Metric")
     assert rec.specs["Package"] == "0805"
 
 
@@ -223,7 +223,7 @@ def test_kind_override_does_not_bleed_the_decoded_value():
                                  datasheet_url="https://x/y.pdf")
     rec = build.record
     assert rec.category == "Capacitors"
-    assert (rec.symbol.lib, rec.symbol.name) == ("Device", "C")
+    assert (rec.assets_for("kicad").symbol.lib, rec.assets_for("kicad").symbol.name) == ("Device", "C")
     assert "Capacitance" not in rec.specs
     assert "Resistance" not in rec.specs
     assert "Tolerance" not in rec.specs
@@ -302,8 +302,9 @@ def test_move_a_passive_changes_only_its_category(tmp_path):
     rec = ops.add_passive_part(build.record)
     moved = ops.move_category(rec.id, "Precision Resistors")
     assert moved.category == "Precision Resistors"
-    assert moved.symbol.name == "R"  # stock lib_id is unchanged by the move
-    assert moved.footprint.name == "R_0603_1608Metric"
+    moved_k = moved.assets_for("kicad")
+    assert moved_k.symbol.name == "R"  # stock lib_id is unchanged by the move
+    assert moved_k.footprint.name == "R_0603_1608Metric"
     assert repo.is_clean()
 
 

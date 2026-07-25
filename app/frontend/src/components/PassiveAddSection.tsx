@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useFacetsQuery, usePassiveAdd } from "../api/queries";
+import { assetsFor } from "../lib/edaTarget";
 import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
@@ -163,7 +164,9 @@ export function PassiveAddSection({
   }
 
   const rec = preview?.record;
-  const fpLibId = rec?.footprint ? `${rec.footprint.lib}:${rec.footprint.name}` : "";
+  // A passive preview's KiCad footprint is a STOCK lib_id (Resistor_SMD:R_0603_1608Metric).
+  const previewFp = rec ? assetsFor(rec, "kicad").footprint : null;
+  const fpLibId = previewFp ? `${previewFp.lib}:${previewFp.name}` : "";
   const specEntries = rec
     ? Object.entries(rec.specs).filter(([k]) => !ASSET_KEYS.has(k))
     : [];

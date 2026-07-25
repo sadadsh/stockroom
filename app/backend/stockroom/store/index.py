@@ -191,6 +191,10 @@ def _mpn_key(text: str) -> str:
 
 def _row_values(rec: PartRecord) -> tuple:
     missing = rec.missing_fields()
+    # The index's footprint_name / model_file columns exist for duplicate grouping and the
+    # doctor's dangling-file sweep, both of which operate on the KiCad library this app
+    # actually writes. Named explicitly rather than read off a tool-neutral-looking field.
+    kicad = rec.assets_for("kicad")
     purchase_url = rec.purchase[0].url if rec.purchase and rec.purchase[0].url else ""
     search_blob = " ".join(
         filter(
@@ -205,8 +209,8 @@ def _row_values(rec: PartRecord) -> tuple:
         rec.description,
         rec.mpn,
         rec.manufacturer,
-        rec.footprint.name if rec.footprint else "",
-        rec.model.file if rec.model else "",
+        kicad.footprint.name if kicad.footprint else "",
+        kicad.model.file if kicad.model else "",
         rec.datasheet.file if rec.datasheet else "",
         purchase_url,
         0 if missing else 1,

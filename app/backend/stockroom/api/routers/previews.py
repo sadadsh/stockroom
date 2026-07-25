@@ -18,6 +18,7 @@ from fastapi.responses import Response
 from stockroom.api.errors import ApiError
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.model.part import PartRecord
 from stockroom.kicad.stock import (
     stock_footprint_file,
     stock_model_file,
@@ -61,8 +62,13 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
     rec_text = ctx.repo.show_file(rev, ctx.profile.library.parts_dir / f"{part_id}.json")
     if not rec_text:
         raise FileNotFoundError(f"part {part_id} did not exist at {rev}")
-    rec = json.loads(rec_text)
-    category = rec.get("category")
+    # Parse through PartRecord rather than poking the raw dict: a blob from git history may
+    # predate the per-EDA cutover, and from_dict folds those legacy flat fields into the
+    # per-tool map. Reading `rec["symbol"]` here would render nothing for every part added
+    # before the cutover, which is most of the owner's history.
+    rec = PartRecord.from_dict(json.loads(rec_text))
+    kicad = rec.assets_for("kicad")
+    category = rec.category
     variant = "_bw" if bw else ""
     cached = _cache_dir(ctx) / f"{kind}_{part_id}_{rev}{variant}.svg"
     if cached.exists():
@@ -70,7 +76,7 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
     with tempfile.TemporaryDirectory() as td:
         tdp = Path(td)
         if kind == "sym":
-            name = (rec.get("symbol") or {}).get("name")
+            name = kicad.symbol.name if kicad.symbol else ""
             if not name or not category:
                 raise FileNotFoundError(f"part {part_id} had no symbol at {rev}")
             lib_text = ctx.repo.show_file(rev, ctx.profile.library.symbol_lib_path(category))
@@ -81,7 +87,7 @@ def _render_at_rev(ctx, part_id: str, kind: str, rev: str, bw: bool) -> str:
             svgs = _clean_symbol_svg(ctx.cli, hist_lib, name, bw, tdp)
             text = Path(svgs[0]).read_text(encoding="utf-8")
         else:  # footprint
-            name = (rec.get("footprint") or {}).get("name")
+            name = kicad.footprint.name if kicad.footprint else ""
             if not name or not category:
                 raise FileNotFoundError(f"part {part_id} had no footprint at {rev}")
             fp_rel = ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
@@ -181,15 +187,18 @@ def previews_router(require_token) -> APIRouter:
         if rev:
             return _svg_response(_svg_at_rev(ctx, part_id, "sym", rev, bw))
         rec = ctx.ops.load_record(part_id)
-        if rec.symbol is None or not rec.symbol.name:
+        # Previews render KiCad artifacts (kicad-cli SVG, the footprint's linked STEP), so
+        # they read the KiCad bundle by name rather than a tool-neutral-looking field.
+        kicad = rec.assets_for("kicad")
+        if kicad.symbol is None or not kicad.symbol.name:
             raise FileNotFoundError(f"part {part_id} has no symbol")
         # A passive references a KiCad STOCK symbol lib (Device:R) with no owned file,
         # so render it from the installed KiCad libraries, not the category lib.
         if rec.passive:
-            lib = stock_symbol_lib_file(rec.symbol.lib)
+            lib = stock_symbol_lib_file(kicad.symbol.lib)
             if lib is None:
                 raise FileNotFoundError(
-                    f"KiCad stock symbol library {rec.symbol.lib} is not installed"
+                    f"KiCad stock symbol library {kicad.symbol.lib} is not installed"
                 )
         else:
             lib = ctx.profile.library.symbol_lib_path(rec.category)
@@ -201,7 +210,7 @@ def previews_router(require_token) -> APIRouter:
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            svgs = _clean_symbol_svg(ctx.cli, lib, rec.symbol.name, bw, Path(td))
+            svgs = _clean_symbol_svg(ctx.cli, lib, kicad.symbol.name, bw, Path(td))
             text = Path(svgs[0]).read_text(encoding="utf-8")
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
@@ -214,14 +223,15 @@ def previews_router(require_token) -> APIRouter:
         if rev:
             return _svg_response(_svg_at_rev(ctx, part_id, "fp", rev, bw))
         rec = ctx.ops.load_record(part_id)
-        if rec.footprint is None or not rec.footprint.name:
+        kicad = rec.assets_for("kicad")
+        if kicad.footprint is None or not kicad.footprint.name:
             raise FileNotFoundError(f"part {part_id} has no footprint")
         # A passive references a KiCad STOCK footprint with no owned file.
         if rec.passive:
-            fp_file = stock_footprint_file(rec.footprint.lib, rec.footprint.name)
+            fp_file = stock_footprint_file(kicad.footprint.lib, kicad.footprint.name)
             if fp_file is None:
                 raise FileNotFoundError(
-                    f"KiCad stock footprint {rec.footprint.lib}:{rec.footprint.name} "
+                    f"KiCad stock footprint {kicad.footprint.lib}:{kicad.footprint.name} "
                     "is not installed"
                 )
             pretty = fp_file.parent
@@ -229,9 +239,9 @@ def previews_router(require_token) -> APIRouter:
             pretty = ctx.profile.library.footprint_lib_path(rec.category)
             if not pretty.exists():
                 raise FileNotFoundError(f"footprint library missing for {rec.category}")
-            fp_file = pretty / f"{rec.footprint.name}.kicad_mod"
+            fp_file = pretty / f"{kicad.footprint.name}.kicad_mod"
             if not fp_file.exists():
-                raise FileNotFoundError(f"footprint file missing: {rec.footprint.name}")
+                raise FileNotFoundError(f"footprint file missing: {kicad.footprint.name}")
         variant = "_bw" if bw else ""
         # Content-address the key (like the symbol + model endpoints) so an edited
         # footprint re-renders and two profiles sharing a part_id + footprint name in
@@ -241,7 +251,7 @@ def previews_router(require_token) -> APIRouter:
         if cached.exists():
             return _svg_response(cached.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:
-            text = _clean_footprint_svg(ctx.cli, fp_file, rec.footprint.name, bw, Path(td))
+            text = _clean_footprint_svg(ctx.cli, fp_file, kicad.footprint.name, bw, Path(td))
         cached.write_text(text, encoding="utf-8")
         return _svg_response(text)
 
@@ -296,25 +306,26 @@ def previews_router(require_token) -> APIRouter:
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.load_record(part_id)
+        kicad = rec.assets_for("kicad")
         # A passive inherits the stock footprint's own 3D model (no owned model.file):
         # resolve it from the installed KiCad libraries keyed on the footprint lib_id.
         if rec.passive:
-            if rec.footprint is None or not rec.footprint.name:
+            if kicad.footprint is None or not kicad.footprint.name:
                 raise FileNotFoundError(f"part {part_id} has no footprint for a 3D model")
-            src = stock_model_file(rec.footprint.lib, rec.footprint.name)
+            src = stock_model_file(kicad.footprint.lib, kicad.footprint.name)
             if src is None:
                 raise FileNotFoundError(
-                    f"KiCad stock 3D model for {rec.footprint.lib}:{rec.footprint.name} "
+                    f"KiCad stock 3D model for {kicad.footprint.lib}:{kicad.footprint.name} "
                     "is not installed"
                 )
         else:
-            if rec.model is None or not rec.model.file:
+            if kicad.model is None or not kicad.model.file:
                 raise FileNotFoundError(f"part {part_id} has no 3D model")
             # model.file is stored relative to the profile library root (same convention
             # the mutation engine and the doctor use).
-            src = ctx.profile.library.root / rec.model.file
+            src = ctx.profile.library.root / kicad.model.file
             if not src.exists():
-                raise FileNotFoundError(f"3D model file is missing: {rec.model.file}")
+                raise FileNotFoundError(f"3D model file is missing: {kicad.model.file}")
         key = f"model_{part_id}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():

@@ -134,8 +134,8 @@ def _write_category_libs(lib) -> None:
 def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
     from stockroom.model.part import (
         Datasheet,
-        LibRef,
-        ModelRef,
+        AssetRef,
+        EdaAssets,
         PartRecord,
         Purchase,
     )
@@ -150,10 +150,10 @@ def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
     )
     # every fixture part has a real symbol + footprint on disk (see _write_category_libs);
     # completeness is still driven by the passport fields below, so mystery stays incomplete.
-    rec.symbol = LibRef(lib="SR-ICs", name=part_id.upper())
-    rec.footprint = LibRef(lib="SR-ICs", name=part_id.upper())
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name=part_id.upper())
+    rec.assets_for("kicad").footprint = AssetRef(lib="SR-ICs", name=part_id.upper())
     if complete:
-        rec.model = ModelRef(file="models/x.step")
+        rec.assets_for("kicad").model = AssetRef(file="models/x.step")
         rec.datasheet = Datasheet(file="datasheets/x.pdf")
         rec.purchase = [Purchase(vendor="LCSC", url="https://x/p")]
     (parts_dir / f"{part_id}.json").write_text(rec.dumps(), encoding="utf-8")

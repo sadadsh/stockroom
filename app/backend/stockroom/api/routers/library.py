@@ -25,6 +25,7 @@ from stockroom.ingest.passive_add import (
     PassiveNeedsInputError,
     build_passive_record,
 )
+from stockroom.model.part import PartRecord
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
@@ -60,8 +61,13 @@ def _symbol_node_at(ctx, rev: str, rec: dict | None) -> str | None:
     name are read from the record AT that rev (both can change over time)."""
     if not rec or not rev:
         return None
-    sym = rec.get("symbol") or {}
-    name, category = sym.get("name"), rec.get("category")
+    # Parse through PartRecord: a blob from git history may predate the per-EDA cutover, and
+    # from_dict folds those legacy flat fields into the per-tool map. Reading rec["symbol"]
+    # here returns None for EVERY post-cutover record, so the timeline would silently report
+    # "no symbol change" forever -- no error, just a permanently wrong answer.
+    parsed = PartRecord.from_dict(rec)
+    sym = parsed.assets_for("kicad").symbol
+    name, category = (sym.name if sym else None), parsed.category
     if not name or not category:
         return None
     text = ctx.repo.show_file(rev, ctx.profile.library.symbol_lib_path(category))
@@ -73,8 +79,9 @@ def _footprint_text_at(ctx, rev: str, rec: dict | None) -> str | None:
     isolation is needed), or None when absent."""
     if not rec or not rev:
         return None
-    fp = rec.get("footprint") or {}
-    name, category = fp.get("name"), rec.get("category")
+    parsed = PartRecord.from_dict(rec)
+    fp = parsed.assets_for("kicad").footprint
+    name, category = (fp.name if fp else None), parsed.category
     if not name or not category:
         return None
     fp_file = ctx.profile.library.footprint_lib_path(category) / f"{name}.kicad_mod"
@@ -484,7 +491,11 @@ def library_router(require_token) -> APIRouter:
         assets = {
             "symbol": _symbol_node_at(ctx, a, before) != _symbol_node_at(ctx, b, after),
             "footprint": _footprint_text_at(ctx, a, before) != _footprint_text_at(ctx, b, after),
-            "model": any(f["key"].startswith("model.") for f in fields),
+            # Any tool's 3D model: the record keys these as `eda.<tool>.model.*`, so this
+            # stays correct when a second tool grows its own model slot.
+            "model": any(
+                f["key"].startswith("eda.") and ".model." in f["key"] for f in fields
+            ),
             "datasheet": any(f["key"].startswith("datasheet.") for f in fields),
         }
         return {"a": a, "b": b, "fields": fields, "assets": assets}

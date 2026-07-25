@@ -22,10 +22,10 @@ def test_attach_from_loose_pair(library_ops):
 
     altium_dir = ops.lib.parts_dir.parent / "altium"
     assert (altium_dir / "r.SchLib").exists() and (altium_dir / "r.PcbLib").exists()
-    assert record.altium_symbol.lib == "r.SchLib" and record.altium_symbol.name == "S1M"
-    assert record.altium_footprint.lib == "r.PcbLib"
-    assert record.altium_footprint.name == "DIOM5227X270N"
-    assert ops.load_record("r").altium_symbol == record.altium_symbol  # persisted
+    assert record.assets_for("altium").symbol.lib == "r.SchLib" and record.assets_for("altium").symbol.name == "S1M"
+    assert record.assets_for("altium").footprint.lib == "r.PcbLib"
+    assert record.assets_for("altium").footprint.name == "DIOM5227X270N"
+    assert ops.load_record("r").assets_for("altium").symbol == record.assets_for("altium").symbol  # persisted
 
 
 def test_attach_from_intlib_autoextracts(library_ops):
@@ -36,8 +36,8 @@ def test_attach_from_intlib_autoextracts(library_ops):
 
     altium_dir = ops.lib.parts_dir.parent / "altium"
     assert (altium_dir / "d.SchLib").exists() and (altium_dir / "d.PcbLib").exists()
-    assert record.altium_symbol.name == "S1M"
-    assert record.altium_footprint.name == "DIOM5227X270N"
+    assert record.assets_for("altium").symbol.name == "S1M"
+    assert record.assets_for("altium").footprint.name == "DIOM5227X270N"
     # only loose files are stored; the .IntLib itself is not committed into the library
     assert not (altium_dir / "d.IntLib").exists()
 
@@ -51,7 +51,7 @@ def test_attach_rejects_symbol_only_intlib_zero_trace(library_ops):
 
     # zero trace: no altium dir/files created, record left untouched
     assert not (ops.lib.parts_dir.parent / "altium").exists()
-    assert ops.load_record("x").altium_symbol is None
+    assert ops.load_record("x").assets_for("altium").symbol is None
 
 
 def test_attach_binds_the_first_symbol_when_the_mpn_matches_none(library_ops):
@@ -61,8 +61,8 @@ def test_attach_binds_the_first_symbol_when_the_mpn_matches_none(library_ops):
     ops = library_ops
     _seed(ops, "amb", "NOMATCH")
     record = ops.attach_altium_assets("amb", FIX / "multi_symbol.SchLib", FIX / "sample.PcbLib")
-    assert record.altium_symbol is not None
-    assert record.altium_symbol.name  # bound to a real entry, never empty
+    assert record.assets_for("altium").symbol is not None
+    assert record.assets_for("altium").symbol.name  # bound to a real entry, never empty
 
 
 def test_attach_picks_the_mpn_matching_symbol_from_a_multi_symbol_lib(library_ops):
@@ -71,7 +71,7 @@ def test_attach_picks_the_mpn_matching_symbol_from_a_multi_symbol_lib(library_op
 
     record = ops.attach_altium_assets("hir", FIX / "multi_symbol.SchLib", FIX / "sample.PcbLib")
 
-    assert record.altium_symbol.name == "HIROSE_BM28_40_RECEPTACLE"  # not the alphabetical first
+    assert record.assets_for("altium").symbol.name == "HIROSE_BM28_40_RECEPTACLE"  # not the alphabetical first
 
 
 def test_attach_rolls_back_first_file_if_second_copy_fails(library_ops, monkeypatch):
@@ -94,7 +94,7 @@ def test_attach_rolls_back_first_file_if_second_copy_fails(library_ops, monkeypa
 
     # the first-copied .SchLib must NOT leak, and the record stays untouched (zero trace)
     assert not (ops.lib.parts_dir.parent / "altium" / "leak.SchLib").exists()
-    assert ops.load_record("leak").altium_symbol is None
+    assert ops.load_record("leak").assets_for("altium").symbol is None
 
 
 def test_attach_prefers_the_mpn_matching_footprint_from_a_multi_footprint_lib(library_ops, monkeypatch):
@@ -110,7 +110,7 @@ def test_attach_prefers_the_mpn_matching_footprint_from_a_multi_footprint_lib(li
         lambda path: ["SOT-23_DENSE", "S1M_VARIANT"],
     )
     record = ops.attach_altium_assets("tpd", FIX / "sample.SchLib", FIX / "sample.PcbLib")
-    assert record.altium_footprint.name == "S1M_VARIANT"
+    assert record.assets_for("altium").footprint.name == "S1M_VARIANT"
 
 
 def test_attach_accepts_a_lone_schlib_then_the_pcblib_completes_the_pair(library_ops):
@@ -122,13 +122,13 @@ def test_attach_accepts_a_lone_schlib_then_the_pcblib_completes_the_pair(library
     _seed(ops, "split", "S1M")
 
     first = ops.attach_altium_assets("split", FIX / "sample.SchLib")
-    assert first.altium_symbol is not None and first.altium_symbol.name == "S1M"
-    assert first.altium_footprint is None
+    assert first.assets_for("altium").symbol is not None and first.assets_for("altium").symbol.name == "S1M"
+    assert first.assets_for("altium").footprint is None
 
     second = ops.attach_altium_assets("split", FIX / "sample.PcbLib")
-    assert second.altium_footprint is not None
-    assert second.altium_footprint.name == "DIOM5227X270N"
-    assert second.altium_symbol is not None and second.altium_symbol.name == "S1M"
+    assert second.assets_for("altium").footprint is not None
+    assert second.assets_for("altium").footprint.name == "DIOM5227X270N"
+    assert second.assets_for("altium").symbol is not None and second.assets_for("altium").symbol.name == "S1M"
     # both files stored
     altium_dir = ops.lib.parts_dir.parent / "altium"
     assert (altium_dir / "split.SchLib").exists() and (altium_dir / "split.PcbLib").exists()
@@ -142,4 +142,4 @@ def test_attach_takes_the_loose_pair_when_a_bundle_carries_intlib_and_pair(libra
     record = ops.attach_altium_assets(
         "trio", FIX / "sample.IntLib", FIX / "sample.SchLib", FIX / "sample.PcbLib"
     )
-    assert record.altium_symbol is not None and record.altium_footprint is not None
+    assert record.assets_for("altium").symbol is not None and record.assets_for("altium").footprint is not None
