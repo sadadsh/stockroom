@@ -19,6 +19,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import (
+    AssignGroupBody,
     ConformBody,
     ManualFillBody,
     ProjectSummary,
@@ -506,6 +507,28 @@ def projects_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         result = ctx.project_ops.manual_fill(
             project_id, body.ref, body.part_id, library_parts=lambda: _library_parts(ctx)
+        )
+        ctx.checks_cache.pop(project_id, None)
+        ctx.bom_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/assign")
+    def get_assign(request: Request, project_id: str) -> dict:
+        # The bulk-assign surface: every placed component with no identified library part, grouped so
+        # identical placements are one row, each with its ranked candidates. Read-only, no git.
+        # Unknown id -> 404. The library is loaded lazily so an unknown id 404s before it is read.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.assign_read(project_id, library_parts=lambda: _library_parts(ctx))
+
+    @r.post("/{project_id}/assign")
+    def assign_group(request: Request, project_id: str, body: AssignGroupBody) -> dict:
+        # Assign one library part to a whole group of identical placements, as ONE atomic commit on the
+        # project's own git. Unknown id -> 404; not under git, an unknown part, an empty ref list, or a
+        # ref naming no component -> 400 (and nothing written); a GitError -> 503. An assignment changes
+        # the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.assign_refs(
+            project_id, body.refs, body.part_id, library_parts=lambda: _library_parts(ctx)
         )
         ctx.checks_cache.pop(project_id, None)
         ctx.bom_cache.pop(project_id, None)

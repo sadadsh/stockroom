@@ -4,9 +4,15 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // The catalogue is the single source of truth for the dev-mode ID system, so these
 // tests guard it against accidental drops, duplicate ids, area drift, and a stale
 // by-id map — the four ways the hand-authored list could silently rot.
+// Bump this when a dev id is deliberately added or removed. It is a drift alarm, not a target: a
+// change here should always accompany a real catalogue change in the same commit.
+const EXPECTED_ENTRIES = 220;
+
 describe("devIds catalogue", () => {
-  it("has exactly 199 entries carrying only id/label/area", () => {
-    expect(DEV_IDS).toHaveLength(219);
+  // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
+  // never drift out of step with the number it checks (it used to say 199 while asserting 219).
+  it(`has exactly ${EXPECTED_ENTRIES} entries carrying only id/label/area`, () => {
+    expect(DEV_IDS).toHaveLength(EXPECTED_ENTRIES);
     for (const entry of DEV_IDS) {
       expect(Object.keys(entry).sort()).toEqual(["area", "id", "label"]);
       expect(typeof entry.id).toBe("string");
@@ -24,7 +30,7 @@ describe("devIds catalogue", () => {
       seen.add(entry.id);
       expect(entry.id.split(".")[0]).toBe(entry.area);
     }
-    expect(seen.size).toBe(219);
+    expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
   it("enumerates the 15 areas in first-appearance order, and every entry is a member", () => {
@@ -61,7 +67,7 @@ describe("devIds catalogue", () => {
   });
 
   it("DEV_ID_BY_ID round-trips every entry", () => {
-    expect(DEV_ID_BY_ID.size).toBe(219);
+    expect(DEV_ID_BY_ID.size).toBe(EXPECTED_ENTRIES);
     for (const entry of DEV_IDS) {
       expect(DEV_ID_BY_ID.get(entry.id)).toBe(entry);
     }

@@ -1278,12 +1278,32 @@ class ProjectOps:
         return {**result, "committed": sha}
 
     def manual_fill(self, project_id: str, ref: str, part_id: str, library_parts=()) -> dict:
-        """Link a specific placed component `ref` to the library part `part_id`, filling ALL its
+        """Link ONE placed component `ref` to the library part `part_id`. The single-ref entry point
+        onto `assign_refs`; see it for the semantics. Kept because a one-component fill is its own user
+        action with its own commit message, and because it is the shape the API has always exposed."""
+        result = self.assign_refs(project_id, [ref], part_id, library_parts=library_parts)
+        return {"project": result["project"], "committed": result["committed"],
+                "ref": ref, "part_id": part_id}
+
+    def assign_refs(self, project_id: str, refs, part_id: str, library_parts=()) -> dict:
+        """Link EVERY placed component in `refs` to the library part `part_id`, filling all their
         identity fields (overwrite allowed, since this is an explicit user choice, unlike the
-        conservative auto pass) and repointing its `(lib_id ...)`, as ONE atomic commit on the
-        project's own git (M7f-D). The residual filler for a component the auto pass could not match.
-        A link that changes nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id);
-        ValueError for a project not under git, an unknown library part, or no such component `ref`."""
+        conservative auto pass) and repointing their `(lib_id ...)`, as ONE atomic commit on the
+        project's own git.
+
+        This is what makes the owner's scenario one action: a project's identical passives are grouped
+        by (symbol, Value, Footprint) and the whole group is assigned in a single decision and a single
+        commit, rather than one component at a time. All-or-nothing by construction, because it is one
+        Transaction: either every ref is written and committed, or every touched path is restored.
+
+        An assignment that changes nothing is an honest no-commit no-op. Raises FileNotFoundError
+        (unknown id); ValueError for a project not under git, an unknown library part, an empty ref
+        list, or a ref that names no component in this project (reported with every missing ref at
+        once, so a partly-stale UI selection does not have to be fixed one round-trip at a time).
+        """
+        wanted = [str(r).strip() for r in (refs or []) if str(r).strip()]
+        if not wanted:
+            raise ValueError("no component references to assign")
         rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
@@ -1303,32 +1323,78 @@ class ProjectOps:
         if part is None:
             raise ValueError(f"no such library part: {part_id}")
         lib_id = fill.lib_id_for(part)
-        found = False
+        remaining = set(wanted)
         changed: list[tuple[Path, SexpDocument]] = []
         for path in sheets:
             doc = SexpDocument.load(path)
             comps = {c["ref"]: c for c in fill.read_components(doc)}
-            comp = comps.get(ref)
-            if comp is None:
+            here = [r for r in wanted if r in comps]
+            if not here:
                 continue
-            found = True
-            changes = {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comp["props"])}
-            n = fill.fill_document(doc, {ref: changes} if changes else {},
-                                   lib_id_by_ref={ref: lib_id} if lib_id else None)
+            remaining.difference_update(here)
+            changes_by_ref = {
+                r: {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comps[r]["props"])}
+                for r in here
+            }
+            n = fill.fill_document(doc, changes_by_ref,
+                                   lib_id_by_ref={r: lib_id for r in here} if lib_id else None)
             if n:
                 changed.append((path, doc))
-        if not found:
-            raise ValueError(f"no component {ref!r} in this project")
+        if remaining:
+            # Named all at once, and BEFORE anything is written, so a stale selection never leaves the
+            # project half assigned.
+            missing = ", ".join(sorted(remaining, key=fill.ref_sort_key))
+            raise ValueError(f"no component {missing} in this project")
+        result = {"project": rec.name, "refs": wanted, "part_id": part_id}
         if not changed:
-            return {"project": rec.name, "committed": None, "ref": ref, "part_id": part_id}
-        message = f"Fill {rec.name}: {ref} from library"
+            return {**result, "committed": None}
+        label = wanted[0] if len(wanted) == 1 else f"{len(wanted)} components"
+        message = f"Fill {rec.name}: {label} from library"
         with Transaction(repo) as txn:
             for path, _doc in changed:
                 txn.track(path)
             for path, doc in changed:
                 doc.save(path)
             sha = txn.commit(message)
-        return {"project": rec.name, "committed": sha, "ref": ref, "part_id": part_id}
+        return {**result, "committed": sha}
+
+    def assign_read(self, project_id: str, library_parts=()) -> dict:
+        """The reviewable bulk-assign surface: every placed component that carries no identified
+        library part, grouped so identical placements are ONE row, each with the ranked library
+        candidates a user could assign to it. Read-only; no git, no writes.
+
+        Only groups whose components are all unidentified are offered: a component the identity tiers
+        already matched is Prepare's job, not a guessing decision. Raises FileNotFoundError for an
+        unknown id; a project with no sheets is an honest empty shape.
+        """
+        rec = self.require_kicad(project_id)
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        root = Path(rec.root)
+        comps: list[dict] = []
+        for path in self._sheet_abs(rec):
+            doc = SexpDocument.load(path)
+            try:
+                rel = path.resolve().relative_to(root.resolve()).as_posix()
+            except ValueError:
+                rel = path.name
+            for c in fill.read_components(doc):
+                c["_sheet"] = rel
+                comps.append(c)
+        unmatched = [c for c in comps if fill.match_component(c, index)["part"] is None]
+        groups = []
+        for group in fill.group_placements(unmatched):
+            first = next(c for c in unmatched if c["ref"] == group["refs"][0])
+            groups.append({**group,
+                           "sheets": sorted({c["_sheet"] for c in unmatched
+                                             if c["ref"] in set(group["refs"])}),
+                           "candidates": fill.candidate_matches(first, index)})
+        return {
+            "project": rec.name,
+            "under_git": bool(rec.git_root),
+            "components": len(comps),
+            "unassigned": len(unmatched),
+            "groups": groups,
+        }
 
     def restore(self, project_id: str) -> dict:
         """Undo the project's last Prepare / Fill by git-reverting that commit as a new commit

@@ -425,6 +425,19 @@ class ManualFillBody(BaseModel):
     part_id: str
 
 
+class AssignGroupBody(BaseModel):
+    """Assign one chosen shared-library part to a whole GROUP of identical placed components at once.
+
+    The bulk form of `ManualFillBody`: a project full of default-library passives groups into a handful
+    of (symbol, Value, Footprint) rows, and each row is one decision instead of one decision per
+    component. `refs` is every designator in the group. One atomic commit covers all of them, so the
+    project is never left half assigned. An unknown part, an empty `refs`, or any ref that names no
+    component in the project is a 400, and nothing is written."""
+
+    refs: list[str]
+    part_id: str
+
+
 class StmStatusDTO(BaseModel):
     """The STM index build/health probe (stm-viewer INTERFACES.md section 4). Never gated on
     409 - this IS the "is it built" check a 409-gated read endpoint routes the frontend to."""

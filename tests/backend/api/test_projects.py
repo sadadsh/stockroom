@@ -1867,3 +1867,102 @@ def test_bom_builds_for_an_altium_project(client, app_ctx, tmp_path):
     bom = client.get(f"/api/projects/{rec['id']}/bom").json()
     assert bom["line_count"] == 1
     assert bom["lines"][0]["mpn"] == "LM358DR"
+
+
+# -- bulk assign surface -------------------------------------------------------
+
+_ASSIGN_SHEET = (
+    '  (symbol (lib_id "Device:R") (property "Reference" "R1" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0))'
+    ' (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0)))\n'
+    '  (symbol (lib_id "Device:R") (property "Reference" "R2" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0))'
+    ' (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0)))\n'
+)
+
+
+def _write_stock_passive(app_ctx, part_id="r10k"):
+    """Add a passive to the fixture library, filed the way `add_passive_part` really files one: its
+    symbol and footprint are KiCad STOCK references, so it is unreachable by the symbol identity tier
+    and only the value-matched candidate tier can offer it."""
+    import json
+
+    parts_dir = app_ctx.profile.library.parts_dir
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    (parts_dir / f"{part_id}.json").write_text(json.dumps({
+        "id": part_id, "display_name": "10k 0402", "category": "Resistors",
+        "description": "10k 1% 0402", "mpn": "RC0402FR-0710KL", "manufacturer": "Yageo",
+        "passive": True,
+        "eda": {"kicad": {"symbol": {"lib": "Device", "name": "R"},
+                          "footprint": {"lib": "Resistor_SMD", "name": "R_0402_1005Metric"}}},
+        "specs": {"Resistance": "10 kOhm", "Package": "0402"},
+    }), encoding="utf-8")
+    return part_id
+
+
+def test_get_assign_groups_unidentified_placements(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.get(f"/api/projects/{rec['id']}/assign")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["unassigned"] == 2
+    assert [g["refs"] for g in body["groups"]] == [["R1", "R2"]]
+    assert [c["part_id"] for c in body["groups"][0]["candidates"]] == ["r10k"]
+    assert body["groups"][0]["candidates"][0]["confidence"] == "value+footprint"
+
+
+def test_get_assign_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/assign").status_code == 404
+
+
+def test_post_assign_fills_the_group(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1", "R2"], "part_id": "r10k"})
+    assert r.status_code == 200, r.text
+    assert r.json()["committed"]
+    after = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    assert after.count('(property "MPN" "RC0402FR-0710KL"') == 2
+    # the stock reference is kept verbatim, never requalified into a Stockroom category library
+    assert "SR-Resistors" not in after
+    # the group is gone from the surface afterwards
+    assert client.get(f"/api/projects/{rec['id']}/assign").json()["unassigned"] == 0
+
+
+def test_post_assign_unknown_part_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1"], "part_id": "nope"})
+    assert r.status_code == 400
+
+
+def test_post_assign_stale_ref_is_400_and_writes_nothing(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    before = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1", "Z99"], "part_id": "r10k"})
+    assert r.status_code == 400
+    assert (proj / "board.kicad_sch").read_text(encoding="utf-8") == before
+
+
+def test_post_assign_empty_refs_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    assert client.post(f"/api/projects/{rec['id']}/assign",
+                       json={"refs": [], "part_id": "r10k"}).status_code == 400
+
+
+def test_post_assign_non_git_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    rec = _register(client, _make_project(tmp_path / "ext" / "asg2", _ASSIGN_SHEET))
+    assert client.post(f"/api/projects/{rec['id']}/assign",
+                       json={"refs": ["R1"], "part_id": "r10k"}).status_code == 400
