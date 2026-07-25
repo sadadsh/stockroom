@@ -7,10 +7,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // Bump this when a dev id is deliberately added or removed. It is a drift alarm, not a target: a
 // change here should always accompany a real catalogue change in the same commit.
 // 237 as of Batch 4d (+rail.collapse, +shell.profile-switch, +shell.profile-menu).
+// 241 as of Batch 5 (+detail.model-views and the three canonical-view buttons: iso/top/front).
+// Deliberate re-baseline, which is what this gate exists for.
 // 234 as of Batch 3: +detail.spec-family (repeated spec keys collapsed into one row),
 // +detail.alternates (the other sources for a value), +detail.trade (the procurement facts that
 // used to be discarded). All three are new controls in this commit.
-const EXPECTED_ENTRIES = 237;
+const EXPECTED_ENTRIES = 241;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

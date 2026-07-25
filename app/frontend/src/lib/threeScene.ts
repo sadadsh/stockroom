@@ -15,11 +15,28 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { orientUpright } from "./modelOrient";
 
+/** The canonical viewing directions. `iso` is the default 3/4; `top` looks straight down at the
+ *  land pattern; `front` is the side elevation, which is how a datasheet draws package height. */
+export type ViewMode = "iso" | "top" | "front";
+
+const VIEW_DIRECTIONS: Record<ViewMode, [number, number, number]> = {
+  iso: [0.55, 0.42, 1],
+  top: [0, 1, 0.0001], // a hair off the pole so `up` stays defined and the camera cannot gimbal
+  front: [0, 0.0001, 1],
+};
+
+export interface ModelSceneHandle {
+  dispose: () => void;
+  /** Move to a canonical view. Stops the idle spin, because a chosen view that then rotates away
+   *  from itself is worse than no control at all. */
+  setView: (mode: ViewMode) => void;
+}
+
 export function mountModelScene(
   container: HTMLElement,
   glb: ArrayBuffer,
   onError?: () => void,
-): () => void {
+): ModelSceneHandle {
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
@@ -65,6 +82,11 @@ export function mountModelScene(
   // render loop advances it. Dragging still works and simply overrides the spin.
   controls.autoRotate = true;
   controls.autoRotateSpeed = 1.6;
+
+  // Captured once the model is framed, so a view change re-uses the SAME fit distance and the
+  // part cannot appear to grow or shrink when you merely look at it from a different side.
+  let fitDistance = 0;
+  let viewTween = 0;
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -154,7 +176,8 @@ export function mountModelScene(
       const fitH = radius / Math.sin(vfov / 2);
       const fitW = radius / Math.sin(vfov / 2) / Math.min(1, camera.aspect);
       const dist = Math.max(fitH, fitW) * 0.98;
-      const dir = new THREE.Vector3(0.55, 0.42, 1).normalize();
+      fitDistance = dist;
+      const dir = new THREE.Vector3(...VIEW_DIRECTIONS.iso).normalize();
       camera.position.copy(dir.multiplyScalar(dist));
       camera.near = radius / 100;
       camera.far = radius * 100;
@@ -190,7 +213,42 @@ export function mountModelScene(
     typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
   resizeObserver?.observe(container);
 
-  return () => {
+  /** Tween the camera to a canonical direction. Short and ease-OUT, because the user is watching
+   *  the very start of this motion: it must move immediately, not creep. Under the 300ms ceiling
+   *  for UI motion, and skipped entirely under prefers-reduced-motion, where the position simply
+   *  snaps - reduced motion means less movement, not a missing feature. */
+  function setView(mode: ViewMode) {
+    if (!fitDistance) return;
+    controls.autoRotate = false;
+    const target = new THREE.Vector3(...VIEW_DIRECTIONS[mode])
+      .normalize()
+      .multiplyScalar(fitDistance);
+    cancelAnimationFrame(viewTween);
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      camera.position.copy(target);
+      controls.target.set(0, 0, 0);
+      controls.update();
+      return;
+    }
+    const from = camera.position.clone();
+    const start = performance.now();
+    const DURATION = 260;
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / DURATION);
+      // easeOutQuint: a strong ease-out, the curve family the built-in `ease-out` is too weak for
+      const e = 1 - Math.pow(1 - t, 5);
+      camera.position.lerpVectors(from, target, e);
+      controls.target.set(0, 0, 0);
+      controls.update();
+      if (t < 1) viewTween = requestAnimationFrame(step);
+    };
+    viewTween = requestAnimationFrame(step);
+  }
+
+  const disposeScene = () => {
     cancelAnimationFrame(raf);
     resizeObserver?.disconnect();
     controls.dispose();
@@ -211,5 +269,13 @@ export function mountModelScene(
     if (renderer.domElement.parentNode === container) {
       container.removeChild(renderer.domElement);
     }
+  };
+
+  return {
+    dispose: () => {
+      cancelAnimationFrame(viewTween);
+      disposeScene();
+    },
+    setView,
   };
 }

@@ -6,6 +6,7 @@
  * The heavy three.js code is import()ed lazily so it only loads when a 3D view is open.
  */
 import { useEffect, useRef, useState } from "react";
+import type { ModelSceneHandle, ViewMode } from "../lib/threeScene";
 import { ApiError } from "../api/client";
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -29,21 +30,26 @@ export function Glb3DView({
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState(false);
+  const sceneRef = useRef<ModelSceneHandle | null>(null);
+  // Which canonical view is in force. Tracked in React (not read back off the camera) so the
+  // control can show the CURRENT answer rather than just issuing commands into the scene.
+  const [view, setView] = useState<ViewMode | null>(null);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!data || !container) return;
     let disposed = false;
-    let dispose = () => {};
+    let handle: ModelSceneHandle | null = null;
     void (async () => {
       try {
         const { mountModelScene } = await import("../lib/threeScene");
         if (disposed || !mountRef.current) return;
-        dispose = mountModelScene(mountRef.current, data, () => {
+        handle = mountModelScene(mountRef.current, data, () => {
           // GLTFLoader rejected the GLB asynchronously: show an honest message rather
           // than a blank canvas.
           if (!disposed) setRenderError(true);
         });
+        sceneRef.current = handle;
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
         if (!disposed) setRenderError(true);
@@ -51,7 +57,8 @@ export function Glb3DView({
     })();
     return () => {
       disposed = true;
-      dispose();
+      sceneRef.current = null;
+      handle?.dispose();
     };
   }, [data]);
 
@@ -69,5 +76,87 @@ export function Glb3DView({
   if (renderError) {
     return <Centered>This device could not render the 3D preview.</Centered>;
   }
-  return <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />
+      <ViewControls
+        active={view}
+        onPick={(mode) => {
+          setView(mode);
+          sceneRef.current?.setView(mode);
+        }}
+      />
+    </div>
+  );
+}
+
+// The dev-id is written out in FULL rather than built as `detail.model-view-${mode}`: the parity
+// gate scans source text, so an interpolated id is invisible to it and to anyone grepping for it.
+const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string }[] = [
+  { mode: "iso", label: "3D", hint: "Three-quarter view", devId: "detail.model-view-iso" },
+  {
+    mode: "top",
+    label: "Top",
+    hint: "Looking down at the land pattern",
+    devId: "detail.model-view-top",
+  },
+  {
+    mode: "front",
+    label: "Front",
+    hint: "Side elevation, the way a datasheet draws height",
+    devId: "detail.model-view-front",
+  },
+];
+
+/**
+ * The canonical views, as a quiet segmented control resting on the canvas.
+ *
+ * Deliberately ALWAYS VISIBLE rather than revealed on hover: this is the only affordance telling
+ * anyone the viewer has more than one view, and a control nobody can find is the same as a control
+ * that does not exist. It stays quiet instead (low contrast until hovered or focused) so it never
+ * competes with the render.
+ */
+function ViewControls({
+  active,
+  onPick,
+}: {
+  active: ViewMode | null;
+  onPick: (mode: ViewMode) => void;
+}) {
+  return (
+    <div
+      data-dev-id="detail.model-views"
+      // the whole strip swallows the tile's open-on-click, not just the buttons
+      onClick={(e) => e.stopPropagation()}
+      className="pointer-events-auto absolute bottom-2 right-2 flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm"
+    >
+      {VIEWS.map((v) => (
+        <button
+          key={v.mode}
+          type="button"
+          data-dev-id={v.devId}
+          aria-pressed={active === v.mode}
+          title={v.hint}
+          onClick={(e) => {
+            // The tile that hosts this canvas is ITSELF a click target that opens the preview
+            // modal, so without stopping here, choosing a view ALSO opened the modal - the
+            // control appeared to do two things at once.
+            e.stopPropagation();
+            onPick(v.mode);
+          }}
+          className={
+            // 160ms ease-out + a 0.97 press: a control with no press feedback does not feel like
+            // it heard the click. transform/opacity only, so it stays off the layout path.
+            "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+            (active === v.mode
+              ? "bg-raise2 text-t1"
+              : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+          }
+        >
+          {v.label}
+        </button>
+      ))}
+    </div>
+  );
 }
