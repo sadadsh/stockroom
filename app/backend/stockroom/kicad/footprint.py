@@ -52,6 +52,23 @@ class Pad:
     drill: float = 0.0
     # "thru_hole" / "smd" / "np_thru_hole" - a non-plated hole has no copper at all.
     pad_type: str = "smd"
+    # The layers the pad declares, verbatim. Ignoring these draws a back-side pad on the FRONT,
+    # which is not a stylistic shortcut - it is the wrong side of the board.
+    layers: tuple[str, ...] = ()
+    # KiCad's own corner ratio for a roundrect, defaulting to its 0.25. Hardcoding a ratio draws a
+    # corner the footprint never asked for.
+    roundrect_rratio: float = 0.25
+
+    @property
+    def side(self) -> str:
+        """front / back / both, from the copper layer the pad declares. `*.Cu` spans both, which is
+        how a through-hole pad is written."""
+        cu = [layer for layer in self.layers if layer.endswith(".Cu") or layer == "*.Cu"]
+        if any(layer.startswith("*") for layer in cu):
+            return "both"
+        if any(layer.startswith("B.") for layer in cu):
+            return "back"
+        return "front"
 
 
 @dataclass(frozen=True)
@@ -297,6 +314,21 @@ class Footprint:
                 except (TypeError, ValueError):
                     rotation = 0.0
 
+            layers_node = node.find("layers")
+            layer_names: tuple[str, ...] = ()
+            if layers_node is not None:
+                layer_names = tuple(
+                    str(c.value) for c in layers_node.children[1:] if c.value is not None
+                )
+
+            rratio = 0.25
+            rr = node.find("roundrect_rratio")
+            if rr is not None and len(rr.children) > 1:
+                try:
+                    rratio = float(rr.children[1].value)
+                except (TypeError, ValueError):
+                    rratio = 0.25
+
             drill = 0.0
             drill_node = node.find("drill")
             if drill_node is not None and len(drill_node.children) > 1:
@@ -314,6 +346,8 @@ class Footprint:
                     rotation=rotation,
                     drill=drill,
                     pad_type=str(pad_type),
+                    layers=layer_names,
+                    roundrect_rratio=rratio,
                 )
             )
         return out

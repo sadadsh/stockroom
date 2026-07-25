@@ -35,7 +35,7 @@ export type ViewMode = "iso" | "top" | "front";
  *   surface reads SHAPE better than a realistic dark one, which is what a mechanical check wants.
  * - `xray`      - translucent, for seeing where the body sits relative to its pads.
  */
-export type RenderMode = "original" | "realistic" | "studio" | "xray";
+export type RenderMode = "realistic" | "studio" | "xray";
 
 /** Which layers are drawn. All three can be off; the viewer simply shows an empty stage. */
 export interface LayerVisibility {
@@ -59,6 +59,10 @@ export interface LandPadInput {
   /** hole diameter in mm; 0 for SMD */
   drill?: number;
   pad_type?: string;
+  /** front / back / both */
+  side?: string;
+  /** KiCad's roundrect corner ratio; hardcoding one draws a corner the footprint never asked for */
+  rratio?: number;
 }
 
 export interface LandGraphicInput {
@@ -365,6 +369,7 @@ export function mountModelScene(
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = bottomY - radius * 0.02;
       ground.receiveShadow = true;
+      groundPlane = ground;
       scene.add(ground);
       // aim the key + scale its shadow frustum to the model so the shadow is crisp, not clipped
       key.position.set(radius * 1.6, radius * 2.6, radius * 1.5);
@@ -450,15 +455,17 @@ export function mountModelScene(
         side: THREE.DoubleSide,
       });
     }
-    if (mode === "original") {
-      // exactly what the file shipped with - the honest answer to "colour it like the model is"
+    if (mode === "realistic") {
+      // REALISTIC == the colours the model actually ships with, lit properly. Substituting an
+      // invented "epoxy" colour was not realism, it was a different guess: the vendor already
+      // said what the part looks like. A model with no material of its own falls back to the
+      // epoxy surface so it still reads as a part rather than as nothing.
       for (const m of modelMeshes) {
         const own = originalMaterials.get(m);
-        if (own) m.material = own;
+        m.material = own ?? (realisticMaterial as THREE.Material);
       }
     } else {
-      const next =
-        mode === "realistic" ? realisticMaterial : mode === "xray" ? xrayMaterial : studioMaterial;
+      const next = mode === "xray" ? xrayMaterial : studioMaterial;
       if (next) for (const m of modelMeshes) m.material = next;
     }
     // The outlines are the cartoon. They earn their place only in studio mode, where a flat
@@ -545,6 +552,7 @@ export function mountModelScene(
   // the scene's is +Y up, so pad Y is negated once, here, where the conversion is visible.
   let landGroup: THREE.Group | null = null;
   let boardMesh: THREE.Mesh | null = null;
+  let groundPlane: THREE.Mesh | null = null;
 
   /**
    * APPLY THE FOOTPRINT'S MODEL PLACEMENT. `(model ...)` carries offset/scale/rotate saying where
@@ -575,6 +583,7 @@ export function mountModelScene(
   }
 
   function setLandPattern(land: LandPatternInput | null) {
+    if (groundPlane) groundPlane.visible = true;
     if (boardMesh) {
       scene.remove(boardMesh);
       boardMesh.geometry.dispose();
@@ -599,6 +608,8 @@ export function mountModelScene(
     // coordinates need no conversion at all. Kept as a named constant so the unit contract is
     // stated rather than implied by bare arithmetic.
     const MM_TO_SCENE = 1;
+    // declared before the pad loop, because a back-side pad is positioned relative to it
+    const boardThickness = 0.6 * MM_TO_SCENE;
     const group = new THREE.Group();
     // ENIG gold over copper, the finish most real boards ship with, and metallic enough that the
     // studio environment puts a highlight on each pad - flat brown planes were part of why the
@@ -618,17 +629,31 @@ export function mountModelScene(
       const pw = w * MM_TO_SCENE;
       const ph = h * MM_TO_SCENE;
       const thickness = 0.05 * MM_TO_SCENE;
-      const radius = pad.shape === "circle" || pad.shape === "oval"
-        ? Math.min(pw, ph) / 2
-        : pad.shape === "roundrect"
-          ? Math.min(pw, ph) * 0.25
-          : 0;
+      // The footprint's OWN corner ratio, not a guess. KiCad's roundrect_rratio is a fraction of
+      // the pad's shorter side; circles and ovals are fully rounded by definition.
+      const radius =
+        pad.shape === "circle" || pad.shape === "oval"
+          ? Math.min(pw, ph) / 2
+          : pad.shape === "roundrect"
+            ? Math.min(pw, ph) * (pad.rratio ?? 0.25)
+            : 0;
       const geo = roundedPadGeometry(pw, ph, thickness, radius, (pad.drill ?? 0) * MM_TO_SCENE);
       const mesh = new THREE.Mesh(geo, copper);
       mesh.rotation.y = (-pad.rotation * Math.PI) / 180;
       // KiCad x -> scene x, KiCad y -> scene z (the board plane). Verified against the real part:
       // pads at x = +-0.675mm span exactly the body's 1.35mm width.
-      mesh.position.set(pad.at[0] * MM_TO_SCENE, 0, pad.at[1] * MM_TO_SCENE);
+      // A BACK-side pad belongs under the board, not on top of it. Drawing every pad on the front
+      // put copper on the wrong side of the part, which is a correctness bug rather than a
+      // stylistic one. `both` (a through-hole *.Cu pad) stays on top and is drilled through.
+      // y=0 in this group IS the board's top face (the group sits at modelBaseY and the board's
+      // top is flush with it), so a front pad rests directly on the surface with no gap.
+      const onBack = pad.side === "back";
+      mesh.position.set(
+        pad.at[0] * MM_TO_SCENE,
+        onBack ? -boardThickness - thickness : 0,
+        pad.at[1] * MM_TO_SCENE,
+      );
+      if (onBack) mesh.rotation.z = Math.PI;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -664,7 +689,7 @@ export function mountModelScene(
     const spanX = (Math.max(...xs) - Math.min(...xs)) * MM_TO_SCENE;
     const spanY = (Math.max(...ys) - Math.min(...ys)) * MM_TO_SCENE;
     const margin = Math.max(spanX, spanY) * 0.28 + 0.5 * MM_TO_SCENE;
-    const boardT = 0.6 * MM_TO_SCENE;
+    const boardT = boardThickness;
     boardMesh = new THREE.Mesh(
       new THREE.BoxGeometry(spanX + margin, boardT, spanY + margin),
       new THREE.MeshPhysicalMaterial({
@@ -684,6 +709,10 @@ export function mountModelScene(
     boardMesh.receiveShadow = true;
     boardMesh.visible = layers.board;
     scene.add(boardMesh);
+    // The bare shadow-catcher belongs to the no-board case. Left visible underneath a real board it
+    // catches the same light a few hundredths of a millimetre lower and reads as a dark seam right
+    // where the pads meet the surface - which is exactly what "the pads are not flush" looks like.
+    if (groundPlane) groundPlane.visible = false;
     // The board plane sits at the model's base, so the body rests ON the pads instead of
     // intersecting them or hovering above.
     group.position.y = modelBaseY;

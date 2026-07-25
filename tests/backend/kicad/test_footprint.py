@@ -350,3 +350,29 @@ class TestGraphics:
         assert p1.drill == 1.0
         assert p2.pad_type == "smd"
         assert p2.drill == 0.0
+
+    def test_reads_the_pad_layers_and_the_real_corner_ratio(self, tmp_path):
+        """Two accuracy defects in one place. A pad declares WHICH LAYERS it is on, and ignoring
+        that draws a back-side pad on the front - simply the wrong side of the board. And a
+        roundrect carries its real `roundrect_rratio`; hardcoding 0.25 draws a corner the footprint
+        never specified."""
+        fp = self._fp(
+            tmp_path,
+            '\t(pad "1" smd roundrect (at 0 0) (size 2 1) '
+            '(layers "F.Cu" "F.Mask" "F.Paste") (roundrect_rratio 0.15))\n'
+            '\t(pad "2" smd rect (at 1 0) (size 1 1) (layers "B.Cu" "B.Mask"))\n'
+            '\t(pad "3" thru_hole circle (at 2 0) (size 1 1) (drill 0.5) (layers "*.Cu" "*.Mask"))\n',
+        )
+        front, back, thru = fp.pads
+        assert front.layers[0] == "F.Cu"
+        assert front.side == "front"
+        assert front.roundrect_rratio == 0.15
+        assert back.side == "back", "a B.Cu pad is on the BACK of the board"
+        assert thru.side == "both", "*.Cu spans both sides"
+
+    def test_a_roundrect_without_an_explicit_ratio_uses_kicads_default(self, tmp_path):
+        fp = self._fp(
+            tmp_path,
+            '\t(pad "1" smd roundrect (at 0 0) (size 2 1) (layers "F.Cu"))\n',
+        )
+        assert fp.pads[0].roundrect_rratio == 0.25
