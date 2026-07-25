@@ -37,7 +37,10 @@ vi.mock("../api/client", async (importActual) => {
 
 // three.js is verified in the Windows pixel gate; mock the scene so opening the 3D
 // tab does not need a WebGL context here.
-vi.mock("../lib/threeScene", () => ({ mountModelScene: vi.fn(() => vi.fn()) }));
+// the scene returns a handle ({dispose, setView}); see PartPreview.test.tsx
+vi.mock("../lib/threeScene", () => ({
+  mountModelScene: vi.fn(() => ({ dispose: vi.fn(), setView: vi.fn() })),
+}));
 
 const mockApi = vi.mocked(api);
 

@@ -21,8 +21,14 @@ vi.mock("../api/client", async (importActual) => {
 // The three.js half is verified in the Windows pixel gate, not jsdom (no WebGL); mock
 // it so the component's mount/error wiring is exercised without a GL context. The mock
 // keeps the (container, glb, onError) signature so a test can fire the async parse error.
+// mountModelScene returns a HANDLE ({dispose, setView}), not a bare dispose function: the viewer
+// needs a channel to move the camera to a canonical view. The mock mirrors that shape, or the
+// component's cleanup calls handle.dispose on a plain function and every 3D test dies on unmount.
 const mountSpy = vi.fn(
-  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => vi.fn(),
+  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => ({
+    dispose: vi.fn(),
+    setView: vi.fn(),
+  }),
 );
 vi.mock("../lib/threeScene", () => ({
   mountModelScene: (c: HTMLElement, g: ArrayBuffer, onErr?: () => void) =>
@@ -131,7 +137,7 @@ describe("ModelViewer", () => {
     // simulate GLTFLoader's async onError firing after a successful fetch + mount
     mountSpy.mockImplementation((_c, _g, onErr) => {
       onErr?.();
-      return vi.fn();
+      return { dispose: vi.fn(), setView: vi.fn() };
     });
     mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
     wrap(<ModelViewer partId="tps62130" />);
