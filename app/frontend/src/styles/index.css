@@ -22,6 +22,12 @@
     --c-line: rgba(255, 255, 255, 0.07);
     --c-line2: rgba(255, 255, 255, 0.13);
     --c-popover: #33333a;
+    /* the chrome band: panel title strips, modal headers, sticky table headers, and the
+       bottom status bar. OPAQUE by contract -- it backs sticky headers that scrolling
+       rows pass beneath, so a translucent value would let content bleed through. Sits
+       one step above canvas and below popover, so it reads as chrome on the canvas and
+       as a header strip inside a popover. */
+    --c-band: #2b2b30;
     --c-t1: #f4f4f4;
     --c-t2: rgba(244, 244, 244, 0.66);
     --c-t3: rgba(244, 244, 244, 0.4);
@@ -112,6 +118,26 @@
     --c-icon-cube: #8d8d8d;
     --c-icon-edge: #4f4f4f;
     --c-icon-faint: #cbcbcb;
+
+    /* --- Shape (theme-agnostic) -------------------------------------------------
+       The rounder north-star adopted 2026-07-17 (docs/design/design-rules.md): card 14
+       / control 8, superseding the earlier 8/6 lock. Exactly two radii; nothing else
+       rounds. Referenced by tailwind.config.js as rounded-card / rounded-control. */
+    --r-card: 14px;
+    --r-control: 8px;
+
+    /* --- Type scale (theme-agnostic) --------------------------------------------
+       The compact desktop scale. Only the px size is a token: the line-heights are
+       bundled with each step in tailwind.config.js, and the body sets the 13px root.
+       Hierarchy here is the whole point -- 2xs is the eyebrow/microcopy tier and title
+       the page headline, so these must stay distinct steps rather than collapse. */
+    --fs-2xs: 10px;
+    --fs-xs: 11px;
+    --fs-sm: 11.5px;
+    --fs-base: 12px;
+    --fs-lg: 13.5px;
+    --fs-xl: 15px;
+    --fs-title: 18px;
   }
 
   :root[data-theme="light"] {
@@ -124,6 +150,9 @@
     --c-line: rgba(0, 0, 0, 0.1);
     --c-line2: rgba(0, 0, 0, 0.16);
     --c-popover: #ffffff;
+    /* light chrome band: reads as a header strip against the white card/popover and as
+       chrome against the grey canvas. Opaque, per the dark-side contract above. */
+    --c-band: #e2e4e9;
     --c-t1: #17181b;
     --c-t2: rgba(23, 24, 27, 0.68);
     --c-t3: rgba(23, 24, 27, 0.46);
