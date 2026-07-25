@@ -1019,6 +1019,36 @@ export function useAltiumRegenerate() {
   });
 }
 
+// Whether a 3D embed can run on this machine. Machine-level like the ODBC check, and it changes
+// out-of-band (the user closes Altium, freeing the license seat), so re-check on window focus:
+// coming back to the app after closing Altium must enable the action without a manual refresh.
+export function useAltiumEmbedCapability() {
+  return useQuery({
+    queryKey: ["altium-embed-capability"],
+    queryFn: () => api.altiumEmbedCapability(),
+    refetchOnWindowFocus: true,
+  });
+}
+
+// Embed a part's 3D model into its Altium footprint's .PcbLib by driving the installed Altium.
+// Slow by nature (Altium boots), so the caller shows a pending state rather than assuming it is
+// instant. Invalidates the part detail (the record gained an altium model ref), the list, the
+// Altium status, and the capability itself: the run leaves Altium closed, so a seat that was
+// reported busy may now be free.
+export function useAltiumEmbedModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; replace?: boolean }) =>
+      api.altiumEmbedModel(vars.id, vars.replace ?? false),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["altium-status"] });
+      qc.invalidateQueries({ queryKey: ["altium-embed-capability"] });
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["part", vars.id] });
+    },
+  });
+}
+
 // Attach a part's Altium assets by native paths, then the part becomes place-ready. Invalidates
 // the Altium status plus the part list/detail (the record gained altium refs).
 export function useAltiumAttach() {

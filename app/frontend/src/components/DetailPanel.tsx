@@ -36,7 +36,14 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
 import { Glb3DView } from "./Glb3DView";
-import { useCadSourceQuery, useDetachAsset, usePreviewGlb, useRefreshSourcing } from "../api/queries";
+import {
+  useAltiumEmbedCapability,
+  useAltiumEmbedModel,
+  useCadSourceQuery,
+  useDetachAsset,
+  usePreviewGlb,
+  useRefreshSourcing,
+} from "../api/queries";
 import { useToast } from "../lib/toast";
 import { PreviewModal, type PreviewKind } from "./PreviewModal";
 import { CompletePartModal } from "./CompletePartModal";
@@ -176,6 +183,12 @@ export function DetailPanel({
   // price/stock/lifecycle from the distributor APIs. Its outcome reports through the
   // quiet toasts like every other background mutation.
   const refreshJob = useRefreshSourcing(detail?.id ?? "");
+  // Whether a 3D body can be written into the Altium footprint HERE. Altium itself does that write
+  // (a 3D body lives inside the .PcbLib binary), so the action needs Altium installed and its
+  // license seat free, and the registry supplies the sentence explaining it. Declared with the
+  // other hooks, above every early return.
+  const embedCapability = useAltiumEmbedCapability();
+  const embedModel = useAltiumEmbedModel();
   const { toast } = useToast();
   // Per-element removal (owner 2026-07-24): a wrongly-captured element deletes on its
   // own, confirmed in-window, leaving the rest of the part standing.
@@ -207,6 +220,32 @@ export function DetailPanel({
   // invalidation. Declared before the needs derivation below, which reads altium.missing.
   const kicad = assetReadiness(detail, "kicad");
   const altium = assetReadiness(detail, "altium");
+
+  // The Altium 3D embed affordance. Every precondition is a real one, and each has its own
+  // message: a 3D body is written INTO the footprint's .PcbLib, so there must be a footprint to
+  // write into and a model file to write. Offered only when the registry says the kind is
+  // embeddable at all, so a tool that gains an embed route needs no edit here.
+  const altiumFootprint = assetsFor(detail, "altium").footprint;
+  const embed3d: Embed3dState | null =
+    "model" in altium.embedded && !detail.passive
+      ? {
+          done: !!altium.present.model,
+          // The blocker to state, in the order the user would fix them. Null means ready to run.
+          blocked: !altiumFootprint?.lib
+            ? "Attach the Altium library first: a 3D body is stored inside the footprint's .PcbLib."
+            : !hasModel
+              ? "Add a 3D model file first. The same file serves every tool."
+              : !embedCapability.data
+                ? ""
+                : !embedCapability.data.installed
+                  ? embedCapability.data.reason
+                  : embedCapability.data.busy
+                    ? `Close Altium first: ${embedCapability.data.busy} is holding the license seat.`
+                    : null,
+          pending: embedModel.isPending,
+          onEmbed: () => embedModel.mutate({ id: detail.id }),
+        }
+      : null;
 
   // What the part still needs, files + data, for the one Complete-Part window and its trigger.
   const missingAssets = [
@@ -384,6 +423,7 @@ export function DetailPanel({
               kicad={kicad}
               altium={altium}
               altiumNeeds={altiumNeeds}
+              embed3d={embed3d}
               canComplete={canComplete}
               needsList={needsList}
               onComplete={() => setCompleteOpen(true)}
@@ -810,10 +850,21 @@ function DataRow({
 // The single readiness read: KiCad and Altium each as one row - a green check when the tool's
 // symbol + footprint are both present, else an amber dot and the exact assets it still needs.
 // The 3D model is optional (it never blocks readiness), so it is not in the needs line.
+// What the readiness popover needs to render the Altium 3D embed row. `blocked` is the sentence
+// explaining why the action cannot run (null = it can, "" = still checking), which is the whole
+// point: a control that is unavailable must say WHY rather than sit there inert.
+export interface Embed3dState {
+  done: boolean;
+  blocked: string | null;
+  pending: boolean;
+  onEmbed: () => void;
+}
+
 function ReadinessBlock({
   kicad,
   altium,
   altiumNeeds,
+  embed3d,
   canComplete,
   needsList,
   onComplete,
@@ -823,6 +874,7 @@ function ReadinessBlock({
   kicad: AssetReadiness;
   altium: AssetReadiness;
   altiumNeeds: string[];
+  embed3d: Embed3dState | null;
   canComplete: boolean;
   needsList: string[];
   onComplete: () => void;
@@ -869,9 +921,17 @@ function ReadinessBlock({
         />
       </button>
       {open ? (
-        <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
+        // Opens UPWARD. This control is pinned near the bottom of the specimen rail by design (only
+        // Filing sits below it), so a downward popover was clipped by the pane edge and a taller
+        // window did not help: the rail grows too, and the control stays at the bottom. Measured
+        // 2026-07-25 with `uishot.py --click detail.readiness` at 1000px AND 1500px viewport
+        // heights, both cut off at the same place, which means the Altium row, the Complete Part
+        // action and the Remove chips had ALL been unreachable. Anchoring to the bottom gives the
+        // popover the whole rail height above it, which is always available here.
+        <div className="absolute inset-x-0 bottom-[calc(100%+6px)] z-[70] rounded-card border border-line2 bg-popover p-3 shadow-pop">
           <ReadinessRow label="KiCad" ready={kicad.ready} needs={kicadNeeds} />
           <ReadinessRow label="Altium" ready={altium.ready} needs={altiumBlocking} />
+          {embed3d ? <Embed3dRow state={embed3d} /> : null}
           {canComplete && needsList.length > 0 ? (
             <button
               data-dev-id="detail.complete-part"
@@ -918,6 +978,65 @@ function ReadinessBlock({
             </div>
           ) : null}
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The Altium 3D embed row inside the readiness popover.
+ *
+ * It sits under the Altium status because that is where the gap is stated, so the fix is one
+ * glance from the problem rather than in a different surface. Three honest states and no fourth:
+ * DONE (the container really carries the payload, verified by reading it back from outside
+ * Altium), BLOCKED with the reason spelled out, or an armed action. The run drives a real Altium
+ * and takes a few seconds, so the pending state says what is happening instead of freezing.
+ */
+function Embed3dRow({ state }: { state: Embed3dState }) {
+  if (state.done) {
+    return (
+      <div
+        data-dev-id="detail.embed3d-done"
+        className="mt-1.5 flex items-center gap-2 rounded-control border border-line bg-field px-2.5 py-1.5"
+      >
+        <Icon id="detail.ready-check" className="h-3 w-3 flex-none" />
+        <span className="text-2xs font-medium text-t2">3D Model embedded in the footprint</span>
+      </div>
+    );
+  }
+  const checking = state.blocked === "";
+  const blocked = !!state.blocked;
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        data-dev-id="detail.embed3d"
+        onClick={state.onEmbed}
+        disabled={blocked || checking || state.pending}
+        className="flex w-full items-center gap-2 rounded-control border border-acc/60 bg-acc/[0.14] px-2.5 py-2 text-left transition-colors hover:border-acc hover:bg-acc/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:pointer-events-none disabled:border-line disabled:bg-field disabled:opacity-60"
+      >
+        {/* A cube receiving a body, not a chevron: this control WRITES, it does not navigate. The
+            accent border and tint are what separate an action from the two status rows above it,
+            which is the whole reason the row is styled differently rather than uniformly. */}
+        <Icon id="detail.embed-3d" className="h-4 w-4 flex-none text-acc" />
+        {/* The LABEL carries the accent, not just the background. A tinted fill reads in the dark
+            theme and washes out to plain white in the light one, so the affordance existed in only
+            one theme; coloured text is legible in both. Caught by shooting both, not by reasoning. */}
+        <span className="text-2xs font-semibold text-acc">
+          {state.pending ? "Embedding 3D Model..." : "Embed 3D Model"}
+        </span>
+      </button>
+      {/* Sentence case for prose, per the design contract, and the reason is never omitted: an
+          unavailable control that does not explain itself is indistinguishable from a broken one. */}
+      {blocked ? (
+        <p data-dev-id="detail.embed3d-blocked" className="mt-1 px-2.5 text-2xs leading-snug text-t3">
+          {state.blocked}
+        </p>
+      ) : null}
+      {state.pending ? (
+        <p className="mt-1 px-2.5 text-2xs leading-snug text-t3">
+          Altium is writing the 3D body into the footprint library. This takes a few seconds.
+        </p>
       ) : null}
     </div>
   );
