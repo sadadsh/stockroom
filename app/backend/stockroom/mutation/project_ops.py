@@ -18,6 +18,7 @@ from stockroom.eda.registry import get_tool
 from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
+from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
 from stockroom.projects import binding, conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, placements, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
@@ -1494,6 +1495,39 @@ class ProjectOps:
             "bound": sorted(bound, key=lambda b: fill.ref_sort_key(b["ref"])),
             "groups": groups,
         }
+
+    def hygiene_read(self, project_id: str) -> dict:
+        """What syncing this project's workspace hygiene would change: {eda, under_git, writes,
+        untracked}. Read-only, no git, no writes. Raises FileNotFoundError for an unknown id.
+
+        The rules are the ones the project's OWN tool declares, so an Altium project never inherits
+        KiCad's per-user rules and the reverse cannot happen either."""
+        rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not rec.git_root:
+            return {"eda": tool, "under_git": False, "writes": [], "untracked": []}
+        plan = hygiene_preview(Path(rec.root), [tool], repo=GitRepo(Path(rec.git_root)))
+        return {"eda": tool, "under_git": True, **plan}
+
+    def hygiene_apply(self, project_id: str) -> dict:
+        """Write this project's workspace hygiene and untrack the per-user files it now covers, as
+        ONE commit on the project's own git.
+
+        This is the fix for the owner's KiCad peer-sync failures. Writing the ignore rules alone
+        would not have been one: an ignore rule has no effect on a file that is already tracked, and
+        those files are already committed, which is why two peers conflict on them at all.
+
+        Raises FileNotFoundError (unknown id); ValueError for a project not under git, a dirty tree,
+        or a hygiene file whose managed block was left unterminated by a hand edit."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before syncing "
+                "workspace hygiene"
+            )
+        tool = rec.eda or "kicad"
+        result = apply_hygiene(Path(rec.root), [tool], repo=GitRepo(Path(rec.git_root)))
+        return {"project": rec.name, "eda": tool, **result}
 
     def restore(self, project_id: str) -> dict:
         """Undo the project's last Prepare / Fill by git-reverting that commit as a new commit
