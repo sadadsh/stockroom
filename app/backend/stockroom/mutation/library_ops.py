@@ -238,6 +238,37 @@ class LibraryOps:
         cover, as ONE commit. An unchanged library is an honest no-commit no-op."""
         return apply_hygiene(self.repo.root, self._hygiene_tools(), repo=self.repo)
 
+    def lfs_status(self) -> dict:
+        """Where this library's binary payloads are stored, and what adopting git-lfs would cover.
+
+        No network: locking is a remote round trip and is probed separately, only when someone is
+        actually deciding whether to turn `lockable` on.
+        """
+        from stockroom.vcs import lfs as lfs_backend
+
+        st = lfs_backend.status(self.repo)
+        covers: list[str] = []
+        for tool in all_tools():
+            covers.extend(p for p in tool.lfs if p not in covers)
+        return {
+            **st.to_dict(),
+            # what adoption WOULD route through LFS, so the offer is concrete rather than a promise
+            "covers": covers,
+            # adoption is a property of the repo's own .gitattributes, never a setting stored
+            # elsewhere that could disagree with it
+            "adopted": bool(st.tracked_patterns),
+        }
+
+    def lfs_adopt(self) -> dict:
+        """Route this library's binary payloads through git-lfs, as ONE hygiene commit.
+
+        Deliberately does NOT convert existing history: that needs `git lfs migrate`, which rewrites
+        commits and therefore needs a force-push, which this project forbids. Files already
+        committed stay ordinary blobs and are counted as `legacy_blobs`, so the limit is visible.
+        """
+        result = apply_hygiene(self.repo.root, self._hygiene_tools(), repo=self.repo, lfs=True)
+        return {**result, **self.lfs_status()}
+
     def add_part(self, staged: StagedPart, require_complete: bool = True) -> PartRecord:
         # Complete-to-add gate (spec section 6): the primary library is complete-only.
         # Fails BEFORE any file write, so a rejected add leaves zero trace. An archive

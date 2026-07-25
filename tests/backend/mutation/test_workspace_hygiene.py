@@ -252,3 +252,68 @@ def test_library_ops_exposes_the_same_two_step(tmp_path):
     assert ops.hygiene_read()["untracked"] == ["Stockroom/fp-info-cache"]
     assert ops.hygiene_apply()["untracked"] == ["Stockroom/fp-info-cache"]
     assert ops.hygiene_apply()["committed"] is None  # idempotent
+
+
+# -- git-lfs adoption (Batch 2 item 4) ------------------------------------------------
+
+
+def _lfs_present():
+    import subprocess
+    return shutil.which("git") is not None and subprocess.run(
+        ["git", "lfs", "version"], capture_output=True).returncode == 0
+
+
+needs_lfs = pytest.mark.skipif(not _lfs_present(), reason="git-lfs not installed")
+
+
+@needs_lfs
+def test_adopting_lfs_writes_the_rules_AND_wires_the_filter_in_one_operation(tmp_path):
+    """Attributes naming `filter=lfs` with no filter configured are INERT: git stores the file
+    normally and reports nothing. Writing one without the other would look like success and do
+    nothing, so adoption does both or neither."""
+    from stockroom.vcs import lfs
+
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n"})
+    apply_hygiene(root, ["altium"], repo=repo, lfs=True)
+
+    assert lfs.repo_enabled(repo) is True
+    text = (root / ".gitattributes").read_text(encoding="utf-8")
+    assert "*.PcbLib filter=lfs binary" in text
+    # the measured trap: never the canned merge=lfs line, which text-merges the POINTER file
+    assert "merge=lfs" not in text
+
+
+@needs_lfs
+def test_a_later_routine_sync_does_not_silently_un_adopt_lfs(tmp_path):
+    """The quiet way a feature gets turned off: someone syncs hygiene for an unrelated reason and
+    the attributes revert to the non-LFS form. Adoption is read back from the repo itself."""
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n"})
+    apply_hygiene(root, ["altium"], repo=repo, lfs=True)
+
+    apply_hygiene(root, ["altium"], repo=repo)  # no flags: whatever the repo already does
+
+    assert "filter=lfs" in (root / ".gitattributes").read_text(encoding="utf-8")
+
+
+@needs_lfs
+def test_adopting_lfs_actually_stores_the_next_binary_as_a_pointer(tmp_path):
+    """The only assertion that proves the feature works. Everything above it can pass while git
+    quietly stores the whole file in the object database."""
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n"})
+    apply_hygiene(root, ["altium"], repo=repo, lfs=True)
+
+    payload = root / "part.PcbLib"
+    payload.write_bytes(b"OLE2 compound bytes" * 200)
+    repo.commit("capture a part", [payload])
+
+    stored = repo._run("cat-file", "-p", "HEAD:part.PcbLib").stdout
+    assert stored.startswith("version https://git-lfs.github.com/spec/v1")
+    assert payload.read_bytes().startswith(b"OLE2 compound bytes")  # working tree is real content
+
+
+def test_lockable_without_lfs_is_refused_before_anything_is_written(tmp_path):
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n"})
+    before = (root / ".gitattributes").exists()
+    with pytest.raises(ValueError, match="lockable"):
+        apply_hygiene(root, ["altium"], repo=repo, lfs=False, lockable=True)
+    assert (root / ".gitattributes").exists() == before

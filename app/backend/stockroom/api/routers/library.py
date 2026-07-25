@@ -379,6 +379,24 @@ def library_router(require_token) -> APIRouter:
         url = resolve_digikey_cad_source(record.mpn, digikey)
         return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
 
+    @r.get("/lfs")
+    def get_library_lfs(request: Request) -> dict:
+        # Where this library's binary payloads are stored. Read-only and NETWORK-FREE: locking is
+        # the only part that needs the remote, and it is probed separately.
+        ctx = request.app.state.ctx
+        return ctx.ops.lfs_status()
+
+    @r.post("/lfs")
+    def adopt_library_lfs(request: Request) -> dict:
+        # Route the binary payloads through git-lfs, as ONE hygiene commit that writes the rules
+        # AND wires the filter (attributes alone are inert). Does not convert existing history:
+        # that needs a rewrite plus a force-push, which this project forbids. A dirty/staged tree
+        # or a hand-broken managed block -> 400; git-lfs missing -> 500 with its own reason.
+        ctx = request.app.state.ctx
+        result = ctx.ops.lfs_adopt()
+        ctx.auto_push()
+        return result
+
     @r.get("/hygiene")
     def get_library_hygiene(request: Request) -> dict:
         # What syncing the LIBRARY's workspace hygiene would change. The library holds assets for
