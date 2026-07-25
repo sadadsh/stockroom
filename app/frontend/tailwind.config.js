@@ -3,6 +3,8 @@
  * and the design contract's 8/6 radii. Kept as the single source of truth so the
  * page matches the mockup by construction. No em dashes anywhere (owner rule).
  */
+import containerQueries from "@tailwindcss/container-queries";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -111,5 +113,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  // Container queries (the official Tailwind plugin, not a hand-rolled ResizeObserver): the
+  // detail sheet must switch column count on the width of the PANE it is in, never the window's.
+  // The rail collapses 190px -> 52px and the picker is a fixed 320px, so the same viewport can
+  // leave the sheet 825px or 963px - and a media query cannot see the difference.
+  plugins: [containerQueries],
 };
