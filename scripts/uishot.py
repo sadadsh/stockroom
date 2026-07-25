@@ -59,6 +59,47 @@ PROBE_JS = """() => {
 }"""
 
 
+# Box probe: what a named element ACTUALLY measures on screen, and how much of it is EMPTY.
+#
+# Every layout slice in this repo has had to answer the same two questions and has answered them
+# by eye, which is how a 205px-wide Specifications column and a 965px portrait 3D stage both
+# shipped. `w`/`h` settle "is this column squished"; `tail` settles "is this column mostly dead
+# space" - it is the distance from the bottom of the element's LAST rendered child to the bottom of
+# the element's own content box, which is the number a person reads as a void. `overflowX`/`clipped`
+# say whether the box is lying about what it contains.
+#
+# It reports EVERY match for an id, not just the first: a repeated dev-id (`detail.spec-group`) is
+# exactly where a per-instance overflow hides.
+MEASURE_JS = """(ids) => {
+  const out = {};
+  for (const id of ids) {
+    const els = Array.from(document.querySelectorAll(`[data-dev-id="${id}"]`));
+    out[id] = els.map((el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const padB = parseFloat(cs.paddingBottom) || 0;
+      // the visible bottom edge of real content, over element children only: text nodes have no
+      // box, so a text-only container reports tail 0 rather than a false void.
+      const kids = Array.from(el.children);
+      const lastBottom = kids.length
+        ? Math.max(...kids.map((k) => k.getBoundingClientRect().bottom))
+        : r.bottom - padB;
+      return {
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        scrollW: el.scrollWidth,
+        scrollH: el.scrollHeight,
+        // dead space at the foot of the box, in CSS px. Negative would mean content overflows.
+        tail: Math.round(r.bottom - padB - lastBottom),
+        overflowX: el.scrollWidth > el.clientWidth,
+        clipped: el.scrollHeight > el.clientHeight,
+      };
+    });
+  }
+  return out;
+}"""
+
+
 # How long a real UI transition is allowed to take before we call it a failure. A ceiling, never a
 # detector: every wait below polls for the element it actually needs and returns the instant it is
 # there, so this only bounds how long a genuine failure takes to report. A fixed sleep in its place
@@ -538,6 +579,27 @@ def run(args) -> int:
                     path = out / f"{surface}-{theme}-{args.width}w.png"
                     page.screenshot(path=str(path), full_page=args.full_page)
                     print(f"  shot {path.name}")
+                    # Measured per THEME, in the same state the shot captured, so a number can
+                    # never be quoted against a layout the screenshot does not show.
+                    if args.measure:
+                        boxes = page.evaluate(MEASURE_JS, args.measure)
+                        for dev_id in args.measure:
+                            hits = boxes.get(dev_id) or []
+                            if not hits:
+                                print(f"  !! no such data-dev-id to measure: {dev_id}")
+                                failures.append(f"{surface}:measure")
+                                continue
+                            for i, b in enumerate(hits):
+                                tag = f"{dev_id}[{i}]" if len(hits) > 1 else dev_id
+                                flags = "".join(
+                                    [" OVERFLOW-X" if b["overflowX"] else "",
+                                     " CLIPPED-Y" if b["clipped"] else ""]
+                                )
+                                print(
+                                    f"  measure {theme} {tag}: {b['w']}x{b['h']} "
+                                    f"scroll={b['scrollW']}x{b['scrollH']} "
+                                    f"tail={b['tail']}px{flags}"
+                                )
                 _close_surface(page, surface)
 
             probe = page.evaluate(PROBE_JS)
@@ -586,6 +648,13 @@ def main() -> int:
         help="hover this data-dev-id before each capture, so a control whose label only appears on "
              "hover/focus (the destructive + pending IconButton language) is actually visible in "
              "the shot. Repeatable. An id that does not exist is reported, never silently skipped.",
+    )
+    ap.add_argument(
+        "--measure", action="append", default=[], metavar="DEV_ID",
+        help="report this data-dev-id's measured box after each capture (repeatable): width, "
+             "height, scroll size, and `tail` - the dead space between its last child and its own "
+             "bottom edge. This is how a column-balance or dead-space claim is backed by a number "
+             "instead of an impression. An id that does not exist is reported, never skipped.",
     )
     ap.add_argument("--seed", action="store_true",
                     help="seed a throwaway library + KiCad project (implied by a project-* surface)")

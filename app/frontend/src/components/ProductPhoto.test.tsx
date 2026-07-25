@@ -8,7 +8,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import { PhotoTrigger, ProductPhoto, productPhotoUrl } from "./ProductPhoto";
+import { PhotoCard, PhotoTrigger, ProductPhoto, partPhotos, productPhotoUrl } from "./ProductPhoto";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -118,5 +118,98 @@ describe("PhotoTrigger + PhotoCard (owner 2026-07-24: hidden until clicked)", ()
   it("renders nothing at all without a url", () => {
     const { container } = wrap(<PhotoTrigger url="" partName="X" />);
     expect(container.querySelector("button")).toBeNull();
+  });
+});
+
+describe("partPhotos + the carousel", () => {
+  it("keeps every distributor's photo, not just the one that won the specs slot", () => {
+    // Both adapters write specs["Image"] with setdefault, so the second vendor's genuinely
+    // different photograph survives only in alternates. It was reaching the record and then
+    // being shown to nobody.
+    const shots = partPhotos(
+      { Image: { value: "https://mouser.com/a.jpg", source: "mouser" } },
+      { Image: [{ value: "https://digikey.com/b.jpg", source: "digikey", confidence: "high" }] },
+    );
+    expect(shots.map((s) => s.url)).toEqual([
+      "https://mouser.com/a.jpg",
+      "https://digikey.com/b.jpg",
+    ]);
+    // and each names its vendor, because WHICH shot you are looking at is the reason to page
+    expect(shots.map((s) => s.vendor)).toEqual(["Mouser", "DigiKey"]);
+  });
+
+  it("humanises an internal source key rather than showing the lane suffix", () => {
+    // "mouser_web" is the scraper lane, not a company; the punch list records it leaking as a
+    // vendor name elsewhere in the UI.
+    const shots = partPhotos({ Image: { value: "https://x/a.jpg", source: "mouser_web" } }, null);
+    expect(shots[0].vendor).toBe("Mouser");
+  });
+
+  it("does not page through the same photograph twice", () => {
+    // Two sources naming the SAME image is the common case; a carousel of identical shots reads
+    // as broken.
+    const shots = partPhotos(
+      { Image: { value: "https://x/a.jpg", source: "mouser" } },
+      { Image: [{ value: "https://x/a.jpg", source: "digikey", confidence: "high" }] },
+    );
+    expect(shots).toHaveLength(1);
+  });
+
+  it("ignores a non-URL value instead of offering a broken slide", () => {
+    const shots = partPhotos(
+      { Image: { value: "not-a-url", source: "mouser" } },
+      { Image: [{ value: 42, source: "digikey", confidence: "high" }] },
+    );
+    expect(shots).toEqual([]);
+  });
+
+  it("shows a counter and pagers only when there is more than one photo", () => {
+    const { rerender } = wrap(
+      <PhotoCard
+        open
+        photos={[{ url: "https://x/a.jpg", vendor: "Mouser" }]}
+        partName="P"
+        onClose={() => {}}
+      />,
+    );
+    expect(document.querySelector('[data-dev-id="preview.photo-count"]')).toBeNull();
+    expect(document.querySelector('[data-dev-id="preview.photo-next"]')).toBeNull();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <PhotoCard
+          open
+          photos={[
+            { url: "https://x/a.jpg", vendor: "Mouser" },
+            { url: "https://x/b.jpg", vendor: "DigiKey" },
+          ]}
+          partName="P"
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("1 / 2");
+    expect(document.querySelector('[data-dev-id="preview.photo-vendor"]')!.textContent).toBe("Mouser");
+  });
+
+  it("pages to the next photo and names its vendor", async () => {
+    const user = userEvent.setup();
+    wrap(
+      <PhotoCard
+        open
+        photos={[
+          { url: "https://x/a.jpg", vendor: "Mouser" },
+          { url: "https://x/b.jpg", vendor: "DigiKey" },
+        ]}
+        partName="P"
+        onClose={() => {}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Next Photo" }));
+    expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("2 / 2");
+    expect(document.querySelector('[data-dev-id="preview.photo-vendor"]')!.textContent).toBe("DigiKey");
+    // wraps around rather than dead-ending on the last slide
+    await user.click(screen.getByRole("button", { name: "Next Photo" }));
+    expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("1 / 2");
   });
 });

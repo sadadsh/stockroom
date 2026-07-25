@@ -105,6 +105,89 @@ class PathContract:
 
 
 @dataclass(frozen=True)
+class DataField:
+    """One piece of RECORD data a tool receives when a part is placed from the library.
+
+    This is the answer to "what does an EDA tool actually get from this part", and it is the
+    registry's job because the answer differs per tool: KiCad takes five schematic properties, while
+    an Altium DbLib row carries commercial columns (price, stock, lifecycle) that KiCad has no
+    property for. Before this existed the same question was answered independently by
+    `altium/dblib.FIELD_MAP`, `altium/datasource.ALTIUM_COLUMNS` and `projects/fill.COMPLETION_FIELDS`,
+    so a column added in one place was silently missing from the others.
+
+    ASSET references are deliberately in scope (`footprint` for KiCad): a schematic property holding
+    a footprint ref is data the tool receives exactly like an MPN is, and the surface that reports
+    the handoff must not draw an arbitrary line through it.
+    """
+
+    # The record-derived value this carries. Lower-case, stable, and the key generic code and the
+    # frontend both join on - never the tool's own spelling, which differs between tools.
+    key: str
+    # What a PERSON calls it. Shared across tools so one field is one row in the union.
+    label: str
+    # What THIS tool calls it: a `.kicad_sch` property name, or an Altium Design Parameter. Altium's
+    # bracket syntax is meaningful (a bracketed name is a reserved model/attribute binding, a bare
+    # one is an ordinary parameter), so it is carried verbatim rather than derived from the label.
+    tool_field: str
+    # Whether the tool shows this on the placed component by default (Altium's VisibleOnAdd).
+    visible: bool = False
+    # Whether a PLACED component can be measured as missing this. Nearly always true.
+    #
+    # False is for a field the tool receives structurally rather than as a fillable property: a
+    # KiCad component's symbol arrives as its `lib_id`, and a component cannot exist without one,
+    # so "components missing a symbol" is not a countable thing and a completion passport that
+    # counted it would report a gap no action could ever close. The field is still declared,
+    # because the handoff band must say the symbol reaches KiCad - leaving it out was the
+    # alternative, and it made the surface claim symbols go to Altium alone.
+    passport: bool = True
+
+
+# WHO OWNS a field's value. Declared ONCE, globally, rather than per tool: "a price comes from a
+# vendor" is a fact about the field itself and is equally true for every tool that carries it, so a
+# per-tool flag would be the same answer written twice with a chance to disagree.
+#
+# Three origins, because there really are three and collapsing them misleads:
+#
+#   "curated" - a PERSON maintains it. These are the fields the detail sheet's handoff band shows
+#       and offers to edit, because they are the ones somebody is responsible for getting right.
+#   "vendor"  - a DISTRIBUTOR supplies it and a Refresh overwrites it. Already the Sourcing
+#       column's whole subject, with a vendor attribution and a refresh control there, and it
+#       changes on its own between sessions. Repeating it at the top of the sheet would be both
+#       duplication and a lie about who owns the value.
+#   "derived" - COMPUTED from other record fields when the artifact is emitted, and never stored.
+#       An Altium `Value` column is a passive's parametric value or an active's MPN, worked out at
+#       emit time by `ingest.component_naming.derive_value`. There is no stored value to show and
+#       nothing to edit, and re-deriving it in the frontend to fill a cell would fork that rule
+#       into a second implementation that drifts - which is exactly what this registry exists to
+#       prevent. So the band omits it rather than guessing.
+#
+# A field absent from this map is "curated", which is the safe default: it appears, and somebody
+# notices it should not, rather than silently vanishing from the surface.
+FIELD_ORIGINS: dict[str, str] = {
+    "supplier": "vendor",
+    "supplier_part_number": "vendor",
+    "supplier_url": "vendor",
+    "price": "vendor",
+    "stock": "vendor",
+    "lifecycle": "vendor",
+    "value": "derived",
+}
+
+
+@dataclass(frozen=True)
+class UnionField:
+    """One row of `data_field_union`: a field, and every tool that consumes it."""
+
+    key: str
+    label: str
+    # Registry declaration order, so a surface can say "KiCad and Altium" in a stable order.
+    tools: tuple[str, ...]
+    # Who owns this value: "curated" | "vendor" | "derived". See FIELD_ORIGINS for what each
+    # means and why it is one global declaration rather than a per-tool flag.
+    origin: str = "curated"
+
+
+@dataclass(frozen=True)
 class EdaTool:
     """Everything generic code needs to know about one EDA tool.
 
@@ -156,6 +239,10 @@ class EdaTool:
     # Asset kinds the tool takes only by EMBEDDING (see EmbeddedAsset). A kind may appear here
     # AND in `unsupported_assets`: it cannot be referenced, but it can be embedded.
     embedded_assets: dict[str, EmbeddedAsset] = field(default_factory=dict)
+    # Record data this tool receives on placement, in the order the tool's own artifact declares it
+    # (see DataField). Generic code and the detail sheet's handoff band iterate this; the Altium
+    # DbLib column map and KiCad's completion passport are both DERIVED from it.
+    data_fields: tuple[DataField, ...] = ()
     # How a placed component carries the library part it is bound to (see PlacementBinding).
     placement_binding: PlacementBinding = PlacementBinding()
     # How this tool's stored library references stay portable across machines (see PathContract).
@@ -221,6 +308,21 @@ _KICAD = EdaTool(
     # STEP file is megabytes and every captured part adds one. Nothing here is lockable, because
     # Stockroom writes the models itself (ingest, doctor repair, capture).
     lfs=("*.wrl", "*.step", "*.stp"),
+    # Exactly the properties `projects/fill.proposed_changes` stamps onto a placed component, in
+    # the order it writes them. `Footprint` is here because a schematic Footprint property is data
+    # KiCad receives from the record just as the MPN is. KiCad has no property for price, stock or
+    # lifecycle, which is why those appear only under Altium.
+    data_fields=(
+        DataField(key="mpn", label="MPN", tool_field="MPN", visible=True),
+        DataField(key="manufacturer", label="Manufacturer", tool_field="Manufacturer"),
+        DataField(key="datasheet", label="Datasheet", tool_field="Datasheet"),
+        DataField(key="description", label="Description", tool_field="Description"),
+        DataField(key="footprint", label="Footprint", tool_field="Footprint"),
+        # KiCad receives the symbol as the placed component's `lib_id`, not as a fillable
+        # property, so it is declared (the handoff band must show that symbols do reach KiCad)
+        # but excluded from the completion passport - see DataField.passport.
+        DataField(key="symbol", label="Symbol", tool_field="lib_id", passport=False),
+    ),
     # Stockroom edits .kicad_sch through the byte-preserving sexp layer, so a KiCad binding
     # lives in the schematic itself: written in the SAME transaction as the fill it records,
     # untouched by annotation, and carried to a peer by the project's own git.
@@ -316,6 +418,32 @@ _ALTIUM = EdaTool(
             ),
         )
     },
+    # The record data an Altium DbLib row carries onto a placed component. Altium receives strictly
+    # MORE than KiCad: a schematic has no property for a supplier's stock level, while a DbLib row
+    # does, and that asymmetry is exactly why this is per-tool rather than one global list.
+    #
+    # This declares the record DATA, not the .DbLib's column LAYOUT - see `altium/dblib.FIELD_MAP`
+    # for the wire format, which additionally carries paired columns (an asset ref splits into
+    # Ref + Path, a datasheet into a link Description + URL) and the placement binding. The two are
+    # tied together by `tests/backend/eda/test_data_fields.py`, which fails if either grows a field
+    # the other does not account for.
+    data_fields=(
+        DataField(key="mpn", label="MPN", tool_field="MPN", visible=True),
+        DataField(key="value", label="Value", tool_field="Value", visible=True),
+        DataField(key="manufacturer", label="Manufacturer", tool_field="Manufacturer", visible=True),
+        DataField(key="description", label="Description", tool_field="[Description]", visible=True),
+        DataField(key="datasheet", label="Datasheet", tool_field="ComponentLink1URL"),
+        DataField(key="supplier", label="Supplier", tool_field="Supplier"),
+        DataField(key="supplier_part_number", label="Supplier Part Number",
+                  tool_field="SupplierPartNumber"),
+        DataField(key="supplier_url", label="Supplier Link", tool_field="SupplierURL"),
+        DataField(key="price", label="Price", tool_field="Price"),
+        DataField(key="stock", label="Stock", tool_field="Stock"),
+        DataField(key="lifecycle", label="Lifecycle", tool_field="Lifecycle"),
+        DataField(key="category", label="Category", tool_field="Category"),
+        DataField(key="symbol", label="Symbol", tool_field="[Library Ref]"),
+        DataField(key="footprint", label="Footprint", tool_field="[Footprint Ref]"),
+    ),
     # A .SchDoc is an OLE2 binary Stockroom reads and never writes, so it cannot stamp a
     # binding onto an existing placement; the binding is kept on the project record instead.
     # A component placed from Stockroom's own DbLib still arrives carrying this parameter,
@@ -352,6 +480,42 @@ _REGISTRY: dict[str, EdaTool] = {t.key: t for t in (_KICAD, _ALTIUM)}
 def all_tools() -> tuple[EdaTool, ...]:
     """Every registered tool, in declaration order (see `_REGISTRY`)."""
     return tuple(_REGISTRY.values())
+
+
+def data_field_union() -> tuple[UnionField, ...]:
+    """Every record field ANY registered tool consumes, deduplicated, each naming its consumers.
+
+    This is what the detail sheet's handoff band renders: one row per field, saying which tools
+    receive it. A third EDA tool joins that band by declaring `data_fields`, with no edit here and
+    none in the frontend.
+
+    Order is registry declaration order - the first tool's fields lead, then whatever each later
+    tool adds. Deliberately NOT sorted: the order a person reads these in is a registry decision
+    (KiCad leads because it is the library Stockroom itself writes), and an alphabetical band would
+    open on "Category" rather than the part number.
+
+    The LABEL is the first registered tool's label for the field, so two tools spelling a field
+    differently still produce one row with one stable name.
+    """
+    order: list[str] = []
+    labels: dict[str, str] = {}
+    consumers: dict[str, list[str]] = {}
+    for tool in _REGISTRY.values():
+        for f in tool.data_fields:
+            if f.key not in consumers:
+                order.append(f.key)
+                labels[f.key] = f.label
+                consumers[f.key] = []
+            consumers[f.key].append(tool.key)
+    return tuple(
+        UnionField(
+            key=k,
+            label=labels[k],
+            tools=tuple(consumers[k]),
+            origin=FIELD_ORIGINS.get(k, "curated"),
+        )
+        for k in order
+    )
 
 
 def default_tool() -> EdaTool:

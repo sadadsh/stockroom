@@ -75,4 +75,19 @@ describe("fitDistance", () => {
     // a camera at the target with a 0 radius has no view direction and renders nothing.
     expect(fitDistance(0, 45, 1)).toBeGreaterThan(0);
   });
+
+  it("needs a DIFFERENT distance for a portrait frame than a landscape one", () => {
+    // The reason `onResize` in threeScene.ts must call refitCamera() and not merely restretch the
+    // camera: distance is a function of aspect, so a frame that changes SHAPE needs a new distance
+    // even though the subject has not moved. A resize that updates only `camera.aspect` leaves the
+    // camera where the old shape put it.
+    //
+    // MEASURED 2026-07-25: the detail sheet's stage went 266x540 (0.49) -> 494x240 (2.06) and the
+    // model rendered at ~28% of the frame width because the portrait distance was retained.
+    const portrait = fitDistance(1, 45, 266 / 540);
+    const landscape = fitDistance(1, 45, 494 / 240);
+    expect(portrait).toBeGreaterThan(landscape);
+    // and the gap is large enough to be plainly visible, not a rounding difference
+    expect(portrait / landscape).toBeGreaterThan(1.5);
+  });
 });
