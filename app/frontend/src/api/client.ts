@@ -259,9 +259,18 @@ export interface LandPad {
   rotation: number;
 }
 
+export interface LandGraphic {
+  start: [number, number];
+  end: [number, number];
+  /** KiCad layer, e.g. F.SilkS (the human-readable outline) or F.CrtYd (the keep-out). */
+  layer: string;
+  width: number;
+}
+
 export interface LandPattern {
   units: string;
   pads: LandPad[];
+  graphics: LandGraphic[];
   model_placement: {
     offset: [number, number, number];
     scale: [number, number, number];

@@ -248,3 +248,46 @@ class TestPads:
         before = (tmp_path / "t.kicad_mod").read_bytes()
         _ = fp.pads
         assert (tmp_path / "t.kicad_mod").read_bytes() == before
+
+
+class TestGraphics:
+    """Silkscreen and courtyard lines - the rest of what a footprint DRAWS.
+
+    Owner, 2026-07-25: "the footprint doesnt show everything". Pads alone are not the land pattern;
+    the silkscreen outline and the pin-1 marker are how anyone recognises the part on a board, and
+    the courtyard is the keep-out it must be checked against.
+    """
+
+    def _fp(self, tmp_path, body: str):
+        p = tmp_path / "t.kicad_mod"
+        p.write_text(f'(footprint "T"\n\t(layer "F.Cu")\n{body}\n)\n', encoding="utf-8")
+        return Footprint.load(p)
+
+    def test_reads_lines_with_their_layer(self, tmp_path):
+        fp = self._fp(
+            tmp_path,
+            '\t(fp_line (start -1 -2) (end 1 -2) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))\n'
+            '\t(fp_line (start -2 -3) (end 2 -3) (stroke (width 0.05) (type solid)) (layer "F.CrtYd"))\n',
+        )
+        g = fp.graphics
+        assert len(g) == 2
+        assert g[0].start == (-1.0, -2.0)
+        assert g[0].end == (1.0, -2.0)
+        assert g[0].layer == "F.SilkS"
+        assert g[0].width == 0.12
+        assert g[1].layer == "F.CrtYd"
+
+    def test_ignores_the_pads_own_geometry(self, tmp_path):
+        fp = self._fp(
+            tmp_path, '\t(pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))'
+        )
+        assert fp.graphics == []
+
+    def test_reading_graphics_does_not_rewrite_the_file(self, tmp_path):
+        fp = self._fp(
+            tmp_path,
+            '\t(fp_line (start 0 0) (end 1 1) (stroke (width 0.1) (type solid)) (layer "F.SilkS"))',
+        )
+        before = (tmp_path / "t.kicad_mod").read_bytes()
+        _ = fp.graphics
+        assert (tmp_path / "t.kicad_mod").read_bytes() == before
