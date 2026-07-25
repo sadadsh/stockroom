@@ -18,7 +18,7 @@ from stockroom.sexp.document import SexpDocument
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.eda.registry import get_tool
+from stockroom.eda.registry import all_tools, get_tool
 from stockroom.model.category import category_nickname
 from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.model.part import (
@@ -70,6 +70,16 @@ def _kicad(record: PartRecord):
     KiCad-only, which is how Altium assets ended up filed over KiCad references.
     """
     return record.assets_for("kicad")
+
+
+def _altium_log_suffix(log: str) -> str:
+    """Altium's own log appended to an error, when there is one.
+
+    A failure message without the tool's own words is what made the 3D embed take ten Altium boots
+    to diagnose: "it did not work" is not a diagnosis.
+    """
+    text = (log or "").strip()
+    return f" Altium said: {text}" if text else ""
 
 
 def _altium(record: PartRecord):
@@ -593,6 +603,91 @@ class LibraryOps:
                 txn.track(json_path)
                 txn.commit(f"Attach Altium assets to {part_id}: {' + '.join(landed)}")
         return record
+
+    def _model_source(self, record: PartRecord):
+        """The file-shaped 3D model this part already holds, from whichever tool carries one.
+
+        A STEP file is tool-agnostic: one file serves every tool. That is exactly why an embed
+        CONSUMES the model the part already has instead of asking a capture session for a second,
+        tool-specific copy, and it is why the registry lists Altium's model as embeddable but not
+        capturable. Registry order decides the preference, so this stays generic.
+        """
+        for tool in all_tools():
+            ref = record.assets_for(tool.key).model
+            if ref is not None and ref.file:
+                return ref
+        return None
+
+    def embed_altium_model(self, part_id: str, *, replace: bool = False, driver=None) -> dict:
+        """Embed the part's 3D model into its Altium footprint's `.PcbLib`, atomically.
+
+        Altium stores a 3D body INSIDE the `.PcbLib` binary, so this is the one mutation Stockroom
+        cannot perform itself: it drives the installed Altium (see `stockroom.altium.embed3d`) and
+        then verifies the container from outside Altium before believing it.
+
+        The `.PcbLib` is a tracked binary, so the whole thing is ONE transaction: the modified
+        library and the updated record land in a single scoped commit, and any failure restores the
+        original bytes and leaves zero trace. That matters more here than usual, because a
+        half-written OLE container is not something a peer could repair by hand.
+        """
+        from stockroom.altium.embed3d import embed_model
+
+        record = self.load_record(part_id)
+        altium = _altium(record)
+        footprint = altium.footprint
+        if footprint is None or not footprint.lib:
+            raise ValueError(
+                f"{part_id} has no Altium footprint, and a 3D body lives inside the footprint's "
+                ".PcbLib. Attach the Altium library first."
+            )
+        pcblib = self.lib.parts_dir.parent / "altium" / footprint.lib
+        if not pcblib.exists():
+            raise ValueError(f"the Altium library {footprint.lib} is missing from this profile")
+
+        source = self._model_source(record)
+        if source is None:
+            raise ValueError(
+                f"{part_id} has no 3D model file to embed. Attach a 3D model first; the same file "
+                "serves every tool."
+            )
+        step = self.lib.root / source.file
+        if not step.exists():
+            raise ValueError(f"the 3D model file is missing: {source.file}")
+
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            # Tracked BEFORE Altium touches it, unlike an attach which tracks after its copy: this
+            # modifies a file that already exists, so the pre-edit bytes are what rollback restores.
+            txn.track(pcblib)
+            result = embed_model(
+                pcblib,
+                step,
+                footprints=(footprint.name,) if footprint.name else (),
+                replace=replace,
+                driver=driver,
+            )
+            if not result.ok:
+                # Raised, not returned, so the transaction rolls the .PcbLib back. Altium's own
+                # words are carried through, because "it did not work" without the reason is what
+                # made this feature take ten boots to diagnose.
+                raise ValueError(f"{result.detail}{_altium_log_suffix(result.altium_log)}")
+            # The Altium model asset is a FILE-shaped ref that also names its container, because
+            # unlike KiCad's the payload lives inside the footprint library rather than beside it.
+            altium.model = AssetRef(lib=footprint.lib, name=footprint.name, file=source.file)
+            json_path.write_text(record.dumps(), encoding="utf-8")
+            txn.track(json_path)
+            sha = txn.commit(f"Embed 3D model into {part_id} Altium footprint")
+        return {
+            "part_id": part_id,
+            "status": result.status,
+            "detail": result.detail,
+            "embedded": result.embedded,
+            "payload_bytes": result.payload_bytes,
+            "orphaned": result.orphaned,
+            "pcblib": footprint.lib,
+            "model": source.file,
+            "commit": sha,
+        }
 
     def detach_asset(self, part_id: str, kind: str) -> PartRecord:
         """Remove ONE element from a part (owner 2026-07-24): the file goes, the record

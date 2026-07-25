@@ -160,13 +160,43 @@ def test_missing_assets_is_per_tool():
     r = _rec()
     r.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="A")
     assert r.missing_assets("kicad") == ["footprint", "3D model"]
-    assert r.missing_assets("altium") == ["symbol", "footprint"]
+    assert r.missing_assets("altium") == ["symbol", "footprint", "3D model"]
 
 
-def test_missing_assets_skips_a_kind_the_tool_cannot_take_by_reference():
-    # Altium stores 3D as a body inside the .PcbLib binary, so a 3D model can never be
-    # attached by reference. Reporting it as "missing" would be a permanent false gap.
-    assert "3D model" not in _rec().missing_assets("altium")
+def test_an_embeddable_kind_IS_reported_as_missing():
+    # RE-BASELINED 2026-07-25. This test previously asserted the opposite, and the assertion was
+    # right for the world it was written in: Altium's 3D model could not be attached BY REFERENCE
+    # and there was no other way to get one, so reporting it named a permanent false gap.
+    #
+    # There is now a way. `stockroom.altium.embed3d` drives Altium to write the 3D body into the
+    # footprint's own .PcbLib, verified end to end against a real library. So the gap is real,
+    # closable, and has an action behind it, and hiding it is what let Altium parts ship with no 3D
+    # at all. The registry carries both facts separately (`unsupported_assets` for "not by
+    # reference", `embedded_assets` for "but it can be embedded") so this stays data, not a branch.
+    assert "3D model" in _rec().missing_assets("altium")
+
+
+def test_a_kind_that_can_NEVER_be_closed_is_still_hidden():
+    # The other half of the rule, and the guard against re-introducing "CAD Incomplete forever":
+    # unsupported WITHOUT an embed route must still be skipped.
+    from dataclasses import replace
+
+    from stockroom.eda.registry import get_tool
+
+    altium = get_tool("altium")
+    no_embed = replace(altium, embedded_assets={})
+    assert "model" not in no_embed.closable_assets()
+    assert "model" in altium.closable_assets()
+
+
+def test_an_embeddable_kind_is_never_asked_of_a_capture_session():
+    # Embedding consumes the model file the part ALREADY holds, so a vendor must not be asked for a
+    # second tool-specific copy. `capturable_assets` and `closable_assets` differ for exactly this.
+    from stockroom.eda.registry import get_tool
+
+    altium = get_tool("altium")
+    assert "model" not in altium.capturable_assets()
+    assert "model" in altium.closable_assets()
 
 
 def test_a_passive_needs_no_owned_model():

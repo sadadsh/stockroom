@@ -17,6 +17,7 @@
  * uniform lookup is how it cannot.
  */
 import { ASSET_LABELS, DEFAULT_EDA_TOOL, EDA_TOOLS, edaTool } from "./edaRegistry.generated";
+import type { EdaToolSpec, EmbeddedAssetSpec } from "./edaRegistry.generated";
 import type { AssetRef, EdaAssets, PartDetail, PartSummary } from "../api/types";
 
 export type EdaTool = string;
@@ -65,26 +66,56 @@ export interface AssetReadiness {
   missing: string[];
   /**
    * Asset kinds this tool cannot be given by reference at all, mapped to why (Altium's 3D
-   * model lives inside the footprint's .PcbLib binary). These are NEVER counted as missing:
-   * reporting a gap that can never be closed is what "CAD Incomplete forever" looked like.
+   * model lives inside the footprint's .PcbLib binary). One of these counts as missing ONLY
+   * when it also appears in `embedded`, i.e. when there is a real way to close it. Reporting a
+   * gap that can never be closed is what "CAD Incomplete forever" looked like; hiding one that
+   * CAN be closed is how Altium parts silently shipped with no 3D at all.
    */
   unsupported: Record<string, string>;
+  /**
+   * Asset kinds obtainable by EMBEDDING, mapped to how. The UI offers the embed action for
+   * these, and `reason` is what to show when it is unavailable (embedding runs the real EDA
+   * tool, so it needs that tool installed on this machine).
+   */
+  embedded: Record<string, EmbeddedAssetSpec>;
   /** Ready when the symbol AND footprint are present; a 3D model is reported when absent but
    * never blocks readiness (a footprint places fine without one). */
   ready: boolean;
+}
+
+/**
+ * The asset kinds worth REPORTING on for a tool: everything except a kind that can never be
+ * closed at all. Mirrors `EdaTool.closable_assets` in stockroom/eda/registry.py, and the
+ * pytest-gated generated registry is what keeps the two from drifting.
+ *
+ * Exported because it is the whole rule in one place and the rule is what needs testing. Asserted
+ * against the live registry it would be VACUOUS today (KiCad has no unsupported kinds, and
+ * Altium's only unsupported kind is embeddable), so a test must hand it a synthetic spec. A test
+ * that cannot fail is worse than no test.
+ */
+export function reportableKinds(
+  spec: Pick<EdaToolSpec, "assetKinds" | "unsupportedAssets" | "embeddedAssets">,
+): string[] {
+  return spec.assetKinds.filter(
+    (kind) => !(kind in spec.unsupportedAssets) || kind in spec.embeddedAssets,
+  );
 }
 
 // The per-tool asset readiness of one part detail.
 export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness {
   const spec = edaTool(tool);
   const assets = assetsFor(part, tool);
-  const kinds = spec?.assetKinds ?? ["symbol", "footprint", "model"];
   const unsupported = spec?.unsupportedAssets ?? {};
+  const embedded = spec?.embeddedAssets ?? {};
+  const kinds = reportableKinds({
+    assetKinds: spec?.assetKinds ?? ["symbol", "footprint", "model"],
+    unsupportedAssets: unsupported,
+    embeddedAssets: embedded,
+  });
 
   const present: Record<string, boolean> = {};
   const missing: string[] = [];
   for (const kind of kinds) {
-    if (kind in unsupported) continue;
     // A passive references the stock footprint, which carries its own 3D body, so it needs
     // no owned model. Mirrors PartRecord.missing_assets.
     if (kind === "model" && part.passive) {
@@ -100,6 +131,7 @@ export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness 
     present,
     missing,
     unsupported,
+    embedded,
     ready: !!present.symbol && !!present.footprint,
   };
 }

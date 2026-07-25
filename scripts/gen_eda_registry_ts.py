@@ -64,6 +64,26 @@ def render() -> str:
         "   * one of these as a missing asset: it names a gap that can never be closed.",
         "   */",
         "  unsupportedAssets: Record<string, string>;",
+        "  /**",
+        "   * Asset kinds this tool takes only by EMBEDDING: the tool itself writes the payload",
+        "   * into a binary container the part already owns (an Altium 3D body goes inside the",
+        "   * footprint's .PcbLib). A kind may be BOTH unsupported-by-reference and embeddable,",
+        "   * and that combination is a real, closable gap that MUST be reported. `reason`",
+        "   * explains what embedding needs, so a machine without the tool can say why rather",
+        "   * than silently doing nothing.",
+        "   */",
+        "  embeddedAssets: Record<string, EmbeddedAssetSpec>;",
+        "}",
+        "",
+        "// How one asset kind gets embedded (mirrors stockroom.eda.registry.EmbeddedAsset).",
+        "export interface EmbeddedAssetSpec {",
+        "  /** The asset whose file receives the payload. */",
+        "  container: string;",
+        "  /** The asset kind that supplies the payload. */",
+        "  source: string;",
+        "  /** Whether embedding needs the EDA tool installed on this machine. */",
+        "  requiresToolInstalled: boolean;",
+        "  reason: string;",
         "}",
         "",
         "// Human labels for the asset kinds, keyed as the registry keys them.",
@@ -91,6 +111,21 @@ def render() -> str:
             lines.append("    },")
         else:
             lines.append("    unsupportedAssets: {},")
+        if tool.embedded_assets:
+            lines.append("    embeddedAssets: {")
+            for kind, spec in tool.embedded_assets.items():
+                lines.append(f"      {_ts_key(kind)}: {{")
+                lines.append(f"        container: {_ts_string(spec.container)},")
+                lines.append(f"        source: {_ts_string(spec.source)},")
+                lines.append(
+                    "        requiresToolInstalled: "
+                    f"{'true' if spec.requires_tool_installed else 'false'},"
+                )
+                lines.append(f"        reason: {_ts_string(spec.reason)},")
+                lines.append("      },")
+            lines.append("    },")
+        else:
+            lines.append("    embeddedAssets: {},")
         lines.append("  },")
     lines += [
         "];",

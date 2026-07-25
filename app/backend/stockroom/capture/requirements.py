@@ -36,12 +36,7 @@ class Requirement(str, Enum):
 def _capturable() -> list[tuple[str, str]]:
     """(tool key, asset kind) for every asset a tool can actually be given by reference,
     tools in registry order and kinds in each tool's registered order."""
-    return [
-        (tool.key, kind)
-        for tool in all_tools()
-        for kind in tool.asset_kinds
-        if kind not in tool.unsupported_assets
-    ]
+    return [(tool.key, kind) for tool in all_tools() for kind in tool.capturable_assets()]
 
 
 def requirement(tool: str, kind: str) -> "Requirement":

@@ -450,17 +450,18 @@ class PartRecord:
         order. Not part of completeness -- a part is complete without any assets now -- but
         it tells the UI what can still be attached.
 
-        A kind the tool cannot take by reference at all (Altium's 3D model, which lives
-        inside the footprint's `.PcbLib` binary) is skipped: reporting it would be a gap
-        that can never be closed. A passive inherits the stock footprint's own 3D model, so
-        it needs no owned model file.
+        A kind that can never be closed at all is skipped, because reporting an impossible
+        gap is what "CAD Incomplete forever" looked like. A kind the tool cannot take by
+        REFERENCE but can be given by EMBEDDING (Altium's 3D model, written into the
+        footprint's `.PcbLib` by Altium itself) is a genuine closable gap and IS reported;
+        hiding it is how Altium parts silently shipped with no 3D. The registry decides which
+        is which, so neither case is a branch here. A passive inherits the stock footprint's
+        own 3D model, so it needs no owned model file.
         """
         assets = self.assets_for(tool)
         spec = get_tool(tool)
         out: list[str] = []
-        for kind in spec.asset_kinds:
-            if kind in spec.unsupported_assets:
-                continue
+        for kind in spec.closable_assets():
             if kind == "model" and self.passive:
                 continue
             if not asset_present(assets.get(kind)):

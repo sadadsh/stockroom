@@ -48,6 +48,37 @@ class PlacementBinding:
 
 
 @dataclass(frozen=True)
+class EmbeddedAsset:
+    """An asset kind this tool can only receive by having the TOOL ITSELF write it into a
+    binary container the part already owns.
+
+    This is a different fact from `unsupported_assets`, and conflating them is what kept
+    Altium 3D permanently out of reach. Both are true of an Altium 3D model at once:
+
+    - it cannot be given BY REFERENCE (no database column or path carries a 3D body), which is
+      what `unsupported_assets` records, and it is why a capture session must never be asked to
+      fetch one;
+    - it CAN be obtained, by driving the tool to embed the model file the part already holds,
+      which is what this records, and it is why the gap is worth reporting.
+
+    So a kind listed here is a CLOSABLE gap. That distinction matters: reporting a gap that can
+    never be closed is exactly what "CAD Incomplete forever" looked like, while hiding a gap that
+    CAN be closed is how Altium parts silently shipped with no 3D at all.
+    """
+
+    # The asset whose file receives the payload (an Altium 3D body lives in the footprint's
+    # `.PcbLib`), and the asset kind that SUPPLIES the payload. The source is normally the same
+    # kind held for another tool: one STEP file serves every tool, so nothing is captured twice.
+    container: str = "footprint"
+    source: str = "model"
+    # Embedding runs the real EDA tool, so it needs that tool installed on THIS machine. Stated
+    # as data because a KiCad-only peer must be told why the action is unavailable rather than
+    # watching it silently do nothing.
+    requires_tool_installed: bool = True
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class EdaTool:
     """Everything generic code needs to know about one EDA tool.
 
@@ -73,8 +104,32 @@ class EdaTool:
     # Asset kinds the tool CANNOT be given through Stockroom's normal reference mechanism,
     # mapped to why. Generic code reads this instead of special-casing a tool.
     unsupported_assets: dict[str, str] = field(default_factory=dict)
+    # Asset kinds the tool takes only by EMBEDDING (see EmbeddedAsset). A kind may appear here
+    # AND in `unsupported_assets`: it cannot be referenced, but it can be embedded.
+    embedded_assets: dict[str, EmbeddedAsset] = field(default_factory=dict)
     # How a placed component carries the library part it is bound to (see PlacementBinding).
     placement_binding: PlacementBinding = PlacementBinding()
+
+    def capturable_assets(self) -> tuple[str, ...]:
+        """Kinds a CAPTURE session can fetch by reference, in registered order.
+
+        An embeddable kind is excluded: the payload comes from a file the part already holds, so
+        asking a vendor for a second, tool-specific copy would be busywork.
+        """
+        return tuple(k for k in self.asset_kinds if k not in self.unsupported_assets)
+
+    def closable_assets(self) -> tuple[str, ...]:
+        """Kinds a part can actually END UP holding, in registered order.
+
+        This is what readiness reports on, and it is deliberately wider than
+        `capturable_assets`: a kind that cannot be referenced but CAN be embedded is a real gap
+        with a real action behind it, so hiding it would be dishonest.
+        """
+        return tuple(
+            k
+            for k in self.asset_kinds
+            if k not in self.unsupported_assets or k in self.embedded_assets
+        )
 
 
 _KICAD = EdaTool(
@@ -139,6 +194,21 @@ _ALTIUM = EdaTool(
         "model": (
             "Altium stores 3D as a 3D Body inside the footprint's .PcbLib (an OLE2 "
             "binary), so it cannot be attached by reference; it must be embedded."
+        )
+    },
+    # ... but it CAN be embedded, verified end to end 2026-07-25 (`stockroom.altium.embed3d`):
+    # Altium itself is driven to write the 3D body into the footprint's own .PcbLib, and the result
+    # is checked by reading the container back from OUTSIDE Altium. So the 3D gap is now REPORTED
+    # and has a real action behind it, instead of being hidden as impossible.
+    embedded_assets={
+        "model": EmbeddedAsset(
+            container="footprint",
+            source="model",
+            requires_tool_installed=True,
+            reason=(
+                "A 3D body is written into the footprint's .PcbLib by Altium itself, so "
+                "embedding needs Altium installed on this machine."
+            ),
         )
     },
     # A .SchDoc is an OLE2 binary Stockroom reads and never writes, so it cannot stamp a

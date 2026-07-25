@@ -90,6 +90,51 @@ def altium_router(require_token) -> APIRouter:
             "dblib": Path(result["dblib"]).as_posix(),
         }
 
+    @r.get("/embed-capability")
+    def embed_capability() -> dict:
+        """Whether a 3D embed can run HERE, and why not when it cannot.
+
+        Machine-level like `/odbc-status`, not profile-scoped. A 3D body is written into the
+        footprint's `.PcbLib` by Altium itself, so this needs Altium installed and its license seat
+        free. A KiCad-only peer gets an explained unavailable state instead of a button that
+        silently does nothing, which is the whole reason the requirement is registry DATA.
+        """
+        from stockroom.altium.driver import AltiumDriver
+        from stockroom.eda.registry import get_tool
+
+        spec = get_tool("altium").embedded_assets.get("model")
+        driver = AltiumDriver()
+        busy = driver.busy_titles()
+        return {
+            "installed": driver.installed,
+            # .as_posix() rather than str(Path), so the path reads the same on both platforms.
+            "binary": driver.x2.as_posix() if driver.x2 else "",
+            "requires_tool_installed": bool(spec and spec.requires_tool_installed),
+            "reason": spec.reason if spec else "",
+            # A windowed Altium holds the single On-Demand seat, so a scripted run would wait for
+            # it forever. Reported up front rather than discovered by a run that never returns.
+            "busy": busy[0] if busy else "",
+            "available": driver.installed and not busy,
+        }
+
+    @r.post("/parts/{part_id}/embed-model")
+    def embed_model_route(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Embed the part's 3D model into its Altium footprint's `.PcbLib`.
+
+        Serialized behind the same module lock as the other git-committing endpoints: this one
+        drives Altium AND commits, so two concurrent calls would collide on both the license seat
+        and `.git/index.lock`.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        with _WRITE_LOCK:
+            # ValueError -> 400 with the reason (including Altium's own words on a tool failure).
+            result = ctx.ops.embed_altium_model(part_id, replace=bool((body or {}).get("replace")))
+            ctx.rebuild_index()
+            ctx.auto_push()
+        return result
+
     @r.post("/parts/{part_id}/attach")
     def attach(request: Request, part_id: str, body: dict) -> dict:
         ctx = request.app.state.ctx
