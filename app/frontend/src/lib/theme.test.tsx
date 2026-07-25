@@ -17,6 +17,9 @@ function Probe() {
 describe("ThemeProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    // See AppShell.test.tsx: the theme is stored in the machine config and injected by the host, so
+    // the injected copy is part of the slate a test has to reset.
+    window.__STOCKROOM_UI__ = {};
     delete document.documentElement.dataset.theme;
   });
 

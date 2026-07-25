@@ -14,6 +14,7 @@ import { ApiError } from "../api/client";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
+import { readPref, writePref } from "../lib/uiPrefs";
 
 function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
@@ -35,22 +36,22 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
 const RAIL_STORAGE_KEY = "stockroom.rail.collapsed";
 
 function readCollapsed(): boolean {
-  try {
-    return localStorage.getItem(RAIL_STORAGE_KEY) === "1";
-  } catch {
-    return false; // localStorage may be unavailable; expanded is the default
-  }
+  // Host-injected preference first, localStorage only as the dev-server fallback. The host binds an
+  // ephemeral port, so localStorage is empty on every launch and the collapsed rail always came
+  // back expanded. See lib/uiPrefs.ts.
+  return readPref<boolean>(
+    "rail_collapsed",
+    RAIL_STORAGE_KEY,
+    (raw) => (raw === "1" ? true : raw === "0" ? false : undefined),
+    false,
+  );
 }
 
 export function Rail() {
   const { route, navigate } = useRouter();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   useEffect(() => {
-    try {
-      localStorage.setItem(RAIL_STORAGE_KEY, collapsed ? "1" : "0");
-    } catch {
-      /* persistence is best-effort, exactly as in ThemeProvider */
-    }
+    writePref("rail_collapsed", collapsed, RAIL_STORAGE_KEY);
   }, [collapsed]);
   const { toggle } = useTheme();
   const items = railNav();

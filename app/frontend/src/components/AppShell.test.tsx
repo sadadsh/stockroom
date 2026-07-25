@@ -20,6 +20,9 @@ vi.mock("../api/client", async (importActual) => {
       listProfiles: vi.fn(),
       activateProfile: vi.fn(),
       checkUpdate: vi.fn(),
+      // The rail persists its collapsed state through the settings endpoint now, so the mock has to
+      // carry it or the write throws inside the effect that saves the preference.
+      updateSettings: vi.fn().mockResolvedValue({}),
     },
   };
 });
@@ -176,7 +179,11 @@ describe("Rail collapse", () => {
   // the first case's collapse leaked into the next one, which is a test-isolation bug and not a
   // product one (it did prove the persistence works).
   beforeEach(() => {
+    // The preference now lives in the MACHINE CONFIG, handed to the page by the host as
+    // window.__STOCKROOM_UI__, because an ephemeral port gave every launch a new origin and wiped
+    // origin-scoped localStorage. Clearing the mirror alone therefore no longer resets the slate.
     localStorage.removeItem("stockroom.rail.collapsed");
+    window.__STOCKROOM_UI__ = {};
   });
 
   it("collapses to icons and back, and says which it will do", async () => {

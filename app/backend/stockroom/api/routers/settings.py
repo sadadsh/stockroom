@@ -151,6 +151,13 @@ def settings_router(require_token) -> APIRouter:
         if "mouser_api_key" in body:
             ctx.config.mouser_api_key = str(body["mouser_api_key"] or "")
             ctx.config.save()
+        # UI preferences (theme, rail_collapsed). MERGED, never replaced, so saving the theme
+        # cannot wipe the rail state written by a different control a moment earlier. They live in
+        # the machine config rather than localStorage because the host binds an ephemeral port and
+        # the page origin changes every launch, which silently reset every preference.
+        if "ui" in body and isinstance(body["ui"], dict):
+            ctx.config.ui = {**(ctx.config.ui or {}), **body["ui"]}
+            ctx.config.save()
         # Saved credentials (no live-apply side effect beyond ctx.config being updated, so the
         # next enrich / cad-source build picks them up): write only the fields sent, then
         # persist once (not once per field). Covers the DigiKey API creds, the DigiKey account

@@ -84,6 +84,13 @@ class MachineConfig:
     # or chose to continue with the default). Drives the one-time welcome screen (M9b).
     onboarded: bool = False
     window: dict = field(default_factory=dict)
+    # UI preferences (theme, rail_collapsed). MACHINE level, not profile level: they follow the
+    # person, not the library. They live here rather than in the browser because the host binds an
+    # EPHEMERAL PORT, so the page origin changes on every launch and origin-scoped localStorage
+    # starts empty each time - measured on real Windows, the theme reverted to dark on every single
+    # launch. A dict so a new preference needs no schema change. Kept separate from `window`, which
+    # is geometry.
+    ui: dict = field(default_factory=dict)
     # Library-scale rescan (Phase-1b-2): a part is re-checked only when its last check is older
     # than this many days (incremental), and each provider's calls are paced to <= N/min so a
     # full-library rescan trickles within quota instead of tripping a 429. Sensible defaults; the

@@ -166,17 +166,27 @@ def bind_native_drop(window, on_drop, dom_event_handler=None) -> bool:
         return False
 
 
-def inject_script(base_url: str, token: str) -> str:
-    """The renderer bootstrap: set the two globals the SPA actually reads: the
-    frontend's runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__,
-    so the SPA authenticates every request, and unregister any service worker so a
-    self-update never serves a stale bundle. Values are JSON-encoded so a token with a
-    quote or backslash cannot break out of the JS string (defense in depth)."""
+def inject_script(base_url: str, token: str, ui: dict | None = None) -> str:
+    """The renderer bootstrap: set the globals the SPA actually reads: the frontend's
+    runtime.ts reads window.__API_BASE__ and window.__STOCKROOM_TOKEN__, so the SPA
+    authenticates every request, and unregister any service worker so a self-update never
+    serves a stale bundle. Values are JSON-encoded so a token with a quote or backslash
+    cannot break out of the JS string (defense in depth).
+
+    `ui` carries the saved UI preferences (theme, rail_collapsed). They ride in HERE, in the
+    script the host injects ahead of the SPA's first byte, because they must be known
+    SYNCHRONOUSLY: fetching them over the API would paint the default theme first and then
+    flip it. They cannot live in localStorage at all, because the host binds an ephemeral
+    port and the page origin therefore differs on every launch (measured: the theme reverted
+    to dark every time)."""
     base = json.dumps(base_url)
     tok = json.dumps(token)
+    # `</script>` inside a JSON string would otherwise close the injected <script> element.
+    prefs = json.dumps(ui or {}).replace("</", "<\\/")
     return (
         f"window.__API_BASE__ = {base};\n"
         f"window.__STOCKROOM_TOKEN__ = {tok};\n"
+        f"window.__STOCKROOM_UI__ = {prefs};\n"
         "if ('serviceWorker' in navigator) {\n"
         "  navigator.serviceWorker.getRegistrations().then(function (rs) {\n"
         "    rs.forEach(function (r) { r.unregister(); });\n"
