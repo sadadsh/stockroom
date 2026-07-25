@@ -11,12 +11,20 @@
 #   scripts/gates.sh frontend     # frontend tests + typecheck + build
 #   scripts/gates.sh quick        # typecheck + a serial-safe backend subset, for a tight loop
 #   scripts/gates.sh types        # ty (advisory: NOT a gate yet, see the punch list)
+#   scripts/gates.sh bg           # start the backend suite detached, print the log path
+#   scripts/gates.sh await        # block until the detached run finishes, print its summary line
+#
+# `bg` + `await` exist because the backend suite takes ~2m and the useful thing to do meanwhile is
+# keep working. That was being hand-written every time as a nohup plus a sleep-and-grep loop, three
+# times in one session, so it is a subcommand now. `await` polls for the pytest SUMMARY LINE, which
+# is a real success/failure signal, and gives up on its own ceiling rather than looping forever: a
+# timeout here means the run died without writing a summary, which is a defect worth seeing.
 #
 # SERIAL_TESTS=1 forces the single-process run. Use it when a failure might itself be a parallelism
 # artifact: if a test passes serially but fails under -n auto, the test shares state, and that is a
 # real defect in the test rather than a reason to abandon parallelism.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 2
 
 FAILED=()
 run() {  # run <label> <cmd...>
@@ -37,8 +45,44 @@ backend() {
 }
 fe() { npm --prefix app/frontend run "$1"; }
 
+ROOT="$PWD"
+BG_LOG="${GATES_BG_LOG:-build/gates-backend.log}"
+
 case "${1:-all}" in
   backend)  run "backend suite" backend ;;
+  bg)       mkdir -p "$(dirname "$BG_LOG")"
+            : > "$BG_LOG"
+            # The child re-invokes THIS script's own `backend` mode from an absolute path, so there
+            # is exactly one pytest invocation to maintain and the child's $0 resolves correctly.
+            # Sourcing it with a flag instead looked tidier and was broken: in a sourced script $0 is
+            # "bash", so `cd $(dirname $0)/..` walked OUT of the repo and .venv/bin/python vanished.
+            setsid nohup "$ROOT/scripts/gates.sh" backend >>"$BG_LOG" 2>&1 &
+            echo $! > "$BG_LOG.pid"
+            echo "backend suite started detached; log: $BG_LOG"
+            echo "wait for it with: $0 await"
+            exit 0 ;;
+  await)    [[ -f "$BG_LOG" ]] || { echo "no detached run: $BG_LOG is absent" >&2; exit 2; }
+            pid="$(cat "$BG_LOG.pid" 2>/dev/null || echo 0)"
+            deadline=$(( $(date +%s) + ${GATES_AWAIT_TIMEOUT:-900} ))
+            while (( $(date +%s) < deadline )); do
+              # SUCCESS signal: pytest's own summary line.
+              if grep -qE '[0-9]+ (passed|failed|error)' "$BG_LOG"; then
+                grep -E '^FAILED|[0-9]+ (passed|failed|error)' "$BG_LOG" | tail -20
+                grep -qE '[0-9]+ (failed|error)' "$BG_LOG" && exit 1
+                exit 0
+              fi
+              # FAILURE signal, checked every cycle so a child that died never costs the ceiling.
+              # This is the whole point: waiting out a clock tells you only that time passed.
+              if [[ "$pid" != 0 ]] && ! kill -0 "$pid" 2>/dev/null; then
+                echo "the detached run exited without a pytest summary:" >&2
+                tail -20 "$BG_LOG" >&2
+                exit 1
+              fi
+              sleep 5
+            done
+            echo "TIMEOUT: no pytest summary in $BG_LOG. The run died without reporting, which is" >&2
+            echo "a gap in the observation, not a normal outcome. Read the log." >&2
+            exit 5 ;;
   frontend) run "frontend tests" fe test:run
             run "typecheck" fe typecheck
             run "build" fe build ;;
