@@ -422,3 +422,85 @@ def test_stock_model_glb_renders_by_lib_id(app_ctx, monkeypatch, tmp_path):
 def test_stock_model_glb_404_when_not_installed(client):
     r = client.get("/api/previews/stock/model.glb?fp=No_Such_Lib:No_Such")
     assert r.status_code == 404
+
+
+class TestScalablePreviewSvg:
+    """A preview SVG must scale to its tile, which means it must NOT declare physical dimensions.
+
+    MEASURED in the real app (2026-07-25) with a real TI USON-14 footprint: `kicad-cli` emits
+    `width="2.641600mm" height="4.114800mm"`, so the browser gives the image an INTRINSIC SIZE of
+    10x16 CSS pixels. Inside a 127x110 tile with `object-fit: contain` that renders as a
+    near-invisible sliver - the long-standing "the footprint tile shows a few dots" bug, which was
+    never a failed render at all. Dropping the two physical attributes and letting the `viewBox`
+    drive sizing took the same file to an intrinsic 96x150, correctly proportioned.
+
+    The symbol has the same defect but hid it, because its intrinsic 175x94 is large enough to look
+    deliberate. Both go through `_svg_response`, so the fix belongs there and cannot be applied to
+    one preview and forgotten on the other.
+    """
+
+    def test_strips_physical_width_and_height_but_keeps_the_viewbox(self):
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="2.641600mm" '
+            'height="4.114800mm" viewBox="0.000000 0.000000 2.641600 4.114800">'
+            "<rect/></svg>"
+        )
+        out = scalable_svg(src)
+        assert 'width="2.641600mm"' not in out
+        assert 'height="4.114800mm"' not in out
+        assert 'viewBox="0.000000 0.000000 2.641600 4.114800"' in out
+        assert "<rect/>" in out, "the drawing itself must be untouched"
+
+    def test_leaves_a_width_inside_the_body_alone(self):
+        # Only the ROOT <svg> element's sizing is the problem. A width on a child (a rect, a
+        # nested svg) is part of the drawing, and stripping it would corrupt the render.
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="5mm" '
+            'viewBox="0 0 10 5"><rect width="3" height="2"/></svg>'
+        )
+        out = scalable_svg(src)
+        assert '<rect width="3" height="2"/>' in out
+        assert 'width="10mm"' not in out
+
+    def test_is_a_no_op_when_there_are_no_physical_dimensions(self):
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><g/></svg>'
+        assert scalable_svg(src) == src
+
+    def test_keeps_a_document_without_a_viewbox_unchanged(self):
+        # Without a viewBox the physical size is the ONLY sizing information there is; removing it
+        # would collapse the image to nothing. Better a small render than an empty one.
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = '<svg xmlns="http://www.w3.org/2000/svg" width="8mm" height="4mm"><g/></svg>'
+        assert scalable_svg(src) == src
+
+    def test_handles_a_REAL_kicad_cli_preamble_and_multiline_root(self):
+        """The shape kicad-cli actually emits: an XML declaration, a DOCTYPE, and a root element
+        whose attributes span several lines. An earlier version of this anchored at offset 0 and so
+        did nothing at all on every real file, while the tidy single-line fixtures above passed."""
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<?xml version="1.0" standalone="no"?>\n'
+            ' <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" \n'
+            ' "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"> \n'
+            "<svg\n"
+            '  xmlns:svg="http://www.w3.org/2000/svg"\n'
+            '  xmlns="http://www.w3.org/2000/svg"\n'
+            '  width="2.641600mm"\n'
+            '  height="4.114800mm"\n'
+            '  viewBox="0.000000 0.000000 2.641600 4.114800">\n'
+            "<rect/>\n</svg>\n"
+        )
+        out = scalable_svg(src)
+        assert "2.641600mm" not in out
+        assert "4.114800mm" not in out
+        assert 'viewBox="0.000000 0.000000 2.641600 4.114800"' in out
+        assert "<!DOCTYPE svg" in out, "the preamble must survive untouched"
+        assert "<rect/>" in out
