@@ -90,10 +90,29 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None) -> dict:
     """
     root = Path(root)
     repo = repo or GitRepo(root)
-    if not repo.is_clean():
+    # Two PRECISE guards rather than one blunt "is the tree clean".
+    #
+    # A blunt clean check would be wrong in both directions. Too strict: the library repo always has
+    # regenerated and in-progress files lying around, so hygiene could never run on a real library.
+    # Too lax in the one place it matters: `commit_staged` commits the whole INDEX, so anything
+    # already staged really would be swept into a commit the user did not make.
+    #
+    # Untracked and unstaged-modified files elsewhere are harmless here: they are not in the index,
+    # and only our own paths get staged.
+    if repo._run("diff", "--cached", "--quiet", check=False).returncode != 0:
         raise ValueError(
-            "this repository has uncommitted changes; commit or discard them before syncing "
-            "workspace hygiene"
+            "this repository has staged changes; commit or unstage them before syncing workspace "
+            "hygiene, so they are not swept into the hygiene commit"
+        )
+    # The one exception: we MERGE into the current on-disk text of the hygiene files, so committing
+    # them would carry an unfinished edit of the user's along with our block.
+    # Only the hygiene files that actually exist: `is_clean([])` falls back to checking the WHOLE
+    # tree, which would quietly reinstate the blunt guard this replaced.
+    hygiene_paths = [p for p in (root / IGNORE_FILE, root / ATTRIBUTES_FILE) if p.exists()]
+    if hygiene_paths and not repo.is_clean(hygiene_paths):
+        raise ValueError(
+            f"{IGNORE_FILE} or {ATTRIBUTES_FILE} has uncommitted changes; commit or discard them "
+            "before syncing workspace hygiene"
         )
     writes, untrack, merged = _planned(root, tool_keys, repo)
     if not writes and not untrack:

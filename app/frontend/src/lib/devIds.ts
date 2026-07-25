@@ -157,6 +157,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "projects.checks", label: "Rules Check (ERC/DRC)", area: "projects" },
   { id: "projects.prepare", label: "Prepare project", area: "projects" },
   { id: "projects.assign", label: "Assign components to groups", area: "projects" },
+  { id: "projects.hygiene", label: "Stop sharing per-user EDA files", area: "projects" },
   { id: "projects.bom", label: "Build and cost", area: "projects" },
   { id: "projects.bom-exports", label: "BOM exports", area: "projects" },
   { id: "projects.revision-diff", label: "Revision diff", area: "projects" },

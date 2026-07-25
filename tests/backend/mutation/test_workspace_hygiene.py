@@ -123,14 +123,43 @@ def test_a_repo_with_an_unterminated_block_refuses_rather_than_guessing(tmp_path
     assert (root / ".gitignore").read_text(encoding="utf-8").endswith("half\n")
 
 
-def test_a_dirty_tree_is_refused_before_anything_is_written(tmp_path):
-    """A hygiene commit stages whole paths, so an in-progress user edit must never be swept into it.
-    Mirrors the Prepare / assign guards."""
+def test_foreign_STAGED_work_is_refused_before_anything_is_written(tmp_path):
+    """`commit_staged` commits the whole index, so anything already staged would be swept into the
+    hygiene commit. That is the real hazard and it is refused."""
     root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n", "board.kicad_prl": "x\n"})
     (root / "board.kicad_sch").write_text("(kicad_sch (edited))\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="uncommitted"):
+    repo._run("add", "--", str(root / "board.kicad_sch"))
+    with pytest.raises(ValueError, match="staged"):
         apply_hygiene(root, ["kicad"], repo=repo)
     assert not (root / ".gitignore").exists()
+
+
+def test_an_uncommitted_edit_to_a_hygiene_FILE_is_refused(tmp_path):
+    """Our merge reads the file's current text, so committing it would carry the user's unfinished
+    edit into a Stockroom commit they did not make."""
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n",
+                                  ".gitignore": "# mine\n"})
+    (root / ".gitignore").write_text("# mine\n# half-written thought\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="uncommitted"):
+        apply_hygiene(root, ["kicad"], repo=repo)
+
+
+def test_UNRELATED_uncommitted_work_does_not_block_the_sync(tmp_path):
+    """The library repo always has in-progress and regenerated files lying around. Refusing on any
+    dirt at all would mean hygiene could never run on a real library, and none of that dirt can
+    reach the commit: untracked files are not in the index, and only our own paths get staged."""
+    root, repo = _repo(tmp_path, {"board.kicad_sch": "(kicad_sch)\n", "board.kicad_prl": "x\n"})
+    (root / "board.kicad_sch").write_text("(kicad_sch (mid-edit))\n", encoding="utf-8")
+    (root / "scratch.txt").write_text("untracked\n", encoding="utf-8")
+
+    result = apply_hygiene(root, ["kicad"], repo=repo)
+    assert result["untracked"] == ["board.kicad_prl"]
+    # the user's in-progress edit is STILL uncommitted, exactly as they left it
+    assert " M board.kicad_sch" in repo.status_porcelain()
+    assert "(mid-edit)" in (root / "board.kicad_sch").read_text(encoding="utf-8")
+    show = repo._run("show", "--stat", "--name-only", "--format=", "HEAD").stdout
+    assert "board.kicad_sch" not in show
+    assert "scratch.txt" not in show
 
 
 # -- wired into the project surface -------------------------------------------
@@ -188,3 +217,38 @@ def test_hygiene_on_a_project_with_no_git_is_an_honest_refusal(tmp_path):
     rec = ops.register(plain)
     with pytest.raises(ValueError, match="git"):
         ops.hygiene_apply(rec.id)
+
+
+def test_the_LIBRARY_repo_gets_every_registered_tools_rules(tmp_path):
+    """The library holds assets for every EDA tool at once, so it takes the union rather than one
+    tool's set. A per-project sync would never cover it, and a peer cloning the library is exactly
+    who inherits a committed `fp-info-cache`."""
+    from stockroom.eda.registry import all_tools
+
+    root, repo = _repo(tmp_path, {
+        "Stockroom/symbols/SR-Resistors.kicad_sym": "(kicad_symbol_lib)\n",
+        "Stockroom/altium/Stockroom.DbLib": "[DatabaseLinks]\n",
+        "Stockroom/fp-info-cache": "cache\n",
+    })
+    result = apply_hygiene(root, [t.key for t in all_tools()], repo=repo)
+    assert result["untracked"] == ["Stockroom/fp-info-cache"]
+    ignore = (root / ".gitignore").read_text(encoding="utf-8")
+    attrs = (root / ".gitattributes").read_text(encoding="utf-8")
+    assert "*.kicad_prl" in ignore and "History/" in ignore      # both adapters contributed
+    assert "*.PcbLib binary" in attrs and "*.kicad_sch text eol=lf" in attrs
+    # the library's real assets stay tracked
+    tracked = set(repo._run("ls-files").stdout.split())
+    assert "Stockroom/symbols/SR-Resistors.kicad_sym" in tracked
+    assert "Stockroom/altium/Stockroom.DbLib" in tracked
+
+
+def test_library_ops_exposes_the_same_two_step(tmp_path):
+    from stockroom.mutation.library_ops import LibraryOps
+    from stockroom.store.profile import Profile
+
+    root, repo = _repo(tmp_path, {"Stockroom/parts/.gitkeep": "",
+                                  "Stockroom/fp-info-cache": "cache\n"})
+    ops = LibraryOps(Profile("Stockroom", root / "Stockroom"), repo)
+    assert ops.hygiene_read()["untracked"] == ["Stockroom/fp-info-cache"]
+    assert ops.hygiene_apply()["untracked"] == ["Stockroom/fp-info-cache"]
+    assert ops.hygiene_apply()["committed"] is None  # idempotent

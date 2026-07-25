@@ -62,6 +62,8 @@ vi.mock("../api/client", async (importActual) => {
       runPrepare: vi.fn(),
       manualFill: vi.fn(),
       getAssign: vi.fn(),
+      getProjectHygiene: vi.fn(),
+      syncProjectHygiene: vi.fn(),
       assignGroup: vi.fn(),
       restore: vi.fn(),
       listParts: vi.fn(),
@@ -805,6 +807,13 @@ beforeEach(() => {
   });
   mockApi.getPrepare.mockResolvedValue(PREPARE);
   mockApi.getAssign.mockResolvedValue(ASSIGN);
+  mockApi.getProjectHygiene.mockResolvedValue({
+    eda: "kicad", under_git: true, writes: [], untracked: [],
+  });
+  mockApi.syncProjectHygiene.mockResolvedValue({
+    project: "Netdeck", eda: "kicad", writes: [".gitignore"],
+    untracked: ["board.kicad_prl"], committed: "aaaa1111",
+  });
   mockApi.assignGroup.mockResolvedValue({
     project: "Netdeck",
     committed: "9999aaaa8888",
@@ -3119,5 +3128,95 @@ describe("ProjectsPage assign components", () => {
     const user = userEvent.setup();
     const section = await openAssign(user);
     expect(within(section).queryByTestId("assign-bound")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("ProjectsPage sync hygiene", () => {
+  async function openHealth(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    return await screen.findByTestId("hygiene-section");
+  }
+
+  it("names the files it would stop sharing, rather than just claiming it will fix things", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitignore", ".gitattributes"],
+      untracked: ["board.kicad_prl", "fp-info-cache"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    const files = within(section).getByTestId("hygiene-files");
+    expect(files).toHaveTextContent("board.kicad_prl");
+    expect(files).toHaveTextContent("fp-info-cache");
+    // and it says the files survive, because "stop sharing" reads like "delete" otherwise
+    expect(section).toHaveTextContent("These stay on your disk.");
+  });
+
+  it("confirms a clean project instead of offering a pointless button", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-clean")).toBeInTheDocument();
+    expect(within(section).queryByTestId("hygiene-sync")).not.toBeInTheDocument();
+  });
+
+  it("syncs and reports how many files stopped being shared", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitignore"], untracked: ["board.kicad_prl"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    await user.click(within(section).getByTestId("hygiene-sync"));
+    expect(mockApi.syncProjectHygiene).toHaveBeenCalledWith("netdeck");
+    expect(await screen.findByText(/no longer shared through git/)).toBeInTheDocument();
+  });
+
+  it("explains a project with no git instead of offering a control that cannot work", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: false, writes: [], untracked: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-no-git")).toBeInTheDocument();
+    expect(within(section).queryByTestId("hygiene-sync")).not.toBeInTheDocument();
+  });
+
+  it("does not offer to stop sharing anything when only the rules are stale", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitattributes"], untracked: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-sync")).toHaveTextContent("Update Ignore Rules");
+    expect(within(section).queryByTestId("hygiene-files")).not.toBeInTheDocument();
+  });
+
+  it("counts one file as one file", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [], untracked: ["board.kicad_prl"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(section).toHaveTextContent("1 file is shared that should not be.");
+  });
+
+  it("surfaces a refused sync honestly", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [], untracked: ["board.kicad_prl"],
+    });
+    mockApi.syncProjectHygiene.mockRejectedValue(
+      new ApiError(400, "this repository has staged changes"),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    await user.click(within(section).getByTestId("hygiene-sync"));
+    expect(await screen.findByText("this repository has staged changes")).toBeInTheDocument();
   });
 });

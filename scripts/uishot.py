@@ -159,6 +159,18 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
     (proj / "SeedBoard.kicad_sch").write_text(
         "(kicad_sch\n\t(version 20260306)\n" + body + ")\n", encoding="utf-8")
 
+    # The per-user files a real KiCad project accumulates and, crucially, COMMITS: `.kicad_prl` is
+    # one person's window layout and `fp-info-cache` is a regenerated machine cache, so both change
+    # on every open and are what make two peers conflict on every pull. Seeded committed on purpose:
+    # without them the Sync Hygiene surface could only ever be shot in its empty state, which would
+    # prove nothing about it.
+    (proj / "SeedBoard.kicad_prl").write_text('{"board":{"visible_layers":"fffffff"}}\n',
+                                              encoding="utf-8")
+    (proj / "fp-info-cache").write_text("# regenerated footprint cache\n", encoding="utf-8")
+    backups = proj / "SeedBoard-backups"
+    backups.mkdir(exist_ok=True)
+    (backups / "SeedBoard-2026.zip").write_text("archive\n", encoding="utf-8")
+
     for cmd in (["init", "-b", "main"], ["config", "user.email", "shot@local"],
                 ["config", "user.name", "shot"], ["add", "."], ["commit", "-m", "seed board"]):
         subprocess.run(["git", "-C", str(proj), *cmd], check=True, capture_output=True)
@@ -198,20 +210,32 @@ def _register_seed(page, proj: Path) -> bool:
     return True
 
 
+# Health-tab surfaces, mapped to the dev-id they scroll to. The Health tab is far taller than one
+# viewport, so "shoot the Health tab" is not a single shot and pretending otherwise means whatever is
+# below the fold never gets looked at.
+_HEALTH_SECTIONS = {
+    "project-health": "projects.assign",
+    "project-hygiene": "projects.hygiene",
+}
+
+
 def _goto_surface(page, surface: str) -> bool:
     """Navigate to a named surface. Returns False if it could not be reached."""
-    if surface == "project-health":
+    if surface in _HEALTH_SECTIONS:
         # The seeded project is already selected by _register_seed; open its Health tab and scroll the
-        # assign surface into view (it sits below Prepare, so a viewport shot would otherwise miss it).
+        # requested section into view. `--full-page` cannot substitute for this: the app's #root is
+        # `overflow:hidden` and the real scroller is an inner pane, so a full-page capture is still
+        # exactly one viewport tall and silently misses everything below the fold.
         tab = page.get_by_role("tab", name="Health")
         if not tab.count():
             return False
         tab.first.click()
         page.wait_for_timeout(2000)
-        section = page.locator('[data-dev-id="projects.assign"]')
-        if section.count():
-            section.first.scroll_into_view_if_needed()
-            page.wait_for_timeout(800)
+        section = page.locator(f'[data-dev-id="{_HEALTH_SECTIONS[surface]}"]')
+        if not section.count():
+            return False
+        section.first.scroll_into_view_if_needed()
+        page.wait_for_timeout(800)
         return True
     if surface == "components":
         rows = page.locator('[data-dev-id^="list.row"]')
@@ -334,7 +358,7 @@ def run(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--surface", default="components",
-                    choices=["components", "search", "projects", "project-health",
+                    choices=["components", "search", "projects", "project-health", "project-hygiene",
                              "settings", "all"])
     ap.add_argument("--seed", action="store_true",
                     help="seed a throwaway library + KiCad project (implied by a project-* surface)")

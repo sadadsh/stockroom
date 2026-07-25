@@ -39,6 +39,7 @@ from stockroom.mutation.placement import (
     mirror_fields_to_symbol,
     place_footprint,
 )
+from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
 from stockroom.ingest.describe import apply_clean_identity
 from stockroom.store.profile import Profile
@@ -206,6 +207,28 @@ class LibraryOps:
         self.repo = repo
         self.lib = profile.library
         self.cli = cli
+
+
+    # -- workspace hygiene (Batch 2) ------------------------------------------
+    #
+    # The library holds assets for EVERY registered EDA tool at once, so it takes the union of their
+    # rules rather than one tool's set. A per-project sync can never cover it, and a peer cloning the
+    # library is exactly who inherits a committed `fp-info-cache`.
+
+    def _hygiene_tools(self) -> list[str]:
+        from stockroom.eda.registry import all_tools
+
+        return [tool.key for tool in all_tools()]
+
+    def hygiene_read(self) -> dict:
+        """What syncing the library's workspace hygiene would change: {writes, untracked}.
+        Read-only."""
+        return hygiene_preview(self.repo.root, self._hygiene_tools(), repo=self.repo)
+
+    def hygiene_apply(self) -> dict:
+        """Write the library's ignore/attributes rules and untrack the per-user files they now
+        cover, as ONE commit. An unchanged library is an honest no-commit no-op."""
+        return apply_hygiene(self.repo.root, self._hygiene_tools(), repo=self.repo)
 
     def add_part(self, staged: StagedPart, require_complete: bool = True) -> PartRecord:
         # Complete-to-add gate (spec section 6): the primary library is complete-only.

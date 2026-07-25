@@ -46,7 +46,9 @@ import {
   useSetFields,
   useManualFill,
   useProjectAssign,
+  useProjectHygiene,
   useAssignGroup,
+  useSyncProjectHygiene,
   useRestore,
   usePartsQuery,
   useBomDiff,
@@ -660,7 +662,99 @@ function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }
       {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
       {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
       {caps.has("assign") ? <AssignSection projectId={projectId} /> : null}
+      <SyncHygieneSection projectId={projectId} />
     </>
+  );
+}
+
+// Workspace sync hygiene. Two people on one project conflict on every pull once an EDA tool's
+// PER-USER files are committed: KiCad's `.kicad_prl` holds one person's window layout and
+// `fp-info-cache` is a regenerated machine cache, so both change every time the app opens while the
+// actual design merges perfectly. KiCad's own documentation says not to commit them.
+//
+// The control shows the FILES rather than a reassuring sentence, because the action stops sharing
+// something, and nobody should agree to that without seeing the list.
+function SyncHygieneSection({ projectId }: { projectId: string }) {
+  const q = useProjectHygiene(projectId);
+  const sync = useSyncProjectHygiene();
+  const { toast } = useToast();
+  const data = q.data;
+  const pending = (data?.untracked.length ?? 0) + (data?.writes.length ?? 0);
+
+  function onSync() {
+    sync.mutate(projectId, {
+      onSuccess: (r) =>
+        toast(
+          r.committed
+            ? `Synced. ${r.untracked.length} file(s) are no longer shared through git.`
+            : "Already in sync; nothing changed.",
+          r.committed ? "ok" : "neutral",
+        ),
+      onError: (e) => toast(errMsg(e, "Could not sync workspace hygiene."), "err"),
+    });
+  }
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="hygiene-section" data-dev-id="projects.hygiene">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Sync Hygiene</Eyebrow>
+        <p className="text-xs text-t3">
+          Your EDA tool writes per-user files next to the design: window layouts, machine caches,
+          backups. Sharing those through git is what makes two people conflict on every pull.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Checking this project...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not check this project.")}</p>
+      ) : !data ? null : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="hygiene-no-git">
+          This project is not under git, so nothing is being shared yet. Initialize a git repository
+          for it first.
+        </p>
+      ) : pending === 0 ? (
+        <p className="text-xs text-ok" data-testid="hygiene-clean">
+          Nothing per-user is being shared from this project.
+        </p>
+      ) : (
+        <div className="rounded-card border border-line2" data-testid="hygiene-pending">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
+            <span className="text-sm text-t2">
+              {data.untracked.length > 0
+                ? `${data.untracked.length} ${data.untracked.length === 1 ? "file is" : "files are"} shared that should not be.`
+                : "The ignore rules are out of date."}
+            </span>
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={sync.isPending}
+              data-testid="hygiene-sync"
+              className="ml-auto inline-flex flex-none items-center rounded-control border border-line bg-raise px-2.5 py-1 text-xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            >
+              {sync.isPending
+                ? "Syncing..."
+                : data.untracked.length > 0
+                  ? "Stop Sharing These"
+                  : "Update Ignore Rules"}
+            </button>
+          </div>
+          {data.untracked.length > 0 ? (
+            <div className="border-t border-line2 px-3 py-2" data-testid="hygiene-files">
+              {data.untracked.map((path) => (
+                <div key={path} className="truncate font-mono text-2xs text-t3" title={path}>
+                  {path}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p className="border-t border-line2 px-3 py-2 text-2xs text-t3">
+            These stay on your disk. Only git stops carrying them to whoever else works on this
+            project.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

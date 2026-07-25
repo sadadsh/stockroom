@@ -959,6 +959,30 @@ export function useAssignGroup() {
   });
 }
 
+// What syncing this project's workspace hygiene would change. Read-only, so it is safe to fetch
+// whenever the Health tab is open.
+export function useProjectHygiene(id: string | null) {
+  return useQuery({
+    queryKey: ["project-hygiene", id],
+    queryFn: () => api.getProjectHygiene(id as string),
+    enabled: !!id,
+  });
+}
+
+// Sync the project's workspace hygiene. It COMMITS to the project's own git, so the git timeline and
+// the project record are stale afterwards, as is this query's own preview (which must now be empty).
+export function useSyncProjectHygiene() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.syncProjectHygiene(id),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["project-hygiene", id] });
+      qc.invalidateQueries({ queryKey: ["project-revisions", id] });
+      qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+  });
+}
+
 // Undo the project's last Prepare / Fill (M7f-D). Invalidates the same derived caches.
 export function useRestore() {
   const invalidate = useInvalidateAfterPrepare();
