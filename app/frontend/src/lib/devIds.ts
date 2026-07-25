@@ -60,13 +60,11 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.root", label: "Detail panel", area: "detail" },
   { id: "detail.title-strip", label: "Detail title strip", area: "detail" },
   { id: "detail.identity", label: "Identity / specimen rail", area: "detail" },
-  // The EDA handoff band: the fields an EDA tool receives, at the top of the sheet. The per-field
-  // cell ids are DERIVED (`detail.handoff-<field key>`) from the generated EDA registry, so a new
-  // registry field brings its own cell id with it and this catalogue does not have to be edited.
-  { id: "detail.handoff", label: "EDA handoff band", area: "detail" },
+  // The EDA handoff block at the head of the Specifications column. Per-field cell ids are
+  // DERIVED (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry
+  // field brings its own cell id and this catalogue needs no edit.
+  { id: "detail.handoff", label: "EDA handoff block", area: "detail" },
   { id: "detail.handoff-ready", label: "Handoff readiness count", area: "detail" },
-  { id: "detail.embodiments", label: "Embodiment strip (3D / symbol / footprint)", area: "detail" },
-  { id: "detail.evidence", label: "Specifications + Sourcing columns", area: "detail" },
   { id: "detail.title", label: "Part headline", area: "detail" },
   { id: "detail.canvas", label: "Part canvas / asset strip", area: "detail" },
   { id: "detail.asset-hero", label: "3D model hero tile", area: "detail" },
@@ -105,6 +103,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.trade", label: "Trade and compliance block", area: "detail" },
   { id: "detail.sourcing", label: "Sourcing panel", area: "detail" },
   { id: "detail.sourcing-refresh", label: "Refresh Sourcing button", area: "detail" },
+  { id: "detail.sourcing-nodata", label: "Vendor with no price or stock", area: "detail" },
   { id: "detail.pinout", label: "Pinout panel", area: "detail" },
   { id: "detail.enrich", label: "Enrich panel", area: "detail" },
   { id: "detail.history", label: "History timeline", area: "detail" },

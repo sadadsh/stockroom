@@ -917,27 +917,26 @@ describe("DetailPanel links row anatomy", () => {
       datasheet: { file: "", source_url: "https://ti.com/ds.pdf", fetched_at: "" },
     });
 
-  // RE-BASELINED 2026-07-25 by the composition slice, deliberately. Punch 8's complaint was that
-  // the datasheet was a bordered pill NEXT TO a bare pencil - "two shapes at two heights with a
-  // gap" - and the fix was to give it one flat 34px row matching Filing's anatomy. Both that row
-  // and Filing are gone now: the datasheet is an EDA handoff field, so it moved into the handoff
-  // band at the top of the sheet and wears the same cell anatomy as every other field there.
-  // The ORIGINAL requirement is unchanged and still asserted below - one consistent shape, the
+  // RE-BASELINED 2026-07-25, deliberately. Punch 8's complaint was that the datasheet was a
+  // bordered pill NEXT TO a bare pencil - "two shapes at two heights with a gap" - and the fix was
+  // one flat 34px row matching Filing's anatomy. The datasheet is an EDA handoff field, so at the
+  // owner's request it moved into the handoff block above Specifications and wears the same cell
+  // anatomy as every other field there; Filing itself is gone, its Category now a cell in the same
+  // block. The ORIGINAL requirement is unchanged and still asserted: one consistent shape, the
   // link still opens, the link is still editable, an absent datasheet still says so plainly.
   it("presents the datasheet with the same cell anatomy as the other handoff fields", () => {
     wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={vi.fn()} />);
     const cell = document.querySelector('[data-dev-id="detail.handoff-datasheet"]');
-    expect(cell, "the datasheet should be a cell in the EDA handoff band").toBeTruthy();
-    // the same class chain every handoff cell uses, so it cannot drift into its own shape again
+    expect(cell, "the datasheet should be a cell in the EDA handoff block").toBeTruthy();
     const peer = document.querySelector('[data-dev-id="detail.handoff-mpn"]')!;
-    expect(cell!.className).toBe(peer.className.replace(/ @4xl:col-span-2/, ""));
+    expect(cell!.className).toBe(peer.className);
   });
 
   it("still opens the datasheet and still allows editing the link", async () => {
     const user = userEvent.setup();
     const onEditField = vi.fn();
     wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={onEditField} />);
-    // OPENS: the cell carries a real anchor at the full URL, not the shortened display label.
+    // OPENS: a real anchor at the FULL url, never the shortened display label.
     expect(screen.getByRole("link", { name: /Open Datasheet/i })).toHaveAttribute(
       "href",
       "https://ti.com/ds.pdf",
@@ -953,8 +952,8 @@ describe("DetailPanel links row anatomy", () => {
   it("says a missing datasheet plainly rather than showing an empty control", () => {
     wrap(<DetailPanel detail={detail({ datasheet: null })} {...BASE} />);
     const cell = document.querySelector('[data-dev-id="detail.handoff-datasheet"]')!;
-    // an unset handoff field reads as a GAP, in the warn tone, because an empty one here is a
-    // component that lands in the EDA tool incomplete
+    // an unset handoff field reads as a GAP, in the warn tone: an empty one here means the part
+    // lands in the EDA tool incomplete
     expect(cell.textContent).toMatch(/Not Set|Add Datasheet/);
   });
 

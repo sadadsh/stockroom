@@ -9,15 +9,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 237 as of Batch 4d (+rail.collapse, +shell.profile-switch, +shell.profile-menu).
 // 241 as of Batch 5 (+detail.model-views and the three canonical-view buttons: iso/top/front).
 // 242 with +detail.model-board, the Footprint toggle that puts the land pattern under the body.
-// 251 after the 2026-07-25 composition slice. Deliberate re-baseline, which is what this gate is
-// for: +3 for the EDA handoff band (the band, its readiness count, the embodiment strip) and +4 for
-// the photo carousel (counter, prev, next, vendor), less 4 retired with the controls they named
-// (detail.identity-line, detail.datasheet-row, detail.notes-row, detail.filing, detail.reference).
+// 249 with the layer + shading bar: model/PCB toggles and the realistic/studio/x-ray modes.
 // Deliberate re-baseline, which is what this gate exists for.
 // 234 as of Batch 3: +detail.spec-family (repeated spec keys collapsed into one row),
 // +detail.alternates (the other sources for a value), +detail.trade (the procurement facts that
 // used to be discarded). All three are new controls in this commit.
-const EXPECTED_ENTRIES = 252;
+const EXPECTED_ENTRIES = 251;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

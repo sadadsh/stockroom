@@ -44,7 +44,7 @@ export function Glb3DView({
   const [showLand, setShowLand] = useState(false);
   const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
   const [showModel, setShowModel] = useState(true);
-  const [showBoard, setShowBoard] = useState(true);
+  const [showBoard, setShowBoard] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -61,7 +61,10 @@ export function Glb3DView({
           if (!disposed) setRenderError(true);
         });
         sceneRef.current = handle;
-        if (showLandRef.current && land) handle.setLandPattern(land);
+        // Build whenever the data exists, not only when the Pads toggle happens to be on: the
+        // board and the pads are two independently switchable layers of ONE land pattern, and
+        // gating construction on one of them made the other unreachable.
+        if (land) handle.setLandPattern(land);
       } catch {
         // no WebGL context (or three failed to load): degrade honestly.
         if (!disposed) setRenderError(true);
@@ -130,7 +133,9 @@ export function Glb3DView({
                   const next = !showLand;
                   setShowLand(next);
                   showLandRef.current = next;
-                  sceneRef.current?.setLandPattern(next ? land : null);
+                  // visibility only - the geometry is already built. Rebuilding it here also
+                  // destroyed and recreated the board every time the pads were toggled.
+                  sceneRef.current?.setLayers({ pads: next });
                 }}
               />
               <LayerToggle
