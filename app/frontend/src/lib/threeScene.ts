@@ -35,7 +35,7 @@ export type ViewMode = "iso" | "top" | "front";
  *   surface reads SHAPE better than a realistic dark one, which is what a mechanical check wants.
  * - `xray`      - translucent, for seeing where the body sits relative to its pads.
  */
-export type RenderMode = "realistic" | "studio" | "xray";
+export type RenderMode = "original" | "realistic" | "studio" | "xray";
 
 /** Which layers are drawn. All three can be off; the viewer simply shows an empty stage. */
 export interface LayerVisibility {
@@ -257,6 +257,7 @@ export function mountModelScene(
   const modelMeshes: THREE.Mesh[] = [];
   const outlineSegments: THREE.LineSegments[] = [];
   let studioMaterial: THREE.Material | null = null;
+  const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   let realisticMaterial: THREE.MeshPhysicalMaterial | null = null;
   let xrayMaterial: THREE.MeshPhysicalMaterial | null = null;
   const layers: LayerVisibility = { model: true, pads: true, board: true };
@@ -297,9 +298,12 @@ export function mountModelScene(
       gltf.scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (!mesh.isMesh) return;
-        const old = mesh.material as THREE.Material | THREE.Material[] | undefined;
-        if (Array.isArray(old)) old.forEach((m) => m.dispose());
-        else old?.dispose();
+        // KEEP the model's OWN material. It used to be disposed on the spot and replaced with one
+        // grey, which threw away the colours the vendor shipped - the opposite of showing what was
+        // downloaded. It is retained so `original` mode can hand it back, and disposed with the
+        // rest of the scene.
+        const own = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (own) originalMaterials.set(mesh, own);
         mesh.material = neutral;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -446,9 +450,17 @@ export function mountModelScene(
         side: THREE.DoubleSide,
       });
     }
-    const next =
-      mode === "realistic" ? realisticMaterial : mode === "xray" ? xrayMaterial : studioMaterial;
-    if (next) for (const m of modelMeshes) m.material = next;
+    if (mode === "original") {
+      // exactly what the file shipped with - the honest answer to "colour it like the model is"
+      for (const m of modelMeshes) {
+        const own = originalMaterials.get(m);
+        if (own) m.material = own;
+      }
+    } else {
+      const next =
+        mode === "realistic" ? realisticMaterial : mode === "xray" ? xrayMaterial : studioMaterial;
+      if (next) for (const m of modelMeshes) m.material = next;
+    }
     // The outlines are the cartoon. They earn their place only in studio mode, where a flat
     // high-contrast surface is deliberately reading SHAPE rather than pretending to be real.
     for (const l of outlineSegments) l.visible = mode === "studio";
@@ -510,6 +522,11 @@ export function mountModelScene(
       if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
       else mat?.dispose();
     });
+    for (const mat of originalMaterials.values()) {
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat.dispose();
+    }
+    originalMaterials.clear();
     envRT.texture.dispose();
     pmrem.dispose();
     renderer.dispose();
