@@ -110,8 +110,11 @@ function roundedPadGeometry(
   shape.quadraticCurveTo(x, y, x + r, y);
   const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
   // extruded in +Z; lay it flat in the board plane and sit it on the surface
+  // rotateX(-90) maps (x,y,z) -> (x,z,-y), so the extrusion's z range 0..thickness becomes the
+  // y range 0..thickness: the pad ALREADY sits on the plane. An extra translate of +thickness
+  // (which is what used to be here) lifted every pad clear of the board by exactly its own
+  // thickness, which is the gap the owner saw as "not flush with the pcb".
   geo.rotateX(-Math.PI / 2);
-  geo.translate(0, thickness, 0);
   return geo;
 }
 
@@ -124,7 +127,13 @@ export function mountModelScene(
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 460;
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  // alpha:false + an explicit background. A TRANSPARENT backdrop leaves the colour buffer
+  // undefined where nothing is drawn, which is what broke GTAO: the pass reads that buffer for
+  // its depth/normal reconstruction and rendered the model pure black. The scene now paints its
+  // own background instead of letting the page show through, so the AO pass has real pixels to
+  // work from. `sceneBackground` is read from the host element, so the viewer still matches the
+  // theme it sits in.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height);
   // Filmic tone mapping so the bright metal highlights + deep shadow sides don't clip: this is
@@ -136,6 +145,18 @@ export function mountModelScene(
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
+  {
+    // take the tile's own background so light and dark themes both look native
+    const bg = getComputedStyle(container).backgroundColor;
+    const probe = new THREE.Color();
+    try {
+      if (bg && !bg.includes("rgba(0, 0, 0, 0)")) probe.setStyle(bg);
+      else probe.setStyle(getComputedStyle(document.body).backgroundColor || "#111214");
+    } catch {
+      probe.setStyle("#111214");
+    }
+    scene.background = probe;
+  }
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
 
   // IMAGE-BASED LIGHTING: a neutral studio room supplies realistic reflections + soft occlusion,
@@ -199,7 +220,7 @@ export function mountModelScene(
   // `alpha: true` transparent backdrop interacting with the AO pass's depth/normal targets.
   // Shipping a mode that renders black is worse than shipping one without AO, so the pass stays
   // wired and off until that is settled. See the punch list.
-  gtao.enabled = false;
+  gtao.enabled = true;
   composer.addPass(gtao);
   composer.addPass(new OutputPass());
 
@@ -252,6 +273,14 @@ export function mountModelScene(
         mesh.material = neutral;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        // A STEP tessellated to glTF frequently arrives with NO vertex normals. Without them every
+        // face shades identically (measured: three separate points on the body all exactly
+        // 181,182,186 - a perfectly flat surface, which is most of "looks cartoony and fake"), and
+        // any screen-space AO reconstructs garbage normals and occludes the whole part to BLACK.
+        // Computing them is cheap and is the difference between a lit solid and a paper cutout.
+        if (mesh.geometry && !mesh.geometry.getAttribute("normal")) {
+          mesh.geometry.computeVertexNormals();
+        }
         modelMeshes.push(mesh);
         if (mesh.geometry) {
           const lines = new THREE.LineSegments(
