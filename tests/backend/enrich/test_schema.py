@@ -172,3 +172,109 @@ def test_merge_missing_a_key_only_one_side_has_never_conflicts():
     a.merge_missing(b)
     assert a.specs["New Key"].value == "x"
     assert a.spec_conflicts == {}
+
+
+# -- Field conflicts (Batch 3, punch 2/9). The single-slot canonical fields lost every
+# losing value with no record at all: two distributors' descriptions, datasheet links,
+# packages and lifecycles all resolved to whichever source ran first and the other was
+# DROPPED. A disagreement on a shared fact is data (owner: "see ALL DigiKey + Mouser
+# data"), so it is kept with its source exactly the way a spec disagreement is.
+
+
+def test_merge_missing_keeps_both_descriptions_with_their_sources():
+    a = EnrichmentResult(category="ICs")
+    a.description = Sourced("3A Buck Converter", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    b.description = Sourced("Step-Down Regulator, 3 A, WSON-8", "digikey", "high")
+    a.merge_missing(b)
+    # the first source still wins the single-value slot
+    assert a.description.value == "3A Buck Converter"
+    # ...and the loser is no longer discarded
+    assert [(s.value, s.source) for s in a.field_conflicts["description"]] == [
+        ("3A Buck Converter", "mouser"),
+        ("Step-Down Regulator, 3 A, WSON-8", "digikey"),
+    ]
+
+
+def test_merge_missing_identical_field_values_merge_without_a_conflict():
+    a = EnrichmentResult(category="ICs")
+    a.manufacturer = Sourced("Texas Instruments", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    b.manufacturer = Sourced(" texas instruments ", "digikey", "high")
+    a.merge_missing(b)
+    assert a.field_conflicts == {}
+
+
+def test_merge_missing_never_conflicts_a_per_vendor_field():
+    """stock and product_url are per-vendor BY NATURE: each distributor legitimately has
+    its own, and they live in dist_stock / dist_urls. Recording them as disagreements
+    would bury the real ones in noise."""
+    a = EnrichmentResult(category="ICs")
+    a.stock = Sourced(1200, "mouser", "high")
+    a.product_url = Sourced("https://mouser.com/x", "mouser", "high")
+    b = EnrichmentResult(category="ICs")
+    b.stock = Sourced(48, "digikey", "high")
+    b.product_url = Sourced("https://digikey.com/y", "digikey", "high")
+    a.merge_missing(b)
+    assert a.field_conflicts == {}
+
+
+def test_merge_missing_a_third_differing_field_value_joins_the_conflict_once():
+    a = EnrichmentResult(category="ICs")
+    a.package = Sourced("WSON-8", "mouser", "high")
+    for source in ("digikey", "lcsc"):
+        other = EnrichmentResult(category="ICs")
+        other.package = Sourced("VSON-8", source, "high")
+        a.merge_missing(other)
+    assert [s.value for s in a.field_conflicts["package"]] == ["WSON-8", "VSON-8"]
+
+
+def test_merge_missing_carries_the_other_sides_conflicts():
+    """A partial can arrive ALREADY carrying disagreements (an adapter that merged two of
+    its own answers, or a nested walk). merge_missing dropped both conflict maps
+    entirely, so every disagreement found below the top level was silently lost."""
+    a = EnrichmentResult(category="ICs")
+    b = EnrichmentResult(category="ICs")
+    b.specs["Vf"] = Sourced("0.7 V", "mouser", "high")
+    b.spec_conflicts["Vf"] = [
+        Sourced("0.7 V", "mouser", "high"), Sourced("0.65 V", "digikey", "high")
+    ]
+    b.description = Sourced("A", "mouser", "high")
+    b.field_conflicts["description"] = [
+        Sourced("A", "mouser", "high"), Sourced("B", "digikey", "high")
+    ]
+    a.merge_missing(b)
+    assert [s.value for s in a.spec_conflicts["Vf"]] == ["0.7 V", "0.65 V"]
+    assert [s.value for s in a.field_conflicts["description"]] == ["A", "B"]
+
+
+def test_merge_missing_keeps_every_vendors_own_ladder_and_stock():
+    """punch 4: the DigiKey sourcing row rendered with no price and no stock. merge_missing
+    kept only the FIRST vendor's ladder and never merged the per-vendor maps at all, so a
+    second distributor's prices existed on its partial and then vanished."""
+    a = EnrichmentResult(category="ICs")
+    a.dist_price_breaks["mouser"] = [PriceBreak(qty=1, price=1.5)]
+    a.dist_stock["mouser"] = 1200
+    b = EnrichmentResult(category="ICs")
+    b.dist_price_breaks["digikey"] = [PriceBreak(qty=1, price=1.42)]
+    b.dist_stock["digikey"] = 48
+    a.merge_missing(b)
+    assert sorted(a.dist_price_breaks) == ["digikey", "mouser"]
+    assert a.dist_price_breaks["digikey"][0].price == 1.42
+    assert a.dist_stock == {"mouser": 1200, "digikey": 48}
+
+
+def test_merge_missing_can_merge_without_recording_a_conflict():
+    """The six extraction techniques run over ONE document are the same authority read six
+    ways; their disagreements are our parsing, not two vendors' answers. `extract_product`
+    merges with record_conflicts=False so an og:title never becomes an "alternative
+    description" competing with a real distributor's."""
+    a = EnrichmentResult(category="ICs")
+    a.description = Sourced("3A Buck Converter", "jsonld", "high")
+    a.specs["Package"] = Sourced("WSON-8", "jsonld", "high")
+    b = EnrichmentResult(category="ICs")
+    b.description = Sourced("TPS62130 - Texas Instruments | Mouser", "opengraph", "medium")
+    b.specs["Package"] = Sourced("VSON", "opengraph", "medium")
+    a.merge_missing(b, record_conflicts=False)
+    assert a.description.value == "3A Buck Converter"  # first still wins the slot
+    assert a.field_conflicts == {} and a.spec_conflicts == {}
