@@ -218,3 +218,34 @@ def test_enrich_dto_carries_the_kept_spec_conflicts(client, monkeypatch):
             {"value": "105 mOhm", "source": "digikey", "confidence": "high"},
         ]
     }
+
+
+def test_enrich_dto_carries_every_canonical_field_and_the_field_conflicts(client, monkeypatch):
+    """The DTO was hand-listing fields too, so country_of_origin and tariff_rate were pulled by
+    the Mouser path and then never reached the UI at all - a part's origin and its real US
+    import tariff existed in the backend and were invisible in the app. Enumerated from the
+    schema now, and asserted for the WHOLE set so the next added field cannot be forgotten."""
+    from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
+
+    class _FakePipeline:
+        def extract_from_url(self, url, progress=None):
+            r = EnrichmentResult(category="ICs")
+            for i, name in enumerate(SOURCED_FIELDS):
+                setattr(r, name, Sourced(f"v{i}", "mouser", "high"))
+            r.field_conflicts = {
+                "description": [
+                    Sourced("A", "mouser", "high"), Sourced("B", "digikey", "high"),
+                ]
+            }
+            return r
+
+    monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
+                        lambda ctx: _FakePipeline())
+    r = client.post("/api/enrich/from-url", json={"url": "https://www.mouser.com/x"})
+    body = _drain_job(client, r.json()["job_id"])["result"]
+    missing = [name for name in SOURCED_FIELDS if body.get(name) is None]
+    assert missing == [], f"the DTO dropped {missing}"
+    assert body["field_conflicts"]["description"] == [
+        {"value": "A", "source": "mouser", "confidence": "high"},
+        {"value": "B", "source": "digikey", "confidence": "high"},
+    ]

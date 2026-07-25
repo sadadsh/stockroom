@@ -696,3 +696,46 @@ def test_cache_round_trip_keeps_spec_conflicts(tmp_path):
     assert [(s.value, s.source) for s in back.spec_conflicts["Vf"]] == [
         ("0.7 V", "mouser"), ("0.65 V", "digikey"),
     ]
+
+
+def test_cache_round_trip_keeps_the_v2_import_fields_and_field_conflicts():
+    """The v2 import fields (country_of_origin / tariff_rate) were on the schema and filled
+    by the Mouser path, but _result_to_cache never wrote them - so a part's origin and its
+    real US tariff survived the first fresh lookup and were DROPPED on every cache hit
+    afterwards. Exactly the M7d bug 4255471 fixed for lifecycle/lead, in the same function,
+    for the fields added after it."""
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.country_of_origin = Sourced("Japan", "mouser", "high")
+    r.tariff_rate = Sourced(37.93, "mouser", "high")
+    r.description = Sourced("3A Buck Converter", "mouser", "high")
+    r.field_conflicts = {
+        "description": [
+            Sourced("3A Buck Converter", "mouser", "high"),
+            Sourced("Step-Down Regulator", "digikey", "high"),
+        ]
+    }
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    assert back.country_of_origin is not None and back.country_of_origin.value == "Japan"
+    assert back.tariff_rate is not None and back.tariff_rate.value == 37.93
+    assert [(s.value, s.source) for s in back.field_conflicts["description"]] == [
+        ("3A Buck Converter", "mouser"), ("Step-Down Regulator", "digikey"),
+    ]
+
+
+def test_every_canonical_field_survives_the_cache_round_trip():
+    """The GATE for the class of bug above, not another instance of it. A field added to
+    EnrichmentResult is cached by construction (both halves iterate SOURCED_FIELDS), and this
+    proves it for the whole set instead of naming a few by hand - the naming-a-few habit is
+    what dropped four fields across two separate slices."""
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    for i, name in enumerate(SOURCED_FIELDS):
+        setattr(r, name, Sourced(f"v{i}", "mouser", "high"))
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    dropped = [name for name in SOURCED_FIELDS if getattr(back, name) is None]
+    assert dropped == [], f"the cache silently dropped {dropped}"

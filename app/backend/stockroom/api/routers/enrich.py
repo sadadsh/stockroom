@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from stockroom.enrich.pipeline import EnrichmentPipeline
-from stockroom.enrich.schema import EnrichmentResult, Sourced
+from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 
 
 def _make_pipeline(ctx) -> EnrichmentPipeline:
@@ -60,18 +60,13 @@ def _add_plan(r: EnrichmentResult) -> dict | None:
 def _result_dto(r: EnrichmentResult) -> dict:
     return {
         "category": r.category,
-        "mpn": _sourced_dto(r.mpn),
-        "manufacturer": _sourced_dto(r.manufacturer),
-        "description": _sourced_dto(r.description),
-        "datasheet_url": _sourced_dto(r.datasheet_url),
-        "stock": _sourced_dto(r.stock),
-        "package": _sourced_dto(r.package),
-        # A2: the FULL pulled depth, not just identity + specs. These live on the schema (the
-        # Mouser/LCSC paths fill them) but the DTO dropped them, so the UI could never surface
-        # a part's manufacturing status, lead time, product page, or distributor order numbers.
-        "lifecycle": _sourced_dto(r.lifecycle),
-        "lead_time": _sourced_dto(r.lead_time),
-        "product_url": _sourced_dto(r.product_url),
+        # A2: the FULL pulled depth, not just identity + specs. Every single-valued canonical
+        # field, enumerated from the schema rather than retyped, because a hand-written list here
+        # dropped lifecycle/lead_time/product_url once and then country_of_origin/tariff_rate
+        # again: the Mouser path filled a part's origin and its real US import tariff and the UI
+        # could never see either. Iterating means a field added to the schema reaches the UI by
+        # construction.
+        **{name: _sourced_dto(getattr(r, name)) for name in SOURCED_FIELDS},
         "dist_pns": dict(r.dist_pns),
         # every vendor's own ladder + stock for the comparison view (owner 2026-07-24)
         "dist_price_breaks": {
@@ -90,6 +85,11 @@ def _result_dto(r: EnrichmentResult) -> dict:
         # 2026-07-24: "display all of it and only merge stuff thats identical")
         "spec_conflicts": {
             k: [_sourced_dto(v) for v in vs] for k, vs in r.spec_conflicts.items()
+        },
+        # the same, for the single-valued fields: both descriptions, both packages, both
+        # datasheet links - whatever two sources disagreed on, with each origin
+        "field_conflicts": {
+            k: [_sourced_dto(v) for v in vs] for k, vs in r.field_conflicts.items()
         },
         # The passive determination for the unified Add-A-Part flow (null = non-passive,
         # needs the symbol/footprint/3D dropped).

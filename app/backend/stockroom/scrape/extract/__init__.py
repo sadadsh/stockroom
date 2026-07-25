@@ -36,10 +36,15 @@ def extract_product(html: str, url: str, site_extractors=SITE_ADAPTERS) -> Enric
     rules match the retired enrich.extract_all: JSON-LD (high) seeds, then OpenGraph,
     next_data, NUXT, microdata fill only gaps, then site adapters add site-specific
     extras (a site pricing table's full ladder supersedes a lone generic JSON-LD offer),
-    then the title/h1 heuristic fills last."""
+    then the title/h1 heuristic fills last.
+
+    Every merge here passes record_conflicts=False: these are six ways of reading the SAME
+    document, so where they differ it is our parsing, not two vendors disagreeing. Keeping
+    those as "conflicts" would fill the part's alternate-value lists with og:title junk and
+    hide the real cross-distributor differences the owner asked to see."""
     result = extract_jsonld_product(html)
-    result.merge_missing(extract_opengraph(html))
-    result.merge_missing(extract_next_data(html))
+    result.merge_missing(extract_opengraph(html), record_conflicts=False)
+    result.merge_missing(extract_next_data(html), record_conflicts=False)
     for ext in site_extractors:
         if ext.matches(url):
             site = ext.extract(html, url)
@@ -55,12 +60,12 @@ def extract_product(html: str, url: str, site_extractors=SITE_ADAPTERS) -> Enric
             # authority the price ladder gets. Only a real site datasheet overrides.
             if site.datasheet_url is not None:
                 result.datasheet_url = site.datasheet_url
-            result.merge_missing(site)
+            result.merge_missing(site, record_conflicts=False)
     # nuxt + microdata are generic fallbacks below the site adapters: they gap-fill only
     # what a matching adapter did not, so the site-adapter precedence is preserved exactly.
-    result.merge_missing(extract_nuxt(html))
-    result.merge_missing(extract_microdata(html))
-    result.merge_missing(_heuristic(html))
+    result.merge_missing(extract_nuxt(html), record_conflicts=False)
+    result.merge_missing(extract_microdata(html), record_conflicts=False)
+    result.merge_missing(_heuristic(html), record_conflicts=False)
     return result
 
 

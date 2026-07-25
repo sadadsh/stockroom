@@ -21,8 +21,8 @@ from stockroom.scrape.validate import validate_product
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
 from stockroom.enrich.progress import Stage, emit, monotonic, stage_callback
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
-from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry
-from stockroom.enrich.schema import EnrichmentResult, Sourced
+from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry, record_vendor_offer
+from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.part import Provenance, Purchase
@@ -133,6 +133,10 @@ class LcscSource:
     catalogue miss or any network failure, so the registry walk is never blocked."""
 
     name = "lcsc"
+    # A real place to buy from, so its ladder / stock / product page are kept under this
+    # vendor key by the registry walk (see registry.record_vendor_offer). Lowercase: it is
+    # a key, not a label.
+    vendor_key = "lcsc"
     _PRODUCT_URL = "https://www.lcsc.com/product-detail/{lcsc}.html"
 
     def __init__(self, http_fetcher, jlcsearch=None, limiter=None):
@@ -471,19 +475,11 @@ class EnrichmentPipeline:
                 partial = adapter.lookup(token)
             except Exception:  # noqa: BLE001 - an adapter must never break the paste path
                 continue
-            # Keep THIS vendor's own buy link, so both survive even though the merged result keeps
-            # a single primary product_url. The pasted vendor's link is set to the pasted url below.
-            if partial.product_url is not None:
-                result.dist_urls.setdefault(name, str(partial.product_url.value))
-            # keep THIS vendor's own ladder + stock too: merge_missing keeps only the
-            # first vendor's, and the comparison view needs every vendor's prices
-            if partial.price_breaks:
-                result.dist_price_breaks.setdefault(name, list(partial.price_breaks))
-            if partial.stock is not None:
-                try:
-                    result.dist_stock.setdefault(name, int(float(str(partial.stock.value))))
-                except (TypeError, ValueError):
-                    pass
+            # Keep THIS vendor's own buy link, price ladder and live stock, so both survive even
+            # though the merged result keeps a single primary of each. The pasted vendor's link is
+            # set to the pasted url below. Same helper the registry walk uses, so the paste path
+            # and the MPN path can never record per-vendor sourcing differently.
+            record_vendor_offer(result, name, partial)
             result.merge_missing(partial)
         return result
 
@@ -655,6 +651,7 @@ class EnrichmentPipeline:
 
 class _MouserSource:
     name = "mouser"
+    vendor_key = "mouser"
 
     def __init__(self, adapter, limiter=None):
         self._adapter = adapter
@@ -675,6 +672,7 @@ class _MouserSource:
 
 class _DigiKeySource:
     name = "digikey"
+    vendor_key = "digikey"
 
     def __init__(self, adapter, limiter=None):
         self._adapter = adapter
@@ -696,12 +694,13 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
     return {
         "schema_version": r.schema_version,
         "category": r.category,
-        "mpn": s(r.mpn), "manufacturer": s(r.manufacturer), "description": s(r.description),
-        "datasheet_url": s(r.datasheet_url), "stock": s(r.stock), "package": s(r.package),
-        # M7d procurement fields: persist them so a cache hit keeps a part's lifecycle, lead
-        # time, product page and distributor P/Ns (otherwise a re-build silently drops the
-        # sourcing risk + lead the first fresh lookup found).
-        "lifecycle": s(r.lifecycle), "lead_time": s(r.lead_time), "product_url": s(r.product_url),
+        # EVERY single-valued canonical field, enumerated from the schema itself rather than
+        # retyped here. A hand-written list has now silently dropped new fields TWICE - the M7d
+        # procurement fields (fixed in 4255471) and then the v2 import fields
+        # (country_of_origin / tariff_rate), each surviving one fresh lookup and vanishing on
+        # every cache hit after it. Iterating SOURCED_FIELDS makes that class of bug
+        # impossible: a field added to the schema is cached by construction.
+        **{name: s(getattr(r, name)) for name in SOURCED_FIELDS},
         "dist_pns": dict(r.dist_pns),
         "dist_urls": dict(r.dist_urls),
         "dist_price_breaks": {
@@ -711,10 +710,15 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         "dist_stock": dict(r.dist_stock),
         "price_breaks": [{"qty": b.qty, "price": b.price, "currency": b.currency} for b in r.price_breaks],
         "specs": {k: {"value": v.value, "source": v.source, "confidence": v.confidence} for k, v in r.specs.items()},
-        # every kept disagreement (a cache hit must not silently resolve a conflict)
+        # every kept disagreement (a cache hit must not silently resolve a conflict), for the
+        # spec bag AND for the single-valued fields
         "spec_conflicts": {
             k: [{"value": v.value, "source": v.source, "confidence": v.confidence} for v in vs]
             for k, vs in r.spec_conflicts.items()
+        },
+        "field_conflicts": {
+            k: [{"value": v.value, "source": v.source, "confidence": v.confidence} for v in vs]
+            for k, vs in r.field_conflicts.items()
         },
     }
 
@@ -725,9 +729,10 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     def s(v):
         return None if v is None else Sourced(v["value"], v["source"], v["confidence"])
     r = EnrichmentResult(category=d.get("category", category))
-    r.mpn, r.manufacturer, r.description = s(d.get("mpn")), s(d.get("manufacturer")), s(d.get("description"))
-    r.datasheet_url, r.stock, r.package = s(d.get("datasheet_url")), s(d.get("stock")), s(d.get("package"))
-    r.lifecycle, r.lead_time, r.product_url = s(d.get("lifecycle")), s(d.get("lead_time")), s(d.get("product_url"))
+    # Read back exactly the set _result_to_cache writes, from the same single source of truth,
+    # so the two halves can never drift apart (see the note there).
+    for name in SOURCED_FIELDS:
+        setattr(r, name, s(d.get(name)))
     r.dist_pns = dict(d.get("dist_pns", {}))
     r.dist_urls = dict(d.get("dist_urls", {}))
     r.dist_price_breaks = {
@@ -741,5 +746,9 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.spec_conflicts = {
         k: [Sourced(v["value"], v["source"], v["confidence"]) for v in vs]
         for k, vs in d.get("spec_conflicts", {}).items()
+    }
+    r.field_conflicts = {
+        k: [Sourced(v["value"], v["source"], v["confidence"]) for v in vs]
+        for k, vs in d.get("field_conflicts", {}).items()
     }
     return r
