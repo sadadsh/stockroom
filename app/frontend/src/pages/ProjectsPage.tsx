@@ -742,7 +742,10 @@ function SyncHygieneSection({ projectId }: { projectId: string }) {
           {data.untracked.length > 0 ? (
             <div className="border-t border-line2 px-3 py-2" data-testid="hygiene-files">
               {data.untracked.map((path) => (
-                <div key={path} className="truncate font-mono text-2xs text-t3" title={path}>
+                // t2, not t3: these paths ARE the content of this card, the thing a person has to
+                // read before agreeing to stop sharing them. At t3 they sat at the same weight as
+                // the footnote explaining them, which inverts the hierarchy.
+                <div key={path} className="truncate font-mono text-2xs text-t2" title={path}>
                   {path}
                 </div>
               ))}
