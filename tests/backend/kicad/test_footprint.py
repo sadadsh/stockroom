@@ -134,3 +134,61 @@ def test_hide_reference_texts_is_idempotent(tmp_path):
     fp = Footprint.load(p)
     assert fp.hide_reference_texts() is True
     assert fp.hide_reference_texts() is False  # already hidden
+
+
+class TestModelPlacement:
+    """The footprint's `(model ...)` block carries the transform that places the mesh relative to the
+    footprint origin - `(offset (xyz ...))`, `(scale (xyz ...))`, `(rotate (xyz ...))`. Stockroom
+    WROTE an identity transform when attaching a model and never READ one back, so a vendor footprint
+    whose model needs an offset or a rotation was rendered as if it sat at the origin unrotated.
+
+    This is the primitive that footprint-on-board 3D needs: without the transform there is no way to
+    know where the body actually sits, and the preview silently shows a wrong placement rather than
+    failing. Units are KiCad's: offset in mm, rotate in degrees, scale unitless.
+    """
+
+    def _fp(self, tmp_path, model_block: str):
+        src = (
+            '(footprint "T"\n'
+            '\t(layer "F.Cu")\n'
+            f"\t{model_block}\n"
+            ")\n"
+        )
+        p = tmp_path / "t.kicad_mod"
+        p.write_text(src, encoding="utf-8")
+        return Footprint.load(p)
+
+    def test_reads_a_non_identity_placement(self, tmp_path):
+        fp = self._fp(
+            tmp_path,
+            '(model "m.step" (offset (xyz 1.5 -2 0.25)) (scale (xyz 2 2 2)) (rotate (xyz 0 0 -90)))',
+        )
+        place = fp.model_placement
+        assert place is not None
+        assert place.offset == (1.5, -2.0, 0.25)
+        assert place.scale == (2.0, 2.0, 2.0)
+        assert place.rotate == (0.0, 0.0, -90.0)
+
+    def test_identity_when_the_block_omits_them(self, tmp_path):
+        # A hand-written or older footprint may carry only the path. KiCad treats the missing
+        # parts as identity, so reporting None here would make the caller invent its own default.
+        fp = self._fp(tmp_path, '(model "m.step")')
+        place = fp.model_placement
+        assert place is not None
+        assert place.offset == (0.0, 0.0, 0.0)
+        assert place.scale == (1.0, 1.0, 1.0)
+        assert place.rotate == (0.0, 0.0, 0.0)
+
+    def test_none_when_there_is_no_model_at_all(self, tmp_path):
+        src = '(footprint "T"\n\t(layer "F.Cu")\n)\n'
+        p = tmp_path / "t.kicad_mod"
+        p.write_text(src, encoding="utf-8")
+        assert Footprint.load(p).model_placement is None
+
+    def test_reading_the_placement_does_not_rewrite_the_file(self, tmp_path):
+        # Layer 0 is byte-preserving; a READ must never dirty the document.
+        block = '(model "m.step" (offset (xyz 1 2 3)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 90)))'
+        fp = self._fp(tmp_path, block)
+        before = (tmp_path / "t.kicad_mod").read_bytes()
+        _ = fp.model_placement
+        assert (tmp_path / "t.kicad_mod").read_bytes() == before
