@@ -28,6 +28,9 @@ vi.mock("../api/client", async (importActual) => {
       // the per-part sourcing refresh job (POST .../refresh + its SSE stream).
       refreshSourcing: vi.fn(),
       openJobStream: vi.fn(),
+      // the Altium 3D embed: whether it can run here, and running it.
+      altiumEmbedCapability: vi.fn(),
+      altiumEmbedModel: vi.fn(),
     },
   };
 });
@@ -42,6 +45,17 @@ beforeEach(() => {
   mockApi.previewSvg.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
   mockApi.partHistory.mockResolvedValue({ commits: [], count: 0 });
+  // Altium present and idle by default, so a case that cares about a BLOCKED state has to say so
+  // rather than passing because the default happened to be unavailable.
+  mockApi.altiumEmbedCapability.mockResolvedValue({
+    installed: true,
+    binary: "C:/Program Files/Altium/AD26/X2.EXE",
+    requires_tool_installed: true,
+    reason: "A 3D body is written into the footprint's .PcbLib by Altium itself, so embedding needs Altium installed on this machine.",
+    busy: "",
+    available: true,
+  } as never);
+  mockApi.altiumEmbedModel.mockResolvedValue({} as never);
   mockApi.partCadSource.mockResolvedValue({
     url: null,
     mpn: "",
@@ -544,5 +558,135 @@ describe("DetailPanel element removal", () => {
     await waitFor(() =>
       expect(mockApi.detachAsset).toHaveBeenCalledWith("lm358", "kicad_model"),
     );
+  });
+});
+
+
+describe("Altium 3D embed (punch 16)", () => {
+  // A part with the full Altium pair and a KiCad 3D model file: the exact state where the .PcbLib
+  // exists to write into and a model exists to write.
+  const ALTIUM_READY = {
+    kicad: { symbol: SYM, footprint: FP, model: MODEL },
+    altium: {
+      symbol: { lib: "lm358.SchLib", name: "LM358", file: "" },
+      footprint: { lib: "lm358.PcbLib", name: "SOIC-8", file: "" },
+      model: null,
+    },
+  };
+
+  async function openReadiness(over: Partial<PartDetail> = {}) {
+    wrap(<DetailPanel detail={detail(over)} {...BASE} />);
+    await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
+  }
+
+  function byDevId(id: string) {
+    return document.querySelector(`[data-dev-id="${id}"]`);
+  }
+
+  it("offers the embed action when there is a footprint to write into and a model to write", async () => {
+    await openReadiness({ eda: ALTIUM_READY });
+    const action = await waitFor(() => {
+      const el = byDevId("detail.embed3d");
+      expect(el).not.toBeNull();
+      expect(el).not.toBeDisabled();
+      return el as HTMLButtonElement;
+    });
+    expect(action).toHaveTextContent("Embed 3D Model");
+    expect(byDevId("detail.embed3d-blocked")).toBeNull();
+  });
+
+  it("runs the embed for this part when the action is clicked", async () => {
+    // Drive the actual control, not the handler: a wired-looking button that calls nothing is the
+    // failure mode this catches.
+    await openReadiness({ eda: ALTIUM_READY });
+    const action = await waitFor(() => {
+      const el = byDevId("detail.embed3d") as HTMLButtonElement;
+      expect(el).not.toBeDisabled();
+      return el;
+    });
+    await userEvent.click(action);
+    expect(mockApi.altiumEmbedModel).toHaveBeenCalledWith("lm358", false);
+  });
+
+  it("explains that the Altium library must be attached first, rather than sitting inert", async () => {
+    await openReadiness({ eda: { kicad: { symbol: SYM, footprint: FP, model: MODEL } } });
+    expect(byDevId("detail.embed3d")).toBeDisabled();
+    expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Attach the Altium library first/);
+  });
+
+  it("explains that a 3D model file is needed first", async () => {
+    await openReadiness({
+      eda: { ...ALTIUM_READY, kicad: { symbol: SYM, footprint: FP, model: null } },
+    });
+    expect(byDevId("detail.embed3d")).toBeDisabled();
+    expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Add a 3D model file first/);
+  });
+
+  it("gives a KiCad-only peer the registry's reason instead of a control that does nothing", async () => {
+    mockApi.altiumEmbedCapability.mockResolvedValue({
+      installed: false,
+      binary: "",
+      requires_tool_installed: true,
+      reason: "A 3D body is written into the footprint's .PcbLib by Altium itself, so embedding needs Altium installed on this machine.",
+      busy: "",
+      available: false,
+    } as never);
+    await openReadiness({ eda: ALTIUM_READY });
+    await waitFor(() =>
+      expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/needs Altium installed/),
+    );
+    expect(byDevId("detail.embed3d")).toBeDisabled();
+  });
+
+  it("says a windowed Altium is holding the license seat", async () => {
+    mockApi.altiumEmbedCapability.mockResolvedValue({
+      installed: true,
+      binary: "C:/x/X2.EXE",
+      requires_tool_installed: true,
+      reason: "",
+      busy: "Altium Designer",
+      available: false,
+    } as never);
+    await openReadiness({ eda: ALTIUM_READY });
+    await waitFor(() =>
+      expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Close Altium first/),
+    );
+  });
+
+  it("shows the embedded confirmation, and no action, once the container really carries it", async () => {
+    await openReadiness({
+      eda: {
+        ...ALTIUM_READY,
+        altium: {
+          ...ALTIUM_READY.altium,
+          model: { lib: "lm358.PcbLib", name: "SOIC-8", file: "models/lm358.step" },
+        },
+      },
+    });
+    expect(byDevId("detail.embed3d-done")).toHaveTextContent(/3D Model embedded/);
+    expect(byDevId("detail.embed3d")).toBeNull();
+  });
+
+  it("shows the 3D gap as an ACTION, and never as a blocker on Altium readiness", async () => {
+    // How the re-baselined rule surfaces at the layer the user sees, stated deliberately because
+    // the two obvious alternatives are both wrong:
+    //  - the gap must NOT join the Altium "needs" list, because a missing 3D body does not stop a
+    //    footprint from placing, and listing it would turn every Altium part red;
+    //  - it must NOT join the Complete Part needs either, because that window opens a CAPTURE
+    //    session and an Altium 3D body cannot be fetched from a vendor. It is embedded from the
+    //    file the part already holds, which is a different action entirely.
+    // So the gap is communicated by the presence of the embed action next to a READY Altium row.
+    await openReadiness({ eda: ALTIUM_READY });
+    await waitFor(() => expect(byDevId("detail.embed3d")).not.toBeNull());
+    const readiness = byDevId("detail.readiness") as HTMLElement;
+    // BOTH tool rows read Ready: the 3D gap is real and actionable without making Altium unready.
+    expect(within(readiness).getAllByText("Ready")).toHaveLength(2);
+    expect(within(readiness).queryByText(/Complete Part/)).toBeNull();
+  });
+
+  it("offers nothing for a passive, which inherits the stock footprint's own 3D body", async () => {
+    await openReadiness({ passive: true, eda: ALTIUM_READY });
+    expect(byDevId("detail.embed3d")).toBeNull();
+    expect(byDevId("detail.embed3d-done")).toBeNull();
   });
 });

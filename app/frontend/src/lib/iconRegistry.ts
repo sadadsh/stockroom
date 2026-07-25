@@ -562,6 +562,21 @@ export const ICON_REGISTRY: IconEntry[] = [
     body: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   },
   {
+    // Embed 3D Model: a cube with an arrow entering it. A chevron was wrong here, because a chevron
+    // means navigate and this control WRITES a 3D body into the footprint library.
+    id: "detail.embed-3d",
+    category: "bespoke",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round",
+    body:
+      '<path d="M20 8.5v7l-6 3.5-6-3.5v-7L14 5z" stroke-linejoin="round"/>' +
+      '<path d="M14 5v3.5m0 0 6-3.5m-6 3.5L8 5" opacity="0.45"/>' +
+      '<path d="M4 12.5h4m0 0-1.6-1.7M8 12.5l-1.6 1.7"/>',
+  },
+  {
     id: "detail.tag-add",
     category: "bespoke",
     viewBox: "0 0 24 24",

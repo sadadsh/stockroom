@@ -257,6 +257,28 @@ def _goto_surface(page, surface: str) -> bool:
     raise SystemExit(f"unknown surface: {surface}")
 
 
+def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
+    """Click each `data-dev-id` in turn, so a shot can reach a control behind a popover.
+
+    Added because a slice cannot be reviewed if it cannot be SEEN, and several real controls live
+    one click deep: the CAD readiness detail, the filters panel, the remove-element chips. Without
+    this the only options were to shoot the collapsed surface and hope, or to skip the visual check
+    and admit it, and the third time that came up it became a flag.
+
+    Returns the ids that were NOT found, so a typo'd id is reported instead of silently producing a
+    shot of the wrong state. A shot that misses is worse than no shot, because it reads as evidence.
+    """
+    missing: list[str] = []
+    for dev_id in dev_ids:
+        target = page.locator(f'[data-dev-id="{dev_id}"]')
+        if not target.count():
+            missing.append(dev_id)
+            continue
+        target.first.click()
+        page.wait_for_timeout(700)
+    return missing
+
+
 def _close_surface(page, surface: str) -> None:
     if surface == "search":
         page.keyboard.press("Escape")
@@ -317,6 +339,16 @@ def run(args) -> int:
                     print(f"  !! could not reach surface: {surface}")
                     failures.append(surface)
                     continue
+                # ONCE per surface, before the theme loop. Clicking per theme TOGGLED a popover
+                # shut on the second theme, so the dark shot showed it open and the light shot
+                # showed it closed; a comment in this very function claimed the opposite was safer.
+                # Switching the theme only sets a root data attribute, so nothing unmounts and an
+                # open popover stays open. Caught by shooting both themes, which is the point.
+                if args.click:
+                    absent = _click_dev_ids(page, args.click)
+                    if absent:
+                        print(f"  !! no such data-dev-id: {', '.join(absent)}")
+                        failures.append(f"{surface}:click")
                 for theme in themes:
                     page.evaluate(
                         "t => document.documentElement.setAttribute('data-theme', t)", theme
@@ -357,6 +389,14 @@ def run(args) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument(
+        "--click",
+        action="append",
+        default=[],
+        metavar="DEV_ID",
+        help="click this data-dev-id before shooting (repeatable), to reach a control behind a "
+        "popover. An id that does not exist is reported, never silently skipped.",
+    )
     ap.add_argument("--surface", default="components",
                     choices=["components", "search", "projects", "project-health", "project-hygiene",
                              "settings", "all"])

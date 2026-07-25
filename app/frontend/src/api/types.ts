@@ -1573,6 +1573,36 @@ export interface OdbcStatus {
   download_url: string;
 }
 
+// GET /api/altium/embed-capability -> whether a 3D embed can run on THIS machine, and why not
+// when it cannot. Altium writes the 3D body into the footprint's .PcbLib itself, so the action
+// needs Altium installed and its license seat free. `reason` comes from the EDA registry, so a
+// KiCad-only peer sees an explanation rather than a control that silently does nothing.
+export interface AltiumEmbedCapability {
+  installed: boolean;
+  binary: string;
+  requires_tool_installed: boolean;
+  reason: string;
+  // The window title of a running Altium holding the single On-Demand license seat, or "".
+  busy: string;
+  available: boolean;
+}
+
+// POST /api/altium/parts/{id}/embed-model -> the VERIFIED outcome of an embed. `embedded` and
+// `payload_bytes` are read back out of the .PcbLib container from outside Altium, so they are the
+// independent proof rather than Altium's own word. `orphaned` counts superseded payloads a replace
+// left behind, which Altium does not prune.
+export interface AltiumEmbedResult {
+  part_id: string;
+  status: string;
+  detail: string;
+  embedded: number;
+  payload_bytes: number;
+  orphaned: number;
+  pcblib: string;
+  model: string;
+  commit: string;
+}
+
 export interface AltiumRegenerateResult {
   emitted: number;
   skipped: string[];

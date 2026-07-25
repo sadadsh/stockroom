@@ -8,6 +8,8 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  AltiumEmbedCapability,
+  AltiumEmbedResult,
   AltiumRegenerateResult,
   DevSaveBody,
   DevSaveResult,
@@ -1050,6 +1052,23 @@ export const api = {
   // machine (null off Windows), plus where to download it. Machine-level, not profile-scoped.
   altiumOdbcStatus(): Promise<OdbcStatus> {
     return apiGet<OdbcStatus>("/api/altium/odbc-status");
+  },
+
+  // Whether a 3D embed can run on this machine (Altium installed, license seat free), and the
+  // registry's reason when it cannot. Machine-level, not profile-scoped.
+  altiumEmbedCapability(): Promise<AltiumEmbedCapability> {
+    return apiGet<AltiumEmbedCapability>("/api/altium/embed-capability");
+  },
+
+  // Embed the part's 3D model into its Altium footprint's .PcbLib by driving the installed Altium.
+  // Synchronous and slow by nature (Altium boots), one atomic commit, and the result is verified by
+  // reading the container back from outside Altium.
+  altiumEmbedModel(partId: string, replace = false): Promise<AltiumEmbedResult> {
+    return request<AltiumEmbedResult>(
+      "POST",
+      `/api/altium/parts/${encodeURIComponent(partId)}/embed-model`,
+      { body: { replace } },
+    );
   },
 
   // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).
