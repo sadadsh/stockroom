@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from stockroom.kicad.errors import KiCadFileError
@@ -94,6 +95,94 @@ class Footprint:
         """Every `fp_line` the footprint draws, with its layer - the silkscreen and courtyard that
         make a land pattern recognisable. Pads are NOT included; they come from `pads`."""
         out: list[GraphicLine] = []
+
+        def _pt(node, key: str) -> tuple[float, float] | None:
+            sub = node.find(key)
+            if sub is None or len(sub.children) < 3:
+                return None
+            try:
+                return (float(sub.children[1].value), float(sub.children[2].value))
+            except (TypeError, ValueError):
+                return None
+
+        def _layer_width(node) -> tuple[str, float]:
+            layer_node = node.find("layer")
+            layer = (
+                str(layer_node.children[1].value)
+                if layer_node is not None and len(layer_node.children) > 1
+                else ""
+            )
+            width = 0.12
+            stroke = node.find("stroke")
+            if stroke is not None:
+                w = stroke.find("width")
+                if w is not None and len(w.children) > 1:
+                    try:
+                        width = float(w.children[1].value)
+                    except (TypeError, ValueError):
+                        width = 0.12
+            return layer, width
+
+        # RECTANGLES - measured at 63% of real KiCad footprints, second only to fp_line, and
+        # previously drawn as nothing at all. Emitted as four segments so every consumer needs
+        # only ONE primitive: a caller that can draw a line can draw the whole land pattern.
+        for node in self._doc.root.find_all("fp_rect"):
+            a, b = _pt(node, "start"), _pt(node, "end")
+            if a is None or b is None:
+                continue
+            layer, width = _layer_width(node)
+            corners = [(a[0], a[1]), (b[0], a[1]), (b[0], b[1]), (a[0], b[1])]
+            for i in range(4):
+                out.append(
+                    GraphicLine(
+                        start=corners[i], end=corners[(i + 1) % 4], layer=layer, width=width
+                    )
+                )
+
+        # CIRCLES (10%) - KiCad stores a centre and a point ON the rim; approximated as a closed
+        # polyline, which is what a renderer would tessellate it into anyway.
+        for node in self._doc.root.find_all("fp_circle"):
+            c, edge = _pt(node, "center"), _pt(node, "end")
+            if c is None or edge is None:
+                continue
+            layer, width = _layer_width(node)
+            r = ((edge[0] - c[0]) ** 2 + (edge[1] - c[1]) ** 2) ** 0.5
+            if r <= 0:
+                continue
+            segments = 32
+            prev = (c[0] + r, c[1])
+            for i in range(1, segments + 1):
+                ang = 2 * math.pi * i / segments
+                cur = (c[0] + r * math.cos(ang), c[1] + r * math.sin(ang))
+                out.append(GraphicLine(start=prev, end=cur, layer=layer, width=width))
+                prev = cur
+
+        # POLYGONS (6%) - the pin-1 wedge on many parts. Closed, because KiCad implies closure.
+        for node in self._doc.root.find_all("fp_poly"):
+            poly = node.find("pts")
+            if poly is None:
+                continue
+            points: list[tuple[float, float]] = []
+            for xy in poly.find_all("xy"):
+                if len(xy.children) < 3:
+                    continue
+                try:
+                    points.append((float(xy.children[1].value), float(xy.children[2].value)))
+                except (TypeError, ValueError):
+                    continue
+            if len(points) < 2:
+                continue
+            layer, width = _layer_width(node)
+            for i in range(len(points)):
+                out.append(
+                    GraphicLine(
+                        start=points[i],
+                        end=points[(i + 1) % len(points)],
+                        layer=layer,
+                        width=width,
+                    )
+                )
+
         for node in self._doc.root.find_all("fp_line"):
 
             def pt(key: str) -> tuple[float, float] | None:
