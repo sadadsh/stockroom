@@ -594,3 +594,222 @@ def test_assign_refs_refuses_a_dirty_sheet(tmp_path):
     sch.write_text(sch.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="uncommitted"):
         ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+
+
+# --- durable bindings: an assignment that survives a re-annotate ---------------
+#
+# Punch 17's last gap. Before this, an assignment only wrote identity FIELDS, so the link between a
+# placement and its library part existed nowhere: renumbering the reference or editing the Value
+# left nothing to re-verify. The binding is that link, and where it is STORED is registry data.
+
+
+def _binding_field(tool="kicad"):
+    from stockroom.projects import binding
+
+    return binding.field_for(tool)
+
+
+def test_assign_refs_stamps_a_durable_binding_into_the_kicad_schematic(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    result = ops.assign_refs(rec.id, ["R1", "R2", "R10"], "r10k", library_parts=_stock_passives())
+    after = (proj / "proj.kicad_sch").read_text(encoding="utf-8")
+    # One binding per assigned placement, written in the SAME commit as the identity fields.
+    assert after.count(f'(property "{_binding_field()}" "r10k"') == 3
+    assert result["bound"] == 3
+    assert prepo.is_clean([proj / "proj.kicad_sch"])
+    # Hidden: a Stockroom bookkeeping field must not print on the user's schematic sheet.
+    field_at = after.index(f'(property "{_binding_field()}" "r10k"')
+    assert "(hide yes)" in after[field_at:field_at + 200]
+
+
+def test_a_binding_survives_a_reannotate_where_every_other_tier_fails(tmp_path):
+    """The property this whole slice exists for. KiCad renumbers R1 to R77; nothing about the
+    placement's symbol, value or designator can identify the part afterwards, and the binding
+    still does."""
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+
+    sch = proj / "proj.kicad_sch"
+    renumbered = sch.read_text(encoding="utf-8").replace('"R1"', '"R77"')
+    sch.write_text(renumbered, encoding="utf-8")
+    prepo.commit("Renumber in KiCad", [sch])
+
+    r = ops.assign_read(rec.id, library_parts=_stock_passives())
+    bound = {b["ref"]: b for b in r["bound"]}
+    assert bound["R77"]["part_id"] == "r10k"
+    assert bound["R77"]["display_name"] == "10 kOhm 0402"
+    assert "R77" not in {ref for g in r["groups"] for ref in g["refs"]}
+    # ...and the fill plan agrees, at the binding tier rather than a guess.
+    plan = ops.prepare_read(rec.id, library_parts=_stock_passives())["plan"]
+    assert {i["ref"]: i["confidence"] for i in plan["items"]}.get("R77") in (None, "binding")
+
+
+def test_a_binding_survives_a_value_edit(tmp_path):
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R3"], "r47k", library_parts=_stock_passives())
+    sch = proj / "proj.kicad_sch"
+    sch.write_text(sch.read_text(encoding="utf-8").replace('"47k"', '"470k"'), encoding="utf-8")
+    prepo.commit("Retune", [sch])
+    r = ops.assign_read(rec.id, library_parts=_stock_passives())
+    assert [b["part_id"] for b in r["bound"] if b["ref"] == "R3"] == ["r47k"]
+
+
+def test_assign_read_reports_drift_between_a_bound_part_and_the_placement(tmp_path):
+    """"Re-verified later" made real: a bound placement whose schematic fields no longer agree with
+    its library part is reported as drift rather than quietly ignored."""
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                               sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+    assert [b["drift"] for b in ops.assign_read(rec.id, library_parts=_stock_passives())["bound"]
+            if b["ref"] == "R1"] == [[]]
+    sch = proj / "proj.kicad_sch"
+    sch.write_text(sch.read_text(encoding="utf-8").replace('"RC0402FR-0710KL"', '"WRONG-MPN"'),
+                   encoding="utf-8")
+    prepo.commit("Hand edit", [sch])
+    drift = [b["drift"] for b in ops.assign_read(rec.id, library_parts=_stock_passives())["bound"]
+             if b["ref"] == "R1"][0]
+    assert [(d["prop"], d["new"]) for d in drift] == [("MPN", "RC0402FR-0710KL")]
+
+
+def test_a_binding_to_a_part_that_left_the_library_is_reported_not_silently_reguessed(tmp_path):
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p",
+                           sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+    shrunk = [p for p in _stock_passives() if p.id != "r10k"]
+    r = ops.assign_read(rec.id, library_parts=shrunk)
+    broken = [b for b in r["bound"] if b["ref"] == "R1"]
+    assert len(broken) == 1 and broken[0]["missing"] is True
+    assert broken[0]["part_id"] == "r10k" and broken[0]["display_name"] == ""
+
+
+# --- the same surface for a tool whose design Stockroom cannot write ----------
+
+
+def _altium_schdoc(path, *component_blocks):
+    """A synthetic .SchDoc, the same shape tests/backend/projects/test_bom.py builds, plus the
+    per-component UNIQUEID that an Altium binding is keyed by."""
+    import struct
+
+    from tests.backend.altium.cfb_writer import write_cfb
+
+    def rec(*pairs):
+        payload = ("|" + "|".join(pairs)).encode("latin-1") + b"\x00"
+        return struct.pack("<I", len(payload)) + payload
+
+    stream = rec("HEADER=Protel for Windows - Schematic Capture Binary File Version 5.0")
+    idx = 0
+    for block in component_blocks:
+        comp_idx = idx
+        stream += rec("RECORD=1", f"LIBREFERENCE={block['lib_ref']}",
+                      f"DESIGNITEMID={block.get('design_item_id', '')}",
+                      f"UNIQUEID={block.get('unique_id', '')}", "OWNERPARTID=-1")
+        idx += 1
+        stream += rec("RECORD=34", f"OWNERINDEX={comp_idx}", "NAME=Designator",
+                      f"TEXT={block['designator']}")
+        idx += 1
+        for name, text in block.get("params", {}).items():
+            stream += rec("RECORD=41", f"OWNERINDEX={comp_idx}", f"NAME={name}", f"TEXT={text}")
+            idx += 1
+        if block.get("footprint"):
+            stream += rec("RECORD=44", f"OWNERINDEX={comp_idx}")
+            stream += rec("RECORD=45", f"OWNERINDEX={idx}", f"MODELNAME={block['footprint']}",
+                          "MODELTYPE=PCBLIB", "ISCURRENT=T")
+            idx += 2
+    write_cfb(path, "FileHeader", stream)
+    return path
+
+
+def _altium_project(dir_path):
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / "proj.PrjPcb").write_text(
+        "[Design]\nVersion=1.0\n[Document1]\nDocumentPath=Amp.SchDoc\n", encoding="utf-8")
+    _altium_schdoc(
+        dir_path / "Amp.SchDoc",
+        {"designator": "R1", "lib_ref": "RES", "unique_id": "AAAAAAAA",
+         "params": {"Value": "10k"}, "footprint": "RESC1005X40"},
+        {"designator": "R2", "lib_ref": "RES", "unique_id": "BBBBBBBB",
+         "params": {"Value": "10k"}, "footprint": "RESC1005X40"},
+    )
+    return dir_path
+
+
+def _altium_passives():
+    return [PartRecord(
+        id="r10k", display_name="10 kOhm 0402", category="Resistors",
+        description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo", passive=True,
+        eda={"altium": EdaAssets(symbol=AssetRef(lib="SR.SchLib", name="RES"),
+                                 footprint=AssetRef(lib="SR.PcbLib", name="RESC1005X40"))},
+        specs={"Resistance": "10 kOhm", "Package": "0402"},
+    )]
+
+
+def test_assign_read_serves_an_altium_project_instead_of_refusing_it(tmp_path):
+    """Registry-generic: the bulk-assign surface reads placements through whichever reader the
+    project's tool declares, so an Altium registration is a first-class citizen here."""
+    ops = _ops(tmp_path)
+    rec = ops.register(_altium_project(tmp_path / "ext" / "a"))
+    assert rec.eda == "altium"
+    r = ops.assign_read(rec.id, library_parts=_altium_passives())
+    assert r["components"] == 2
+    assert [g["refs"] for g in r["groups"]] == [["R1", "R2"]]
+    assert r["binding"]["writable"] is False and r["binding"]["reason"]
+
+
+def test_an_altium_assignment_is_recorded_because_the_design_cannot_be_written(tmp_path):
+    """Stockroom never writes Altium binary, so the binding lives on the project record. The
+    .SchDoc must come out byte-identical: a write there would be the bug, not the feature."""
+    ops = _ops(tmp_path)
+    proj = _altium_project(tmp_path / "ext" / "a")
+    rec = ops.register(proj)
+    before = (proj / "Amp.SchDoc").read_bytes()
+
+    result = ops.assign_refs(rec.id, ["R1", "R2"], "r10k", library_parts=_altium_passives())
+    assert result["bound"] == 2
+    assert (proj / "Amp.SchDoc").read_bytes() == before
+
+    stored = ops.store.get(rec.id).bindings["altium"]
+    assert stored == {"AAAAAAAA": "r10k", "BBBBBBBB": "r10k"}
+    # ...and reading back resolves it, so the group leaves the unassigned work list.
+    r = ops.assign_read(rec.id, library_parts=_altium_passives())
+    assert r["groups"] == [] and r["unassigned"] == 0
+    assert sorted(b["ref"] for b in r["bound"]) == ["R1", "R2"]
+
+
+def test_an_altium_binding_is_keyed_by_the_components_unique_id_not_its_designator(tmp_path):
+    ops = _ops(tmp_path)
+    rec = ops.register(_altium_project(tmp_path / "ext" / "a"))
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_altium_passives())
+    assert list(ops.store.get(rec.id).bindings["altium"]) == ["AAAAAAAA"]
+
+
+def test_a_natively_dblib_placed_altium_component_is_already_bound(tmp_path):
+    """Altium copies a DbLib column onto the placement, so a component placed from Stockroom's own
+    library arrives carrying its binding with nothing recorded anywhere."""
+    from stockroom.projects import binding
+
+    ops = _ops(tmp_path)
+    proj = (tmp_path / "ext" / "a")
+    proj.mkdir(parents=True, exist_ok=True)
+    (proj / "proj.PrjPcb").write_text("[Design]\n[Document1]\nDocumentPath=Amp.SchDoc\n",
+                                      encoding="utf-8")
+    _altium_schdoc(proj / "Amp.SchDoc",
+                   {"designator": "R1", "lib_ref": "RES", "unique_id": "AAAAAAAA",
+                    "params": {"Value": "10k", binding.field_for("altium"): "r10k"},
+                    "footprint": "RESC1005X40"})
+    rec = ops.register(proj)
+    r = ops.assign_read(rec.id, library_parts=_altium_passives())
+    assert r["groups"] == []
+    assert [b["part_id"] for b in r["bound"]] == ["r10k"]

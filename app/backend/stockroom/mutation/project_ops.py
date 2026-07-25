@@ -14,11 +14,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from stockroom.eda.registry import get_tool
 from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, settings_ops, standards
+from stockroom.projects import binding, conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, placements, settings_ops, standards
 from stockroom.sexp.document import SexpDocument
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
@@ -113,6 +114,10 @@ class ProjectOps:
             name=rec.name, boards=boards, tax_rate=tax_rate,
             library_parts=_resolve_parts(library_parts),
             price_lookup=price_lookup, progress=progress,
+            # The durable bindings for a tool whose design files Stockroom cannot write. A
+            # writable tool's bindings live in the design itself, so this is empty for it and the
+            # BOM reads them straight off each placement.
+            bindings=binding.stored_for(rec, rec.eda or "kicad"),
         )
 
     def fab_preview(self, project_id: str) -> dict:
@@ -1157,6 +1162,8 @@ class ProjectOps:
             with open(p, encoding="utf-8", newline="") as fh:
                 texts.append(fh.read())
         used = fill.used_references(texts)  # seed project-wide before any sheet is numbered
+        tool = rec.eda or "kicad"
+        stored = binding.stored_for(rec, tool)
         staged: list[dict] = []
         pre_comps: list[dict] = []      # current on-disk designators (for the plan + current residual)
         final_comps: list[dict] = []    # post-annotate + post-fill (for the projected residual)
@@ -1168,15 +1175,17 @@ class ProjectOps:
             doc = SexpDocument.parse(text)
             # Read the CURRENT on-disk components (disk designators) BEFORE annotation, so the plan and
             # the manual-fill picker name refs that actually exist on disk (a manual fill matches disk,
-            # not the projected annotated ref). Matching is designator-independent (by lib_id / MPN).
-            for c in fill.read_components(doc):
+            # not the projected annotated ref). Matching is designator-independent (by binding /
+            # lib_id / MPN), and every read resolves the durable binding first so a component the user
+            # has already assigned is matched by that decision rather than re-guessed.
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 c["_sheet"] = rel
                 pre_comps.append(c)
             annotated = fill.annotate_document(doc, used)
             # Read AFTER annotation so the auto-fill keys off the FINAL designators annotation just
             # assigned (the doc it will save), not the R? placeholders.
             changes_by_ref: dict[str, dict[str, str]] = {}
-            for c in fill.read_components(doc):
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 m = fill.match_component(c, index)
                 if m["part"] is None:
                     continue
@@ -1188,7 +1197,7 @@ class ProjectOps:
             # the reported "fill_fields" is the number of property fields filled (its own count).
             filled_comps = fill.fill_document(doc, changes_by_ref)
             filled_fields = sum(len(v) for v in changes_by_ref.values())
-            for c in fill.read_components(doc):
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 final_comps.append(c)
             changed = (annotated + filled_comps) > 0
             staged.append({"path": rel, "_abs": path, "annotated": annotated,
@@ -1286,25 +1295,52 @@ class ProjectOps:
                 "ref": ref, "part_id": part_id}
 
     def assign_refs(self, project_id: str, refs, part_id: str, library_parts=()) -> dict:
-        """Link EVERY placed component in `refs` to the library part `part_id`, filling all their
-        identity fields (overwrite allowed, since this is an explicit user choice, unlike the
-        conservative auto pass) and repointing their `(lib_id ...)`, as ONE atomic commit on the
-        project's own git.
+        """Link EVERY placed component in `refs` to the library part `part_id`, as ONE atomic
+        commit, and record the link DURABLY so it survives a re-annotate or a Value edit.
 
         This is what makes the owner's scenario one action: a project's identical passives are grouped
         by (symbol, Value, Footprint) and the whole group is assigned in a single decision and a single
         commit, rather than one component at a time. All-or-nothing by construction, because it is one
         Transaction: either every ref is written and committed, or every touched path is restored.
 
+        WHERE the binding is written is registry data, not a branch (see eda/registry.PlacementBinding
+        and projects/binding.py):
+
+          - A tool whose design Stockroom can write (KiCad) gets the binding stamped onto the
+            placement itself, hidden, alongside the identity fields and the repointed `(lib_id ...)`,
+            in the SAME byte-preserving commit on the project's own git. It is then atomic with the
+            fill it records, it travels to a peer through the project's own history, and it cannot
+            disagree with the design because it IS the design.
+          - A tool whose design Stockroom only reads (Altium) gets the binding recorded on the
+            Stockroom project record, one scoped commit on the library repo. No design file is
+            touched, which is the correct outcome and not a degraded one.
+
         An assignment that changes nothing is an honest no-commit no-op. Raises FileNotFoundError
-        (unknown id); ValueError for a project not under git, an unknown library part, an empty ref
-        list, or a ref that names no component in this project (reported with every missing ref at
-        once, so a partly-stale UI selection does not have to be fixed one round-trip at a time).
+        (unknown id); ValueError for a writable-tool project not under git, an unknown library part, an
+        empty ref list, or a ref that names no component in this project (reported with every missing
+        ref at once, so a partly-stale UI selection does not have to be fixed one round-trip at a time).
         """
         wanted = [str(r).strip() for r in (refs or []) if str(r).strip()]
         if not wanted:
             raise ValueError("no component references to assign")
-        rec = self.require_kicad(project_id)
+        rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not placements.supported(tool):
+            raise ValueError(
+                f"{rec.name} is registered for {tool!r}, which Stockroom cannot assign parts in"
+            )
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        part = next((p for p in index if p["id"] == part_id), None)
+        if part is None:
+            raise ValueError(f"no such library part: {part_id}")
+        if binding.writes_into_design(tool):
+            return self._assign_in_design(rec, wanted, part, part_id)
+        return self._assign_on_record(rec, wanted, part_id)
+
+    def _assign_in_design(self, rec: ProjectRecord, wanted: list[str], part: dict,
+                          part_id: str) -> dict:
+        """Assign by writing the design: identity fields, the repointed symbol link, and the hidden
+        binding field, in one atomic commit on the project's own git."""
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before filling"
@@ -1318,11 +1354,8 @@ class ProjectOps:
             raise ValueError(
                 "this project has uncommitted changes to a schematic; commit or discard them before filling"
             )
-        index = fill.library_match_records(_resolve_parts(library_parts))
-        part = next((p for p in index if p["id"] == part_id), None)
-        if part is None:
-            raise ValueError(f"no such library part: {part_id}")
         lib_id = fill.lib_id_for(part)
+        binding_field = binding.field_for(rec.eda or "kicad")
         remaining = set(wanted)
         changed: list[tuple[Path, SexpDocument]] = []
         for path in sheets:
@@ -1336,8 +1369,11 @@ class ProjectOps:
                 r: {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comps[r]["props"])}
                 for r in here
             }
+            for r in here:
+                changes_by_ref[r][binding_field] = part_id
             n = fill.fill_document(doc, changes_by_ref,
-                                   lib_id_by_ref={r: lib_id for r in here} if lib_id else None)
+                                   lib_id_by_ref={r: lib_id for r in here} if lib_id else None,
+                                   hidden_props={binding_field})
             if n:
                 changed.append((path, doc))
         if remaining:
@@ -1345,7 +1381,7 @@ class ProjectOps:
             # project half assigned.
             missing = ", ".join(sorted(remaining, key=fill.ref_sort_key))
             raise ValueError(f"no component {missing} in this project")
-        result = {"project": rec.name, "refs": wanted, "part_id": part_id}
+        result = {"project": rec.name, "refs": wanted, "part_id": part_id, "bound": len(wanted)}
         if not changed:
             return {**result, "committed": None}
         label = wanted[0] if len(wanted) == 1 else f"{len(wanted)} components"
@@ -1358,29 +1394,72 @@ class ProjectOps:
             sha = txn.commit(message)
         return {**result, "committed": sha}
 
+    def _assign_on_record(self, rec: ProjectRecord, wanted: list[str], part_id: str) -> dict:
+        """Assign by recording the binding on the Stockroom project record, for a tool whose design
+        files Stockroom reads but never writes. The design is left byte-identical on purpose."""
+        tool = rec.eda or "kicad"
+        comps = {c["ref"]: c for c in placements.read_placements(rec)}
+        missing = [r for r in wanted if r not in comps]
+        if missing:
+            names = ", ".join(sorted(set(missing), key=fill.ref_sort_key))
+            raise ValueError(f"no component {names} in this project")
+        updates = {binding.placement_key(comps[r]): part_id for r in wanted}
+        merged = binding.merged_bindings(rec, tool, updates)
+        label = wanted[0] if len(wanted) == 1 else f"{len(wanted)} components"
+        self.store.set_bindings(rec.id, merged, f"Bind {rec.name}: {label} to a library part")
+        return {"project": rec.name, "refs": wanted, "part_id": part_id,
+                "bound": len(wanted), "committed": None}
+
     def assign_read(self, project_id: str, library_parts=()) -> dict:
         """The reviewable bulk-assign surface: every placed component that carries no identified
         library part, grouped so identical placements are ONE row, each with the ranked library
-        candidates a user could assign to it. Read-only; no git, no writes.
+        candidates a user could assign to it, PLUS every component that already carries a durable
+        binding, so an assignment can be re-verified later instead of being written and forgotten.
+        Read-only; no git, no writes.
+
+        Registry-generic: placements are read through the tool's own reader (`projects/placements`),
+        so an Altium registration is served here exactly like a KiCad one.
 
         Only groups whose components are all unidentified are offered: a component the identity tiers
         already matched is Prepare's job, not a guessing decision. Raises FileNotFoundError for an
         unknown id; a project with no sheets is an honest empty shape.
         """
-        rec = self.require_kicad(project_id)
+        rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not placements.supported(tool):
+            raise ValueError(
+                f"{rec.name} is registered for {tool!r}, which Stockroom cannot read placements for"
+            )
         index = fill.library_match_records(_resolve_parts(library_parts))
-        root = Path(rec.root)
-        comps: list[dict] = []
-        for path in self._sheet_abs(rec):
-            doc = SexpDocument.load(path)
-            try:
-                rel = path.resolve().relative_to(root.resolve()).as_posix()
-            except ValueError:
-                rel = path.name
-            for c in fill.read_components(doc):
-                c["_sheet"] = rel
-                comps.append(c)
-        unmatched = [c for c in comps if fill.match_component(c, index)["part"] is None]
+        by_id = {p["id"]: p for p in index}
+        comps = placements.read_placements(rec)
+        unmatched: list[dict] = []
+        bound: list[dict] = []
+        for comp in comps:
+            match = fill.match_component(comp, index)
+            if match["confidence"] in ("binding", "binding_missing"):
+                part_id = binding.bound_part_id(comp)
+                part = by_id.get(part_id)
+                key = binding.placement_key(comp)
+                bound.append({
+                    "ref": comp.get("ref", ""),
+                    "sheet": comp.get("_sheet", ""),
+                    "key": key,
+                    # A key derived from a designator does not survive a re-annotate. Saying so is
+                    # the difference between a durable binding and one that only looks durable.
+                    "weak_key": binding.is_weak_key(key),
+                    "part_id": part_id,
+                    "display_name": (part or {}).get("display_name", ""),
+                    "mpn": (part or {}).get("mpn", ""),
+                    "missing": part is None,
+                    # What re-verification MEANS: the fields this placement would still receive from
+                    # the part it is bound to. Empty is agreement; non-empty is drift a human edit
+                    # (or a library change) introduced after the assignment.
+                    "drift": fill.proposed_changes(part, comp.get("props") or {}) if part else [],
+                })
+                continue
+            if match["part"] is None:
+                unmatched.append(comp)
         groups = []
         for group in fill.group_placements(unmatched):
             first = next(c for c in unmatched if c["ref"] == group["refs"][0])
@@ -1388,11 +1467,17 @@ class ProjectOps:
                            "sheets": sorted({c["_sheet"] for c in unmatched
                                              if c["ref"] in set(group["refs"])}),
                            "candidates": fill.candidate_matches(first, index)})
+        pb = get_tool(tool).placement_binding
         return {
             "project": rec.name,
+            "eda": tool,
             "under_git": bool(rec.git_root),
+            # How this tool carries a binding, so the surface can say where an assignment lands
+            # instead of the user having to know.
+            "binding": {"field": pb.field, "writable": pb.writable, "reason": pb.reason},
             "components": len(comps),
             "unassigned": len(unmatched),
+            "bound": sorted(bound, key=lambda b: fill.ref_sort_key(b["ref"])),
             "groups": groups,
         }
 

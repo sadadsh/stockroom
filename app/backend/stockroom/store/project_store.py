@@ -189,6 +189,28 @@ class ProjectStore:
             return None
         return ProjectRecord.loads(path.read_text(encoding="utf-8"))
 
+    def set_bindings(self, project_id: str, bindings: dict, message: str) -> ProjectRecord:
+        """Persist a project's durable placement bindings as ONE scoped commit on the library repo.
+
+        This is the store for tools whose design files Stockroom cannot write (see the registry's
+        PlacementBinding). A tool that CAN be written keeps its bindings in the design itself and
+        never reaches here, so the record and the design can never hold two different answers.
+
+        A no-op write is an honest no-op: the record is not rewritten and nothing is committed, so
+        re-assigning the same part does not churn the library history.
+        """
+        rec = self.get(project_id)
+        if rec is None:
+            raise FileNotFoundError(f"no such project: {project_id}")
+        normalized = {tool: dict(m) for tool, m in (bindings or {}).items() if m}
+        if normalized == {tool: dict(m) for tool, m in rec.bindings.items() if m}:
+            return rec
+        rec.bindings = normalized
+        path = self._path(project_id)
+        path.write_text(rec.dumps(), encoding="utf-8")
+        self.repo.commit(message, [path])
+        return rec
+
     def delete(self, project_id: str) -> None:
         rec = self.get(project_id)
         if rec is None:

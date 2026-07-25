@@ -29,10 +29,22 @@ def test_render_maps_reserved_params_and_one_fieldmap_per_column():
     assert "ParameterName=[Comment]" in text  # the placed symbol's display value
     assert "ParameterName=Value" in text  # non-bracketed = ordinary parameter
     fieldmaps = text.count("[FieldMap")
-    assert fieldmaps == len(FIELD_MAP) == 18
+    assert fieldmaps == len(FIELD_MAP) == 19  # 18 data columns + the "Stockroom ID" binding
 
 
 def test_emit_writes_file(tmp_path):
     out = tmp_path / "Stockroom.DbLib"
     emit_dblib("Parts", "stockroom-parts.db", out)
     assert out.read_text(encoding="utf-8").startswith("[OutputDatabaseLinkFile]")
+
+
+def test_the_dblib_carries_the_stockroom_binding_column():
+    """A component placed from this DbLib arrives in the schematic already bound to its library
+    part, because Altium copies the column onto the placement. Stockroom cannot write a .SchDoc,
+    so this is the only way an Altium placement can carry its own binding."""
+    from stockroom.projects.binding import field_for
+
+    field = field_for("altium")
+    assert any(col == field and param == field for col, param, _v in FIELD_MAP), FIELD_MAP
+    text = render_dblib("Parts", "stockroom-parts.db")
+    assert f"FieldNameOnly={field}" in text

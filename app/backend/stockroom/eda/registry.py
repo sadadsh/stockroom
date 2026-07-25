@@ -27,6 +27,27 @@ GENERATED_HEADER = (
 
 
 @dataclass(frozen=True)
+class PlacementBinding:
+    """How a PLACED component in this tool's design files carries the id of the Stockroom
+    library part it is bound to.
+
+    A binding is what makes an assignment durable: a designator is renumbered by annotation
+    and a Value is edited freely, so neither can key the link. `field` is the placement field
+    that holds the part id; `writable` says whether Stockroom can put it there itself.
+
+    `writable=False` is not a missing feature, it is a fact about the tool, and it decides
+    where the binding is STORED: a tool Stockroom can write carries its binding inside the
+    design (atomic with the same byte-preserving write, and it travels with the file), while
+    a tool Stockroom can only read keeps it on the Stockroom project record instead.
+    """
+
+    field: str = "Stockroom ID"
+    writable: bool = False
+    # Why the design cannot be written, shown to the user rather than left as silence.
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class EdaTool:
     """Everything generic code needs to know about one EDA tool.
 
@@ -52,6 +73,8 @@ class EdaTool:
     # Asset kinds the tool CANNOT be given through Stockroom's normal reference mechanism,
     # mapped to why. Generic code reads this instead of special-casing a tool.
     unsupported_assets: dict[str, str] = field(default_factory=dict)
+    # How a placed component carries the library part it is bound to (see PlacementBinding).
+    placement_binding: PlacementBinding = PlacementBinding()
 
 
 _KICAD = EdaTool(
@@ -79,6 +102,10 @@ _KICAD = EdaTool(
         "*.net",
     ),
     binary=("*.wrl", "*.step", "*.stp"),
+    # Stockroom edits .kicad_sch through the byte-preserving sexp layer, so a KiCad binding
+    # lives in the schematic itself: written in the SAME transaction as the fill it records,
+    # untouched by annotation, and carried to a peer by the project's own git.
+    placement_binding=PlacementBinding(field="Stockroom ID", writable=True),
 )
 
 _ALTIUM = EdaTool(
@@ -114,6 +141,18 @@ _ALTIUM = EdaTool(
             "binary), so it cannot be attached by reference; it must be embedded."
         )
     },
+    # A .SchDoc is an OLE2 binary Stockroom reads and never writes, so it cannot stamp a
+    # binding onto an existing placement; the binding is kept on the project record instead.
+    # A component placed from Stockroom's own DbLib still arrives carrying this parameter,
+    # because Altium copies the DbLib column onto the placement itself.
+    placement_binding=PlacementBinding(
+        field="Stockroom ID",
+        writable=False,
+        reason=(
+            "A .SchDoc is an OLE2 binary that Stockroom reads but never writes, so an "
+            "assignment is recorded by Stockroom rather than stamped into the schematic."
+        ),
+    ),
 )
 
 # Declaration order is MEANINGFUL: it is the order tools are offered and reported in, and the
