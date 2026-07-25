@@ -6,7 +6,7 @@
  * The heavy three.js code is import()ed lazily so it only loads when a 3D view is open.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ModelSceneHandle, ViewMode } from "../lib/threeScene";
+import type { ModelSceneHandle, RenderMode, ViewMode } from "../lib/threeScene";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 
@@ -42,6 +42,9 @@ export function Glb3DView({
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>(null);
   const [showLand, setShowLand] = useState(false);
+  const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
+  const [showModel, setShowModel] = useState(true);
+  const [showBoard, setShowBoard] = useState(true);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -88,30 +91,70 @@ export function Glb3DView({
   return (
     <div className="relative h-full w-full">
       <div ref={mountRef} className="h-full w-full" data-testid="model-canvas" />
-      {land && land.pads.length > 0 ? (
-        <button
-          type="button"
-          data-dev-id="detail.model-board"
-          aria-pressed={showLand}
-          title="Show the land pattern under the body, to check the model is oriented correctly"
-          onClick={(e) => {
-            e.stopPropagation();
-            const next = !showLand;
-            setShowLand(next);
-            showLandRef.current = next;
-            sceneRef.current?.setLandPattern(next ? land : null);
-          }}
-          className={
-            "pointer-events-auto absolute bottom-2 left-2 rounded-control border border-line px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
-            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
-            (showLand
-              ? "bg-raise2 text-t1"
-              : "bg-[var(--c-popover)]/85 text-t3 backdrop-blur-sm hover:text-t1")
-          }
+      <div
+        data-dev-id="detail.model-layers"
+        onClick={(e) => e.stopPropagation()}
+        className="pointer-events-auto absolute bottom-2 left-2 flex flex-col items-start gap-1"
+      >
+        <div className="flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm">
+          <LayerToggle
+            devId="detail.model-show-model"
+            label="Model"
+            on={showModel}
+            hint="Show or hide the 3D body"
+            onToggle={() => {
+              const next = !showModel;
+              setShowModel(next);
+              sceneRef.current?.setLayers({ model: next });
+            }}
+          />
+          {land && land.pads.length > 0 ? (
+            <>
+              <LayerToggle
+                devId="detail.model-board"
+                label="Pads"
+                on={showLand}
+                hint="Show the land pattern, to check the body is oriented correctly"
+                onToggle={() => {
+                  const next = !showLand;
+                  setShowLand(next);
+                  showLandRef.current = next;
+                  sceneRef.current?.setLandPattern(next ? land : null);
+                }}
+              />
+              <LayerToggle
+                devId="detail.model-show-board"
+                label="PCB"
+                on={showBoard}
+                hint="Show the board the pads sit on"
+                onToggle={() => {
+                  const next = !showBoard;
+                  setShowBoard(next);
+                  sceneRef.current?.setLayers({ board: next });
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+        <div
+          data-dev-id="detail.model-shading"
+          className="flex items-center gap-0.5 rounded-control border border-line bg-[var(--c-popover)]/85 p-0.5 backdrop-blur-sm"
         >
-          Footprint
-        </button>
-      ) : null}
+          {SHADING.map((r) => (
+            <LayerToggle
+              key={r.mode}
+              devId={r.devId}
+              label={r.label}
+              on={renderMode === r.mode}
+              hint={r.hint}
+              onToggle={() => {
+                setRenderMode(r.mode);
+                sceneRef.current?.setRenderMode(r.mode);
+              }}
+            />
+          ))}
+        </div>
+      </div>
       <ViewControls
         active={view}
         onPick={(mode) => {
@@ -125,6 +168,62 @@ export function Glb3DView({
 
 // The dev-id is written out in FULL rather than built as `detail.model-view-${mode}`: the parity
 // gate scans source text, so an interpolated id is invisible to it and to anyone grepping for it.
+const SHADING: { mode: RenderMode; label: string; hint: string; devId: string }[] = [
+  {
+    mode: "realistic",
+    label: "Realistic",
+    hint: "Physically lit with ambient occlusion, the closest to a ray-traced look",
+    devId: "detail.model-shade-realistic",
+  },
+  {
+    mode: "studio",
+    label: "Studio",
+    hint: "Flat high-contrast surface with feature lines, easiest for reading shape",
+    devId: "detail.model-shade-studio",
+  },
+  {
+    mode: "xray",
+    label: "X-Ray",
+    hint: "Translucent body, so the pads underneath stay visible",
+    devId: "detail.model-shade-xray",
+  },
+];
+
+/** One quiet toggle. Pressed state carries the answer; `aria-pressed` makes it audible too. */
+function LayerToggle({
+  devId,
+  label,
+  on,
+  hint,
+  onToggle,
+}: {
+  devId: string;
+  label: string;
+  on: boolean;
+  hint: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-dev-id={devId}
+      aria-pressed={on}
+      title={hint}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={
+        "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+        "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+        (on ? "bg-raise2 text-t1" : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
 const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string }[] = [
   { mode: "iso", label: "3D", hint: "Three-quarter view", devId: "detail.model-view-iso" },
   {
