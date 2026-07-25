@@ -813,3 +813,47 @@ def test_a_natively_dblib_placed_altium_component_is_already_bound(tmp_path):
     r = ops.assign_read(rec.id, library_parts=_altium_passives())
     assert r["groups"] == []
     assert [b["part_id"] for b in r["bound"]] == ["r10k"]
+
+
+def test_drift_is_a_DISAGREEMENT_not_a_blank_field(tmp_path):
+    """The distinction that decides whether the record is usable at all. A placement that simply has
+    not been filled in yet is Prepare's job and is not a problem with the binding; only a field whose
+    schematic value CONTRADICTS the library part needs a human. Counting blanks as drift flagged
+    every healthy assignment, which is the same as flagging none."""
+    ops = _ops(tmp_path)
+    proj, prepo = _git_project(tmp_path / "ext" / "p",
+                              sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    sch = proj / "proj.kicad_sch"
+    # R1 is bound and left with NO Manufacturer/Description at all; R2 is bound and contradicts the
+    # library on MPN. Only R2 is drift.
+    field = _binding_field()
+    text = sch.read_text(encoding="utf-8")
+    text = text.replace(
+        '(property "Reference" "R1"',
+        f'(property "{field}" "r10k" (at 0 0 0) (hide yes))\n\t\t(property "Reference" "R1"', 1)
+    text = text.replace(
+        '(property "Reference" "R2"',
+        f'(property "{field}" "r10k" (at 0 0 0) (hide yes))\n'
+        '\t\t(property "MPN" "SOMETHING-ELSE" (at 0 0 0))\n\t\t(property "Reference" "R2"', 1)
+    sch.write_text(text, encoding="utf-8")
+    prepo.commit("hand edits", [sch])
+
+    bound = {b["ref"]: b for b in ops.assign_read(rec.id, library_parts=_stock_passives())["bound"]}
+    assert bound["R1"]["drift"] == []
+    assert [(d["prop"], d["old"], d["new"]) for d in bound["R2"]["drift"]] == [
+        ("MPN", "SOMETHING-ELSE", "RC0402FR-0710KL")]
+
+
+def test_a_dangling_binding_is_offered_for_reassignment_not_only_reported(tmp_path):
+    """A diagnosis with no repair is a dead end. The placement genuinely carries no library part, so
+    it belongs in the assignable work list as well as in the broken-links report."""
+    ops = _ops(tmp_path)
+    proj, _ = _git_project(tmp_path / "ext" / "p",
+                           sheets={"proj.kicad_sch": _passive_sheet()})
+    rec = ops.register(proj)
+    ops.assign_refs(rec.id, ["R1"], "r10k", library_parts=_stock_passives())
+    shrunk = [p for p in _stock_passives() if p.id != "r10k"]
+    r = ops.assign_read(rec.id, library_parts=shrunk)
+    assert [b["ref"] for b in r["bound"] if b["missing"]] == ["R1"]
+    assert "R1" in {ref for g in r["groups"] for ref in g["refs"]}

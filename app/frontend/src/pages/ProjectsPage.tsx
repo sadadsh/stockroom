@@ -80,6 +80,8 @@ import type {
   StackupPreview,
   StackupRead,
   PrepareRead,
+  AssignBinding,
+  AssignBound,
   AssignCandidate,
   AssignGroup,
   PrepareResult,
@@ -657,7 +659,7 @@ function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }
 
       {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
       {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
-      {caps.has("prepare") ? <AssignSection projectId={projectId} /> : null}
+      {caps.has("assign") ? <AssignSection projectId={projectId} /> : null}
     </>
   );
 }
@@ -5027,7 +5029,8 @@ function AssignSection({ projectId }: { projectId: string }) {
         <p className="text-xs text-t3">
           Components placed from a default library carry a generic symbol, so no single component in
           your library matches them on their own. Identical ones are grouped here, so assigning a
-          whole group of passives is one decision and one commit.
+          whole group of passives is one decision and one commit. An assignment is remembered against
+          the placement itself, so renumbering or retuning a component does not lose it.
         </p>
       </div>
 
@@ -5035,7 +5038,10 @@ function AssignSection({ projectId }: { projectId: string }) {
         <p className="text-sm text-t3">Loading the unassigned components...</p>
       ) : q.isError ? (
         <p className="text-sm text-err">{errMsg(q.error, "Could not read the unassigned components.")}</p>
-      ) : !data ? null : !data.under_git ? (
+      ) : !data ? null : !data.under_git && data.binding.writable ? (
+        // Only a project whose SCHEMATIC Stockroom writes needs its own git repo. When the binding
+        // is recorded on Stockroom's side instead, the project's version control is not involved,
+        // so demanding it here would refuse work that is perfectly safe to do.
         <p className="text-sm text-t3" data-testid="assign-no-git">
           This project is not under git. Initialize a git repository for it to assign components, so
           each assignment is committed atomically and can be undone.
@@ -5057,11 +5063,115 @@ function AssignSection({ projectId }: { projectId: string }) {
               ))}
             </div>
           )}
+          <BoundLedger bound={data.bound} binding={data.binding} />
           {incompleteRefs.length > 0 ? (
             <ManualFillPanel projectId={projectId} incompleteRefs={incompleteRefs} />
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+// What is wrong with one bound placement, or null when nothing is. Ordered by severity, because a
+// row can be more than one kind of wrong and the worst one is what the engineer needs to read.
+function boundIssue(b: AssignBound): { label: string; tone: BadgeTone; detail: string } | null {
+  if (b.missing) {
+    return { label: "Part Missing", tone: "err", detail: "This part is no longer in your library." };
+  }
+  if (b.drift.length > 0) {
+    const fields = b.drift.map((c) => c.prop).join(", ");
+    return {
+      label: "Drifted",
+      tone: "warn",
+      detail: `${fields} ${b.drift.length === 1 ? "disagrees" : "disagree"} with the library part.`,
+    };
+  }
+  if (b.weak_key) {
+    return {
+      label: "Weak Link",
+      tone: "warn",
+      detail: "Linked by designator, so renumbering this component would lose the link.",
+    };
+  }
+  return null;
+}
+
+// The record of what is already decided, kept deliberately quiet: agreement is a COUNT, and only the
+// placements that need a person are given a row. A list of a hundred healthy links reads as noise
+// and buries the two that are broken. The full list is one click away for a real audit.
+function BoundLedger({ bound, binding }: { bound: AssignBound[]; binding: AssignBinding }) {
+  const [showAll, setShowAll] = useState(false);
+  if (bound.length === 0) return null;
+  const issues = bound.map((b) => [b, boundIssue(b)] as const);
+  const problems = issues.filter(([, issue]) => issue !== null);
+  const shown = showAll ? issues : problems;
+  const healthy = bound.length - problems.length;
+
+  return (
+    <div className="rounded-card border border-line2" data-testid="assign-bound">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-3 py-2">
+        <Eyebrow className="mr-1">Assigned</Eyebrow>
+        <span className="text-sm text-t2" data-testid="assign-bound-summary">
+          {bound.length} {bound.length === 1 ? "component is" : "components are"} linked to a
+          library part
+          {problems.length > 0
+            ? `, ${problems.length} ${problems.length === 1 ? "needs" : "need"} a look`
+            : ""}
+          .
+        </span>
+        {bound.length > problems.length ? (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            data-testid="assign-bound-toggle"
+            // The only control in an otherwise inert card, so it has to LOOK like one at rest, not
+            // only on hover. The app's quiet-button treatment: bordered, raised, 2xs.
+            className="ml-auto inline-flex flex-none items-center rounded-control border border-line bg-raise px-2 py-0.5 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          >
+            {showAll ? "Show Only Issues" : `Show All ${bound.length}`}
+          </button>
+        ) : null}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs text-ok" data-testid="assign-bound-clean">
+          All {healthy} agree with the library.
+        </p>
+      ) : (
+        <div data-testid="assign-bound-rows">
+          {shown.map(([b, issue]) => (
+            <div
+              key={b.key || b.ref}
+              data-testid="assign-bound-row"
+              className="flex items-center gap-3 border-t border-line2 px-3 py-2"
+            >
+              <span className="w-16 flex-none truncate font-mono text-2xs text-t2">{b.ref}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-t1">
+                  {b.display_name || b.part_id}
+                </span>
+                <span className="block truncate text-2xs text-t3">
+                  {issue ? issue.detail : b.mpn}
+                </span>
+              </span>
+              {issue ? (
+                <Badge tone={issue.tone} size="sm">
+                  {issue.label}
+                </Badge>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Where the link is kept. A user assigning parts in Altium needs to know their schematic was
+          not touched, and a user in KiCad needs to know their schematic was. */}
+      <p className="border-t border-line2 px-3 py-2 text-2xs text-t3" data-testid="assign-bound-where">
+        {binding.writable
+          ? `Each link is stored on the placement as a hidden ${binding.field} field, so it travels with your schematic.`
+          : binding.reason}
+      </p>
     </div>
   );
 }

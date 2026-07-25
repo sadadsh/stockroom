@@ -101,7 +101,7 @@ const NETDECK_DETAIL: ProjectDetail = {
   board_paths: ["/home/sadad/git/netdeck/netdeck.kicad_pcb"],
   sheet_paths: ["/home/sadad/git/netdeck/netdeck.kicad_sch"],
   eda: "kicad",
-  capabilities: ["audit", "bom", "revisions", "restore", "file",
+  capabilities: ["audit", "bom", "revisions", "restore", "file", "assign",
                  "checks", "fab", "setup", "netclasses", "prepare", "viewer"],
   git_root: "/home/sadad/git/netdeck",
   audit_digest: null,
@@ -623,9 +623,12 @@ const PREPARE: PrepareRead = {
 // one exact-footprint candidate) plus a 47k group nothing in the library matches.
 const ASSIGN: AssignRead = {
   project: "Netdeck",
+  eda: "kicad",
   under_git: true,
+  binding: { field: "Stockroom ID", writable: true, reason: "" },
   components: 5,
   unassigned: 4,
+  bound: [],
   groups: [
     {
       key: "Device:R␟10k␟Resistor_SMD:R_0402_1005Metric",
@@ -807,6 +810,7 @@ beforeEach(() => {
     committed: "9999aaaa8888",
     refs: ["R1", "R2", "R10"],
     part_id: "r10k",
+    bound: 3,
   });
   mockApi.runPrepare.mockResolvedValue({ job_id: "prep-1" });
   mockApi.manualFill.mockResolvedValue({
@@ -2824,7 +2828,9 @@ describe("EDA-neutral projects", () => {
     board_paths: ["Amp.PcbDoc"],
     sheet_paths: ["Amp.SchDoc"],
     eda: "altium",
-    capabilities: ["audit", "bom", "revisions", "restore", "file"],
+    // Assign is registry-generic: an Altium project can be assigned even though every
+    // KiCad-only writer stays off.
+    capabilities: ["audit", "bom", "revisions", "restore", "file", "assign"],
     git_root: "/home/sadad/altium/amp",
     audit_digest: null,
     registered_at: "2026-07-23T12:00:00-04:00",
@@ -3014,5 +3020,104 @@ describe("ProjectsPage assign components", () => {
     const groups = within(section).getAllByTestId("assign-group");
     await user.click(within(groups[0]).getAllByTestId("assign-candidate")[0]);
     expect(await screen.findByText("no component R9 in this project")).toBeInTheDocument();
+  });
+
+  // -- the record of what is already assigned, and whether it still holds ------
+
+  const BOUND_OK = {
+    ref: "R1", sheet: "root.kicad_sch", key: "u-1", weak_key: false,
+    part_id: "r10k", display_name: "10 kOhm 0402", mpn: "RC0402FR-0710KL",
+    missing: false, drift: [],
+  };
+  const BOUND_DRIFTED = {
+    ...BOUND_OK, ref: "R2", key: "u-2",
+    drift: [{ prop: "MPN", old: "WRONG", new: "RC0402FR-0710KL", kind: "overwrite" as const }],
+  };
+  const BOUND_BROKEN = {
+    ...BOUND_OK, ref: "R3", key: "u-3", display_name: "", mpn: "", missing: true,
+  };
+
+  it("counts the healthy links and gives a row only to the ones needing a person", async () => {
+    // A hundred healthy rows would bury the two that are broken, so agreement is a COUNT.
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, groups: [], bound: [BOUND_OK, BOUND_DRIFTED, BOUND_BROKEN],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-summary")).toHaveTextContent(
+      "3 components are linked to a library part, 2 need a look.",
+    );
+    const rows = within(section).getAllByTestId("assign-bound-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("R2");
+    expect(rows[0]).toHaveTextContent("Drifted");
+    expect(rows[0]).toHaveTextContent("MPN disagrees with the library part.");
+    expect(rows[1]).toHaveTextContent("R3");
+    expect(rows[1]).toHaveTextContent("Part Missing");
+  });
+
+  it("opens the full list on demand, because re-verifying needs to see everything", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK, BOUND_DRIFTED] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getAllByTestId("assign-bound-row")).toHaveLength(1);
+    await user.click(within(section).getByTestId("assign-bound-toggle"));
+    expect(within(section).getAllByTestId("assign-bound-row")).toHaveLength(2);
+  });
+
+  it("confirms agreement instead of showing an empty issue list", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-clean")).toHaveTextContent(
+      "All 1 agree with the library.",
+    );
+  });
+
+  it("flags a link that renumbering would break, rather than calling it durable", async () => {
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, groups: [], bound: [{ ...BOUND_OK, key: "ref:R1", weak_key: true }],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getAllByTestId("assign-bound-row")[0]).toHaveTextContent("Weak Link");
+  });
+
+  it("says where a link is kept, per EDA tool", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-where")).toHaveTextContent(
+      "hidden Stockroom ID field",
+    );
+  });
+
+  it("does not demand project git when the binding is not written to the design", async () => {
+    // Altium: Stockroom records the link on its own side, so the project's version control is not
+    // involved and refusing the whole surface would block work that is perfectly safe.
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, eda: "altium", under_git: false, bound: [BOUND_OK],
+      binding: { field: "Stockroom ID", writable: false, reason: "Stockroom records this link." },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).queryByTestId("assign-no-git")).not.toBeInTheDocument();
+    expect(within(section).getByTestId("assign-bound-where")).toHaveTextContent(
+      "Stockroom records this link.",
+    );
+  });
+
+  it("hides the record entirely when nothing has been assigned yet", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, bound: [] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).queryByTestId("assign-bound")).not.toBeInTheDocument();
   });
 });
