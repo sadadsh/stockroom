@@ -739,3 +739,88 @@ def test_every_canonical_field_survives_the_cache_round_trip():
     back = _result_from_cache(_result_to_cache(r), "ICs")
     dropped = [name for name in SOURCED_FIELDS if getattr(back, name) is None]
     assert dropped == [], f"the cache silently dropped {dropped}"
+
+
+# -- What reaches the candidate, and therefore the record (Batch 3, punch 2). The audit's list
+# of fields "never persisted anywhere" was accurate, and the reason was this hop: the pulled
+# result carries lifecycle / lead_time / country_of_origin / tariff_rate as canonical fields,
+# per-spec provenance, and every kept disagreement - and the candidate had nowhere to put any
+# of it, so all of it stopped here.
+
+
+def _batch3_result():
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.description = Sourced("3A Buck Converter", "mouser", "high")
+    r.package = Sourced("WSON-8", "mouser", "high")
+    r.lifecycle = Sourced("Active", "mouser", "high")
+    r.lead_time = Sourced("16 Weeks", "mouser", "high")
+    r.country_of_origin = Sourced("Japan", "mouser", "high")
+    r.tariff_rate = Sourced(0.0, "mouser", "high")
+    r.specs["Product Category"] = Sourced("Buck Converters", "mouser", "high")
+    r.field_conflicts["description"] = [
+        Sourced("3A Buck Converter", "mouser", "high"),
+        Sourced("Step-Down Regulator, 3 A", "digikey", "high"),
+    ]
+    r.spec_conflicts["Product Category"] = [
+        Sourced("Buck Converters", "mouser", "high"),
+        Sourced("DC DC Converters", "digikey", "high"),
+    ]
+    return r
+
+
+def _batch3_candidate():
+    from stockroom.ingest.staging import StagingCandidate
+
+    return StagingCandidate(vendor="v", symbol_lib_path=None, symbol_name="",
+                            footprint_variants=[])
+
+
+def test_the_procurement_fields_reach_the_candidate_as_specs():
+    """lifecycle / lead_time / country_of_origin / tariff_rate are canonical FIELDS upstream and
+    have no top-level home on a record, so they are mirrored into the spec bag from ONE registry
+    map. Previously each extractor had to remember to mirror its own, and lead_time's never was:
+    DigiKey filled `r.lead_time` and nothing ever wrote it down."""
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.specs["Lifecycle"] == "Active"
+    assert cand.specs["Lead Time"] == "16 Weeks"
+    assert cand.specs["Country of Origin"] == "Japan"
+    # 0.0 is a MEANINGFUL tariff (the page's own confirmed no-tariff), never a missing value
+    assert cand.specs["US Tariff %"] == 0.0
+
+
+def test_per_spec_provenance_reaches_the_batch3_candidate():
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.enrichment["Product Category"] == {"source": "mouser", "confidence": "high"}
+    assert cand.enrichment["Lifecycle"]["source"] == "mouser"
+
+
+def test_every_kept_disagreement_reaches_the_batch3_candidate():
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert [(a["value"], a["source"]) for a in cand.alternates["description"]] == [
+        ("3A Buck Converter", "mouser"), ("Step-Down Regulator, 3 A", "digikey"),
+    ]
+    assert [a["value"] for a in cand.alternates["Product Category"]] == [
+        "Buck Converters", "DC DC Converters",
+    ]
+
+
+def test_a_user_typed_spec_still_wins_over_a_mirrored_field():
+    """The per-field rule does not change: what is already on the candidate is kept unless the
+    caller opted into overwriting."""
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    cand.specs["Lifecycle"] = "Obsolete"
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.specs["Lifecycle"] == "Obsolete"

@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
+from stockroom.enrich.apply import conflict_entries, spec_updates
 from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
 from stockroom.enrich.distributor_url import distributor_mpn_from_url
@@ -38,25 +39,37 @@ _CANDIDATE_FIELDS = {
 
 
 def _copy_specs(candidate, result, overwrite: set[str]) -> None:
-    """Carry every enriched spec (and the resolved package) onto the candidate's spec
-    bag, so the FULL field set a distributor page yielded reaches the committed record,
-    not just the three identity fields (the owner's capture-everything requirement).
-    Per-field: an existing spec is kept unless 'specs' is opted into overwrite.
-    product_url is a purchase-link mechanism, not a spec row."""
+    """Carry everything the pull yielded onto the candidate: every enriched spec, the resolved
+    package, the canonical procurement fields that have no other home, where each value came
+    from, and every value a source offered and lost with.
+
+    This is the hop the audited data used to die at - the candidate could hold specs and nothing
+    else, so provenance and disagreements were computed and then dropped on the floor. Per-field
+    throughout: an existing value is kept unless its group is opted into overwrite.
+    product_url is a purchase-link mechanism, not a spec row.
+    """
     take = "specs" in overwrite
-    if result.package is not None and (take or "Package" not in candidate.specs):
-        candidate.specs["Package"] = str(result.package.value)
-    for label, sourced in result.specs.items():
-        if label == "product_url":
-            continue
-        # Canonicalize the label to the record's key-space BEFORE the dedup check, so an
-        # extractor that emits a duplicated-label key updates the existing clean key
-        # instead of adding a twin the persistence layer would then collapse.
-        key = normalize_spec_key(label)
+
+    def put(key: str, value, sourced) -> None:
+        key = normalize_spec_key(key)
         if not key:
-            continue
+            return
         if take or key not in candidate.specs:
-            candidate.specs[key] = normalize_spec_value(str(sourced.value))
+            candidate.specs[key] = normalize_spec_value(value)
+            if sourced is not None:
+                candidate.enrichment[key] = {
+                    "source": sourced.source, "confidence": sourced.confidence,
+                }
+
+    # `put` canonicalizes each label to the record's key-space BEFORE its dedup check, so an
+    # extractor that emits a duplicated-label key updates the existing clean key instead of
+    # adding a twin the persistence layer would then collapse.
+    for label, value, sourced in spec_updates(result):
+        put(label, value, sourced)
+    for key, entries in conflict_entries(result).items():
+        candidate.alternates.setdefault(key, [
+            {"value": s.value, "source": s.source, "confidence": s.confidence} for s in entries
+        ])
 
 
 def fill_category(result: EnrichmentResult) -> None:

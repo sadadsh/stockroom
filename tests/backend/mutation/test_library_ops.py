@@ -787,3 +787,35 @@ def test_add_part_never_overwrites_a_name_the_user_actually_typed(tmp_path, fixt
     record = ops.add_part(staged)
 
     assert record.display_name == "TPS62130 buck"
+
+
+def test_add_part_persists_provenance_and_alternates(tmp_path, fixtures_dir):
+    """The last hop of the audited data loss (Batch 3, punch 2/9). A pulled part reached
+    add_part carrying where each spec came from and every value a source lost with, and the
+    record was built from an explicit field list that mentioned neither - so
+    `enrichment` was `{}` on every real part and both distributors' descriptions were
+    reduced to whichever one the merge happened to run first."""
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.specs = {"Product Category": "Buck Converters", "Lifecycle": "Active"}
+    staged.enrichment = {
+        "Product Category": {"source": "mouser", "confidence": "high"},
+        "Lifecycle": {"source": "mouser", "confidence": "high"},
+    }
+    staged.alternates = {
+        "description": [
+            {"value": "3A buck", "source": "mouser", "confidence": "high"},
+            {"value": "Step-Down Regulator, 3 A", "source": "digikey", "confidence": "high"},
+        ],
+    }
+    record = LibraryOps(profile, repo).add_part(staged)
+
+    assert record.enrichment["Product Category"].source == "mouser"
+    assert [a.source for a in record.alternates["description"]] == ["mouser", "digikey"]
+    # and it is on DISK, not just on the object the call returned
+    on_disk = PartRecord.loads(
+        (profile.library.parts_dir / f"{record.id}.json").read_text(encoding="utf-8")
+    )
+    assert on_disk.enrichment["Lifecycle"].source == "mouser"
+    assert [a.value for a in on_disk.alternates["description"]] == [
+        "3A buck", "Step-Down Regulator, 3 A",
+    ]
