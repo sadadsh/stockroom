@@ -33,3 +33,25 @@
 *.stp   binary
 *.wrl   binary
 *.zip   binary
+
+# Altium libraries and documents are OLE2 compound BINARIES. They were missing from this
+# list (it predates Altium support), so they fell under the `* text=auto` rule above and
+# git applied content-based text detection to them -- a line-ending rewrite of a compound
+# file is unrecoverable corruption, and it is exactly what this repo's byte-preserving
+# premise forbids. `binary` is shorthand for `-diff -merge -text`, so it also makes git
+# REFUSE to auto-merge them rather than silently producing a broken library: these formats
+# cannot be three-way merged, and a loud conflict is the only correct outcome.
+# NOTE: .DbLib and .PrjPcb are deliberately NOT here -- both are INI-style TEXT (the DbLib
+# is emitted as deterministic INI by altium/dblib.py), so they diff and merge normally.
+*.PcbLib binary
+*.SchLib binary
+*.IntLib binary
+*.PcbDoc binary
+*.SchDoc binary
+*.PcbLib3D binary
+
+# The derived SQLite index + the generated workbook are binary containers too.
+*.db     binary
+*.sqlite binary
+*.sqlite3 binary
+*.xlsx   binary
