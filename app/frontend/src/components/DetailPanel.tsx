@@ -997,7 +997,7 @@ function Embed3dRow({ state }: { state: Embed3dState }) {
     return (
       <div
         data-dev-id="detail.embed3d-done"
-        className="mt-1.5 flex items-center gap-2 rounded-control border border-line bg-field px-2.5 py-1.5"
+        className="ml-5 mt-1.5 flex items-center gap-2 border-l border-line py-1.5 pl-2.5"
       >
         <Icon id="detail.ready-check" className="h-3 w-3 flex-none" />
         <span className="text-2xs font-medium text-t2">3D Model embedded in the footprint</span>
@@ -1006,8 +1006,12 @@ function Embed3dRow({ state }: { state: Embed3dState }) {
   }
   const checking = state.blocked === "";
   const blocked = !!state.blocked;
+  // Indented so the row reads as a CHILD of the Altium status line above it. The first version put
+  // an "Altium" tag on the right instead, which was removed as redundant; that left the action
+  // attributed to a tool by vertical position alone, which is not attribution. The indent says the
+  // same thing structurally and costs no words.
   return (
-    <div className="mt-1.5">
+    <div className="ml-5 mt-1.5 border-l border-line pl-2.5">
       <button
         type="button"
         data-dev-id="detail.embed3d"
