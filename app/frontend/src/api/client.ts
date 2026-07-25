@@ -52,6 +52,8 @@ import type {
   AssignRead,
   HygieneRead,
   HygieneResult,
+  LibraryPinRead,
+  LibraryPinResult,
   AssignResult,
   ManualFillBody,
   ManualFillResult,
@@ -1026,6 +1028,16 @@ export const api = {
       `/api/projects/${encodeURIComponent(id)}/assign`,
       { body },
     );
+  },
+
+  // Which library version this project is pinned to, versus the library on this machine.
+  getLibraryPin(id: string): Promise<LibraryPinRead> {
+    return apiGet<LibraryPinRead>(`/api/projects/${encodeURIComponent(id)}/library-pin`);
+  },
+
+  // Record the library's current commit as this project's pin (one commit on the project's git).
+  setLibraryPin(id: string): Promise<LibraryPinResult> {
+    return request<LibraryPinResult>("POST", `/api/projects/${encodeURIComponent(id)}/library-pin`);
   },
 
   // What syncing this project's workspace hygiene would change. Read-only.
