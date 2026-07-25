@@ -195,3 +195,22 @@ def test_embed_model_defaults_replace_to_false(client, monkeypatch):
     )
     client.post("/api/altium/parts/tps62130/embed-model")
     assert seen["replace"] is False
+
+
+def test_status_reports_whether_the_derived_data_source_is_built(client, app_ctx):
+    """The .db is derived and no longer shared through git, so it can legitimately be absent on a
+    fresh clone. The surface has to be able to say so instead of implying the library is broken."""
+    body = client.get("/api/altium/status")
+    assert body.status_code == 200, body.text
+    assert "datasource_present" in body.json()
+
+    db = app_ctx.profile.library.parts_dir.parent / "altium" / "stockroom-parts.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    db.unlink(missing_ok=True)
+    assert client.get("/api/altium/status").json()["datasource_present"] is False
+
+    # a GET must never rebuild it: reporting a gap is not the same as fixing one
+    assert not db.exists()
+
+    app_ctx.ops.ensure_altium_datasource()
+    assert client.get("/api/altium/status").json()["datasource_present"] is True

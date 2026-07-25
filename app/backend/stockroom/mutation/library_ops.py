@@ -13,14 +13,12 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from stockroom.sexp.document import SexpDocument
-
+from stockroom.eda.registry import all_tools, get_tool
+from stockroom.ingest.describe import apply_clean_identity
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.eda.registry import all_tools, get_tool
 from stockroom.model.category import category_nickname
-from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.model.part import (
     AssetRef,
     Datasheet,
@@ -33,18 +31,18 @@ from stockroom.model.part import (
     missing_from_presence,
     new_part_id,
 )
+from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
+from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.placement import (
     kicad_visible_properties,
     merge_symbol_into_lib,
     mirror_fields_to_symbol,
     place_footprint,
 )
-from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
-from stockroom.ingest.describe import apply_clean_identity
+from stockroom.sexp.document import SexpDocument
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
-
 
 # top-level record field -> KiCad property to re-mirror on edit (None => no mirror)
 _MIRROR_ON_EDIT = {
@@ -504,17 +502,92 @@ class LibraryOps:
             txn.commit(f"Attach {tool} {field} {lib}:{name} to {part_id}")
         return record
 
-    def regenerate_altium_dblib(self) -> dict:
-        """Regenerate the SQLite data source (stockroom-parts.db) for every place-ready part
-        and the .DbLib, BOTH committed in one atomic commit (owner decision 2026-07-23: a
-        fresh clone is placeable with no regenerate step). Parts missing Altium assets or the
-        required data fields are excluded and reported (never half-placed). The emitter is
-        byte-deterministic, so an unchanged library produces no commit."""
-        from stockroom.altium.datasource import emit_db
-        from stockroom.altium.dblib import emit_dblib
+    def _altium_dir(self) -> Path:
+        return self.lib.parts_dir.parent / "altium"
+
+    def _altium_place_ready(self) -> tuple[list, list[str]]:
+        """The place-ready records the data source emits, and the ids of everything excluded.
+
+        Reads parts_dir directly (never the derived index) because this is the SAME source the
+        status view globs, and a count that disagrees with the emitter is how a surface starts
+        lying about how many parts are placeable.
+        """
         from stockroom.model.part import tool_place_ready
 
-        altium_dir = self.lib.parts_dir.parent / "altium"
+        ready, skipped = [], []
+        for json_path in sorted(self.lib.parts_dir.glob("*.json")):
+            record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
+            # value is intentionally NOT required (nothing persists it; the emitter derives the
+            # Value column). tool_place_ready is the shared predicate the status view also uses.
+            if tool_place_ready(record, "altium"):
+                ready.append(record)
+            else:
+                skipped.append(record.id)
+        return ready, skipped
+
+    def ensure_altium_datasource(self, allow_tracked: bool = False) -> dict:
+        """Make the derived SQLite data source on disk match the library, committing NOTHING.
+
+        This is what replaced committing the `.db` (Batch 2 item 3). The commit had been bought to
+        keep a fresh clone placeable with no regenerate step; rebuilding on demand buys the same
+        thing without sharing a derived binary that two peers can never merge.
+
+        Called at context build and on a profile/library switch, so by the time anyone opens Altium
+        the file is there and current. Returns {path, rows, written, reason} where reason is
+        "missing", "stale", "current" or "shared".
+
+        The staleness test is a byte comparison against a freshly emitted copy. That is sound
+        because `emit_db` is byte-deterministic ON ONE MACHINE (measured); it is deliberately NOT
+        relied on ACROSS machines, where SQLite stamps its own library version into the header.
+
+        `allow_tracked=False` (the default, used by the automatic callers) refuses to touch a copy
+        git still TRACKS, reporting "shared". Two peers on different SQLite builds hold
+        byte-different but content-IDENTICAL files, so a boot-time rewrite there would achieve
+        nothing except dirtying a tree that has not been migrated yet, which is the exact churn
+        this item exists to remove. An explicit regenerate passes True.
+        """
+        from stockroom.altium.datasource import emit_db
+
+        altium_dir = self._altium_dir()
+        altium_dir.mkdir(parents=True, exist_ok=True)
+        db_path = altium_dir / "stockroom-parts.db"
+        ready, _skipped = self._altium_place_ready()
+        if not allow_tracked and db_path.exists() and self.repo._is_tracked(db_path):
+            return {"path": db_path, "rows": len(ready), "written": False, "reason": "shared"}
+
+        with tempfile.TemporaryDirectory() as td:
+            candidate = Path(td) / "stockroom-parts.db"
+            rows = emit_db(ready, candidate)
+            if not db_path.exists():
+                reason, written = "missing", True
+            elif db_path.read_bytes() != candidate.read_bytes():
+                reason, written = "stale", True
+            else:
+                reason, written = "current", False
+            if written:
+                shutil.copyfile(candidate, db_path)
+        return {"path": db_path, "rows": rows, "written": written, "reason": reason}
+
+    def regenerate_altium_dblib(self) -> dict:
+        """Regenerate the derived SQLite data source and the .DbLib for every place-ready part.
+
+        Only the `.DbLib` is COMMITTED. The `.db` is derived from the JSON records and is written
+        to disk untracked (see `eda.registry` `_ALTIUM.derived` for the measurement behind that).
+
+        A library from before 2026-07-25 still has the derived copy COMMITTED, and an ignore rule
+        has no effect on a file git already tracks, so this MIGRATES it first by running the
+        library's own workspace hygiene: that writes the ignore rule and untracks the file in one
+        commit, leaving a clean tree. Hygiene is reused rather than reimplemented here because a
+        second, weaker "stop sharing this file" is exactly the duplication that drifts. If hygiene
+        refuses (it will not run over staged changes), the regenerate still completes and the
+        refusal is REPORTED as `migration_blocked` rather than swallowed.
+
+        Parts missing Altium assets or the required data fields are excluded and reported (never
+        half-placed). An unchanged .DbLib produces no commit.
+        """
+        from stockroom.altium.dblib import emit_dblib
+
+        altium_dir = self._altium_dir()
         altium_dir.mkdir(parents=True, exist_ok=True)
         db_path = altium_dir / "stockroom-parts.db"
         dblib_path = altium_dir / "Stockroom.DbLib"
@@ -527,25 +600,25 @@ class LibraryOps:
         gitignore_path.unlink(missing_ok=True)
         (altium_dir / "stockroom-parts.xlsx").unlink(missing_ok=True)
 
-        ready, skipped = [], []
-        for json_path in sorted(self.lib.parts_dir.glob("*.json")):
-            record = PartRecord.loads(json_path.read_text(encoding="utf-8"))
-            # value is intentionally NOT required (nothing persists it; the emitter derives the
-            # Value column). tool_place_ready is the shared predicate the status view also uses.
-            if tool_place_ready(record, "altium"):
-                ready.append(record)
-            else:
-                skipped.append(record.id)
+        migration_blocked = ""
+        if db_path.exists() and self.repo._is_tracked(db_path):
+            try:
+                self.hygiene_apply()
+            except ValueError as exc:
+                migration_blocked = str(exc)
 
-        emit_db(ready, db_path)
+        ready, skipped = self._altium_place_ready()
+        self.ensure_altium_datasource(allow_tracked=True)
         with Transaction(self.repo) as txn:
             emit_dblib("Parts", db_path.name, dblib_path)
             txn.track(dblib_path)
-            txn.track(db_path)
             if retire_ignore:
                 txn.track(gitignore_path)  # tracked-but-deleted: stages the removal
             txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")
-        return {"emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "db": db_path}
+        return {
+            "emitted": len(ready), "skipped": skipped, "dblib": dblib_path, "db": db_path,
+            "migration_blocked": migration_blocked,
+        }
 
     def attach_altium_assets(self, part_id: str, *sources) -> PartRecord:
         """Store a part's Altium assets verbatim under <profile>/altium/ and set

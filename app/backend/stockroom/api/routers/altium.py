@@ -66,6 +66,10 @@ def altium_router(require_token) -> APIRouter:
             # (backslashes would break a "/altium/..." consumer and the test); repo display rule.
             "dblib": (altium_dir / "Stockroom.DbLib").as_posix(),
             "dblib_dir": altium_dir.as_posix(),
+            # The SQLite data source is DERIVED and no longer shared through git, so it can
+            # legitimately be absent on a fresh clone until Stockroom rebuilds it. A plain
+            # exists() and never a rebuild: a GET must not write to the library.
+            "datasource_present": (altium_dir / "stockroom-parts.db").exists(),
             "ready": sum(1 for x in rows if x["ready"]),
             "total": len(rows),
             # not-ready first (the ones needing attention), then by name

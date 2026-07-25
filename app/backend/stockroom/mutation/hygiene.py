@@ -36,7 +36,10 @@ def _rules_for(tool_keys) -> list[str]:
     disagree about what is covered."""
     out: list[str] = []
     for tool in _resolve(tool_keys, ()):
-        out.extend(tool.ignore)
+        # `ignored_patterns`, not `ignore`: a DERIVED artifact that is already committed (the
+        # Altium `stockroom-parts.db`, which shipped tracked until 2026-07-25) must be untracked
+        # too, or the generated rules would claim it is ignored while git keeps sharing it.
+        out.extend(tool.ignored_patterns())
     return out
 
 

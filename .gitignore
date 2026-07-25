@@ -57,8 +57,15 @@ docs/research/
 # outside the repo already; these are belt-and-suspenders for any in-repo fallback path)
 /.stockroom-stm-index/
 *.stm-index.sqlite
-# Derived Altium data source (regenerated from JSON like the SQLite index; the .DbLib IS committed)
+# Derived Altium data sources (regenerated from the JSON records; the .DbLib IS committed).
+# The .db was committed until 2026-07-25 so a fresh clone was placeable with no regenerate step.
+# That traded one benefit for a worse problem: SQLite stamps its own library version into the file
+# header, so two peers on different SQLite builds emit different bytes for identical content, and
+# two peers adding different parts produce genuinely unmergeable binaries carrying nothing the
+# records do not already hold. LibraryOps.ensure_altium_datasource now rebuilds it on boot and on
+# every profile switch, which keeps a fresh clone placeable without sharing the file.
 libraries/*/altium/*.xlsx
+libraries/*/altium/stockroom-parts.db
 
 # Agent tooling: installed skills + SuperDesign workspace (never committed)
 .agents/

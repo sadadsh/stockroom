@@ -80,9 +80,12 @@ def test_emit_writes_parts_table_sorted(tmp_path):
     assert [r[0] for r in rows] == ["BQ24074RGTT", "RC0603FR-0710KL"]
 
 
-def test_emit_is_deterministic_bytes(tmp_path):
-    # The .db is COMMITTED to the library repo, so re-emitting unchanged records must
-    # produce identical bytes (no churn commits, and regenerate stays idempotent).
+def test_emit_is_deterministic_bytes_on_one_machine(tmp_path):
+    # This is what `ensure_altium_datasource` relies on to detect staleness with a byte
+    # comparison. It holds on ONE machine only: SQLite stamps its own library version into the
+    # header, so the same records under 3.45.1 and 3.50.4 differ by two bytes (measured
+    # 2026-07-25). Cross-machine byte equality is deliberately NOT claimed anywhere, and is why
+    # the derived .db stopped being committed rather than being chased toward byte stability.
     a = tmp_path / "a.db"
     b = tmp_path / "b.db"
     emit_db([_part(), _passive()], a)

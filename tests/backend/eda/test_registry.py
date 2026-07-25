@@ -145,3 +145,37 @@ def test_kicad_resolves_through_an_env_var_and_altium_resolves_relatively():
 def test_a_tool_that_needs_no_variable_still_has_a_contract():
     """Generic code must never have to test for absence; an unset contract is still an answer."""
     assert EdaTool(key="x", label="X").path_contract.kind == "relative"
+
+
+# -- derived artifacts: files Stockroom GENERATES and must not share through git ----
+
+
+def test_altium_declares_its_generated_data_source_as_derived():
+    """`stockroom-parts.db` is emitted from the JSON records. Sharing a derived binary through git
+    means two peers who each add a different part produce two different unmergeable files for a
+    file that carries no information the records do not already hold."""
+    assert "stockroom-parts.db" in get_tool("altium").derived
+    # the .DbLib is NOT derived in this sense: it is deterministic TEXT that only changes when the
+    # column map does, and a human reviews it, so it stays shared
+    assert not any("DbLib" in p for p in get_tool("altium").derived)
+
+
+def test_a_derived_file_is_ignored_and_says_why_in_the_generated_file():
+    text = workspace_gitignore(["altium"])
+    assert "stockroom-parts.db" in text
+    # a person opening the file must be able to tell a derived artifact from a per-user one,
+    # because the remedy for each is completely different
+    assert "regenerated" in text.lower()
+
+
+def test_derived_patterns_join_the_ignore_set_used_to_untrack():
+    """The untrack decision reads `ignored_patterns`, not `ignore`, or a derived file already
+    committed would stay committed forever while the generated rules claimed otherwise."""
+    tool = get_tool("altium")
+    assert set(tool.ignore) <= set(tool.ignored_patterns())
+    assert set(tool.derived) <= set(tool.ignored_patterns())
+
+
+def test_a_tool_with_nothing_derived_emits_no_derived_section():
+    text = workspace_gitignore(["kicad"])
+    assert "Derived" not in text
