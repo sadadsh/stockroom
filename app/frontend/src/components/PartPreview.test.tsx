@@ -81,6 +81,34 @@ describe("PreviewImage", () => {
     );
     expect(await screen.findByText("ART-FALLBACK")).toBeInTheDocument();
   });
+
+  // The tile is the ONE preview that used to tint with an unconditional `invert(0.66)` while its
+  // three siblings (StockAssetPreview, SvgViewport, SvgDiffViewport) all switched on the theme.
+  // Measured on the owner's real Windows window 2026-07-25: black line-art became rgb(162) which
+  // is 2.34:1 against the light card - under the 3:1 floor for non-text (WCAG 1.4.11) - while the
+  // SAME asset in the modal measured 14.87:1. A 6.3x spread on one asset, and the constant's own
+  // comment claimed it worked "on both themes". These two tests pin the tile to its siblings so
+  // one theme can never be tuned at the other's expense again.
+  it("inverts the monochrome art for the dark theme, matching the modal", async () => {
+    wrap(<PreviewImage kind="symbol" partId="lm358" fallback={<span>ART</span>} />);
+    const img = (await screen.findByAltText("symbol preview")) as HTMLImageElement;
+    // dark is the default theme
+    expect(img.style.filter).toBe("invert(1)");
+  });
+
+  it("leaves the art un-inverted on the light theme, so black line-art stays black", async () => {
+    // Set the HOST-INJECTED pref, not the localStorage mirror: injection is the real source of
+    // truth (uiPrefs.ts) and the mirror leaks between tests in one jsdom instance.
+    window.__STOCKROOM_UI__ = { theme: "light" };
+    try {
+      wrap(<PreviewImage kind="footprint" partId="lm358" fallback={<span>ART</span>} />);
+      const img = (await screen.findByAltText("footprint preview")) as HTMLImageElement;
+      // The bug: `invert(0.66)` turned black strokes into a mid grey that vanished on a light card.
+      expect(img.style.filter).toBe("none");
+    } finally {
+      delete window.__STOCKROOM_UI__;
+    }
+  });
 });
 
 describe("SvgViewport", () => {
