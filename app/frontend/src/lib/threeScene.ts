@@ -11,6 +11,7 @@
  */
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ViewHelper } from "three/examples/jsm/helpers/ViewHelper.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -307,6 +308,14 @@ export function mountModelScene(
   let spinChosen = false;
   // The view in force, so the spin switch knows whether spinning is even legal (only free iso spins).
   let viewMode: ViewMode = "iso";
+  // The axis gizmo. Constructed lazily in `mountGizmo` once the DOM parent exists. It is REBOUND on
+  // every camera swap for the same reason GTAOPass had to be: a helper that captures its camera at
+  // construction keeps pointing at the camera it was born with, and the orthographic top view would
+  // then spin a gizmo describing a camera nobody is looking through. That bug has been paid for
+  // twice in this file already.
+  let viewHelper: ViewHelper | null = null;
+  /** The camera the live gizmo was CONSTRUCTED with, since ViewHelper does not expose it. */
+  let gizmoCamera: THREE.Camera | null = null;
 
   let controls = makeControls(camera);
   function makeControls(cam: THREE.PerspectiveCamera | THREE.OrthographicCamera) {
@@ -557,6 +566,12 @@ export function mountModelScene(
     // a perspective image through an orthographic view's controls, which looks like the view
     // control simply not working.
     renderPass.camera = activeCamera;
+    // Same trap as GTAOPass below, with a twist: ViewHelper CLOSES OVER its camera in the
+    // constructor and exposes no field to rebind (checked in the installed source, not assumed), so
+    // it cannot be pointed at a new one - it has to be REBUILT. Cheap, because this only fires when
+    // the view actually swaps projection, and the alternative is a gizmo describing a camera nobody
+    // is looking through.
+    if (viewHelper && gizmoCamera !== activeCamera) rebuildGizmo();
     // GTAO renders its OWN depth/normal G-buffer, from its OWN camera reference - which the pass
     // captures at construction and never updates. Left alone, the orthographic top view drew its
     // beauty pass through one camera while the occlusion multiplied over it was computed through
@@ -571,11 +586,59 @@ export function mountModelScene(
     }
     if (renderMode === "realistic") composer.render();
     else renderer.render(scene, activeCamera);
+    // THE AXIS GIZMO, drawn last and over the top (owner, 2026-07-26: "one of those 3d view things
+    // where u can look at different views"). three's own ViewHelper, not a hand-rolled cube: it is
+    // maintained, it already labels and hit-tests its axes, and reproducing that is exactly the
+    // wheel-reinvention the rules warn about.
+    //
+    // It needs its own clearDepth or the composer's output buffer occludes it, and it is rendered
+    // OUTSIDE the composer so the AO pass never processes it as scene geometry.
+    if (viewHelper) {
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      viewHelper.render(renderer);
+      renderer.autoClear = true;
+    }
     raf = requestAnimationFrame(tick);
   };
+  // Mounted after the loop is armed so the first frame already carries it. The parent is the
+  // renderer's own container, and the helper draws into a corner viewport of the same canvas -
+  // no second canvas, no second context.
+  /** three's ViewHelper draws into a FIXED 128px corner viewport (`const dim = 128`, read from the
+   *  installed source - it is not configurable and we do not fork vendor code). In the ~280px
+   *  detail tile that is 45% of the width, which is an axis gizmo wearing the stage rather than
+   *  sitting in its corner. So it appears only where 128px reads as a corner: measured against the
+   *  live canvas, so the modal gets it, the tile does not, and a resize re-decides on its own
+   *  rather than needing a context flag threaded down. */
+  const GIZMO_MIN_STAGE_PX = 420;
+  function gizmoFits() {
+    return renderer.domElement.clientWidth >= GIZMO_MIN_STAGE_PX;
+  }
+
+  function rebuildGizmo() {
+    try {
+      viewHelper?.dispose?.();
+      viewHelper = null;
+      gizmoCamera = null;
+      if (!gizmoFits()) return;
+      viewHelper = new ViewHelper(activeCamera, renderer.domElement);
+      gizmoCamera = activeCamera;
+      // Its "look at" point must be the point the controls actually orbit, or clicking an axis
+      // frames a different subject than dragging does.
+      viewHelper.center.copy(controls.target);
+    } catch {
+      // A helper that fails to construct must never take the viewer down with it: the 3D view is
+      // the feature, the gizmo is an affordance on top of it.
+      viewHelper = null;
+      gizmoCamera = null;
+    }
+  }
+  rebuildGizmo();
   raf = requestAnimationFrame(tick);
 
   const onResize = () => {
+    // crossing the threshold in either direction adds or removes the gizmo
+    if (gizmoFits() !== Boolean(viewHelper)) rebuildGizmo();
     const w = container.clientWidth || width;
     const h = container.clientHeight || height;
     camera.aspect = w / h;
@@ -756,6 +819,7 @@ export function mountModelScene(
     const orbit = modelCenter ?? centre;
     fitTarget.copy(orbit);
     controls.target.copy(orbit);
+    viewHelper?.center.copy(orbit);
     if (!forDirection) {
       activeCamera.position.copy(orbit).add(direction.clone().multiplyScalar(fitDistance));
     }
@@ -849,6 +913,11 @@ export function mountModelScene(
     cancelAnimationFrame(raf);
     resizeObserver?.disconnect();
     controls.dispose();
+    // The gizmo owns geometry, materials and its own sprite textures. This viewer is mounted and
+    // unmounted every time a part is opened, so leaking them once per part is leaking them forever.
+    viewHelper?.dispose?.();
+    viewHelper = null;
+    gizmoCamera = null;
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (mesh.geometry) mesh.geometry.dispose();

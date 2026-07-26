@@ -91,7 +91,12 @@ const KNOWN_DERIVED: readonly string[] = [
   "projects.tab-bom",
   "projects.tab-setup",
   "projects.tab-netclasses",
-]; // 15
+  // DetailPanel AssetTile: data-dev-id={`${devId}-open`} on the EYE. Since the 3D stage stopped
+  // being one big button (so it can be orbited in place), the eye is the only opener, and it needed
+  // to be addressable by the shot harness. Only the hero tile passes `interactiveStage`, so this is
+  // the only `-open` id that renders.
+  "detail.asset-hero-open",
+]; // 16
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
