@@ -10,6 +10,7 @@ import { AddPartModal } from "./AddPartModal";
 import { useAddPart } from "../lib/addPart";
 import { queuePaths } from "../lib/ingestQueue";
 import { Text } from "../lib/copy";
+import { plural } from "../lib/plural";
 import {
   useActivateProfile,
   useFacetsQuery,
@@ -89,8 +90,12 @@ function ShellStatusBar() {
         </span>
       ) : (
         <>
+          {/* Agrees with its number: this read "1 Components" on 10 of the 12 captured screens.
+              The NUMBER stays outside <Text>, whose id maps to one overridable string - folding a
+              count into it would mint a different copy key for every library size. */}
           <span className="tnum">
-            {total} <Text id="shell.status.count">Components</Text>
+            {total.toLocaleString()}{" "}
+            <Text id="shell.status.count">{plural(total, "Component")}</Text>
           </span>
           {incomplete > 0 ? (
             <>

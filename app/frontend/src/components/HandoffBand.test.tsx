@@ -56,7 +56,7 @@ describe("HandoffBand", () => {
     }
   });
 
-  it("reads the record's real values, and counts how many are ready", () => {
+  it("reads the record's real values, and counts how many are FILLED", () => {
     render(<HandoffBand detail={part()} />);
     expect(screen.getByText("Texas Instruments")).toBeTruthy();
     // symbol and footprint legitimately carry the SAME reference string here, so each is read
@@ -66,7 +66,7 @@ describe("HandoffBand", () => {
     const footprint = document.querySelector('[data-dev-id="detail.handoff-footprint"]')!;
     expect(footprint.textContent).toContain("SR-Diodes:TPD6E05U06RVZR");
     // 7 of 7: every curated field on this fixture is filled.
-    expect(screen.getByText(/7 of 7 ready/)).toBeTruthy();
+    expect(screen.getByText(/7 of 7 filled/)).toBeTruthy();
   });
 
   it("names an unset field as a GAP rather than leaving the cell blank", () => {
@@ -74,7 +74,7 @@ describe("HandoffBand", () => {
     // A blank cell reads as "nothing to see"; these are fields whose absence means the placed
     // component arrives incomplete, so they have to be visible as missing.
     expect(screen.getAllByText("Not Set").length).toBe(2);
-    expect(screen.getByText(/5 of 7 ready/)).toBeTruthy();
+    expect(screen.getByText(/5 of 7 filled/)).toBeTruthy();
   });
 
   it("shortens a long datasheet URL for display while linking the full one", () => {
@@ -99,4 +99,13 @@ describe("HandoffBand", () => {
     expect(mpn.textContent).not.toContain("Altium Designer");
     expect(mpn.textContent).not.toContain("KiCad");
   });
+});
+
+it('never says "ready", because that word belongs to placement', () => {
+  // Measured on the owner's real window: one part carried THREE verdicts in one screen, all using
+  // the same vocabulary - this band's "7 of 7 ready" (non-empty TEXT FIELDS), the CAD chip's
+  // "Incomplete" 12px away (ASSETS), and Settings' "0 of 1 parts ready to place" (PLACEABILITY).
+  // A word meaning three things in one window means nothing.
+  render(<HandoffBand detail={part()} />);
+  expect(screen.queryByText(/ready/i)).toBeNull();
 });
