@@ -177,7 +177,11 @@
         "lib": "tpd6e05u06rvzr.PcbLib",
         "name": "RVZ0014A"
       },
-      "model": null,
+      "model": {
+        "file": "models/TPD6E05U06RVZ.step",
+        "lib": "tpd6e05u06rvzr.PcbLib",
+        "name": "RVZ0014A"
+      },
       "symbol": {
         "file": "",
         "lib": "tpd6e05u06rvzr.SchLib",
