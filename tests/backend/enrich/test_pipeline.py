@@ -824,3 +824,115 @@ def test_a_user_typed_spec_still_wins_over_a_mirrored_field():
     cand.specs["Lifecycle"] = "Obsolete"
     _copy_specs(cand, _batch3_result(), set())
     assert cand.specs["Lifecycle"] == "Obsolete"
+
+
+# --- The MPN lookup must classify from what the distributors actually said. -------------------
+# Owner, 2026-07-26, on their real Windows library: a part reads "Other" though all three
+# distributors classify it. TPD6E05U06RVZR carries Product Category "ESD Protection Diodes /
+# TVS Diodes" (LCSC) and "Circuit Protection" (DigiKey), and still landed in SR-Other with
+# Category=Other in the generated Altium DbLib. `fill_category` existed and was wired into the
+# paste-a-link path ONLY, so the MPN path returned the caller's default forever.
+
+class _CatOnlySource:
+    """A source that answers with nothing but the distributor's own Product Category, which is
+    exactly the shape the LCSC/DigiKey legs contribute for a part whose identity is already
+    known."""
+
+    def __init__(self, product_category: str, description: str = ""):
+        self._pc = product_category
+        self._desc = description
+
+    def enrich(self, mpn, category, remaining):
+        r = EnrichmentResult()
+        if self._pc:
+            r.specs["Product Category"] = Sourced(self._pc, "lcsc", "high")
+        if self._desc:
+            r.description = Sourced(self._desc, "lcsc", "high")
+        return r
+
+
+def _cat_pipeline(tmp_path, source):
+    from stockroom.enrich.registry import SourceRegistry
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(""),
+                              limiter=_NoWaitLimiter())
+    pipe.registry = SourceRegistry([source])
+    return pipe
+
+
+def test_enrich_by_mpn_classifies_from_the_distributor_product_category(tmp_path):
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_enrich_by_mpn_falls_back_to_the_description_when_the_category_is_generic(tmp_path):
+    """DigiKey answers "Circuit Protection", which names no component kind. The description
+    still does, so the classifier must not stop at the first unrecognized signal."""
+    pipe = _cat_pipeline(
+        tmp_path,
+        _CatOnlySource("Circuit Protection", description="TVS DIODE 5.5VWM 14VC 14USON"),
+    )
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_enrich_by_mpn_keeps_a_category_the_user_already_chose(tmp_path):
+    """A caller who states the category owns it; classification only fills a blank/Other."""
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    assert pipe.enrich("TPD6E05U06RVZR", "ICs").category == "ICs"
+
+
+def test_a_cached_lookup_is_classified_too(tmp_path):
+    """The cache is written by the same call that classifies, but an install carries entries
+    written BEFORE this fix, whose stored category is "Other" beside a perfectly good Product
+    Category. Reading one back must classify it rather than serve the stale verdict."""
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    from stockroom.enrich.pipeline import _result_to_cache
+
+    stale = _result_to_cache(pipe.registry.enrich("TPD6E05U06RVZR", "Other"))
+    assert stale["category"] == "Other"  # the poisoned shape this test is about
+    pipe.cache.put("TPD6E05U06RVZR", stale)
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_classification_uses_every_source_not_just_the_winner(tmp_path):
+    """Owner, 2026-07-26: "find the BEST classification across sources rather than taking one
+    and giving up". DigiKey's "Circuit Protection" names no component kind; LCSC's "ESD
+    Protection Diodes / TVS Diodes" does. Whichever of them happens to win the single Product
+    Category slot, the classifier must see both before it falls through to the description."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.specs["Product Category"] = Sourced("Circuit Protection", "digikey", "high")
+    r.spec_conflicts["Product Category"] = [
+        Sourced("Circuit Protection", "digikey", "high"),
+        Sourced("ESD Protection Diodes / TVS Diodes", "lcsc", "high"),
+    ]
+    fill_category(r)
+    assert r.category == "Diodes"
+
+
+def test_a_losing_description_can_classify_when_no_category_does(tmp_path):
+    """Same rule one tier down: the description that won the slot is generic, an alternate
+    description is not. Product Category still outranks both - this only widens each tier."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.description = Sourced("6-CH low cap IEC protection, 14USON", "jsonld", "low")
+    r.field_conflicts["description"] = [
+        Sourced("6-CH low cap IEC protection, 14USON", "jsonld", "low"),
+        Sourced("TVS DIODE 5.5VWM 14VC 14USON", "digikey", "high"),
+    ]
+    fill_category(r)
+    assert r.category == "Diodes"
+
+
+def test_a_product_category_still_outranks_any_description(tmp_path):
+    """The widening must not become a blend: a description naming another component kind
+    ("resistor divider" on a regulator) may never beat a Product Category that classifies."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.specs["Product Category"] = Sourced("Voltage Regulators - Switching", "mouser", "high")
+    r.description = Sourced("Buck IC for a resistor divider feedback network", "lcsc", "low")
+    fill_category(r)
+    assert r.category == "ICs"
