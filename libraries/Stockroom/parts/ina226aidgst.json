@@ -81,7 +81,25 @@
   },
   "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR",
   "display_name": "Current",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "INA226AIDGST"
+      },
+      "model": {
+        "file": "models/INA226AIDGST.stp",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "INA226AIDGST"
+      }
+    }
+  },
   "enrichment": {},
   "hashes": null,
   "id": "ina226aidgst",
