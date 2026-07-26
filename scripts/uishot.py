@@ -55,6 +55,19 @@ PROBE_JS = """() => {
     controlRadius: pick('.rounded-control', 'borderRadius'),
     docScrollW: document.documentElement.scrollWidth,
     clientW: document.documentElement.clientWidth,
+    // THE RAIL'S ACTUAL STATE AT CAPTURE. The nav rail peeks open on hover as an opaque overlay
+    // that floats OVER the page, and the theme toggle sits at the bottom of the rail - so clicking
+    // it to reach light theme parked the pointer on the rail and photographed the overlay covering
+    // the components list, in every light shot, silently, since the peek shipped. Reported on every
+    // run because a shot with the rail open is not a shot of the page, and nothing else says so.
+    railW: (() => {
+      const r = document.querySelector('[data-dev-id="rail.root"]');
+      return r ? Math.round(r.getBoundingClientRect().width) : null;
+    })(),
+    railHovered: (() => {
+      const r = document.querySelector('[data-dev-id="rail.root"]');
+      return r ? r.matches(':hover') : null;
+    })(),
   };
 }"""
 
@@ -403,6 +416,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
             else:
                 rows.first.click()
             _appears(page.locator('[data-dev-id="detail.root"]'))
+            _await_land_pattern(page)
             return True
         # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
         # family, and it is named to sort first. Both disclosures are OPENED, because what is behind
@@ -504,6 +518,86 @@ def _set_theme(page, theme: str) -> str | None:
             f"theme stuck at {got!r}, wanted {theme!r} "
             f"(--c-canvas still {before!r} after clicking rail.theme-toggle)"
         )
+    return _park_pointer_off_rail(page)
+
+
+def _await_land_pattern(page) -> None:
+    """Wait for the part's land pattern to ARRIVE before anything is photographed.
+
+    The 3D viewer fetches the footprint's pads asynchronously and builds the board and the pad
+    geometry only once it lands. Everything before that is a model alone on an empty stage, and the
+    two look enough alike at a glance that a capture taken early reads as a real scene.
+
+    MEASURED 2026-07-26: four identical runs of one bundle, and ONE of them photographed a model-only
+    scene - the board's horizon sampled 40 (the bare canvas colour) instead of 46, which is a
+    difference big enough to have been read as a regression in the material being tuned at the time.
+    A shot harness that is right three times in four is not a measuring instrument.
+
+    The pads/board CHIPS are the honest DOM signal: `Glb3DView` renders them only when a land pattern
+    with at least one pad exists, so their presence is the arrival event itself rather than a proxy
+    for it. Absence is legitimate - plenty of parts have no footprint - so this cannot fail the run;
+    but it must never be SILENT, because "no board in this shot" and "the board had not loaded yet"
+    are indistinguishable in the image and only one of them is a fact about the part."""
+    if _appears(page.locator('[data-dev-id="detail.model-show-board"]'), 4000):
+        return
+    if _appears(page.locator('[data-dev-id="detail.model-layers"]'), 500):
+        print("  note: no land pattern for this part, so the 3D stage carries no board or pads")
+
+
+def _park_pointer_off_rail(page) -> str | None:
+    """Move the pointer off the rail and WAIT for the hover-peek to actually close.
+
+    The theme toggle lives at the bottom of the nav rail, so clicking it leaves Playwright's pointer
+    parked ON the rail - and the rail peeks open on hover as an opaque 190px overlay that floats OVER
+    the page. The result was that every LIGHT capture (light is the theme we have to click to reach)
+    photographed the peek covering the components list, while every DARK capture, which needs no
+    click, showed the rail collapsed.
+
+    MEASURED 2026-07-26: the two themes of one run disagreed about the whole left column, and the
+    components list has therefore been un-critiqueable from a light shot ever since the peek shipped
+    in `9f76b4e`. Nothing failed; the shot just quietly contained a state no user had asked for.
+
+    The peek is pure CSS `:hover`, so its WIDTH is the honest readout - there is no React state to
+    ask. Poll that, rather than sleeping and hoping: the transition carries a 150ms hover-intent
+    delay, so a guessed wait would be either too short or needlessly slow."""
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    rail = page.locator('[data-dev-id="rail.root"]')
+    if not _appears(rail, 1000):
+        return None  # no rail on this surface; nothing to park away from
+    # FOCUS, not hover - and it took three wrong answers to find that, so all three are recorded:
+    #   * "wait for the width to return to its resting value" - the resting value has to be sampled
+    #     BEFORE parking, when the rail is already open, so the target WAS the open width and the
+    #     condition passed instantly. A check that cannot fail is worse than none; it shipped a shot
+    #     with the rail wide open while reporting success.
+    #   * "wait for width < 120px" - a rail the user PINNED open is legitimately 190px, so width
+    #     alone cannot tell open-by-accident from open-on-purpose, and this would hang on the latter.
+    #   * "wait for :hover to clear" - measured `railHovered: false` while the rail sat at 190px, so
+    #     hover was never the mechanism at all. Moving the mouse could not have helped.
+    # The collapsed rail carries `focus-within:w-[190px]` so a keyboard user can reach it, and
+    # `toggle.click()` leaves the browser's focus ON the theme button, which lives in the rail. So
+    # the rail expands and stays expanded, and it is the FOCUS that has to leave.
+    box = page.viewport_size or {"width": 1600, "height": 1000}
+    page.mouse.move(box["width"] - 40, box["height"] // 2)
+    page.evaluate(
+        """() => {
+             const a = document.activeElement;
+             if (a && a !== document.body && typeof a.blur === 'function') a.blur();
+           }"""
+    )
+    try:
+        page.wait_for_function(
+            """() => {
+                 const r = document.querySelector('[data-dev-id="rail.root"]');
+                 if (!r) return true;
+                 // both states that widen a COLLAPSED rail, asked of the browser directly rather
+                 // than inferred from a width that a pinned rail shares
+                 return !r.matches(':hover') && !r.contains(document.activeElement);
+               }""",
+            timeout=_UI_TIMEOUT_MS,
+        )
+    except PlaywrightTimeoutError:
+        return "the rail stayed expanded over the page and would cover the components list"
     return None
 
 
