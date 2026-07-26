@@ -8,6 +8,7 @@ import {
   boardPlaneHalfExtents,
   boardPlaneThickness,
   boardStack,
+  PAD_EMBED_FRACTION,
   DEFAULT_LAYERS,
   silkQuad,
 } from "./boardPlane";
@@ -77,11 +78,23 @@ describe("boardStack (the clipping fix, as an invariant)", () => {
     expect(padTop).toBeLessThanOrEqual(BASE + 1e-9);
   });
 
-  it("puts the board box entirely BELOW the pads' top face", () => {
+  it("sinks the pads HALFWAY into the plate, so copper reads as part of the stack", () => {
+    // Owner, 2026-07-26: "the 3D footprint should sit WITHIN the pcb plate, not lay on top of it."
+    // The board's top face rises to the pads' mid-height - not to their top, which would bury the
+    // land pattern completely and lose the thing the layer exists to show.
     const s = boardStack(BASE, H);
     const boardTop = s.boardCenterY + s.boardThickness / 2;
-    expect(boardTop).toBeCloseTo(s.padGroupY, 10);
-    expect(boardTop).toBeLessThan(s.padTopY);
+    expect(boardTop).toBeCloseTo(s.padGroupY + PAD_THICKNESS_MM * PAD_EMBED_FRACTION, 10);
+    expect(boardTop).toBeGreaterThan(s.padGroupY); // embedded, not merely resting on the surface
+    expect(boardTop).toBeLessThan(s.padTopY); // still visible, not swallowed
+  });
+
+  it("does NOT move the component down to do it", () => {
+    // The regression `cae5a81` fixed, and the one the owner reported as "the 3d model clips into
+    // the pads and pcb": embedding the pads must raise the BOARD, never lower the body.
+    const s = boardStack(BASE, H);
+    expect(s.padTopY).toBeCloseTo(BASE, 10);
+    expect(s.padGroupY).toBeCloseTo(BASE - PAD_THICKNESS_MM, 10);
   });
 
   it("keeps the board thinner than the component at every height", () => {

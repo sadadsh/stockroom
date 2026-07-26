@@ -1052,3 +1052,39 @@ describe("the description lede", () => {
     expect(block?.textContent).toMatch(/2 Sources/);
   });
 });
+
+// --- The 3D tile must be usable IN PLACE (owner, 2026-07-26). -----------------------------------
+// "clicking the tile must NOT expand - only the eye symbol opens the modal." The tile used to be
+// one big <button>, so every drag to orbit and every wheel to zoom landed on it and opened the
+// modal instead, which is exactly what made the mini viewer impossible to use.
+
+describe("the 3D tile's click target", () => {
+  it("does NOT open the modal when the STAGE is clicked", async () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const tile = document.querySelector('[data-dev-id="detail.asset-hero"]');
+    expect(tile).not.toBeNull();
+    // the stage is the region the viewer draws into; clicking it is an orbit gesture, not a command
+    const stage = tile!.firstElementChild as HTMLElement;
+    await userEvent.click(stage);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("is not itself a button, so pointer events reach the viewer", () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    const tile = document.querySelector('[data-dev-id="detail.asset-hero"]');
+    expect(tile!.tagName).toBe("DIV");
+  });
+
+  it("still opens the modal from the eye", async () => {
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    await userEvent.click(screen.getByRole("button", { name: "Open 3D Model Preview" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("leaves the STATIC tiles as whole-tile buttons", () => {
+    // symbol and footprint stages are images; whole-tile click is the better target there, and this
+    // change must not quietly shrink them to a 14px glyph.
+    wrap(<DetailPanel detail={detail()} {...BASE} />);
+    expect(document.querySelector('[data-dev-id="detail.asset-symbol"]')!.tagName).toBe("BUTTON");
+  });
+});
