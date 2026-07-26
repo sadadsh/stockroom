@@ -203,10 +203,12 @@ describe("partPhotos + the carousel", () => {
       </QueryClientProvider>,
     );
     expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("1 / 2");
-    expect(document.querySelector('[data-dev-id="preview.photo-vendor"]')!.textContent).toBe("Mouser");
+    // NO vendor row. The owner's "product photos: do NOT show the source" applies to the viewer as
+    // well as to the trigger; the counter is what says which shot you are on.
+    expect(document.querySelector('[data-dev-id="preview.photo-vendor"]')).toBeNull();
   });
 
-  it("pages to the next photo and names its vendor", async () => {
+  it("pages to the next photo", async () => {
     const user = userEvent.setup();
     wrap(
       <PhotoCard
@@ -221,7 +223,6 @@ describe("partPhotos + the carousel", () => {
     );
     await user.click(screen.getByRole("button", { name: "Next Photo" }));
     expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("2 / 2");
-    expect(document.querySelector('[data-dev-id="preview.photo-vendor"]')!.textContent).toBe("DigiKey");
     // wraps around rather than dead-ending on the last slide
     await user.click(screen.getByRole("button", { name: "Next Photo" }));
     expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("1 / 2");

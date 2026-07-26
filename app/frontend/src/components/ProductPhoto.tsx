@@ -267,7 +267,14 @@ export function PhotoCard({
   const shot = shots[index];
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+      // OPAQUE, not bg-black/50 (owner, 2026-07-26: "when the photo viewer is OPEN, remove their
+      // transparent thing"). Confirmed against a real shot of the opened viewer before changing it,
+      // as their note asked: at /50 the page read straight through - spec rows, their star
+      // controls and the whole sourcing column were legible around the dialog, and every sampled
+      // point measured at roughly half its normal luminance (rail 87 -> 43, list 63 -> 31).
+      // A photograph of the part is a thing you LOOK at; competing with a readable page behind it
+      // is what made it feel like a floating panel rather than a viewer.
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-canvas p-4"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -352,15 +359,11 @@ export function PhotoCard({
             </>
           ) : null}
         </div>
-        {/* Attribution belongs ON the viewer: two distributors photograph the same part
-            differently, so which one you are looking at is information, not a footnote. */}
-        {shot.vendor ? (
-          <div className="flex h-[30px] flex-none items-center justify-center border-t border-line px-4">
-            <span data-dev-id="preview.photo-vendor" className="truncate text-2xs text-t3">
-              {shot.vendor}
-            </span>
-          </div>
-        ) : null}
+        {/* NO attribution row. The comment here used to argue that "which distributor photographed
+            it is information, not a footnote" - a fair argument, and the owner decided otherwise:
+            "product photos: do NOT show the source". That instruction was about the photos, not
+            about one control, so it applies here too. The provenance is still on the record; it is
+            simply not what this surface is for. */}
       </div>
     </div>
   );
