@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { PAD_THICKNESS_MM, boardPlaneThickness, boardStack, silkQuad } from "./boardPlane";
+import {
+  BOARD_PLANE_MIN_HALF_MM,
+  BOARD_PLANE_REACH,
+  PAD_THICKNESS_MM,
+  boardExtent,
+  boardPlaneHalfExtents,
+  boardPlaneThickness,
+  boardStack,
+  silkQuad,
+} from "./boardPlane";
 
 // Owner 2026-07-26: "the 3d model clips into the pads and pcb. the pcb should be a plane less than
 // its own component." Both halves are geometry, so both are testable without a GL context.
@@ -132,6 +141,68 @@ describe("silkQuad (the footprint's real ink width)", () => {
 
   it("drops a zero-length segment instead of emitting a degenerate quad", () => {
     expect(silkQuad([1, 1], [1, 1], 0.12)).toBeNull();
+  });
+});
+
+// Owner 2026-07-26, after the first attempt: "the 3d footprint looks horribly wrong now it looked way
+// better before. the pcb render should legitimately add a plane to the 3d view not just another
+// floating component." Two defects and one taste call, all locked here.
+describe("boardExtent", () => {
+  const pad = (x: number, z: number, w: number, h: number) =>
+    ({ at: [x, z] as const, size: [w, h] as const });
+
+  it("includes the pad's own SIZE, not just its centre", () => {
+    // the bug: a span from centres alone left the board narrower than the pads standing on it
+    const e = boardExtent([pad(1, 0, 0.6, 0.4)]);
+    expect(e.halfX).toBeCloseTo(1.3, 10); // 1 + 0.6/2
+    expect(e.halfZ).toBeCloseTo(0.2, 10);
+  });
+
+  it("includes silkscreen graphics, so nothing can hang off the board edge", () => {
+    const e = boardExtent([pad(0, 0, 0.2, 0.2)], [{ start: [-3, -2], end: [3, 2] }]);
+    expect(e.halfX).toBeCloseTo(3, 10);
+    expect(e.halfZ).toBeCloseTo(2, 10);
+  });
+
+  it("covers a footprint whose graphics reach further than its pads", () => {
+    const e = boardExtent([pad(0.5, 0, 0.4, 0.4)], [{ start: [-1.75, -0.9], end: [1.75, 0.9] }]);
+    expect(e.halfX).toBeGreaterThanOrEqual(1.75);
+    expect(e.halfZ).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it("is zero for nothing at all, rather than NaN", () => {
+    expect(boardExtent([])).toEqual({ halfX: 0, halfZ: 0 });
+  });
+});
+
+describe("boardPlaneHalfExtents", () => {
+  it("reaches WELL past the footprint, so it reads as a surface not a coaster", () => {
+    const e = boardPlaneHalfExtents({ halfX: 1, halfZ: 0.5 });
+    expect(e.halfX).toBeCloseTo(BOARD_PLANE_REACH, 10);
+  });
+
+  it("is SQUARE, so it does not read as a footprint-shaped tile", () => {
+    const e = boardPlaneHalfExtents({ halfX: 3, halfZ: 0.4 });
+    expect(e.halfX).toBeCloseTo(e.halfZ, 10);
+  });
+
+  it("always contains what stands on it, in both axes", () => {
+    for (const src of [
+      { halfX: 1, halfZ: 0.5 },
+      { halfX: 0.3, halfZ: 0.3 },
+      { halfX: 8, halfZ: 1 },
+      { halfX: 0.05, halfZ: 4 },
+    ]) {
+      const e = boardPlaneHalfExtents(src);
+      expect(e.halfX).toBeGreaterThan(src.halfX);
+      expect(e.halfZ).toBeGreaterThan(src.halfZ);
+    }
+  });
+
+  it("gives a tiny part a real surface rather than a stamp", () => {
+    expect(boardPlaneHalfExtents({ halfX: 0.3, halfZ: 0.15 }).halfX).toBeGreaterThanOrEqual(
+      BOARD_PLANE_MIN_HALF_MM,
+    );
   });
 });
 
