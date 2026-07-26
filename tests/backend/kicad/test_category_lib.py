@@ -1,4 +1,3 @@
-import pytest
 
 from stockroom.kicad.category_lib import (
     create_empty_symbol_lib,

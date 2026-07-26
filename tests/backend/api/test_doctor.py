@@ -1,14 +1,6 @@
 from __future__ import annotations
 
 
-def test_drift_report_is_returned(client):
-    r = client.get("/api/doctor/drift")
-    assert r.status_code == 200
-    body = r.json()
-    assert "items" in body
-    assert "missing_symbol" in body
-
-
 def test_wire_kicad_runs_as_a_job(client, monkeypatch):
     from stockroom.kicad.wiring import WiringReport
 

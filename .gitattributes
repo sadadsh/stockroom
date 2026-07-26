@@ -1,0 +1,57 @@
+# Stockroom is a BYTE-PRESERVING, git-synced KiCad tool. Windows git defaults to
+# core.autocrlf=true, which would rewrite every checked-out text file (the in-repo
+# library, KiCad sources, fixtures) to CRLF on a Windows device. That drifts line
+# endings between a Windows user and a Linux collaborator, churns diffs, and makes a
+# committed library file no longer byte-identical across platforms. Force LF on checkout
+# everywhere so a part edited on Windows and one edited on Linux stay byte-consistent.
+* text=auto eol=lf
+
+# KiCad sources are always LF (KiCad's own convention); never let them become CRLF.
+*.kicad_pcb  text eol=lf
+*.kicad_sch  text eol=lf
+*.kicad_sym  text eol=lf
+*.kicad_mod  text eol=lf
+*.kicad_pro  text eol=lf
+*.kicad_prl  text eol=lf
+*.kicad_wks  text eol=lf
+*.pretty     text eol=lf
+
+# Binary assets: leave the bytes exactly as committed (no line-ending or text munging).
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.glb   binary
+*.gltf  binary
+*.step  binary
+*.stp   binary
+*.wrl   binary
+*.zip   binary
+
+# Altium libraries and documents are OLE2 compound BINARIES. They were missing from this
+# list (it predates Altium support), so they fell under the `* text=auto` rule above and
+# git applied content-based text detection to them -- a line-ending rewrite of a compound
+# file is unrecoverable corruption, and it is exactly what this repo's byte-preserving
+# premise forbids. `binary` is shorthand for `-diff -merge -text`, so it also makes git
+# REFUSE to auto-merge them rather than silently producing a broken library: these formats
+# cannot be three-way merged, and a loud conflict is the only correct outcome.
+# NOTE: .DbLib and .PrjPcb are deliberately NOT here -- both are INI-style TEXT (the DbLib
+# is emitted as deterministic INI by altium/dblib.py), so they diff and merge normally.
+*.PcbLib binary
+*.SchLib binary
+*.IntLib binary
+*.PcbDoc binary
+*.SchDoc binary
+*.PcbLib3D binary
+
+# The derived SQLite index + the generated workbook are binary containers too.
+*.db     binary
+*.sqlite binary
+*.sqlite3 binary
+*.xlsx   binary

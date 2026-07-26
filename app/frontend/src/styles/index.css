@@ -9,97 +9,251 @@
      The dark values are the mockup palette, so the dark app is byte-identical to
      before the variable refactor. lib/theme.tsx flips the attribute. */
   :root {
-    --c-canvas: #0b0b0b;
-    --c-rail: rgba(255, 255, 255, 0.022);
-    --c-surface: rgba(23, 23, 24, 0.5);
-    --c-raise: rgba(255, 255, 255, 0.055);
-    --c-raise2: rgba(255, 255, 255, 0.1);
-    --c-field: rgba(0, 0, 0, 0.2);
-    --c-line: rgba(255, 255, 255, 0.08);
-    --c-line2: rgba(255, 255, 255, 0.14);
-    --c-popover: #212329;
+    /* A readable elevation ladder (design principle: structure reads through depth,
+       not borders). Four distinct steps on a cool near-black so the nav, the list, and
+       the detail cards separate into real layers instead of one flat grey field.
+       canvas (deepest) < rail/panel < raise (card) < raise2 (hover/selected). */
+    --c-canvas: #242427;
+    --c-rail: rgba(255, 255, 255, 0.032);
+    --c-surface: rgba(255, 255, 255, 0.016);
+    --c-raise: rgba(255, 255, 255, 0.07);
+    --c-raise2: rgba(255, 255, 255, 0.135);
+    --c-field: rgba(0, 0, 0, 0.28);
+    --c-line: rgba(255, 255, 255, 0.07);
+    --c-line2: rgba(255, 255, 255, 0.13);
+    --c-popover: #33333a;
+    /* the chrome band: panel title strips, modal headers, sticky table headers, and the
+       bottom status bar. OPAQUE by contract -- it backs sticky headers that scrolling
+       rows pass beneath, so a translucent value would let content bleed through. Sits
+       one step above canvas and below popover, so it reads as chrome on the canvas and
+       as a header strip inside a popover. */
+    --c-band: #2b2b30;
     --c-t1: #f4f4f4;
     --c-t2: rgba(244, 244, 244, 0.66);
     --c-t3: rgba(244, 244, 244, 0.4);
-    --c-ok: #6cc08a;
+    --c-ok: #5fd39a;
     --c-warn: #e0b354;
     --c-err: #e8756c;
-    --c-acc: #f3f3f3;
-    --c-acc-on: #161616;
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.5);
+    /* Category hues (FIX-03): a subtle, distinct tint per component family so the list-row
+       fallback thumbnails read apart at a glance. Dark-theme values sit light enough (L ~62-70%)
+       to clear >=3:1 against the recessed near-black tile; the light theme darkens them below. */
+    --cat-resistor: #e0a24a;
+    --cat-capacitor: #5aa9f0;
+    --cat-inductor: #4fc9a8;
+    --cat-diode: #ef7a86;
+    --cat-connector: #b58cf0;
+    --cat-crystal: #4fc3dd;
+    --cat-ic: #8a9cf0;
+    /* STM pin color-is-data family (VIZ-02) — the ONE token family for the pinout map's
+       electrical-class/category encoding axis (Phase 6 consolidation: this supersedes and renames
+       the Phase 4 per-bucket family; there is no longer a parallel set). A SEPARATE taxonomy from
+       the --cat-* BOM-component families above; color is the data on the pinout map, so these run
+       saturated on the pad fill only (never a surface tint). The ten API category buckets plus the
+       legacy io electrical_class (which the API only emits pre-split; it reads as plain gpio). Each
+       verified >=3:1 against the card/stage background in BOTH themes (dark values here sit light
+       for the near-black well). io/gpio is the calmest (most pins carry it); power is hot; ground a
+       cool desaturated reference; reset amber; boot violet; vcap teal; nc the quietest inert grey;
+       analog chartreuse; debug magenta; oscillator the crystal cyan. Measured 3.4-9.3 both themes. */
+    --stm-io: #5aa9f0;
+    --stm-gpio: #5aa9f0;
+    --stm-analog: #9ecf63;
+    --stm-debug: #e389cf;
+    --stm-oscillator: #4fc3dd;
+    --stm-power: #ef7a86;
+    --stm-ground: #8b93a3;
+    --stm-reset: #e0a24a;
+    --stm-boot: #b58cf0;
+    --stm-vcap: #4fc9a8;
+    --stm-nc: #9a8f99;
+    /* Socket-union classification (COMPAT-02/03) — a DISTINCT three-value token set from the
+       electrical-class hues above, because classification encodes a different fact (do a pin's
+       identities agree across a set). Tuned to the shipped compatEncoding semantic: shared reads
+       as the calm positive green, divergent the warm amber that asks for attention, partial the
+       quiet cool grey of an absent position. Each clears >=3:1 on the recessed dark tile. */
+    --stm-classify-shared: #5fd39a;
+    --stm-classify-divergent: #e0b354;
+    --stm-classify-partial: #7f8794;
+    /* Neutral accent (design principle: restraint — no brand hue; craft carries it).
+       Near-white on dark, on the primary action, focus, active nav, selected row,
+       section ticks, links. `acc-strong` is the loud neutral, `acc-soft` its wash. */
+    --c-acc: #f4f4f5;
+    --c-acc-on: #141414;
+    --c-acc-strong: #ffffff;
+    --c-acc-soft: rgba(255, 255, 255, 0.11);
+    /* the soft studio glow under a lit hero specimen */
+    --c-hero-glow: rgba(255, 255, 255, 0.09);
+    /* Monochrome elevation. Each raised surface casts a soft shadow AND carries a
+       hairline top highlight (the inset line), so it reads as lifted off the
+       canvas instead of painted on it. Three steps: a resting card, a lifted/hover
+       card, and the pop layer for menus + the Add A Part window. */
+    --edge-hi: rgba(255, 255, 255, 0.10);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(0, 0, 0, 0.5),
+      0 6px 18px rgba(0, 0, 0, 0.42);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(0, 0, 0, 0.5),
+      0 16px 38px rgba(0, 0, 0, 0.44);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(0, 0, 0, 0.4),
+      0 28px 64px rgba(0, 0, 0, 0.62);
     --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.16);
-    /* page backdrop + chrome that lives outside the token classes */
-    --body-bg: #090909;
-    --root-bg: radial-gradient(
-        1100px 560px at 12% -6%,
-        rgba(255, 255, 255, 0.05),
-        transparent 58%
-      ),
-      radial-gradient(
-        1000px 680px at 108% 8%,
-        rgba(255, 255, 255, 0.032),
-        transparent 56%
-      ),
-      #0b0b0b;
+    /* the springy easing used for tactile press + hover lift across controls */
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+    /* page backdrop + chrome that lives outside the token classes: two soft neutral
+       highlights over a near-black base so the window reads lit, not flat. */
+    --body-bg: #202023;
+    --root-bg: #242427;
     --sb-thumb: rgba(255, 255, 255, 0.13);
     --sb-thumb-hover: rgba(255, 255, 255, 0.22);
     --sb-track: rgba(255, 255, 255, 0.14);
     /* subtle row hover + the sticky category header band + the ring track */
     --c-hover: rgba(255, 255, 255, 0.03);
-    --c-sticky: rgba(15, 15, 16, 0.72);
+    --c-sticky: rgba(36, 36, 39, 0.8);
     --c-ring-track: #26272c;
+    /* the recessed "specimen chamber" an asset render sits in (Part Canvas): a
+       darker inset than the card so the 3D model / symbol / footprint read as lit
+       objects in a well, not painted on the surface. Theme-aware. */
+    --c-stage: rgba(0, 0, 0, 0.26);
     /* the file-card line art (Symbol/Footprint/3D): each keeps its exact
        pre-refactor dark value, so the dark app stays byte-identical. */
-    --c-icon-line: #8b9099;
-    --c-icon-fill: #7f858e;
-    --c-icon-cube: #8a8f97;
-    --c-icon-edge: #4b5057;
-    --c-icon-faint: #c7ccd3;
+    --c-icon-line: #8f8f8f;
+    --c-icon-fill: #858585;
+    --c-icon-cube: #8d8d8d;
+    --c-icon-edge: #4f4f4f;
+    --c-icon-faint: #cbcbcb;
+
+    /* --- Shape (theme-agnostic) -------------------------------------------------
+       The Altium Dark/Light Gray regrounding (204b921, 2026-07-23) is the CURRENT
+       direction: near-square chrome, card 3 / control 2. It supersedes BOTH the 8/6
+       lock and the rounder card-14 / control-8 north-star that docs/design/design-rules.md
+       still describes -- that note predates the Altium switch by six days and is stale.
+       Do not "restore" 14/8 from it; a rounded card reads as a different application. */
+    --r-card: 3px;
+    --r-control: 2px;
+
+    /* --- Type scale (theme-agnostic) --------------------------------------------
+       The compact desktop scale. Only the px size is a token: the line-heights are
+       bundled with each step in tailwind.config.js, and the body sets the 13px root.
+       Hierarchy here is the whole point -- 2xs is the eyebrow/microcopy tier and title
+       the page headline, so these must stay distinct steps rather than collapse. */
+    /* THE WHOLE SCALE FOLLOWS THE WINDOW (owner, 2026-07-26: "i want to avoid text wrapping as
+       much as i can in any of our content, resize text based on windows size so everything fits
+       without wrapping").
+
+       ONE multiplier, applied to every step, so the hierarchy above is preserved exactly - the
+       steps shrink together rather than converging, which is what would happen if each were
+       clamped independently. Tokens only, no JavaScript: CSS cannot measure overflow, but it can
+       be told how much room there is, and the window IS the input the owner named.
+
+       0.90 at 1024px up to 1.00 at 1600px, then flat. Deliberately a narrow range: this buys back
+       roughly a character per ten at the small end, which is the difference between a spec value
+       fitting its column and wrapping, without making the app illegible on a small screen.
+
+       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort,
+       because a value cut to "100 ..." has lost the data - that is why wrapping was chosen in the
+       first place, and this reduces how often it is reached rather than replacing it with
+       truncation. */
+    /* ONE ratio per step, expressed as a clamp on the SIZE ITSELF.
+
+       A shared unitless multiplier is the obvious shape and is INVALID CSS: `calc(0.9 + (100vw -
+       1024px) / 5760)` adds a number to a length, so the declaration is dropped, every --fs-* that
+       referenced it became invalid, and all text silently fell back to the 13px root. Caught by
+       adding a COMPUTED font-size readout to the shot probe - the declared token reports its calc()
+       text verbatim, so it looked identical at every width and proved nothing.
+
+       Each step therefore carries its own clamp: 0.90x at 1024px, rising to 1.00x at 1600px, flat
+       above. They share one ratio, so the hierarchy is preserved rather than converging.
+
+       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort, since a
+       value cut to "100 ..." has lost the data - this reduces how often wrapping is reached rather
+       than replacing it with truncation. */
+    --fs-2xs: clamp(9.0px, calc(9.0px + (100vw - 1024px) * 0.001736), 10px);
+    --fs-xs: clamp(9.9px, calc(9.9px + (100vw - 1024px) * 0.00191), 11px);
+    --fs-sm: clamp(10.35px, calc(10.35px + (100vw - 1024px) * 0.001997), 11.5px);
+    --fs-base: clamp(10.8px, calc(10.8px + (100vw - 1024px) * 0.002083), 12px);
+    --fs-lg: clamp(12.15px, calc(12.15px + (100vw - 1024px) * 0.002344), 13.5px);
+    --fs-xl: clamp(13.5px, calc(13.5px + (100vw - 1024px) * 0.002604), 15px);
+    --fs-title: clamp(16.2px, calc(16.2px + (100vw - 1024px) * 0.003125), 18px);
   }
 
   :root[data-theme="light"] {
-    --c-canvas: #f3f3f4;
-    --c-rail: rgba(0, 0, 0, 0.024);
+    --c-canvas: #e9eaee;
+    --c-rail: rgba(255, 255, 255, 0.5);
     --c-surface: rgba(255, 255, 255, 0.66);
-    --c-raise: rgba(0, 0, 0, 0.045);
+    --c-raise: #ffffff;
     --c-raise2: rgba(0, 0, 0, 0.08);
     --c-field: rgba(0, 0, 0, 0.05);
     --c-line: rgba(0, 0, 0, 0.1);
     --c-line2: rgba(0, 0, 0, 0.16);
     --c-popover: #ffffff;
+    /* light chrome band: reads as a header strip against the white card/popover and as
+       chrome against the grey canvas. Opaque, per the dark-side contract above. */
+    --c-band: #e2e4e9;
     --c-t1: #17181b;
     --c-t2: rgba(23, 24, 27, 0.68);
     --c-t3: rgba(23, 24, 27, 0.46);
-    --c-ok: #2f9457;
+    --c-ok: #2f9e63;
     --c-warn: #a9761b;
     --c-err: #cf4a40;
+    /* Category hues (FIX-03), darkened (L ~34-45%) so they clear >=3:1 against the light tile. */
+    --cat-resistor: #b6710f;
+    --cat-capacitor: #1f6fc4;
+    --cat-inductor: #12876a;
+    --cat-diode: #c23b4a;
+    --cat-connector: #7a45c2;
+    --cat-crystal: #147d97;
+    --cat-ic: #4a5bc0;
+    /* STM pin color-is-data family (VIZ-02), darkened so each clears >=3:1 against the white
+       light card. Same taxonomy/order as the dark block above (Phase 6 consolidated family). */
+    --stm-io: #1f6fc4;
+    --stm-gpio: #1f6fc4;
+    --stm-analog: #55801c;
+    --stm-debug: #a2439b;
+    --stm-oscillator: #147d97;
+    --stm-power: #c23b4a;
+    --stm-ground: #59606c;
+    --stm-reset: #b6710f;
+    --stm-boot: #7a45c2;
+    --stm-vcap: #12876a;
+    --stm-nc: #6a5f68;
+    /* Socket-union classification (COMPAT-02/03), darkened for the white light card. Same
+       shared/divergent/partial semantic as the dark block. */
+    --stm-classify-shared: #2f9e63;
+    --stm-classify-divergent: #a9761b;
+    --stm-classify-partial: #66606e;
+    /* Neutral accent: near-black on light. */
     --c-acc: #1b1b1e;
     --c-acc-on: #f5f5f5;
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, 0.16);
+    --c-acc-strong: #1b1b1e;
+    --c-acc-soft: rgba(0, 0, 0, 0.06);
+    --c-hero-glow: rgba(0, 0, 0, 0.05);
+    /* Light elevation: a bright top edge (the crisp highlight a lit panel has)
+       over soft, low-opacity shadows. */
+    --edge-hi: rgba(255, 255, 255, 0.9);
+    --shadow-card: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(17, 18, 20, 0.06),
+      0 4px 14px rgba(17, 18, 20, 0.07);
+    --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 2px 6px rgba(17, 18, 20, 0.09),
+      0 14px 30px rgba(17, 18, 20, 0.11);
+    --shadow-pop: inset 0 1px 0 var(--edge-hi), 0 2px 8px rgba(17, 18, 20, 0.1),
+      0 28px 64px rgba(17, 18, 20, 0.2);
     --shadow-file: 0 6px 20px rgba(0, 0, 0, 0.08);
-    --body-bg: #e9e9eb;
-    --root-bg: radial-gradient(
-        1100px 560px at 12% -6%,
-        rgba(0, 0, 0, 0.03),
-        transparent 58%
-      ),
-      radial-gradient(
-        1000px 680px at 108% 8%,
-        rgba(0, 0, 0, 0.02),
-        transparent 56%
-      ),
-      #f3f3f4;
+    --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+    --body-bg: #dfe0e4;
+    --root-bg: #e9eaee;
     --sb-thumb: rgba(0, 0, 0, 0.2);
     --sb-thumb-hover: rgba(0, 0, 0, 0.32);
     --sb-track: rgba(0, 0, 0, 0.16);
     --c-hover: rgba(0, 0, 0, 0.04);
-    --c-sticky: rgba(244, 244, 245, 0.82);
+    --c-sticky: rgba(233, 234, 238, 0.85);
     --c-ring-track: #dfe0e3;
-    --c-icon-line: #6b7078;
-    --c-icon-fill: #6b7078;
-    --c-icon-cube: #6b7078;
-    --c-icon-edge: #b0b5bd;
-    --c-icon-faint: #6b7078;
+    /* 0.045 measured 1.12:1 against its pane in LIGHT theme, so the three empty asset tiles
+       read as blank space rather than as slots awaiting a file. Deepened on the owner's
+       decision, to the alpha that MEASURES the agreed target rather than one that looked
+       deeper: near-white ratios compress hard, so 0.045 -> 0.09 only reached 1.20:1 and
+       reaching 1.6:1 takes 0.214. DARK is untouched at 0.26, where it already reads. */
+    --c-stage: rgba(17, 18, 20, 0.214);
+    --c-icon-line: #6f6f6f;
+    --c-icon-fill: #6f6f6f;
+    --c-icon-cube: #6f6f6f;
+    --c-icon-edge: #b3b3b3;
+    --c-icon-faint: #6f6f6f;
   }
 
   html,
@@ -107,15 +261,20 @@
   #root {
     height: 100%;
     margin: 0;
+    /* the app owns all scrolling INSIDE its panes; the window itself never scrolls, so you can
+       never drag the whole app off-screen or rubber-band past it (WebView2 on Windows). */
+    overflow: hidden;
+    overscroll-behavior: none;
   }
   body {
     background: var(--body-bg);
     color: var(--c-t1);
-    font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+    font-family: "Work Sans Variable", "Segoe UI", system-ui, sans-serif;
     font-size: 13px;
     line-height: 1.5;
     letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   #root {
     background: var(--root-bg);

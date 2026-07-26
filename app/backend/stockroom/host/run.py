@@ -84,12 +84,23 @@ def _install_injected_index(app, base_url: str, token: str) -> None:
     from starlette.routing import Route
 
     html = index.read_text(encoding="utf-8")
-    injected = html.replace(
-        "<head>", "<head>\n<script>" + inject_script(base_url, token) + "</script>", 1
-    )
+
+    def _render() -> str:
+        # The UI preferences are read PER REQUEST, not baked in once at startup: the SPA reloads
+        # itself after a self-update, and a reload must not resurrect the theme that was saved when
+        # the process booted. The index.html text stays cached; only the small config is re-read.
+        from stockroom.store.machine_config import MachineConfig
+
+        try:
+            ui = MachineConfig.load().ui
+        except Exception:  # noqa: BLE001 - an unreadable config must never block the window opening
+            ui = {}
+        return html.replace(
+            "<head>", "<head>\n<script>" + inject_script(base_url, token, ui=ui) + "</script>", 1
+        )
 
     async def _index(_request):
-        return HTMLResponse(injected)
+        return HTMLResponse(_render())
 
     app.router.routes.insert(0, Route("/", _index))
     app.router.routes.insert(1, Route("/index.html", _index))

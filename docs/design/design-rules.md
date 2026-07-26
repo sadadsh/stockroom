@@ -102,6 +102,15 @@ the same: decoration standing in for design.
 > opaque panels + the gradient supplies the depth — a "native match", not literal frost).
 > Radii stay 8/6 (the mockup's 9/7 is a sub-perceptual delta not worth the invariant churn).
 > The zero-hue-neutral, monotonic-ladder, and WCAG contracts below are unchanged and still enforced.
+> **2026-07-17 — North-star adoption (owner decision, supersedes the palette + radii above for the React app):**
+> the app is re-skinned to the perfected north-star direction. Canvas lifts from near-black to a
+> **lighter charcoal** (`#242427` dark / `#e9eaee` light); cards read one clean step up (the existing
+> translucent-overlay ladder lands on the north-star values once the canvas base lifts). Light cards go
+> **white** (`#fff`) on the gray canvas (the macOS-light look). The ambient radial backdrop is **flattened**
+> to a solid canvas (owner: no gradients; depth comes from elevation + hairlines only). **Radii become
+> card 14 / control 8** (the rounder north-star), superseding the 8/6 lock for the React app. All asset /
+> 3D renders are **neutral monochrome** (no cool-blue bias). The zero-hue-neutral accent, monotonic ladder,
+> and WCAG contracts are unchanged. Tokens live in `app/frontend/src/styles/index.css` + `tailwind.config.js`.
 
 The identity is neutral WinUI grey; there is **no brand/accent hue**. The interaction
 "accent" is a near-neutral (near-white in dark, near-black in light) used only on

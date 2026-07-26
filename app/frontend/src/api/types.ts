@@ -42,6 +42,54 @@ export interface Facets {
   incomplete: number;
 }
 
+// GET /api/library/facets/parametric — filter dimensions GENERATED from the parts' own spec
+// bags (never a hardcoded per-category list). A numeric key becomes a `range`; any other key
+// becomes `options` (the top distinct values with counts). A new spec key surfaces on its own.
+export interface FacetOption {
+  value: string;
+  count: number;
+}
+
+export interface ParametricFacet {
+  key: string;
+  label: string;
+  kind: "options" | "range";
+  count: number;
+  options?: FacetOption[] | null;
+  // range facets carry SI-normalized magnitude bounds + the shared base unit
+  min?: number | null;
+  max?: number | null;
+  unit?: string | null;
+}
+
+export interface ParametricFacets {
+  category: string | null;
+  facets: ParametricFacet[];
+  total: number;
+}
+
+// GET /api/library/search — a rich results row: the lean identity plus the part's own scalar
+// spec bag and a flattened sourcing summary. The results table picks its columns from `specs`,
+// so a new spec becomes a column with no code change.
+export interface SearchRow {
+  id: string;
+  display_name: string;
+  category: string;
+  mpn: string;
+  manufacturer: string;
+  is_complete: boolean;
+  missing: string[];
+  specs: Record<string, string | number | boolean>;
+  stock: number | null;
+  unit_price: number | null;
+  currency: string;
+}
+
+export interface SearchResponse {
+  parts: SearchRow[];
+  count: number;
+}
+
 // Nested records inside the full part detail (stockroom.model.part).
 export interface DatasheetRef {
   file: string;
@@ -58,19 +106,32 @@ export interface PriceBreak {
 export interface PurchaseRef {
   vendor: string;
   url: string;
+  // The distributor's own order number (e.g. Mouser "667-ERJ-P03F1101V"), distinct
+  // from the manufacturer MPN. Optional so older records without it still type-check.
+  part_number?: string;
   price_breaks: PriceBreak[];
   stock: number | null;
   currency: string;
   fetched_at: string;
 }
 
-export interface LibRef {
+// One EDA asset reference (stockroom.model.part.AssetRef). `lib` names the container (a
+// KiCad library nickname, an Altium .SchLib/.PcbLib filename), `name` the entry inside it,
+// and `file` the repo-relative path for a file-shaped asset such as a 3D model. A kind fills
+// the fields it needs and leaves the rest blank -- nothing here is tool-specific.
+export interface AssetRef {
   lib: string;
   name: string;
+  file: string;
 }
 
-export interface ModelRef {
-  file: string;
+// Everything ONE EDA tool holds for a part (stockroom.model.part.EdaAssets). Every tool gets
+// the same symmetric bundle, which is what makes readiness a single generic check instead of
+// a per-tool branch. Slots are absent when the tool has no such asset.
+export interface EdaAssets {
+  symbol: AssetRef | null;
+  footprint: AssetRef | null;
+  model: AssetRef | null;
 }
 
 export interface Provenance {
@@ -96,17 +157,79 @@ export interface PartDetail {
   tags: string[];
   mpn: string;
   manufacturer: string;
+  // True for a passive (R/C/L) that references KiCad stock symbol/footprint/3D
+  // rather than owning copied asset files. Optional so older fixtures/records
+  // without the flag still type-check; the backend always emits it.
+  passive?: boolean;
   datasheet: DatasheetRef | null;
   purchase: PurchaseRef[];
-  symbol: LibRef | null;
-  footprint: LibRef | null;
-  model: ModelRef | null;
+  // The CAD assets, one symmetric bundle per EDA tool key ("kicad", "altium", ...). Tools
+  // with nothing attached are omitted by the backend, so read it through
+  // `assetsFor(detail, tool)` in lib/edaTarget.ts rather than indexing it directly.
+  eda: Record<string, EdaAssets>;
   provenance: Provenance | null;
   hashes: Record<string, string> | null;
   enrichment: Record<string, { source: string; confidence: string }>;
   // Persisted canonical spec data (M6i). A free-form value bag keyed by spec name;
   // specs.pinout is a list of {pin, name}. Per-key provenance lives in `enrichment`.
   specs: Record<string, unknown>;
+  // Every value a source offered for a field and did NOT win with, keyed exactly like
+  // `enrichment` (a canonical field name in lower_snake, or a spec label). The value in force is
+  // repeated as the first entry, so a reader sees which answer is stored beside the ones set
+  // aside. Optional because the backend omits the key entirely for a part whose sources never
+  // disagreed - most parts carry no alternates at all.
+  alternates?: Record<string, SourcedAlternate[]>;
+}
+
+// One value a source offered for a field. `value` is unknown, not string: a tariff rate is a
+// number whose 0.0 means "confirmed no tariff", not a missing value.
+export interface SourcedAlternate {
+  value: unknown;
+  source: string;
+  confidence: string;
+}
+
+// POST /api/library/passive/preview -> either a decoded, not-yet-committed passive
+// record (status "ok"), or a needs_input signal (status "needs_input") when the MPN
+// could not be decoded and the user must pick a kind + package to add it file-less.
+export interface PassivePreviewOk {
+  status: "ok";
+  record: PartDetail;
+  gaps: string[];
+  stock_present: boolean;
+}
+
+// The MPN did not decode: reveal the manual pickers, pre-filled with what is known.
+// `packages` are the only EIA cases that resolve to a KiCad stock footprint.
+export interface PassiveNeedsInput {
+  status: "needs_input";
+  mpn: string;
+  manufacturer: string;
+  suggested_kind: string | null;
+  packages: string[];
+  message: string;
+}
+
+export type PassivePreview = PassivePreviewOk | PassiveNeedsInput;
+
+// The body for a file-less passive preview/add: an MPN or a Mouser product URL, plus
+// optional category/manufacturer overrides, a datasheet URL, and the manual
+// kind/package/value/tolerance the user picks when the MPN cannot be decoded.
+export interface PassiveAddBody {
+  input: string;
+  kind?: string;
+  package?: string;
+  value?: string;
+  tolerance?: string;
+  category?: string;
+  manufacturer?: string;
+  datasheet_url?: string;
+  purchase_part_number?: string;
+  // A7: the full pulled result carried onto the passive commit (parametric specs + the price
+  // ladder + live stock), so a passive from a link keeps the same depth the non-passive path does.
+  specs?: Record<string, string>;
+  price_breaks?: { qty: number; price: number }[];
+  stock?: number;
 }
 
 export interface ApiErrorBody {
@@ -168,6 +291,17 @@ export interface EnrichPriceBreak {
   currency: string;
 }
 
+// The passive-or-not determination the unified Add-A-Part flow branches on. Non-null
+// means the pulled page describes a file-less passive (R/C/L) that adds with KiCad
+// stock symbol/footprint/3D, carrying the fields the file-less add needs; null means
+// the part needs its symbol/footprint/3D dropped.
+export interface PassiveAddPlan {
+  kind: string;
+  package: string;
+  value: string;
+  tolerance: string;
+}
+
 export interface EnrichmentResult {
   category: string;
   mpn: SourcedField | null;
@@ -176,8 +310,32 @@ export interface EnrichmentResult {
   datasheet_url: SourcedField | null;
   stock: SourcedField | null;
   package: SourcedField | null;
+  // A2 procurement depth: a part's manufacturing status, factory lead time, distributor
+  // product page, and the distributor's own order numbers. The backend always emits these;
+  // optional so fixtures/older payloads without them still type-check (null = not pulled).
+  lifecycle?: SourcedField | null;
+  lead_time?: SourcedField | null;
+  product_url?: SourcedField | null;
+  dist_pns?: Record<string, string>;
+  dist_price_breaks?: Record<string, { qty: number; price: number; currency: string }[]>;
+  dist_stock?: Record<string, number | null>;
+  // Each distributor's own buy link ("mouser"->..., "digikey"->...): when both APIs answer a
+  // lookup we keep BOTH, so the part carries every place it can be ordered, not only the pasted
+  // link. Optional so older payloads without it still type-check.
+  dist_urls?: Record<string, string>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
+  // Every kept disagreement between sources for a spec key: all values with their
+  // origins (merge-only-identical, owner 2026-07-24). Optional so fixtures/older
+  // payloads without it still type-check.
+  spec_conflicts?: Record<string, SourcedField[]>;
+  // The same, for the single-valued canonical fields: both descriptions, both packages, both
+  // datasheet links. Keyed by the field name in lower_snake ("description"). Optional for the
+  // same reason.
+  field_conflicts?: Record<string, SourcedField[]>;
+  // The backend always emits this; optional so fixtures/older payloads without it
+  // still type-check. null (or absent) means the part is not a file-less passive.
+  add_plan?: PassiveAddPlan | null;
   schema_version: number;
 }
 
@@ -186,6 +344,9 @@ export interface EnrichmentResult {
 export interface PurchaseDTO {
   vendor?: string;
   url?: string;
+  // The distributor's own order number (e.g. Mouser "667-ERJ-P03F1101V"), carried onto the
+  // committed record so an order export can say "order from {vendor} by {this P/N}".
+  part_number?: string;
   price_breaks?: unknown[];
   stock?: number | null;
   currency?: string;
@@ -212,11 +373,57 @@ export interface StagingCandidate {
   tags: string[];
   purchase: PurchaseDTO[];
   gaps: string[];
+  // the enriched spec bag the inspect -> edit -> commit trip carries onto the record
+  // (every parametric field a distributor page yielded); absent on a bare ZIP candidate.
+  specs?: Record<string, unknown>;
+  // Every value a source offered and LOST with, keyed like the record's `alternates`. The
+  // review modal already showed these disagreements; without carrying them here the commit
+  // dropped them, so a part added and never refreshed kept none of the competing answers.
+  alternates?: Record<string, { value: string; source: string; confidence: string }[]>;
+  // per-key provenance for `specs`, the same trip and the same reason
+  enrichment?: Record<string, { source: string; confidence: string }>;
+  // carries the datasheet source_url onto the committed record; absent on
+  // candidates staged before it was round-tripped
+  provenance?: {
+    source: string;
+    source_url: string;
+    original_zip_sha256: string;
+    ingested_at: string;
+  } | null;
+}
+
+// POST /api/ingest/enrich -> a background job whose result is this report.
+export interface IngestEnrichResult {
+  candidate: StagingCandidate;
+  filled: string[];
+  notes: string[];
+  missing: string[];
 }
 
 // POST /api/ingest/inspect -> a background job.
 export interface JobRef {
   job_id: string;
+}
+
+// GET /api/library/parts/{id}/cad-source (Phase-2 DigiKey asset download, spec section
+// 5). `url` is the DigiKey product-detail page hosting the Ultra Librarian / SnapEDA CAD
+// download for the part's MPN, or null when the part has no MPN, DigiKey enrichment is
+// disabled, or nothing resolved - a resolvable 200 either way, never an error.
+// The KiCad + Altium asset types a part can still need. Mirrors the backend
+// stockroom.capture.requirements.Requirement enum values exactly (the wire contract).
+export type Requirement =
+  | "kicad_symbol"
+  | "kicad_footprint"
+  | "kicad_model"
+  | "altium_symbol"
+  | "altium_footprint";
+
+export interface CadSourceResponse {
+  url: string | null;
+  mpn: string;
+  vendor: string;
+  // The requirements this part is missing, so the guided checklist knows what to fill.
+  needs: Requirement[];
 }
 
 // Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
@@ -240,6 +447,55 @@ export interface SettingsInfo {
   mouser_api_key_hint: string;
   github_token_set: boolean;
   github_token_hint: string;
+  // DigiKey Product Information API OAuth creds. The client_id is echoed raw (a
+  // non-secret identifier); the client_secret crosses only as presence + last-4 hint.
+  digikey_client_id: string;
+  digikey_client_secret_set: boolean;
+  digikey_client_secret_hint: string;
+  // DigiKey account web login (the driver's hands-free sign-in), distinct from the
+  // API creds. The username is echoed raw; the password is presence + last-4 hint.
+  digikey_username: string;
+  digikey_password_set: boolean;
+  digikey_password_hint: string;
+  // Saved logins for the in-DigiKey CAD providers (Ultra Librarian, SnapEDA, SamacSys).
+  // Usernames are echoed raw (not secrets); passwords cross the wire only as presence
+  // + a last-4 hint.
+  ul_username: string;
+  ul_password_set: boolean;
+  ul_password_hint: string;
+  snapeda_username: string;
+  snapeda_password_set: boolean;
+  snapeda_password_hint: string;
+  samacsys_username: string;
+  samacsys_password_set: boolean;
+  samacsys_password_hint: string;
+  // KiCad wiring: the per-machine overrides (plain paths, not secrets), the
+  // effective locations they resolve to, and whether SR_LIB currently points at
+  // the active profile's library.
+  kicad_config_override: string;
+  kicad_cli_override: string;
+  kicad_config_dir: string;
+  kicad_cli_path: string;
+  kicad_cli_available: boolean;
+  kicad_wired: boolean;
+}
+
+// The PATCH /api/settings body: only the sent fields are touched.
+export interface SettingsPatch {
+  mouser_api_key?: string;
+  github_token?: string;
+  digikey_client_id?: string;
+  digikey_client_secret?: string;
+  digikey_username?: string;
+  digikey_password?: string;
+  ul_username?: string;
+  ul_password?: string;
+  snapeda_username?: string;
+  snapeda_password?: string;
+  samacsys_username?: string;
+  samacsys_password?: string;
+  kicad_config_override?: string;
+  kicad_cli_override?: string;
 }
 
 // GET /api/profiles, POST /api/profiles
@@ -338,6 +594,9 @@ export interface UpdateCheck {
   update_available: boolean;
   state?: string;
   behind?: number;
+  // set when the check could not reach the remote (state "offline"), so the UI
+  // never shows a silent Up To Date it did not verify
+  detail?: string;
 }
 
 // POST /api/update/apply
@@ -390,6 +649,38 @@ export interface RepairResult {
   manual: RepairFinding[];
 }
 
+// POST /api/library/rescan -> a background job (Phase-1b-3: library-scale procurement
+// rescan). already_running is set (instead of a fresh job_id) when a rescan was already in
+// flight; the caller attaches to that job rather than starting a second one.
+export interface RescanStartResponse extends JobRef {
+  already_running?: boolean;
+}
+
+// The terminal `result` event of a rescan job: one part-count per outcome, the providers
+// (if any) that hit a quota/auth issue partway through and were skipped for the rest of the
+// run, and the engine's own honest summary line.
+export interface RescanSummary {
+  total: number;
+  updated: number;
+  unchanged: number;
+  no_data: number;
+  failed: number;
+  paused_providers: string[];
+  message: string;
+}
+
+// GET /api/library/rescan/state -> the last-known rescan outcome per part (uncommitted,
+// per-machine; empty before any rescan has ever run on this machine).
+export interface RescanStateEntry {
+  checked_at: string;
+  outcome: string;
+}
+
+export interface RescanStateResponse {
+  parts: Record<string, RescanStateEntry>;
+  counts: Record<string, number>;
+}
+
 // POST /api/doctor/wire-kicad (a job) -> the KiCad wiring outcome. restart_needed is
 // true when KiCad was running while the library tables changed under it.
 export interface WiringReport {
@@ -412,6 +703,8 @@ export interface ProjectSummary {
   id: string;
   name: string;
   root: string;
+  // Which EDA owns the project files: "kicad" | "altium".
+  eda: string;
   board_count: number;
   sheet_count: number;
   has_git: boolean;
@@ -428,6 +721,10 @@ export interface ProjectDetail {
   pro_path: string;
   board_paths: string[];
   sheet_paths: string[];
+  // Which EDA owns the project files, and what this registration can do here (the
+  // server's truth: the KiCad-only surfaces are absent for an Altium project).
+  eda: string;
+  capabilities: string[];
   git_root: string | null;
   audit_digest: Record<string, unknown> | null;
   registered_at: string;
@@ -522,11 +819,21 @@ export interface BomLine {
   datasheet: string;
   description: string;
   basic: boolean;
+  // D1 library coverage: whether this line's part is in the shared library, and which one.
+  // Optional so an older cached BOM shape (before coverage existed) still typechecks.
+  in_library?: boolean;
+  library_part_id?: string;
   unit_price?: number | string;
   extended?: number;
   stock?: number;
   source?: string;
   price_breaks?: { qty: number; price: number }[];
+  // Wide-BOM columns (the "perfect BOM" table): package + RoHS + category, derived offline
+  // from the footprint and filled from the enrich layer / library. Optional so an older cached
+  // shape (before these fields existed) still typechecks; the table renders "-" when absent.
+  package?: string;
+  rohs?: string;
+  category?: string;
   // M7d procurement fields, present only when the enrich layer carried them.
   lifecycle?: string;
   lead_time?: string;
@@ -534,6 +841,34 @@ export interface BomLine {
   mouser_pn?: string;
   lcsc_pn?: string;
   digikey_pn?: string;
+  // Folded procurement verdict (the one BOM table reads it directly): per-line stock coverage
+  // for the current run + whether the line is orderable. Present after a build/reprice.
+  stock_risk?: StockRisk;
+  orderable?: boolean;
+  // Per-line build economics (M7... reprice): the order quantity and cost at a chosen
+  // build size + tax/tariff rate. Present after a build/reprice; optional so an older
+  // cached shape (before this field existed) still typechecks. final_qty is always a
+  // real number once attached (never invented, but never absent either); the cost
+  // fields are null when the line itself could not be priced.
+  moq?: number | null;
+  final_qty?: number;
+  final_unit_price?: number | null;
+  final_extended?: number | null;
+  tax_tariff?: number | null;
+  line_total?: number | null;
+}
+
+// The BOM roll-up for one build: build_qty boards at tax_rate percent, summed over every
+// priced line's final_extended (+ tax). Only present once a build has been costed.
+export interface BuildRollup {
+  build_qty: number;
+  tax_rate: number;
+  subtotal: number;
+  tax_total: number;
+  grand_total: number;
+  priced_lines: number;
+  unpriced_lines: number;
+  currency: string;
 }
 
 // The BOM cost roll-up. state is the honest verdict: "empty" (no lines), "built"
@@ -573,6 +908,14 @@ export interface BomResult {
     unpriced_lines: number;
     currency: string;
   } | null;
+  // The tax/tariff rate (percent) the cached build was costed at, and the build-size cost
+  // roll-up. Optional so an older cached shape (before this field existed) still typechecks.
+  tax_rate?: number;
+  build?: BuildRollup | null;
+  // The folded procurement roll-ups (the one BOM page's risk headline): sourcing risk + the
+  // critical-path lead time. Present after a build/reprice; optional for an older cached shape.
+  risks?: SourcingRisks;
+  lead?: LeadTime;
 }
 
 // --- Procurement (M7d) ---
@@ -1096,6 +1439,212 @@ export interface ManualFillResult {
   part_id: string;
 }
 
+// GET /api/projects/{id}/assign -- the bulk-assign surface.
+//
+// A project full of default-library passives cannot be auto-filled: every one of them carries a
+// generic stock symbol like "Device:R", which is shared by every resistor that has ever existed and so
+// identifies no library part. Assigning one automatically would write a coin-flip MPN into the user's
+// schematic. Instead the placements are GROUPED (identical symbol + Value + Footprint is one row) and
+// each row offers the library parts whose value actually matches, for the user to pick once.
+export interface AssignCandidate {
+  part_id: string;
+  display_name: string;
+  mpn: string;
+  description: string;
+  // Strongest first: the value matches and so does the exact footprint reference / the EIA case /
+  // only the value. Never an identity claim, always a ranked suggestion.
+  confidence: "value+footprint" | "value+package" | "value";
+  // The ratings that DIFFER between this group's candidates, already filtered to the ones that vary.
+  // When several parts are equally good matches on value and package, the evidence tier is the same on
+  // every row and this is the only thing that makes the choice possible: "1%" against "5%".
+  distinguish: string[];
+}
+
+export interface AssignGroup {
+  key: string;
+  lib_id: string;
+  value: string;
+  footprint: string;
+  refs: string[];
+  count: number;
+  sheets: string[];
+  candidates: AssignCandidate[];
+}
+
+// A placement Stockroom already knows the library part for, because someone assigned it. The point
+// of recording it is that it can be CHECKED later: `drift` is the fields this placement would still
+// receive from the part it is bound to, so an empty list means the schematic and the library agree
+// and a non-empty one means something changed under it.
+export interface AssignBound {
+  ref: string;
+  sheet: string;
+  // The durable key the binding is stored against (a KiCad symbol uuid, an Altium UNIQUEID).
+  key: string;
+  // True when the key had to fall back to the reference designator, which annotation rewrites. Such
+  // a binding is real but not durable, and saying so is the difference between the two.
+  weak_key: boolean;
+  part_id: string;
+  display_name: string;
+  mpn: string;
+  // The bound part is no longer in the library. Never silently re-guessed: it is shown as broken.
+  missing: boolean;
+  drift: FillChange[];
+}
+
+// How this project's EDA tool carries a binding. KiCad's schematics are written by Stockroom, so the
+// binding rides on the placement; Altium's are read-only here, so Stockroom records it instead.
+export interface AssignBinding {
+  field: string;
+  writable: boolean;
+  reason: string;
+}
+
+export interface AssignRead {
+  project: string;
+  eda: string;
+  under_git: boolean;
+  binding: AssignBinding;
+  components: number;
+  unassigned: number;
+  bound: AssignBound[];
+  groups: AssignGroup[];
+}
+
+// POST /api/projects/{id}/assign -- assign one library part to a whole group, one atomic commit.
+export interface AssignGroupBody {
+  refs: string[];
+  part_id: string;
+}
+
+export interface AssignResult {
+  project: string;
+  committed: string | null;
+  refs: string[];
+  part_id: string;
+  // How many placements now carry a durable binding to this part. For a tool Stockroom cannot
+  // write, `committed` is null (no design file changed) while this is still the full count.
+  bound: number;
+}
+
+// GET/POST /api/projects/{id}/hygiene and /api/library/hygiene -- workspace sync hygiene.
+//
+// Two peers conflict on every pull when an EDA tool's PER-USER files (KiCad's `.kicad_prl` window
+// state, the regenerated `fp-info-cache`) are committed. Syncing writes the ignore rules AND
+// untracks the files already committed, because an ignore rule does nothing to a file git already
+// tracks. Untracking leaves the file on disk; only git stops sharing it.
+export interface HygieneRead {
+  // present on the project endpoint only; the library covers every tool at once
+  eda?: string;
+  under_git?: boolean;
+  // the hygiene files whose content would change
+  writes: string[];
+  // repo-relative paths that would stop being shared
+  untracked: string[];
+}
+
+export interface HygieneResult extends HygieneRead {
+  project?: string;
+  committed: string | null;
+}
+
+// GET/POST /api/library/lfs -- where the library's BINARY payloads are stored.
+//
+// Without git-lfs every captured part adds a permanent, un-GC-able copy of its .PcbLib / .SchLib /
+// .step to history for everyone who will ever clone the library, so clone size only ever grows.
+export interface LibraryLfsStatus {
+  // is the `git lfs` binary reachable at all, and which version
+  installed: boolean;
+  version: string;
+  // is the filter wired into THIS repository. Attributes naming `filter=lfs` are INERT without it:
+  // git stores the file normally and reports nothing, so this is the flag that decides truth.
+  enabled: boolean;
+  // patterns git-lfs believes it is handling, read from git-lfs rather than parsed out of a file
+  tracked_patterns: string[];
+  // files currently stored as pointers
+  objects: number;
+  // tracked files matching an LFS pattern that are STILL ordinary blobs, i.e. committed before
+  // adoption. Converting them needs a history rewrite plus a force-push, which this project
+  // forbids, so the number is reported and never silently "fixed".
+  legacy_blobs: number;
+  // what adoption WOULD route through LFS, so the offer is concrete rather than a promise
+  covers: string[];
+  adopted: boolean;
+  reason: string;
+}
+
+export interface LibraryLfsResult extends LibraryLfsStatus {
+  writes: string[];
+  untracked: string[];
+  committed: string | null;
+}
+
+// GET/POST /api/projects/{id}/library-pin -- the library-version pin.
+//
+// A project and the library are two SEPARATE git repos, so two peers can sit on the identical
+// project commit while their libraries differ, and the same footprint reference then resolves to
+// different geometry with nothing in either history saying so. The pin is a lockfile committed into
+// the PROJECT's repo, naming the library commit the project was resolved against.
+export type LibraryPinStatus =
+  | "unpinned"
+  | "match"
+  | "library_ahead"
+  | "library_behind"
+  | "diverged"
+  | "unknown_commit"
+  | "different_library"
+  | "different_profile"
+  | "library_not_git";
+
+// What is recorded in the project's `stockroom-library.json`.
+export interface LibraryPinRecord {
+  schema: number;
+  profile: string;
+  remote: string;
+  commit: string;
+  pinned_at: string;
+}
+
+// How this EDA tool keeps a stored library reference resolving to the same asset on every machine.
+// Registry data, so the surface never hardcodes that `SR_LIB` is a KiCad concept.
+export interface LibraryPathContract {
+  // "env_var": a named variable must be set on each machine. "relative": nothing to set.
+  // "derived": the file carrying the references is machine-specific, so Stockroom rebuilds it
+  // locally. Nothing to set, but the rebuild is not optional (this is Altium's .DbLib).
+  kind: "env_var" | "relative" | "derived";
+  variable: string;
+  config_file: string;
+  prefix: string;
+  description: string;
+}
+
+export interface LibraryPinRead {
+  project: string;
+  eda: string;
+  under_git: boolean;
+  pinned: LibraryPinRecord | null;
+  path_contract: LibraryPathContract;
+  status: LibraryPinStatus;
+  // The sentence explaining the status and the one naming the remedy. Both come from the backend
+  // so the two layers can never describe the same state differently.
+  detail: string;
+  remedy: string;
+  // "ok" | "notice" | "problem" -- decided by the backend, never re-derived from the status here.
+  severity: string;
+  ahead: number;
+  behind: number;
+  library_commit: string;
+  library_short: string;
+  library_remote: string;
+  library_profile: string;
+}
+
+export interface LibraryPinResult {
+  project: string;
+  pinned: LibraryPinRecord;
+  // null when the pin already named this exact version, so re-pinning never churns history
+  committed: string | null;
+}
+
 // POST /api/projects/{id}/restore (revert the last Prepare/Fill commit as a new commit)
 export interface RestoreResult {
   project: string;
@@ -1113,4 +1662,361 @@ export interface SystemInfo {
   kicad_running: boolean;
   kicad_cli_available: boolean;
   kicad_cli_path: string;
+}
+
+// One part's Altium DbLib status: its identity, the Value the emitter writes, its resolved
+// Altium symbol/footprint entry names (empty until attached), and whether it is place-ready.
+export interface AltiumStatusRow {
+  id: string;
+  display_name: string;
+  category: string;
+  mpn: string;
+  value: string;
+  symbol: string;
+  footprint: string;
+  ready: boolean;
+}
+
+// The Altium Database Library status for the ACTIVE profile.
+export interface AltiumStatus {
+  profile: string;
+  dblib: string;
+  dblib_dir: string;
+  ready: number;
+  total: number;
+  // Whether the SQLite data source the .DbLib reads exists on disk. It is DERIVED from the JSON
+  // records and no longer shared through git, so a fresh clone legitimately has none until
+  // Stockroom rebuilds it (which it does at boot). False means "not built yet", never "broken".
+  datasource_present: boolean;
+  rows: AltiumStatusRow[];
+}
+
+// GET /api/altium/odbc-status -> whether the 64-bit SQLite3 ODBC driver Altium needs to read the
+// DbLib is registered on this machine. `installed` is null off Windows, where it cannot be checked.
+export interface OdbcStatus {
+  installed: boolean | null;
+  driver: string;
+  download_url: string;
+}
+
+// GET /api/altium/embed-capability -> whether a 3D embed can run on THIS machine, and why not
+// when it cannot. Altium writes the 3D body into the footprint's .PcbLib itself, so the action
+// needs Altium installed and its license seat free. `reason` comes from the EDA registry, so a
+// KiCad-only peer sees an explanation rather than a control that silently does nothing.
+export interface AltiumEmbedCapability {
+  installed: boolean;
+  binary: string;
+  requires_tool_installed: boolean;
+  reason: string;
+  // The window title of a running Altium holding the single On-Demand license seat, or "".
+  busy: string;
+  available: boolean;
+}
+
+// POST /api/altium/parts/{id}/embed-model -> the VERIFIED outcome of an embed. `embedded` and
+// `payload_bytes` are read back out of the .PcbLib container from outside Altium, so they are the
+// independent proof rather than Altium's own word. `orphaned` counts superseded payloads a replace
+// left behind, which Altium does not prune.
+export interface AltiumEmbedResult {
+  part_id: string;
+  status: string;
+  detail: string;
+  embedded: number;
+  payload_bytes: number;
+  orphaned: number;
+  pcblib: string;
+  model: string;
+  commit: string;
+}
+
+// One part's outcome inside a bulk run. `status` is "ok" for an embed that was verified in the
+// container, "failed" for one that was not; a failure carries Altium's own words in `detail`,
+// because a run the owner walked away from is exactly where "it did not work" is useless.
+export interface AltiumBulkEmbedItem {
+  part_id: string;
+  status: string;
+  detail?: string;
+}
+
+// POST /api/altium/embed-models -> the whole run. `skipped` is the parts that were never
+// candidates (no Altium footprint, no 3D model file, or a model already embedded); those are not
+// failures, and keeping them separate is what makes "2 of 40" explicable rather than alarming.
+export interface AltiumBulkEmbedResult {
+  embedded: number;
+  failed: number;
+  attempted: number;
+  skipped: string[];
+  results: AltiumBulkEmbedItem[];
+}
+
+export interface AltiumModelsPending {
+  pending: string[];
+  count: number;
+}
+
+export interface AltiumRegenerateResult {
+  emitted: number;
+  skipped: string[];
+  dblib: string;
+}
+
+// A single icon override in the POST /api/dev/save request (dev-mode v2): either `body` (raw inner
+// SVG markup, sanitised by the backend before it is written) or `swapToId` (another registry icon
+// id to render instead). Both optional; an entry with neither is dropped server-side.
+export interface DevIconOverride {
+  body?: string;
+  swapToId?: string;
+}
+
+// POST /api/dev/save (dev mode, owner-only): persist the nudged design tokens, reworded UI copy,
+// re-drawn icons, and per-element overrides back to source (lib/token.overrides.ts +
+// lib/copy.overrides.ts + lib/icon.overrides.ts + lib/element.overrides.ts), so a saved change
+// ships for everyone. `tokens.root` carries the dark-theme colours + shared radii, `tokens.light`
+// the light-theme colours; `copy` maps a stable copy id to its new text. The v2 blocks are
+// optional (an omitted block regenerates its file empty, matching the token/copy behaviour):
+// `icons` maps an icon id to its override, `elements` maps a `data-dev-id` to a CSS prop -> value
+// map. Every icon body / CSS value is validated + re-serialised by the backend (the authority on
+// what may ship); a malicious value is a 400.
+export interface DevSaveBody {
+  tokens: { root: Record<string, string>; light: Record<string, string> };
+  copy: Record<string, string>;
+  icons?: Record<string, DevIconOverride>;
+  elements?: Record<string, Record<string, string>>;
+}
+
+// The write outcome: the relative source paths written, and how many token / copy / icon / element
+// overrides now persist. ok is false with a message only on an honest refuse (no source tree in a
+// frozen exe).
+export interface DevSaveResult {
+  ok: boolean;
+  written: string[];
+  tokens: number;
+  copy: number;
+  icons: number;
+  elements: number;
+}
+
+// --- STM Viewer DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4) ---
+// These mirror the FastAPI Pydantic models on api/routers/stm.py + api/schemas.py. Kept in
+// lockstep with that frozen contract; a genuine gap is an INTERFACES.md amendment + a Phase-3
+// fix, never a client-side shim.
+
+// GET /api/stm/status
+export interface StmStatusDTO {
+  built: boolean;
+  building: boolean;
+  source_path: string;
+  source_present: boolean;
+  all_families: boolean;
+  device_xml_count: number;
+  family_count: number;
+  families: string[];
+  mcu_count: number;
+  classifier_rev: number;
+  af_schema_rev: number;
+  geometry_rev: number;
+  source_sha256: string;
+  built_at: string;
+}
+
+// One spec-matrix row (the ST-MCU-FINDER column set). `part` is the addressable ref_name used
+// as ?part=; `mpn_example` is the real MPN shown to the user (ref_name is never displayed).
+export interface McuSpecRow {
+  part: string;
+  mpn_example: string;
+  series: string;
+  line: string;
+  core: string;
+  package: string;
+  pin_count: number;
+  io_count: number;
+  flash_kb: number;
+  ram_kb: number;
+  max_freq_mhz: number;
+  vdd_min: number;
+  vdd_max: number;
+  temp_min_c: number;
+  temp_max_c: number;
+  // peripheral name -> instance count (USART, SPI, I2C, TIM, ADC, USB, ...)
+  peripherals: Record<string, number>;
+}
+
+// GET /api/stm/mcus -> the full matrix + server-computed facet counts for the coarse scope.
+export interface McusResponse {
+  mcus: McuSpecRow[];
+  count: number;
+  facets: {
+    family: Record<string, number>;
+    core: Record<string, number>;
+    package: Record<string, number>;
+    series: Record<string, number>;
+  };
+}
+
+// GET /api/stm/families -> { families: FamilyDTO[] }
+export interface FamilyDTO {
+  family: string;
+  lines: string[];
+  mcu_count: number;
+  packages: string[];
+}
+
+export interface FamiliesResponse {
+  families: FamilyDTO[];
+}
+
+// One alternate-function option on a pin (SWAP-01). Declared once here and REUSED by Phase 5;
+// nested on PinDTO.alternate_functions and shown read-only by the inspector in Phase 4.
+export interface AfOptionDTO {
+  af_index: number;
+  signal: string;
+  peripheral: string | null;
+}
+
+// Every derived fact for one pin (VIZ-03).
+export interface PinDTO {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  canonical_pin_name: string;
+  raw_pin_name: string;
+  pin_type: string;
+  electrical_class: "io" | "power" | "ground" | "reset" | "boot" | "vcap" | "nc";
+  // the visual-encoding category (color-is-data); tracks electrical_class today
+  category: string;
+  roles: { role_name: string; role_class: string }[];
+  functions: { signal: string; io_modes: string }[];
+  alternate_functions: AfOptionDTO[];
+  five_v: { tolerant: boolean; by_family: Record<string, boolean>; caveat: string } | null;
+  // the VDD/VDDA/VBAT domain, when a power pin
+  supply: string | null;
+}
+
+// GET /api/stm/pinout?part= -> the full pinout with every pin's facts inlined (one call feeds
+// both the map and the inspector; decision 4).
+export interface PinoutGeometryDTO {
+  body_shape: "qfp" | "qfn" | "bga" | "wlcsp";
+  pin_count: number;
+  rows: number | null;
+  cols: number | null;
+  pitch_mm: number | null;
+  has_center_pad: boolean;
+  // "curated": from the cited PACKAGE_GEOMETRY table; "inferred": derived at request time
+  // from the package name + real pin positions (the map badges this honestly).
+  source?: "curated" | "inferred";
+}
+
+export interface PinoutDTO {
+  part: string;
+  mpn_example: string;
+  package: string;
+  geometry: PinoutGeometryDTO;
+  pins: PinDTO[];
+}
+
+// --- Compatibility Workbench DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4).
+// POST /api/stm/compat/union returns UnionDTO; every field mirrors the frozen Pydantic shape. The
+// classification vocabulary is exactly shared | divergent | partial (never the retired switch-fabric
+// identity), and reconcile is a read-only description of the alternate-function remap, never applied.
+
+// One union position at (mcu, package, position) grain, classified from the per-part facts so the
+// classification is auditable (never a silent package-majority collapse). lqfp_side / bga_row /
+// bga_col carry the same geometry hint PinDTO does, so lib/pinMapGeometry lays these out unchanged.
+export interface UnionPositionDTO {
+  position: string;
+  position_kind: "numeric" | "alnum";
+  lqfp_side: "left" | "bottom" | "right" | "top" | null;
+  bga_row: string | null;
+  bga_col: number | null;
+  classification: "shared" | "divergent" | "partial";
+  present_on: number;
+  total: number;
+  // the raw per-part trail behind the classification (inspector detail on click, never per-pad).
+  per_part: {
+    ref: string;
+    canonical_pin_name: string;
+    roles: string[];
+    functions: string[];
+  }[];
+  // for a divergent position (COMPAT-03): the AF remap that makes each part carry the union's
+  // required signal here, or swappable:false + a reason. Read-only, never applied. null when the
+  // position needs no reconcile (a shared / partial position).
+  reconcile: {
+    swappable: boolean;
+    swaps: { ref: string; target_signal: string; via_af_index: number }[];
+    reason: string | null;
+  } | null;
+}
+
+// POST /api/stm/compat/union -> the socket-union of a set + its set-level verdict (COMPAT-01/02/03/05).
+export interface UnionDTO {
+  parts: string[];
+  resolved: { ref: string; mpn: string }[];
+  package: string;
+  // the display scope (joined names for a cross-family set) + the real sorted family list
+  family: string;
+  families: string[];
+  grain: "per-part";
+  positions: UnionPositionDTO[];
+  // the one dominant verdict (COMPAT-05): interchangeable with N swaps, or incompatible with the
+  // blocking signal(s) that cannot be placed listed beneath.
+  verdict: {
+    interchangeable: boolean;
+    swaps_required: number;
+    blocking: { position: string; signal: string; reason: string }[];
+  };
+}
+
+// The body POST /api/stm/compat/union accepts: an explicit set of refs OR a (families, package)
+// group. Families may mix (owner amendment 2026-07-23); the package is always singular (a socket
+// is a physical footprint).
+export interface CompatUnionBody {
+  parts?: string[];
+  family?: string;
+  families?: string[];
+  package?: string;
+}
+
+// GET /api/stm/pin/af?part=&position= -> one pin's complete AF0-15 set (SWAP-01). Reuses Phase 4's
+// AfOptionDTO for the array element (declared once above); this is only the response wrapper.
+export interface PinAfResponse {
+  position: string;
+  alternate_functions: AfOptionDTO[];
+}
+
+// GET /api/stm/signal/candidates?part=&signal= -> every candidate pin a peripheral signal can be
+// routed to across the part (SWAP-02).
+export interface SignalCandidatesResponse {
+  signal: string;
+  candidates: { position: string; canonical_pin_name: string; af_index: number }[];
+}
+
+// One auto-discovered compatible set, grouped by pin-divergence signature (COMPAT-04). Picking a
+// group loads its refs into the workbench assembly as an explicit action (never auto-applied).
+export interface SuggestionGroupDTO {
+  signature_id: string;
+  tier: "baseline" | "divergent";
+  package: string;
+  family: string;
+  refs: string[];
+  divergent_positions: number;
+}
+
+// GET /api/stm/compat/suggestions?package=&family=&tolerance= -> { groups: [...] }.
+export interface SuggestionsResponse {
+  groups: SuggestionGroupDTO[];
+}
+
+// POST /api/stm/af-check body: one part + a client-held assignment (position -> { signal, af_index }).
+// The assignment lives in React state only, never persisted (CONTEXT decision 8).
+export interface AfCheckBody {
+  part: string;
+  assignment: Record<string, { signal: string; af_index: number }>;
+}
+
+// POST /api/stm/af-check -> the conflicts a held assignment would introduce (empty list = clean).
+export interface AfCheckResponse {
+  conflicts: { kind: string; positions: string[]; peripheral: string; message: string }[];
 }

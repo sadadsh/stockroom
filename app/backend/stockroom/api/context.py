@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from stockroom.api.jobs import JobRunner
 from stockroom.kicad.cli import KiCadCli
@@ -21,6 +21,9 @@ from stockroom.store.project_index import ProjectIndex
 from stockroom.store.project_store import ProjectStore
 from stockroom.vcs.repo import GitRepo
 from stockroom.vcs.sync import SyncEngine
+
+if TYPE_CHECKING:
+    from stockroom.stm.db import StmIndex
 
 
 @dataclass
@@ -44,6 +47,13 @@ class AppContext:
     project_store: ProjectStore
     project_index: ProjectIndex
     project_ops: ProjectOps
+    # The STM32 pinout/spec index (stm-viewer workstream, Phase 3). LAZY, unlike `index`
+    # above: no CubeMX source is synced at launch, so build_context only ATTEMPTS a load of
+    # whatever is already on disk (default_index_path()) and accepts None (first run, a
+    # stamp mismatch, or a missing/corrupt file are all legitimate, non-fatal outcomes).
+    # `switch_library` deliberately leaves this untouched - the CubeMX source is a
+    # machine-global setting, not library-scoped.
+    stm_index: "StmIndex | None" = None
     # The last ERC/DRC run per project id (M7b), cached in-memory (never committed to
     # the library repo: an external project's check results are not library records, and
     # a git commit per check run is churn). Read by the checks GET, Overview, and the
@@ -62,10 +72,43 @@ class AppContext:
     app_repo: GitRepo | None = None
     uv_sync: Callable[[], None] = lambda: None
     request_restart: Callable[[], None] = lambda: None
+    # The most recent automatic KiCad wiring outcome (a WiringReport: boot, profile
+    # or library switch, or a KiCad settings change), so Doctor/Settings can surface
+    # honestly what happened without re-running it. None until the first attempt.
+    last_wiring: object | None = None
+    # The explicitly injected kicad_dir (tests, embeddings), when one was given: a
+    # settings change must never silently repoint it at the real machine config
+    # (the review-confirmed footgun that let the test suite write into ~/.config).
+    # Clearing an override returns HERE, not to autodetection.
+    kicad_dir_pinned: Path | None = None
 
     def rebuild_index(self) -> None:
         self.index.close()
         self.index = LibraryIndex.build(self.profile.library.parts_dir)
+
+    def rebuild_stm_index(self, source: Path | None = None, progress=None) -> None:
+        """Build the STM index from `source` (falling back to the configured
+        stm_cubemx_source, then stm.source's own env-var/candidate-path discovery)
+        into the per-machine index path, closing any existing stm_index and
+        swapping the new one in. Mirrors rebuild_index/rebuild_project_index's
+        close-then-rebuild-then-swap shape. A build error propagates to the caller
+        (the JobRunner work closure surfaces it as an SSE error event) - never
+        swallowed here."""
+        from stockroom.stm.db import StmIndex
+        from stockroom.stm.source import default_cubemx_source, default_index_path
+
+        resolved_source = source or (
+            Path(self.config.stm_cubemx_source) if self.config.stm_cubemx_source else None
+        ) or default_cubemx_source()
+        if resolved_source is None:
+            raise ValueError(
+                "no STM32 CubeMX source configured or discoverable - set "
+                "stm_cubemx_source via PATCH /api/settings or STM32_CUBEMX"
+            )
+        old_stm_index = self.stm_index
+        self.stm_index = StmIndex.build(resolved_source, default_index_path(), progress=progress)
+        if old_stm_index is not None:
+            old_stm_index.close()
 
     def auto_push(self) -> None:
         """After a library write, push it to the remote when a GitHub token is configured and sync
@@ -91,12 +134,63 @@ class AppContext:
         self.project_index.close()
         self.project_index = ProjectIndex.build(self.libraries_root / ".projects")
 
+    def ensure_derived_artifacts(self) -> None:
+        """Rebuild the per-tool DERIVED artifacts this library needs on disk, committing nothing.
+
+        Today that is Altium's SQLite data source, which stopped being committed on 2026-07-25 (see
+        `eda.registry` `_ALTIUM.derived`). Committing it had bought "a fresh clone is placeable with
+        no regenerate step"; rebuilding it here buys the same thing without sharing a binary two
+        peers can never merge. Called on boot and on every profile/library switch, so the file is
+        already there and current before anyone opens Altium.
+
+        Never raises: a library that cannot produce a data source (an unreadable record, a
+        read-only disk) must not stop the app from booting. The Altium surface reports the file's
+        absence honestly, which is a better failure than a dead launch.
+        """
+        try:
+            self.ops.ensure_altium_datasource()
+        except Exception:  # noqa: BLE001 - best-effort; the surface reports the gap instead
+            pass
+
+    def rewire_kicad(self) -> None:
+        """Repoint KiCad at the active profile (SR_LIB + table rows + category libs),
+        never raising: auto_wire skips when KiCad is absent and captures failures
+        into the report. Called on boot, on every switch, and on a KiCad settings
+        change - the fix for SR_LIB going stale when the profile/library switched."""
+        from stockroom.kicad.wiring import auto_wire
+
+        explicit = self.kicad_dir_pinned is not None or bool(self.config.kicad_config_override)
+        self.last_wiring = auto_wire(
+            self.kicad_dir, self.profile, cli=self.cli, explicit=explicit
+        )
+
+    def apply_kicad_settings(self) -> None:
+        """Rebuild every engine piece derived from the KiCad overrides LIVE (no
+        restart): the cli, the ops that captured it, the effective config dir - then
+        rewire so the new KiCad sees the active library immediately. A pinned
+        (explicitly injected) kicad_dir is only ever moved by an explicit override,
+        never silently repointed at the real machine config."""
+        self.cli = KiCadCli(self.config.kicad_cli_override or None)
+        self.ops = LibraryOps(self.profile, self.repo, self.cli)
+        self.project_ops = ProjectOps(self.project_store, self.cli)
+        if self.config.kicad_config_override:
+            self.kicad_dir = kicad_config_dir(override=self.config.kicad_config_override)
+        elif self.kicad_dir_pinned is not None:
+            self.kicad_dir = self.kicad_dir_pinned
+        else:
+            self.kicad_dir = kicad_config_dir()
+        self.rewire_kicad()
+
     def switch_profile(self, name: str) -> None:
         self.profile = self.profile_store.get(name)
         self.ops = LibraryOps(self.profile, self.repo, self.cli)
         self.config.active_profile = name
         self.config.save()
         self.rebuild_index()
+        self.rewire_kicad()
+        # Each profile has its own parts and therefore its own derived data source; without this
+        # a switch would leave Altium reading the PREVIOUS profile's parts.
+        self.ensure_derived_artifacts()
 
     def switch_library(self, new_root: Path) -> None:
         """Repoint the whole engine at a different library root (M9b onboarding / switch),
@@ -125,6 +219,8 @@ class AppContext:
         self.bom_cache.clear()
         self.config.libraries_root = str(new_root)
         self.config.save()
+        self.rewire_kicad()
+        self.ensure_derived_artifacts()
 
 
 def build_context(
@@ -182,6 +278,7 @@ def build_context(
         project_index=project_index,
         project_ops=project_ops,
         app_repo=app_repo,
+        kicad_dir_pinned=Path(kicad_dir) if kicad_dir is not None else None,
     )
     # Apply the configured GitHub credential to the library repo so push/pull authenticate
     # non-interactively (a recovery re-clone resets .git/config, so re-applying on every boot
@@ -191,5 +288,25 @@ def build_context(
 
         github_auth.configure(repo, getattr(config, "github_token", ""))
     except Exception:  # noqa: BLE001 - auth config is best-effort; never crash the context build
+        pass
+    # Build any DERIVED per-tool artifact this library needs on disk but does not share through
+    # git (today: Altium's SQLite data source). Doing it at boot is what keeps a fresh clone
+    # placeable now that the file is no longer committed.
+    ctx.ensure_derived_artifacts()
+    # Lazy STM index load: unlike `index`, no source is synced at launch, so this only picks
+    # up whatever derived index already sits on disk (default_index_path()). When nothing
+    # valid is on disk, the committed baked seed (stm/seed.py) is restored once and the load
+    # retried - the rev-stamp gate still decides; a stale seed is refused like any stale
+    # file. None remains a legitimate result (first run with no seed, a stamp mismatch on
+    # both paths, or corruption) - never treated as an error, and never blocks the boot.
+    try:
+        from stockroom.stm.db import StmIndex
+        from stockroom.stm.seed import restore_baked_index
+        from stockroom.stm.source import default_index_path
+
+        ctx.stm_index = StmIndex.load(default_index_path())
+        if ctx.stm_index is None and restore_baked_index(default_index_path()):
+            ctx.stm_index = StmIndex.load(default_index_path())
+    except Exception:  # noqa: BLE001 - a missing/stale/corrupt STM index must never break the boot
         pass
     return ctx

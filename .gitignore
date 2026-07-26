@@ -43,6 +43,63 @@ Thumbs.db
 docs/superpowers/
 docs/research/
 
+# GSD spec-driven-development working state: local only, never pushed (like docs/superpowers/)
+.planning/
+.gsd/
+
 # Derived, never-committed library artifacts (the SQLite indexes are in-memory; the enrich
 # cache is the one on-disk derived dir, written beside the in-repo library at <repo>/)
 /.stockroom-enrich-cache/
+/.stockroom-previews/
+.firecrawl/
+# The derived STM32 pinout/spec index RAW sqlite (config_dir()/stm/index.sqlite by default,
+# stays per-machine; the COMMITTED artifact is the compressed seed at data/stm/index.sqlite.xz,
+# outside the repo already; these are belt-and-suspenders for any in-repo fallback path)
+/.stockroom-stm-index/
+*.stm-index.sqlite
+# Derived Altium data sources, regenerated from the JSON records. NEITHER is committed.
+# The .DbLib was committed until 2026-07-26, on the premise that it is portable. It is not: its
+# ConnectionString names the SQLite file by an ABSOLUTE path (the SQLite ODBC driver resolves a
+# relative one against the process working directory, which is never the library folder, so Altium
+# answers it with "Connection Failed"). A committed copy is therefore one machine's file, and the
+# one in this repo had gone stale in exactly that way: it still carried the broken relative form
+# AND no key field, so a fresh clone got a library that connects to nothing and indexes nothing.
+# The .db was committed until 2026-07-25 so a fresh clone was placeable with no regenerate step.
+# That traded one benefit for a worse problem: SQLite stamps its own library version into the file
+# header, so two peers on different SQLite builds emit different bytes for identical content, and
+# two peers adding different parts produce genuinely unmergeable binaries carrying nothing the
+# records do not already hold. LibraryOps.ensure_altium_datasource now rebuilds it on boot and on
+# every profile switch, which keeps a fresh clone placeable without sharing the file.
+libraries/*/altium/*.xlsx
+libraries/*/altium/stockroom-parts.db
+libraries/*/altium/*.DbLib
+
+# Agent tooling: installed skills + SuperDesign workspace (never committed)
+.agents/
+.superdesign/
+/skills-lock.json
+
+# S8 cold-rebuild harness run outputs (local only)
+scripts/out/
+
+# Untracked, kept local (out of the repo, still on disk). library-v2.html stays tracked.
+docs/mockups/accent-direction.html
+docs/mockups/layout-direction.html
+docs/mockups/library-app.html
+docs/mockups/library-combined.html
+docs/mockups/projects.html
+docs/mockups/render-library-parts.html
+docs/Stockroom-Knowledge-Transfer.md
+docs/FINALE_SAUCE_BOM.md
+docs/FINALE_SAUCE_BOM.xlsx
+docs/FINALE_SAUCE_SOURCE.md
+# Superseded root launcher; the shipped one is stockroom.launcher (see packaging/).
+/launcher/
+tests/backend/api/test_launcher.py
+tests/backend/api/test_gitshim.py
+
+.planning/
+.gsd/
+
+# headless UI shot output
+build/shots/

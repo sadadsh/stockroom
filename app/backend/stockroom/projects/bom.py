@@ -26,7 +26,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from stockroom.projects import kibom
+from stockroom.projects import binding, kibom
 from stockroom.projects.identity import _PLACEHOLDERS, part_identity, strict_mpn
 from stockroom.sexp.document import SexpDocument, SexpNode
 
@@ -131,6 +131,76 @@ def _lead_weeks(v):
     return int(n)
 
 
+# -- Package / RoHS derivation (the wide-BOM columns, offline) ------------------
+
+# Two-terminal SMD body packages KiCad names without a size number (a diode's D_SMA), so the
+# package deriver can still resolve them past a single-letter device-class prefix.
+_SMD_BODY_PACKAGES = {"SMA", "SMB", "SMC", "MELF", "MINIMELF", "MICROMELF"}
+
+
+def package_from_footprint(footprint: str) -> str:
+    """A compact package code for the BOM's Package column, derived from a KiCad footprint
+    name offline (no network). A passive footprint (R_0603_1608Metric, R_0402) yields its
+    imperial EIA code (0603, 0402); an IC footprint (SOIC-8_3.9x4.9mm_P1.27mm, SOT-23) yields
+    its package family (SOIC-8, SOT-23). Returns "" when the name carries no recognizable
+    package (a blank is honest, never a guess); the library prefix (Resistor_SMD:) is stripped
+    first. Display-only, so it is never a grouping key."""
+    name = (footprint or "").split(":")[-1].strip()
+    if not name:
+        return ""
+    m = re.match(r"^[A-Za-z]+_(\d{3,5})(?:_|$)", name)  # R_0603_1608Metric / R_0402 -> imperial code
+    if m:
+        return m.group(1)
+    tokens = name.split("_")
+    first = tokens[0]
+    # A real package family carries a size number or a hyphen (SOT-23, SOIC-8, QFN-32, TO-92).
+    if re.search(r"[-\d]", first):
+        return first
+    # A single-letter device-class prefix (a diode's D_SOD-123 / D_SMA) hides the package in the
+    # next token; take it when it names a package (a hyphen/digit, or a known two-body SMD case).
+    if len(first) == 1 and len(tokens) > 1:
+        second = tokens[1]
+        if re.search(r"[-\d]", second) or second.upper() in _SMD_BODY_PACKAGES:
+            return second
+    # A bare word (Crystal, MountingHole) is not a package -> honest blank.
+    return ""
+
+
+# Spec values that read as RoHS compliant vs not, matched case-insensitively against the value
+# of any spec whose key names RoHS (Mouser "RoHS Status", LCSC compliance, a plain "RoHS" row).
+_ROHS_YES = ("compliant", "yes", "compatible", "lead free", "lead-free", "rohs3", "rohs 3")
+# Genuine non-compliance phrasing ONLY (not any "not"/"non" prefix, which also opens unknown
+# statuses like "Not Applicable"/"None" that must never be read as a hard "No").
+_ROHS_NO = ("non-compliant", "noncompliant", "not compliant", "non compliant")
+# Explicit "no verdict" statuses a distributor emits for a part with no RoHS data: unknown, not
+# a compliance verdict, so they map to blank rather than a fabricated Yes/No.
+_ROHS_UNKNOWN = {"none", "n/a", "na", "not applicable", "not specified", "not reviewed",
+                 "unknown", "tbd", "-"}
+
+
+def rohs_from_specs(specs) -> str:
+    """A compact RoHS verdict ("Yes" / "No" / "" ) for the BOM's RoHS column, read from a
+    part's specs dict (Mouser/LCSC label the compliance in a "RoHS"-named key). Compliant
+    values ("RoHS3 Compliant", "Lead Free", "Compliant", "Yes") map to "Yes"; genuinely
+    non-compliant values ("Non-Compliant", "Not Compliant") to "No"; a no-verdict status
+    ("Not Applicable", "None", "Unknown") or a missing/blank RoHS key to "" (unknown, never a
+    guessed compliance); any other value passes through verbatim."""
+    if not isinstance(specs, dict):
+        return ""
+    for key, val in specs.items():
+        if "rohs" in str(key).lower():
+            s = str(val or "").strip()
+            low = s.lower()
+            if not s or low in _ROHS_UNKNOWN:
+                return ""
+            if any(t in low for t in _ROHS_NO):
+                return "No"
+            if any(t in low for t in _ROHS_YES):
+                return "Yes"
+            return s
+    return ""
+
+
 # -- schematic read (Stockroom sexp, replacing fp_render.parse_sexpr) ----------
 
 
@@ -151,7 +221,7 @@ def _token_is_yes(node: SexpNode | None) -> bool:
     return val != "no"
 
 
-def _bom_components(sch_path) -> list:
+def _bom_components(sch_path, bindings=None) -> list:
     """Every real BOM component (ref, lib_id, props) in one .kicad_sch. Skips power / virtual
     symbols, in_bom=no / exclude_from_bom / dnp=yes parts, and the KiBoM exclude set
     (testpoints, fiducials, mounting holes, do-not-fit). [] for a non-schematic file. lib_id is
@@ -189,8 +259,71 @@ def _bom_components(sch_path) -> list:
             continue
         if kibom.is_do_not_fit(props):
             continue
-        out.append((ref, lib_id, props))
-    return out
+        uuid_node = node.find("uuid")
+        uuid = (uuid_node.children[1].value
+                if uuid_node is not None and len(uuid_node.children) > 1 else "")
+        out.append((ref, lib_id, props, uuid))
+    # A multi-unit symbol (an op-amp's A and B units) appears as SEPARATE (symbol)
+    # nodes sharing one Reference. That is ONE physical part: keep the first node per
+    # ref so qty counts components, never units (units carry identical properties).
+    seen_refs: set = set()
+    deduped = []
+    for ref, lib_id, props, uuid in out:
+        if ref in seen_refs:
+            continue
+        seen_refs.add(ref)
+        deduped.append({"ref": ref, "uuid": uuid, "lib_id": lib_id, "props": props})
+    # Resolve each placement's durable binding into its props BEFORE anything downstream tries to
+    # identify it, so `library_enrich` reads a decision the user already made rather than guessing
+    # again. The (ref, lib_id, props) triple the rest of the BOM speaks in has no room for a uuid,
+    # which is exactly why `binding.resolve` stamps the placement key into props.
+    binding.resolve(deduped, "kicad", stored=bindings)
+    return [(c["ref"], c["lib_id"], c["props"]) for c in deduped]
+
+
+def _altium_bom_components(sch_path, bindings=None) -> list:
+    """Every real BOM component (ref, lib_id, props) in one Altium .SchDoc, through the
+    same exclusion rules as the KiCad reader. The schdoc reader already collapses
+    multi-part unit placements to one physical component. Props carry the placed
+    parameter set (a DbLib placement carries every Stockroom column: MPN,
+    Manufacturer, Description, ...) plus Reference and the current PCBLIB footprint;
+    DesignItemId (the DbLib item, i.e. the Stockroom MPN) backfills a missing MPN.
+    lib_id is `altium:<LibReference>` so grouping and library matching read the symbol
+    name exactly like a KiCad lib_id."""
+    from stockroom.altium.schdoc import read_schdoc_components
+
+    out = []
+    for c in read_schdoc_components(sch_path):
+        ref = c["designator"]
+        if not ref:
+            continue
+        props = dict(c["params"])
+        props["Reference"] = ref
+        if not (props.get("Footprint") or "").strip():
+            props["Footprint"] = c["footprint"]
+        if not (props.get("MPN") or "").strip() and (c["design_item_id"] or "").strip():
+            props["MPN"] = c["design_item_id"]
+        lib_id = f"altium:{c['lib_ref']}" if c["lib_ref"] else ""
+        part_name = lib_id.split(":")[-1]
+        if kibom.is_excluded(ref, part_name, props.get("Footprint", "")):
+            continue
+        if kibom.is_do_not_fit(props):
+            continue
+        out.append({"ref": ref, "uuid": c.get("unique_id", ""), "lib_id": lib_id, "props": props})
+    # Stockroom never writes a .SchDoc, so an Altium binding lives on the project record and is
+    # passed in; a component placed from Stockroom's own DbLib already carries it as a parameter.
+    binding.resolve(out, "altium", stored=bindings)
+    return [(c["ref"], c["lib_id"], c["props"]) for c in out]
+
+
+def _components_for_sheet(sch_path, bindings=None) -> list:
+    """Dispatch a sheet to its EDA's reader by extension: .SchDoc reads through the
+    Altium binary reader, everything else through the KiCad sexp reader (which
+    honestly returns [] for a non-schematic). `bindings` is the project record's stored
+    placement bindings for tools whose design files Stockroom cannot write."""
+    if str(sch_path).lower().endswith(".schdoc"):
+        return _altium_bom_components(sch_path, bindings)
+    return _bom_components(sch_path, bindings)
 
 
 # -- grouping (the app's MPN-primary logic + KiBoM value-normalization) --------
@@ -235,9 +368,14 @@ def _bom_from_components(comps, lookup=None,
             "mpn": smpn, "manufacturer": ident["manufacturer"],
             "datasheet": ident["datasheet"], "description": ident["description"],
             "value": props.get("Value", ""), "footprint": props.get("Footprint", ""),
-            "part_name": part_name, "refs": []})
+            "part_name": part_name, "library_part_id": "", "refs": []})
         if not g["part_name"] and part_name:  # prefer the first non-blank symbol name in the group
             g["part_name"] = part_name
+        # A line is "in library" if any of its components was matched to a library part
+        # (stamped by library_enrich); the first such id represents the line (D1).
+        lib_pid = props.get("_sr_library_part_id", "")
+        if lib_pid and not g["library_part_id"]:
+            g["library_part_id"] = lib_pid
         g["refs"].append(ref)
 
     if lookup:
@@ -257,7 +395,14 @@ def _bom_from_components(comps, lookup=None,
                      "has_real_mpn": bool(g["mpn"]),
                      "footprint": g["footprint"], "datasheet": g["datasheet"] or "",
                      "description": g["description"] or "", "part_name": g["part_name"] or "",
-                     "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"])})
+                     # Wide-BOM columns: package is derived offline from the footprint as a
+                     # baseline (an authoritative enrich/library package overrides it below);
+                     # rohs/category start blank and fill from the enrich layer or the library.
+                     "package": package_from_footprint(g["footprint"]), "rohs": "", "category": "",
+                     "basic": is_basic_part(refs[0] if refs else "", g["value"], g["mpn"]),
+                     # D1 coverage: is this line's part in the shared library, and which one.
+                     "in_library": bool(g["library_part_id"]),
+                     "library_part_id": g["library_part_id"]})
     rows.sort(key=lambda r: (r["value"].lower(), r["footprint"].lower(),
                              _natural_ref(r["refs"][0]) if r["refs"] else ("", 0)))
 
@@ -306,6 +451,10 @@ def library_enrich(comps, match_index):
                 for ch in fill.proposed_changes(match["part"], props):
                     if ch["kind"] == "fill":  # blanks only, never an overwrite
                         enriched[ch["prop"]] = ch["new"]
+                # Record WHICH library part covered this component (D1) so the BOM line can
+                # flag coverage, not just fill blanks. A reserved key the line builder reads.
+                # The match index holds plain dicts (from fill.library_match_records).
+                enriched["_sr_library_part_id"] = match["part"].get("id", "")
         out.append((ref, lib_id, enriched))
     return out
 
@@ -351,7 +500,58 @@ def library_price_index(library_parts) -> dict:
             entry["description"] = p.description
         if best is not None and getattr(best, "url", ""):
             entry["url"] = best.url
+        # Wide-BOM columns from the part's captured specs / category, so a library-priced line
+        # carries its package + RoHS + category without a network round-trip.
+        specs = getattr(p, "specs", None)
+        if isinstance(specs, dict):
+            pkg = str(specs.get("Package") or "").strip()
+            if pkg:
+                entry["package"] = pkg
+            rohs = rohs_from_specs(specs)
+            if rohs:
+                entry["rohs"] = rohs
+            # v2 Mouser-page import fields captured as specs: the manufacturing origin, the
+            # page's own effective US import-tariff % (drives the per-line tariff math), and the
+            # lifecycle. Only non-blank values are threaded, so a part without them degrades honestly.
+            coo = str(specs.get("Country of Origin") or "").strip()
+            if coo:
+                entry["country_of_origin"] = coo
+            tariff = specs.get("US Tariff %")
+            if tariff not in (None, ""):
+                entry["tariff_rate"] = tariff
+            lifecycle = str(specs.get("Lifecycle") or "").strip()
+            if lifecycle:
+                entry["lifecycle"] = lifecycle
+        if getattr(p, "category", ""):
+            entry["category"] = p.category
         index[mpn] = entry
+    return index
+
+
+def library_spec_index(library_parts) -> dict:
+    """mpn -> {package, rohs, category} from a library part's captured specs + category, so a
+    BOM line matched to a library part surfaces those wide-table columns even when the line is
+    UNPRICED (library_price_index only indexes priced parts). Only non-blank fields are emitted;
+    a part with no MPN, or nothing to contribute, is skipped."""
+    index: dict = {}
+    for p in (library_parts or ()):
+        mpn = (getattr(p, "mpn", "") or "").strip()
+        if not mpn:
+            continue
+        specs = getattr(p, "specs", None)
+        entry: dict = {}
+        if isinstance(specs, dict):
+            pkg = str(specs.get("Package") or "").strip()
+            if pkg:
+                entry["package"] = pkg
+            rohs = rohs_from_specs(specs)
+            if rohs:
+                entry["rohs"] = rohs
+        cat = (getattr(p, "category", "") or "").strip()
+        if cat:
+            entry["category"] = cat
+        if entry:
+            index[mpn] = entry
     return index
 
 
@@ -375,7 +575,7 @@ def combined_price_lookup(library_parts, enrich_lookup=None):
 
 def bom_from_project(sch_paths, lookup=None,
                      enrich_fields=("manufacturer", "datasheet", "description"),
-                     price_lookup=None, library_index=None) -> dict:
+                     price_lookup=None, library_index=None, bindings=None) -> dict:
     """A single BOM merged across EVERY sheet of a project (not just the root),
     grouping identical parts with summed quantity. Priced when `price_lookup` is given.
     When `library_index` is given, each component's blank identity fields are first filled
@@ -383,9 +583,13 @@ def bom_from_project(sch_paths, lookup=None,
     comps = []
     for p in (sch_paths or []):
         try:
-            comps.extend(_bom_components(p))
+            comps.extend(_components_for_sheet(p, bindings))
         except Exception:  # noqa: BLE001 - an unreadable sheet drops out, never crashes the build
             continue
+    # Units of one multi-unit component can live on DIFFERENT pages; references are
+    # project-unique, so a ref seen again on a later sheet is the same physical part.
+    seen_refs: set = set()
+    comps = [c for c in comps if not (c[0] in seen_refs or seen_refs.add(c[0]))]
     if library_index:
         comps = library_enrich(comps, library_index)
     return _bom_from_components(comps, lookup, enrich_fields, price_lookup=price_lookup)
@@ -590,6 +794,146 @@ def line_extended(unit_price, qty):
     return round(p * q, 4) if (p is not None and q) else None
 
 
+def _coerce_rate(v) -> float:
+    """A tax/tariff percentage ('8.25', '8.25%', 8.25, None) -> a non-negative float,
+    or 0.0 when unparseable (a rate we cannot read never inflates a total)."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v) if v >= 0 else 0.0
+    s = str(v).strip().rstrip("%").replace(",", "")
+    try:
+        r = float(s)
+    except (TypeError, ValueError):
+        return 0.0
+    return r if r >= 0 else 0.0
+
+
+def line_moq(price_breaks) -> int | None:
+    """A line's minimum order quantity: the smallest quantity on its price ladder (the
+    fewest a distributor will sell). None when the ladder is empty or unparseable (an
+    unpriced or value-only part has no MOQ)."""
+    if not price_breaks:
+        return None
+    try:
+        qtys = [int(b["qty"]) for b in price_breaks]
+    except (TypeError, ValueError, KeyError):
+        return None
+    return min(qtys) if qtys else None
+
+
+def price_line_at_build(row, build_qty, tax_rate=0.0, optimize_breaks=True) -> dict:
+    """The order economics for ONE BOM line at a build of `build_qty` boards, taxed at
+    `tax_rate` percent. Pure: never mutates `row`. Returns:
+      moq              the smallest price-break quantity (the minimum orderable), or None
+      final_qty        per_board_qty * build_qty, RAISED to the MOQ (you cannot order
+                       fewer than the minimum), unit-priced at that quantity
+      final_unit_price the ladder price at final_qty (a bigger run buys a cheaper break),
+                       else the stored qty-1 unit_price; None when the line is unpriced
+      final_extended   final_unit_price * final_qty; None when unpriced
+      tax_tariff       final_extended * tax_rate / 100; None when unpriced
+      line_total       final_extended + tax_tariff; None when unpriced
+    """
+    per_board = _bom_line_qty(row)
+    build = _board_count(build_qty)
+    needed = per_board * build
+    ladder = row.get("price_breaks")
+    moq = line_moq(ladder)
+
+    final_qty = needed
+    if needed > 0 and moq is not None and moq > needed:
+        final_qty = moq  # round up to the minimum order
+
+    # Price-break optimization: order MORE than needed when a higher break makes the TOTAL
+    # cost lower (a steep quantity discount can beat ordering the exact count). We compare the
+    # total (qty * unit at that qty) at `final_qty` against each break quantity above it, and
+    # take the cheapest total. Because it minimizes TOTAL (not unit) cost, it never overbuys for
+    # a trivial saving: a far-larger break whose total exceeds the smaller run is not chosen.
+    if optimize_breaks and ladder and final_qty > 0:
+        best_qty = final_qty
+        best_unit = _coerce_price(price_at_qty(ladder, final_qty))
+        best_total = best_unit * final_qty if best_unit is not None else None
+        for b in ladder:
+            try:
+                bq = int(b["qty"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if bq <= final_qty:
+                continue  # only consider ordering MORE than the needed/MOQ quantity
+            bu = _coerce_price(price_at_qty(ladder, bq))
+            if bu is None:
+                continue
+            bt = bu * bq
+            if best_total is None or bt < best_total:
+                best_qty, best_total = bq, bt
+        final_qty = best_qty
+
+    unit = _coerce_price(price_at_qty(ladder, final_qty)) if ladder else None
+    if unit is None:
+        unit = _coerce_price(row.get("unit_price"))
+    extended = round(unit * final_qty, 4) if (unit is not None and final_qty) else None
+
+    # A per-part tariff overrides the blanket project rate for THIS line (some parts carry a
+    # country-of-origin tariff others do not). A row-level tariff_rate wins when set; otherwise
+    # the project-wide rate applies. So a mixed order taxes each line at its own rate.
+    line_tariff = row.get("tariff_rate")
+    rate = _coerce_rate(line_tariff if line_tariff not in (None, "") else tax_rate)
+    tax = round(extended * rate / 100.0, 4) if extended is not None else None
+    total = round(extended + tax, 4) if extended is not None else None
+    return {
+        "moq": moq,
+        "final_qty": final_qty,
+        "final_unit_price": unit,
+        "final_extended": extended,
+        "tax_tariff": tax,
+        "line_total": total,
+    }
+
+
+def bom_build_rollup(rows, build_qty, tax_rate=0.0) -> dict:
+    """Roll a priced BOM up for a build of `build_qty` boards taxed at `tax_rate`%: the
+    subtotal (sum of every priced line's final_extended), the tax/tariff total on that
+    subtotal, and the grand total, plus priced/unpriced counts. Pure. Mirrors
+    price_line_at_build so the roll-up and the per-line columns always agree."""
+    build = _board_count(build_qty)
+    rate = _coerce_rate(tax_rate)
+    subtotal = 0.0
+    tax_total = 0.0
+    priced = unpriced = 0
+    for r in rows:
+        line = price_line_at_build(r, build, rate)
+        if line["final_extended"] is None:
+            unpriced += 1
+        else:
+            subtotal += line["final_extended"]
+            # Sum each line's OWN tax (its per-part tariff when set, else the blanket rate), so a
+            # mixed-tariff order rolls up correctly - not one rate applied to the whole subtotal.
+            tax_total += line["tax_tariff"] or 0.0
+            priced += 1
+    subtotal = round(subtotal, 2)
+    tax_total = round(tax_total, 2)
+    return {
+        "build_qty": build,
+        "tax_rate": rate,
+        "subtotal": subtotal,
+        "tax_total": tax_total,
+        "grand_total": round(subtotal + tax_total, 2),
+        "priced_lines": priced,
+        "unpriced_lines": unpriced,
+        "currency": "USD",
+    }
+
+
+def annotate_build_pricing(rows, boards=1, tax_rate=0.0) -> dict:
+    """Attach the per-line build economics (moq / final_qty / final_unit_price /
+    final_extended / tax_tariff / line_total) to each row IN PLACE for a build of `boards`
+    boards taxed at `tax_rate`%, and return the roll-up. The single place the per-line
+    columns and the roll-up are computed, so the table and the totals always agree."""
+    for r in rows:
+        r.update(price_line_at_build(r, boards, tax_rate))
+    return bom_build_rollup(rows, boards, tax_rate)
+
+
 def bom_cost_summary(rows) -> dict:
     """Roll up a BOM's line costs. Sums the extended cost of every PRICED line and
     counts unpriced lines separately, so a partial total is never mistaken for the whole.
@@ -719,7 +1063,20 @@ def _price_rows(rows, price_lookup, qty_key: str):
             r["lifecycle"] = res.get("lifecycle")
         if res.get("lead_time") not in (None, ""):
             r["lead_time"] = res.get("lead_time")
-        for k in ("source", "lcsc_pn", "mouser_pn", "digikey_pn", "url", "category"):
+        # The enrich spec-table package (Mouser/LCSC) is authoritative, so it OVERRIDES the
+        # footprint-derived baseline; rohs/category only fill a value the row does not carry.
+        if res.get("package"):
+            r["package"] = res["package"]
+        # The part's own effective import tariff drives the per-line tariff math (_annotate_pricing
+        # reads row["tariff_rate"]); without threading it here the enriched specs["US Tariff %"]
+        # never reaches the cost and every line silently falls back to the blanket project rate.
+        # An explicit None/"" guard (not truthiness) so a confirmed 0.0 (US-origin no-tariff) still
+        # propagates rather than being read as "unknown".
+        if res.get("tariff_rate") not in (None, ""):
+            r["tariff_rate"] = res["tariff_rate"]
+        if res.get("country_of_origin") and not r.get("country_of_origin"):
+            r["country_of_origin"] = res["country_of_origin"]
+        for k in ("source", "lcsc_pn", "mouser_pn", "digikey_pn", "url", "category", "rohs"):
             v = res.get(k)
             if v and not r.get(k):
                 r[k] = v
@@ -818,6 +1175,17 @@ def enrichment_to_bom_lookup(result) -> dict | None:
         out["datasheet"] = _val(result.datasheet_url)
     if result.description is not None:
         out["description"] = _val(result.description)
+    # Wide-BOM columns: package (from the distributor's spec table, authoritative), the RoHS
+    # verdict (from a RoHS-named spec) and the enrich category. Each emitted only when present.
+    if result.package is not None:
+        pkg = _val(result.package)
+        if pkg:
+            out["package"] = pkg
+    rohs = rohs_from_specs({k: _val(v) for k, v in (result.specs or {}).items()})
+    if rohs:
+        out["rohs"] = rohs
+    if result.category:
+        out["category"] = result.category
     # M7d procurement fields the sourcing-risk + export layer reads off the priced row.
     if result.lifecycle is not None:
         out["lifecycle"] = _val(result.lifecycle)
@@ -862,8 +1230,8 @@ def _bom_state(line_count: int, priced: bool, summary: dict) -> str:
     return "costed"
 
 
-def project_bom(root, pro_path, sheet_paths, name="", boards=1,
-                price_lookup=None, progress=None, library_parts=None) -> dict:
+def project_bom(root, pro_path, sheet_paths, name="", boards=1, tax_rate=0.0,
+                price_lookup=None, progress=None, library_parts=None, bindings=None) -> dict:
     """Build a grouped, optionally priced BOM for a registered project (M7c), combining the KiCad
     schematic with the Stockroom library (M7c library-combining).
 
@@ -903,8 +1271,21 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
         return wrapped
 
     lookup = _priced_progress(combined) if priced else None
-    built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index)
+    built = bom_from_project(abs_sheets, price_lookup=lookup, library_index=match_index,
+                             bindings=bindings)
     rows = built["rows"]
+
+    # Fill each line's still-blank wide-BOM columns (package / rohs / category) from its matching
+    # library part's captured specs, so a library-matched line surfaces them even when unpriced
+    # (the enrich layer already overrode package + filled rohs/category for a priced line above).
+    if parts:
+        spec_index = library_spec_index(parts)
+        for r in rows:
+            entry = spec_index.get((r.get("mpn") or "").strip())
+            if entry:
+                for k, v in entry.items():
+                    if v and not r.get(k):
+                        r[k] = v
 
     n = _board_count(boards)
     summary = bom_cost_summary(rows)
@@ -920,11 +1301,24 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
     summary["state"] = _bom_state(built["line_count"], priced, summary)
     summary["priced"] = priced
 
+    # Attach the per-line build economics (MOQ, final order qty, unit cost at that qty,
+    # cost@qty, tax/tariff, line total) and the priced roll-up. Annotated for every build,
+    # priced or not, so the quantity columns show even when a line is unpriced.
+    rate = _coerce_rate(tax_rate)
+    build = annotate_build_pricing(rows, n, rate)
+
+    # Fold the procurement view onto the one BOM: each line gets a stock_risk + orderable and
+    # the result carries the risk/lead roll-ups, so the wide table + its risk headline read a
+    # single source (local import breaks the bom<->procurement import cycle).
+    from stockroom.projects.procurement import annotate_procurement_fields
+    proc = annotate_procurement_fields(rows, n)
+
     _p(95, "Summarizing")
     return {
         "project": name,
         "ran_at": _utc_now_iso(),
         "boards": n,
+        "tax_rate": rate,
         "priced": priced,
         "line_count": built["line_count"],
         "component_count": built["component_count"],
@@ -932,4 +1326,46 @@ def project_bom(root, pro_path, sheet_paths, name="", boards=1,
         "summary": summary,
         "by_source": bom_cost_by_source(rows, n) if priced else None,
         "cost_at_qty": bom_cost_at_qty(rows, n) if (priced and n > 1) else None,
+        "build": build,
+        "risks": proc["risks"],
+        "lead": proc["lead"],
     }
+
+
+def reprice_bom(bom_result, boards, tax_rate=0.0) -> dict:
+    """Re-cost an EXISTING BOM result for a new build quantity + tax/tariff rate, PURELY
+    over its already-built lines (their stored price_breaks) - no schematic re-read, no
+    network. Returns a NEW result dict with re-annotated lines, an updated build roll-up,
+    boards, tax_rate, and the scaled summary/by_source/cost_at_qty. The cached BOM's raw
+    lines are the source of truth; only the quantity + tax math changes."""
+    n = _board_count(boards)
+    rate = _coerce_rate(tax_rate)
+    result = dict(bom_result)
+    rows = [dict(r) for r in (bom_result.get("lines") or [])]
+    priced = bool(bom_result.get("priced"))
+
+    build = annotate_build_pricing(rows, n, rate)
+    summary = bom_cost_summary(rows)
+    if priced and n > 1:
+        at_qty = bom_cost_at_qty(rows, n)
+        summary["total_cost"] = at_qty["total_cost"]
+        summary["priced_lines"] = at_qty["priced_lines"]
+        summary["unpriced_lines"] = at_qty["unpriced_lines"]
+    summary["state"] = _bom_state(len(rows), priced, summary)
+    summary["priced"] = priced
+
+    # Re-fold procurement over the re-costed lines: the stock-risk verdict depends on the build
+    # quantity, so a reprice must recompute it (and the roll-ups) or the table would go stale.
+    from stockroom.projects.procurement import annotate_procurement_fields
+    proc = annotate_procurement_fields(rows, n)
+
+    result["lines"] = rows
+    result["boards"] = n
+    result["tax_rate"] = rate
+    result["summary"] = summary
+    result["by_source"] = bom_cost_by_source(rows, n) if priced else None
+    result["cost_at_qty"] = bom_cost_at_qty(rows, n) if (priced and n > 1) else None
+    result["build"] = build
+    result["risks"] = proc["risks"]
+    result["lead"] = proc["lead"]
+    return result

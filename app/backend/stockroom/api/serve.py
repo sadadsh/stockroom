@@ -9,7 +9,8 @@ import socket
 import subprocess
 from pathlib import Path
 
-from stockroom.api.context import AppContext, build_context as _build_context
+from stockroom.api.context import AppContext
+from stockroom.api.context import build_context as _build_context
 from stockroom.api.security import mint_token
 from stockroom.store.machine_config import MachineConfig
 
@@ -45,6 +46,20 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
         from stockroom.store.onboarding import bootstrap_library
 
         libraries_root = bootstrap_library(config)
+    else:
+        # A provided library may not carry this machine's active-profile name (a config from
+        # another machine, or a retired/renamed profile - e.g. the old "Main" after it is
+        # deleted). Repair it to a profile that actually exists here so the immediately-following
+        # _build_context never 404s the profile - the same drift repair bootstrap_library does.
+        from stockroom.store.profile import ProfileStore
+        from stockroom.vcs.repo import GitError, GitRepo
+
+        try:
+            names = ProfileStore(Path(libraries_root), GitRepo(Path(libraries_root))).list()
+            if names and config.active_profile not in names:
+                config.active_profile = names[0]
+        except GitError:
+            pass
     ctx = _build_context(libraries_root, kicad_dir=kicad_dir, config=config, token=mint_token())
     # Attach the app-repo GitRepo + a real uv_sync runner for the self-updater. The
     # app repo (this file's repo) is distinct from the library repo the context
@@ -60,6 +75,26 @@ def build_context(libraries_root: Path | None = None, kicad_dir: Path | None = N
         # surfaces the state honestly rather than crashing the whole bootstrap.
         pass
     ctx.uv_sync = _uv_sync
+    # S5: the real app renders JS distributor pages through the portable, stealthed,
+    # anti-ban-governed headless Chromium engine (retires the HTTP-only default and the
+    # never-shipped WebView2 seam). Lazy: Chromium only launches on the first render, so
+    # boot stays fast and a machine that never enriches never starts a browser.
+    import atexit
+
+    from stockroom.enrich.scrape_adapter import default_rendered_dom_fetcher
+
+    _fetcher = default_rendered_dom_fetcher(Path(ctx.enrich_cache_dir) / "rendered")
+    ctx.rendered_dom_fetcher = _fetcher
+    # Best-effort: close the render runtime (browser + node driver) on a normal quit or a
+    # self-update restart, so a headless Chromium is not orphaned. The runtime is a daemon
+    # thread, so this is a courtesy, not required for a hard kill.
+    atexit.register(_fetcher.close)
+    # Wire KiCad at the active library on every real boot (both entries - the
+    # windowed host and standalone serve - build their context here), so the
+    # library is visible in KiCad without the manual Doctor click. rewire_kicad
+    # never raises: it skips when KiCad is absent and captures failures into
+    # ctx.last_wiring, which Settings surfaces honestly.
+    ctx.rewire_kicad()
     return ctx
 
 

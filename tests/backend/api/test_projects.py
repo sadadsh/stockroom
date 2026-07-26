@@ -7,6 +7,8 @@ No em dashes anywhere (standing owner rule)."""
 
 from __future__ import annotations
 
+from tests.backend.api.conftest import _drain_job
+
 # a single unannotated resistor symbol with an empty Footprint: yields both an
 # `unannotated` (R? reference) and a `no_footprint` finding when audited.
 _UNANNOTATED = (
@@ -36,6 +38,17 @@ def _register(client, root) -> dict:
     return r.json()
 
 
+def _git_init_commit(root):
+    """Give an external project dir its OWN git repo with everything committed, which is the state
+    every project write requires (the commit-time gate refuses a project with no git_root)."""
+    from stockroom.vcs.repo import GitRepo
+
+    repo = GitRepo(root)
+    repo.init()
+    repo.commit("seed", sorted(p for p in root.iterdir() if p.is_file()))
+    return repo
+
+
 # ---- list -------------------------------------------------------------------
 
 
@@ -60,6 +73,7 @@ def test_list_returns_registered_projects_as_summaries(client, tmp_path):
         "id",
         "name",
         "root",
+        "eda",
         "board_count",
         "sheet_count",
         "has_git",
@@ -405,6 +419,35 @@ def test_get_bom_for_an_unknown_project_is_a_404(client):
     assert client.get("/api/projects/nope/bom").status_code == 404
 
 
+def test_reprice_bom_recosts_the_cached_build_for_a_new_qty_and_tax(client, app_ctx, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    app_ctx.bom_cache[rec["id"]] = {
+        "project": rec["name"], "ran_at": "t", "boards": 1, "priced": True,
+        "line_count": 1, "component_count": 1,
+        "lines": [{"mpn": "X", "qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]}],
+        "summary": {"priced": True}, "by_source": None, "cost_at_qty": None,
+    }
+    body = client.post(
+        f"/api/projects/{rec['id']}/bom/reprice", json={"boards": 10, "tax_rate": 8.25}
+    ).json()
+    assert body["boards"] == 10 and body["tax_rate"] == 8.25
+    line = body["lines"][0]
+    assert line["final_qty"] == 100 and line["final_extended"] == 5.0
+    assert body["build"]["grand_total"] == round(5.0 + 5.0 * 8.25 / 100, 2)
+    # re-cached so a subsequent GET / procurement sees the same numbers
+    assert app_ctx.bom_cache[rec["id"]]["boards"] == 10
+
+
+def test_reprice_bom_before_a_build_is_an_honest_not_built_shape(client, tmp_path):
+    rec = _register(client, _make_project(tmp_path / "ext" / "board"))
+    body = client.post(f"/api/projects/{rec['id']}/bom/reprice", json={"boards": 5}).json()
+    assert body["ran_at"] is None and body["lines"] == [] and body["build"] is None
+
+
+def test_reprice_bom_for_an_unknown_project_is_a_404(client):
+    assert client.post("/api/projects/nope/bom/reprice", json={}).status_code == 404
+
+
 def test_delete_evicts_the_cached_bom(client, app_ctx, tmp_path, monkeypatch):
     monkeypatch.setattr(
         "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _FakePipeline()
@@ -457,43 +500,6 @@ class _ProcPipeline:
             r.lead_time = Sourced("18 Weeks", "mouser", "high")
             r.price_breaks = [PriceBreak(qty=1, price=1.25)]
         return r
-
-
-def test_get_procurement_before_a_build_is_an_honest_not_built_shape(client, tmp_path):
-    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
-    body = client.get(f"/api/projects/{rec['id']}/procurement").json()
-    assert body["built"] is False
-    assert body["lines"] == []
-    assert body["risks"]["any"] is False
-    assert body["lead"]["any"] is False
-
-
-def test_get_procurement_after_a_build_reports_risk_and_lead(client, app_ctx, tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "stockroom.api.routers.enrich._make_pipeline", lambda ctx: _ProcPipeline()
-    )
-    rec = _register(client, _make_project(tmp_path / "ext" / "board", _IC_AND_PASSIVE))
-    _stream_job_result(client, client.post(f"/api/projects/{rec['id']}/bom").json()["job_id"])
-
-    body = client.get(f"/api/projects/{rec['id']}/procurement").json()
-    assert body["built"] is True
-    assert body["priced"] is True
-    by_mpn = {ln["mpn"]: ln for ln in body["lines"]}
-    assert by_mpn["TPS2121RUXR"]["stock_risk"]["kind"] == "err"  # 0 stock
-    assert by_mpn["TPS2121RUXR"]["orderable"] is False
-    assert body["risks"]["not_active"] == 1  # NRND
-    assert body["risks"]["no_stock"] == 1
-    assert "TPS2121RUXR" in body["risks"]["risky_mpns"]
-    assert body["lead"]["max_weeks"] == 18
-    assert body["lead"]["critical_mpn"] == "TPS2121RUXR"
-    assert body["summary"].startswith("BOM: ")
-
-
-def test_get_procurement_for_an_unknown_project_is_a_404(client):
-    assert client.get("/api/projects/nope/procurement").status_code == 404
-
-
-# ---- exports (M7d) ----------------------------------------------------------
 
 
 def _build_bom(client, monkeypatch, tmp_path, pipeline_cls):
@@ -1094,7 +1100,6 @@ def test_projects_requires_a_token(anon_client):
     assert anon_client.post("/api/projects/x/checks").status_code == 401
     assert anon_client.post("/api/projects/x/bom").status_code == 401
     assert anon_client.get("/api/projects/x/bom").status_code == 401
-    assert anon_client.get("/api/projects/x/procurement").status_code == 401
     assert anon_client.get("/api/projects/x/bom/export").status_code == 401
     assert anon_client.get("/api/projects/x/revisions").status_code == 401
     assert anon_client.get("/api/projects/x/bom/diff").status_code == 401
@@ -1632,8 +1637,9 @@ def _make_board_project(dir_path):
     board and fab export has something to plot."""
     dir_path.mkdir(parents=True, exist_ok=True)
     (dir_path / "board.kicad_pro").write_text("{}", encoding="utf-8")
-    (dir_path / "board.kicad_pcb").write_text(
-        _FIXTURE_PCB.read_text(encoding="utf-8"), encoding="utf-8")
+    # copy the fixture BYTE-for-byte (write_text would translate LF to CRLF on Windows and
+    # drift from the served bytes / the byte-preserving layer); a real KiCad board is LF.
+    (dir_path / "board.kicad_pcb").write_bytes(_FIXTURE_PCB.read_bytes())
     return dir_path
 
 
@@ -1723,7 +1729,8 @@ def test_project_file_returns_the_registered_board_bytes(client, tmp_path):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
     r = client.get(f"/api/projects/{rec['id']}/file", params={"path": "board.kicad_pcb"})
     assert r.status_code == 200
-    assert r.text == _FIXTURE_PCB.read_text(encoding="utf-8")
+    # the endpoint serves the exact file bytes; compare bytes, not newline-normalized text
+    assert r.content == _FIXTURE_PCB.read_bytes()
 
 
 def test_project_file_rejects_an_unregistered_path_as_404(client, tmp_path):
@@ -1753,3 +1760,304 @@ def test_project_file_requires_the_token(anon_client, client, tmp_path):
     rec = _register(client, _make_board_project(tmp_path / "brd"))
     assert anon_client.get(f"/api/projects/{rec['id']}/file",
                            params={"path": "board.kicad_pcb"}).status_code == 401
+
+
+# ---- EDA-neutral projects: Altium registration + per-EDA capabilities --------
+
+
+def _make_altium_api_project(dir_path, name="Amp", blocks=None):
+    from tests.backend.projects.test_bom import _write_schdoc
+
+    dir_path.mkdir(parents=True, exist_ok=True)
+    (dir_path / f"{name}.PrjPcb").write_text(
+        f"[Design]\nVersion=1.0\n\n[Document1]\nDocumentPath={name}.SchDoc\n",
+        encoding="utf-8",
+    )
+    _write_schdoc(
+        dir_path / f"{name}.SchDoc",
+        *(blocks if blocks is not None else [
+            {"designator": "U1", "lib_ref": "LM358",
+             "params": {"MPN": "LM358DR", "Manufacturer": "TI", "Value": "LM358DR",
+                        "Datasheet": "https://ti.com/lm358.pdf",
+                        "Description": "Dual op-amp"},
+             "footprint": "SOIC-8"},
+        ]),
+    )
+    return dir_path
+
+
+def test_register_detects_an_altium_project(client, tmp_path):
+    proj = _make_altium_api_project(tmp_path / "ext" / "amp")
+    rec = _register(client, proj)
+    assert rec["eda"] == "altium"
+    assert rec["pro_path"] == "Amp.PrjPcb"
+    assert rec["sheet_paths"] == ["Amp.SchDoc"]
+    row = client.get("/api/projects").json()[0]
+    assert row["eda"] == "altium"
+
+
+def test_register_an_ambiguous_dir_needs_an_explicit_eda(client, tmp_path):
+    proj = _make_project(tmp_path / "ext" / "board")
+    _make_altium_api_project(proj, name="board")
+    r = client.post("/api/projects", json={"root": proj.as_posix()})
+    assert r.status_code == 400
+    assert "both" in r.json()["detail"]
+    r = client.post("/api/projects", json={"root": proj.as_posix(), "eda": "altium"})
+    assert r.status_code == 200
+    assert r.json()["eda"] == "altium"
+
+
+def test_project_detail_carries_capabilities_per_eda(client, tmp_path):
+    kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    k = client.get(f"/api/projects/{kicad['id']}").json()
+    a = client.get(f"/api/projects/{altium['id']}").json()
+    assert "checks" in k["capabilities"] and "setup" in k["capabilities"]
+    assert "bom" in a["capabilities"] and "audit" in a["capabilities"]
+    for kicad_only in ("checks", "fab", "setup", "netclasses", "prepare", "viewer"):
+        assert kicad_only not in a["capabilities"]
+
+
+def test_audit_reads_an_altium_project(client, tmp_path):
+    proj = _make_altium_api_project(
+        tmp_path / "ext" / "amp",
+        blocks=[
+            {"designator": "U1", "lib_ref": "LM358",
+             "params": {"MPN": "LM358DR", "Manufacturer": "TI"}, "footprint": "SOIC-8"},
+            {"designator": "R?", "lib_ref": "RES", "params": {"Value": "10k"}},
+        ],
+    )
+    rec = _register(client, proj)
+    au = client.get(f"/api/projects/{rec['id']}/audit").json()
+    assert au["components"] == 2
+    kinds = {f["kind"] for f in au["findings"]}
+    assert "unannotated" in kinds
+
+
+def test_kicad_only_endpoints_are_an_honest_400_for_an_altium_project(client, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    pid = rec["id"]
+    gated = [
+        ("post", f"/api/projects/{pid}/checks", {}),
+        ("get", f"/api/projects/{pid}/checks", None),
+        ("get", f"/api/projects/{pid}/fab", None),
+        ("get", f"/api/projects/{pid}/design", None),
+        ("get", f"/api/projects/{pid}/settings", None),
+        ("get", f"/api/projects/{pid}/fields", None),
+        ("get", f"/api/projects/{pid}/conform", None),
+        ("get", f"/api/projects/{pid}/stackup", None),
+        ("get", f"/api/projects/{pid}/prepare", None),
+        ("post", f"/api/projects/{pid}/prepare", {}),
+    ]
+    for method, path, body in gated:
+        fn = getattr(client, method)
+        r = fn(path, json=body) if body is not None else fn(path)
+        assert r.status_code == 400, (path, r.status_code, r.text)
+        assert "Altium" in r.json()["detail"], path
+
+
+def test_buildability_for_an_altium_project_skips_erc_drc_honestly(client, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    v = client.get(f"/api/projects/{rec['id']}/buildability").json()
+    # ERC/DRC run inside Altium, not here: the signal says not_applicable and never
+    # blocks, while the BOM cold cache still does.
+    assert v["signals"]["checks"]["state"] == "not_applicable"
+    kinds = {b["kind"] for b in v["blockers"]}
+    assert "checks_not_run" not in kinds
+    assert "bom_not_built" in kinds
+    # the complete DbLib placement carries an annotated ref and a footprint
+    assert v["signals"]["completeness"]["state"] == "pass"
+
+
+def test_bom_builds_for_an_altium_project(client, app_ctx, tmp_path):
+    rec = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    r = client.post(f"/api/projects/{rec['id']}/bom", json={})
+    assert r.status_code == 200, r.text
+    job = r.json()["job_id"]
+    _drain_job(client, job)
+    bom = client.get(f"/api/projects/{rec['id']}/bom").json()
+    assert bom["line_count"] == 1
+    assert bom["lines"][0]["mpn"] == "LM358DR"
+
+
+# -- bulk assign surface -------------------------------------------------------
+
+_ASSIGN_SHEET = (
+    '  (symbol (lib_id "Device:R") (property "Reference" "R1" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0))'
+    ' (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0)))\n'
+    '  (symbol (lib_id "Device:R") (property "Reference" "R2" (at 0 0 0))'
+    ' (property "Value" "10k" (at 0 0 0))'
+    ' (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0)))\n'
+)
+
+
+def _write_stock_passive(app_ctx, part_id="r10k"):
+    """Add a passive to the fixture library, filed the way `add_passive_part` really files one: its
+    symbol and footprint are KiCad STOCK references, so it is unreachable by the symbol identity tier
+    and only the value-matched candidate tier can offer it."""
+    import json
+
+    parts_dir = app_ctx.profile.library.parts_dir
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    (parts_dir / f"{part_id}.json").write_text(json.dumps({
+        "id": part_id, "display_name": "10k 0402", "category": "Resistors",
+        "description": "10k 1% 0402", "mpn": "RC0402FR-0710KL", "manufacturer": "Yageo",
+        "passive": True,
+        "eda": {"kicad": {"symbol": {"lib": "Device", "name": "R"},
+                          "footprint": {"lib": "Resistor_SMD", "name": "R_0402_1005Metric"}}},
+        "specs": {"Resistance": "10 kOhm", "Package": "0402"},
+    }), encoding="utf-8")
+    return part_id
+
+
+def test_get_assign_groups_unidentified_placements(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.get(f"/api/projects/{rec['id']}/assign")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["unassigned"] == 2
+    assert [g["refs"] for g in body["groups"]] == [["R1", "R2"]]
+    assert [c["part_id"] for c in body["groups"][0]["candidates"]] == ["r10k"]
+    assert body["groups"][0]["candidates"][0]["confidence"] == "value+footprint"
+
+
+def test_get_assign_unknown_project_is_404(client):
+    assert client.get("/api/projects/nope/assign").status_code == 404
+
+
+def test_post_assign_fills_the_group(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1", "R2"], "part_id": "r10k"})
+    assert r.status_code == 200, r.text
+    assert r.json()["committed"]
+    after = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    assert after.count('(property "MPN" "RC0402FR-0710KL"') == 2
+    # the stock reference is kept verbatim, never requalified into a Stockroom category library
+    assert "SR-Resistors" not in after
+    # the group is gone from the surface afterwards
+    assert client.get(f"/api/projects/{rec['id']}/assign").json()["unassigned"] == 0
+
+
+def test_post_assign_unknown_part_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1"], "part_id": "nope"})
+    assert r.status_code == 400
+
+
+def test_post_assign_stale_ref_is_400_and_writes_nothing(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    before = (proj / "board.kicad_sch").read_text(encoding="utf-8")
+    r = client.post(f"/api/projects/{rec['id']}/assign",
+                    json={"refs": ["R1", "Z99"], "part_id": "r10k"})
+    assert r.status_code == 400
+    assert (proj / "board.kicad_sch").read_text(encoding="utf-8") == before
+
+
+def test_post_assign_empty_refs_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    proj, _head = _make_git_project(tmp_path / "asg", _ASSIGN_SHEET)
+    rec = _register(client, proj)
+    assert client.post(f"/api/projects/{rec['id']}/assign",
+                       json={"refs": [], "part_id": "r10k"}).status_code == 400
+
+
+def test_post_assign_non_git_is_400(client, app_ctx, tmp_path):
+    _write_stock_passive(app_ctx)
+    rec = _register(client, _make_project(tmp_path / "ext" / "asg2", _ASSIGN_SHEET))
+    assert client.post(f"/api/projects/{rec['id']}/assign",
+                       json={"refs": ["R1"], "part_id": "r10k"}).status_code == 400
+
+
+def test_assign_is_a_capability_of_every_eda_stockroom_can_read_placements_for(client, tmp_path):
+    """Bulk assign is registry-generic, so it is NOT in the KiCad-only set. Gating it on `prepare`
+    (a KiCad-only writer) hid the whole surface from an Altium project that can be assigned."""
+    kicad = _register(client, _make_project(tmp_path / "ext" / "board"))
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    for proj in (kicad, altium):
+        caps = client.get(f"/api/projects/{proj['id']}").json()["capabilities"]
+        assert "assign" in caps, caps
+
+
+def test_the_assign_endpoint_serves_an_altium_project(client, tmp_path):
+    altium = _register(client, _make_altium_api_project(tmp_path / "ext" / "amp"))
+    body = client.get(f"/api/projects/{altium['id']}/assign")
+    assert body.status_code == 200, body.text
+    data = body.json()
+    assert data["eda"] == "altium"
+    # The surface states where an assignment LANDS, because for this tool it is not the schematic.
+    assert data["binding"]["writable"] is False
+    assert data["binding"]["reason"]
+
+
+def test_workspace_hygiene_endpoints_preview_then_apply(client, tmp_path):
+    """The measured cause of the owner's KiCad peer-sync failures, reachable from the app. Preview is
+    read-only; apply writes the ignore rules AND untracks the per-user files they now cover, because
+    an ignore rule does nothing to a file that is already tracked."""
+    root = _make_project(tmp_path / "ext" / "board")
+    (root / "board.kicad_prl").write_text('{"window":{}}\n', encoding="utf-8")
+    _git_init_commit(root)
+    proj = _register(client, root)
+
+    preview = client.get(f"/api/projects/{proj['id']}/hygiene")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["untracked"] == ["board.kicad_prl"]
+
+    applied = client.post(f"/api/projects/{proj['id']}/hygiene")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["untracked"] == ["board.kicad_prl"]
+    assert "*.kicad_prl" in (root / ".gitignore").read_text(encoding="utf-8")
+
+    # ...and it is idempotent, so re-syncing does not churn the project's history.
+    again = client.post(f"/api/projects/{proj['id']}/hygiene")
+    assert again.json()["committed"] is None
+
+
+def test_library_pin_endpoints_read_then_pin(client, tmp_path, app_ctx):
+    """Batch 2 item 2, reachable from the app: an unpinned project says so, pinning writes the pin
+    into the PROJECT's own repo, and reading it back reports a match against this machine."""
+    root = _make_project(tmp_path / "ext" / "pinned")
+    _git_init_commit(root)
+    proj = _register(client, root)
+
+    before = client.get(f"/api/projects/{proj['id']}/library-pin")
+    assert before.status_code == 200, before.text
+    body = before.json()
+    assert body["status"] == "unpinned"
+    assert body["pinned"] is None
+    # the surface is told HOW this tool's paths stay portable, rather than hardcoding SR_LIB
+    assert body["path_contract"]["variable"] == "SR_LIB"
+
+    applied = client.post(f"/api/projects/{proj['id']}/library-pin")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["pinned"]["commit"] == app_ctx.repo.head()
+    assert (root / "stockroom-library.json").exists()
+
+    after = client.get(f"/api/projects/{proj['id']}/library-pin")
+    assert after.json()["status"] == "match"
+    # re-pinning an unchanged library commits nothing
+    assert client.post(f"/api/projects/{proj['id']}/library-pin").json()["committed"] is None
+
+
+def test_library_pin_on_a_project_with_no_git_is_a_400_not_a_silent_write(client, tmp_path):
+    root = _make_project(tmp_path / "ext" / "loose")
+    proj = _register(client, root)
+    assert client.get(f"/api/projects/{proj['id']}/library-pin").json()["under_git"] is False
+    resp = client.post(f"/api/projects/{proj['id']}/library-pin")
+    assert resp.status_code == 400, resp.text
+    assert not (root / "stockroom-library.json").exists()
+
+
+def test_library_pin_for_an_unknown_project_is_a_404(client):
+    assert client.get("/api/projects/nope/library-pin").status_code == 404
+    assert client.post("/api/projects/nope/library-pin").status_code == 404

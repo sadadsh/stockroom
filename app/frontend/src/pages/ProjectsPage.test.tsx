@@ -10,13 +10,13 @@ import type {
   ConformCatalog,
   DesignResult,
   FabStatus,
-  ProcurementResult,
   ProjectDetail,
   ProjectSummary,
   RevisionsResult,
   BoardSettings,
   StackupRead,
   PrepareRead,
+  AssignRead,
 } from "../api/types";
 import { ToastProvider } from "../lib/toast";
 import { ProjectsPage } from "./ProjectsPage";
@@ -36,7 +36,7 @@ vi.mock("../api/client", async (importActual) => {
       getChecks: vi.fn(),
       runBom: vi.fn(),
       getBom: vi.fn(),
-      getProcurement: vi.fn(),
+      repriceBom: vi.fn(),
       getFab: vi.fn(),
       downloadFabExport: vi.fn(),
       projectFile: vi.fn(),
@@ -61,6 +61,10 @@ vi.mock("../api/client", async (importActual) => {
       getPrepare: vi.fn(),
       runPrepare: vi.fn(),
       manualFill: vi.fn(),
+      getAssign: vi.fn(),
+      getProjectHygiene: vi.fn(),
+      syncProjectHygiene: vi.fn(),
+      assignGroup: vi.fn(),
       restore: vi.fn(),
       listParts: vi.fn(),
     },
@@ -73,6 +77,7 @@ const NETDECK: ProjectSummary = {
   id: "netdeck",
   name: "Netdeck",
   root: "/home/sadad/git/netdeck",
+  eda: "kicad",
   board_count: 1,
   sheet_count: 3,
   has_git: true,
@@ -83,6 +88,7 @@ const BENCH: ProjectSummary = {
   id: "bench",
   name: "Bench",
   root: "/home/sadad/git/bench",
+  eda: "kicad",
   board_count: 1,
   sheet_count: 1,
   has_git: false,
@@ -96,6 +102,9 @@ const NETDECK_DETAIL: ProjectDetail = {
   pro_path: "/home/sadad/git/netdeck/netdeck.kicad_pro",
   board_paths: ["/home/sadad/git/netdeck/netdeck.kicad_pcb"],
   sheet_paths: ["/home/sadad/git/netdeck/netdeck.kicad_sch"],
+  eda: "kicad",
+  capabilities: ["audit", "bom", "revisions", "restore", "file", "assign",
+                 "checks", "fab", "setup", "netclasses", "prepare", "viewer"],
   git_root: "/home/sadad/git/netdeck",
   audit_digest: null,
   registered_at: "2026-07-13T12:00:00-04:00",
@@ -191,6 +200,7 @@ const BUILT: BomResult = {
   priced: true,
   line_count: 2,
   component_count: 3,
+  tax_rate: 9.52,
   lines: [
     {
       refs: ["R1", "R2"],
@@ -201,8 +211,23 @@ const BUILT: BomResult = {
       has_real_mpn: false,
       footprint: "Resistor_SMD:R_0402",
       datasheet: "",
-      description: "",
+      description: "Bulk Resistor",
       basic: true,
+      in_library: false,  // D1: this line's part is not in the library
+      // Wide-BOM columns: the package derives from the footprint offline; rohs unknown; a
+      // never-priced line has unknown stock (never a risk) and is not orderable.
+      package: "0402",
+      rohs: "",
+      stock_risk: { kind: null, required: 2, available: null, short: false },
+      orderable: false,
+      // Unpriced: the build economics still compute a final order qty (2 per board x 1
+      // board), but every cost field stays honestly null (never a fabricated price).
+      moq: null,
+      final_qty: 2,
+      final_unit_price: null,
+      final_extended: null,
+      tax_tariff: null,
+      line_total: null,
     },
     {
       refs: ["U1"],
@@ -211,14 +236,32 @@ const BUILT: BomResult = {
       mpn: "TPS2121RUXR",
       manufacturer: "TI",
       has_real_mpn: true,
-      footprint: "",
-      datasheet: "",
-      description: "",
+      footprint: "Package_SON:VSON-8",
+      datasheet: "https://ti.com/tps2121.pdf",
+      description: "USB-C Power Mux",
       basic: false,
+      in_library: true,  // D1: this line's part IS in the library
+      library_part_id: "tps2121ruxr",
       unit_price: 1.25,
       extended: 1.25,
       stock: 5000,
       source: "Mouser",
+      // Wide-BOM columns: an authoritative package + RoHS + distributor P/N + product URL, and
+      // the folded stock risk (5000 covers the run, so no risk and orderable).
+      package: "VSON-8",
+      rohs: "Yes",
+      mouser_pn: "595-TPS2121RUXR",
+      url: "https://mouser.com/tps2121",
+      stock_risk: { kind: null, required: 10, available: 5000, short: false },
+      orderable: true,
+      // Priced, with a MOQ of 10 exceeding the 1-per-board x 10-boards need (10 exactly),
+      // so the order rounds to the MOQ and costs at that ladder break.
+      moq: 10,
+      final_qty: 10,
+      final_unit_price: 1.25,
+      final_extended: 12.5,
+      tax_tariff: 1.19,
+      line_total: 13.69,
     },
   ],
   summary: {
@@ -232,6 +275,95 @@ const BUILT: BomResult = {
   },
   by_source: { sources: { Mouser: { total_cost: 1.25, lines: 1 } }, currency: "USD" },
   cost_at_qty: null,
+  build: {
+    build_qty: 10,
+    tax_rate: 9.52,
+    subtotal: 12.5,
+    tax_total: 1.19,
+    grand_total: 13.69,
+    priced_lines: 1,
+    unpriced_lines: 1,
+    currency: "USD",
+  },
+  // The folded procurement roll-ups: a clean build (the priced line's stock covers the run).
+  risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
+  lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
+};
+
+// A built BOM whose priced line is NRND with zero stock and a long lead: exercises the folded
+// risk headline (Not Active / No Stock Line / critical path) and the wide table's stock tint +
+// lifecycle. One priced, risky line so the roll-ups are unambiguous.
+const BUILT_RISKY: BomResult = {
+  ...BUILT,
+  line_count: 1,
+  lines: [
+    {
+      refs: ["U1"],
+      qty: 1,
+      value: "TPS2121",
+      mpn: "TPS2121RUXR",
+      manufacturer: "TI",
+      has_real_mpn: true,
+      footprint: "Package_SON:VSON-8",
+      datasheet: "",
+      description: "USB-C Power Mux",
+      basic: false,
+      package: "VSON-8",
+      rohs: "Yes",
+      unit_price: 1.25,
+      extended: 1.25,
+      stock: 0,
+      lifecycle: "NRND",
+      lead_time: "18 Weeks",
+      source: "Mouser",
+      stock_risk: { kind: "err", required: 1, available: 0, short: true },
+      orderable: false,
+      moq: 1,
+      final_qty: 1,
+      final_unit_price: 1.25,
+      final_extended: 1.25,
+      tax_tariff: 0.12,
+      line_total: 1.37,
+    },
+  ],
+  risks: {
+    not_active: 1,
+    no_stock: 1,
+    insufficient_stock: 0,
+    risky_mpns: ["TPS2121RUXR"],
+    any: true,
+  },
+  lead: { max_weeks: 18, critical_mpn: "TPS2121RUXR", with_lead: 1, any: true },
+};
+
+// The result of reprising BUILT at a bigger build (20 boards, same tax rate): the priced
+// line's order economics scale, the passive's Final Qty doubles, and the roll-up updates,
+// all WITHOUT touching line_count/component_count (a reprice never re-groups).
+const REPRICED: BomResult = {
+  ...BUILT,
+  boards: 20,
+  lines: [
+    { ...BUILT.lines[0], final_qty: 40 },
+    {
+      ...BUILT.lines[1],
+      moq: 10,
+      final_qty: 20,
+      final_unit_price: 1.1,
+      final_extended: 22.0,
+      tax_tariff: 2.09,
+      line_total: 24.09,
+    },
+  ],
+  build: {
+    build_qty: 20,
+    tax_rate: 9.52,
+    subtotal: 22.0,
+    tax_total: 2.09,
+    grand_total: 24.09,
+    priced_lines: 1,
+    unpriced_lines: 1,
+    currency: "USD",
+  },
 };
 
 // Build an SSE body from event frames, matching the fetch-based job stream the client
@@ -260,60 +392,11 @@ function renderPage() {
   );
 }
 
-const PROC_NOT_BUILT: ProcurementResult = {
-  project: "Netdeck",
-  built: false,
-  priced: false,
-  boards: 1,
-  lines: [],
-  risks: { not_active: 0, no_stock: 0, insufficient_stock: 0, risky_mpns: [], any: false },
-  lead: { max_weeks: null, critical_mpn: null, with_lead: 0, any: false },
-  summary: "",
-};
-
 const FAB_READY: FabStatus = {
   project: "Netdeck",
   has_board: true,
   cli_available: true,
   boards: ["netdeck.kicad_pcb"],
-};
-
-const PROC_BUILT: ProcurementResult = {
-  project: "Netdeck",
-  built: true,
-  priced: true,
-  boards: 1,
-  lines: [
-    {
-      refs: ["U1"],
-      qty: 1,
-      value: "TPS2121",
-      mpn: "TPS2121RUXR",
-      manufacturer: "TI",
-      has_real_mpn: true,
-      footprint: "",
-      datasheet: "",
-      description: "",
-      basic: false,
-      unit_price: 1.25,
-      extended: 1.25,
-      stock: 0,
-      lifecycle: "NRND",
-      lead_time: "18 Weeks",
-      source: "Mouser",
-      stock_risk: { kind: "err", required: 1, available: 0, short: true },
-      orderable: false,
-    },
-  ],
-  risks: {
-    not_active: 1,
-    no_stock: 1,
-    insufficient_stock: 0,
-    risky_mpns: ["TPS2121RUXR"],
-    any: true,
-  },
-  lead: { max_weeks: 18, critical_mpn: "TPS2121RUXR", with_lead: 1, any: true },
-  summary: "BOM: 1 lines · 1 parts · $1.25/board · critical path 18 wk",
 };
 
 const DESIGN: DesignResult = {
@@ -538,6 +621,59 @@ const PREPARE: PrepareRead = {
   },
 };
 
+// The bulk-assign surface: three identical 10k resistors placed from the default library (one group,
+// one exact-footprint candidate) plus a 47k group nothing in the library matches.
+const ASSIGN: AssignRead = {
+  project: "Netdeck",
+  eda: "kicad",
+  under_git: true,
+  binding: { field: "Stockroom ID", writable: true, reason: "" },
+  components: 5,
+  unassigned: 4,
+  bound: [],
+  groups: [
+    {
+      key: "Device:R␟10k␟Resistor_SMD:R_0402_1005Metric",
+      lib_id: "Device:R",
+      value: "10k",
+      footprint: "Resistor_SMD:R_0402_1005Metric",
+      refs: ["R1", "R2", "R10"],
+      count: 3,
+      sheets: ["root.kicad_sch"],
+      candidates: [
+        {
+          part_id: "r10k",
+          display_name: "10k 0402",
+          mpn: "RC0402FR-0710KL",
+          description: "10k 1% 0402",
+          confidence: "value+footprint",
+          // Both candidates are equally good matches on value and package, so the evidence tier is
+          // identical and the tolerance is the only thing that lets the user choose.
+          distinguish: ["1%"],
+        },
+        {
+          part_id: "r10k5",
+          display_name: "10k 0402 5%",
+          mpn: "RC0402JR-0710KL",
+          description: "10k 5% 0402",
+          confidence: "value+package",
+          distinguish: ["5%"],
+        },
+      ],
+    },
+    {
+      key: "Device:R␟47k␟Resistor_SMD:R_0402_1005Metric",
+      lib_id: "Device:R",
+      value: "47k",
+      footprint: "Resistor_SMD:R_0402_1005Metric",
+      refs: ["R3"],
+      count: 1,
+      sheets: ["root.kicad_sch"],
+      candidates: [],
+    },
+  ],
+};
+
 const REVS_NONE: RevisionsResult = { project: "Bench", under_git: false, revisions: [] };
 
 const REVS_TWO: RevisionsResult = {
@@ -599,6 +735,9 @@ const BUILDABILITY_NOT_READY = {
 };
 
 beforeEach(() => {
+  // The Build Quantity / Tax-Tariff guided inputs persist to localStorage; clear it so one
+  // test's typed value never leaks into the next test's seed defaults.
+  localStorage.clear();
   mockApi.listProjects.mockResolvedValue([NETDECK, BENCH]);
   mockApi.getProject.mockResolvedValue(NETDECK_DETAIL);
   mockApi.projectAudit.mockResolvedValue(AUDIT);
@@ -607,7 +746,7 @@ beforeEach(() => {
   mockApi.getBuildability.mockResolvedValue(BUILDABILITY_NOT_READY);
   mockApi.getChecks.mockResolvedValue(NOT_RUN);
   mockApi.getBom.mockResolvedValue(NOT_BUILT);
-  mockApi.getProcurement.mockResolvedValue(PROC_NOT_BUILT);
+  mockApi.repriceBom.mockResolvedValue(NOT_BUILT);
   mockApi.getFab.mockResolvedValue(FAB_READY);
   mockApi.downloadFabExport.mockResolvedValue(undefined);
   mockApi.projectFile.mockResolvedValue("(kicad_pcb (version 20240108))");
@@ -667,6 +806,21 @@ beforeEach(() => {
     changed: true,
   });
   mockApi.getPrepare.mockResolvedValue(PREPARE);
+  mockApi.getAssign.mockResolvedValue(ASSIGN);
+  mockApi.getProjectHygiene.mockResolvedValue({
+    eda: "kicad", under_git: true, writes: [], untracked: [],
+  });
+  mockApi.syncProjectHygiene.mockResolvedValue({
+    project: "Netdeck", eda: "kicad", writes: [".gitignore"],
+    untracked: ["board.kicad_prl"], committed: "aaaa1111",
+  });
+  mockApi.assignGroup.mockResolvedValue({
+    project: "Netdeck",
+    committed: "9999aaaa8888",
+    refs: ["R1", "R2", "R10"],
+    part_id: "r10k",
+    bound: 3,
+  });
   mockApi.runPrepare.mockResolvedValue({ job_id: "prep-1" });
   mockApi.manualFill.mockResolvedValue({
     project: "Netdeck",
@@ -749,6 +903,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
 
     // headline: healthy / total
     expect(await screen.findByText(/40 of 42/)).toBeInTheDocument();
@@ -766,14 +921,14 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
 
     const section = await screen.findByTestId("buildability-section");
-    expect(within(section).getByText("Not Ready")).toBeInTheDocument();
+    expect(within(section).getByText("Not Buildable")).toBeInTheDocument();
     // cold caches are surfaced as their honest states, never fabricated passes
     expect(within(section).getByText("Not Run")).toBeInTheDocument();
     expect(within(section).getByText("Not Built")).toBeInTheDocument();
     expect(within(section).getByText(/2 reference\(s\) are not annotated/)).toBeInTheDocument();
   });
 
-  it("shows Ready to Build when every signal passes (M7g)", async () => {
+  it("shows Buildable when every signal passes (M7g)", async () => {
     mockApi.getBuildability.mockResolvedValue({
       ...BUILDABILITY_NOT_READY,
       ready: true,
@@ -791,13 +946,14 @@ describe("ProjectsPage", () => {
     await user.click(await screen.findByTestId("project-row-netdeck"));
 
     const section = await screen.findByTestId("buildability-section");
-    expect(within(section).getByText("Ready to Build")).toBeInTheDocument();
+    expect(within(section).getByText("Buildable")).toBeInTheDocument();
   });
 
   it("renders the findings-table headers without letterspaced uppercase (design contract)", async () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     const head = await screen.findByTestId("findings-head");
     // no `uppercase` / `tracking-*` classes: Title Case labels, no letterspacing.
     expect(head.className).not.toMatch(/uppercase|tracking/);
@@ -809,6 +965,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await screen.findByText("U1");
 
     // click the unannotated breakdown chip -> only U1 (unannotated) remains, R5 gone
@@ -834,6 +991,7 @@ describe("ProjectsPage", () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Download Report" }));
 
     expect(createUrl).toHaveBeenCalledTimes(1);
@@ -879,6 +1037,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByText(/Checks have not run yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run Checks" })).toBeInTheDocument();
   });
@@ -894,6 +1053,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Run Checks" }));
 
     await waitFor(() => expect(mockApi.runChecks).toHaveBeenCalledWith("netdeck"));
@@ -913,6 +1073,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     await user.click(await screen.findByRole("button", { name: "Run Checks" }));
 
     // inline error (never a fabricated pass) + the run prompt did not become a result
@@ -933,6 +1094,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     const result = await screen.findByTestId("checks-result");
     expect(within(result).getByText("Nothing Checked")).toBeInTheDocument();
     expect(within(result).queryByText("Clean")).toBeNull();
@@ -943,6 +1105,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
 
     // the cached run renders and the action reads Re-run, without any runChecks call
     expect(await screen.findByTestId("checks-result")).toBeInTheDocument();
@@ -954,6 +1117,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByText(/BOM has not been built yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Build And Cost" })).toBeInTheDocument();
   });
@@ -969,19 +1133,58 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
 
-    await waitFor(() => expect(mockApi.runBom).toHaveBeenCalledWith("netdeck"));
+    // The guided inputs default to boards=1, tax=0% before any cached build seeds them.
+    await waitFor(() =>
+      expect(mockApi.runBom).toHaveBeenCalledWith("netdeck", { boards: 1, tax_rate: 0 }),
+    );
     const result = await screen.findByTestId("bom-result");
     // partial verdict: costed total plus an honest unpriced-line count (never hidden)
     expect(within(result).getByText("$1.25 Costed")).toBeInTheDocument();
     expect(within(result).getByText("1 Unpriced Line")).toBeInTheDocument();
+    // the build roll-up for the 10-board run the cached BOM carries
+    const rollup = within(result).getByTestId("bom-build-rollup");
+    expect(rollup).toHaveTextContent("For 10 Boards");
+    expect(rollup).toHaveTextContent("Subtotal $12.50");
+    expect(rollup).toHaveTextContent("Tax + Tariff $1.19");
+    expect(rollup).toHaveTextContent("Grand Total $13.69");
     // the grouped lines: the merged passive (Basic) and the priced IC
     const lines = within(result).getByTestId("bom-lines");
     expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
     expect(within(lines).getByText("Basic")).toBeInTheDocument();
     expect(within(lines).getByText("R1, R2")).toBeInTheDocument();
-    expect(within(lines).getByText("$1.25")).toBeInTheDocument();
+    expect(within(lines).getByText("USB-C Power Mux")).toBeInTheDocument();
+    expect(within(lines).getByText("Mouser")).toBeInTheDocument();
+    // the wide-table columns on the priced IC: manufacturer, package, distributor P/N, covered
+    // stock, plus the build economics (MOQ 10 forces Final Qty to 10, priced at $1.25 unit,
+    // $12.50 at qty, $1.19 tax/tariff, $13.69 total)
+    const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(within(priceRow).getByText("TI")).toBeInTheDocument(); // Manufacturer
+    expect(within(priceRow).getAllByText("VSON-8")).toHaveLength(2); // Footprint (short) + Package
+    expect(within(priceRow).getByText("595-TPS2121RUXR")).toBeInTheDocument(); // Distributor P/N
+    expect(within(priceRow).getByText("5,000")).toBeInTheDocument(); // covered stock
+    expect(within(priceRow).getAllByText("10")).toHaveLength(2); // Min Qty and Final Qty
+    expect(within(priceRow).getByText("$1.25")).toBeInTheDocument(); // Unit Cost
+    expect(within(priceRow).getByText("$12.50")).toBeInTheDocument(); // Cost @ Qty
+    expect(within(priceRow).getByText("$1.19")).toBeInTheDocument(); // Tax/Tariff
+    expect(within(priceRow).getByText("$13.69")).toBeInTheDocument(); // Total Cost
+    // the unpriced passive: a real Qty + Final Qty (both 2), a footprint-derived package, and
+    // unknown stock (never priced); its cost cells read "-" (never a fabricated $0.00)
+    const passiveRow = within(lines).getByText("R1, R2").closest("tr") as HTMLElement;
+    expect(within(passiveRow).getAllByText("2")).toHaveLength(2); // Qty and Final Qty
+    expect(within(passiveRow).getByText("0402")).toBeInTheDocument(); // Package from footprint
+    expect(within(passiveRow).getByText("R_0402")).toBeInTheDocument(); // short Footprint
+    expect(within(passiveRow).getByText("Unknown")).toBeInTheDocument(); // never-priced stock
+
+    // D1 library coverage: the IC is in the library, the passive is not, and a summary
+    // above the table counts it. This replaces the old paste-a-BOM coverage tool.
+    expect(within(priceRow).getByText("In Library")).toBeInTheDocument();
+    expect(within(passiveRow).getByText("Not in Library")).toBeInTheDocument();
+    expect(within(result).getByTestId("bom-coverage")).toHaveTextContent(
+      "1 of 2 lines are in your library",
+    );
   });
 
   it("surfaces an honest error when the BOM build cannot start", async () => {
@@ -989,6 +1192,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByRole("button", { name: "Build And Cost" }));
 
     expect(await screen.findAllByText(/the build engine failed/i)).not.toHaveLength(0);
@@ -998,7 +1202,17 @@ describe("ProjectsPage", () => {
   it("shows an honest Unpriced verdict when a build could source nothing", async () => {
     mockApi.getBom.mockResolvedValue({
       ...BUILT,
-      lines: [BUILT.lines[1]].map((l) => ({ ...l, unit_price: undefined, extended: undefined, source: undefined })),
+      lines: [BUILT.lines[1]].map((l) => ({
+        ...l,
+        unit_price: undefined,
+        extended: undefined,
+        source: undefined,
+        moq: null,
+        final_unit_price: null,
+        final_extended: null,
+        tax_tariff: null,
+        line_total: null,
+      })),
       line_count: 1,
       priced: true,
       summary: {
@@ -1015,6 +1229,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const result = await screen.findByTestId("bom-result");
     expect(within(result).getByText("Unpriced")).toBeInTheDocument();
     expect(within(result).queryByText(/Costed/)).toBeNull();
@@ -1037,6 +1252,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const lines = within(await screen.findByTestId("bom-result")).getByTestId("bom-lines");
     expect(within(lines).getByText("No MPN")).toBeInTheDocument();
     expect(within(lines).getByText("Basic")).toBeInTheDocument(); // the true passive keeps it
@@ -1047,64 +1263,154 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     expect(await screen.findByTestId("bom-result")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rebuild BOM" })).toBeInTheDocument();
     expect(mockApi.runBom).not.toHaveBeenCalled();
   });
 
-  // -- Procurement (M7d) --
-
-  it("prompts to build the BOM before showing procurement", async () => {
+  it("seeds Build Quantity and Tax/Tariff from the cached build", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
-    const section = await screen.findByTestId("procurement-section");
-    expect(section).toHaveTextContent(/Build the BOM to see sourcing risk/i);
-    expect(screen.queryByTestId("procurement-lines")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
+
+    expect(screen.getByTestId("build-qty-input")).toHaveValue(10); // BUILT.build.build_qty
+    expect(screen.getByTestId("tax-rate-input")).toHaveValue(9.52); // BUILT.tax_rate
   });
 
-  it("shows sourcing risk, lead and per-line orderability from a built BOM", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+  it("reprices an already-built BOM when Build Quantity changes, without a rebuild", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    mockApi.repriceBom.mockResolvedValue(REPRICED);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
 
-    const rollup = await screen.findByTestId("procurement-rollup");
+    const input = screen.getByTestId("build-qty-input");
+    await user.clear(input);
+    await user.type(input, "20");
+    await user.tab(); // blur applies the pending reprice immediately, no debounce wait
+
+    await waitFor(() =>
+      expect(mockApi.repriceBom).toHaveBeenCalledWith("netdeck", { boards: 20, tax_rate: 9.52 }),
+    );
+    // a reprice never rebuilds: no job is started
+    expect(mockApi.runBom).not.toHaveBeenCalled();
+
+    const rollup = await screen.findByTestId("bom-build-rollup");
+    expect(rollup).toHaveTextContent("For 20 Boards");
+    expect(rollup).toHaveTextContent("Grand Total $24.09");
+    const lines = within(screen.getByTestId("bom-result")).getByTestId("bom-lines");
+    const priceRow = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(within(priceRow).getByText("$22.00")).toBeInTheDocument(); // Cost @ Qty, repriced
+    expect(within(priceRow).getByText("$24.09")).toBeInTheDocument(); // Total Cost, repriced
+  });
+
+  it("reprices when Tax/Tariff changes, and the value sticks in localStorage across a restart", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    mockApi.repriceBom.mockResolvedValue(REPRICED);
+    const { unmount } = renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    await screen.findByTestId("bom-result");
+
+    const taxInput = screen.getByTestId("tax-rate-input");
+    await user.clear(taxInput);
+    await user.type(taxInput, "12.5");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(mockApi.repriceBom).toHaveBeenCalledWith("netdeck", { boards: 10, tax_rate: 12.5 }),
+    );
+    expect(localStorage.getItem("sr.bom.taxRate")).toBe("12.5");
+    unmount();
+
+    // A fresh mount (an app restart) on a project that has never been built: the persisted
+    // preference still seeds the guided input, never silently resetting to the 0% default.
+    mockApi.getBom.mockResolvedValue(NOT_BUILT);
+    renderPage();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    expect(await screen.findByTestId("tax-rate-input")).toHaveValue(12.5);
+  });
+
+  // -- Folded procurement (sourcing risk + orderability now live in the one BOM table) --
+
+  it("folds the sourcing-risk headline and per-line stock into the one BOM table", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT_RISKY);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+
+    const result = await screen.findByTestId("bom-result");
+    const rollup = within(result).getByTestId("bom-risk-rollup");
     expect(rollup).toHaveTextContent(/Not Active/i);
     expect(rollup).toHaveTextContent(/No Stock Line/i);
     expect(rollup).toHaveTextContent(/Critical path 18 wk/i);
-    const lines = screen.getByTestId("procurement-lines");
-    expect(within(lines).getByText("TPS2121RUXR")).toBeInTheDocument();
+    // the same table carries the per-line lifecycle + the folded stock shortfall
+    const lines = within(result).getByTestId("bom-lines");
     expect(within(lines).getByText("NRND")).toBeInTheDocument();
-    // 0 stock + a 1-part run -> not orderable
-    expect(within(lines).getByText("No")).toBeInTheDocument();
+    const row = within(lines).getByText("TPS2121RUXR").closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("need 1"); // 0 stock, short of the run
   });
 
-  it("exports the BOM through the authed download client", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+  it("reads No Sourcing Risks on a clean built BOM", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    const rollup = within(await screen.findByTestId("bom-result")).getByTestId("bom-risk-rollup");
+    expect(rollup).toHaveTextContent(/No Sourcing Risks/i);
+  });
+
+  // -- Exports (one control, folded onto the BOM page) --
+
+  it("prompts to build the BOM before the exports are available", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    const section = await screen.findByTestId("exports-section");
+    expect(section).toHaveTextContent(/Build the BOM to export/i);
+    expect(screen.queryByTestId("export-bar")).not.toBeInTheDocument();
+  });
+
+  it("exports the selected BOM format through the authed download client", async () => {
+    mockApi.getBom.mockResolvedValue(BUILT);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
-    await user.click(screen.getByRole("button", { name: "JLCPCB BOM" }));
+    await user.selectOptions(screen.getByTestId("export-format"), "jlcpcb");
+    await user.click(screen.getByRole("button", { name: "Export" }));
     // JLCPCB is a plain one-click export: no procurement knobs.
     expect(mockApi.downloadBomExport).toHaveBeenCalledWith("netdeck", "jlcpcb", undefined);
   });
 
   it("threads the procurement-sheet options into the export (percent to fraction)", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    mockApi.getBom.mockResolvedValue(BUILT);
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-options");
     await user.clear(screen.getByTestId("opt-sparesPct"));
     await user.type(screen.getByTestId("opt-sparesPct"), "5");
     await user.clear(screen.getByTestId("opt-taxPct"));
     await user.type(screen.getByTestId("opt-taxPct"), "7");
-    await user.click(screen.getByRole("button", { name: "Procurement Sheet" }));
+    await user.selectOptions(screen.getByTestId("export-format"), "procurement");
+    await user.click(screen.getByRole("button", { name: "Export" }));
 
     expect(mockApi.downloadBomExport).toHaveBeenCalledWith(
       "netdeck",
@@ -1114,14 +1420,15 @@ describe("ProjectsPage", () => {
   });
 
   it("toasts when an export fails", async () => {
-    mockApi.getProcurement.mockResolvedValue(PROC_BUILT);
+    mockApi.getBom.mockResolvedValue(BUILT);
     mockApi.downloadBomExport.mockRejectedValue(new ApiError(400, "build the BOM before exporting it"));
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("export-bar");
-    await user.click(screen.getByRole("button", { name: "BOM CSV" }));
+    await user.click(screen.getByRole("button", { name: "Export" }));
     expect(await screen.findByText(/build the BOM before exporting it/i)).toBeInTheDocument();
   });
 
@@ -1132,6 +1439,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const section = await screen.findByTestId("diff-section");
     expect(section).toHaveTextContent(/not under git/i);
   });
@@ -1141,6 +1449,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
@@ -1159,6 +1468,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     expect(screen.getByText(/Choose a commit to compare/i)).toBeInTheDocument();
@@ -1173,6 +1483,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
 
     await screen.findByTestId("diff-pickers");
     await user.selectOptions(screen.getByTestId("diff-rev-a"), "aaaaaaaa1111");
@@ -1189,6 +1500,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("editor-section");
     expect(within(editor).getByTestId("nc-row-Default")).toBeInTheDocument();
     expect(within(editor).getByTestId("nc-row-HS")).toBeInTheDocument();
@@ -1200,6 +1512,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1219,6 +1532,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     expect(within(section).getByTestId("fields-table")).toBeInTheDocument();
     expect(within(section).getByTestId("fields-row-R1")).toBeInTheDocument();
@@ -1231,6 +1545,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("fields-section");
     // the unannotated R? row exposes no editable cell for its Value
     expect(screen.getByTestId("fields-row-R?")).toBeInTheDocument();
@@ -1242,6 +1557,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     await user.type(within(section).getByTestId("fields-cell-R1-MPN"), "RC0402FR-0710KL");
     await user.click(within(section).getByRole("button", { name: "Save Field Edits" }));
@@ -1255,6 +1571,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     const section = await screen.findByTestId("fields-section");
     await user.type(within(section).getByTestId("fields-new-field"), "Tolerance");
     await user.click(within(section).getByRole("button", { name: "Add Field" }));
@@ -1268,6 +1585,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(screen.getByRole("button", { name: "Add Net Class" }));
     await user.type(screen.getByTestId("nc-new-name"), "PWR");
@@ -1282,6 +1600,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Save Net Classes" }));
@@ -1296,6 +1615,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("dr-min_track_width");
     await user.clear(input);
@@ -1311,6 +1631,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const row = screen.getByTestId("nc-row-HS");
     expect(row).toHaveTextContent(/below fab min/i);
@@ -1320,6 +1641,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.selectOptions(screen.getByTestId("fab-floor-select"), "oshpark_2");
     await waitFor(() =>
@@ -1331,6 +1653,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const save = screen.getByRole("button", { name: "Save Net Classes" });
     expect(save).toBeDisabled(); // clean on load
@@ -1345,6 +1668,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("editor-section");
     expect(editor).toHaveTextContent(/not under git/i);
     expect(screen.queryByRole("button", { name: "Save Net Classes" })).not.toBeInTheDocument();
@@ -1359,6 +1683,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1375,6 +1700,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     await user.click(within(screen.getByTestId("nc-row-HS")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Add Net Class" }));
@@ -1389,6 +1715,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("nc-Default-track_width");
     await user.clear(input);
@@ -1402,6 +1729,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("editor-section");
     const input = screen.getByTestId("dr-min_track_width");
     await user.clear(input);
@@ -1416,6 +1744,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     const editor = await screen.findByTestId("netclass-pattern-editor");
     expect((within(editor).getByTestId("ncp-0-pattern") as HTMLInputElement).value).toBe("*USB*");
     expect((within(editor).getByTestId("ncp-0-netclass") as HTMLSelectElement).value).toBe("HS");
@@ -1425,6 +1754,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     const input = screen.getByTestId("ncp-0-pattern");
     await user.clear(input);
@@ -1440,6 +1770,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.selectOptions(screen.getByTestId("ncp-0-netclass"), "Default");
     await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
@@ -1451,6 +1782,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     await user.type(screen.getByTestId("ncp-1-pattern"), "*GND");
@@ -1465,6 +1797,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(within(screen.getByTestId("ncp-row-0")).getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Save Netclass Patterns" }));
@@ -1476,6 +1809,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     // the new row's pattern is left blank; only the existing complete row is sent
@@ -1488,6 +1822,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
     expect(save).toBeDisabled(); // clean on load
@@ -1505,6 +1840,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     expect(screen.getByTestId("ncp-row-0")).toHaveTextContent(/no longer/i);
   });
@@ -1520,6 +1856,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     // make an unrelated valid edit so there is a change to attempt to save
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
@@ -1537,6 +1874,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Net Classes" }));
     await screen.findByTestId("netclass-pattern-editor");
     await user.click(screen.getByRole("button", { name: "Add Pattern" }));
     const save = screen.getByRole("button", { name: "Save Netclass Patterns" });
@@ -1554,6 +1892,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     expect(screen.getByTestId("bs-pad_to_mask_clearance")).toHaveValue("0.0508");
     expect(screen.getByTestId("bs-thickness")).toHaveValue("1.6");
@@ -1566,6 +1905,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-pad_to_mask_clearance");
     await user.clear(input);
@@ -1584,6 +1924,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1600,6 +1941,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     await user.click(screen.getByTestId("bs-tenting_front")); // ON -> OFF
     await user.click(screen.getByRole("button", { name: "Save Board Setup" }));
@@ -1614,6 +1956,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const save = screen.getByRole("button", { name: "Save Board Setup" });
     expect(save).toBeDisabled();
@@ -1627,6 +1970,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-pad_to_mask_clearance");
     await user.clear(input);
@@ -1643,6 +1987,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("board-setup-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
   });
@@ -1652,6 +1997,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("board-setup-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("board-setup-form")).not.toBeInTheDocument();
   });
@@ -1661,6 +2007,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1674,6 +2021,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     await user.clear(screen.getByTestId("bs-pad_to_mask_clearance"));
     expect(screen.getByRole("button", { name: "Save Board Setup" })).toBeDisabled();
@@ -1691,6 +2039,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("board-setup-form");
     const input = screen.getByTestId("bs-thickness");
     await user.clear(input);
@@ -1708,6 +2057,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     expect(screen.getByTestId("sev-erc-pin_not_connected")).toHaveValue("error");
     expect(screen.getByTestId("sev-erc-wire_dangling")).toHaveValue("warning");
@@ -1718,6 +2068,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     await user.selectOptions(screen.getByTestId("sev-erc-pin_not_connected"), "warning");
     await user.selectOptions(screen.getByTestId("sev-drc-clearance"), "ignore");
@@ -1733,6 +2084,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("severities-form");
     expect(screen.getByRole("button", { name: "Save Severities" })).toBeDisabled();
     await user.selectOptions(screen.getByTestId("sev-erc-wire_dangling"), "ignore");
@@ -1743,6 +2095,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("pinmap-grid");
     // output vs output (index 1,1) is an error in the fixture
     expect(screen.getByTestId("pm-1-1")).toHaveAttribute("data-sev", "2");
@@ -1753,6 +2106,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("pinmap-grid");
     await user.click(screen.getByTestId("pm-0-1")); // 0 -> 1 (warning), mirrors to [1][0]
     expect(screen.getByTestId("pm-0-1")).toHaveAttribute("data-sev", "1");
@@ -1770,6 +2124,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("pinmap-absent")).toBeInTheDocument();
     expect(screen.queryByTestId("pinmap-grid")).not.toBeInTheDocument();
   });
@@ -1778,6 +2133,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     expect(screen.getByTestId("tv-name-0")).toHaveValue("REV");
     expect(screen.getByTestId("tv-value-0")).toHaveValue("A");
@@ -1787,6 +2143,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByTestId("tv-del-1")); // remove OLD
     await user.click(screen.getByRole("button", { name: "Save Text Variables" }));
@@ -1800,6 +2157,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByRole("button", { name: "Add Variable" }));
     await user.type(screen.getByTestId("tv-name-2"), "BATCH");
@@ -1821,6 +2179,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByTestId("tv-del-0")); // remove A -> rows [B]
     await user.click(screen.getByRole("button", { name: "Add Variable" })); // -> [B, blank]
@@ -1834,6 +2193,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("textvars-form");
     await user.click(screen.getByRole("button", { name: "Add Variable" }));
     await user.type(screen.getByTestId("tv-name-2"), "REV"); // duplicate
@@ -1851,6 +2211,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("prosettings-no-pro")).toBeInTheDocument();
     expect(screen.queryByTestId("severities-form")).not.toBeInTheDocument();
   });
@@ -1861,6 +2222,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.getByTestId("conform-enable-silk")).toBeInTheDocument();
     expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
@@ -1872,6 +2234,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.getByRole("button", { name: "Preview Changes" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Conform Objects" })).toBeDisabled();
@@ -1884,6 +2247,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.click(screen.getByTestId("conform-enable-labels"));
@@ -1900,6 +2264,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.clear(screen.getByTestId("conform-thickness-silk")); // drop thickness
@@ -1914,6 +2279,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.click(screen.getByRole("button", { name: "Preview Changes" }));
@@ -1929,6 +2295,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     await user.click(screen.getByTestId("conform-enable-silk"));
     await user.clear(screen.getByTestId("conform-size-silk"));
@@ -1944,6 +2311,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("conform-no-target")).toBeInTheDocument();
     expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
   });
@@ -1953,6 +2321,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("conform-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("conform-form")).not.toBeInTheDocument();
   });
@@ -1962,6 +2331,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("conform-form");
     expect(screen.queryByTestId("conform-enable-silk")).not.toBeInTheDocument();
     expect(screen.getByTestId("conform-enable-labels")).toBeInTheDocument();
@@ -1973,6 +2343,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     expect(screen.getByTestId("stackup-current")).toHaveTextContent("F.Cu");
     expect(screen.getByTestId("stackup-row-dielectric 1")).toHaveTextContent("FR4");
@@ -1984,6 +2355,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-preset-block"));
     // Apply is disabled until a preset is chosen
@@ -2000,6 +2372,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-preset-block"));
     // the board has 4 copper layers; the 2-layer preset is incompatible
@@ -2014,6 +2387,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     // buttons are disabled until something differs from disk
@@ -2030,6 +2404,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2045,6 +2420,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2060,6 +2436,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     const block = within(screen.getByTestId("stackup-field-block"));
     await user.clear(screen.getByTestId("stackup-thickness-dielectric 1"));
@@ -2073,6 +2450,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     await screen.findByTestId("stackup-form");
     expect(screen.getByTestId("stackup-none")).toBeInTheDocument();
     expect(screen.getByTestId("stackup-preset-block")).toBeInTheDocument();
@@ -2087,6 +2465,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("stackup-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
   });
@@ -2096,6 +2475,7 @@ describe("ProjectsPage", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "PCB Setup" }));
     expect(await screen.findByTestId("stackup-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("stackup-form")).not.toBeInTheDocument();
   });
@@ -2104,7 +2484,15 @@ describe("ProjectsPage", () => {
 describe("Prepare / Complete-All (M7f-D)", () => {
   async function openPrepare(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     return await screen.findByTestId("prepare-form");
+  }
+
+  // The per-component link panel is the FALLBACK for what the grouped assign surface cannot offer, so
+  // it renders below that surface rather than inside the prepare form. Looked up by its own test id so
+  // these tests assert the control's behaviour without pinning where the page places it.
+  function linkPanel() {
+    return screen.findByTestId("manual-fill-panel");
   }
 
   it("previews the annotate + fill counts and the completion residual", async () => {
@@ -2118,8 +2506,8 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     const residual = within(form).getByTestId("prepare-residual");
     expect(residual).toHaveTextContent("0 / 3 Complete");
     expect(residual).toHaveTextContent("3 Missing MPN");
-    // the unmatched refs offer a manual link
-    expect(within(form).getByTestId("manual-fill-panel")).toBeInTheDocument();
+    // the unmatched refs offer a manual link, as the fallback below the grouped assign surface
+    expect(await linkPanel()).toBeInTheDocument();
   });
 
   it("runs Prepare as a job and shows the prepared result", async () => {
@@ -2168,15 +2556,16 @@ describe("Prepare / Complete-All (M7f-D)", () => {
   it("manually links an unmatched component to a chosen library part", async () => {
     renderPage();
     const user = userEvent.setup();
-    const form = await openPrepare(user);
+    await openPrepare(user);
+    const panel = within(await linkPanel());
     // pick the ref, search + select the library part, then Link
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    await user.click(within(form).getByTestId("manual-fill-link"));
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    await user.click(panel.getByTestId("manual-fill-link"));
     await waitFor(() =>
       expect(mockApi.manualFill).toHaveBeenCalledWith("netdeck", { ref: "R51", part_id: "r10k" }),
     );
@@ -2185,17 +2574,18 @@ describe("Prepare / Complete-All (M7f-D)", () => {
   it("clears the armed library part when the target component changes", async () => {
     renderPage();
     const user = userEvent.setup();
-    const form = await openPrepare(user);
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await openPrepare(user);
+    const panel = within(await linkPanel());
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("r10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    expect((panel.getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("r10k");
     // switching the target component must disarm the part (never Link a part chosen for another ref)
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "C22");
-    expect((within(form).getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "C22");
+    expect((panel.getByTestId("manual-fill-part") as HTMLSelectElement).value).toBe("");
   });
 
   it("re-reads the residual from the live query after a manual link (not the frozen job result)", async () => {
@@ -2209,14 +2599,15 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     const form = await openPrepare(user);
+    const panel = within(await linkPanel());
     expect(within(form).getByTestId("prepare-residual")).toHaveTextContent("0 / 3 Complete");
-    await user.selectOptions(within(form).getByTestId("manual-fill-ref"), "R51");
-    await user.type(within(form).getByTestId("manual-fill-search"), "10k");
+    await user.selectOptions(panel.getByTestId("manual-fill-ref"), "R51");
+    await user.type(panel.getByTestId("manual-fill-search"), "10k");
     await waitFor(() =>
-      expect(within(form).getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
+      expect(panel.getByTestId("manual-fill-part")).toHaveTextContent("10k 0402"),
     );
-    await user.selectOptions(within(form).getByTestId("manual-fill-part"), "r10k");
-    await user.click(within(form).getByTestId("manual-fill-link"));
+    await user.selectOptions(panel.getByTestId("manual-fill-part"), "r10k");
+    await user.click(panel.getByTestId("manual-fill-link"));
     await waitFor(() => expect(mockApi.manualFill).toHaveBeenCalled());
     // the residual follows the refetched query, not a frozen result
     await waitFor(() =>
@@ -2229,6 +2620,7 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByTestId("prepare-no-git")).toBeInTheDocument();
     expect(screen.queryByTestId("prepare-form")).not.toBeInTheDocument();
   });
@@ -2238,6 +2630,7 @@ describe("Prepare / Complete-All (M7f-D)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
     expect(await screen.findByTestId("prepare-no-sch")).toBeInTheDocument();
   });
 });
@@ -2250,6 +2643,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     const section = await screen.findByTestId("fab-section");
     expect(await within(section).findByTestId("fab-no-board")).toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
@@ -2262,6 +2656,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByTestId("fab-no-cli")).toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
   });
@@ -2271,6 +2666,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     expect(await screen.findByTestId("fab-error")).toHaveTextContent(/server exploded/i);
     expect(screen.queryByTestId("fab-no-board")).not.toBeInTheDocument();
     expect(screen.queryByTestId("fab-export")).not.toBeInTheDocument();
@@ -2280,6 +2676,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage(); // beforeEach seeds FAB_READY (board present + kicad-cli available)
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await user.click(await screen.findByTestId("fab-export"));
     expect(mockApi.downloadFabExport).toHaveBeenCalledWith("netdeck", {
       drillFormat: "excellon",
@@ -2295,6 +2692,7 @@ describe("Fab Prep (M7i)", () => {
     renderPage();
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
     await screen.findByTestId("fab-options");
     await user.click(screen.getByTestId("fab-include-pos")); // placement off (default on)
     await user.click(screen.getByTestId("fab-protel-ext")); // protel ext off (default on)
@@ -2308,5 +2706,517 @@ describe("Fab Prep (M7i)", () => {
       protelExt: false,
       board: undefined,
     });
+  });
+});
+
+describe("Project tabs (IA)", () => {
+  async function select(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+  }
+
+  it("renders the five per-project tabs with Overview active by default", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    for (const name of [
+      "Overview",
+      "Health",
+      "BOM & Procurement",
+      "PCB Setup",
+      "Net Classes",
+    ]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // A freshly selected project lands on Overview's readiness verdict.
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
+  });
+
+  it("shows only the active tab's sections (conditional render, not merely hidden)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
+
+    // BOM & Procurement: its sections mount and Overview's leave the DOM entirely.
+    await user.click(screen.getByRole("tab", { name: "BOM & Procurement" }));
+    expect(await screen.findByTestId("bom-section")).toBeInTheDocument();
+    expect(screen.queryByTestId("buildability-section")).toBeNull();
+    expect(
+      screen.getByRole("tab", { name: "BOM & Procurement" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    // PCB Setup: the BOM sections unmount in turn (never two tabs' bodies at once).
+    await user.click(screen.getByRole("tab", { name: "PCB Setup" }));
+    expect(await screen.findByTestId("board-setup-section")).toBeInTheDocument();
+    expect(screen.queryByTestId("bom-section")).toBeNull();
+  });
+
+  it("resets to the Overview tab when a different project is selected", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    await user.click(screen.getByRole("tab", { name: "Net Classes" }));
+    expect(await screen.findByTestId("editor-section")).toBeInTheDocument();
+
+    // Switching to another project drops back to Overview, never stranding the
+    // previous project's open tab.
+    await user.click(await screen.findByTestId("project-row-bench"));
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(screen.queryByTestId("editor-section")).toBeNull();
+    expect(await screen.findByTestId("buildability-section")).toBeInTheDocument();
+  });
+
+  it("moves between tabs with the arrow keys (roving tabindex)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    // roving tabindex: only the active tab is in the tab order
+    expect(overview).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: "Health" })).toHaveAttribute("tabindex", "-1");
+
+    overview.focus();
+    await user.keyboard("{ArrowRight}");
+    const health = screen.getByRole("tab", { name: "Health" });
+    expect(health).toHaveAttribute("aria-selected", "true");
+    expect(health).toHaveFocus();
+    expect(await screen.findByTestId("checks-section")).toBeInTheDocument();
+
+    // End jumps to the last tab, Home back to the first
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: "Net Classes" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("wires each tab to its panel (aria-controls + role=tabpanel + aria-labelledby)", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    await select(user);
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    const panelId = overview.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveAttribute("id", panelId);
+    // the panel points back at the tab that labels it
+    expect(panel.getAttribute("aria-labelledby")).toBe(overview.getAttribute("id"));
+  });
+});
+
+describe("EDA-neutral projects", () => {
+  const AMP: ProjectSummary = {
+    id: "amp",
+    name: "Amp",
+    root: "/home/sadad/altium/amp",
+    eda: "altium",
+    board_count: 1,
+    sheet_count: 1,
+    has_git: true,
+    registered_at: "2026-07-23T12:00:00-04:00",
+  };
+  const AMP_DETAIL: ProjectDetail = {
+    id: "amp",
+    name: "Amp",
+    root: "/home/sadad/altium/amp",
+    pro_path: "Amp.PrjPcb",
+    board_paths: ["Amp.PcbDoc"],
+    sheet_paths: ["Amp.SchDoc"],
+    eda: "altium",
+    // Assign is registry-generic: an Altium project can be assigned even though every
+    // KiCad-only writer stays off.
+    capabilities: ["audit", "bom", "revisions", "restore", "file", "assign"],
+    git_root: "/home/sadad/altium/amp",
+    audit_digest: null,
+    registered_at: "2026-07-23T12:00:00-04:00",
+  };
+
+  it("an Altium project shows its EDA tag and only the EDA-neutral tabs", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    expect(await screen.findByTestId("project-row-amp")).toHaveTextContent("Altium");
+    await screen.findByRole("tab", { name: "Overview" });
+    expect(screen.getByRole("tab", { name: "Health" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "BOM & Procurement" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("tab", { name: "PCB Setup" })).toBeNull(),
+    );
+    expect(screen.queryByRole("tab", { name: "Net Classes" })).toBeNull();
+  });
+
+  it("a KiCad project row carries its EDA tag too", async () => {
+    renderPage();
+    expect(await screen.findByTestId("project-row-netdeck")).toHaveTextContent("KiCad");
+  });
+
+  it("an Altium project's Health tab runs the audit but offers no ERC/DRC or Prepare", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    // the audit findings render (the shared fixture audit)
+    expect(await screen.findByTestId("audit-findings")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /Run Checks/i })).toBeNull(),
+    );
+    expect(screen.queryByText(/Prepare This Project/i)).toBeNull();
+  });
+
+  it("an Altium project's BOM tab omits the KiCad fab exports", async () => {
+    mockApi.listProjects.mockResolvedValue([AMP]);
+    mockApi.getProject.mockResolvedValue(AMP_DETAIL);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "BOM & Procurement" }));
+    // the BOM build affordance is there for both EDAs
+    expect(await screen.findByRole("button", { name: /Build And Cost/i })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId("fab-section")).toBeNull(),
+    );
+  });
+
+  it("an ambiguous folder offers an explicit EDA choice and registers with it", async () => {
+    mockApi.listProjects.mockResolvedValue([]);
+    mockApi.registerProject.mockRejectedValueOnce(
+      new ApiError(
+        400,
+        "/x holds both KiCad and Altium project files; pass eda='kicad' or eda='altium' to choose",
+      ),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    const input = await screen.findByPlaceholderText(/absolute path/i);
+    await user.type(input, "/x");
+    await user.click(screen.getByRole("button", { name: "Register Project" }));
+
+    // the ambiguity turns into an explicit in-place choice, not a dead-end toast
+    const asAltium = await screen.findByRole("button", { name: "Register As Altium" });
+    expect(screen.getByRole("button", { name: "Register As KiCad" })).toBeInTheDocument();
+    mockApi.registerProject.mockResolvedValueOnce(AMP_DETAIL);
+    await user.click(asAltium);
+    await waitFor(() =>
+      expect(mockApi.registerProject).toHaveBeenLastCalledWith("/x", "altium"),
+    );
+  });
+});
+
+// -- Assign Components (bulk assign) -----------------------------------------
+//
+// The correctness property this surface exists to protect: a generic placement is never assigned
+// automatically. Everything here asserts that the user's single click is what commits, that the click
+// covers the WHOLE group, and that the evidence behind each suggestion is visible.
+describe("ProjectsPage assign components", () => {
+  async function openAssign(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    return await screen.findByTestId("assign-section");
+  }
+
+  it("groups identical placements and names every designator in the group", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-summary")).toHaveTextContent(
+      "4 of 5 components carry no library part, in 2 groups",
+    );
+    const groups = within(section).getAllByTestId("assign-group");
+    expect(groups).toHaveLength(2);
+    const tenk = within(groups[0]);
+    expect(tenk.getByTestId("assign-group-count")).toHaveTextContent("3");
+    // The refs are shown, not just counted: a bulk write is only trustworthy if the user can see
+    // exactly which components it will touch.
+    const refs = within(tenk.getByTestId("assign-group-refs"));
+    for (const ref of ["R1", "R2", "R10"]) expect(refs.getByText(ref)).toBeInTheDocument();
+  });
+
+  it("ranks candidates strongest first and labels what actually matched", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    const cands = within(groups[0]).getAllByTestId("assign-candidate");
+    expect(cands).toHaveLength(2);
+    expect(cands[0]).toHaveTextContent("10k 0402");
+    expect(cands[0]).toHaveTextContent("Value + Footprint");
+    expect(cands[1]).toHaveTextContent("Value + Package");
+  });
+
+  it("assigns the whole group from one click on the chosen candidate", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    const cands = within(groups[0]).getAllByTestId("assign-candidate");
+    // Nothing is armed or committed before the click.
+    expect(mockApi.assignGroup).not.toHaveBeenCalled();
+    await user.click(cands[0]);
+    await waitFor(() =>
+      expect(mockApi.assignGroup).toHaveBeenCalledWith("netdeck", {
+        refs: ["R1", "R2", "R10"],
+        part_id: "r10k",
+      }),
+    );
+  });
+
+  it("assigns the second-ranked candidate when that is the one clicked", async () => {
+    // The ranking must be a suggestion, never a forced choice: picking the weaker-evidence part has
+    // to send THAT part, or the ranking would be silently overriding the user.
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    await user.click(within(groups[0]).getAllByTestId("assign-candidate")[1]);
+    await waitFor(() =>
+      expect(mockApi.assignGroup).toHaveBeenCalledWith("netdeck", {
+        refs: ["R1", "R2", "R10"],
+        part_id: "r10k5",
+      }),
+    );
+  });
+
+  it("tells the user what to do when the library has nothing matching", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    expect(within(groups[1]).getByTestId("assign-no-candidates")).toHaveTextContent(
+      "No component in your library has this value. Add one, then assign these here.",
+    );
+    expect(within(groups[1]).queryAllByTestId("assign-candidate")).toHaveLength(0);
+  });
+
+  it("confirms completion instead of showing an empty list", async () => {
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, components: 5, unassigned: 0, groups: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-all-assigned")).toBeInTheDocument();
+    expect(within(section).queryByTestId("assign-groups")).not.toBeInTheDocument();
+  });
+
+  it("explains the git requirement rather than offering a control that cannot work", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, under_git: false });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-no-git")).toBeInTheDocument();
+    expect(within(section).queryAllByTestId("assign-candidate")).toHaveLength(0);
+  });
+
+  it("surfaces a failed assignment honestly", async () => {
+    mockApi.assignGroup.mockRejectedValue(new ApiError(400, "no component R9 in this project"));
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    const groups = within(section).getAllByTestId("assign-group");
+    await user.click(within(groups[0]).getAllByTestId("assign-candidate")[0]);
+    expect(await screen.findByText("no component R9 in this project")).toBeInTheDocument();
+  });
+
+  // -- the record of what is already assigned, and whether it still holds ------
+
+  const BOUND_OK = {
+    ref: "R1", sheet: "root.kicad_sch", key: "u-1", weak_key: false,
+    part_id: "r10k", display_name: "10 kOhm 0402", mpn: "RC0402FR-0710KL",
+    missing: false, drift: [],
+  };
+  const BOUND_DRIFTED = {
+    ...BOUND_OK, ref: "R2", key: "u-2",
+    drift: [{ prop: "MPN", old: "WRONG", new: "RC0402FR-0710KL", kind: "overwrite" as const }],
+  };
+  const BOUND_BROKEN = {
+    ...BOUND_OK, ref: "R3", key: "u-3", display_name: "", mpn: "", missing: true,
+  };
+
+  it("counts the healthy links and gives a row only to the ones needing a person", async () => {
+    // A hundred healthy rows would bury the two that are broken, so agreement is a COUNT.
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, groups: [], bound: [BOUND_OK, BOUND_DRIFTED, BOUND_BROKEN],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-summary")).toHaveTextContent(
+      "3 components are linked to a library part, 2 need a look.",
+    );
+    const rows = within(section).getAllByTestId("assign-bound-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("R2");
+    expect(rows[0]).toHaveTextContent("Drifted");
+    expect(rows[0]).toHaveTextContent("MPN disagrees with the library part.");
+    expect(rows[1]).toHaveTextContent("R3");
+    expect(rows[1]).toHaveTextContent("Part Missing");
+  });
+
+  it("opens the full list on demand, because re-verifying needs to see everything", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK, BOUND_DRIFTED] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getAllByTestId("assign-bound-row")).toHaveLength(1);
+    await user.click(within(section).getByTestId("assign-bound-toggle"));
+    expect(within(section).getAllByTestId("assign-bound-row")).toHaveLength(2);
+  });
+
+  it("confirms agreement instead of showing an empty issue list", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-clean")).toHaveTextContent(
+      "All 1 agree with the library.",
+    );
+  });
+
+  it("flags a link that renumbering would break, rather than calling it durable", async () => {
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, groups: [], bound: [{ ...BOUND_OK, key: "ref:R1", weak_key: true }],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getAllByTestId("assign-bound-row")[0]).toHaveTextContent("Weak Link");
+  });
+
+  it("says where a link is kept, per EDA tool", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, groups: [], bound: [BOUND_OK] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).getByTestId("assign-bound-where")).toHaveTextContent(
+      "hidden Stockroom ID field",
+    );
+  });
+
+  it("does not demand project git when the binding is not written to the design", async () => {
+    // Altium: Stockroom records the link on its own side, so the project's version control is not
+    // involved and refusing the whole surface would block work that is perfectly safe.
+    mockApi.getAssign.mockResolvedValue({
+      ...ASSIGN, eda: "altium", under_git: false, bound: [BOUND_OK],
+      binding: { field: "Stockroom ID", writable: false, reason: "Stockroom records this link." },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).queryByTestId("assign-no-git")).not.toBeInTheDocument();
+    expect(within(section).getByTestId("assign-bound-where")).toHaveTextContent(
+      "Stockroom records this link.",
+    );
+  });
+
+  it("hides the record entirely when nothing has been assigned yet", async () => {
+    mockApi.getAssign.mockResolvedValue({ ...ASSIGN, bound: [] });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openAssign(user);
+    expect(within(section).queryByTestId("assign-bound")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("ProjectsPage sync hygiene", () => {
+  async function openHealth(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByTestId("project-row-netdeck"));
+    await user.click(await screen.findByRole("tab", { name: "Health" }));
+    return await screen.findByTestId("hygiene-section");
+  }
+
+  it("names the files it would stop sharing, rather than just claiming it will fix things", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitignore", ".gitattributes"],
+      untracked: ["board.kicad_prl", "fp-info-cache"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    const files = within(section).getByTestId("hygiene-files");
+    expect(files).toHaveTextContent("board.kicad_prl");
+    expect(files).toHaveTextContent("fp-info-cache");
+    // and it says the files survive, because "stop sharing" reads like "delete" otherwise
+    expect(section).toHaveTextContent("These stay on your disk.");
+  });
+
+  it("confirms a clean project instead of offering a pointless button", async () => {
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-clean")).toBeInTheDocument();
+    expect(within(section).queryByTestId("hygiene-sync")).not.toBeInTheDocument();
+  });
+
+  it("syncs and reports how many files stopped being shared", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitignore"], untracked: ["board.kicad_prl"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    await user.click(within(section).getByTestId("hygiene-sync"));
+    expect(mockApi.syncProjectHygiene).toHaveBeenCalledWith("netdeck");
+    expect(await screen.findByText(/no longer shared through git/)).toBeInTheDocument();
+  });
+
+  it("explains a project with no git instead of offering a control that cannot work", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: false, writes: [], untracked: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-no-git")).toBeInTheDocument();
+    expect(within(section).queryByTestId("hygiene-sync")).not.toBeInTheDocument();
+  });
+
+  it("does not offer to stop sharing anything when only the rules are stale", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [".gitattributes"], untracked: [],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(within(section).getByTestId("hygiene-sync")).toHaveTextContent("Update Ignore Rules");
+    expect(within(section).queryByTestId("hygiene-files")).not.toBeInTheDocument();
+  });
+
+  it("counts one file as one file", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [], untracked: ["board.kicad_prl"],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    expect(section).toHaveTextContent("1 file is shared that should not be.");
+  });
+
+  it("surfaces a refused sync honestly", async () => {
+    mockApi.getProjectHygiene.mockResolvedValue({
+      eda: "kicad", under_git: true, writes: [], untracked: ["board.kicad_prl"],
+    });
+    mockApi.syncProjectHygiene.mockRejectedValue(
+      new ApiError(400, "this repository has staged changes"),
+    );
+    renderPage();
+    const user = userEvent.setup();
+    const section = await openHealth(user);
+    await user.click(within(section).getByTestId("hygiene-sync"));
+    expect(await screen.findByText("this repository has staged changes")).toBeInTheDocument();
   });
 });

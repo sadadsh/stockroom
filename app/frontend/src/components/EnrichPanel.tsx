@@ -8,9 +8,10 @@
  * PDF-fetch flow to fill the gate, and package/stock are not identity fields.
  * A scrape miss surfaces as "nothing found", never a fabricated value.
  */
-import { useEnrichPart } from "../api/queries";
+import { useEnrichLookup } from "../api/queries";
 import type { EnrichmentResult, SourcedField } from "../api/types";
 import { Badge, Button, Card, Eyebrow } from "./primitives";
+import { EnrichStages } from "./EnrichStages";
 import { ExternalIcon } from "./icons";
 
 interface Props {
@@ -68,8 +69,9 @@ export function EnrichPanel({
   hasPinout = false,
   busy = false,
 }: Props) {
-  const enrich = useEnrichPart();
-  const result = enrich.data;
+  const enrich = useEnrichLookup();
+  const result = enrich.result;
+  const running = enrich.status === "running";
 
   return (
     <div>
@@ -83,21 +85,22 @@ export function EnrichPanel({
             variant="accent"
             small
             className="ml-auto flex-none"
-            disabled={enrich.isPending}
-            onClick={() => enrich.mutate({ mpn, category })}
+            disabled={running}
+            onClick={() => enrich.runPart(mpn, category)}
           >
-            {enrich.isPending ? "Looking Up..." : "Enrich From Distributor"}
+            {running ? "Looking Up..." : "Enrich From Distributor"}
           </Button>
         </div>
 
-        {enrich.isError ? (
+        {running ? <EnrichStages progress={enrich.progress} className="mt-3.5" /> : null}
+
+        {enrich.status === "error" ? (
           <div className="mt-3 text-sm text-err">
-            Lookup failed.{" "}
-            {enrich.error instanceof Error ? enrich.error.message : "Unknown error."}
+            Lookup failed. {enrich.error ?? "Unknown error."}
           </div>
         ) : null}
 
-        {result ? (
+        {result && !running ? (
           hasAnyData(result) ? (
             <div className="mt-3.5 flex flex-col gap-1">
               {APPLIABLE.map(({ field, label }) => (

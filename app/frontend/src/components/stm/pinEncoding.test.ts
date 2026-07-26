@@ -1,0 +1,39 @@
+import { describe, expect, it } from "vitest";
+import { PIN_CATEGORIES, categoryFill, categoryLabel } from "./pinEncoding";
+
+describe("pinEncoding categories", () => {
+  it("covers the API's full ten-bucket category vocabulary", () => {
+    expect(PIN_CATEGORIES.map((c) => c.key)).toEqual([
+      "gpio",
+      "analog",
+      "debug",
+      "oscillator",
+      "power",
+      "ground",
+      "reset",
+      "boot",
+      "vcap",
+      "nc",
+    ]);
+  });
+
+  it("maps each known category to its own token", () => {
+    expect(categoryFill("analog")).toBe("var(--stm-analog)");
+    expect(categoryFill("gpio")).toBe("var(--stm-gpio)");
+    expect(categoryFill("nc")).toBe("var(--stm-nc)");
+    expect(categoryLabel("oscillator")).toBe("Oscillator");
+    expect(categoryLabel("nc")).toBe("Not Connected");
+  });
+
+  it("reads a raw io electrical class as GPIO (its own live io token)", () => {
+    expect(categoryFill("io")).toBe("var(--stm-io)");
+    expect(categoryLabel("io")).toBe("GPIO");
+  });
+
+  it("never masks an unknown category as Not Connected", () => {
+    // the regression that painted analog-capable PA1 as a "Not Connected" pin
+    expect(categoryFill("someday-new")).toBe("var(--c-line2)");
+    expect(categoryLabel("someday-new")).toBe("Someday-new");
+    expect(categoryLabel("")).toBe("Unknown");
+  });
+});

@@ -28,7 +28,6 @@ def test_build_context_starts_without_kicad_cli(library_root, tmp_path, monkeypa
     # the regression the owner hit: no kicad-cli on PATH must NOT crash startup — the
     # app builds fine and degrades previews/import honestly.
     import stockroom.kicad.cli as cli_mod
-
     from stockroom.api.context import build_context
     from stockroom.store.machine_config import MachineConfig
 

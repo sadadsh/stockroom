@@ -133,7 +133,13 @@ class KiCadCli:
         pretty_dir: Path,
         footprint: str,
         out_dir: Path,
-        layers: str = "F.Cu,F.SilkS,F.Fab",
+        # THE COURTYARD IS IN. This reverses part of 58cc9bc, which dropped it as "a documentation
+        # layer that is never printed" - correct for a fabrication view, and the wrong goal here.
+        # The owner reads this preview to check a footprint against a datasheet, which is exactly
+        # what the PCB editor's view is for, and the courtyard is the part of it that says how much
+        # room the part actually claims (owner, 2026-07-26: "the FOOTPRINT must show the COURTYARD
+        # and everything the PCB editor would show, exactly as it would").
+        layers: str = "F.Cu,F.SilkS,F.Fab,F.CrtYd",
         *,
         black_and_white: bool = False,
     ) -> Path:
@@ -145,6 +151,13 @@ class KiCadCli:
             "-o", str(out_dir),
             "--fp", footprint,
             "-l", layers,
+            # kicad-cli's own switch, read from `fp export svg --help` rather than guessed: "Draw
+            # pad outlines and their NUMBERS on front and back fab layers". F.Fab is already in the
+            # layer list above, so this is what puts pad numbers on the preview - they are drawn as
+            # part of the pad rather than living on a layer of their own, which is why adding
+            # another layer would never have produced them (owner: "the 2D footprint preview has NO
+            # PAD NUMBERS").
+            "--sketch-pads-on-fab-layers",
         ]
         if black_and_white:
             # monochrome black-on-transparent so the web viewer can re-tint it to the

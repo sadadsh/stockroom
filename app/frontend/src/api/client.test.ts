@@ -65,6 +65,34 @@ describe("api client", () => {
     expect(url).toContain("complete_only=true");
   });
 
+  it("searchParts serializes each spec constraint as a repeated query param", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ parts: [], count: 0 }));
+
+    await api.searchParts({
+      category: "Resistors",
+      spec: ["Resistance:1000~10000", "Tolerance:1%"],
+    });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toContain("/api/library/search");
+    expect(url.searchParams.get("category")).toBe("Resistors");
+    expect(url.searchParams.getAll("spec")).toEqual([
+      "Resistance:1000~10000",
+      "Tolerance:1%",
+    ]);
+  });
+
+  it("parametricFacets scopes by category and query", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ category: "Resistors", facets: [], total: 0 }));
+
+    await api.parametricFacets({ category: "Resistors", q: "0603" });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toContain("/api/library/facets/parametric");
+    expect(url.searchParams.get("category")).toBe("Resistors");
+    expect(url.searchParams.get("q")).toBe("0603");
+  });
+
   it("surfaces the backend error message and status on a non-ok response", async () => {
     fetchMock.mockResolvedValueOnce(errJson(404, { error: "not found" }));
 
@@ -152,31 +180,63 @@ describe("api client", () => {
     });
   });
 
-  it("posts the mpn and category to enrich and returns the sourced result", async () => {
-    fetchMock.mockResolvedValueOnce(
-      okJson({
-        category: "ICs",
-        mpn: { value: "LM358DR", source: "jsonld", confidence: "high" },
-        manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
-        description: null,
-        datasheet_url: null,
-        stock: null,
-        package: null,
-        price_breaks: [],
-        specs: {},
-        schema_version: 1,
-      }),
-    );
+  it("posts the mpn and category to enrich and returns the job ref (the sourced result now streams over SSE)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job456" }));
 
     const res = await api.enrichPart("LM358DR", "ICs");
 
-    expect(res.manufacturer?.value).toBe("Texas Instruments");
+    expect(res).toEqual({ job_id: "job456" });
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain("/api/enrich/part");
     expect((init as RequestInit).method).toBe("POST");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       mpn: "LM358DR",
       category: "ICs",
+    });
+  });
+
+  it("POSTs the per-part sourcing refresh and returns the job ref", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job789" }));
+
+    const res = await api.refreshSourcing("lm358");
+
+    expect(res).toEqual({ job_id: "job789" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/library/parts/lm358/refresh");
+    expect((init as RequestInit).method).toBe("POST");
+  });
+
+  it("POSTs a symbol reference with lib, name and the default kicad tool", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({
+        id: "r1",
+        eda: { kicad: { symbol: { lib: "Device", name: "R", file: "" }, footprint: null, model: null } },
+      }),
+    );
+    const res = await api.attachSymbol("r1", "Device", "R");
+    expect(res.eda.kicad.symbol?.name).toBe("R");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/symbol");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      lib: "Device",
+      name: "R",
+      tool: "kicad",
+    });
+  });
+
+  it("POSTs a footprint reference and carries an explicit tool", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ id: "r1", footprint: { lib: "L", name: "F", tool: "altium" } }),
+    );
+    await api.attachFootprint("r1", "L", "F", "altium");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/footprint");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      lib: "L",
+      name: "F",
+      tool: "altium",
     });
   });
 
@@ -525,5 +585,87 @@ describe("api client", () => {
     expect((init as RequestInit).method).toBe("PATCH");
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.rules).toEqual({ min_track_width: 0.13 });
+  });
+
+  // --- STM Viewer (Phase 3 contract) ---
+
+  it("getStmMcus builds the mcus URL with only the provided scope params", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ mcus: [], count: 0, facets: {} }));
+
+    await api.getStmMcus({ family: "STM32F4", q: "", core: "Cortex-M4", package: "" });
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/mcus");
+    expect(url.searchParams.get("family")).toBe("STM32F4");
+    expect(url.searchParams.get("core")).toBe("Cortex-M4");
+    // empty q + package are dropped from the query, exactly like listParts
+    expect(url.searchParams.has("q")).toBe(false);
+    expect(url.searchParams.has("package")).toBe(false);
+  });
+
+  it("getStmMcus with a blank scope requests the full matrix (no query params)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ mcus: [], count: 0, facets: {} }));
+
+    await api.getStmMcus();
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/mcus");
+    expect(url.search).toBe("");
+  });
+
+  it("getStmPinout passes part as a query param (never path-encoded)", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ part: "x", pins: [] }));
+
+    await api.getStmPinout("STM32F407V(E-G)Tx");
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.pathname).toBe("/api/stm/pinout");
+    // the ref name's parentheses live in the ?part= value, not the path
+    expect(url.searchParams.get("part")).toBe("STM32F407V(E-G)Tx");
+  });
+
+  it("getStmStatus and getStmFamilies send the bearer token", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ built: false }));
+    await api.getStmStatus();
+    const [statusUrl, statusInit] = fetchMock.mock.calls[0];
+    expect(String(statusUrl)).toContain("/api/stm/status");
+    expect((statusInit as RequestInit).headers).toMatchObject({
+      Authorization: "Bearer test-token",
+    });
+
+    fetchMock.mockResolvedValueOnce(okJson({ families: [] }));
+    await api.getStmFamilies();
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/api/stm/families");
+  });
+
+  it("buildStmIndex POSTs to /api/stm/build and resolves the job ref", async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ job_id: "job-42" }));
+
+    const ref = await api.buildStmIndex();
+
+    expect(ref).toEqual({ job_id: "job-42" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/api/stm/build");
+    expect((init as RequestInit).method).toBe("POST");
+  });
+
+  it("a 409 from an STM read surfaces as ApiError.status === 409 the caller can branch on", async () => {
+    fetchMock.mockResolvedValueOnce(errJson(409, { detail: "STM index not built" }));
+
+    await expect(api.getStmMcus()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 409,
+    });
+    // and the message is carried through for an honest surface
+    await expect(
+      (async () => {
+        fetchMock.mockResolvedValueOnce(errJson(409, { detail: "STM index not built" }));
+        try {
+          await api.getStmStatus();
+        } catch (err) {
+          throw err instanceof ApiError ? err.message : "wrong error type";
+        }
+      })(),
+    ).rejects.toBe("STM index not built");
   });
 });

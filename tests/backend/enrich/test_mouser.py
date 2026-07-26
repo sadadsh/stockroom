@@ -1,9 +1,71 @@
 import json
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-from stockroom.enrich.mouser import MouserAdapter
+import pytest
+
+from stockroom.enrich.errors import EnrichError
+from stockroom.enrich.mouser import MouserAdapter, _default_requester, _parse_mouser_part
 
 FIX = Path(__file__).parent / "fixtures"
+
+
+# A real-shaped Mouser part carrying the full field set the API returns (parametric attributes,
+# category, compliance, trade origin, image, order quantities) that the parser used to drop.
+_FULL_PART = {
+    "ManufacturerPartNumber": "TPD6E05U06RVZR",
+    "Manufacturer": "Texas Instruments",
+    "Description": "ESD Protection Diodes / TVS Diodes 6-CH",
+    "Category": "ESD Protection Diodes / TVS Diodes",
+    "ImagePath": "https://www.mouser.com/images/ti/tpd6e05.jpg",
+    "ROHSStatus": "RoHS Compliant",
+    "Min": "1",
+    "Mult": "1",
+    "SalesMaximumOrderQty": "240",
+    "AvailabilityInStock": "12317",
+    "ProductDetailUrl": "https://www.mouser.com/x",
+    "MouserPartNumber": "595-TPD6E05U06RVZR",
+    "UnitWeightKg": {"UnitWeight": 4.2e-05},
+    "ProductAttributes": [
+        {"AttributeName": "Packaging", "AttributeValue": "Reel"},
+        {"AttributeName": "Packaging", "AttributeValue": "Cut Tape"},
+        {"AttributeName": "Standard Pack Qty", "AttributeValue": "3000"},
+    ],
+    "ProductCompliance": [
+        {"ComplianceName": "USHTS", "ComplianceValue": "8541100080"},
+        {"ComplianceName": "ECCN", "ComplianceValue": "EAR99"},
+    ],
+    "TradeCompliance": [
+        {"ComplianceName": "Country of Origin", "ComplianceValue": "China"},
+    ],
+    "PriceBreaks": [{"Quantity": 1, "Price": "$0.50"}],
+}
+
+
+def test_parse_captures_parametrics_category_and_compliance():
+    r = _parse_mouser_part(_FULL_PART)
+    # packaging/parametric attributes flow into specs, grouped by name (distinct values joined)
+    assert "Reel" in r.specs["Packaging"].value and "Cut Tape" in r.specs["Packaging"].value
+    assert r.specs["Standard Pack Qty"].value == "3000"
+    # the distributor category is kept as a spec (also drives the fill_category classifier)
+    assert r.specs["Product Category"].value == "ESD Protection Diodes / TVS Diodes"
+    assert r.specs["RoHS"].value == "RoHS Compliant"
+    assert r.specs["ECCN"].value == "EAR99"
+    assert r.specs["HTS Code (US)"].value == "8541100080"
+    assert r.specs["Image"].value.startswith("http")
+    # country of origin becomes the canonical field AND a spec
+    assert r.country_of_origin.value == "China"
+    # order quantities
+    assert r.specs["Minimum Order Quantity"].value == "1"
+    assert r.specs["Maximum Order Quantity"].value == "240"
+
+
+def test_parse_never_raises_on_missing_rich_blocks():
+    # a lean part (no attributes/compliance/category) must still parse cleanly, never raise
+    r = _parse_mouser_part({"ManufacturerPartNumber": "X"})
+    assert r.mpn.value == "X"
+    assert r.country_of_origin is None and "Product Category" not in r.specs
 
 
 def test_adapter_is_off_by_default_with_no_key():
@@ -49,3 +111,83 @@ def test_lookup_carries_the_procurement_fields(  # M7d: lifecycle / lead / produ
     assert r.lead_time.value == "16 Weeks"
     assert r.product_url.value == "http://x/exact"
     assert r.dist_pns == {"mouser": "595-TPS62130RGTR"}
+
+
+# --- Phase-1b-2b: last_status circuit-breaker signal ------------------------------
+
+
+def test_last_status_is_rate_limited_on_a_429():
+    def boom(mpn):
+        raise EnrichError("throttled", status_code=429)
+
+    a = MouserAdapter(api_key="k", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "rate_limited"
+    assert r.filled_fields() == set()  # a failed lookup still returns an empty result
+
+
+def test_last_status_is_auth_error_on_a_401():
+    def boom(mpn):
+        raise EnrichError("unauthorized", status_code=401)
+
+    a = MouserAdapter(api_key="k", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "auth_error"
+    assert r.filled_fields() == set()
+
+
+def test_last_status_is_auth_error_on_a_403():
+    def boom(mpn):
+        raise EnrichError("forbidden", status_code=403)
+
+    a = MouserAdapter(api_key="k", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "auth_error"
+    assert r.filled_fields() == set()
+
+
+def test_last_status_is_error_on_a_generic_failure():
+    def boom(mpn):
+        raise EnrichError("transport blip")  # no status_code: not HTTP-coded
+
+    a = MouserAdapter(api_key="k", requester=boom)
+    r = a.lookup("X")
+    assert a.last_status == "error"
+    assert r.filled_fields() == set()
+
+
+def test_last_status_is_ok_on_a_matching_part():
+    body = json.loads((FIX / "mouser_partnumber.json").read_text())
+    a = MouserAdapter(api_key="k", requester=lambda mpn: body)
+    a.lookup("TPS62130RGTR")
+    assert a.last_status == "ok"
+
+
+def test_last_status_is_not_found_on_no_parts():
+    a = MouserAdapter(api_key="k", requester=lambda mpn: {"SearchResults": {"Parts": []}})
+    a.lookup("NOPE")
+    assert a.last_status == "not_found"
+
+
+def test_last_status_defaults_to_empty_before_any_lookup():
+    assert MouserAdapter(api_key="k").last_status == ""
+
+
+def test_default_requester_raises_enricherror_with_status_code_on_http_error(monkeypatch):
+    def _boom(req, timeout=8):
+        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", None, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    with pytest.raises(EnrichError) as exc_info:
+        _default_requester("key")("X")
+    assert exc_info.value.status_code == 429
+
+
+def test_default_requester_raises_plain_enricherror_on_transport_failure(monkeypatch):
+    def _boom(req, timeout=8):
+        raise OSError("network down")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    with pytest.raises(EnrichError) as exc_info:
+        _default_requester("key")("X")
+    assert exc_info.value.status_code is None

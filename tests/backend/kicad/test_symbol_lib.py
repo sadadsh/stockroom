@@ -72,3 +72,59 @@ def test_remove_symbol_and_missing_raises(tmp_fixture):
     assert lib.symbol_names == []
     with pytest.raises(KiCadFileError):
         lib.remove_symbol("R_0603")
+
+
+def test_set_property_hidden_inserts_with_hide_effects(tmp_fixture):
+    path = tmp_fixture("minimal.kicad_sym")
+    lib = SymbolLib.load(path)
+    sym = lib.get_symbol("R_0603")
+    sym.set_property("MPN", "RC0603FR-0710KL", hide=True)
+    lib.save(path)
+    text = path.read_text()
+    # the inserted metadata property carries (hide yes) so KiCad never splats it
+    # onto a schematic and the symbol preview stays readable
+    start = text.index('(property "MPN"')
+    assert "(hide yes)" in text[start:start + 300]
+
+
+def test_set_property_hidden_enforces_hide_on_an_existing_visible_property(tmp_fixture):
+    path = tmp_fixture("minimal.kicad_sym")
+    lib = SymbolLib.load(path)
+    lib.get_symbol("R_0603").set_property("MPN", "OLD")
+    lib.save(path)
+    # the property exists VISIBLE (the pre-fix state); a hidden set must heal it
+    lib2 = SymbolLib.load(path)
+    lib2.get_symbol("R_0603").set_property("MPN", "NEW", hide=True)
+    lib2.save(path)
+    text = path.read_text()
+    start = text.index('(property "MPN"')
+    assert '"NEW"' in text[start:start + 200]
+    assert "(hide yes)" in text[start:start + 300]
+
+
+def test_set_property_hidden_never_duplicates_the_hide_effects(tmp_fixture):
+    path = tmp_fixture("minimal.kicad_sym")
+    lib = SymbolLib.load(path)
+    sym = lib.get_symbol("R_0603")
+    sym.set_property("MPN", "A", hide=True)
+    sym.set_property("MPN", "B", hide=True)  # update again: still exactly one hide
+    lib.save(path)
+    text = path.read_text()
+    start = text.index('(property "MPN"')
+    assert text[start:start + 300].count("(hide yes)") == 1
+
+
+def test_hide_all_properties_hides_every_visible_field(tmp_fixture):
+    # C1: a preview render hides every property field so the symbol body + pins show,
+    # not a smudge of overlapping Value / Footprint / Datasheet / Reference.
+    lib = SymbolLib.load(tmp_fixture("minimal.kicad_sym"))
+    sym = lib.get_symbol("R_0603")
+    # seed a couple of visible fields so there is something to hide
+    sym.set_property("MPN", "RC0603FR-0710KL")
+    sym.hide_all_properties()
+    for field in ("Reference", "Value", "Footprint", "Datasheet", "MPN"):
+        state = sym.property_hidden(field)
+        assert state in (True, None)  # hidden if present; absent fields stay absent
+    # at least the core fields that exist are now hidden (not still visible)
+    assert sym.property_hidden("Value") is True
+    assert sym.property_hidden("MPN") is True

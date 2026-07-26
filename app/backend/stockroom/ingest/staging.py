@@ -39,6 +39,18 @@ class StagingCandidate:
     purchase: list[Purchase] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     provenance: Provenance | None = None
+    # Every parametric/procurement field enrichment recovered (package, ratings,
+    # tolerances, compliance, ...). A plain str->str bag so the whole set a distributor
+    # page exposes reaches the record, not just the handful of identity fields.
+    specs: dict = field(default_factory=dict)
+    # Where each of those values came from: {key: {"source": ..., "confidence": ...}}. Parallel
+    # to `specs` rather than folded into it, so the review UI keeps editing a plain bag while the
+    # provenance still reaches the record's `enrichment` map (which was empty on every real part).
+    enrichment: dict = field(default_factory=dict)
+    # Every value a source offered and lost with: {key: [{"value","source","confidence"}, ...]},
+    # keyed like the record's `alternates`. Without this the candidate was where a kept
+    # disagreement died - the enrich layer computed it and nothing downstream could hold it.
+    alternates: dict = field(default_factory=dict)
 
     @property
     def chosen_footprint(self) -> Path | None:
@@ -50,11 +62,10 @@ class StagingCandidate:
         return self.footprint_variants[idx]
 
     def to_staged_part(self) -> StagedPart:
-        if self.symbol_lib_path is None:
-            raise IngestError("candidate has no symbol; cannot stage")
+        # A candidate may stage with NO asset files at all (the primary add flow lands a
+        # part on its pulled identity + sourcing; the guided capture attaches both EDA
+        # formats afterwards). The gate that decides entry is add_part's, not this shape.
         fp = self.chosen_footprint
-        if fp is None:
-            raise IngestError("candidate has no footprint; cannot stage")
         datasheet_meta = None
         if self.provenance is not None and self.provenance.source_url:
             datasheet_meta = Datasheet(source_url=self.provenance.source_url)
@@ -74,6 +85,9 @@ class StagingCandidate:
             provenance=self.provenance,
             datasheet_meta=datasheet_meta,
             purchase=list(self.purchase),
+            specs=dict(self.specs),
+            enrichment=dict(self.enrichment),
+            alternates={k: list(v) for k, v in self.alternates.items()},
         )
 
 
@@ -146,3 +160,84 @@ def build_candidates(
             )
         )
     return candidates
+
+
+def _identity_key(text: str) -> str:
+    """Case/punctuation-insensitive identity token for matching a fragment to the
+    candidate it completes (MPN-B == mpn-b == MPN_B)."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
+
+
+def _fragment_keys(c: StagingCandidate) -> set[str]:
+    return {k for k in (_identity_key(c.mpn), _identity_key(c.display_name),
+                        _identity_key(c.entry_name)) if k}
+
+
+def _full_keys(c: StagingCandidate) -> set[str]:
+    return {k for k in (_identity_key(c.mpn), _identity_key(c.display_name),
+                        _identity_key(c.entry_name), _identity_key(c.symbol_name)) if k}
+
+
+def _refresh_asset_gaps(c: StagingCandidate) -> None:
+    c.gaps = [
+        g for g in c.gaps
+        if not (("3D model" in g and c.model_path is not None)
+                or ("datasheet" in g and c.datasheet_path is not None))
+    ]
+
+
+def _absorb(target: StagingCandidate, frag: StagingCandidate) -> bool:
+    """MOVE the fragment's assets onto the target where the target lacks them (a
+    taken asset leaves the fragment, so it can never appear on two cards). True
+    when the fragment ended empty; a leftover asset (the target already had its
+    own) keeps the fragment alive so nothing is silently dropped."""
+    took_any = False
+    if frag.model_path is not None and target.model_path is None:
+        target.model_path = frag.model_path
+        frag.model_path = None
+        took_any = True
+    if frag.datasheet_path is not None and target.datasheet_path is None:
+        target.datasheet_path = frag.datasheet_path
+        frag.datasheet_path = None
+        took_any = True
+    if took_any:
+        _refresh_asset_gaps(target)
+    return frag.model_path is None and frag.datasheet_path is None
+
+
+def merge_candidates(candidates: list[StagingCandidate]) -> list[StagingCandidate]:
+    """Fold symbol-less fragments (a bare 3D model or datasheet, the second half
+    of a split vendor download) into the symbol-bearing candidate they complete.
+    Conservative: a fragment with an identity merges into the full candidate whose
+    identity matches; anonymous fragments merge only when exactly ONE full
+    candidate exists AND at most one fragment offers each asset kind (zip + step +
+    pdf is one part; two bare steps are ambiguous). Never a guess."""
+    fulls = [c for c in candidates if c.symbol_lib_path is not None]
+    anon = [
+        c for c in candidates
+        if c.symbol_lib_path is None and not _fragment_keys(c)
+    ]
+    # ambiguity per asset kind among the anonymous fragments
+    anon_models = sum(1 for c in anon if c.model_path is not None)
+    anon_datasheets = sum(1 for c in anon if c.datasheet_path is not None)
+    out: list[StagingCandidate] = []
+    for c in candidates:
+        if c.symbol_lib_path is not None:
+            out.append(c)
+            continue
+        keys = _fragment_keys(c)
+        if keys:
+            matches = [f for f in fulls if keys & _full_keys(f)]
+            if len(matches) == 1 and _absorb(matches[0], c):
+                continue
+            out.append(c)
+            continue
+        if (
+            len(fulls) == 1
+            and (c.model_path is None or anon_models == 1)
+            and (c.datasheet_path is None or anon_datasheets == 1)
+            and _absorb(fulls[0], c)
+        ):
+            continue
+        out.append(c)
+    return out

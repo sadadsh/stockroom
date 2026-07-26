@@ -7,11 +7,11 @@ never blocks the gate)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 
-from stockroom.enrich.bulk import bulk_enrich, parse_bom_csv, parse_mpn_list
 from stockroom.enrich.pipeline import EnrichmentPipeline
-from stockroom.enrich.schema import EnrichmentResult, Sourced
+from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 
 
 def _make_pipeline(ctx) -> EnrichmentPipeline:
@@ -20,10 +20,16 @@ def _make_pipeline(ctx) -> EnrichmentPipeline:
         from stockroom.enrich.mouser import MouserAdapter
 
         mouser = MouserAdapter(api_key=ctx.config.mouser_api_key)
+    digikey = None
+    if getattr(ctx.config, "digikey_client_id", "") and getattr(ctx.config, "digikey_client_secret", ""):
+        from stockroom.enrich.digikey_api import DigiKeyAdapter
+
+        digikey = DigiKeyAdapter(ctx.config.digikey_client_id, ctx.config.digikey_client_secret)
     return EnrichmentPipeline(
         ctx.enrich_cache_dir,
         fetcher=ctx.rendered_dom_fetcher,  # None -> pipeline's HTTP default
         mouser=mouser,
+        digikey=digikey,
     )
 
 
@@ -33,19 +39,61 @@ def _sourced_dto(s: Sourced | None) -> dict | None:
     return {"value": s.value, "source": s.source, "confidence": s.confidence}
 
 
+def _add_plan(r: EnrichmentResult) -> dict | None:
+    """The passive-or-not determination the unified Add-A-Part flow branches on: the
+    {kind, package, value, tolerance} a file-less passive add needs, or None when the
+    part is not an addable file-less passive (it then takes the drop-the-assets path)."""
+    from stockroom.enrich.passive import passive_add_plan
+
+    def v(s):
+        return "" if s is None else str(s.value)
+
+    return passive_add_plan(
+        mpn=v(r.mpn),
+        category=r.category,
+        package=v(r.package),
+        specs={k: str(s.value) for k, s in r.specs.items() if s is not None},
+        description=v(r.description),
+    )
+
+
 def _result_dto(r: EnrichmentResult) -> dict:
     return {
         "category": r.category,
-        "mpn": _sourced_dto(r.mpn),
-        "manufacturer": _sourced_dto(r.manufacturer),
-        "description": _sourced_dto(r.description),
-        "datasheet_url": _sourced_dto(r.datasheet_url),
-        "stock": _sourced_dto(r.stock),
-        "package": _sourced_dto(r.package),
+        # A2: the FULL pulled depth, not just identity + specs. Every single-valued canonical
+        # field, enumerated from the schema rather than retyped, because a hand-written list here
+        # dropped lifecycle/lead_time/product_url once and then country_of_origin/tariff_rate
+        # again: the Mouser path filled a part's origin and its real US import tariff and the UI
+        # could never see either. Iterating means a field added to the schema reaches the UI by
+        # construction.
+        **{name: _sourced_dto(getattr(r, name)) for name in SOURCED_FIELDS},
+        "dist_pns": dict(r.dist_pns),
+        # every vendor's own ladder + stock for the comparison view (owner 2026-07-24)
+        "dist_price_breaks": {
+            k: [{"qty": p.qty, "price": p.price, "currency": p.currency} for p in v]
+            for k, v in r.dist_price_breaks.items()
+        },
+        "dist_stock": dict(r.dist_stock),
+        # both distributor buy links (mouser + digikey) when both APIs answered, so the committed
+        # part carries every place it can be ordered, not only the pasted link.
+        "dist_urls": dict(r.dist_urls),
         "price_breaks": [
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],
         "specs": {k: _sourced_dto(v) for k, v in r.specs.items()},
+        # every kept disagreement between sources, all values with their origins (owner
+        # 2026-07-24: "display all of it and only merge stuff thats identical")
+        "spec_conflicts": {
+            k: [_sourced_dto(v) for v in vs] for k, vs in r.spec_conflicts.items()
+        },
+        # the same, for the single-valued fields: both descriptions, both packages, both
+        # datasheet links - whatever two sources disagreed on, with each origin
+        "field_conflicts": {
+            k: [_sourced_dto(v) for v in vs] for k, vs in r.field_conflicts.items()
+        },
+        # The passive determination for the unified Add-A-Part flow (null = non-passive,
+        # needs the symbol/footprint/3D dropped).
+        "add_plan": _add_plan(r),
         "schema_version": r.schema_version,
     }
 
@@ -64,37 +112,57 @@ def enrich_router(require_token) -> APIRouter:
 
     @r.post("/part")
     def enrich_part(request: Request, body: dict) -> dict:
+        """Look a part up by MPN through the pipeline. Runs as a background job (spec
+        section 8): the render tier can take seconds, so the window never blocks. The SSE
+        stream emits the live `fetching -> rendering -> extracting -> validating` stages and
+        ends with the sourced DTO on the `result` event."""
         ctx = request.app.state.ctx
-        pipeline = _make_pipeline(ctx)
-        result = pipeline.enrich(body["mpn"], body.get("category", "Other"),
-                                 want=body.get("want"))
-        return _result_dto(result)
-
-    @r.post("/bulk")
-    def enrich_bulk(request: Request, body: dict) -> dict:
-        ctx = request.app.state.ctx
-        if "csv" in body:
-            mpns = parse_bom_csv(body["csv"])
-        else:
-            mpns = parse_mpn_list(body.get("text", ""))
+        mpn = body["mpn"]
         category = body.get("category", "Other")
+        want = body.get("want")
 
         def work(progress):
-            progress({"pct": 1, "message": f"enriching {len(mpns)} parts"})
             pipeline = _make_pipeline(ctx)
-            report = bulk_enrich(mpns, pipeline, category=category)
-            return _report_dto(report)
+            return _result_dto(pipeline.enrich(mpn, category, want=want, progress=progress))
 
         return {"job_id": ctx.jobs.submit(work)}
 
-    @r.post("/datasheet")
-    def enrich_datasheet(request: Request, body: dict) -> dict:
-        from stockroom.api.routers.ingest import dto_to_candidate
+    @r.post("/from-url")
+    def enrich_from_url(request: Request, body: dict) -> dict:
+        """Paste a distributor product URL (a Mouser link) -> fetch it through the real
+        browser and return EVERYTHING the page exposes: identity, price breaks, stock, a
+        datasheet URL, package, and the full parametric spec set. This is the "paste a
+        link and autofill all of it" seam; a blocked/dead page returns empty fields, not
+        an error. A background job (spec section 8): the live stage sequence streams over
+        SSE and the sourced DTO arrives on the terminal `result` event."""
+        ctx = request.app.state.ctx
+        url = str(body.get("url", ""))
+
+        def work(progress):
+            pipeline = _make_pipeline(ctx)
+            return _result_dto(pipeline.extract_from_url(url, progress=progress))
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/image")
+    def product_image(request: Request, url: str) -> Response:
+        """Proxy a pulled product photo (specs["Image"]) for the SPA's <img> fallback: a
+        vendor CDN that refuses the browser's hotlink still renders, served from the disk
+        cache after the first fetch. 400 for a URL the proxy refuses to touch (hostile
+        input - loopback/private/plain-http); 404 when the fetch yields no real image."""
+        from stockroom.enrich.image_proxy import allowed_image_url, fetch_product_image
 
         ctx = request.app.state.ctx
-        pipeline = _make_pipeline(ctx)
-        candidate = dto_to_candidate(body.get("candidate", {}))
-        path = pipeline.fetch_and_store_datasheet(candidate, body["url"])
-        return {"stored": str(path) if path else None}
+        if not allowed_image_url(url):
+            raise HTTPException(status_code=400, detail="URL not allowed")
+        got = fetch_product_image(url, ctx.enrich_cache_dir)
+        if got is None:
+            raise HTTPException(status_code=404, detail="No image at that URL")
+        data, ctype = got
+        return Response(
+            content=data,
+            media_type=ctype,
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     return r

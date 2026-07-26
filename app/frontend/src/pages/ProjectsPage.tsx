@@ -16,7 +16,7 @@
  * blank frame); loading and error surfaces are explicit; a connection failure shows
  * a retry surface, never a crash.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../api/client";
 import {
@@ -26,7 +26,6 @@ import {
   useProjectAudit,
   useProjectBom,
   useProjectChecks,
-  useProjectProcurement,
   useProjectFab,
   useProjectRevisions,
   useProjectDesign,
@@ -46,11 +45,16 @@ import {
   useProjectFields,
   useSetFields,
   useManualFill,
+  useProjectAssign,
+  useProjectHygiene,
+  useAssignGroup,
+  useSyncProjectHygiene,
   useRestore,
   usePartsQuery,
   useBomDiff,
   useRegisterProject,
   useDeleteProject,
+  useRepriceBom,
 } from "../api/queries";
 import type {
   AuditFinding,
@@ -62,6 +66,7 @@ import type {
   BomExportKind,
   BomLine,
   BomResult,
+  BuildRollup,
   CheckFinding,
   CheckRun,
   ChecksResult,
@@ -77,6 +82,10 @@ import type {
   StackupPreview,
   StackupRead,
   PrepareRead,
+  AssignBinding,
+  AssignBound,
+  AssignCandidate,
+  AssignGroup,
   PrepareResult,
   CompletionRoll,
   DesignResult,
@@ -87,19 +96,33 @@ import type {
   FieldEdit,
   NetClass,
   ProcurementExportOptions,
-  ProcurementLine,
-  ProcurementResult,
+  SourcingRisks,
+  LeadTime,
   ProjectSummary,
   BoardSettings,
 } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Badge, Button, Card, Dot, Eyebrow } from "../components/primitives";
+import {
+  Badge,
+  type BadgeTone,
+  Button,
+  Card,
+  Dot,
+  Eyebrow,
+  PanelTitle,
+  TabPanel,
+  TabStrip,
+  type TabItem,
+} from "../components/primitives";
+import { LibraryVersionSection } from "../components/LibraryVersionSection";
 import { ProjectViewer, type ViewFile } from "../components/ProjectViewer";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ExternalIcon } from "../components/icons";
+import { Icon } from "../components/Icon";
 
 const INPUT_CLS =
-  "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-2 " +
+  "h-[29px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 " +
   "text-sm text-t1 outline-none focus:border-acc disabled:opacity-50";
 
 // Severity -> the shared tone (err/warn/neutral) so the findings table and the
@@ -123,30 +146,45 @@ export function ProjectsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rootInput, setRootInput] = useState("");
   const [pendingDelete, setPendingDelete] = useState<ProjectSummary | null>(null);
+  // A folder holding BOTH KiCad and Altium files needs an explicit choice; the 400
+  // turns into an in-place picker for this path instead of a dead-end toast.
+  const [edaChoiceRoot, setEdaChoiceRoot] = useState<string | null>(null);
 
   const projects = projectsQuery.data ?? [];
 
-  // Keep the selection valid: when the list settles, drop a selection that fell out
-  // of it (a delete, or the first load). Do not auto-select the first project; the
-  // audit is a deliberate click, not something to fire on every list refresh.
+  // Auto-select the first project once the list settles (mirrors the Components picker) so the
+  // detail pane is never a large empty void on load. Landing on the Overview tab is cheap - the
+  // Health audit only runs on its own tab, so this never fires an expensive check unbidden. Act
+  // only on SETTLED data so a refetch never re-picks a just-deleted project.
   const projectsFetching = projectsQuery.isFetching;
   useEffect(() => {
     if (projectsFetching) return;
-    if (selectedId && !projects.some((p) => p.id === selectedId)) {
-      setSelectedId(null);
+    if (projects.length === 0) {
+      if (selectedId !== null) setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !projects.some((p) => p.id === selectedId)) {
+      setSelectedId(projects[0].id);
     }
   }, [projects, selectedId, projectsFetching]);
 
-  function handleRegister() {
-    const root = rootInput.trim();
+  function handleRegister(eda?: string) {
+    const root = (edaChoiceRoot && eda ? edaChoiceRoot : rootInput).trim();
     if (!root || register.isPending) return;
-    register.mutate(root, {
+    register.mutate(eda ? { root, eda } : root, {
       onSuccess: (rec) => {
         toast(`Registered ${rec.name}.`, "ok");
         setRootInput("");
+        setEdaChoiceRoot(null);
         setSelectedId(rec.id);
       },
-      onError: (err) => toast(errMsg(err, "Could not register the project."), "err"),
+      onError: (err) => {
+        if (err instanceof ApiError && /both KiCad and Altium/i.test(err.message)) {
+          setEdaChoiceRoot(root);
+          return;
+        }
+        toast(errMsg(err, "Could not register the project."), "err");
+      },
     });
   }
 
@@ -176,19 +214,17 @@ export function ProjectsPage() {
 
   return (
     <>
-      <div className="flex h-14 flex-none items-center px-[18px]">
-        <div className="text-lg font-semibold text-t1">Projects</div>
-        <div className="ml-auto text-2xs text-t3">
-          {projectsQuery.data
-            ? `${projects.length} ${projects.length === 1 ? "Project" : "Projects"}`
-            : ""}
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1">
-        {/* picker */}
-        <div className="flex w-[348px] flex-none flex-col border-r border-line px-3.5 pt-1.5">
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1">
+      <div className="flex min-h-0 flex-1" data-dev-id="projects.root">
+        {/* picker: a docked panel - the shared PanelTitle strip, then the padded body,
+            mirroring the Components picker exactly */}
+        <div className="flex w-[348px] flex-none flex-col border-r border-line" data-dev-id="projects.picker">
+          <PanelTitle
+            data-dev-id="projects.picker-title"
+            right={projectsQuery.data ? projects.length.toLocaleString() : undefined}
+          >
+            Projects
+          </PanelTitle>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2.5">
             <ProjectPicker
               isLoading={projectsQuery.isLoading}
               error={projectsQuery.error}
@@ -203,22 +239,25 @@ export function ProjectsPage() {
             onChange={setRootInput}
             onRegister={handleRegister}
             busy={register.isPending}
+            edaChoice={edaChoiceRoot != null}
+            onCancelChoice={() => setEdaChoiceRoot(null)}
           />
         </div>
 
-        {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto px-[30px] pt-[22px]">
+        {/* detail: the view owns its title strip, scroll, and footer (no scroll here) */}
+        <div className="flex min-w-0 flex-1 flex-col" data-dev-id="projects.detail">
           {selected ? (
             <ProjectDetailView
+              key={selected.id}
               project={selected}
               onRemove={() => setPendingDelete(selected)}
               removeBusy={del.isPending}
             />
           ) : (
-            <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
+            <div className="flex min-h-[300px] flex-1 items-center justify-center text-sm text-t3">
               {projectsQuery.isLoading
-                ? "Loading Projects..."
-                : "Select A Project To See Its Health."}
+                ? "Loading projects..."
+                : "Select a project to see its health."}
             </div>
           )}
         </div>
@@ -260,7 +299,7 @@ function ProjectPicker({
 }) {
   if (isLoading) {
     return (
-      <div className="px-3 py-8 text-center text-sm text-t3">Loading Projects...</div>
+      <div className="px-3 py-8 text-center text-sm text-t3">Loading projects...</div>
     );
   }
   if (error) {
@@ -292,7 +331,7 @@ function ProjectPicker({
     );
   }
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-0.5" data-dev-id="projects.list">
       {projects.map((project) => (
         <ProjectRow
           key={project.id}
@@ -317,32 +356,58 @@ function ProjectRow({
   return (
     <button
       type="button"
+      data-dev-id="projects.row"
       data-testid={`project-row-${project.id}`}
       onClick={onSelect}
+      aria-current={selected ? "true" : undefined}
       className={
-        "flex w-full flex-col gap-1 rounded-control border px-3 py-2.5 text-left transition-colors " +
+        // The same flat row idiom as the Components list: whitespace-separated rows,
+        // the selection is the acc-soft fill plus the inset accent bar, never a lifted card.
+        "flex w-full items-start gap-3 rounded-control px-2.5 py-2.5 text-left transition-colors " +
         (selected
-          ? "border-acc bg-raise2"
-          : "border-line bg-raise hover:bg-raise2 hover:border-line2")
+          ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
+          : "hover:bg-[var(--c-hover)]")
       }
     >
-      <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-t1">
-          {project.name}
-        </span>
-        {project.has_git ? (
-          <Badge tone="neutral" title="Under version control">
-            Git
-          </Badge>
-        ) : null}
+      <span
+        aria-hidden
+        className="mt-0.5 grid h-9 w-9 flex-none place-items-center rounded-control border border-line2 bg-field text-t2"
+      >
+        <Icon id="glyph.project" className="h-[18px] w-[18px]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-t1">
+            {project.name}
+          </span>
+          <span
+            className="flex-none rounded-control border border-line2 bg-field px-1.5 py-px text-2xs font-semibold text-t2"
+            title={project.eda === "altium" ? "An Altium project" : "A KiCad project"}
+          >
+            {project.eda === "altium" ? "Altium" : "KiCad"}
+          </span>
+          <span
+            className={
+              "inline-flex flex-none items-center gap-1 text-2xs font-medium " +
+              (project.has_git ? "text-ok" : "text-t3")
+            }
+            title={project.has_git ? "Under version control" : "Not under version control"}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: project.has_git ? "var(--c-ok)" : "var(--c-t3)" }}
+            />
+            {project.has_git ? "Git" : "No Git"}
+          </span>
+        </div>
+        <div className="mt-0.5 truncate font-mono text-2xs text-t3" title={project.root}>
+          {project.root}
+        </div>
+        <div className="tnum mt-1 font-mono text-2xs text-t3">
+          {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
+          {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
+        </div>
       </div>
-      <span className="truncate font-mono text-2xs text-t3" title={project.root}>
-        {project.root}
-      </span>
-      <span className="text-2xs text-t3">
-        {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
-        {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
-      </span>
     </button>
   );
 }
@@ -352,38 +417,114 @@ function RegisterBar({
   onChange,
   onRegister,
   busy,
+  edaChoice,
+  onCancelChoice,
 }: {
   value: string;
   onChange: (v: string) => void;
-  onRegister: () => void;
+  onRegister: (eda?: string) => void;
   busy: boolean;
+  edaChoice: boolean;
+  onCancelChoice: () => void;
 }) {
   return (
-    <div className="flex-none border-t border-line px-2 py-3">
+    <div className="flex-none border-t border-line px-3 py-3" data-dev-id="projects.register">
       <Eyebrow className="mb-1.5">Register Project</Eyebrow>
-      <div className="flex flex-col gap-2">
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onRegister();
-          }}
-          placeholder="Absolute path to a KiCad project folder"
-          className={INPUT_CLS}
-          spellCheck={false}
-        />
-        <Button
-          variant="accent"
-          onClick={onRegister}
-          disabled={busy || !value.trim()}
-          className="w-full justify-center"
-        >
-          {busy ? "Registering..." : "Register Project"}
-        </Button>
-      </div>
+      {edaChoice ? (
+        // The folder holds BOTH KiCad and Altium project files: registration needs an
+        // explicit choice, offered in place (never a dead-end error).
+        <div className="flex flex-col gap-2" data-dev-id="projects.register-eda-choice">
+          <p className="text-xs text-t2">
+            This folder holds both KiCad and Altium project files. Which should Stockroom
+            manage here?
+          </p>
+          <Button
+            variant="accent"
+            small
+            onClick={() => onRegister("kicad")}
+            disabled={busy}
+            className="w-full justify-center"
+            data-dev-id="projects.register-as-kicad"
+          >
+            Register As KiCad
+          </Button>
+          <Button
+            variant="accent"
+            small
+            onClick={() => onRegister("altium")}
+            disabled={busy}
+            className="w-full justify-center"
+            data-dev-id="projects.register-as-altium"
+          >
+            Register As Altium
+          </Button>
+          <Button
+            small
+            onClick={onCancelChoice}
+            disabled={busy}
+            className="w-full justify-center"
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRegister();
+            }}
+            placeholder="Absolute path to a KiCad or Altium project folder"
+            className={INPUT_CLS}
+            spellCheck={false}
+            data-dev-id="projects.register-input"
+          />
+          <Button
+            variant="accent"
+            onClick={() => onRegister()}
+            disabled={busy || !value.trim()}
+            className="w-full justify-center"
+            data-dev-id="projects.register-action"
+          >
+            {busy ? "Registering..." : "Register Project"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
+
+// The selected project was ONE long scroll of 14 stacked sections (owner: "the ia
+// is still really bad"). It is now five per-project tabs, mirroring the Library
+// fold and the north-star Projects shape: Overview (the readiness verdict + board
+// viewer), Health (audit findings + ERC/DRC + Prepare), BOM & Procurement (build,
+// cost, orderability, revision diff, fab exports), PCB Setup (board/stackup/conform/
+// checks-config/meta editors), and Net Classes (net classes + design rules + patterns).
+type ProjectTab = "overview" | "health" | "bom" | "setup" | "netclasses";
+
+const PROJECT_TABS: readonly TabItem<ProjectTab>[] = [
+  { id: "overview", label: "Overview" },
+  { id: "health", label: "Health" },
+  { id: "bom", label: "BOM & Procurement" },
+  { id: "setup", label: "PCB Setup" },
+  { id: "netclasses", label: "Net Classes" },
+];
+
+// Sections carry a leading `mt-7 border-t pt-6` divider to separate them when
+// stacked. Whichever section renders FIRST in a tab has that divider stripped, so
+// the tab strip is not followed by a stray rule and a large gap.
+const TAB_BODY_CLS =
+  "[&>*:first-child]:mt-0 [&>*:first-child]:border-t-0 [&>*:first-child]:pt-0";
+
+// What an EDA's registration can do, derived the same way the server derives it, so
+// the tab strip renders correctly BEFORE the detail (the server's authoritative
+// capabilities list) arrives. Once loaded, the server list wins.
+const EDA_FALLBACK_CAPABILITIES: Record<string, string[]> = {
+  kicad: ["audit", "bom", "revisions", "restore", "file",
+          "checks", "fab", "setup", "netclasses", "prepare", "viewer"],
+  altium: ["audit", "bom", "revisions", "restore", "file"],
+};
 
 function ProjectDetailView({
   project,
@@ -394,39 +535,113 @@ function ProjectDetailView({
   onRemove: () => void;
   removeBusy: boolean;
 }) {
-  const auditQuery = useProjectAudit(project.id);
+  // The whole view is keyed by project id at the call site, so a project switch
+  // remounts it and this lands back on Overview with a fresh, flash-free state (no
+  // post-paint reset effect, no stale tab briefly rendered against the new project).
+  const [tab, setTab] = useState<ProjectTab>("overview");
+  // The server's capabilities (what this EDA's registration can do here) gate the
+  // tabs and the per-tab KiCad-only sections; the eda-derived fallback prevents a
+  // tab flash while the detail loads.
+  const detailQuery = useProjectQuery(project.id);
+  const caps = new Set(
+    detailQuery.data?.capabilities
+      ?? EDA_FALLBACK_CAPABILITIES[project.eda]
+      ?? EDA_FALLBACK_CAPABILITIES.kicad,
+  );
+  const tabs = PROJECT_TABS.filter(
+    (t) =>
+      (t.id !== "setup" || caps.has("setup"))
+      && (t.id !== "netclasses" || caps.has("netclasses")),
+  );
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : "overview";
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {/* title strip: the same band + hairline as the opened component's, so the two
+          flagship detail panes read identically */}
+      <div
+        className="flex h-[34px] flex-none items-center gap-3 border-b border-line bg-band px-6"
+        data-dev-id="projects.detail-header"
+      >
+        <span className="min-w-0 truncate text-sm font-semibold text-t1">{project.name}</span>
+        <span className="ml-auto flex-none truncate text-2xs font-semibold uppercase tracking-[0.07em] text-t3">
+          {project.eda === "altium" ? "Altium" : "KiCad"} ·{" "}
+          {project.board_count} {project.board_count === 1 ? "board" : "boards"} ·{" "}
+          {project.sheet_count} {project.sheet_count === 1 ? "sheet" : "sheets"}
+        </span>
+
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col px-6 pb-3 pt-3">
+        {/* sub-header: the project's path on the left, the view tabs on the right */}
+        <div className="flex flex-none items-center justify-between gap-4 border-b border-line pb-2.5">
+          <span className="min-w-0 truncate font-mono text-xs text-t3" title={project.root}>
+            {project.root}
+          </span>
+          <TabStrip
+            tabs={tabs}
+            active={activeTab}
+            onSelect={setTab}
+            idBase="project"
+            devIdBase="projects"
+            className="flex-none"
+            aria-label="Project sections"
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto pt-4">
+          <TabPanel idBase="project" tab={activeTab} className={TAB_BODY_CLS + " max-w-[900px] pb-4"}>
+            {activeTab === "overview" ? (
+              <OverviewTab projectId={project.id} caps={caps} />
+            ) : activeTab === "health" ? (
+              <HealthTab projectId={project.id} caps={caps} />
+            ) : activeTab === "bom" ? (
+              <BomTab projectId={project.id} caps={caps} />
+            ) : activeTab === "setup" ? (
+              <SetupTab projectId={project.id} />
+            ) : (
+              <NetClassesTab projectId={project.id} />
+            )}
+          </TabPanel>
+        </div>
+
+        {/* footer: the destructive action sits alone at the end, same as the component pane */}
+        <footer className="mt-3 flex flex-none items-center justify-end border-t border-line pt-2.5">
+          <Button
+            variant="danger"
+            small
+            onClick={onRemove}
+            disabled={removeBusy}
+            className="flex-none"
+            data-dev-id="projects.remove"
+          >
+            Remove Project
+          </Button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// Overview: the readiness verdict card and (for a KiCad project) the board viewer.
+function OverviewTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
+  return (
+    <>
+      <BuildabilitySection projectId={projectId} />
+      {caps.has("viewer") ? <ProjectViewerSection projectId={projectId} /> : null}
+    </>
+  );
+}
+
+// Health: the audit findings table (with its kind filter), the ERC/DRC checks, and
+// Prepare This Project (Fix-All + Restore). The audit query is scoped here so it
+// loads only when Health is open, not on every project select.
+function HealthTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
+  const auditQuery = useProjectAudit(projectId);
   // The active kind filter for the findings table. null = show every finding.
   const [kindFilter, setKindFilter] = useState<string | null>(null);
 
-  // Reset the filter whenever the selected project changes, so a chip active on one
-  // project never carries over to another.
-  useEffect(() => {
-    setKindFilter(null);
-  }, [project.id]);
-
   return (
-    <div className="max-w-[820px] pb-12">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="truncate text-xl font-semibold text-t1">{project.name}</div>
-          <div className="truncate font-mono text-xs text-t3" title={project.root}>
-            {project.root}
-          </div>
-        </div>
-        <Button
-          variant="danger"
-          small
-          onClick={onRemove}
-          disabled={removeBusy}
-          className="flex-none"
-        >
-          Remove Project
-        </Button>
-      </div>
-
-      <BuildabilitySection key={`build-${project.id}`} projectId={project.id} />
-      <ProjectViewerSection key={`viewer-${project.id}`} projectId={project.id} />
-
+    <>
       {auditQuery.isLoading ? (
         <Card className="px-4 py-3.5">
           <p className="py-1 text-sm text-t3">Auditing the project...</p>
@@ -445,20 +660,140 @@ function ProjectDetailView({
         />
       ) : null}
 
-      <ChecksSection key={project.id} projectId={project.id} />
-      <BomSection key={`bom-${project.id}`} projectId={project.id} />
-      <ProcurementSection key={`proc-${project.id}`} projectId={project.id} />
-      <FabSection key={`fab-${project.id}`} projectId={project.id} />
-      <RevisionDiffSection key={`diff-${project.id}`} projectId={project.id} />
-      <EditorSection key={`editor-${project.id}`} projectId={project.id} />
-      <BoardSetupSection key={`setup-${project.id}`} projectId={project.id} />
-      <ProSettingsSection key={`pro-${project.id}`} projectId={project.id} />
-      <StackupSection key={`stackup-${project.id}`} projectId={project.id} />
-      <ConformSection key={`conform-${project.id}`} projectId={project.id} />
-      <PrepareSection key={`prepare-${project.id}`} projectId={project.id} />
-      <FieldsSection key={`fields-${project.id}`} projectId={project.id} />
+      {caps.has("checks") ? <ChecksSection projectId={projectId} /> : null}
+      {caps.has("prepare") ? <PrepareSection projectId={projectId} /> : null}
+      {caps.has("assign") ? <AssignSection projectId={projectId} /> : null}
+      <LibraryVersionSection projectId={projectId} />
+      <SyncHygieneSection projectId={projectId} />
+    </>
+  );
+}
+
+// Workspace sync hygiene. Two people on one project conflict on every pull once an EDA tool's
+// PER-USER files are committed: KiCad's `.kicad_prl` holds one person's window layout and
+// `fp-info-cache` is a regenerated machine cache, so both change every time the app opens while the
+// actual design merges perfectly. KiCad's own documentation says not to commit them.
+//
+// The control shows the FILES rather than a reassuring sentence, because the action stops sharing
+// something, and nobody should agree to that without seeing the list.
+function SyncHygieneSection({ projectId }: { projectId: string }) {
+  const q = useProjectHygiene(projectId);
+  const sync = useSyncProjectHygiene();
+  const { toast } = useToast();
+  const data = q.data;
+  const pending = (data?.untracked.length ?? 0) + (data?.writes.length ?? 0);
+
+  function onSync() {
+    sync.mutate(projectId, {
+      onSuccess: (r) =>
+        toast(
+          r.committed
+            ? `Synced. ${r.untracked.length} file(s) are no longer shared through git.`
+            : "Already in sync; nothing changed.",
+          r.committed ? "ok" : "neutral",
+        ),
+      onError: (e) => toast(errMsg(e, "Could not sync workspace hygiene."), "err"),
+    });
+  }
+
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="hygiene-section" data-dev-id="projects.hygiene">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Sync Hygiene</Eyebrow>
+        <p className="text-xs text-t3">
+          Your EDA tool writes per-user files next to the design: window layouts, machine caches,
+          backups. Sharing those through git is what makes two people conflict on every pull.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Checking this project...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not check this project.")}</p>
+      ) : !data ? null : !data.under_git ? (
+        <p className="text-sm text-t3" data-testid="hygiene-no-git">
+          This project is not under git, so nothing is being shared yet. Initialize a git repository
+          for it first.
+        </p>
+      ) : pending === 0 ? (
+        <p className="text-xs text-ok" data-testid="hygiene-clean">
+          Nothing per-user is being shared from this project.
+        </p>
+      ) : (
+        <div className="rounded-card border border-line2" data-testid="hygiene-pending">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2">
+            <span className="text-sm text-t2">
+              {data.untracked.length > 0
+                ? `${data.untracked.length} ${data.untracked.length === 1 ? "file is" : "files are"} shared that should not be.`
+                : "The ignore rules are out of date."}
+            </span>
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={sync.isPending}
+              data-testid="hygiene-sync"
+              className="ml-auto inline-flex flex-none items-center rounded-control border border-line bg-raise px-2.5 py-1 text-xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            >
+              {sync.isPending
+                ? "Syncing..."
+                : data.untracked.length > 0
+                  ? "Stop Sharing These"
+                  : "Update Ignore Rules"}
+            </button>
+          </div>
+          {data.untracked.length > 0 ? (
+            <div className="border-t border-line2 px-3 py-2" data-testid="hygiene-files">
+              {data.untracked.map((path) => (
+                // t2, not t3: these paths ARE the content of this card, the thing a person has to
+                // read before agreeing to stop sharing them. At t3 they sat at the same weight as
+                // the footnote explaining them, which inverts the hierarchy.
+                <div key={path} className="truncate font-mono text-2xs text-t2" title={path}>
+                  {path}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p className="border-t border-line2 px-3 py-2 text-2xs text-t3">
+            These stay on your disk. Only git stops carrying them to whoever else works on this
+            project.
+          </p>
+        </div>
+      )}
     </div>
   );
+}
+
+// BOM & Procurement: build and cost, per-line orderability, revision diff, and the
+// fab (gerber/drill/placement) exports.
+function BomTab({ projectId, caps }: { projectId: string; caps: Set<string> }) {
+  return (
+    <>
+      <BomSection projectId={projectId} />
+      <BomExportsSection projectId={projectId} />
+      <RevisionDiffSection projectId={projectId} />
+      {caps.has("fab") ? <FabSection projectId={projectId} /> : null}
+    </>
+  );
+}
+
+// PCB Setup: the master-detail editors for the physical board and project settings
+// (board setup + thickness, ERC/DRC severities + pin map + text variables, stackup,
+// object conform, and the project title-block fields).
+function SetupTab({ projectId }: { projectId: string }) {
+  return (
+    <>
+      <BoardSetupSection projectId={projectId} />
+      <ProSettingsSection projectId={projectId} />
+      <StackupSection projectId={projectId} />
+      <ConformSection projectId={projectId} />
+      <FieldsSection projectId={projectId} />
+    </>
+  );
+}
+
+// Net Classes: net classes, board design rules, and netclass patterns.
+function NetClassesTab({ projectId }: { projectId: string }) {
+  return <EditorSection projectId={projectId} />;
 }
 
 function AuditView({
@@ -479,7 +814,7 @@ function AuditView({
     : audit.findings;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-dev-id="projects.audit">
       {/* headline */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2">
@@ -510,7 +845,7 @@ function AuditView({
         <>
           {/* breakdown chips: click one to filter the table by that kind */}
           {kinds.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2" data-testid="audit-chips">
+            <div className="flex flex-wrap items-center gap-2" data-testid="audit-chips" data-dev-id="projects.audit-chips">
               {kinds.map(([kind, count]) => {
                 const active = kindFilter === kind;
                 return (
@@ -553,7 +888,7 @@ function AuditView({
         <p className="text-xs text-t3">
           Pin/pad and 3D checks ran on {audit.checked_footprints}{" "}
           {audit.checked_footprints === 1 ? "footprint" : "footprints"};{" "}
-          {audit.unresolved_footprints} could not be resolved from the active library.
+          {audit.unresolved_footprints} could not be resolved from your components.
         </p>
       ) : null}
     </div>
@@ -567,7 +902,7 @@ function FindingsTable({ findings }: { findings: AuditFinding[] }) {
     );
   }
   return (
-    <Card className="overflow-hidden" data-testid="audit-findings">
+    <Card className="overflow-hidden" data-testid="audit-findings" data-dev-id="projects.audit-table">
       <table className="w-full text-left text-sm">
         <thead>
           <tr data-testid="findings-head" className="border-b border-line text-2xs text-t3">
@@ -650,11 +985,21 @@ const BUILD_SIGNAL_LABEL: Record<string, string> = {
   not_built: "Not Built",
   dirty: "Uncommitted",
   not_git: "No Git",
+  // An Altium project runs ERC/DRC inside Altium; the verdict says so, never blocks.
+  not_applicable: "In Altium",
 };
 
-function buildSignalTone(state: string): "ok" | "warn" | "err" {
+// The backend's detail/next_step strings sometimes end with their own period; render
+// each as exactly one sentence, never "text.. text..".
+function sentence(s: string): string {
+  const trimmed = s.trim().replace(/\.+$/, "");
+  return trimmed ? `${trimmed}.` : "";
+}
+
+function buildSignalTone(state: string): "ok" | "warn" | "err" | "neutral" {
   if (state === "pass" || state === "clean") return "ok";
   if (state === "fail" || state === "not_run" || state === "not_built") return "err";
+  if (state === "not_applicable") return "neutral"; // checked in the owning EDA, not here
   return "warn"; // warn / dirty / not_git
 }
 
@@ -696,7 +1041,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
     { key: "git", label: "Version Control", state: v.signals.git.state },
   ];
   return (
-    <Card className="mb-5 p-4" data-testid="buildability-section">
+    <Card className="mb-5 p-4" data-testid="buildability-section" data-dev-id="projects.buildability">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Buildability</Eyebrow>
@@ -705,7 +1050,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
           </p>
         </div>
         <Badge tone={v.ready ? "ok" : "err"} className="text-sm">
-          {v.ready ? "Ready to Build" : "Not Ready"}
+          {v.ready ? "Buildable" : "Not Buildable"}
         </Badge>
       </div>
 
@@ -736,7 +1081,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
                   <Dot tone="err" />
                 </span>
                 <span>
-                  {b.detail}. <span className="text-t3">{b.next_step}.</span>
+                  {sentence(b.detail)} <span className="text-t3">{sentence(b.next_step)}</span>
                 </span>
               </li>
             ))}
@@ -754,7 +1099,7 @@ function BuildabilitySection({ projectId }: { projectId: string }) {
                   <Dot tone="warn" />
                 </span>
                 <span>
-                  {w.detail}. <span className="text-t3">{w.next_step}.</span>
+                  {sentence(w.detail)} <span className="text-t3">{sentence(w.next_step)}</span>
                 </span>
               </li>
             ))}
@@ -804,7 +1149,7 @@ function ChecksSection({ projectId }: { projectId: string }) {
   const hasRun = data != null && data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="checks-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="checks-section" data-dev-id="projects.checks">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Rules Check</Eyebrow>
@@ -1013,19 +1358,42 @@ function countLabel(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
-// -- Build And Cost (BOM grouping + cost, M7c) -------------------------------
+// -- Build And Cost (BOM grouping + cost, M7c + build-economics reprice) -----
+
+const BUILD_QTY_KEY = "sr.bom.buildQty";
+const TAX_RATE_KEY = "sr.bom.taxRate";
 
 function formatMoney(n: number, currency: string): string {
   const sym = currency === "USD" ? "$" : "";
   return `${sym}${n.toFixed(2)}`;
 }
 
-function unitPriceLabel(line: BomLine): string {
-  if (line.unit_price === undefined || line.unit_price === null || line.unit_price === "") {
-    return "";
+// A per-line build-economics cell: "-" for a field that was never priced, never a
+// fabricated $0.00.
+function moneyOrDash(n: number | null | undefined, currency = "USD"): string {
+  return n == null ? "-" : formatMoney(n, currency);
+}
+
+// A guided-input value persisted in localStorage so the Build Quantity / Tax-Tariff inputs
+// "stick" across an app restart. A read/write failure (private mode, quota) falls back to
+// the given default for this session only, never a crash.
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    return fallback;
   }
-  const n = typeof line.unit_price === "number" ? line.unit_price : Number(line.unit_price);
-  return Number.isFinite(n) ? `$${n.toFixed(4)}` : String(line.unit_price);
+}
+
+function writeStoredNumber(key: string, value: number): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    /* storage unavailable; the input still works for this session */
+  }
 }
 
 // The Build And Cost section: build a grouped, priced BOM as a job, then show the cached
@@ -1033,28 +1401,111 @@ function unitPriceLabel(line: BomLine): string {
 // Honest states throughout: a project with no parts is "Nothing to Build", a build whose
 // parts could not be sourced is "Unpriced" (never a fabricated cost), and an unbuilt
 // project shows a "not built yet" prompt.
+//
+// Build Quantity and Tax/Tariff are two guided inputs (a stepper, a percent field) seeded
+// from the cached build and persisted in localStorage so they stick across a restart. A
+// change reprices the ALREADY-BUILT BOM instantly (POST .../bom/reprice, no rebuild,
+// debounced ~400ms or applied immediately on blur) so the table and roll-up never sit
+// stale on the old quantity; before a build the values are simply held for the next run.
 function BomSection({ projectId }: { projectId: string }) {
   const bomQuery = useProjectBom(projectId);
   const job = useJob<BomResult>();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const reprice = useRepriceBom();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [boards, setBoardsState] = useState<number>(() => readStoredNumber(BUILD_QTY_KEY, 1));
+  const [taxRate, setTaxRateState] = useState<number>(() => readStoredNumber(TAX_RATE_KEY, 0));
+  const seededRef = useRef(false);
+  const repriceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (job.status === "done") {
       qc.invalidateQueries({ queryKey: ["project-bom", projectId] });
-      // A fresh build changes the sourcing data and the diff's cost side, so both re-read.
-      qc.invalidateQueries({ queryKey: ["project-procurement", projectId] });
+      // A fresh build changes the diff's cost side (sourcing is now folded into the BOM result).
       qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
     }
   }, [job.status, projectId, qc]);
+
+  const data: BomResult | null =
+    job.status === "done" && job.result ? job.result : (bomQuery.data ?? null);
+  const hasBuilt = data != null && data.ran_at != null;
+
+  // Seed the guided inputs from the loaded build the FIRST time data arrives, but only
+  // where nothing was persisted yet: a persisted value is the deliberate last-used
+  // setting and always wins, so it sticks across both a project switch and a restart.
+  useEffect(() => {
+    if (seededRef.current || !data) return;
+    seededRef.current = true;
+    if (window.localStorage.getItem(BUILD_QTY_KEY) == null) {
+      setBoardsState(data.build?.build_qty ?? 1);
+    }
+    if (window.localStorage.getItem(TAX_RATE_KEY) == null) {
+      setTaxRateState(data.tax_rate ?? 0);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (repriceTimer.current) clearTimeout(repriceTimer.current);
+    };
+  }, []);
+
+  async function doReprice(nextBoards: number, nextTax: number) {
+    if (!hasBuilt) return; // hold the values for the next build; nothing to reprice yet
+    try {
+      await reprice.mutateAsync(
+        { id: projectId, boards: nextBoards, tax_rate: nextTax },
+        {
+          onSuccess: (result) => {
+            qc.setQueryData(["project-bom", projectId], result);
+            // A reprice changes the diff's cost side exactly like a rebuild does.
+            qc.invalidateQueries({ queryKey: ["project-diff", projectId] });
+          },
+        },
+      );
+    } catch (e) {
+      toast(errMsg(e, "Could not reprice the BOM."), "err");
+    }
+  }
+
+  function scheduleReprice(nextBoards: number, nextTax: number) {
+    if (repriceTimer.current) clearTimeout(repriceTimer.current);
+    repriceTimer.current = setTimeout(() => {
+      repriceTimer.current = null;
+      void doReprice(nextBoards, nextTax);
+    }, 400);
+  }
+
+  // Applied on blur: fires the pending reprice immediately instead of waiting out the
+  // debounce, so tabbing away from the field feels instant.
+  function applyPendingNow() {
+    if (!repriceTimer.current) return;
+    clearTimeout(repriceTimer.current);
+    repriceTimer.current = null;
+    void doReprice(boards, taxRate);
+  }
+
+  function onBoardsChange(n: number) {
+    const v = Number.isFinite(n) ? Math.max(1, Math.round(n)) : 1;
+    setBoardsState(v);
+    writeStoredNumber(BUILD_QTY_KEY, v);
+    scheduleReprice(v, taxRate);
+  }
+
+  function onTaxChange(n: number) {
+    const v = Number.isFinite(n) && n >= 0 ? n : 0;
+    setTaxRateState(v);
+    writeStoredNumber(TAX_RATE_KEY, v);
+    scheduleReprice(boards, v);
+  }
 
   async function onRun() {
     setStarting(true);
     setStartError(null);
     try {
-      const { job_id } = await api.runBom(projectId);
+      const { job_id } = await api.runBom(projectId, { boards, tax_rate: taxRate });
       job.run(job_id);
     } catch (e) {
       const msg = errMsg(e, "Could not start the BOM build.");
@@ -1066,13 +1517,10 @@ function BomSection({ projectId }: { projectId: string }) {
   }
 
   const busy = starting || job.status === "running";
-  const data: BomResult | null =
-    job.status === "done" && job.result ? job.result : (bomQuery.data ?? null);
-  const hasBuilt = data != null && data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="bom-section">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div className="mt-7 border-t border-line pt-6" data-testid="bom-section" data-dev-id="projects.bom">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Eyebrow className="mb-0.5">Build And Cost</Eyebrow>
           <p className="text-xs text-t3">
@@ -1080,14 +1528,29 @@ function BomSection({ projectId }: { projectId: string }) {
             layer.
           </p>
         </div>
-        <Button variant="accent" small onClick={onRun} disabled={busy}>
-          {busy ? "Building..." : hasBuilt ? "Rebuild BOM" : "Build And Cost"}
-        </Button>
+        <div className="flex flex-wrap items-end gap-3">
+          <BuildQuantityStepper
+            value={boards}
+            onChange={onBoardsChange}
+            onApplyNow={applyPendingNow}
+            disabled={busy}
+          />
+          <TaxTariffInput
+            value={taxRate}
+            onChange={onTaxChange}
+            onApplyNow={applyPendingNow}
+            disabled={busy}
+          />
+          <Button variant="accent" small onClick={onRun} disabled={busy}>
+            {busy ? "Building..." : hasBuilt ? "Rebuild BOM" : "Build And Cost"}
+          </Button>
+        </div>
       </div>
 
       {busy && job.progress?.message ? (
         <p className="mb-2 text-xs text-t3">{job.progress.message}...</p>
       ) : null}
+      {reprice.isPending ? <p className="mb-2 text-xs text-t3">Repricing...</p> : null}
       {startError ? <p className="mb-2 text-sm text-err">{startError}</p> : null}
       {job.status === "error" ? (
         <p className="mb-2 text-sm text-err">{job.error ?? "The BOM build failed."}</p>
@@ -1106,10 +1569,155 @@ function BomSection({ projectId }: { projectId: string }) {
   );
 }
 
+// A stepper (- / + plus a bare numeric field) for the Build Quantity guided input: a
+// whole-number board count, minimum 1. Reads and buttons alike route through `onChange` so
+// every path (typing, clicking) shares the same clamp + persist + reprice-schedule.
+function BuildQuantityStepper({
+  value,
+  onChange,
+  onApplyNow,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onApplyNow: () => void;
+  disabled?: boolean;
+}) {
+  // The input's own draft string, separate from the clamped `value` it reflects: a plain
+  // controlled `value={value}` would re-round every keystroke (typing "5" over a cleared
+  // field would land as "1" mid-edit, so "5" lands after it as "15"). The draft only syncs
+  // FROM the committed value (buttons, blur-revert, a prop change from a reprice); typing
+  // free-edits the draft and commits upward the moment it parses to a real number.
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return (
+    <label className="flex flex-col gap-1 text-2xs text-t3">
+      Build Quantity
+      <div className="flex h-[31px] items-stretch overflow-hidden rounded-control border border-line2 bg-field">
+        <button
+          type="button"
+          aria-label="Decrease Build Quantity"
+          className="flex w-7 flex-none items-center justify-center text-t2 transition-colors hover:bg-raise2 hover:text-t1 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => onChange(value - 1)}
+          disabled={disabled || value <= 1}
+        >
+          -
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          data-testid="build-qty-input"
+          aria-label="Build Quantity"
+          className="w-14 flex-none border-x border-line2 bg-field text-center text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value);
+            if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
+          }}
+          onBlur={() => {
+            setDraft(String(value)); // revert an invalid/empty draft to the last committed value
+            onApplyNow();
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Increase Build Quantity"
+          className="flex w-7 flex-none items-center justify-center text-t2 transition-colors hover:bg-raise2 hover:text-t1 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => onChange(value + 1)}
+          disabled={disabled}
+        >
+          +
+        </button>
+      </div>
+    </label>
+  );
+}
+
+// The Tax/Tariff guided input: a percent field with a `%` suffix affordance, minimum 0,
+// quarter-point steps (fine enough for a real tariff schedule). Same draft/commit split as
+// the Build Quantity stepper, so typing "9.5" over a cleared field never mangles into "09.5".
+function TaxTariffInput({
+  value,
+  onChange,
+  onApplyNow,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onApplyNow: () => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return (
+    <label className="flex flex-col gap-1 text-2xs text-t3">
+      Tax/Tariff
+      <div className="flex h-[31px] items-stretch overflow-hidden rounded-control border border-line2 bg-field">
+        <input
+          type="number"
+          min={0}
+          step={0.25}
+          data-testid="tax-rate-input"
+          aria-label="Tax/Tariff Percent"
+          className="w-16 flex-none bg-field pl-3 text-sm text-t1 outline-none focus:border-acc disabled:opacity-50"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const n = Number(e.target.value);
+            if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
+          }}
+          onBlur={() => {
+            setDraft(String(value));
+            onApplyNow();
+          }}
+        />
+        <span className="flex w-6 flex-none items-center justify-center border-l border-line2 text-xs text-t3">
+          %
+        </span>
+      </div>
+    </label>
+  );
+}
+
 // A BOM cost source ("library" / "mouser" / "digikey") as a Title Case chip label. "library" is
 // your own combined library, priced offline from its stored data before any distributor.
 function titleCaseSource(name: string): string {
+  // The "library" source is your own combined components, priced offline; show it
+  // as "Components" while the underlying source value stays "library".
+  if (name.trim().toLowerCase() === "library") return "Components";
   return name.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Known distributor hosts, so a line's purchase URL can name the real vendor even when its
+// stored source is something generic (e.g. "library", priced offline from a Mouser link
+// saved on the part) - the same host-mapping idiom the part detail's Sourcing card uses.
+const _KNOWN_VENDOR_HOSTS: Record<string, string> = {
+  lcsc: "LCSC",
+  mouser: "Mouser",
+  digikey: "DigiKey",
+};
+
+// The BOM line Vendor cell: map a known distributor host from the purchase URL first, else
+// Title Case the stored source. "-" when the line carries neither (never a fabricated vendor).
+function vendorLabel(source: string, url?: string): string {
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname.toLowerCase() : "";
+  } catch {
+    host = "";
+  }
+  for (const [token, name] of Object.entries(_KNOWN_VENDOR_HOSTS)) {
+    if (host.includes(token)) return name;
+  }
+  const s = (source || "").trim();
+  return s ? titleCaseSource(s) : "-";
 }
 
 function BomResultView({ result }: { result: BomResult }) {
@@ -1133,11 +1741,83 @@ function BomResultView({ result }: { result: BomResult }) {
         ))}
       </div>
 
+      {result.risks ? (
+        <BomRiskHeadline risks={result.risks} lead={result.lead} priced={result.priced} />
+      ) : null}
+
+      {result.build && result.priced ? <BuildRollupLine build={result.build} /> : null}
+
       {result.lines.length === 0 ? (
         <p className="text-xs text-t3">No parts to build a BOM from.</p>
       ) : (
-        <BomLinesTable lines={result.lines} priced={result.priced} />
+        <BomLinesTable lines={result.lines} />
       )}
+    </div>
+  );
+}
+
+// The sourcing-risk headline, folded onto the one BOM page (was the separate Procurement
+// section): the failures worth catching before ordering (NRND, no stock, short lines) plus
+// the critical-path lead time. Honest: a clean priced build reads "No Sourcing Risks"; an
+// unpriced build notes that stock is unknown, not a risk.
+function BomRiskHeadline({
+  risks,
+  lead,
+  priced,
+}: {
+  risks: SourcingRisks;
+  lead?: LeadTime;
+  priced: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2.5" data-testid="bom-risk-rollup">
+      {!risks.any ? (
+        <Badge tone="ok">No Sourcing Risks</Badge>
+      ) : (
+        <>
+          {risks.not_active > 0 ? (
+            <Badge tone="warn">{countLabel(risks.not_active, "Not Active")}</Badge>
+          ) : null}
+          {risks.no_stock > 0 ? (
+            <Badge tone="err">{countLabel(risks.no_stock, "No Stock Line")}</Badge>
+          ) : null}
+          {risks.insufficient_stock > 0 ? (
+            <Badge tone="warn">{countLabel(risks.insufficient_stock, "Short Line")}</Badge>
+          ) : null}
+        </>
+      )}
+      {lead?.any && lead.max_weeks != null ? (
+        <span className="text-xs text-t3">
+          Critical path {lead.max_weeks} wk{lead.critical_mpn ? ` (${lead.critical_mpn})` : ""}
+        </span>
+      ) : null}
+      {!priced ? (
+        <span className="text-2xs text-t3">Unpriced build: stock is unknown, not a risk.</span>
+      ) : null}
+    </div>
+  );
+}
+
+// The build-size cost roll-up: subtotal, tax + tariff, and an emphasized grand total, for
+// the N boards the cached BOM was last (re)priced at.
+function BuildRollupLine({ build }: { build: BuildRollup }) {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-4 rounded-control border border-line2 bg-raise2 px-3 py-2"
+      data-testid="bom-build-rollup"
+    >
+      <span className="text-2xs text-t3">
+        For {build.build_qty} Board{build.build_qty === 1 ? "" : "s"}
+      </span>
+      <span className="text-xs text-t2">
+        Subtotal {formatMoney(build.subtotal, build.currency)}
+      </span>
+      <span className="text-xs text-t2">
+        Tax + Tariff {formatMoney(build.tax_total, build.currency)}
+      </span>
+      <span className="text-sm font-semibold text-t1">
+        Grand Total {formatMoney(build.grand_total, build.currency)}
+      </span>
     </div>
   );
 }
@@ -1165,60 +1845,193 @@ function BomVerdictBadge({ summary }: { summary: NonNullable<BomResult["summary"
   }
 }
 
-function BomLinesTable({ lines, priced }: { lines: BomLine[]; priced: boolean }) {
+// The distributor's own part number for a priced line, matched to its Source (LCSC -> lcsc_pn,
+// Mouser -> mouser_pn, DigiKey -> digikey_pn), else whichever is present. Mirrors the backend
+// _dist_pn so the on-screen Distributor P/N agrees with the export.
+function distPn(line: BomLine): string {
+  const src = (line.source || "").trim().toLowerCase();
+  const lcsc = (line.lcsc_pn || "").trim();
+  const mouser = (line.mouser_pn || "").trim();
+  const digikey = (line.digikey_pn || "").trim();
+  if (src === "lcsc") return lcsc || mouser || digikey;
+  if (src === "mouser") return mouser || lcsc || digikey;
+  if (src === "digikey") return digikey || mouser || lcsc;
+  return lcsc || mouser || digikey;
+}
+
+// A KiCad footprint name without its library prefix (Resistor_SMD:R_0603 -> R_0603), for a
+// compact Footprint column; the full name stays in the cell title.
+function shortFootprint(fp: string): string {
+  return (fp || "").split(":").pop() || "";
+}
+
+// A compact icon link that opens a datasheet or product page in a new tab; "-" when the line
+// carries no URL (never a dead link).
+function IconLink({ href, label }: { href?: string; label: string }) {
+  if (!href) return <span className="text-t3">-</span>;
   return (
-    <Card className="overflow-hidden" data-testid="bom-lines">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-line text-2xs text-t3">
-            <th className="px-4 py-2 font-medium">Qty</th>
-            <th className="px-4 py-2 font-medium">Value</th>
-            <th className="px-4 py-2 font-medium">Part</th>
-            <th className="px-4 py-2 font-medium">Footprint</th>
-            {priced ? <th className="px-4 py-2 font-medium">Unit</th> : null}
-            {priced ? <th className="px-4 py-2 font-medium">Ext</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, i) => (
-            <tr key={`${line.mpn || line.value}-${i}`} className="border-b border-line last:border-b-0">
-              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
-              <td className="px-4 py-2 align-top text-t1">
-                {line.value || "-"}
-                <span className="mt-0.5 block text-2xs text-t3" title={line.refs.join(", ")}>
-                  {line.refs.join(", ")}
-                </span>
-              </td>
-              <td className="px-4 py-2 align-top">
-                {line.mpn ? (
-                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                ) : line.basic ? (
-                  <Badge tone="neutral">Basic</Badge>
-                ) : (
-                  <Badge tone="neutral">No MPN</Badge>
-                )}
-                {line.manufacturer ? (
-                  <span className="mt-0.5 block text-2xs text-t3">{line.manufacturer}</span>
-                ) : null}
-              </td>
-              <td className="px-4 py-2 align-top font-mono text-2xs text-t3">
-                {line.footprint || "-"}
-              </td>
-              {priced ? (
-                <td className="px-4 py-2 align-top text-t2">{unitPriceLabel(line) || "-"}</td>
-              ) : null}
-              {priced ? (
-                <td className="px-4 py-2 align-top text-t2">
-                  {line.extended !== undefined && line.extended !== null
-                    ? `$${line.extended.toFixed(2)}`
-                    : "-"}
-                </td>
-              ) : null}
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={label}
+      title={label}
+      className="inline-flex text-t2 hover:text-t1"
+    >
+      <ExternalIcon />
+    </a>
+  );
+}
+
+// The Stock cell, folded from the retired Procurement table: the known count, tinted by the
+// per-line stock risk (red at 0, amber when short of the run) with the required quantity when
+// short; "Unknown" when the line was never priced (unknown is never a risk).
+function BomStockCell({ line }: { line: BomLine }) {
+  const risk = line.stock_risk;
+  if (!risk || risk.available == null) {
+    return <span className="text-2xs text-t3">Unknown</span>;
+  }
+  const tone = risk.kind === "err" ? "text-err" : risk.kind === "warn" ? "text-warn" : "text-t2";
+  return (
+    <span className={`text-xs ${tone}`}>
+      {risk.available.toLocaleString()}
+      {risk.short ? (
+        <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
+      ) : null}
+    </span>
+  );
+}
+
+// The RoHS cell: a compact compliance verdict. "Yes" reads as an ok badge, "No" as an error
+// badge, an unreadable value as muted text; "-" when unknown (never a guessed compliance).
+function RohsCell({ value }: { value?: string }) {
+  const v = (value || "").trim();
+  if (!v) return <span className="text-t3">-</span>;
+  if (v.toLowerCase() === "yes") return <Badge tone="ok">Yes</Badge>;
+  if (v.toLowerCase() === "no") return <Badge tone="err">No</Badge>;
+  return <span className="text-2xs text-t2">{v}</span>;
+}
+
+// The one wide BOM table (the "perfect BOM"): every field its own column, spreadsheet-style,
+// scrolling horizontally inside its own container so the page body never does. Identity +
+// package + sourcing (Vendor / Distributor P/N / Stock / Lifecycle / Lead) + the datasheet and
+// product links + RoHS, then the per-line build economics (Min Qty / Final Qty / Unit Cost /
+// Cost @ Qty / Tax/Tariff / Total Cost) at the current Build Quantity + Tax/Tariff. Every cell
+// reads "-" when its value is absent, so an unpriced line still lines up the columns.
+const BOM_COLUMNS = [
+  "Reference", "Qty", "Value", "Library", "Description", "MPN", "Manufacturer", "Footprint", "Package",
+  "Vendor", "Distributor P/N", "Stock", "Lifecycle", "Lead", "Datasheet", "Product Link", "RoHS",
+  "Min Qty", "Final Qty", "Unit Cost", "Cost @ Qty", "Tax/Tariff", "Total Cost",
+];
+
+function BomLinesTable({ lines }: { lines: BomLine[] }) {
+  const known = lines.filter((l) => l.in_library !== undefined);
+  const covered = known.filter((l) => l.in_library).length;
+  return (
+    <>
+      {known.length > 0 ? (
+        <div className="mb-2 text-xs text-t3" data-testid="bom-coverage">
+          <span className="text-t2">{covered}</span> of {known.length}{" "}
+          {known.length === 1 ? "line is" : "lines are"} in your library
+          {covered < known.length ? " (add the rest from the Components tab)" : ""}.
+        </div>
+      ) : null}
+      <Card className="overflow-hidden" data-testid="bom-lines">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1680px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-2xs text-t3">
+              {BOM_COLUMNS.map((c) => (
+                <th key={c} className="whitespace-nowrap px-3 py-2 font-medium">
+                  {c}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {lines.map((line, i) => (
+              <BomLineRow key={`${line.mpn || line.value}-${i}`} line={line} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
+    </>
+  );
+}
+
+function BomLineRow({ line }: { line: BomLine }) {
+  const refsText = line.refs.join(", ");
+  const fp = shortFootprint(line.footprint);
+  const dist = distPn(line);
+  const lifecycle = (line.lifecycle || "").trim();
+  return (
+    <tr className="border-b border-line last:border-b-0">
+      <td className="max-w-[9rem] truncate px-3 py-2 align-top text-t2" title={refsText}>
+        {refsText || "-"}
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.qty}</td>
+      <td className="px-3 py-2 align-top text-t1">{line.value || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        {line.in_library === undefined ? (
+          <span className="text-t3">-</span>
+        ) : line.in_library ? (
+          <Badge tone="ok" size="sm">In Library</Badge>
+        ) : (
+          <Badge tone="neutral" size="sm">Not in Library</Badge>
+        )}
+      </td>
+      <td
+        className="max-w-[14rem] truncate px-3 py-2 align-top text-2xs text-t3"
+        title={line.description}
+      >
+        {line.description || "-"}
+      </td>
+      <td className="px-3 py-2 align-top">
+        {line.mpn ? (
+          <span className="font-mono text-xs text-t2">{line.mpn}</span>
+        ) : line.basic ? (
+          <Badge tone="neutral">Basic</Badge>
+        ) : (
+          <Badge tone="neutral">No MPN</Badge>
+        )}
+      </td>
+      <td className="px-3 py-2 align-top text-2xs text-t3">{line.manufacturer || "-"}</td>
+      <td className="max-w-[11rem] truncate px-3 py-2 align-top text-2xs text-t3" title={line.footprint}>
+        {fp || "-"}
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.package || "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{vendorLabel(line.source ?? "", line.url)}</td>
+      <td className="px-3 py-2 align-top font-mono text-2xs text-t3">{dist || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        <BomStockCell line={line} />
+      </td>
+      <td className="px-3 py-2 align-top text-2xs">
+        {lifecycle ? (
+          <span className={lifecycle.toLowerCase() === "active" ? "text-t3" : "text-warn"}>
+            {lifecycle}
+          </span>
+        ) : (
+          <span className="text-t3">-</span>
+        )}
+      </td>
+      <td className="px-3 py-2 align-top text-2xs text-t3">{line.lead_time || "-"}</td>
+      <td className="px-3 py-2 align-top">
+        <IconLink href={line.datasheet} label="Datasheet" />
+      </td>
+      <td className="px-3 py-2 align-top">
+        <IconLink href={line.url} label="Product Page" />
+      </td>
+      <td className="px-3 py-2 align-top">
+        <RohsCell value={line.rohs} />
+      </td>
+      <td className="px-3 py-2 align-top text-t2">{line.moq ?? "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{line.final_qty ?? "-"}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.final_unit_price)}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.final_extended)}</td>
+      <td className="px-3 py-2 align-top text-t2">{moneyOrDash(line.tax_tariff)}</td>
+      <td className="px-3 py-2 align-top font-medium text-t1">{moneyOrDash(line.line_total)}</td>
+    </tr>
   );
 }
 
@@ -1248,10 +2061,6 @@ function saveText(filename: string, text: string): void {
   URL.revokeObjectURL(url);
 }
 
-// The Procurement section reads the cached BOM's sourcing view: a risk headline (NRND / no
-// stock / short lines / critical-path lead), a per-line orderability table, and the export
-// bar. Honest: before a build it prompts to build; an unpriced build lists lines with
-// unknown (never-a-risk) stock and no cost.
 // The buy-side knobs, in UI units (percentages as whole numbers), defaulting to no
 // adjustment so a one-click export is never silently inflated. tax/assembly are converted to
 // the backend's fraction form when sent; spares stays a whole percent.
@@ -1273,8 +2082,12 @@ const DEFAULT_EXPORT_OPTS: ExportOpts = {
   assemblyPct: 0,
 };
 
-function ProcurementSection({ projectId }: { projectId: string }) {
-  const query = useProjectProcurement(projectId);
+// The Exports section on the one BOM page (the sourcing risk + per-line orderability are now
+// folded into the BOM table above): the purchasing-sheet knobs and the export bar. Gated on the
+// cached BOM's built state (read from the same project-bom query the table uses, so the two
+// never disagree): before a build it prompts to build, never a dead export.
+function BomExportsSection({ projectId }: { projectId: string }) {
+  const bomQuery = useProjectBom(projectId);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState<BomExportKind | null>(null);
   const [opts, setOpts] = useState<ExportOpts>(DEFAULT_EXPORT_OPTS);
@@ -1307,31 +2120,25 @@ function ProcurementSection({ projectId }: { projectId: string }) {
     }
   }
 
-  const data = query.data ?? null;
-  const built = data != null && data.built;
+  const built = bomQuery.data != null && bomQuery.data.ran_at != null;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="procurement-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="exports-section" data-dev-id="projects.bom-exports">
       <div className="mb-3">
-        <Eyebrow className="mb-0.5">Procurement</Eyebrow>
+        <Eyebrow className="mb-0.5">Exports</Eyebrow>
         <p className="text-xs text-t3">
-          Sourcing risk, lead time and per-line orderability from the priced BOM, plus the
-          purchasing exports.
+          Purchasing sheets and vendor uploads from the priced BOM.
         </p>
       </div>
 
-      {query.isLoading ? (
-        <p className="text-sm text-t3">Loading procurement...</p>
+      {bomQuery.isLoading ? (
+        <p className="text-sm text-t3">Loading the last build...</p>
       ) : !built ? (
-        <p className="text-sm text-t3">
-          Build the BOM to see sourcing risk, lead time and export the purchasing sheets.
-        </p>
+        <p className="text-sm text-t3">Build the BOM to export the purchasing sheets.</p>
       ) : (
-        <div className="flex flex-col gap-4" data-testid="procurement-result">
-          <ProcurementRollup data={data as ProcurementResult} />
+        <div className="flex flex-col gap-4" data-testid="exports-result">
           <ExportOptionsForm opts={opts} onChange={setOpts} />
           <ExportBar onExport={onExport} downloading={downloading} />
-          <ProcurementLinesTable lines={(data as ProcurementResult).lines} />
         </div>
       )}
     </div>
@@ -1378,37 +2185,20 @@ function ExportOptionsForm({
   );
 }
 
-function ProcurementRollup({ data }: { data: ProcurementResult }) {
-  const { risks, lead } = data;
-  return (
-    <div className="flex flex-wrap items-center gap-2.5" data-testid="procurement-rollup">
-      {!risks.any ? (
-        <Badge tone="ok">No Sourcing Risks</Badge>
-      ) : (
-        <>
-          {risks.not_active > 0 ? (
-            <Badge tone="warn">{countLabel(risks.not_active, "Not Active")}</Badge>
-          ) : null}
-          {risks.no_stock > 0 ? (
-            <Badge tone="err">{countLabel(risks.no_stock, "No Stock Line")}</Badge>
-          ) : null}
-          {risks.insufficient_stock > 0 ? (
-            <Badge tone="warn">{countLabel(risks.insufficient_stock, "Short Line")}</Badge>
-          ) : null}
-        </>
-      )}
-      {lead.any && lead.max_weeks != null ? (
-        <span className="text-xs text-t3">
-          Critical path {lead.max_weeks} wk{lead.critical_mpn ? ` (${lead.critical_mpn})` : ""}
-        </span>
-      ) : null}
-      {!data.priced ? (
-        <span className="text-2xs text-t3">Unpriced build: stock is unknown, not a risk.</span>
-      ) : null}
-    </div>
-  );
-}
+// What each export format is, so the picked format explains itself instead of the buyer
+// guessing from a terse button label.
+const EXPORT_HELP: Record<BomExportKind, string> = {
+  csv: "The full grouped BOM as a CSV.",
+  xlsx: "The full grouped BOM as an Excel workbook.",
+  priced: "The priced purchasing sheet: unit and extended cost per line.",
+  procurement: "The procurement sheet with spares, tax, shipping and assembly applied.",
+  cart: "A Mouser cart upload: part numbers and quantities.",
+  jlcpcb: "A JLCPCB assembly BOM.",
+};
 
+// One export control, not a row of six buttons (the formats are one choice, not six actions):
+// pick a format, read what it is, then Export. Keeps a single primary action and lets the format
+// list grow without crowding the page.
 function ExportBar({
   onExport,
   downloading,
@@ -1416,96 +2206,31 @@ function ExportBar({
   onExport: (kind: BomExportKind) => void;
   downloading: BomExportKind | null;
 }) {
+  const [kind, setKind] = useState<BomExportKind>("csv");
+  const busy = downloading != null;
   return (
-    <div className="flex flex-wrap gap-2" data-testid="export-bar">
-      {EXPORT_KINDS.map(({ kind, label }) => (
-        <Button
-          key={kind}
-          small
-          onClick={() => onExport(kind)}
-          disabled={downloading != null}
+    <div className="flex flex-wrap items-end gap-3" data-testid="export-bar">
+      <label className="flex flex-col gap-1 text-2xs text-t3">
+        Export Format
+        <select
+          className={`${INPUT_CLS} w-52`}
+          data-testid="export-format"
+          value={kind}
+          disabled={busy}
+          onChange={(e) => setKind(e.target.value as BomExportKind)}
         >
-          {downloading === kind ? "Saving..." : label}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-function ProcurementLinesTable({ lines }: { lines: ProcurementLine[] }) {
-  return (
-    <Card className="overflow-hidden" data-testid="procurement-lines">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-line text-2xs text-t3">
-            <th className="px-4 py-2 font-medium">Part</th>
-            <th className="px-4 py-2 font-medium">Qty</th>
-            <th className="px-4 py-2 font-medium">Stock</th>
-            <th className="px-4 py-2 font-medium">Lifecycle</th>
-            <th className="px-4 py-2 font-medium">Lead</th>
-            <th className="px-4 py-2 font-medium">Orderable</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, i) => (
-            <tr
-              key={`${line.mpn || line.value}-${i}`}
-              className="border-b border-line last:border-b-0"
-            >
-              <td className="px-4 py-2 align-top">
-                {line.mpn ? (
-                  <span className="font-mono text-xs text-t2">{line.mpn}</span>
-                ) : (
-                  <span className="text-t2">{line.value || "-"}</span>
-                )}
-                <span className="mt-0.5 block text-2xs text-t3">{line.refs.join(", ")}</span>
-              </td>
-              <td className="px-4 py-2 align-top text-t2">{line.qty}</td>
-              <td className="px-4 py-2 align-top">
-                <StockCell line={line} />
-              </td>
-              <td className="px-4 py-2 align-top text-2xs">
-                {line.lifecycle ? (
-                  <span
-                    className={
-                      line.lifecycle.toLowerCase() === "active" ? "text-t3" : "text-warn"
-                    }
-                  >
-                    {line.lifecycle}
-                  </span>
-                ) : (
-                  <span className="text-t3">-</span>
-                )}
-              </td>
-              <td className="px-4 py-2 align-top text-2xs text-t3">{line.lead_time || "-"}</td>
-              <td className="px-4 py-2 align-top">
-                {line.orderable ? (
-                  <Badge tone="ok">Yes</Badge>
-                ) : (
-                  <Badge tone="neutral">No</Badge>
-                )}
-              </td>
-            </tr>
+          {EXPORT_KINDS.map(({ kind: k, label }) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
           ))}
-        </tbody>
-      </table>
-    </Card>
-  );
-}
-
-function StockCell({ line }: { line: ProcurementLine }) {
-  const risk = line.stock_risk;
-  if (risk.available == null) {
-    return <span className="text-2xs text-t3">Unknown</span>;
-  }
-  const tone = risk.kind === "err" ? "text-err" : risk.kind === "warn" ? "text-warn" : "text-t2";
-  return (
-    <span className={`text-xs ${tone}`}>
-      {risk.available.toLocaleString()}
-      {risk.short ? (
-        <span className="ml-1 text-2xs">need {risk.required.toLocaleString()}</span>
-      ) : null}
-    </span>
+        </select>
+      </label>
+      <Button variant="accent" small onClick={() => onExport(kind)} disabled={busy}>
+        {busy ? "Saving..." : "Export"}
+      </Button>
+      <p className="mb-1.5 max-w-xs text-2xs text-t3">{EXPORT_HELP[kind]}</p>
+    </div>
   );
 }
 
@@ -1531,7 +2256,7 @@ function ProjectViewerSection({ projectId }: { projectId: string }) {
     : [];
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="viewer-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="viewer-section" data-dev-id="projects.viewer">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Board Viewer</Eyebrow>
         <p className="text-xs text-t3">
@@ -1587,7 +2312,7 @@ function FabSection({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="fab-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="fab-section" data-dev-id="projects.fab">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Fab Prep</Eyebrow>
         <p className="text-xs text-t3">
@@ -1754,7 +2479,7 @@ function RevisionDiffSection({ projectId }: { projectId: string }) {
   const revisions = revs.data?.revisions ?? [];
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="diff-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="diff-section" data-dev-id="projects.revision-diff">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Revision Diff</Eyebrow>
         <p className="text-xs text-t3">
@@ -2074,7 +2799,7 @@ function FieldsSection({ projectId }: { projectId: string }) {
   const canEdit = !!data && data.has_sch && data.under_git;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="fields-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="fields-section" data-dev-id="projects.fields">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -2092,7 +2817,7 @@ function FieldsSection({ projectId }: { projectId: string }) {
               type="text"
               className={`${INPUT_CLS} w-40 !py-1 text-xs`}
               data-testid="fields-new-field"
-              placeholder="Add A Field"
+              placeholder="Add a field"
               value={newField}
               onChange={(e) => setNewField(e.target.value)}
               onKeyDown={(e) => {
@@ -2213,7 +2938,7 @@ function EditorSection({ projectId }: { projectId: string }) {
   const data = design.data;
 
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="editor-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="editor-section" data-dev-id="projects.editor">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Editor</Eyebrow>
         <p className="text-xs text-t3">
@@ -2792,7 +3517,7 @@ function BoardSetupSection({ projectId }: { projectId: string }) {
   const q = useProjectSettings(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="board-setup-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="board-setup-section" data-dev-id="projects.board-setup">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Board Setup</Eyebrow>
         <p className="text-xs text-t3">
@@ -3016,7 +3741,7 @@ function ProSettingsSection({ projectId }: { projectId: string }) {
   const q = useProjectSettings(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="pro-settings-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="pro-settings-section" data-dev-id="projects.pro-settings">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Design Checks and Variables</Eyebrow>
         <p className="text-xs text-t3">
@@ -3453,7 +4178,7 @@ function ConformSection({ projectId }: { projectId: string }) {
   const q = useProjectConform(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="conform-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="conform-section" data-dev-id="projects.conform">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Object Conform</Eyebrow>
         <p className="text-xs text-t3">
@@ -3746,7 +4471,7 @@ function StackupSection({ projectId }: { projectId: string }) {
   const q = useProjectStackup(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="stackup-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="stackup-section" data-dev-id="projects.stackup">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Stackup</Eyebrow>
         <p className="text-xs text-t3">
@@ -3809,7 +4534,7 @@ function CurrentStackTable({
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium text-t1">Current Stack</h3>
         <Badge tone="neutral">
-          {thickness != null ? `${thickness} mm` : "No thickness"}
+          {thickness != null ? `${thickness} mm` : "No Thickness"}
         </Badge>
         <Badge tone="neutral">Finish: {stack.copper_finish ?? "None"}</Badge>
         <Badge tone="neutral">
@@ -4174,7 +4899,7 @@ function StackupFieldBlock({ projectId, stack }: { projectId: string; stack: Sta
             checked={draft.dielectric_constraints}
             onChange={(e) => updateGlobal({ dielectric_constraints: e.target.checked })}
           />
-          Dielectric constraints
+          Dielectric Constraints
         </label>
       </div>
 
@@ -4249,13 +4974,13 @@ function PrepareSection({ projectId }: { projectId: string }) {
   const q = useProjectPrepare(projectId);
   const data = q.data;
   return (
-    <div className="mt-7 border-t border-line pt-6" data-testid="prepare-section">
+    <div className="mt-7 border-t border-line pt-6" data-testid="prepare-section" data-dev-id="projects.prepare">
       <div className="mb-3">
         <Eyebrow className="mb-0.5">Prepare</Eyebrow>
         <p className="text-xs text-t3">
           Annotate every unnumbered reference and auto-fill each component's blank identity fields from
-          the shared library, as one byte-preserving commit on the project's own git. Any component the
-          library cannot match stays untouched and can be linked by hand.
+          your shared components, as one byte-preserving commit on the project's own git. Any component
+          that cannot match stays untouched and can be linked by hand.
         </p>
       </div>
 
@@ -4332,7 +5057,7 @@ function PrepareForm({ projectId, data }: { projectId: string; data: PrepareRead
               ? `Prepared: annotated ${result.annotated} references and filled ${result.fill_fields} fields.`
               : "Prepared: nothing needed annotating or filling."
             : nothingToPrepare
-              ? "Nothing to prepare: every reference is numbered and no blank field has a library match."
+              ? "Nothing to prepare: every reference is numbered and no blank field has a component match."
               : `Prepare would annotate ${data.annotate} references and fill ${data.fill_fields} fields.`}
         </p>
         <div className="flex items-center gap-2">
@@ -4365,12 +5090,312 @@ function PrepareForm({ projectId, data }: { projectId: string; data: PrepareRead
       ) : null}
 
       <CompletionResidual roll={residual} />
-      {residual.incomplete_refs.length > 0 ? (
-        <ManualFillPanel projectId={projectId} incompleteRefs={residual.incomplete_refs} />
-      ) : (
+      {residual.incomplete_refs.length === 0 ? (
         <p className="text-xs text-ok" data-testid="prepare-all-complete">
           Every component carries a full identity.
         </p>
+      ) : null}
+      {/* The per-component link panel is NOT rendered here. It is the fallback for what the grouped
+          assign surface cannot offer, so it belongs after that surface, not above it. */}
+    </div>
+  );
+}
+
+// Assign Components: the surface for placements that carry a GENERIC symbol.
+//
+// A component placed from KiCad's default library carries a symbol like "Device:R", which every
+// resistor in existence shares, so it identifies no library part and Prepare correctly refuses to
+// guess at it. What Prepare cannot do automatically, a person can do quickly, as long as the work is
+// arranged as decisions rather than as a form: identical placements collapse into one row, and each
+// row shows the candidates whose value actually matches, ranked by how much evidence backs them.
+//
+// The interaction is the point: each candidate row IS the assign action. There is no select-then-
+// confirm, because the confirmation carries no information the row does not already show, and this is
+// a reversible atomic commit (Restore Last reverts it). The strongest candidate is listed first but
+// never pre-armed, since ranking a suggestion and committing it are different acts.
+function AssignSection({ projectId }: { projectId: string }) {
+  const q = useProjectAssign(projectId);
+  const data = q.data;
+  // The same cached query PrepareSection reads (TanStack dedupes it, so this costs no extra request).
+  // The per-component link fallback lives at the bottom of THIS section, below the grouped surface it
+  // is a fallback for, and it needs the current on-disk incomplete refs to offer.
+  const prepare = useProjectPrepare(projectId);
+  const incompleteRefs = prepare.data?.completion.incomplete_refs ?? [];
+  return (
+    <div className="mt-7 border-t border-line pt-6" data-testid="assign-section" data-dev-id="projects.assign">
+      <div className="mb-3">
+        <Eyebrow className="mb-0.5">Assign Components</Eyebrow>
+        <p className="text-xs text-t3">
+          Components placed from a default library carry a generic symbol, so no single component in
+          your library matches them on their own. Identical ones are grouped here, so assigning a
+          whole group of passives is one decision and one commit. An assignment is remembered against
+          the placement itself, so renumbering or retuning a component does not lose it.
+        </p>
+      </div>
+
+      {q.isLoading ? (
+        <p className="text-sm text-t3">Loading the unassigned components...</p>
+      ) : q.isError ? (
+        <p className="text-sm text-err">{errMsg(q.error, "Could not read the unassigned components.")}</p>
+      ) : !data ? null : !data.under_git && data.binding.writable ? (
+        // Only a project whose SCHEMATIC Stockroom writes needs its own git repo. When the binding
+        // is recorded on Stockroom's side instead, the project's version control is not involved,
+        // so demanding it here would refuse work that is perfectly safe to do.
+        <p className="text-sm text-t3" data-testid="assign-no-git">
+          This project is not under git. Initialize a git repository for it to assign components, so
+          each assignment is committed atomically and can be undone.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {data.groups.length === 0 ? (
+            <p className="text-xs text-ok" data-testid="assign-all-assigned">
+              Every placed component already matches a component in your library.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2" data-testid="assign-groups">
+              <p className="text-sm text-t2" data-testid="assign-summary">
+                {data.unassigned} of {data.components} components carry no library part, in{" "}
+                {data.groups.length} {data.groups.length === 1 ? "group" : "groups"}.
+              </p>
+              {data.groups.map((group) => (
+                <AssignGroupCard key={group.key} projectId={projectId} group={group} />
+              ))}
+            </div>
+          )}
+          <BoundLedger bound={data.bound} binding={data.binding} />
+          {incompleteRefs.length > 0 ? (
+            <ManualFillPanel projectId={projectId} incompleteRefs={incompleteRefs} />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// What is wrong with one bound placement, or null when nothing is. Ordered by severity, because a
+// row can be more than one kind of wrong and the worst one is what the engineer needs to read.
+function boundIssue(b: AssignBound): { label: string; tone: BadgeTone; detail: string } | null {
+  if (b.missing) {
+    return { label: "Part Missing", tone: "err", detail: "This part is no longer in your library." };
+  }
+  if (b.drift.length > 0) {
+    const fields = b.drift.map((c) => c.prop).join(", ");
+    return {
+      label: "Drifted",
+      tone: "warn",
+      detail: `${fields} ${b.drift.length === 1 ? "disagrees" : "disagree"} with the library part.`,
+    };
+  }
+  if (b.weak_key) {
+    return {
+      label: "Weak Link",
+      tone: "warn",
+      detail: "Linked by designator, so renumbering this component would lose the link.",
+    };
+  }
+  return null;
+}
+
+// The record of what is already decided, kept deliberately quiet: agreement is a COUNT, and only the
+// placements that need a person are given a row. A list of a hundred healthy links reads as noise
+// and buries the two that are broken. The full list is one click away for a real audit.
+function BoundLedger({ bound, binding }: { bound: AssignBound[]; binding: AssignBinding }) {
+  const [showAll, setShowAll] = useState(false);
+  if (bound.length === 0) return null;
+  const issues = bound.map((b) => [b, boundIssue(b)] as const);
+  const problems = issues.filter(([, issue]) => issue !== null);
+  const shown = showAll ? issues : problems;
+  const healthy = bound.length - problems.length;
+
+  return (
+    <div className="rounded-card border border-line2" data-testid="assign-bound">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-3 py-2">
+        <Eyebrow className="mr-1">Assigned</Eyebrow>
+        <span className="text-sm text-t2" data-testid="assign-bound-summary">
+          {bound.length} {bound.length === 1 ? "component is" : "components are"} linked to a
+          library part
+          {problems.length > 0
+            ? `, ${problems.length} ${problems.length === 1 ? "needs" : "need"} a look`
+            : ""}
+          .
+        </span>
+        {bound.length > problems.length ? (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            data-testid="assign-bound-toggle"
+            // The only control in an otherwise inert card, so it has to LOOK like one at rest, not
+            // only on hover. The app's quiet-button treatment: bordered, raised, 2xs.
+            className="ml-auto inline-flex flex-none items-center rounded-control border border-line bg-raise px-2 py-0.5 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          >
+            {showAll ? "Show Only Issues" : `Show All ${bound.length}`}
+          </button>
+        ) : null}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs text-ok" data-testid="assign-bound-clean">
+          All {healthy} agree with the library.
+        </p>
+      ) : (
+        <div data-testid="assign-bound-rows">
+          {shown.map(([b, issue]) => (
+            <div
+              key={b.key || b.ref}
+              data-testid="assign-bound-row"
+              className="flex items-center gap-3 border-t border-line2 px-3 py-2"
+            >
+              <span className="w-16 flex-none truncate font-mono text-2xs text-t2">{b.ref}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-t1">
+                  {b.display_name || b.part_id}
+                </span>
+                <span className="block truncate text-2xs text-t3">
+                  {issue ? issue.detail : b.mpn}
+                </span>
+              </span>
+              {issue ? (
+                <Badge tone={issue.tone} size="sm">
+                  {issue.label}
+                </Badge>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Where the link is kept. A user assigning parts in Altium needs to know their schematic was
+          not touched, and a user in KiCad needs to know their schematic was. */}
+      <p className="border-t border-line2 px-3 py-2 text-2xs text-t3" data-testid="assign-bound-where">
+        {binding.writable
+          ? `Each link is stored on the placement as a hidden ${binding.field} field, so it travels with your schematic.`
+          : binding.reason}
+      </p>
+    </div>
+  );
+}
+
+// How much evidence backs a candidate. Ranked, and labelled with what actually matched, so the
+// weakest suggestion cannot be mistaken for a confident one.
+const ASSIGN_TIERS: Record<AssignCandidate["confidence"], { label: string; tone: BadgeTone }> = {
+  "value+footprint": { label: "Value + Footprint", tone: "ok" },
+  "value+package": { label: "Value + Package", tone: "neutral" },
+  value: { label: "Value Only", tone: "warn" },
+};
+
+// Enough designators to recognise the group at a glance without turning the card into a wall of
+// chips. The remainder is COUNTED rather than dropped: a silent truncation would read as "this is all
+// of them" while a bulk write touched more.
+const REF_CHIPS = 8;
+
+function AssignGroupCard({ projectId, group }: { projectId: string; group: AssignGroup }) {
+  const assign = useAssignGroup();
+  const { toast } = useToast();
+  const [pending, setPending] = useState<string | null>(null);
+  const shownRefs = group.refs.slice(0, REF_CHIPS);
+  const hiddenRefs = group.refs.length - shownRefs.length;
+
+  function onAssign(candidate: AssignCandidate) {
+    setPending(candidate.part_id);
+    assign.mutate(
+      { id: projectId, refs: group.refs, part_id: candidate.part_id },
+      {
+        onSuccess: (r) =>
+          toast(
+            r.committed
+              ? `Assigned ${r.refs.length} ${r.refs.length === 1 ? "component" : "components"} to ${candidate.display_name}.`
+              : "Those components already match; nothing changed.",
+            r.committed ? "ok" : "neutral",
+          ),
+        onError: (e) => toast(errMsg(e, "Could not assign the components."), "err"),
+        onSettled: () => setPending(null),
+      },
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-line2" data-testid="assign-group">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 bg-raise px-3 py-2">
+        {/* The count leads, because collapsing N identical placements into one decision IS the point
+            of this surface. It is dropped at one, where a multiplier is noise. */}
+        {group.count > 1 ? (
+          <span className="tnum text-sm font-semibold text-t1" data-testid="assign-group-count">
+            &times;{group.count}
+          </span>
+        ) : null}
+        <span className="text-sm text-t1">{group.value || "No value"}</span>
+        <span className="truncate font-mono text-2xs text-t3" title={group.footprint}>
+          {group.lib_id}
+          {group.footprint ? ` · ${group.footprint}` : ""}
+        </span>
+        {/* The designators are shown, not just counted: an engineer will not accept a bulk write
+            without seeing exactly which components it touches. */}
+        <span className="ml-auto flex flex-wrap items-baseline gap-1" data-testid="assign-group-refs">
+          {shownRefs.map((ref) => (
+            <span key={ref} className="rounded-control bg-raise2 px-1.5 py-0.5 font-mono text-2xs text-t2">
+              {ref}
+            </span>
+          ))}
+          {hiddenRefs > 0 ? (
+            <span className="text-2xs text-t3">and {hiddenRefs} more</span>
+          ) : null}
+          {group.sheets.length > 0 ? (
+            <span className="ml-1 font-mono text-2xs text-t3">{group.sheets.join(", ")}</span>
+          ) : null}
+        </span>
+      </div>
+
+      {group.candidates.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs text-t3" data-testid="assign-no-candidates">
+          No component in your library has this value. Add one, then assign these here.
+        </p>
+      ) : (
+        <div data-testid="assign-candidates">
+          {group.candidates.map((candidate) => {
+            const tier = ASSIGN_TIERS[candidate.confidence];
+            const busy = pending === candidate.part_id;
+            return (
+              <button
+                key={candidate.part_id}
+                type="button"
+                onClick={() => onAssign(candidate)}
+                disabled={assign.isPending}
+                data-testid="assign-candidate"
+                className="group/cand flex w-full items-center gap-3 border-t border-line2 px-3 py-2 text-left hover:bg-raise focus-visible:bg-raise disabled:opacity-60 disabled:hover:bg-transparent"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className="truncate text-sm text-t1">{candidate.display_name}</span>
+                    {/* Only the ratings that DIFFER between these candidates. When every row shows the
+                        same evidence tier, this is the whole basis for choosing. */}
+                    {candidate.distinguish.map((spec) => (
+                      <span key={spec} className="tnum flex-none text-2xs text-t2">
+                        {spec}
+                      </span>
+                    ))}
+                  </span>
+                  {candidate.mpn ? (
+                    <span className="block truncate font-mono text-2xs text-t3">{candidate.mpn}</span>
+                  ) : null}
+                </span>
+                <Badge tone={tier.tone} size="sm">
+                  {tier.label}
+                </Badge>
+                {/* The row is the action, so the label stays short: the count is stated once in the
+                    group header, and repeating it on every row was pure noise. The chevron is what
+                    makes a row read as actionable at rest. */}
+                <span className="flex flex-none items-center gap-1 text-xs font-medium text-t2 group-hover/cand:text-t1">
+                  {busy ? "Assigning..." : "Assign"}
+                  {busy ? null : (
+                    /* A bespoke registry entry carries no intrinsic size, so the class must supply
+                       it or the glyph renders at zero and the affordance silently disappears. */
+                    <Icon id="detail.chevron-right" className="h-3 w-3" />
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -4426,7 +5451,7 @@ function ManualFillPanel({
       {
         onSuccess: (r) =>
           toast(
-            r.committed ? `Linked ${r.ref} to the library part.` : `${r.ref} already matches; nothing changed.`,
+            r.committed ? `Linked ${r.ref} to the component.` : `${r.ref} already matches; nothing changed.`,
             r.committed ? "ok" : "neutral",
           ),
         onError: (e) => toast(errMsg(e, "Could not link the component."), "err"),
@@ -4439,12 +5464,15 @@ function ManualFillPanel({
       data-testid="manual-fill-panel"
       className="rounded-control border border-line2 p-3"
     >
-      <h3 className="mb-2 text-sm font-medium text-t1">Link a Component</h3>
+      <h3 className="mb-2 text-sm font-medium text-t1">Link One Component</h3>
       <p className="mb-3 text-xs text-t3">
-        Pick a component the library could not match, then a library part to link it to. Its symbol,
-        footprint, and identity fields are set from that part in one commit.
+        For anything the groups above cannot offer, pick a single component and search your whole
+        library for the part to link it to. Its symbol, footprint, and identity fields are set from
+        that part in one commit.
       </p>
       <div className="flex flex-wrap items-end gap-2">
+        {/* Three controls in a row, and two of them used to be labelled "Component", which named the
+            system's noun twice instead of each control's actual job. */}
         <label className="flex flex-col gap-1 text-xs text-t3">
           Component
           <select
@@ -4461,7 +5489,7 @@ function ManualFillPanel({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Search Library
+          Search Your Library
           <input
             data-testid="manual-fill-search"
             className="rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"
@@ -4471,7 +5499,7 @@ function ManualFillPanel({
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-t3">
-          Library Part
+          Link To
           <select
             data-testid="manual-fill-part"
             className="min-w-[12rem] rounded-control border border-line2 bg-bg2 px-2 py-1 text-sm text-t1"

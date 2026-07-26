@@ -3,7 +3,7 @@ read from git blobs with no working-tree checkout."""
 
 from __future__ import annotations
 
-from stockroom.model.part import LibRef, PartRecord
+from stockroom.model.part import AssetRef, PartRecord
 
 
 def _history(client, part_id):
@@ -36,7 +36,7 @@ def test_history_is_empty_for_an_uncommitted_part(client, app_ctx):
     # a part present in the index but never committed has no timeline yet: an honest
     # empty list, not an error.
     rec = PartRecord(id="ghost", display_name="GHOST", category="ICs")
-    rec.symbol = LibRef(lib="SR-ICs", name="GHOST")
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="GHOST")
     (app_ctx.profile.library.parts_dir / "ghost.json").write_text(rec.dumps(), encoding="utf-8")
     app_ctx.rebuild_index()
     body = _history(client, "ghost")
@@ -50,7 +50,7 @@ def test_diff_reports_field_changes_between_two_revs(client):
         "/api/library/parts/tps62130", json={"field": "manufacturer", "value": "NewCo"}
     ).status_code == 200
     edit = _history(client, "tps62130")["commits"][0]["sha"]
-    r = client.get(f"/api/library/parts/tps62130/diff", params={"a": seed, "b": edit})
+    r = client.get("/api/library/parts/tps62130/diff", params={"a": seed, "b": edit})
     assert r.status_code == 200, r.text
     body = r.json()
     changes = {f["key"]: f for f in body["fields"]}
@@ -62,7 +62,7 @@ def test_diff_reports_field_changes_between_two_revs(client):
 def test_diff_first_version_is_all_added(client):
     seed = _history(client, "tps62130")["commits"][0]["sha"]
     # a="" means the part did not exist before this rev: every field reads as added
-    r = client.get(f"/api/library/parts/tps62130/diff", params={"a": "", "b": seed})
+    r = client.get("/api/library/parts/tps62130/diff", params={"a": "", "b": seed})
     assert r.status_code == 200, r.text
     changes = {f["key"]: f for f in r.json()["fields"]}
     assert changes["mpn"]["status"] == "added"
@@ -79,7 +79,7 @@ def test_diff_detects_a_symbol_change_but_not_footprint(client):
     ).status_code == 200
     edit = _history(client, "tps62130")["commits"][0]["sha"]
     body = client.get(
-        f"/api/library/parts/tps62130/diff", params={"a": seed, "b": edit}
+        "/api/library/parts/tps62130/diff", params={"a": seed, "b": edit}
     ).json()
     assert body["assets"]["symbol"] is True
     assert body["assets"]["footprint"] is False

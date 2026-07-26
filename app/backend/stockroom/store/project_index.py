@@ -23,6 +23,7 @@ CREATE TABLE projects (
     name          TEXT NOT NULL,
     root          TEXT NOT NULL,
     pro_path      TEXT NOT NULL DEFAULT '',
+    eda           TEXT NOT NULL DEFAULT 'kicad',
     board_count   INTEGER NOT NULL DEFAULT 0,
     sheet_count   INTEGER NOT NULL DEFAULT 0,
     has_git       INTEGER NOT NULL DEFAULT 0,
@@ -39,6 +40,7 @@ class ProjectIndexRow:
     name: str
     root: str
     pro_path: str
+    eda: str
     board_count: int
     sheet_count: int
     has_git: bool
@@ -75,8 +77,8 @@ class ProjectIndex:
                 rows.append(_row_values(ProjectRecord.loads(json_path.read_text(encoding="utf-8"))))
             if rows:
                 conn.executemany(
-                    "INSERT OR REPLACE INTO projects (id, name, root, pro_path, board_count, "
-                    "sheet_count, has_git, registered_at, search_blob) VALUES (?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR REPLACE INTO projects (id, name, root, pro_path, eda, board_count, "
+                    "sheet_count, has_git, registered_at, search_blob) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     rows,
                 )
         conn.commit()
@@ -118,6 +120,7 @@ def _row_values(rec: ProjectRecord) -> tuple:
         rec.name,
         rec.root,
         rec.pro_path,
+        rec.eda,
         len(rec.board_paths),
         len(rec.sheet_paths),
         1 if rec.git_root else 0,
@@ -132,6 +135,7 @@ def _to_row(r: sqlite3.Row) -> ProjectIndexRow:
         name=r["name"],
         root=r["root"],
         pro_path=r["pro_path"],
+        eda=r["eda"],
         board_count=r["board_count"],
         sheet_count=r["sheet_count"],
         has_git=bool(r["has_git"]),

@@ -51,6 +51,18 @@ def test_defaults_are_honest_empties():
     assert ProjectRecord.from_dict({"id": "x", "name": "X", "root": "/tmp/x"}) == p
 
 
+def test_eda_defaults_to_kicad_and_round_trips():
+    # EDA-neutral projects: the record says which EDA owns the files. A record written
+    # before the field existed reads as kicad (every registration then WAS KiCad).
+    p = ProjectRecord(id="x", name="X", root="/tmp/x")
+    assert p.eda == "kicad"
+    assert p.to_dict()["eda"] == "kicad"
+    assert ProjectRecord.from_dict({"id": "x", "name": "X", "root": "/tmp/x"}).eda == "kicad"
+    alt = ProjectRecord(id="y", name="Y", root="/tmp/y", eda="altium")
+    assert ProjectRecord.from_dict(alt.to_dict()).eda == "altium"
+    assert ProjectRecord.loads(alt.dumps()) == alt
+
+
 def test_from_dict_copies_mutable_containers():
     # A record built from a dict must not alias the caller's lists/dicts.
     src = {"id": "x", "name": "X", "root": "/tmp/x", "board_paths": ["a.kicad_pcb"], "audit_digest": {"n": 1}}
@@ -75,3 +87,32 @@ def test_new_project_id_dedups_against_existing(tmp_path):
 
 def test_new_project_id_falls_back_when_base_slugifies_empty(tmp_path):
     assert new_project_id(tmp_path, "!!!") == "project"
+
+
+# -- durable placement bindings (punch 17) -------------------------------------
+
+
+def test_bindings_round_trip_per_tool():
+    """A project record carries which library part each PLACEMENT is bound to, keyed by the
+    EDA tool, so an Altium binding and a KiCad binding can never be confused for each other."""
+    p = ProjectRecord(id="p", name="P", root="/tmp/p",
+                      bindings={"altium": {"UID-1": "stm32f405", "UID-2": "r10k"}})
+    back = ProjectRecord.loads(p.dumps())
+    assert back.bindings == {"altium": {"UID-1": "stm32f405", "UID-2": "r10k"}}
+
+
+def test_bindings_default_to_empty_and_read_from_a_record_written_before_they_existed():
+    # Every project record on disk predates this field; reading one must not explode.
+    assert ProjectRecord(id="p", name="P", root="/tmp/p").bindings == {}
+    old = '{"id": "p", "name": "P", "root": "/tmp/p"}'
+    assert ProjectRecord.loads(old).bindings == {}
+
+
+def test_bindings_are_copied_not_aliased():
+    src = {"id": "x", "name": "X", "root": "/tmp/x", "bindings": {"kicad": {"u1": "r10k"}}}
+    p = ProjectRecord.from_dict(src)
+    p.bindings["kicad"]["u2"] = "r47k"
+    assert src["bindings"] == {"kicad": {"u1": "r10k"}}
+    out = p.to_dict()
+    out["bindings"]["kicad"]["u3"] = "c100n"
+    assert p.bindings["kicad"] == {"u1": "r10k", "u2": "r47k"}

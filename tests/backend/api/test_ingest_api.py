@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.backend.conftest import requires_kicad_cli
+
 
 def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
     # candidate_to_dto must emit a `purchase` key (even empty) so the frontend
@@ -29,7 +31,8 @@ def test_candidate_dto_round_trips_purchase_and_always_includes_the_key():
 def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx):
     # No fake: drive the REAL IngestPipeline.commit -> LibraryOps.add_part gate through
     # the API. The candidate carries real symbol + footprint SOURCES (so to_staged_part
-    # succeeds) but is missing the datasheet/3D model/purchase passport fields, so the
+    # succeeds) but is missing the datasheet/purchase passport fields (the 3D model is an
+    # attachable asset that no longer gates entry), so the
     # complete-to-add gate must reject it with an honest 422 + per-field missing list,
     # and NOTHING may be written to the primary Main profile (spec section 6). This is
     # the proof that an incomplete part cannot be snuck into a primary profile.
@@ -50,11 +53,12 @@ def test_commit_fires_the_REAL_gate_end_to_end_with_missing_list(client, app_ctx
     assert r.status_code == 422
     body = r.json()
     assert body["error"] == "IncompleteError"
-    assert set(body["missing"]) >= {"3D model", "datasheet", "purchase link"}
+    assert set(body["missing"]) >= {"datasheet", "purchase link"}
     # the primary profile is untouched: the rejected add left zero trace
     assert client.get("/api/library/parts").json()["count"] == before
 
 
+@requires_kicad_cli  # the real /api/ingest/commit merges a symbol lib, which needs kicad-cli
 def test_archive_profile_bypasses_the_gate_through_the_api(client, app_ctx):
     # The one honest bypass (spec section 7): an archive profile grandfathers a legacy
     # import, so the SAME incomplete candidate that is rejected on Main is accepted on
@@ -175,3 +179,204 @@ def test_a_failing_job_surfaces_its_error_over_sse_then_terminates(client, monke
     assert "error" in body
     assert "staging blew up" in body
     assert "done" in body
+
+
+def test_candidate_dto_round_trips_provenance():
+    # provenance carries the datasheet source_url that to_staged_part records on
+    # the committed part; dropping it between inspect and commit loses the source
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+    from stockroom.model.part import Provenance
+
+    c = StagingCandidate(
+        vendor="snapeda", symbol_lib_path=None, symbol_name="X",
+        footprint_variants=[], mpn="LM358", display_name="LM358",
+        entry_name="LM358", category="ICs",
+        provenance=Provenance(source="snapeda", source_url="https://x/ds.pdf",
+                              original_zip_sha256="abc123"),
+    )
+    dto = candidate_to_dto(c)
+    back = dto_to_candidate(dto)
+    assert back.provenance is not None
+    assert back.provenance.source == "snapeda"
+    assert back.provenance.source_url == "https://x/ds.pdf"
+    assert back.provenance.original_zip_sha256 == "abc123"
+    # a candidate without provenance still round-trips as None
+    bare = StagingCandidate(vendor="lcsc", symbol_lib_path=None, symbol_name="X",
+                            footprint_variants=[], mpn="A", display_name="A",
+                            entry_name="A", category="ICs")
+    assert dto_to_candidate(candidate_to_dto(bare)).provenance is None
+
+
+def test_vendor_from_url_names_the_known_distributors():
+    from stockroom.api.routers.ingest import vendor_from_url
+
+    assert vendor_from_url("https://www.lcsc.com/product-detail/x.html") == "LCSC"
+    assert vendor_from_url("https://www.mouser.com/ProductDetail/x") == "Mouser"
+    assert vendor_from_url("https://www.digikey.com/en/products/detail/x") == "DigiKey"
+    assert vendor_from_url("https://shop.example.com/p/1") == "shop.example.com"
+    assert vendor_from_url("not a url") == "manual"
+
+
+def _drain_job(client, job_id):
+    # SSE frames are `event: <kind>` + `data: <json>`; the terminal kinds are
+    # "result" (payload under "result") and "error" (detail + error class).
+    import json as _json
+
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            line = line.strip()
+            if line.startswith("event:"):
+                kind = line[len("event:"):].strip()
+            elif line.startswith("data:") and kind in ("result", "error"):
+                data = _json.loads(line[len("data:"):].strip())
+                if kind == "result":
+                    return {"status": "done", "result": data["result"]}
+                return {"status": "error", "result": data}
+    return None
+
+
+
+
+def test_commit_lands_a_file_less_candidate_from_a_pulled_link(client):
+    # The primary add flow (owner 2026-07-24): a part pulled from a purchase link commits
+    # with NO asset files at all - identity + datasheet link + purchase suffice - and the
+    # guided capture attaches both EDA formats afterwards. The detail carries null asset
+    # refs, never a fabricated LibRef.
+    r = client.post("/api/ingest/commit", json={
+        "vendor": "Mouser",
+        "symbol_lib_path": None, "symbol_name": "",
+        "footprint_variants": [], "chosen_footprint_index": 0,
+        "model_path": None, "datasheet_path": None,
+        "category": "ICs", "mpn": "TPD6E05U06RVZR", "display_name": "TPD6E05U06",
+        "entry_name": "", "manufacturer": "TI", "description": "6-ch ESD array",
+        "purchase": [{"vendor": "Mouser", "url": "https://www.mouser.com/ProductDetail/x"}],
+        "provenance": {"source": "mouser", "source_url": "https://ti.com/tpd6e05u06.pdf",
+                       "original_zip_sha256": "", "ingested_at": ""},
+        "gaps": [],
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # A file-less add carries NO assets for any tool, and an empty bundle is omitted from
+    # the wire format entirely rather than serialized as a wall of nulls.
+    assert body["eda"] == {}
+    assert body["mpn"] == "TPD6E05U06RVZR"
+    detail = client.get(f"/api/library/parts/{body['id']}").json()
+    assert detail["eda"] == {}
+
+
+def test_the_add_lane_carries_vendor_disagreements_all_the_way_to_the_record():
+    """A part ADDED must keep the competing vendor answers, exactly as a REFRESHED one does.
+
+    Measured symptom: adding a part showed seven disagreeing fields in the review modal and then
+    saved `alternates: None`, while Refresh on the same part produced 13 alternates and 9 UI
+    disclosures. A part added and never refreshed silently lost every competing answer - the
+    exact loss the conflict machinery exists to prevent.
+
+    Cause: the inspect -> edit -> commit round trip goes through this DTO, and the DTO carried
+    `specs` while dropping `alternates` (the disagreements) and `enrichment` (per-key
+    provenance). The enrich layer computed both, `StagingCandidate` held both and
+    `to_staged_part` forwarded both; they died crossing the wire.
+    """
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+
+    c = StagingCandidate(
+        vendor="", symbol_lib_path=None, symbol_name="", footprint_variants=[],
+        display_name="TPS62130RGTR",
+        category="ICs",
+        mpn="TPS62130RGTR",
+        specs={"Tolerance": "1%"},
+        enrichment={"Tolerance": {"source": "mouser", "confidence": "high"}},
+        alternates={
+            "Tolerance": [
+                {"value": "1%", "source": "mouser", "confidence": "high"},
+                {"value": "2%", "source": "digikey", "confidence": "high"},
+            ],
+            "description": [
+                {"value": "3A step-down converter", "source": "mouser", "confidence": "high"},
+                {"value": "Buck Regulator 3A", "source": "digikey", "confidence": "high"},
+            ],
+        },
+    )
+
+    back = dto_to_candidate(candidate_to_dto(c))
+
+    assert set(back.alternates) == {"Tolerance", "description"}, (
+        "the vendor disagreements did not survive the commit round trip"
+    )
+    assert [a["value"] for a in back.alternates["Tolerance"]] == ["1%", "2%"]
+    assert [a["source"] for a in back.alternates["description"]] == ["mouser", "digikey"]
+    # Provenance rides along too: it is the same drop, and an empty `enrichment` map on every
+    # real part is what that staging comment already recorded as a symptom.
+    assert back.enrichment["Tolerance"]["source"] == "mouser"
+
+    # And the projection onto the record keeps them, so this is end to end and not DTO-only.
+    staged = back.to_staged_part()
+    assert [a["value"] for a in staged.alternates["Tolerance"]] == ["1%", "2%"]
+
+
+def test_a_candidate_with_no_disagreements_round_trips_to_empty_not_missing():
+    """The empty case is the one that crashes a review card: the frontend reads these keys
+    unconditionally, so they must always be PRESENT, like `purchase` already is."""
+    from stockroom.api.routers.ingest import candidate_to_dto, dto_to_candidate
+    from stockroom.ingest.staging import StagingCandidate
+
+    dto = candidate_to_dto(StagingCandidate(
+        vendor="", symbol_lib_path=None, symbol_name="", footprint_variants=[],
+        display_name="R", category="Resistors"))
+    assert dto["alternates"] == {}
+    assert dto["enrichment"] == {}
+    assert dto_to_candidate(dto).alternates == {}
+
+
+@requires_kicad_cli  # the real /api/ingest/commit merges a symbol lib, which needs kicad-cli
+def test_a_part_committed_through_the_api_has_the_disagreements_in_its_RECORD(client, app_ctx):
+    """End to end, at the layer the sheet reads from.
+
+    The DTO round-trip test above proves the wire carries `alternates`; this proves the value
+    survives all the way into the persisted record, which is what the detail sheet's alternates
+    disclosure actually reads. The two are different claims, and only this one is the feature.
+    """
+    import json
+
+    main_lib = app_ctx.profile.library
+    sym_source = main_lib.symbol_lib_path("ICs")
+    fp_source = main_lib.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+
+    r = client.post("/api/ingest/commit", json={
+        "vendor": "snapeda",
+        "symbol_lib_path": str(sym_source), "symbol_name": "TPS62130",
+        "footprint_variants": [str(fp_source)], "chosen_footprint_index": 0,
+        "category": "ICs", "mpn": "TPS62130RGTR", "display_name": "TPS62130RGTR",
+        "entry_name": "TPS62130CONF", "manufacturer": "Texas Instruments",
+        "description": "3A step-down converter",
+        # the complete-to-add gate wants a datasheet and somewhere to buy it; both are real
+        # parts of the add flow, not scaffolding for this assertion
+        "provenance": {"source": "mouser", "source_url": "https://ti.com/lit/ds/tps62130.pdf",
+                       "original_zip_sha256": "", "ingested_at": ""},
+        "purchase": [{"vendor": "Mouser", "url": "https://www.mouser.com/x",
+                      "part_number": "595-TPS62130RGTR", "price_breaks": [], "stock": 10,
+                      "currency": "USD", "fetched_at": ""}],
+        "specs": {"Tolerance": "1%"},
+        "enrichment": {"Tolerance": {"source": "mouser", "confidence": "high"}},
+        "alternates": {
+            "Tolerance": [
+                {"value": "1%", "source": "mouser", "confidence": "high"},
+                {"value": "2%", "source": "digikey", "confidence": "high"},
+            ],
+        },
+    })
+    assert r.status_code == 200, r.text
+    part_id = r.json()["id"]
+
+    on_disk = json.loads(
+        (app_ctx.profile.library.parts_dir / f"{part_id}.json").read_text(encoding="utf-8")
+    )
+    alts = on_disk.get("alternates") or {}
+    assert [a["value"] for a in alts.get("Tolerance", [])] == ["1%", "2%"], (
+        f"the committed record dropped the vendor disagreement: {on_disk.get('alternates')!r}"
+    )
+    assert [a["source"] for a in alts["Tolerance"]] == ["mouser", "digikey"]
+    assert (on_disk.get("enrichment") or {}).get("Tolerance", {}).get("source") == "mouser"

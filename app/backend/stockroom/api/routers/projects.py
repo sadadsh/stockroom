@@ -19,18 +19,20 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.schemas import (
+    AssignGroupBody,
     ConformBody,
     ManualFillBody,
     ProjectSummary,
     RegisterProjectBody,
     SetDesignRulesBody,
     SetFieldsBody,
-    SetNetclassPatternsBody,
     SetNetClassesBody,
+    SetNetclassPatternsBody,
     SetSettingsBody,
     StackupBody,
 )
 from stockroom.kicad.errors import KiCadCliError
+from stockroom.mutation.project_ops import project_capabilities
 
 
 def projects_router(require_token) -> APIRouter:
@@ -43,12 +45,13 @@ def projects_router(require_token) -> APIRouter:
 
     @r.post("")
     def register_project(request: Request, body: RegisterProjectBody) -> dict:
-        # A bad/nonexistent dir, a dir with no KiCad files, or an already-registered
-        # root each raises ValueError in the store -> 400 via the error layer.
+        # A bad/nonexistent dir, a dir with no project files, an ambiguous dir holding
+        # both EDAs with no explicit choice, or an already-registered root each raises
+        # ValueError in the store -> 400 via the error layer.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.register(body.root)
+        rec = ctx.project_ops.register(body.root, eda=body.eda)
         ctx.rebuild_project_index()
-        return rec.to_dict()
+        return dict(rec.to_dict(), capabilities=project_capabilities(rec))
 
     @r.get("/{project_id}")
     def project_detail(request: Request, project_id: str) -> dict:
@@ -56,7 +59,9 @@ def projects_router(require_token) -> APIRouter:
         rec = ctx.project_ops.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
-        return rec.to_dict()
+        # capabilities say what this EDA's registration can do here, so the frontend
+        # renders tabs from the server's truth instead of hardcoding per-EDA rules.
+        return dict(rec.to_dict(), capabilities=project_capabilities(rec))
 
     @r.delete("/{project_id}", status_code=204)
     def delete_project(request: Request, project_id: str) -> Response:
@@ -106,8 +111,9 @@ def projects_router(require_token) -> APIRouter:
         # honest 502 (never a fabricated clean pass, Decision 8). The result is cached
         # in AppContext so Overview and Buildability read one consistent verdict.
         ctx = request.app.state.ctx
-        if ctx.project_ops.get(project_id) is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        # gate BEFORE the job is submitted: an Altium project gets its honest 400 now,
+        # never a job that fails asynchronously
+        ctx.project_ops.require_kicad(project_id)
         if not ctx.cli.available:
             raise KiCadCliError(
                 "kicad-cli not found; install KiCad 10 (or set its path in Settings) to run ERC and DRC"
@@ -128,9 +134,7 @@ def projects_router(require_token) -> APIRouter:
         # The cached last run, or an honest not-run shape (never a fabricated pass) so
         # the frontend can render a stable "not checked yet" state. Unknown id -> 404.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = ctx.project_ops.require_kicad(project_id)
         cached = ctx.checks_cache.get(project_id)
         if cached is None:
             return {"project": rec.name, "ran_at": None, "erc": None, "drc": [], "summary": None}
@@ -148,6 +152,7 @@ def projects_router(require_token) -> APIRouter:
         if ctx.project_ops.get(project_id) is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         boards = (body or {}).get("boards", 1)
+        tax_rate = (body or {}).get("tax_rate", 0.0)
 
         def work(progress):
             price_lookup = _bom_price_lookup(ctx)
@@ -155,7 +160,7 @@ def projects_router(require_token) -> APIRouter:
             # from the library's stored prices first, the enrich layer second.
             library_parts = _library_parts(ctx)
             result = ctx.project_ops.bom(
-                project_id, boards=boards, library_parts=library_parts,
+                project_id, boards=boards, tax_rate=tax_rate, library_parts=library_parts,
                 price_lookup=price_lookup, progress=progress,
             )
             # A DELETE may have landed (and evicted the cache) during this network-bound
@@ -177,29 +182,35 @@ def projects_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such project: {project_id}")
         cached = ctx.bom_cache.get(project_id)
         if cached is None:
-            return {"project": rec.name, "ran_at": None, "boards": 1, "priced": False,
-                    "line_count": 0, "component_count": 0, "lines": [],
-                    "summary": None, "by_source": None, "cost_at_qty": None}
+            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
+                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
+                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
         return cached
 
-    @r.get("/{project_id}/procurement")
-    def get_procurement(request: Request, project_id: str) -> dict:
-        # Per-line orderability + sourcing/stock risk + lead time, computed offline over
-        # the CACHED BOM build (M7d). No rebuild: procurement is a pure read of the last
-        # priced BOM, so before a build it is an honest not-built shape (never a fabricated
-        # risk), and an unpriced build lists its lines with unknown (never-a-risk) stock.
+    @r.post("/{project_id}/bom/reprice")
+    def reprice_bom_route(request: Request, project_id: str, body: dict | None = None) -> dict:
+        # Re-cost the CACHED BOM for a new build quantity + tax/tariff rate, PURELY over the
+        # already-built lines (no schematic re-read, no network, no kicad-cli): changing the
+        # build size or the tax rate is just quantity + percentage math over the stored price
+        # ladders, so it is synchronous and instant. Re-caches so procurement/exports and a
+        # re-open see the same numbers. No cached build yet -> an honest not-built shape.
         # Unknown id -> 404.
-        from stockroom.projects.procurement import project_procurement
+        from stockroom.projects.bom import reprice_bom
 
         ctx = request.app.state.ctx
         rec = ctx.project_ops.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
-        cached = ctx.bom_cache.get(project_id) or {"ran_at": None, "boards": 1,
-                                                   "priced": False, "lines": []}
-        proc = project_procurement(cached)
-        proc["project"] = rec.name
-        return proc
+        boards = (body or {}).get("boards", 1)
+        tax_rate = (body or {}).get("tax_rate", 0.0)
+        cached = ctx.bom_cache.get(project_id)
+        if cached is None:
+            return {"project": rec.name, "ran_at": None, "boards": 1, "tax_rate": 0.0,
+                    "priced": False, "line_count": 0, "component_count": 0, "lines": [],
+                    "summary": None, "by_source": None, "cost_at_qty": None, "build": None}
+        result = reprice_bom(cached, boards, tax_rate)
+        ctx.bom_cache[project_id] = result
+        return result
 
     @r.get("/{project_id}/bom/export")
     def export_bom(request: Request, project_id: str, kind: str = "csv",
@@ -465,9 +476,7 @@ def projects_router(require_token) -> APIRouter:
         # not-under-git 400 are resolved before the job is submitted (an immediate honest error, not an
         # async one). A Prepare changes the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
         ctx = request.app.state.ctx
-        rec = ctx.project_ops.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = ctx.project_ops.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before preparing"
@@ -483,7 +492,9 @@ def projects_router(require_token) -> APIRouter:
                 ctx.bom_cache.pop(project_id, None)
             return result
 
-        return {"job_id": ctx.jobs.submit(work)}
+        # write=True: prepare_apply is one atomic commit on the project's git, so it runs on
+        # the serialized write lane (never two git Transactions at once).
+        return {"job_id": ctx.jobs.submit(work, write=True)}
 
     @r.post("/{project_id}/prepare/fill")
     def manual_fill(request: Request, project_id: str, body: ManualFillBody) -> dict:
@@ -500,6 +511,62 @@ def projects_router(require_token) -> APIRouter:
         ctx.checks_cache.pop(project_id, None)
         ctx.bom_cache.pop(project_id, None)
         return result
+
+    @r.get("/{project_id}/assign")
+    def get_assign(request: Request, project_id: str) -> dict:
+        # The bulk-assign surface: every placed component with no identified library part, grouped so
+        # identical placements are one row, each with its ranked candidates. Read-only, no git.
+        # Unknown id -> 404. The library is loaded lazily so an unknown id 404s before it is read.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.assign_read(project_id, library_parts=lambda: _library_parts(ctx))
+
+    @r.post("/{project_id}/assign")
+    def assign_group(request: Request, project_id: str, body: AssignGroupBody) -> dict:
+        # Assign one library part to a whole group of identical placements, as ONE atomic commit on the
+        # project's own git. Unknown id -> 404; not under git, an unknown part, an empty ref list, or a
+        # ref naming no component -> 400 (and nothing written); a GitError -> 503. An assignment changes
+        # the netlist/BOM, so the stale cached ERC/DRC + BOM are evicted.
+        ctx = request.app.state.ctx
+        result = ctx.project_ops.assign_refs(
+            project_id, body.refs, body.part_id, library_parts=lambda: _library_parts(ctx)
+        )
+        ctx.checks_cache.pop(project_id, None)
+        ctx.bom_cache.pop(project_id, None)
+        return result
+
+    @r.get("/{project_id}/hygiene")
+    def get_hygiene(request: Request, project_id: str) -> dict:
+        # What syncing this project's workspace hygiene would change: the ignore/attributes rules its
+        # EDA tool declares, plus the already-tracked per-user files those rules now cover. Read-only,
+        # no git. Unknown id -> 404.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.hygiene_read(project_id)
+
+    @r.post("/{project_id}/hygiene")
+    def sync_hygiene(request: Request, project_id: str) -> dict:
+        # Write the rules AND untrack the per-user files, as ONE commit on the project's own git.
+        # Both halves are required: an ignore rule has no effect on a file that is already tracked,
+        # and those files being tracked is exactly why two peers conflict on them. Unknown id -> 404;
+        # not under git, a dirty tree, or a hand-broken managed block -> 400; a GitError -> 503.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.hygiene_apply(project_id)
+
+    @r.get("/{project_id}/library-pin")
+    def get_library_pin(request: Request, project_id: str) -> dict:
+        # Which library version this project is pinned to, versus the library on THIS machine
+        # (Batch 2 item 2). Read-only. Unknown id -> 404; an unreadable pin file -> 400. The active
+        # profile comes from the context because a pin is taken against a specific profile, and two
+        # profiles hold different parts inside the same repository.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.library_pin_read(project_id, profile=ctx.profile.name)
+
+    @r.post("/{project_id}/library-pin")
+    def set_library_pin(request: Request, project_id: str) -> dict:
+        # Record the library's current commit as this project's pin, as one commit on the PROJECT's
+        # own git so it travels with the project. Unknown id -> 404; a project or library not under
+        # git, or a pin written by a newer build -> 400; a GitError -> 503.
+        ctx = request.app.state.ctx
+        return ctx.project_ops.library_pin_apply(project_id, profile=ctx.profile.name)
 
     @r.post("/{project_id}/restore")
     def restore(request: Request, project_id: str) -> dict:

@@ -79,10 +79,24 @@ def place_footprint(pretty_dir: Path, footprint_source: Path, new_name: str) -> 
 
 
 def _datasheet_value(record: PartRecord) -> str:
-    if record.datasheet and record.datasheet.file:
-        return f"${{SR_LIB}}/datasheets/{record.datasheet.file}"
-    if record.datasheet and record.datasheet.source_url:
-        return record.datasheet.source_url
+    """The datasheet reference a KiCad symbol carries.
+
+    KiCad declares ("file", "url") in the registry: a stored PDF wins because KiCad resolves
+    `${SR_LIB}/datasheets/<file>` through the path variable in its own config, so it opens with no
+    network. The order is registry DATA, not a hand-written sequence - Altium's is the opposite
+    for a real reason (no such variable in a .DbLib column) and the two had drifted apart with
+    nothing stating why.
+    """
+    from stockroom.eda.registry import get_tool
+
+    ds = record.datasheet
+    if ds is None:
+        return ""
+    for form in get_tool("kicad").datasheet_sources:
+        if form == "file" and (ds.file or "").strip():
+            return f"${{SR_LIB}}/datasheets/{ds.file}"
+        if form == "url" and (ds.source_url or "").strip():
+            return ds.source_url
     return ""
 
 
@@ -102,5 +116,7 @@ def kicad_visible_properties(record: PartRecord) -> dict[str, str]:
 
 
 def mirror_fields_to_symbol(symbol: Symbol, record: PartRecord) -> None:
+    # hidden: these are metadata for KiCad's field views, never schematic text;
+    # visible they would splat URLs over a schematic and drown the symbol preview
     for name, value in kicad_visible_properties(record).items():
-        symbol.set_property(name, value)
+        symbol.set_property(name, value, hide=True)

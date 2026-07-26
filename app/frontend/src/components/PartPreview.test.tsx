@@ -21,8 +21,14 @@ vi.mock("../api/client", async (importActual) => {
 // The three.js half is verified in the Windows pixel gate, not jsdom (no WebGL); mock
 // it so the component's mount/error wiring is exercised without a GL context. The mock
 // keeps the (container, glb, onError) signature so a test can fire the async parse error.
+// mountModelScene returns a HANDLE ({dispose, setView}), not a bare dispose function: the viewer
+// needs a channel to move the camera to a canonical view. The mock mirrors that shape, or the
+// component's cleanup calls handle.dispose on a plain function and every 3D test dies on unmount.
 const mountSpy = vi.fn(
-  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => vi.fn(),
+  (_container: HTMLElement, _glb: ArrayBuffer, _onError?: () => void) => ({
+    dispose: vi.fn(),
+    setView: vi.fn(),
+  }),
 );
 vi.mock("../lib/threeScene", () => ({
   mountModelScene: (c: HTMLElement, g: ArrayBuffer, onErr?: () => void) =>
@@ -45,7 +51,11 @@ beforeEach(() => {
 });
 
 function wrap(ui: ReactNode) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // retryDelay:0 keeps the preview query's retry:2 (a real cold-render recovery) instant
+  // in tests, so the fallback-on-error path still settles fast.
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+  });
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>{ui}</ThemeProvider>
@@ -70,6 +80,34 @@ describe("PreviewImage", () => {
       <PreviewImage kind="footprint" partId="x" fallback={<span>ART-FALLBACK</span>} />,
     );
     expect(await screen.findByText("ART-FALLBACK")).toBeInTheDocument();
+  });
+
+  // The tile is the ONE preview that used to tint with an unconditional `invert(0.66)` while its
+  // three siblings (StockAssetPreview, SvgViewport, SvgDiffViewport) all switched on the theme.
+  // Measured on the owner's real Windows window 2026-07-25: black line-art became rgb(162) which
+  // is 2.34:1 against the light card - under the 3:1 floor for non-text (WCAG 1.4.11) - while the
+  // SAME asset in the modal measured 14.87:1. A 6.3x spread on one asset, and the constant's own
+  // comment claimed it worked "on both themes". These two tests pin the tile to its siblings so
+  // one theme can never be tuned at the other's expense again.
+  it("inverts the monochrome art for the dark theme, matching the modal", async () => {
+    wrap(<PreviewImage kind="symbol" partId="lm358" fallback={<span>ART</span>} />);
+    const img = (await screen.findByAltText("symbol preview")) as HTMLImageElement;
+    // dark is the default theme
+    expect(img.style.filter).toBe("invert(1)");
+  });
+
+  it("leaves the art un-inverted on the light theme, so black line-art stays black", async () => {
+    // Set the HOST-INJECTED pref, not the localStorage mirror: injection is the real source of
+    // truth (uiPrefs.ts) and the mirror leaks between tests in one jsdom instance.
+    window.__STOCKROOM_UI__ = { theme: "light" };
+    try {
+      wrap(<PreviewImage kind="footprint" partId="lm358" fallback={<span>ART</span>} />);
+      const img = (await screen.findByAltText("footprint preview")) as HTMLImageElement;
+      // The bug: `invert(0.66)` turned black strokes into a mid grey that vanished on a light card.
+      expect(img.style.filter).toBe("none");
+    } finally {
+      delete window.__STOCKROOM_UI__;
+    }
   });
 });
 
@@ -127,7 +165,7 @@ describe("ModelViewer", () => {
     // simulate GLTFLoader's async onError firing after a successful fetch + mount
     mountSpy.mockImplementation((_c, _g, onErr) => {
       onErr?.();
-      return vi.fn();
+      return { dispose: vi.fn(), setView: vi.fn() };
     });
     mockApi.modelGlb.mockResolvedValue(new Uint8Array([0x67, 0x6c, 0x54, 0x46]).buffer);
     wrap(<ModelViewer partId="tps62130" />);

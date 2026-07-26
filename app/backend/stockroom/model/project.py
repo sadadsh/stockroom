@@ -28,10 +28,15 @@ class ProjectRecord:
     # Absolute path to the project directory, stored as_posix so a record written on
     # one OS reads the same on another (display never uses str(Path)).
     root: str
-    # The project's KiCad files, relative to `root` (so the record is location-stable).
+    # The project's EDA files, relative to `root` (so the record is location-stable).
+    # For a KiCad project: .kicad_pro / .kicad_pcb / .kicad_sch. For an Altium project:
+    # .PrjPcb / .PcbDoc / .SchDoc.
     pro_path: str = ""
     board_paths: list[str] = field(default_factory=list)
     sheet_paths: list[str] = field(default_factory=list)
+    # Which EDA owns the project files: "kicad" | "altium". A record written before this
+    # field existed reads as kicad (every registration then WAS KiCad).
+    eda: str = "kicad"
     # The git repo root the project lives under (absolute, as_posix), or None when the
     # project is not under version control. Project writes require this (commit-time
     # asset gate); a None git_root makes an edit an honest refuse, never a silent write.
@@ -40,6 +45,12 @@ class ProjectRecord:
     # Health, and the Buildability verdict read one consistent result; invalidated on
     # any write. None until the project has been audited once.
     audit_digest: dict | None = None
+    # Durable placement bindings: tool key -> {placement key: library part id}. This is the
+    # store for tools whose design files Stockroom cannot write (see the registry's
+    # PlacementBinding); a tool that CAN be written keeps the binding in the design itself,
+    # so it never appears here and the two can never disagree. Keyed per tool because an
+    # Altium UNIQUEID and a KiCad symbol uuid are different namespaces.
+    bindings: dict[str, dict[str, str]] = field(default_factory=dict)
     registered_at: str = ""
 
     def to_dict(self) -> dict:
@@ -50,8 +61,10 @@ class ProjectRecord:
             "pro_path": self.pro_path,
             "board_paths": list(self.board_paths),
             "sheet_paths": list(self.sheet_paths),
+            "eda": self.eda,
             "git_root": self.git_root,
             "audit_digest": dict(self.audit_digest) if self.audit_digest is not None else None,
+            "bindings": {tool: dict(m) for tool, m in self.bindings.items()},
             "registered_at": self.registered_at,
         }
 
@@ -65,8 +78,10 @@ class ProjectRecord:
             pro_path=d.get("pro_path", ""),
             board_paths=list(d.get("board_paths", [])),
             sheet_paths=list(d.get("sheet_paths", [])),
+            eda=d.get("eda", "kicad"),
             git_root=d.get("git_root"),
             audit_digest=dict(digest) if digest is not None else None,
+            bindings={str(tool): dict(m) for tool, m in (d.get("bindings") or {}).items()},
             registered_at=d.get("registered_at", ""),
         )
 

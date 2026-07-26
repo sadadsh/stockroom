@@ -25,7 +25,7 @@ from stockroom.store.machine_config import MachineConfig, config_dir
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
 
-_DEFAULT_PROFILE = "Main"
+_DEFAULT_PROFILE = "Stockroom"
 
 
 def default_library_dir() -> Path:

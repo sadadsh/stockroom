@@ -17,10 +17,10 @@ from __future__ import annotations
 import re
 
 from stockroom.projects.bom import (
+    _board_count,
     _bom_consolidated_csv,
     _bom_line_qty,
     _bom_project_csv,
-    _board_count,
     _coerce_price,
     _dist_pn,
     _lead_weeks,
@@ -210,19 +210,25 @@ def _xlsx_number(num: float) -> str:
     return format(num, ".6f").rstrip("0").rstrip(".")
 
 
-# Shared workbook scaffolding. Style ids referenced by cells: s="1" bold (header / totals
-# label); s="2" currency 0.00; s="3" bold currency (totals).
+# Shared workbook scaffolding. Style ids referenced by cells: s=1 bold (header / totals label),
+# s=2 hyperlink (blue underline), s=3 currency ($#,##0.00), s=4 bold currency (totals).
 _XLSX_STYLES_BOLD = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
-    '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+    '<numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;#,##0.00"/></numFmts>'
+    '<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>'
+    '<font><b/><sz val="11"/><name val="Calibri"/></font>'
+    # font 2: the hyperlink look (blue + underline) so a link cell reads as a clickable link
+    '<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font></fonts>'
     '<fills count="2"><fill><patternFill patternType="none"/></fill>'
     '<fill><patternFill patternType="gray125"/></fill></fills>'
     '<borders count="1"><border/></borders>'
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'
+    '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+    '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs>'
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
     '</styleSheet>')
 # Adds a currency number format ($#,##0.00) as styles 2 (plain) and 3 (bold, for totals).
@@ -246,10 +252,12 @@ _XLSX_STYLES_CURRENCY = (
     '</styleSheet>')
 
 
-def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1") -> bytes:
+def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1",
+                  sheet_rels_xml: str = "") -> bytes:
     """Zip a single-worksheet .xlsx from its worksheet + styles XML. Writes the fixed OPC
     parts (content types, relationships, workbook) around them so each writer only builds
-    the sheet and picks a style table. Pure stdlib - no packaging dependency."""
+    the sheet and picks a style table. `sheet_rels_xml`, when given, is the worksheet's own
+    relationships part (external hyperlink targets). Pure stdlib - no packaging dependency."""
     import io as _io
     import zipfile as _zip
     name = _xlsx_escape(sheet_name)[:31] or "Sheet1"  # Excel caps sheet names at 31 chars
@@ -271,7 +279,9 @@ def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1") -
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-        f'<sheets><sheet name="{name}" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        f'<sheets><sheet name="{name}" sheetId="1" r:id="rId1"/></sheets>'
+        # recalc every formula when the file opens, so the live formulas are authoritative
+        '<calcPr fullCalcOnLoad="1"/></workbook>')
     wb_rels = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -286,6 +296,8 @@ def _xlsx_package(sheet_xml: str, styles_xml: str, sheet_name: str = "Sheet1") -
         z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
         z.writestr("xl/styles.xml", styles_xml)
         z.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+        if sheet_rels_xml:
+            z.writestr("xl/worksheets/_rels/sheet1.xml.rels", sheet_rels_xml)
     return buf.getvalue()
 
 
@@ -299,19 +311,31 @@ def bom_xlsx(rows) -> bytes:
     Returns the .xlsx file as bytes."""
     priced = any(_coerce_price(r.get("unit_price")) is not None or r.get("extended") is not None
                  for r in rows)
+    # The build-economics group is present once a BOM has been built for a board count (every row
+    # carries final_qty then): the ORDER quantity for the build (price-break optimized), its unit
+    # cost, the line cost, the tax/tariff, and the line total - the columns you actually order and
+    # budget from. XLSX is the primary deliverable, so it must carry these, not just the CSV/table.
+    build = any(r.get("final_qty") is not None for r in rows)
     cols = [("Refs", "t"), ("Qty", "i"), ("Value", "t"), ("MPN", "t"), ("Manufacturer", "t"),
-            ("Footprint", "t"), ("Datasheet", "t"), ("Description", "t"), ("Basic", "t")]
+            ("Footprint", "t"), ("Package", "t"), ("Datasheet", "t"), ("Mouser Link", "t"),
+            ("Description", "t"), ("Basic", "t"), ("RoHS", "t"), ("Country of Origin", "t")]
     if priced:
-        cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "n"), ("Ext Price", "n"),
+        cols += [("Source", "t"), ("Dist P/N", "t"), ("Unit Price", "m"), ("Ext Price", "m"),
                  ("Stock", "i"), ("Lifecycle", "t")]
+    if build:
+        cols += [("Min Qty", "i"), ("Final Qty", "i"), ("Order Unit Cost", "m"),
+                 ("Cost @ Qty", "m"), ("Tariff %", "n"), ("Tax/Tariff", "m"), ("Total Cost", "m")]
 
     def values(r):
         refs = r.get("refs", [])
         v = {"Refs": ",".join(refs) if isinstance(refs, list) else str(refs),
              "Qty": _bom_line_qty(r), "Value": r.get("value", ""), "MPN": r.get("mpn", ""),
              "Manufacturer": r.get("manufacturer", ""), "Footprint": r.get("footprint", ""),
-             "Datasheet": r.get("datasheet", ""), "Description": r.get("description", ""),
-             "Basic": "yes" if r.get("basic") else ""}
+             "Package": r.get("package", ""), "Datasheet": r.get("datasheet", ""),
+             # the distributor purchase link (canonical Mouser ProductDetail) the owner buys from
+             "Mouser Link": r.get("url", ""),
+             "Description": r.get("description", ""), "Basic": "yes" if r.get("basic") else "",
+             "RoHS": r.get("rohs", ""), "Country of Origin": r.get("country_of_origin", "")}
         if priced:
             ext = r.get("extended")
             if ext is None:
@@ -319,6 +343,14 @@ def bom_xlsx(rows) -> bytes:
             v.update({"Source": r.get("source", ""), "Dist P/N": _dist_pn(r),
                       "Unit Price": _coerce_price(r.get("unit_price")), "Ext Price": ext,
                       "Stock": r.get("stock", ""), "Lifecycle": r.get("lifecycle", "")})
+        if build:
+            # Min Qty = the per-board quantity (what you place per board), not the distributor MOQ.
+            v.update({"Min Qty": _bom_line_qty(r), "Final Qty": r.get("final_qty"),
+                      "Order Unit Cost": r.get("final_unit_price"),
+                      "Cost @ Qty": r.get("final_extended"),
+                      # per-part US import tariff: the % Mouser shows, and the $ it works out to
+                      "Tariff %": r.get("tariff_rate"),
+                      "Tax/Tariff": r.get("tax_tariff"), "Total Cost": r.get("line_total")})
         return v
 
     def _num(raw):
@@ -330,7 +362,7 @@ def bom_xlsx(rows) -> bytes:
 
     def cell(ref, kind, raw, header=False):
         style = ' s="1"' if header else ""
-        if kind in ("n", "i") and not header:
+        if kind in ("n", "i", "m") and not header:
             n = _num(raw)
             if n is None:
                 return f'<c r="{ref}"{style}/>'  # blank, not a text "0"
@@ -338,7 +370,8 @@ def bom_xlsx(rows) -> bytes:
                 return f'<c r="{ref}"{style}><v>{int(round(n))}</v></c>'
             num = round(float(n), 6)  # currency precision, never sci-notation
             text = _xlsx_number(num)
-            return f'<c r="{ref}"{style}><v>{text}</v></c>'
+            cs = ' s="3"' if kind == "m" else style  # currency ($#,##0.00) for money cells
+            return f'<c r="{ref}"{cs}><v>{text}</v></c>'
         s = "" if raw is None else str(raw)
         if s == "":
             return f'<c r="{ref}"{style}/>'
@@ -359,16 +392,93 @@ def bom_xlsx(rows) -> bytes:
     body = ["".join(cell(f"{_xlsx_col(i)}1", "t", name, header=True)
                     for i, (name, _k) in enumerate(cols))]
     row_xml = [f'<row r="1">{body[0]}</row>']
+    # URL columns become real, clickable external hyperlinks. A generated xlsx does NOT
+    # auto-linkify plain text, so without this the Datasheet/Mouser cells are dead when clicked
+    # and read as "cut" in a narrow column. Each gets the blue-underline link style (s=2) and a
+    # worksheet relationship to the external target.
+    url_cols = {"Datasheet", "Mouser Link"}
+    # The derived money columns are emitted as LIVE Excel formulas (each with a cached value so the
+    # sheet reads correctly before a recalc), so editing an input - a unit price, an order qty, a
+    # tariff % - recalculates the costs. Column letters are looked up from the header order.
+    fcol = {name: _xlsx_col(i) for i, (name, _k) in enumerate(cols)}
+    FORMULA_COLS = {"Ext Price", "Cost @ Qty", "Tax/Tariff", "Total Cost"}
+
+    def _formula(name, ri, v):
+        def ok(*ns):
+            return all(n in fcol and _num(v.get(n)) is not None for n in ns)
+        if name == "Ext Price" and ok("Unit Price", "Qty"):
+            return f"{fcol['Unit Price']}{ri}*{fcol['Qty']}{ri}"
+        if name == "Cost @ Qty" and ok("Order Unit Cost", "Final Qty"):
+            return f"{fcol['Order Unit Cost']}{ri}*{fcol['Final Qty']}{ri}"
+        if name == "Tax/Tariff" and ok("Cost @ Qty", "Tariff %"):
+            return f"{fcol['Cost @ Qty']}{ri}*{fcol['Tariff %']}{ri}/100"
+        if name == "Total Cost" and ok("Cost @ Qty"):
+            tax = f"+{fcol['Tax/Tariff']}{ri}" if "Tax/Tariff" in fcol else ""
+            return f"{fcol['Cost @ Qty']}{ri}{tax}"
+        return None
+
+    hyperlinks: list[tuple[str, str, str]] = []
     for ri, v in enumerate(all_vals, start=2):
-        cells = "".join(cell(f"{_xlsx_col(i)}{ri}", k, v[name]) for i, (name, k) in enumerate(cols))
-        row_xml.append(f'<row r="{ri}">{cells}</row>')
+        parts = []
+        for i, (name, k) in enumerate(cols):
+            ref = f"{_xlsx_col(i)}{ri}"
+            val = v[name]
+            if name in url_cols and isinstance(val, str) and val.startswith("http"):
+                rid = f"rId{len(hyperlinks) + 1}"
+                hyperlinks.append((ref, rid, val))
+                parts.append(f'<c r="{ref}" s="2" t="inlineStr"><is>'
+                             f'<t xml:space="preserve">{_xlsx_escape(val)}</t></is></c>')
+                continue
+            fx = _formula(name, ri, v) if name in FORMULA_COLS else None
+            cached = _num(val)
+            if fx and cached is not None:
+                parts.append(f'<c r="{ref}" s="3"><f>{fx}</f>'
+                             f'<v>{_xlsx_number(round(float(cached), 6))}</v></c>')
+            else:
+                parts.append(cell(ref, k, val))
+        row_xml.append(f'<row r="{ri}">{"".join(parts)}</row>')
+
+    # A bold TOTAL row that SUMs the build-economics money columns as a live formula.
+    total_row_ix = None
+    if build and all_vals:
+        total_row_ix = len(all_vals) + 2
+        last_data = len(all_vals) + 1
+        sums = {name: round(sum((_num(v.get(name)) or 0) for v in all_vals), 4)
+                for name in ("Cost @ Qty", "Tax/Tariff", "Total Cost")}
+        tcells = []
+        for i, (name, _k) in enumerate(cols):
+            ref = f"{_xlsx_col(i)}{total_row_ix}"
+            col = _xlsx_col(i)
+            if i == 0:
+                tcells.append(f'<c r="{ref}" s="1" t="inlineStr"><is><t>TOTAL</t></is></c>')
+            elif name in sums:
+                tcells.append(f'<c r="{ref}" s="4"><f>SUM({col}2:{col}{last_data})</f>'
+                              f'<v>{_xlsx_number(sums[name])}</v></c>')
+            else:
+                tcells.append(f'<c r="{ref}"/>')
+        row_xml.append(f'<row r="{total_row_ix}">{"".join(tcells)}</row>')
+
+    hl_xml = sheet_rels = ""
+    if hyperlinks:
+        hl_xml = "<hyperlinks>" + "".join(
+            f'<hyperlink ref="{ref}" r:id="{rid}"/>' for ref, rid, _ in hyperlinks) + "</hyperlinks>"
+        sheet_rels = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + "".join(
+                f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/'
+                f'officeDocument/2006/relationships/hyperlink" Target="{_xlsx_escape(url)}" '
+                'TargetMode="External"/>' for _, rid, url in hyperlinks)
+            + "</Relationships>")
 
     last = _xlsx_col(len(cols) - 1)
     nr = len(all_vals) + 1
+    dim_last = total_row_ix or nr  # extend the sheet dimension over the TOTAL row when present
     sheet = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        f'<dimension ref="A1:{last}{nr}"/>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<dimension ref="A1:{last}{dim_last}"/>'
         '<sheetViews><sheetView tabSelected="1" workbookViewId="0">'
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
         '<selection pane="bottomLeft"/></sheetView></sheetViews>'
@@ -376,8 +486,9 @@ def bom_xlsx(rows) -> bytes:
         f'<cols>{cols_xml}</cols>'
         f'<sheetData>{"".join(row_xml)}</sheetData>'
         f'<autoFilter ref="A1:{last}{nr}"/>'
+        f'{hl_xml}'
         '</worksheet>')
-    return _xlsx_package(sheet, _XLSX_STYLES_BOLD, sheet_name="BOM")
+    return _xlsx_package(sheet, _XLSX_STYLES_BOLD, sheet_name="BOM", sheet_rels_xml=sheet_rels)
 
 
 _REFDES_CATEGORY = {
