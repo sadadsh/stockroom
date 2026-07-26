@@ -243,7 +243,12 @@
     --c-hover: rgba(0, 0, 0, 0.04);
     --c-sticky: rgba(233, 234, 238, 0.85);
     --c-ring-track: #dfe0e3;
-    --c-stage: rgba(17, 18, 20, 0.045);
+    /* 0.045 measured 1.12:1 against its pane in LIGHT theme, so the three empty asset tiles
+       read as blank space rather than as slots awaiting a file. Deepened on the owner's
+       decision, to the alpha that MEASURES the agreed target rather than one that looked
+       deeper: near-white ratios compress hard, so 0.045 -> 0.09 only reached 1.20:1 and
+       reaching 1.6:1 takes 0.214. DARK is untouched at 0.26, where it already reads. */
+    --c-stage: rgba(17, 18, 20, 0.214);
     --c-icon-line: #6f6f6f;
     --c-icon-fill: #6f6f6f;
     --c-icon-cube: #6f6f6f;
