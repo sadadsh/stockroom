@@ -247,3 +247,69 @@ describe("pulledSpecConflicts", () => {
     expect(pulledSpecConflicts(zipWithSpecs, RESULT)).toEqual([]);
   });
 });
+
+describe("the ADD lane keeps what the review modal showed", () => {
+  // The measured bug: adding a part displayed seven disagreeing fields in the modal and then
+  // saved `alternates: None`, while Refresh on the SAME part produced 13 alternates. The
+  // disagreements were computed here (`pulledSpecConflicts` renders them) and never written
+  // onto the candidate, so nothing downstream could persist them. A part added and never
+  // refreshed lost every competing vendor answer.
+  const CONFLICTED: EnrichmentResult = {
+    ...RESULT,
+    spec_conflicts: {
+      Tolerance: [
+        { value: "1%", source: "mouser", confidence: "high" },
+        { value: "2%", source: "digikey", confidence: "high" },
+      ],
+    },
+    field_conflicts: {
+      description: [
+        { value: "ARM Cortex-M3 MCU", source: "mouser", confidence: "high" },
+        { value: "32-bit MCU 64KB Flash", source: "digikey", confidence: "high" },
+      ],
+    },
+  };
+
+  it("writes every spec disagreement onto the candidate as an alternate", () => {
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, CONFLICTED, "https://www.mouser.com/x");
+    expect(merged.alternates?.Tolerance?.map((a) => a.value)).toEqual(["1%", "2%"]);
+    expect(merged.alternates?.Tolerance?.map((a) => a.source)).toEqual(["mouser", "digikey"]);
+  });
+
+  it("keeps a canonical FIELD disagreement too, the way the refresh lane does", () => {
+    // `apply.conflict_entries` on the backend is spec_conflicts + field_conflicts, and the
+    // detail sheet reads `alternates.description`. Persisting only the spec half would leave
+    // the two lanes disagreeing about a part again.
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, CONFLICTED, "https://www.mouser.com/x");
+    expect(merged.alternates?.description?.map((a) => a.value)).toEqual([
+      "ARM Cortex-M3 MCU",
+      "32-bit MCU 64KB Flash",
+    ]);
+  });
+
+  it("saves exactly what the modal displays, so the two can never disagree", () => {
+    // Same source of truth: whatever `pulledSpecConflicts` renders is what gets stored. An
+    // internal key the modal deliberately hides (Image, product_url) must not reappear in the
+    // record as a conflict nobody asked about.
+    const withImage: EnrichmentResult = {
+      ...CONFLICTED,
+      spec_conflicts: {
+        ...CONFLICTED.spec_conflicts,
+        Image: [
+          { value: "https://a/1.jpg", source: "mouser", confidence: "high" },
+          { value: "https://b/2.jpg", source: "digikey", confidence: "high" },
+        ],
+      },
+    };
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, withImage, "https://www.mouser.com/x");
+    const shown = pulledSpecConflicts(ZIP_CANDIDATE, withImage).map((c) => c.key);
+    expect(shown).not.toContain("Image");
+    expect(Object.keys(merged.alternates ?? {})).not.toContain("Image");
+    for (const key of shown) expect(Object.keys(merged.alternates ?? {})).toContain(key);
+  });
+
+  it("adds no alternates key when the vendors agreed", () => {
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, RESULT, "https://www.mouser.com/x");
+    expect(merged.alternates ?? {}).toEqual({});
+  });
+});

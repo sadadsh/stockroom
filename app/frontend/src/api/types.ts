@@ -376,6 +376,12 @@ export interface StagingCandidate {
   // the enriched spec bag the inspect -> edit -> commit trip carries onto the record
   // (every parametric field a distributor page yielded); absent on a bare ZIP candidate.
   specs?: Record<string, unknown>;
+  // Every value a source offered and LOST with, keyed like the record's `alternates`. The
+  // review modal already showed these disagreements; without carrying them here the commit
+  // dropped them, so a part added and never refreshed kept none of the competing answers.
+  alternates?: Record<string, { value: string; source: string; confidence: string }[]>;
+  // per-key provenance for `specs`, the same trip and the same reason
+  enrichment?: Record<string, { source: string; confidence: string }>;
   // carries the datasheet source_url onto the committed record; absent on
   // candidates staged before it was round-tripped
   provenance?: {

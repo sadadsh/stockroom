@@ -75,6 +75,16 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         # the enriched spec bag rides the inspect -> edit -> commit trip so every field
         # a distributor page yielded reaches the committed record, not just identity
         "specs": dict(c.specs),
+        # ...and so do the two maps that hang off it. `specs` alone crossed the wire, so a part
+        # ADDED saved `alternates: None` while the same part REFRESHED produced 13 alternates:
+        # the enrich layer computed the disagreements, StagingCandidate held them and
+        # to_staged_part forwarded them, and they died here. `enrichment` is the same drop,
+        # which is why the per-key provenance map was empty on every real part.
+        #
+        # Always emitted, even when empty, for the same reason `purchase` is: the review card
+        # reads these keys unconditionally and a missing key crashes it.
+        "alternates": {k: list(v) for k, v in c.alternates.items()},
+        "enrichment": dict(c.enrichment),
         # provenance carries the datasheet source_url that to_staged_part records
         # on the committed part, so it must survive the inspect -> edit -> commit trip
         "provenance": (
@@ -118,6 +128,8 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
         purchase=[Purchase(**p) for p in d.get("purchase", [])],
         gaps=list(d.get("gaps", [])),
         specs=dict(d.get("specs", {})),
+        alternates={k: list(v) for k, v in (d.get("alternates") or {}).items()},
+        enrichment=dict(d.get("enrichment") or {}),
     )
 
 
