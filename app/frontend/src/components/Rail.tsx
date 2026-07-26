@@ -5,7 +5,7 @@
  * theme toggle. Icons are the artifact's own set, inline, so the rail matches the
  * north-star 1:1.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { railNav, railRouteFor, type NavEntry } from "../lib/nav";
 import { useRouter, type Route } from "../lib/router";
 import { useTheme } from "../lib/theme";
@@ -51,24 +51,69 @@ const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
 // setting you re-apply forever. Read lazily so the first paint is already correct.
 const RAIL_STORAGE_KEY = "stockroom.rail.collapsed";
 
-function readCollapsed(): boolean {
+// Below this WINDOW width an expanded rail costs the detail sheet its third column, so a rail
+// nobody has touched starts collapsed instead.
+//
+// DERIVED, not picked: DetailPanel's grid needs a container of >=896px for three columns (its own
+// comment states the breakpoint). Measured on the owner's real window at 1384px with the rail
+// expanded, that container was 815px - so the chrome outside it costs window-189-815 = 380px (the
+// part picker plus padding). Expanded, three columns therefore need 896+189+380 = 1465.
+//
+// One threshold, not two. Below ~1328 collapsing cannot buy the third column back either, and a
+// narrow window is exactly where the extra 137px is worth most anyway, so there is no width at
+// which an untouched rail is better off expanded.
+const RAIL_NEEDS_COLLAPSE_BELOW = 1465;
+
+/** The stored preference, or `undefined` when the user has never chosen one. */
+function storedCollapsed(): boolean | undefined {
   // Host-injected preference first, localStorage only as the dev-server fallback. The host binds an
   // ephemeral port, so localStorage is empty on every launch and the collapsed rail always came
   // back expanded. See lib/uiPrefs.ts.
-  return readPref<boolean>(
+  //
+  // `undefined` is the whole point of this signature: "collapsed=false" and "never chosen" are
+  // different facts, and the old boolean-with-a-default could not tell them apart.
+  return readPref<boolean | undefined>(
     "rail_collapsed",
     RAIL_STORAGE_KEY,
     (raw) => (raw === "1" ? true : raw === "0" ? false : undefined),
-    false,
+    undefined,
   );
+}
+
+function readCollapsed(): boolean {
+  const chosen = storedCollapsed();
+  if (chosen !== undefined) return chosen; // an explicit choice always wins, at any width
+  try {
+    return window.innerWidth < RAIL_NEEDS_COLLAPSE_BELOW;
+  } catch {
+    return false; // no window to measure (SSR / a test env): the old default
+  }
 }
 
 export function Rail() {
   const { route, navigate } = useRouter();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
+  // value straight into the preference store - and after that first launch "never chosen" could
+  // never occur again, on any machine, so the width would never be consulted a second time. A
+  // default that records itself as a decision is not a default.
+  const chosenByUser = useRef(storedCollapsed() !== undefined);
   useEffect(() => {
-    writePref("rail_collapsed", collapsed, RAIL_STORAGE_KEY);
+    if (chosenByUser.current) writePref("rail_collapsed", collapsed, RAIL_STORAGE_KEY);
   }, [collapsed]);
+  const setCollapsedByUser = (next: boolean | ((v: boolean) => boolean)) => {
+    chosenByUser.current = true;
+    setCollapsed(next);
+  };
+  // Follow the window while it is still a default. Once chosen, this stops watching entirely.
+  useEffect(() => {
+    if (chosenByUser.current) return;
+    const onResize = () => {
+      if (!chosenByUser.current) setCollapsed(window.innerWidth < RAIL_NEEDS_COLLAPSE_BELOW);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const { toggle } = useTheme();
   const items = railNav();
   const primary = items.filter((item) => item.group === "primary");
@@ -174,7 +219,7 @@ export function Rail() {
           aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
           title={collapsed ? "Expand Rail" : "Collapse Rail"}
           aria-expanded={!collapsed}
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => setCollapsedByUser((v) => !v)}
           className={
             "flex h-[24px] w-[24px] flex-none items-center justify-center rounded-control " +
             "text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +

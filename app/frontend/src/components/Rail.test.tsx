@@ -32,6 +32,15 @@ vi.mock("../lib/toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
+// The rail now starts collapsed on a window too narrow for the detail sheet's three-column
+// layout (see RAIL_NEEDS_COLLAPSE_BELOW), and jsdom's default window is 1024px - narrow. Every
+// test below this line was written against the EXPANDED rail and reads labels that only exist
+// there ("Updating", the wordmark), so the width they always implicitly relied on is now stated
+// instead of assumed. The auto-collapse block at the bottom sets its own widths.
+beforeEach(() => {
+  Object.defineProperty(window, "innerWidth", { value: 1600, configurable: true, writable: true });
+});
+
 describe("Rail", () => {
   beforeEach(() => {
     state.route = "components";
@@ -179,4 +188,53 @@ describe("Rail AboutModal - copy + brand icon adoption", () => {
     expect(screen.getByRole("dialog").textContent).not.toContain("—");
   });
 
+});
+
+describe("the rail fits itself to the window when you have never chosen", () => {
+  // MEASURED on the owner's real window: the detail sheet needs a container of >=896px for its
+  // three-column layout (DetailPanel's own comment states the breakpoint). At 1384x861 with the
+  // rail EXPANDED the container was 815px, so Specifications and Sourcing stacked and each got
+  // its own scrollbar in a 500px column. Collapsing the rail gains 137px and clears it.
+  //
+  // The rule the owner picked: the app does that itself rather than expecting them to know that
+  // a nav rail governs whether a spec sheet has three columns. An EXPLICIT choice still wins,
+  // forever - this only decides the case where they have never touched it.
+  const setWidth = (w: number) => {
+    Object.defineProperty(window, "innerWidth", { value: w, configurable: true, writable: true });
+  };
+
+  beforeEach(() => {
+    window.__STOCKROOM_UI__ = {};
+    try { localStorage.clear(); } catch { /* jsdom may deny it */ }
+  });
+
+  it("starts collapsed on a window too narrow for the three-column sheet", () => {
+    setWidth(1384); // the owner's real window
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    expect(screen.getByRole("button", { name: /expand rail/i })).toBeInTheDocument();
+  });
+
+  it("starts expanded when the window is wide enough for it", () => {
+    setWidth(1920);
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    expect(screen.getByRole("button", { name: /collapse rail/i })).toBeInTheDocument();
+  });
+
+  it("NEVER overrides a stored preference, however narrow the window", () => {
+    // The half that matters: once you have chosen, the window does not get a vote. Otherwise the
+    // app would quietly undo your choice every launch, which is worse than the layout it fixes.
+    setWidth(1000);
+    window.__STOCKROOM_UI__ = { rail_collapsed: false };
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    expect(screen.getByRole("button", { name: /collapse rail/i })).toBeInTheDocument();
+  });
+
+  it("does not persist the width-derived state, so it stays a default and not a choice", () => {
+    // The trap this was written around: the existing effect wrote the state on MOUNT, which would
+    // turn the derived value into a stored preference immediately - and then "never chosen" could
+    // never happen again on any machine.
+    setWidth(1384);
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    expect(localStorage.getItem("stockroom.rail.collapsed")).toBeNull();
+  });
 });
