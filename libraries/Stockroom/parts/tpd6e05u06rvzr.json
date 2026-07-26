@@ -82,6 +82,19 @@
   "description": "ESD Protection Diodes / TVS Diodes 6-CH lo cap IEC ESD protect diodes",
   "display_name": "ESD Protection Diode",
   "eda": {
+    "altium": {
+      "footprint": {
+        "file": "",
+        "lib": "tpd6e05u06rvzr.PcbLib",
+        "name": "RVZ0014A"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "tpd6e05u06rvzr.SchLib",
+        "name": "TPD6E05U06RVZR"
+      }
+    },
     "kicad": {
       "footprint": {
         "file": "",
