@@ -125,11 +125,13 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.enrich",
   "detail.history",
   "detail.handoff-tab",
+  // Glb3DView.tsx LayerToggle: devId= string prop on the idle-spin chip.
+  "detail.model-spin",
   // ProductPhoto.tsx PhotoTrigger: devId= string prop on the click-to-view photo chips.
   "detail.photo",
   "ingest.pulled-photo",
   "ingest.candidate-photo",
-]; // 11
+]; // 12
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

@@ -76,6 +76,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.asset-symbol", label: "Symbol file card", area: "detail" },
   { id: "detail.asset-footprint", label: "Footprint file card", area: "detail" },
   { id: "detail.asset-stage", label: "Asset tile stage / chamber", area: "detail" },
+  { id: "detail.model-spin", label: "3D idle-spin toggle", area: "detail" },
   { id: "detail.model-views", label: "3D canonical view switcher", area: "detail" },
   { id: "detail.model-board", label: "3D land-pattern (footprint) toggle", area: "detail" },
   { id: "detail.model-layers", label: "3D layer + shading bar", area: "detail" },

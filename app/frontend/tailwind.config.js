@@ -78,7 +78,12 @@ export default {
         // align. Reserved strictly for real machine values so mono re-acquires
         // meaning (and gives tabular-figure alignment down a data grid).
         mono: [
-          '"JetBrains Mono Variable"',
+          // Geist Mono (owner asked for a change, 2026-07-26). Chosen over IBM Plex Mono for its
+          // TIGHTER proportions: this app's problem is spec values overflowing their column, and a
+          // narrower face is a functional win there, not just a different look. Bundled offline via
+          // @fontsource-variable like the interface face - a CDN font would fail outright, since the
+          // host serves the SPA from an ephemeral local port with no internet assumption.
+          '"Geist Mono Variable"',
           '"Cascadia Mono"',
           "Consolas",
           "ui-monospace",
