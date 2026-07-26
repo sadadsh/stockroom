@@ -30,6 +30,7 @@ import { deriveTitle, isReferenceOnlySpecKey } from "../lib/derive";
 import { useCapture } from "../lib/capture";
 import {
   groupSpecs,
+  mergeSameConcept,
   TRADE_GROUP,
   type SpecGroup,
   type SpecRow,
@@ -643,7 +644,17 @@ export function DetailPanel({
   // Grouped, extensible spec sheet (Electrical / Physical / Ratings / Other) from lib/specSchema,
   // with catalog metadata (manufacturer, country, packaging, ...) dropped so the sheet is the
   // physical parameters, not a distributor page. Groups emptied by the filter fall away.
-  const allSpecGroups = groupSpecs(detail.category, detail.specs);
+  // ONE CONCEPT, ONE ROW. Distributors word a parameter differently and the record keeps every
+  // wording, so this part carries both `Breakdown Voltage` (6 V) and `Voltage - Breakdown` (8.5 V)
+  // - two rows whose labels both prettify to "Breakdown Voltage", showing two numbers with nothing
+  // saying which was in force. The fold routes the displaced value into `alternates`, so the
+  // existing "N Sources" disclosure shows and swaps it like any other vendor disagreement.
+  const mergedSpecs = mergeSameConcept(
+    groupSpecs(detail.category, detail.specs),
+    detail.alternates ?? {},
+  );
+  const allSpecGroups = mergedSpecs.groups;
+  const specAlternates = mergedSpecs.alternates;
   const specGroups = allSpecGroups
     .filter((group) => group.title !== TRADE_GROUP)
     .map((group) => ({
@@ -1007,7 +1018,7 @@ export function DetailPanel({
                 // has to look DISTINCT from this one: two identically-styled lists showing the same
                 // row is what makes a repeat read as a bug rather than as a summary.
                 groups={specGroups}
-                alternates={detail.alternates ?? {}}
+                alternates={specAlternates}
                 onUseSpecValue={onUseSpecValue}
                 category={detail.category}
                 pinned={pinnedSpecs}
@@ -1072,7 +1083,7 @@ export function DetailPanel({
               {tradeGroup ? (
                 <TradeCompliance
                   group={tradeGroup}
-                  alternates={detail.alternates ?? {}}
+                  alternates={specAlternates}
                   onUseSpecValue={onUseSpecValue}
                 />
               ) : null}

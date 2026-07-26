@@ -19,6 +19,10 @@ export const PAD_THICKNESS_MM = 0.05;
  *  it; 1 would bury it completely and 0 is the sticker look the owner rejected. */
 export const PAD_EMBED_FRACTION = 0.5;
 
+/** The most of a part's SHORT axis one silkscreen line may occupy. 0.08 keeps the outline legible
+ *  without letting an accurately-drawn 0.21mm line eat 15% of a 1.4mm body. */
+export const SILK_MAX_FRACTION = 0.08;
+
 /** The old fixed value, kept as the CEILING and as the unknown-height fallback. */
 const MAX_BOARD_MM = 0.6;
 
@@ -85,12 +89,23 @@ export function silkQuad(
   start: readonly [number, number],
   end: readonly [number, number],
   width: number,
+  /** Upper bound in mm, normally `SILK_MAX_FRACTION` of the part's short axis. Omitted = no cap. */
+  maxWidth?: number,
 ): (SilkQuad & { width: number }) | null {
   const dx = end[0] - start[0];
   const dz = end[1] - start[1];
   const length = Math.hypot(dx, dz);
   if (!Number.isFinite(length) || length <= 0) return null;
-  const w = Number.isFinite(width) && width > 0 ? width : DEFAULT_STROKE_MM;
+  let w = Number.isFinite(width) && width > 0 ? width : DEFAULT_STROKE_MM;
+  // CAPPED against the part (owner's decision, 2026-07-26, from previews). The footprint's OWN
+  // specified width is drawn faithfully - measured 0.1 / 0.17 / 0.21mm on their real part - and on
+  // a 1.4mm-wide body 0.21mm is 15% of the short axis, which reads as a heavy outline BECAUSE it
+  // is accurate. Same trap as the courtyard in 58cc9bc: "more accurate" and "looks right" are
+  // different goals, and the owner picked the cap. Faithful on ordinary parts, and a tiny part is
+  // no longer swallowed by its own silkscreen.
+  if (Number.isFinite(maxWidth) && (maxWidth as number) > 0) {
+    w = Math.min(w, maxWidth as number);
+  }
   return {
     cx: (start[0] + end[0]) / 2,
     cz: (start[1] + end[1]) / 2,
