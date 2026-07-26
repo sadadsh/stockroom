@@ -124,13 +124,25 @@ def test_every_tool_declares_how_its_library_paths_stay_portable():
     surface happens to be explaining it."""
     for tool in all_tools():
         pc = tool.path_contract
-        assert pc.kind in ("env_var", "relative"), f"{tool.key} declares no path contract kind"
+        assert pc.kind in (
+            "env_var",
+            "relative",
+            "derived",
+        ), f"{tool.key} declares no path contract kind"
         assert pc.description, f"{tool.key} declares no path contract description"
 
 
-def test_kicad_resolves_through_an_env_var_and_altium_resolves_relatively():
+def test_kicad_resolves_through_an_env_var_and_altium_is_regenerated_per_machine():
     """The concrete asymmetry the pin surface has to explain. KiCad needs SR_LIB set on every
-    machine; an Altium DbLib names its data source relative to its own folder and needs nothing."""
+    machine; Altium's .DbLib carries an ABSOLUTE data-source path and so is rebuilt locally.
+
+    The Altium half asserted the opposite until 2026-07-26: `kind="relative"` with a description
+    promising the folder "resolves on any machine with no variable to set". That was the premise
+    `49bde17` disproved -- the SQLite ODBC driver resolves `Database=` against the PROCESS working
+    directory, which is never the library folder, so a relative form produced a red "Connection
+    Failed" in real Altium. The path form changed and this contract did not, and the contract is
+    rendered verbatim to the owner in the library-version card.
+    """
     kicad = get_tool("kicad").path_contract
     assert kicad.kind == "env_var"
     assert kicad.variable == "SR_LIB"
@@ -138,8 +150,29 @@ def test_kicad_resolves_through_an_env_var_and_altium_resolves_relatively():
     assert kicad.prefix == "${SR_LIB}/"
 
     altium = get_tool("altium").path_contract
-    assert altium.kind == "relative"
+    assert altium.kind == "derived"
     assert altium.variable == ""
+    # No portable prefix to SHOW: there is no path shape that makes this file travel.
+    assert altium.prefix == ""
+
+
+def test_a_contract_may_not_promise_portability_for_an_artifact_it_regenerates():
+    """The structural invariant behind the bug above, so prose and data can never disagree again.
+
+    A `relative` contract claims stored references travel as they stand. A tool that lists the very
+    file carrying those references in `derived` is saying the opposite: that file is rebuilt on each
+    machine because it cannot travel. Both cannot be true, and when they disagreed it was the
+    OWNER-FACING sentence that was wrong.
+    """
+    for tool in all_tools():
+        pc = tool.path_contract
+        if pc.kind != "relative":
+            continue
+        carriers = [name for name in tool.derived if name.lower().endswith((".dblib", ".dblink"))]
+        assert not carriers, (
+            f"{tool.key} promises relative portability while regenerating {carriers}; "
+            "declare kind='derived' instead"
+        )
 
 
 def test_a_tool_that_needs_no_variable_still_has_a_contract():

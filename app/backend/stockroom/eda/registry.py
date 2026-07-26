@@ -85,8 +85,8 @@ class PathContract:
     A project stores references to library symbols, footprints and 3D models, and a library lives
     at a different absolute path on every peer's disk. Whether a stored reference survives that is
     a fact about the TOOL, not about any one surface, so it belongs here: KiCad resolves through a
-    path VARIABLE it holds in its own config, while an Altium DbLib names its data source by a path
-    relative to its own folder and needs nothing set up at all.
+    path VARIABLE it holds in its own config, while Altium's .DbLib carries an absolute data-source
+    path and so is rebuilt on each machine instead of travelling.
 
     Generic code (the library-version pin surface, the doctor, onboarding) reads this instead of
     knowing that `SR_LIB` is a KiCad concept.
@@ -94,6 +94,10 @@ class PathContract:
 
     # "env_var": the tool resolves through a named variable that must be set on each machine.
     # "relative": references are relative to the library folder, so nothing has to be set.
+    # "derived": the file carrying the references is machine-specific, so Stockroom REGENERATES it
+    #   locally. Nothing to set, but the rebuild is not optional. Do not conflate this with
+    #   "relative": that one promises the artifact travels as it stands, which for a .DbLib is the
+    #   exact belief that shipped a library nobody could connect to (see _ALTIUM.path_contract).
     kind: str = "relative"
     # The variable's name, and the tool config file Stockroom writes it into, for an honest
     # message when it is missing. Empty for a relative contract.
@@ -461,16 +465,21 @@ _ALTIUM = EdaTool(
             "assignment is recorded by Stockroom rather than stamped into the schematic."
         ),
     ),
-    # The generated .DbLib names its SQLite data source as `.\stockroom-parts.db`, relative to the
-    # .DbLib's own folder (see altium/dblib.py), so the Altium library folder is portable as it
-    # stands and there is no machine-specific variable a peer can get wrong.
+    # The generated .DbLib names its SQLite data source by an ABSOLUTE path (see altium/dblib.py),
+    # so the file is machine-specific and Stockroom rebuilds it locally rather than sharing it.
+    # This read `kind="relative"` until 2026-07-26, on the premise that `.\stockroom-parts.db`
+    # travels. It does not: `49bde17` measured the SQLite ODBC driver resolving `Database=` against
+    # the PROCESS working directory, which is never the library folder, so real Altium answered a
+    # relative form with "Connection Failed". The path form was fixed and this contract was not,
+    # and it is rendered verbatim to the owner in the library-version card.
     path_contract=PathContract(
-        kind="relative",
-        prefix=".\\",
+        kind="derived",
+        prefix="",
         description=(
-            "The generated .DbLib names its data source by a path relative to its own folder, so "
-            "an Altium library folder resolves on any machine with no variable to set. What a peer "
-            "still needs is the SQLite ODBC driver Altium reads it through."
+            "Altium reads this library through a .DbLib naming its data source by an absolute "
+            "path, so the file cannot be shared. Stockroom regenerates it on each machine, which "
+            "means a peer needs no variable set but must let Stockroom rebuild the .DbLib once. "
+            "What a peer still needs is the SQLite ODBC driver Altium reads it through."
         ),
     ),
 )
