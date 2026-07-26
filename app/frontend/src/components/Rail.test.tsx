@@ -238,3 +238,50 @@ describe("the rail fits itself to the window when you have never chosen", () => 
     expect(localStorage.getItem("stockroom.rail.collapsed")).toBeNull();
   });
 });
+
+describe("the rail's three reported defects", () => {
+  const setWidth = (w: number) =>
+    Object.defineProperty(window, "innerWidth", { value: w, configurable: true, writable: true });
+
+  it("does not drop a shadow when the peek opens", () => {
+    // Owner: "i dont like its shadow on hover". The peek is already an opaque panel with a border,
+    // so the shadow only added weight to a hover state.
+    setWidth(1000);
+    window.__STOCKROOM_UI__ = {};
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    const rail = document.querySelector('[data-dev-id="rail.root"]')!;
+    expect(rail.className).not.toContain("shadow-pop");
+  });
+
+  it("keeps the glyph column still while the peek opens", () => {
+    // Owner: "hovering it shifts the icons to the right spot but not hovering on it misaligns
+    // everything". MEASURED before: glyph centre 20.5 collapsed, 30.5 hovered - a 10px jump, and
+    // neither was the rail's centre. AFTER: 25.5 in both states (jsdom has no layout, so what is
+    // asserted here is the STRUCTURE that produces it).
+    //   * the row is left-aligned in both states, so the peek cannot re-justify it;
+    //   * the panel's padding does not change on hover, so the row's x cannot move;
+    //   * the glyph sits in a fixed-width box, so the zero-width label's flex GAP - which is what
+    //     dragged it 5px off centre - lands to its right instead of being centred with it.
+    setWidth(1000);
+    window.__STOCKROOM_UI__ = {};
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    const rail = document.querySelector('[data-dev-id="rail.root"]')!;
+    expect(rail.className).not.toContain("hover:px-3");
+    expect(rail.className).not.toContain("focus-within:px-3");
+    const row = document.querySelector('[data-dev-id="rail.nav-components"]')!;
+    expect(row.className).toContain("justify-start");
+    expect(row.className).not.toContain("justify-center");
+    expect(row.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
+  });
+
+  it("fills its column when pinned open, instead of stopping under the last icon", () => {
+    // Owner: "pinning the nav also shortens it to only fit the icons". MEASURED: 190x279 in a
+    // 1000px-tall window. The nav is a block child of a wrapper that stretches, so with no height
+    // of its own it was exactly as tall as its content - and its right border stopped there too.
+    // AFTER: 190x976.
+    setWidth(1600);
+    window.__STOCKROOM_UI__ = { rail_collapsed: false };
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    expect(document.querySelector('[data-dev-id="rail.root"]')!.className).toContain("h-full");
+  });
+});
