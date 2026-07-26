@@ -114,6 +114,13 @@ class Drive:
             self.console.append(f"error: {detail.get('text', 'exception')}")
 
     def eval(self, expression: str):
+        # `@path` reads the expression from a FILE. Anything with quotes or parentheses in it is
+        # unusable as an argv string across the WSL -> cmd.exe boundary: interop re-splits the
+        # command line, so a one-line arrow function arrives shredded and argparse rejects the
+        # fragments. Scoped to that boundary rather than solved by escaping, which never survives
+        # two layers of quoting.
+        if expression.startswith("@"):
+            expression = Path(expression[1:]).read_text(encoding="utf-8")
         return self.client.evaluate(expression)
 
     def click(self, dev_id: str) -> str:
