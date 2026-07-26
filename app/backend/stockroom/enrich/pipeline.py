@@ -86,14 +86,44 @@ def fill_category(result: EnrichmentResult) -> None:
     # first, and only fall back to the description when it yields nothing. Blending them let a
     # description that merely NAMES another component ("resistor divider" on an IC) mis-steer the
     # category, so the two are tried in priority order, never joined.
-    pc = result.specs.get("Product Category")
+    #
+    # Within each tier, EVERY source's answer is considered, not just the one that won the slot
+    # (owner, 2026-07-26: "find the BEST classification across sources rather than taking one and
+    # giving up"). Only one distributor category fits in `specs`, and the displaced ones sit in
+    # the conflict map - so which vendor happened to answer first decided whether a part could be
+    # classified at all. DigiKey's "Circuit Protection" names no component kind while LCSC's "ESD
+    # Protection Diodes / TVS Diodes" does, and the real library had the unclassifiable one in the
+    # slot. The tiers stay ordered, so this widens the search without blending it.
     guess = "Other"
-    if pc is not None and str(pc.value).strip():
-        guess = propose_category(str(pc.value))
-    if guess == "Other" and result.description is not None:
-        guess = propose_category(str(result.description.value))
+    for text in _classification_signals(result):
+        guess = propose_category(text)
+        if guess != "Other":
+            break
     if guess != "Other":
         result.category = guess
+
+
+def _classification_signals(result: EnrichmentResult):
+    """Every text worth classifying from, most authoritative first: all sources' distributor
+    Product Category, then all sources' description. Within a tier the value that won the slot
+    leads, then the displaced answers in the order they were recorded. De-duplicated, because the
+    conflict map records the winner alongside the loser."""
+    seen: set[str] = set()
+
+    def tier(primary, alternates):
+        out = []
+        for sourced in [primary, *alternates]:
+            if sourced is None:
+                continue
+            text = str(sourced.value).strip()
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+        return out
+
+    yield from tier(result.specs.get("Product Category"),
+                    result.spec_conflicts.get("Product Category", []))
+    yield from tier(result.description, result.field_conflicts.get("description", []))
 
 
 def _is_substantive(result: EnrichmentResult) -> bool:
@@ -398,13 +428,24 @@ class EnrichmentPipeline:
         if cached is not None:
             # An instant cache hit does no network work; the job returns straight to a
             # `done`, so no fetching/rendering stage is claimed for it.
-            return _result_from_cache(cached, category)
+            hit = _result_from_cache(cached, category)
+            # Classify the cache hit too. An install carries entries written BEFORE the MPN path
+            # classified at all, whose stored category is "Other" beside a perfectly good Product
+            # Category, and a cached answer must not serve that stale verdict for the whole TTL.
+            fill_category(hit)
+            return hit
         # One monotonic wrapper for the whole registry walk, so a later source's low local
         # pct (the datasheet leg after the scrape leg) never rewinds the bar.
         sink = monotonic(progress)
         result = self.registry.enrich(mpn, category,
                                       want=set(want) if want else set(DEFAULT_WANT),
                                       progress=sink)
+        # The MPN path classifies exactly like the paste-a-link path. Without this the caller's
+        # default ("Other", from the Add-A-Part form) survived every distributor answer, so a part
+        # whose sources all said "ESD Protection Diodes / TVS Diodes" still landed in SR-Other and
+        # emitted Category=Other into the Altium DbLib (owner, 2026-07-26, on the real library).
+        # Before the cache write, so the classification is what gets stored.
+        fill_category(result)
         self.cache.put(mpn, _result_to_cache(result))
         return result
 
