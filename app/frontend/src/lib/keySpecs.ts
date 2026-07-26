@@ -89,6 +89,16 @@ function termsFor(category: string): readonly string[] {
   return KEY_SPECS_BY_CATEGORY[key] ?? KEY_SPECS_FALLBACK;
 }
 
+/**
+ * The comparison form for matching a pin against a row: lowercased, with every run of non
+ * alphanumerics collapsed to one space and the ends trimmed. Deliberately NOT a substring or a
+ * stemmer - it makes "Factory  Pack Quantity", "factory pack quantity" and "Factory-Pack-Quantity"
+ * one term while keeping "Factory Lead Time" a different one.
+ */
+export function normalizeSpecTerm(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 /** Pinned spec keys, per category display name. */
 export type PinnedSpecs = Record<string, readonly string[]>;
 
@@ -115,10 +125,32 @@ export function keySpecRows(
     out.push(r);
   };
 
-  // PINS FIRST, and by exact key: a pin is a specific row the user chose, so it must not be
-  // re-matched loosely onto a different spec that merely shares a word with it.
+  // PINS FIRST. A pin is a SPECIFIC row the user chose, so it is matched by identity and never by
+  // substring - "Breakdown Voltage" must not drag in "Reverse Standoff Voltage".
+  //
+  // But identity is compared on a NORMALIZED form, not the raw string (owner, 2026-07-26: "spec
+  // pinning must persist across ALL items of that group"). Pins are already stored per CATEGORY, so
+  // the write was never the problem; the read was. Records key a spec the way the DISTRIBUTOR wrote
+  // it, and `normalize_spec_key` on the backend only trims whitespace - it does not canonicalize
+  // wording - so two parts in one category routinely differ by case, spacing or punctuation for the
+  // same spec, and an exact match silently applied the pin to only one of them. The row's LABEL is
+  // considered too, since one part can carry as its key what another carries as its label.
+  //
+  // KNOWN LIMIT, stated rather than implied: this bridges SPELLING, not vocabulary. A part whose
+  // distributor calls it "Voltage - Breakdown (Min)" against a pin on "Breakdown Voltage (Min)"
+  // still will not match, because closing that gap needs either substring matching (which
+  // reintroduces exactly the false promotion this exactness protects) or a synonym table. That is a
+  // decision, not an oversight, and it is in the punch list.
   for (const key of pinned[category] ?? []) {
-    take(all.find((r) => r.key === key));
+    const wanted = normalizeSpecTerm(key);
+    take(
+      all.find(
+        (r) =>
+          r.key === key ||
+          normalizeSpecTerm(r.key) === wanted ||
+          normalizeSpecTerm(r.label ?? "") === wanted,
+      ),
+    );
   }
 
   // then the curated set, matched as a substring in both directions so the registry term can be
