@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "action",
         choices=sorted(
-            {"list", "move", "probe", "shotwin", "mclick", "foreground"} | _DESKTOP_ACTIONS
+            {"list", "move", "probe", "shotwin", "mclick", "foreground", "focusclick"} | _DESKTOP_ACTIONS
         ),
     )
     ap.add_argument("--title", default="Altium Designer", help="window title substring")
