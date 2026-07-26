@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ModelSceneHandle, RenderMode, ViewMode } from "../lib/threeScene";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
+import { Icon } from "./Icon";
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -26,6 +27,7 @@ export function Glb3DView({
   land,
   showViews = false,
   showShading = false,
+  compact = false,
 }: {
   data: ArrayBuffer | undefined;
   isLoading: boolean;
@@ -56,6 +58,9 @@ export function Glb3DView({
    * with the one group that is genuinely per-part, the layers.
    */
   showShading?: boolean;
+  /** Narrow host (the detail tile): chips render as ICONS so ten controls fit one row instead of
+   *  wrapping to three and eating a third of the stage. Names survive via title + aria-label. */
+  compact?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState(false);
@@ -155,6 +160,8 @@ export function Glb3DView({
         <div className="flex items-center gap-0.5">
           <LayerToggle
             devId="detail.model-show-model"
+            icon="art.model"
+            compact={compact}
             label="Model"
             on={showModel}
             hint="Show or hide the 3D body"
@@ -168,6 +175,8 @@ export function Glb3DView({
             <>
               <LayerToggle
                 devId="detail.model-board"
+            icon="art.footprint"
+            compact={compact}
                 label="Pads"
                 on={showLand}
                 hint="Show the land pattern, to check the body is oriented correctly"
@@ -182,6 +191,8 @@ export function Glb3DView({
               />
               <LayerToggle
                 devId="detail.model-show-board"
+            icon="nav.board"
+            compact={compact}
                 label="PCB"
                 on={showBoard}
                 hint="Show the board the pads sit on"
@@ -207,6 +218,8 @@ export function Glb3DView({
               key={r.mode}
               devId={r.devId}
               label={r.label}
+              icon={r.icon}
+              compact={compact}
               on={renderMode === r.mode}
               hint={r.hint}
               onToggle={() => {
@@ -222,6 +235,8 @@ export function Glb3DView({
         <div className="flex items-center gap-2">
           <LayerToggle
             devId="detail.model-spin"
+            icon="action.refresh"
+            compact={compact}
             label="Spin"
             on={spinning}
             hint="Stop or resume the idle rotation"
@@ -248,24 +263,27 @@ export function Glb3DView({
 
 // The dev-id is written out in FULL rather than built as `detail.model-view-${mode}`: the parity
 // gate scans source text, so an interpolated id is invisible to it and to anyone grepping for it.
-const SHADING: { mode: RenderMode; label: string; hint: string; devId: string }[] = [
+const SHADING: { mode: RenderMode; label: string; hint: string; devId: string; icon: string }[] = [
   {
     mode: "realistic",
     label: "Realistic",
     hint: "The model's own colours, physically lit with ambient occlusion",
     devId: "detail.model-shade-realistic",
+    icon: "view.shade-realistic",
   },
   {
     mode: "studio",
     label: "Studio",
     hint: "Flat high-contrast surface with feature lines, easiest for reading shape",
     devId: "detail.model-shade-studio",
+    icon: "view.shade-studio",
   },
   {
     mode: "xray",
     label: "X-Ray",
     hint: "Translucent body, so the pads underneath stay visible",
     devId: "detail.model-shade-xray",
+    icon: "view.shade-xray",
   },
 ];
 
@@ -276,47 +294,62 @@ function LayerToggle({
   on,
   hint,
   onToggle,
+  icon,
+  compact = false,
 }: {
   devId: string;
   label: string;
   on: boolean;
   hint: string;
   onToggle: () => void;
+  /** Registry icon id. Only used in `compact` mode. */
+  icon?: string;
+  /** ICON-ONLY. The mini tile is ~280px and ten text chips wrapped to three rows there, taking a third
+   *  of the stage; the owner chose icon-only for the tile (2026-07-26). The modal has room and keeps
+   *  its labels. The NAME is never lost - `title` and `aria-label` both carry it. */
+  compact?: boolean;
 }) {
+  const iconOnly = compact && !!icon;
   return (
     <button
       type="button"
       data-dev-id={devId}
       aria-pressed={on}
-      title={hint}
+      aria-label={iconOnly ? label : undefined}
+      title={iconOnly ? `${label} - ${hint}` : hint}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
       }}
       className={
-        "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+        "rounded-[2px] font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
         "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+        (iconOnly
+          ? "flex h-[22px] w-[22px] items-center justify-center "
+          : "px-1.5 py-0.5 text-2xs ") +
         (on ? "bg-raise2 text-t1" : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
       }
     >
-      {label}
+      {iconOnly ? <Icon id={icon} className="h-3.5 w-3.5" /> : label}
     </button>
   );
 }
 
-const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string }[] = [
-  { mode: "iso", label: "3D", hint: "Three-quarter view", devId: "detail.model-view-iso" },
+const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon: string }[] = [
+  { mode: "iso", label: "3D", hint: "Three-quarter view", devId: "detail.model-view-iso", icon: "view.iso" },
   {
     mode: "top",
     label: "Top",
     hint: "Looking down at the land pattern",
     devId: "detail.model-view-top",
+    icon: "view.top",
   },
   {
     mode: "front",
     label: "Front",
     hint: "Side elevation, the way a datasheet draws height",
     devId: "detail.model-view-front",
+    icon: "view.front",
   },
 ];
 
