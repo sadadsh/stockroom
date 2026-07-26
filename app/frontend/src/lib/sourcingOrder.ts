@@ -80,9 +80,24 @@ export function orderPhotos<T extends { vendor: string }>(photos: readonly T[]):
  * is always a suffix of the real ladder, so no tier is ever omitted from the middle and none is
  * invented.
  */
-export function ladderRows(breaks: readonly PriceTier[]): PriceTier[] {
+export function ladderRows(
+  breaks: readonly PriceTier[],
+  // The tier currently shown as the headline price. Passed since the headline became quantity-aware:
+  // dropping the first break is only safe while the headline IS that break.
+  inForceQty?: number,
+): PriceTier[] {
   if (breaks.length < 2) return [];  // one tier IS the headline unit price; nothing to compare
   const bulk = breaks.slice(1);
+  // The first break must stay when it is the tier in force, or the headline points at a row the
+  // ladder hides - measured on the owner's real DigiKey data, where the headline said "at 3,000+"
+  // above a ladder starting at 6,000+. Parity is still reached by ADDING, never by hiding: if
+  // keeping it makes the count odd, the whole ladder shows.
+  // THREE constraints that cannot all hold at an odd tier count: even parity, include the in-force
+  // tier, hide nothing. Ranked by what a reader loses - hiding a real price is a correctness fault, a
+  // headline pointing at a hidden row is a contradiction, and an odd count is a cosmetic hole in one
+  // grid cell. So when the in-force tier is the first one, the WHOLE ladder shows and parity yields.
+  const mustKeepFirst = inForceQty != null && breaks[0]?.qty === inForceQty;
+  if (mustKeepFirst) return [...breaks];
   return bulk.length % 2 === 0 ? bulk : [...breaks];
 }
 

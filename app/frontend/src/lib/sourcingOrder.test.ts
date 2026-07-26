@@ -215,3 +215,42 @@ describe("recommendVendor (quantity-aware)", () => {
     expect(recommendVendor([v("A", 1, [])], 10)).toBeNull();
   });
 });
+
+// A defect the FIRST real Windows shot showed and no test could: DigiKey's headline read "at 3,000+"
+// while its own ladder started at 6,000+, because `ladderRows` drops the first break as redundant with
+// the headline - a rule written when the headline was always the qty-1 price. Now that the headline is
+// the tier IN FORCE at the needed quantity, that tier is the one which must never be hidden.
+describe("ladderRows keeps the IN-FORCE tier visible", () => {
+  const five = [
+    { qty: 3000, price: 0.45 },
+    { qty: 6000, price: 0.42 },
+    { qty: 9000, price: 0.41 },
+    { qty: 15000, price: 0.39 },
+    { qty: 21000, price: 0.38 },
+  ];
+
+  it("shows the in-force tier even when the parity rule would have dropped it", () => {
+    const rows = ladderRows(five, 3000);
+    expect(rows.map((r) => r.qty)).toContain(3000);
+  });
+
+  it("keeps EVEN parity except where that would force hiding a real price", () => {
+    // Ranked deliberately: hiding a price is a correctness fault, a headline pointing at a hidden row
+    // is a contradiction, an odd count is one empty grid cell. Only the last one is allowed to lose.
+    for (const q of [6000, 9000, 15000, 21000]) {
+      expect(ladderRows(five, q).length % 2).toBe(0);
+    }
+    // in-force is the FIRST tier and the ladder is 5 long: all five show, parity yields
+    expect(ladderRows(five, 3000)).toHaveLength(5);
+  });
+
+  it("never invents or drops a tier: what shows is always a subset of the real ladder", () => {
+    const rows = ladderRows(five, 3000);
+    for (const r of rows) expect(five).toContain(r);
+  });
+
+  it("behaves exactly as before when no quantity is given", () => {
+    expect(ladderRows(five)).toEqual(ladderRows(five, undefined));
+    expect(ladderRows(five).map((r) => r.qty)).toEqual([6000, 9000, 15000, 21000]);
+  });
+});
