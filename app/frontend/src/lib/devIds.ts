@@ -34,6 +34,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "about.icon", label: "About logo tile", area: "about" },
   { id: "about.title", label: "About title", area: "about" },
   { id: "about.credit", label: "About credit line", area: "about" },
+  { id: "about.close", label: "Close About", area: "about" },
   { id: "about.links", label: "About social links", area: "about" },
   { id: "components.root", label: "Components page", area: "components" },
   { id: "components.picker", label: "Parts picker column", area: "components" },
