@@ -225,6 +225,16 @@ function KeySpecificationsBlock({
             </span>
           </div>
         ))}
+        {/* AN ODD NUMBER OF CELLS LEAVES A PAINTED HOLE. The grid draws its own rules by sitting on
+            `bg-line` and letting a 1px gap show through between `bg-surface` cells - which means any
+            grid AREA with no cell in it shows that line colour at FULL SIZE, not as a line. With
+            five curated specs the second column of the last row was a solid block of border colour,
+            reading as a broken or still-loading tile in both themes. This fills it with the surface
+            the cells use, and exists ONLY at the two-column breakpoint, because at one column every
+            row is full and a filler would add an empty cell of its own. */}
+        {rows.length % 2 === 1 ? (
+          <div aria-hidden="true" className="hidden bg-surface @sm:block" />
+        ) : null}
       </div>
     </section>
   );
