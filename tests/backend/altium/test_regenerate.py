@@ -40,14 +40,14 @@ def test_regenerate_emits_only_place_ready(library_ops):
     rows = _db_rows(result["db"])
     assert [r["MPN"] for r in rows] == ["AAA"]
 
-    # Only the .DbLib is shared. The .db is derived from these very records, so committing it
-    # (the 2026-07-23 decision, reversed 2026-07-25) made two peers adding different parts
-    # conflict on an unmergeable binary carrying nothing the records did not already hold.
+    # NEITHER Altium artifact is shared. The .db is derived from these very records (committing
+    # it, the 2026-07-23 decision, was reversed 2026-07-25); the .DbLib followed on 2026-07-26,
+    # because the absolute data-source path real Altium needs is machine-specific.
     ops = library_ops
     tracked = ops.repo._run("ls-files", "--", str(result["db"].parent)).stdout.splitlines()
     names = {p.rsplit("/", 1)[-1] for p in tracked}
     assert "stockroom-parts.db" not in names
-    assert "Stockroom.DbLib" in names
+    assert "Stockroom.DbLib" not in names
     assert ".gitignore" not in names
 
 
@@ -116,7 +116,7 @@ def test_regenerate_survives_a_staged_never_committed_gitignore(library_ops):
 def test_the_derived_data_source_is_no_longer_shared_through_git(library_ops):
     """Batch 2 item 3. The .db is emitted from the JSON records, so sharing it means two peers who
     each add a DIFFERENT part produce two unmergeable binaries carrying nothing the records do not
-    already hold. It is now ignored and untracked; only the .DbLib stays shared."""
+    already hold. It is now ignored and untracked, as is the .DbLib beside it."""
     ops = library_ops
     ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
     (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
@@ -127,7 +127,7 @@ def test_the_derived_data_source_is_no_longer_shared_through_git(library_ops):
     tracked = ops.repo._run("ls-files", "--", str(result["db"].parent)).stdout.splitlines()
     names = {p.rsplit("/", 1)[-1] for p in tracked}
     assert "stockroom-parts.db" not in names
-    assert "Stockroom.DbLib" in names
+    assert "Stockroom.DbLib" not in names
 
 
 def test_a_library_that_already_committed_the_data_source_is_migrated_by_a_regenerate(library_ops):
@@ -220,3 +220,52 @@ def test_ensure_rebuilds_after_the_library_changes(library_ops):
     assert result["written"] is True
     assert result["reason"] == "stale"
     assert [r["MPN"] for r in _db_rows(result["path"])] == ["AAA", "BBB"]
+
+
+def test_the_dblib_is_no_longer_shared_through_git_either(library_ops):
+    """2026-07-26, superseding the "the .DbLib stays shared" decision. Real Altium (AD26) cannot
+    open a data source named by a relative path, so the connection string must carry a
+    machine-specific ABSOLUTE one - which is exactly what a git-shared file may not hold. Both
+    Altium artifacts are now rebuilt locally; what peers share is the records they are derived
+    from. See altium/dblib.py for the measurement."""
+    ops = library_ops
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
+
+    result = ops.regenerate_altium_dblib()
+
+    assert result["dblib"].exists()  # on disk, so Altium can open it
+    tracked = ops.repo._run("ls-files", "--", str(result["dblib"].parent)).stdout.splitlines()
+    names = {p.rsplit("/", 1)[-1] for p in tracked}
+    assert "Stockroom.DbLib" not in names, names
+    assert "stockroom-parts.db" not in names, names
+
+
+def test_the_dblib_names_its_data_source_absolutely(library_ops):
+    """The whole point of the change: what Altium reads must be openable from Altium's own
+    working directory, which is never the library folder."""
+    ops = library_ops
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
+
+    result = ops.regenerate_altium_dblib()
+
+    text = result["dblib"].read_text(encoding="utf-8")
+    conn = next(ln for ln in text.splitlines() if ln.startswith("ConnectionString="))
+    assert f"Database={result['db'].resolve()};" in conn, conn
+
+
+def test_boot_writes_the_dblib_not_just_the_data_source(library_ops):
+    """A fresh clone has neither derived file. Altium is opened by a person, not by Stockroom, so
+    both must already exist by the time they open it - the same reason the .db is written at boot.
+    A .DbLib that only appears after an explicit regenerate is a library that silently does not
+    work on a new machine."""
+    ops = library_ops
+    ops.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+    (ops.lib.parts_dir / "a.json").write_text(_place_ready("a", "AAA").dumps(), encoding="utf-8")
+    dblib = ops.lib.parts_dir.parent / "altium" / "Stockroom.DbLib"
+    assert not dblib.exists()
+
+    ops.ensure_altium_datasource()
+
+    assert dblib.exists()

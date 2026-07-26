@@ -231,15 +231,21 @@ def test_the_LIBRARY_repo_gets_every_registered_tools_rules(tmp_path):
         "Stockroom/fp-info-cache": "cache\n",
     })
     result = apply_hygiene(root, [t.key for t in all_tools()], repo=repo)
-    assert result["untracked"] == ["Stockroom/fp-info-cache"]
+    # Both a per-user file and a DERIVED one are untracked. The .DbLib became derived on
+    # 2026-07-26 (its connection string must name the database by a machine-specific absolute
+    # path or real Altium cannot open it), so hygiene is what MIGRATES a library that committed
+    # it before that. Sorted, so the assertion states a set rather than an emission order.
+    assert sorted(result["untracked"]) == [
+        "Stockroom/altium/Stockroom.DbLib", "Stockroom/fp-info-cache",
+    ]
     ignore = (root / ".gitignore").read_text(encoding="utf-8")
     attrs = (root / ".gitattributes").read_text(encoding="utf-8")
     assert "*.kicad_prl" in ignore and "History/" in ignore      # both adapters contributed
     assert "*.PcbLib binary" in attrs and "*.kicad_sch text eol=lf" in attrs
-    # the library's real assets stay tracked
+    # the library's real assets stay tracked; only generated ones are let go
     tracked = set(repo._run("ls-files").stdout.split())
     assert "Stockroom/symbols/SR-Resistors.kicad_sym" in tracked
-    assert "Stockroom/altium/Stockroom.DbLib" in tracked
+    assert "Stockroom/altium/Stockroom.DbLib" not in tracked
 
 
 def test_library_ops_exposes_the_same_two_step(tmp_path):

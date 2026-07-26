@@ -150,14 +150,18 @@ def test_a_tool_that_needs_no_variable_still_has_a_contract():
 # -- derived artifacts: files Stockroom GENERATES and must not share through git ----
 
 
-def test_altium_declares_its_generated_data_source_as_derived():
+def test_altium_declares_both_generated_artifacts_as_derived():
     """`stockroom-parts.db` is emitted from the JSON records. Sharing a derived binary through git
     means two peers who each add a different part produce two different unmergeable files for a
-    file that carries no information the records do not already hold."""
-    assert "stockroom-parts.db" in get_tool("altium").derived
-    # the .DbLib is NOT derived in this sense: it is deterministic TEXT that only changes when the
-    # column map does, and a human reviews it, so it stays shared
-    assert not any("DbLib" in p for p in get_tool("altium").derived)
+    file that carries no information the records do not already hold.
+
+    The `.DbLib` joined it 2026-07-26, SUPERSEDING "it is deterministic text a human reviews, so it
+    stays shared". That reasoning assumed the file was portable. It is not: real Altium cannot open
+    a data source named by a relative path (measured on AD26 - see `altium/dblib.py`), so the
+    connection must carry a machine-specific absolute one, which no shared file can hold."""
+    derived = get_tool("altium").derived
+    assert "stockroom-parts.db" in derived
+    assert "Stockroom.DbLib" in derived
 
 
 def test_a_derived_file_is_ignored_and_says_why_in_the_generated_file():
