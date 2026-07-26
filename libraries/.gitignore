@@ -17,6 +17,7 @@ Project Outputs for*/
 
 # Altium Designer: derived from the library records and regenerated on demand, so it is never shared
 stockroom-parts.db
+Stockroom.DbLib
 
 # KiCad: per-user and generated files (never design sources)
 *.kicad_prl
