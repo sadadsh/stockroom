@@ -227,3 +227,35 @@ describe("partPhotos + the carousel", () => {
     expect(document.querySelector('[data-dev-id="preview.photo-count"]')!.textContent).toBe("1 / 2");
   });
 });
+
+// --- Owner, 2026-07-26: "do NOT show the source" + "just a View Photos BUTTON, with an icon".
+
+describe("PhotoTrigger panel variant", () => {
+  const photos = [
+    { url: "https://example.test/a.jpg", vendor: "DigiKey" },
+    { url: "https://example.test/b.jpg", vendor: "Mouser" },
+  ];
+
+  it("names the action and the count, with an icon", () => {
+    render(<PhotoTrigger photos={photos} partName="TPD6E05" variant="panel" />);
+    const button = screen.getByRole("button", { name: /View 2 Photos of TPD6E05/ });
+    expect(button).toHaveTextContent("View 2 Photos");
+    expect(button.querySelector("svg")).toBeTruthy();
+  });
+
+  it("does NOT name the distributor the photograph came from", () => {
+    // The vendor is a fact about sourcing, not about the part; the viewer still shows it per photo.
+    render(<PhotoTrigger photos={photos} partName="TPD6E05" variant="panel" />);
+    const button = screen.getByRole("button", { name: /View 2 Photos/ });
+    expect(button).not.toHaveTextContent(/DigiKey/);
+    expect(button).not.toHaveTextContent(/Mouser/);
+    expect(button).not.toHaveTextContent(/From the distributor/);
+  });
+
+  it("says Photo, singular, for one", () => {
+    render(<PhotoTrigger photos={[photos[0]]} partName="TPD6E05" variant="panel" />);
+    expect(screen.getByRole("button", { name: /View Photo of TPD6E05/ })).toHaveTextContent(
+      "View Photo",
+    );
+  });
+});
