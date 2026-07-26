@@ -253,3 +253,41 @@ describe("panel header band height", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// --- The machine-data face matches Altium. -------------------------------------------------------
+describe("monospace stack", () => {
+  it("leads with Consolas, and still bundles a fallback that travels", () => {
+    // Owner, 2026-07-26, superseding their own Geist Mono pick: "the monospace font does not match
+    // Altium". Consolas ships with Windows, where Altium runs. A peer without it must still get a
+    // real mono, offline - the host serves from an ephemeral local port, so a CDN font is not an
+    // option and the bundled face has to stay in the stack.
+    //
+    // Read as RAW SOURCE, not imported: `tailwind.config.js` has no type declaration, and importing
+    // it breaks `tsc -b` (which is exactly what my first draft did).
+    const raw = import.meta.glob("/tailwind.config.js", {
+      query: "?raw",
+      eager: true,
+      import: "default",
+    }) as Record<string, string>;
+    const cfg = Object.values(raw)[0];
+    expect(cfg).toBeTruthy();
+    const block = /mono:\s*\[([\s\S]*?)\]/.exec(cfg)![1];
+    // Strip comment lines FIRST. The block carries a long rationale comment containing quoted
+    // owner words, and matching quotes across it made faces[0] the sentence "the monospace font
+    // does not match Altium" rather than a font name - a gate reading its own documentation.
+    const mono = block
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
+    // Split on commas and strip quote characters. A quote-pair regex kept matching the SEPARATORS
+    // between entries (the closing quote of one and the opening quote of the next), which is how
+    // the last "face" came out as ",\n          ".
+    const faces = mono
+      .split(",")
+      .map((s) => s.replace(/["'`]/g, "").trim())
+      .filter(Boolean);
+    expect(faces[0]).toBe("Consolas");
+    expect(faces.some((f) => f.includes("Geist Mono"))).toBe(true);
+    expect(faces[faces.length - 1]).toBe("monospace");
+  });
+});
