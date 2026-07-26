@@ -94,7 +94,13 @@ export function EditableText({
       onClick={begin}
       aria-label={`Edit ${label}`}
       className={
-        "group flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-1 text-left transition-colors hover:bg-raise2 disabled:cursor-not-allowed disabled:hover:bg-transparent " +
+        // max-w-full is LOAD-BEARING for `truncate`. This button is sized by its CONTENT, so a long
+        // unbroken value (a URL has no spaces to break at) made it wider than its own parent and the
+        // inner truncating span inherited that width - so it never ellipsised and simply overflowed.
+        // MEASURED in the owner's real window 2026-07-25: button 345/345 and span 333/333 inside a
+        // 197px parent. `min-w-0` alone cannot fix this; it permits shrinking below content, it does
+        // not impose a ceiling.
+        "group flex min-w-0 max-w-full items-center gap-1.5 rounded-control px-1.5 py-1 text-left transition-colors hover:bg-raise2 disabled:cursor-not-allowed disabled:hover:bg-transparent " +
         (empty ? "italic text-t3 " : "text-t1 ") +
         (mono ? "font-mono tnum " : "") +
         (displayClassName ?? "text-base")
