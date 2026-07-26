@@ -23,6 +23,7 @@ import {
   fitDistanceForBox,
   fitOrthoHalfHeight,
   halfExtents,
+  screenUpFor,
   visibleBounds,
 } from "./cameraFit";
 
@@ -53,7 +54,11 @@ export interface LayerVisibility {
 
 const VIEW_DIRECTIONS: Record<ViewMode, [number, number, number]> = {
   iso: [0.55, 0.42, 1],
-  top: [0, 1, 0.0001], // a hair off the pole so `up` stays defined and the camera cannot gimbal
+  // Straight down, with no epsilon. The hair off the pole used to be here so `up` stayed defined;
+  // it did not solve the problem, it hid it - the in-plane rotation then came out of the epsilon's
+  // sign rather than being chosen, and came out 90 degrees away from the frustum the fit had sized.
+  // `screenUpFor` now names the up vector for this direction, so the pole is a handled case.
+  top: [0, 1, 0],
   front: [0, 0.0001, 1],
 };
 
@@ -543,11 +548,22 @@ export function mountModelScene(
     // behind. That is what left the orthographic top view framed by the ISO fit - a frustum sized
     // for a three-quarter silhouette, with the subject small inside it and the shadow plane's own
     // edge visible in the corner.
+    // Read the live direction off the camera that is ACTUALLY rendering. Reading it off the
+    // perspective one unconditionally meant that any refit while the top view was up - a resize, a
+    // layer toggle - re-sized the orthographic frustum for the three-quarter direction the
+    // perspective camera was still parked at.
     const direction = forDirection
       ? new THREE.Vector3(...forDirection).normalize()
-      : camera.position.clone().sub(controls.target);
+      : activeCamera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(...VIEW_DIRECTIONS.iso);
     direction.normalize();
+    // ONE screen basis for the fit and for the cameras. `fitOrthoHalfHeight` derives its own right
+    // and up from the direction; if the cameras resolve a different in-plane rotation, the frustum
+    // is sized for a silhouette that is not the one being drawn. Straight down is exactly where
+    // they diverged, because world up is the view direction there.
+    const up = screenUpFor(direction.toArray());
+    camera.up.set(...up);
+    orthoCamera.up.set(...up);
     // Fit the BOX, not its enclosing sphere. A sphere fit is exact for a sphere and wasteful for a
     // component package: its radius comes from the long diagonal while the on-screen silhouette
     // comes from the short one, so the camera backed off for space nothing occupied. MEASURED on
@@ -574,18 +590,19 @@ export function mountModelScene(
     fitTarget.copy(centre);
     controls.target.copy(centre);
     if (!forDirection) {
-      camera.position.copy(centre).add(direction.clone().multiplyScalar(fitDistance));
+      activeCamera.position.copy(centre).add(direction.clone().multiplyScalar(fitDistance));
     }
     camera.near = Math.max(bounds.radius / 100, 1e-4);
     camera.far = bounds.radius * 100;
     camera.updateProjectionMatrix();
-    // The orthographic camera shares the position and target. Its distance does not affect the
-    // projection, but it still has to sit OUTSIDE the geometry or near-plane clipping slices the
-    // subject in half - hence a generous near/far around the same standoff.
-    orthoCamera.position.copy(camera.position);
+    // The orthographic camera shares the standoff. Its distance does not affect the projection, but
+    // it still has to sit OUTSIDE the geometry or near-plane clipping slices the subject in half -
+    // hence a generous near/far around the same standoff. It only INHERITS the perspective
+    // camera's position while the perspective camera is the one in use; once the top view is up,
+    // the ortho camera owns its own position and copying over it would yank the view back.
+    if (activeCamera !== orthoCamera) orthoCamera.position.copy(camera.position);
     orthoCamera.near = 0.01;
     orthoCamera.far = Math.max(bounds.radius * 200, 10);
-    orthoCamera.up.copy(camera.up);
     orthoCamera.lookAt(centre);
     orthoCamera.updateProjectionMatrix();
     controls.update();
