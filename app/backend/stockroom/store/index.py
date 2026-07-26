@@ -94,10 +94,14 @@ class LibraryIndex:
 
     @classmethod
     def build(cls, parts_dir: Path, db_path: str | Path = ":memory:") -> "LibraryIndex":
-        # check_same_thread=False so the warm index can be read from the API's
-        # threadpool worker threads (FastAPI runs sync route handlers off the
-        # thread that built the connection); reads stay serialized by the GIL and
-        # every write still goes through the M2 atomic engine, not this connection.
+        # check_same_thread=False so the warm index can be read from the API's threadpool worker
+        # threads (FastAPI runs sync route handlers off the thread that built the connection).
+        # That flag only silences Python's own guard; the SERIALIZATION is `self._lock` in
+        # `__init__`, and every write still goes through the M2 atomic engine, not this connection.
+        #
+        # This comment used to read "reads stay serialized by the GIL". That was FALSE - sqlite3
+        # releases the GIL around its C calls - and it is why the torn-read 500s survived: it sat
+        # here reading as a reason not to look.
         conn = sqlite3.connect(str(db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(_SCHEMA)
