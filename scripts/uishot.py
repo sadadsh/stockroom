@@ -347,7 +347,7 @@ _HEALTH_SECTIONS = {
 }
 
 
-def _goto_surface(page, surface: str) -> bool:
+def _goto_surface(page, surface: str, select: str = "") -> bool:
     """Navigate to a named surface. Returns False if it could not be reached."""
     if surface in _HEALTH_SECTIONS:
         # The seeded project is already selected by _register_seed; open its Health tab and scroll the
@@ -385,7 +385,23 @@ def _goto_surface(page, surface: str) -> bool:
             print("  components: no part rows ever rendered, so a shot would prove nothing")
             return False
         if surface == "components":
-            rows.first.click()
+            # WHICH part. Default is the first row, which is whatever sorts first by category - a
+            # capacitor in the seeded library. That is fine for a layout shot and useless for any
+            # shot about an ASSET: the part carrying a STEP model is several rows down, so a driven
+            # 3D control (`--click detail.model-view-top`) landed on a part with no model at all and
+            # the control was not on the page. `--select` names the row instead of hoping.
+            if select:
+                wanted = rows.filter(has_text=select)
+                if not wanted.count():
+                    names = rows.all_inner_texts()
+                    print(
+                        f"  components: no part row matching {select!r}; the list holds: "
+                        + " | ".join(n.split("\n")[0] for n in names)
+                    )
+                    return False
+                wanted.first.click()
+            else:
+                rows.first.click()
             _appears(page.locator('[data-dev-id="detail.root"]'))
             return True
         # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
@@ -447,10 +463,19 @@ def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
     missing: list[str] = []
     for dev_id in dev_ids:
         target = page.locator(f'[data-dev-id="{dev_id}"]')
-        if not target.count():
+        # POLL, do not sample. `count()` asks whether the element exists AT THIS INSTANT, which is a
+        # clock-as-detector in disguise: any control that renders asynchronously is reported absent
+        # simply because the check ran first. MEASURED - the 3D viewer's controls only exist once
+        # the GLB has been fetched and three.js lazily imported, so `--click detail.model-view-top`
+        # reported "no such data-dev-id" on a part that definitely has one. `_appears` returns the
+        # moment the element is really there, and its ceiling only bounds how long a GENUINE
+        # absence takes to report.
+        if not _appears(target.first):
             missing.append(dev_id)
             continue
         target.first.click()
+        # a settle wait, not a detector: the click has already landed, and this only lets the
+        # resulting transition finish before the next click or the capture.
         page.wait_for_timeout(700)
     return missing
 
@@ -549,7 +574,7 @@ def run(args) -> int:
                 return
 
             for surface in surfaces:
-                if not _goto_surface(page, surface):
+                if not _goto_surface(page, surface, args.select):
                     print(f"  !! could not reach surface: {surface}")
                     failures.append(surface)
                     continue
@@ -648,6 +673,13 @@ def main() -> int:
         help="hover this data-dev-id before each capture, so a control whose label only appears on "
              "hover/focus (the destructive + pending IconButton language) is actually visible in "
              "the shot. Repeatable. An id that does not exist is reported, never silently skipped.",
+    )
+    ap.add_argument(
+        "--select", default="", metavar="TEXT",
+        help="select the components row whose text contains TEXT, instead of the first row. The "
+             "first row is whatever sorts first by category, which is the wrong part for any shot "
+             "about a specific asset (a 3D model, a symbol). A TEXT that matches nothing is a loud "
+             "failure listing what the library does hold, never a silent fallback to row one.",
     )
     ap.add_argument(
         "--measure", action="append", default=[], metavar="DEV_ID",
