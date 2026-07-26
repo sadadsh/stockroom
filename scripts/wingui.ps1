@@ -43,6 +43,9 @@ public class SRWin {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr wp, IntPtr lp);
   [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(System.Drawing.Point p);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
@@ -156,6 +159,27 @@ switch ($Action) {
       "FAIL: the window did not land at the requested origin. The window manager refused or"
       "adjusted the move (snap, DPI scaling, or a minimum size), so treat this as NOT moved."
       exit 4
+    }
+  }
+  "foreground" {
+    # A click on an UNFOCUSED window is consumed by the focus change, so a control never sees it.
+    # Measured 2026-07-26: clicks aimed at Altium's Panels button landed at the right screen
+    # coordinate and did nothing, because a fullscreen game on the other monitor held the focus and
+    # kept recapturing the cursor.
+    #
+    # Reports the foreground window BEFORE and AFTER, and fails if it did not change: Windows
+    # refuses SetForegroundWindow from a process that does not own the current foreground, and it
+    # refuses SILENTLY by returning false while everything looks fine.
+    $before = [SRWin]::GetForegroundWindow()
+    [void][SRWin]::ShowWindow($hwnd, [SRWin]::SW_RESTORE)
+    [void][SRWin]::BringWindowToTop($hwnd)
+    $ok = [SRWin]::SetForegroundWindow($hwnd)
+    Start-Sleep -Milliseconds 250
+    $after = [SRWin]::GetForegroundWindow()
+    "FOREGROUND before=$before after=$after target=$hwnd setfg=$ok"
+    if ($after -ne $hwnd) {
+      "FAIL: the window did not take focus, so any click sent to it will be swallowed."
+      exit 5
     }
   }
   "probe" {
