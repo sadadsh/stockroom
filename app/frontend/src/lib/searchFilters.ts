@@ -381,6 +381,9 @@ export interface SpecColumn {
 const _GROUP_SCORE: Record<SpecGroupName, number> = {
   Electrical: 400,
   Physical: 250,
+  // A device characteristic (type, channels, topology) is a genuine parametric dimension people
+  // filter on, so it earns a column - unlike the commercial noise below.
+  Device: 200,
   "Ratings & Compliance": 120,
   // The procurement group IS the commercial/logistics noise this score exists to keep out of the
   // columns (origin, tariff, packaging, order quantities), so it can never earn one.
@@ -491,6 +494,7 @@ function _railScore(facet: ParametricFacet, category: string): number {
   const groupRank: Record<SpecGroupName, number> = {
     Electrical: 4,
     Physical: 3,
+    Device: 3,
     "Ratings & Compliance": 2,
     Other: 1,
     // sunk below every parameter dimension, never hidden - the rail's stated rule for a
