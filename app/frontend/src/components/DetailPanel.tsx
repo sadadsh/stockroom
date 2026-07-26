@@ -168,6 +168,33 @@ function readPinnedSpecs(): PinnedSpecs {
  * it, because the owner asked for it "formatted like the specifications": two lists on one sheet
  * that measure the same thing must not read as two different widget species.
  */
+/**
+ * The part's description at the head of the Specifications column (owner, 2026-07-26).
+ *
+ * Renders NOTHING when there is no description: an emphasized empty lede would be the loudest
+ * element on the sheet saying nothing, which is exactly the empty-state fault the punch list
+ * already carries for other blocks.
+ */
+function DescriptionLede({
+  text,
+  alternates,
+  onUse,
+}: {
+  text?: string;
+  alternates: SourcedAlternate[];
+  onUse?: (value: string) => void;
+}) {
+  const body = (text ?? "").trim();
+  if (!body) return null;
+  return (
+    <section data-dev-id="detail.description-lede" className="mb-3 flex flex-col gap-1">
+      <p className="text-sm leading-snug text-t1">{body}</p>
+      {/* the disagreement follows the value it is about, the same rule the Handoff tab uses */}
+      <AlternatesDisclosure entries={alternates} current={body} onUse={onUse} />
+    </section>
+  );
+}
+
 function KeySpecificationsBlock({
   groups,
   category,
@@ -932,6 +959,21 @@ export function DetailPanel({
                 formatted like the specifications, but the most important details people care about
                 when looking at this component". Curated per category (lib/keySpecs.ts) with a star on
                 any Specifications row below to pin one up here. */}
+            {/* THE DESCRIPTION LEADS, and Top Specifications is pushed down behind it. Owner,
+                2026-07-26: "the item's description must be emphasized, perhaps above the top
+                specifications". It is the one sentence that says what the part IS, and it had been
+                reachable only from the Handoff tab - so the Details view opened on parameters
+                without ever stating the thing they describe.
+                Set in the sheet's reading size rather than as another label/value row: it is prose,
+                not a parameter, and giving it the spec treatment is what made it disappear into the
+                list before. The "N Sources" swap comes WITH it - two distributors word a description
+                differently, and moving the text without its disclosure would silently drop the
+                ability to choose between them. */}
+            <DescriptionLede
+              text={detail.description}
+              alternates={detail.alternates?.description ?? []}
+              onUse={onEditField ? (value) => onEditField("description", value) : undefined}
+            />
             <KeySpecificationsBlock
               groups={allSpecGroups}
               category={detail.category}

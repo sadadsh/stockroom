@@ -86,7 +86,10 @@ describe("App shell", () => {
     // The rail brand and a live part both render through the shell.
     expect(screen.getByText("Stockroom")).toBeInTheDocument();
     expect(await screen.findByText("LM358")).toBeInTheDocument();
-    expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+    // findAllByText, not findByText: the description now appears BOTH as the lede at the head
+    // of the Specifications column and as the editable field in the Handoff tab. Only one is
+    // visible at a time (they are alternative tabs), but both are in the DOM.
+    expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
     // the default route renders the Components flagship: no page-level tab strip
     // (BOM Coverage / Duplicates / Doctor all moved out). The only tabs now are the
     // selected part's workbench (Specs / Sourcing / History / ...).

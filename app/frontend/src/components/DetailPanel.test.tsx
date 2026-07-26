@@ -999,3 +999,56 @@ describe("DetailPanel links row anatomy", () => {
     expect(screen.getByRole("button", { name: "Open Symbol Preview" })).toBeTruthy();
   });
 });
+
+// --- The description leads the Specifications column (owner, 2026-07-26). -----------------------
+
+describe("the description lede", () => {
+  it("shows the description at the head of the column, above Top Specifications", () => {
+    // Real specs, so Top Specifications actually renders and the ordering assertion below is not
+    // vacuously true against a block that is not there.
+    wrap(
+      <DetailPanel
+        detail={detail({
+          description: "Dual op-amp, 3 MHz",
+          specs: { "Supply Voltage": "3 V", "Package / Case": "SOIC-8" },
+        })}
+        {...BASE}
+      />,
+    );
+    // Scoped to the lede block on purpose: the Handoff TAB also carries the description, and a
+    // bare getByText finds both. That is not duplication on screen - the tabs are alternatives -
+    // but it does mean this assertion has to name which one it means.
+    const block = document.querySelector('[data-dev-id="detail.description-lede"]');
+    expect(block).not.toBeNull();
+    expect(block).toHaveTextContent("Dual op-amp, 3 MHz");
+    // ABOVE, not merely present: the whole ask was about where it sits.
+    const top = document.querySelector('[data-dev-id="detail.key-specs"]');
+    expect(top).not.toBeNull();
+    expect(block!.compareDocumentPosition(top!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders NOTHING when the part has no description", () => {
+    // An emphasized empty lede would be the loudest element on the sheet saying nothing.
+    wrap(<DetailPanel detail={detail({ description: "" })} {...BASE} />);
+    expect(document.querySelector('[data-dev-id="detail.description-lede"]')).toBeNull();
+  });
+
+  it("keeps the N Sources swap with the text it is about", () => {
+    wrap(
+      <DetailPanel
+        detail={detail({
+          description: "Dual op-amp",
+          alternates: {
+            description: [
+              { value: "Dual op-amp", source: "mouser", confidence: "high" },
+              { value: "Op Amp, 2 channel", source: "digikey", confidence: "high" },
+            ],
+          },
+        } as Partial<PartDetail>)}
+        {...BASE}
+      />,
+    );
+    const block = document.querySelector('[data-dev-id="detail.description-lede"]');
+    expect(block?.textContent).toMatch(/2 Sources/);
+  });
+});
