@@ -845,6 +845,7 @@ export function DetailPanel({
                 ) : undefined
               }
               onOpen={hasModel ? () => setPreview("model") : undefined}
+              interactiveStage
             />
             {/* Content-sized, NOT `h-[200px]`. That literal sat here holding two `h-[142px]` tiles,
                 so it guaranteed 58px of empty row under the cards on every part, forever - and with
@@ -1650,6 +1651,7 @@ function AssetTile({
   art,
   thumb,
   onOpen,
+  interactiveStage,
   onAttach,
   className,
   devId,
@@ -1663,6 +1665,9 @@ function AssetTile({
   thumb?: ReactNode;
   // When present and set, the whole tile is a button that expands the preview.
   onOpen?: () => void;
+  // The stage handles its OWN pointer events (the 3D viewer orbits and zooms in place), so the
+  // tile must not swallow them.
+  interactiveStage?: boolean;
   // When the asset is MISSING and set, the whole tile is a button that opens the
   // Attach modal. Ignored when the asset is present.
   onAttach?: () => void;
@@ -1710,7 +1715,22 @@ function AssetTile({
           // An openable tile shows an EYE rather than spelling out "View" (punch 11): the tile is
           // already a button whose aria-label says "Open <name> Preview", so the word was carrying
           // no information a glyph could not, in a strip that has no room to spare.
-          onOpen ? <EyeIcon className="h-3.5 w-3.5" /> : <>Linked</>
+          onOpen ? (
+            interactiveStage ? (
+              <button
+                type="button"
+                onClick={onOpen}
+                aria-label={`Open ${name} Preview`}
+                className="-m-1 flex items-center rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+              >
+                <EyeIcon className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <EyeIcon className="h-3.5 w-3.5" />
+            )
+          ) : (
+            <>Linked</>
+          )
         ) : onAttach ? (
           <>
             <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden="true" />
@@ -1731,6 +1751,20 @@ function AssetTile({
   const buttonCls =
     base +
     " cursor-pointer text-left transition-colors hover:border-line2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc";
+  // A tile whose STAGE is itself interactive cannot also be one big button: every drag to orbit and
+  // every wheel to zoom would land on the button and open the modal instead (owner, 2026-07-26:
+  // "clicking the tile must NOT expand - only the eye symbol opens the modal", which is exactly what
+  // made the 3D tile impossible to use in place). So the wrapper stays a plain div and the EYE in
+  // the footer becomes the only opener. The symbol and footprint tiles are unaffected: their stages
+  // are static images, where whole-tile click is the better target.
+  if (onOpen && present && interactiveStage) {
+    return (
+      <div data-dev-id={devId} className={base}>
+        {stage}
+        {footer}
+      </div>
+    );
+  }
   if (onOpen && present) {
     return (
       <button

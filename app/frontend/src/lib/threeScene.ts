@@ -299,6 +299,12 @@ export function mountModelScene(
   // turn off: a "top" view that rotates away from top is not a top view, so the two reasons to stop
   // spinning must not overwrite each other.
   let spinWanted = true;
+  // Has the PERSON said anything about spinning? `prefers-reduced-motion` is an OS-level DEFAULT,
+  // and treating it as a veto meant the owner asking for auto-rotation got none, silently, with no
+  // way to get it - the switch was on and the scene still would not turn. So the media query decides
+  // the STARTING state, and the moment someone touches the control their choice wins. That is also
+  // what the query is for: it expresses "do not surprise me with motion", not "never move".
+  let spinChosen = false;
   // The view in force, so the spin switch knows whether spinning is even legal (only free iso spins).
   let viewMode: ViewMode = "iso";
 
@@ -313,7 +319,7 @@ export function mountModelScene(
     // honoured prefers-reduced-motion while this PERPETUAL rotation ignored it - exactly the wrong way
     // round, since a continuous spin is what that media query exists to stop (vestibular safety). The
     // owner separately asked for "an option to stop rotation", and one switch serves both.
-    next.autoRotate = spinWanted && !prefersReducedMotion();
+    next.autoRotate = spinWanted && (spinChosen || !prefersReducedMotion());
     next.autoRotateSpeed = 1.6;
     return next;
   }
@@ -736,13 +742,22 @@ export function mountModelScene(
       orthoCamera.top = halfH;
       orthoCamera.bottom = -halfH;
     }
-    // Orbit the CENTRE of what is visible, not the origin. The part is centred on the origin but
-    // the board and pads hang below it, so an origin-locked target framed the subject low with a
-    // large empty band above it.
-    fitTarget.copy(centre);
-    controls.target.copy(centre);
+    // FRAME the centre of what is visible, but ORBIT the model's own centre (owner, 2026-07-26:
+    // "use the center of the model as an axis ... to rotate around"). Those are two different
+    // points and conflating them is what made the package swing around a spot below and outside
+    // itself: the pads sit under the part, so the visible-bounds centre drops toward them, and it
+    // MOVES whenever a layer is toggled - so turning pads on visibly shifted the axis. `modelCenter`
+    // is captured once at load and stays put.
+    // ONE point serves as the target AND as the point the camera position is derived from. They
+    // must be the same or the camera stops looking along its own fit direction: aiming at the model
+    // while standing where the BOUNDS centre put you throws the subject off-frame, which is exactly
+    // what the first cut of this change did - the part sat up and to the left with the board filling
+    // the stage.
+    const orbit = modelCenter ?? centre;
+    fitTarget.copy(orbit);
+    controls.target.copy(orbit);
     if (!forDirection) {
-      activeCamera.position.copy(centre).add(direction.clone().multiplyScalar(fitDistance));
+      activeCamera.position.copy(orbit).add(direction.clone().multiplyScalar(fitDistance));
     }
     camera.near = Math.max(bounds.radius / 100, 1e-4);
     camera.far = bounds.radius * 100;
@@ -755,7 +770,7 @@ export function mountModelScene(
     if (activeCamera !== orthoCamera) orthoCamera.position.copy(camera.position);
     orthoCamera.near = 0.01;
     orthoCamera.far = Math.max(bounds.radius * 200, 10);
-    orthoCamera.lookAt(centre);
+    orthoCamera.lookAt(orbit);
     // the ortho camera's up may just have changed, and the controls' orbit frame is derived from
     // it at construction only, so they have to be rebuilt or they will fight the camera
     rebindControls(activeCamera);
@@ -783,7 +798,8 @@ export function mountModelScene(
     // it made the control look broken. The FIXED views (top/front) are the ones that must hold
     // still, because a "top" view that rotates away from top is not a top view.
     // iso is the free orbit and the only view that may spin - but only if the user still wants it.
-    controls.autoRotate = mode === "iso" && spinWanted && !prefersReducedMotion();
+    controls.autoRotate =
+      mode === "iso" && spinWanted && (spinChosen || !prefersReducedMotion());
     // Swap the projection with the view. OrbitControls binds a camera at construction, so its
     // `object` has to be reassigned too, or the user would orbit the camera that is not rendering.
     activeCamera = mode === "top" ? orthoCamera : camera;
@@ -1148,6 +1164,7 @@ export function mountModelScene(
      *  OS asks for reduced motion no matter what was requested. */
     setSpin: (wanted: boolean) => {
       spinWanted = wanted;
+      spinChosen = true;
       const on = wanted && !prefersReducedMotion();
       controls.autoRotate = on && viewMode === "iso";
       return on;

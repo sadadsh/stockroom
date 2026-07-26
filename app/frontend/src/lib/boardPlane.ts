@@ -14,6 +14,11 @@
  *  a contact shadow, which is most of why the pads used to read as stickers rather than metal. */
 export const PAD_THICKNESS_MM = 0.05;
 
+/** How much of a pad's thickness sits INSIDE the board plate. Half leaves the land pattern plainly
+ *  visible while making the copper read as part of the stack rather than as something resting on
+ *  it; 1 would bury it completely and 0 is the sticker look the owner rejected. */
+export const PAD_EMBED_FRACTION = 0.5;
+
 /** The old fixed value, kept as the CEILING and as the unknown-height fallback. */
 const MAX_BOARD_MM = 0.6;
 
@@ -202,11 +207,24 @@ export function boardStack(componentBaseY: number, componentHeightMm: number): B
   // thickness inside the body - "the 3d model clips into the pads and pcb".
   const padTopY = componentBaseY;
   const padGroupY = componentBaseY - PAD_THICKNESS_MM;
+  // THE PADS ARE LAMINATED INTO THE PLATE, not laid on top of it (owner, 2026-07-26: "the 3D
+  // footprint should sit WITHIN the pcb plate, not lay on top of it"). Real copper is part of the
+  // stack, and a pad standing proud of the surface reads as a sticker.
+  //
+  // The board's top face therefore rises to the pads' MID-HEIGHT rather than their underside. Half,
+  // not all: burying them flush would make the land pattern invisible, which loses the thing the
+  // layer exists to show.
+  //
+  // CRITICALLY, the part does NOT move. `padTopY` is still exactly `componentBaseY`, so the body
+  // still rests on the pads' top face - re-sinking the body into the board is the regression
+  // `cae5a81` fixed and the owner reported as "the 3d model clips into the pads and pcb". Only the
+  // BOARD moves, and only upward.
+  const boardTopY = padGroupY + PAD_THICKNESS_MM * PAD_EMBED_FRACTION;
   return {
     boardThickness,
     padGroupY,
     padTopY,
-    boardCenterY: padGroupY - boardThickness / 2,
+    boardCenterY: boardTopY - boardThickness / 2,
   };
 }
 
