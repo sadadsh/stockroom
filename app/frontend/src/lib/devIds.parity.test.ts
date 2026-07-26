@@ -214,3 +214,42 @@ describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
     expect(emitted.size + KNOWN_DERIVED.length + KNOWN_PROP_PASSED.length).toBe(catalogueIds.size);
   });
 });
+
+// --- Every docked panel header shares ONE band height. ------------------------------------------
+// Owner, 2026-07-26: "the component title bar is MISALIGNED with the library Components line and
+// the nav line". Measured on their real Windows window: the detail strip was h-[38px] while the
+// other three headers were h-[34px], putting its ink centre 1.6px low on a band the three share.
+// A source-level gate, because this cannot be a shared constant: a Tailwind arbitrary value built
+// from a template literal produces a class with no CSS behind it, which would delete the height.
+
+// The DOCKED PANEL headers - the rail, the list, the detail sheet, the projects sheet. These four
+// sit on ONE horizontal band across the window, so a difference between them reads as a
+// mis-registration rather than as variety. Modal headers are a SEPARATE family (consistently 38px)
+// and status bars a third (24px); scoping matters, because the first draft of this gate convicted
+// all of them and would have "fixed" a consistency that was never broken.
+const DOCKED_PANEL_HEADERS = [
+  "/src/components/primitives.tsx",
+  "/src/components/Rail.tsx",
+  "/src/components/DetailPanel.tsx",
+  "/src/pages/ProjectsPage.tsx",
+];
+
+describe("panel header band height", () => {
+  it("is h-[34px] in every docked panel header", () => {
+    // Measured on the owner's real Windows window, 2026-07-26: the detail strip was h-[38px] while
+    // the other three were h-[34px], putting its ink centre at 17.8 against 16.2 for "Components"
+    // and the rail toggle. Uses the RAW glob this file already established, NOT node:fs - the
+    // header comment says why, and my first draft ignored it and used node:fs anyway.
+    const offenders: string[] = [];
+    for (const [path, src] of SOURCE) {
+      if (!DOCKED_PANEL_HEADERS.includes(path)) continue;
+      for (const line of src.split("\n")) {
+        if (line.includes("bg-band") && /h-\[\d+px\]/.test(line)) {
+          const h = /h-\[(\d+)px\]/.exec(line)![1];
+          if (h !== "34") offenders.push(`${path}: h-[${h}px]`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
