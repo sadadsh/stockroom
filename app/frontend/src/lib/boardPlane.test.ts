@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  BOARD_PLANE_HALF_MM,
+  BOARD_PLANE_MIN_ASPECT,
+  BOARD_PLANE_MIN_HALF_MM,
+  BOARD_PLANE_REACH,
   PAD_THICKNESS_MM,
   boardExtent,
   boardPlaneHalfExtents,
@@ -180,22 +182,34 @@ describe("boardExtent", () => {
 // square 2.6x, per-axis with a floor ratio) - every one of which was solving the wrong problem, because
 // the board only looked wrong relative to the part while the CAMERA was framing the board. The camera
 // now ignores it, so the plane just runs past the frame.
-describe("boardPlaneHalfExtents (effectively infinite)", () => {
-  it("is the same vast surface whatever stands on it, like a real bench", () => {
-    const tiny = boardPlaneHalfExtents({ halfX: 0.3, halfZ: 0.15 });
-    const big = boardPlaneHalfExtents({ halfX: 12, halfZ: 4 });
-    expect(tiny).toEqual(big);
-    expect(tiny.halfX).toBeCloseTo(BOARD_PLANE_HALF_MM, 10);
+// OWNER REVERSAL 2026-07-26: "the pcb should return to a flat plane properly sized for the
+// component". Sized per axis again. The three attempts that FAILED before the infinite plane are
+// pinned here so they are not re-walked: fully square (the owner's 3.5x1.4mm USON got a 6.3mm square,
+// 4.5x its short axis, and read as lost), footprint-cropped (read as footprint-shaped, not a board),
+// and per-axis with no floor (a long thin part got a long thin sliver, the same fault again).
+describe("boardPlaneHalfExtents (sized to the component)", () => {
+  it("grows each axis from its OWN extent, so an elongated part keeps its presence", () => {
+    const p = boardPlaneHalfExtents({ halfX: 1.75, halfZ: 0.7 });
+    expect(p.halfX).toBeGreaterThan(p.halfZ);
+    expect(p.halfX).toBeCloseTo(1.75 * BOARD_PLANE_REACH, 6);
   });
 
-  it("is far larger than any package this app handles, so no frame reaches its edge", () => {
-    // the longest thing realistically placed here is a few tens of mm; 250mm half-extent is ~70x that
-    expect(BOARD_PLANE_HALF_MM).toBeGreaterThan(100);
+  it("never lets the narrow axis become a sliver", () => {
+    // a long thin part must still get a BOARD, not a strip that reads as the footprint again
+    const p = boardPlaneHalfExtents({ halfX: 10, halfZ: 0.2 });
+    expect(p.halfZ / p.halfX).toBeGreaterThanOrEqual(BOARD_PLANE_MIN_ASPECT - 1e-9);
   });
 
-  it("is square, since an edge that is never visible has no aspect to get wrong", () => {
-    const e = boardPlaneHalfExtents({ halfX: 8, halfZ: 0.1 });
-    expect(e.halfX).toBeCloseTo(e.halfZ, 10);
+  it("gives a tiny part a real board rather than a chip of one", () => {
+    const p = boardPlaneHalfExtents({ halfX: 0.2, halfZ: 0.1 });
+    expect(p.halfX).toBeGreaterThanOrEqual(BOARD_PLANE_MIN_HALF_MM);
+    expect(p.halfZ).toBeGreaterThanOrEqual(BOARD_PLANE_MIN_HALF_MM * BOARD_PLANE_MIN_ASPECT);
+  });
+
+  it("scales WITH the component, which is the whole point of the reversal", () => {
+    const small = boardPlaneHalfExtents({ halfX: 1, halfZ: 1 });
+    const large = boardPlaneHalfExtents({ halfX: 20, halfZ: 20 });
+    expect(large.halfX).toBeGreaterThan(small.halfX * 5);
   });
 });
 

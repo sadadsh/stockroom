@@ -117,7 +117,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.spec-family", label: "Repeated spec family row", area: "detail" },
   { id: "detail.alternates", label: "Other sources for a value", area: "detail" },
   { id: "detail.trade", label: "Trade and compliance block", area: "detail" },
-  { id: "detail.sourcing-qty", label: "Amount-needed input", area: "detail" },
   { id: "detail.sourcing", label: "Sourcing panel", area: "detail" },
   { id: "detail.sourcing-refresh", label: "Refresh Sourcing button", area: "detail" },
   { id: "detail.sourcing-nodata", label: "Vendor with no price or stock", area: "detail" },
