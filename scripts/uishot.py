@@ -469,17 +469,42 @@ def _set_theme(page, theme: str) -> str | None:
     until it agrees. Fails LOUDLY - a theme that cannot be reached must never be photographed as
     though it had been, because a wrong shot reads as evidence.
     """
-    for _ in range(3):
-        current = page.evaluate("() => document.documentElement.dataset.theme || ''")
-        if current == theme:
-            return None
-        toggle = page.locator('[data-dev-id="rail.theme-toggle"]')
-        if not _appears(toggle):
-            return f"rail.theme-toggle not reachable, cannot switch to {theme}"
-        toggle.click()
-        page.wait_for_timeout(250)
-    final = page.evaluate("() => document.documentElement.dataset.theme || ''")
-    return None if final == theme else f"theme stuck at {final!r}, wanted {theme!r}"
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    if page.evaluate("() => document.documentElement.dataset.theme || ''") == theme:
+        return None
+    toggle = page.locator('[data-dev-id="rail.theme-toggle"]')
+    if not _appears(toggle):
+        return f"rail.theme-toggle not reachable, cannot switch to {theme}"
+
+    # The var the whole palette hangs off, sampled BEFORE the click so the wait below can require
+    # that the theme's CSS actually took effect - not merely that an attribute changed. Two signals,
+    # because the attribute is React's claim and the computed var is the browser's.
+    before = page.evaluate(
+        "() => getComputedStyle(document.documentElement).getPropertyValue('--c-canvas').trim()"
+    )
+    toggle.click()
+    try:
+        # POLL the success signal, do not sleep toward it. `wait_for_function` returns the instant
+        # the condition holds (typically one frame), so the ceiling here is a BACKSTOP that only a
+        # genuine failure reaches - a fixed wait would have been both slower and, if the app were
+        # ever slower than the guess, a false pass photographing the previous theme.
+        page.wait_for_function(
+            """([want, before]) => {
+                 const root = document.documentElement;
+                 const now = getComputedStyle(root).getPropertyValue('--c-canvas').trim();
+                 return root.dataset.theme === want && now !== before;
+               }""",
+            arg=[theme, before],
+            timeout=_UI_TIMEOUT_MS,
+        )
+    except PlaywrightTimeoutError:
+        got = page.evaluate("() => document.documentElement.dataset.theme || ''")
+        return (
+            f"theme stuck at {got!r}, wanted {theme!r} "
+            f"(--c-canvas still {before!r} after clicking rail.theme-toggle)"
+        )
+    return None
 
 
 def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
@@ -590,6 +615,12 @@ def run(args) -> int:
             page = browser.new_page(
                 viewport={"width": args.width, "height": args.height},
                 device_scale_factor=args.scale,
+                # The app already ships `transition: none !important` under this media query
+                # (styles/index.css), so asking for it means there is NOTHING left to settle after a
+                # theme switch or a click - which is what lets the waits below be real signals
+                # instead of guessed durations. This harness shoots layout, spacing, tokens and
+                # hierarchy; a mid-transition frame is noise in every one of those.
+                reduced_motion="reduce",
             )
             console: list[str] = []
             page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
@@ -628,7 +659,10 @@ def run(args) -> int:
                         print(f"  !! {theme_err}")
                         failures.append(f"{surface}:{theme}")
                         continue
-                    page.wait_for_timeout(600)
+                    # No settle wait here on purpose. `_set_theme` has already confirmed the
+                    # COMPUTED `--c-canvas` changed, and the context runs with reduced motion so
+                    # transitions are `none` - so there is no state left in flight to sleep toward.
+                    # A `wait_for_timeout(600)` used to sit here; it was pacing, not detection.
                     # Hover LAST and per theme, unlike --click: a theme switch does not unmount
                     # anything, but moving the pointer is not sticky the way an open popover is, and
                     # the hovered state is what needs to appear in BOTH shots.
