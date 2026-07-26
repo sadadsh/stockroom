@@ -10,6 +10,7 @@ import type {
   ActivateResponse,
   AltiumEmbedCapability,
   AltiumEmbedResult,
+  AltiumModelsPending,
   AltiumRegenerateResult,
   DevSaveBody,
   DevSaveResult,
@@ -1146,6 +1147,21 @@ export const api = {
       `/api/altium/parts/${encodeURIComponent(partId)}/embed-model`,
       { body: { replace } },
     );
+  },
+
+  // Embed the 3D model of every part that still needs one. A JOB, not a plain call: each part that
+  // genuinely needs work costs an Altium boot, so a full library can run for minutes, and the
+  // stream names the part it is on. Parts already carrying a model are never attempted.
+  altiumEmbedModels(partIds?: string[]): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/altium/embed-models", {
+      body: partIds ? { part_ids: partIds } : {},
+    });
+  },
+
+  // How many parts a bulk embed would actually work on, so the action can state a number it will
+  // honour rather than one it might not.
+  altiumModelsPending(): Promise<AltiumModelsPending> {
+    return request<AltiumModelsPending>("GET", "/api/altium/models-pending");
   },
 
   // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).

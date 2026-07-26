@@ -252,6 +252,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "altiumdb.modal-table", label: "DbLib parts table", area: "altiumdb" },
   { id: "altiumdb.modal-attach", label: "DbLib attach button", area: "altiumdb" },
   { id: "altiumdb.setup-modal", label: "Altium setup guide modal", area: "altiumdb" },
+  { id: "altiumdb.embed-all", label: "Embed every pending 3D model in one run", area: "altiumdb" },
   { id: "complete.root", label: "Complete Part dialog", area: "complete" },
   { id: "complete.header", label: "Complete Part header", area: "complete" },
   { id: "complete.cad", label: "CAD Files capture block", area: "complete" },

@@ -1136,3 +1136,43 @@ export function useAltiumAttach() {
     },
   });
 }
+
+// The parts a bulk 3D embed would work on. Polled on window focus like the other Altium probes:
+// the count changes when parts are added or captured elsewhere in the app, and an action that
+// promises a stale number is worse than one that promises none.
+export function useAltiumModelsPending() {
+  return useQuery({
+    queryKey: ["altium-models-pending"],
+    queryFn: () => api.altiumModelsPending(),
+    refetchOnWindowFocus: true,
+  });
+}
+
+// Embed every pending 3D model in one action. A JOB, because each part that needs work costs an
+// Altium boot and a whole library can run for minutes; the caller shows the streamed message,
+// which names the part being embedded. On completion it invalidates everything the run changed:
+// the pending count, the parts list and each detail (records gained an altium model ref), the
+// Altium status, and the capability (the run leaves Altium closed, so a held seat may be free).
+export function useAltiumEmbedModels() {
+  const qc = useQueryClient();
+  const job = useJob<import("./types").AltiumBulkEmbedResult>();
+  const start = useCallback(
+    async (partIds?: string[]) => {
+      // `useJob.start` resolves when the stream ends and leaves the payload on `job.result`; the
+      // invalidation runs after it either way, because a run that embedded 38 of 40 before failing
+      // still changed 38 records and the surfaces must not keep showing the old state.
+      await job.start(() => api.altiumEmbedModels(partIds));
+      for (const key of [
+        ["altium-models-pending"],
+        ["parts"],
+        ["part"],
+        ["altium-status"],
+        ["altium-embed-capability"],
+      ]) {
+        qc.invalidateQueries({ queryKey: key });
+      }
+    },
+    [job, qc],
+  );
+  return { ...job, start };
+}

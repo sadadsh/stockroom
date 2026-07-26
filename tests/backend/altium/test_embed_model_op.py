@@ -211,3 +211,150 @@ def test_an_already_embedded_model_is_a_no_op_that_never_starts_altium(
 
     assert result["status"] == "ok" and "already" in result["detail"].lower()
     assert driver.runs == 0, "an Altium boot costs ~15s and the license seat"
+
+
+# --- The bulk path. -----------------------------------------------------------------------------
+# Owner's deadline, 2026-07-26: "tomorrow i wanna build my full altium library ... literally
+# everything i'd want fully done, no work on my end." One click per part is work, so a whole
+# library's worth of 3D bodies has to be one action.
+#
+# This deliberately LOOPS the proven single-part embed rather than generalising the DelphiScript to
+# take many jobs in one Altium boot. That script cost nine ruled-out hypotheses to get right, every
+# iteration on it costs an Altium boot and a license seat, and an already-embedded model is skipped
+# in 0.055s WITHOUT starting Altium - so a re-run is nearly free and only genuinely new work costs a
+# boot. The one-boot-many-jobs version is a later optimisation, not a prerequisite.
+
+
+def _payload_streams_per_library(monkeypatch):
+    """EMPTY the first time each `.PcbLib` is inspected, FULL afterwards.
+
+    The single-part helper walks ONE global sequence, which is right for one container and wrong
+    for a bulk run: it would report the second part's library as already embedded before anything
+    touched it. Every part in a Stockroom library has its own `.PcbLib`, so the state is per path.
+    """
+    seen: set[str] = set()
+
+    def streams(path):
+        key = str(path)
+        if key in seen:
+            return FULL
+        seen.add(key)
+        return EMPTY
+
+    monkeypatch.setattr("stockroom.altium.embed3d.ole_streams", streams)
+
+
+def test_bulk_embed_covers_every_part_that_needs_one(library_ops, tmp_path, monkeypatch):
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "e")
+    _payload_streams_per_library(monkeypatch)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+
+    report = ops.embed_altium_models(driver=FakeDriver(tmp_path, writes=b"XX"))
+
+    assert report["embedded"] == 2, report
+    assert report["failed"] == 0
+    assert {r["part_id"] for r in report["results"]} == {"d", "e"}
+    for pid in ("d", "e"):
+        assert ops.load_record(pid).assets_for("altium").model is not None
+
+
+def test_bulk_embed_skips_a_part_that_cannot_have_one_instead_of_failing(
+    library_ops, tmp_path, monkeypatch
+):
+    """A library is mixed: KiCad-only parts, parts with no STEP yet, parts with no Altium
+    footprint. None of those is an ERROR the owner should have to read - they are simply not
+    candidates, and saying so is how the count stays honest."""
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "nomodel", model=None)
+    _seed(ops, "nofootprint", footprint=False)
+    _payload_streams(monkeypatch, EMPTY, FULL)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+
+    report = ops.embed_altium_models(driver=FakeDriver(tmp_path, writes=b"XX"))
+
+    assert report["embedded"] == 1
+    assert report["failed"] == 0
+    assert sorted(report["skipped"]) == ["nofootprint", "nomodel"]
+
+
+def test_one_part_failing_never_abandons_the_rest(library_ops, tmp_path, monkeypatch):
+    """The whole point of a bulk action is that the owner walks away. A single bad .PcbLib must
+    not decide that the other forty parts go un-embedded, and its reason must survive to the
+    report rather than being swallowed."""
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "e")
+    _payload_streams_per_library(monkeypatch)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+    real = ops.embed_altium_model
+    seen: list[str] = []
+
+    def flaky(part_id, **kw):
+        seen.append(part_id)
+        if part_id == "d":
+            raise ValueError("Altium said no")
+        return real(part_id, **kw)
+
+    monkeypatch.setattr(ops, "embed_altium_model", flaky)
+    report = ops.embed_altium_models(driver=FakeDriver(tmp_path, writes=b"XX"))
+
+    assert sorted(seen) == ["d", "e"]  # it kept going
+    assert report["embedded"] == 1
+    assert report["failed"] == 1
+    failure = next(r for r in report["results"] if r["status"] == "failed")
+    assert failure["part_id"] == "d"
+    assert "Altium said no" in failure["detail"]
+
+
+def test_bulk_embed_reports_progress_per_part(library_ops, tmp_path, monkeypatch):
+    """It runs as a job because it can take minutes, so it must say which part it is on - a
+    silent multi-minute bar is the thing the owner cannot tell apart from a hang."""
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "e")
+    _payload_streams_per_library(monkeypatch)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+    seen: list[tuple[int, int, str]] = []
+
+    ops.embed_altium_models(
+        driver=FakeDriver(tmp_path, writes=b"XX"),
+        on_progress=lambda done, total, pid: seen.append((done, total, pid)),
+    )
+
+    assert [s[2] for s in seen] == ["d", "e"] or [s[2] for s in seen] == ["e", "d"]
+    assert seen[-1][0] == 2 and seen[-1][1] == 2
+
+
+def test_bulk_embed_can_be_scoped_to_named_parts(library_ops, tmp_path, monkeypatch):
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "e")
+    _payload_streams(monkeypatch, EMPTY, FULL)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+
+    report = ops.embed_altium_models(part_ids=["e"], driver=FakeDriver(tmp_path, writes=b"XX"))
+
+    assert report["embedded"] == 1
+    assert [r["part_id"] for r in report["results"]] == ["e"]
+    assert ops.load_record("d").assets_for("altium").model is None
+
+
+def test_the_pending_count_is_what_the_button_can_promise(library_ops, tmp_path, monkeypatch):
+    """The count beside the action must be the number of parts it will actually work on, so a
+    button never offers work it cannot do (or hides work it will)."""
+    ops = library_ops
+    _seed(ops, "d")
+    _seed(ops, "nomodel", model=None)
+    _payload_streams(monkeypatch, EMPTY, FULL)
+    monkeypatch.setattr("stockroom.altium.embed3d.read_model_index", lambda _p: ())
+
+    assert ops.altium_models_pending() == ["d"]
+
+    # After the embed the record carries the model, so the same part stops being offered. The
+    # count is read from the records, not by parsing every .PcbLib, or asking "how many are
+    # pending" would cost the whole library in disk reads on every status poll.
+    ops.embed_altium_models(driver=FakeDriver(tmp_path, writes=b"XX"))
+    assert ops.altium_models_pending() == []
