@@ -2165,12 +2165,15 @@ function Sourcing({
             }
           >
             <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
-            <div className="min-w-0 pr-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-t1">{name}</span>
+            {/* overflow-hidden + min-w-0 on the column AND flex-none on the badge: without all three a
+                flex child refuses to shrink and simply DRAWS OVER the next grid column, which is how
+                the Recommended badge ended up printed on top of the stock figure ("Rec2,810ded"). */}
+            <div className="min-w-0 overflow-hidden pr-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold text-t1">{name}</span>
                 {isBest ? (
                   <span
-                    className="rounded-control px-1.5 py-0.5 text-2xs font-bold"
+                    className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-bold"
                     style={{
                       color: "var(--c-ok)",
                       background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
