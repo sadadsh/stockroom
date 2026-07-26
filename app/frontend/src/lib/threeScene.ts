@@ -1039,9 +1039,12 @@ export function mountModelScene(
       color: 0x08090b,
       roughness: 0.78,
       metalness: 0.0,
-      clearcoat: 0.06,
-      clearcoatRoughness: 0.8,
-      envMapIntensity: 0.1,
+      clearcoat: 0.02,
+      clearcoatRoughness: 0.9,
+      // Measured again after the de-gloss: near 45, far 98. With a near-BLACK basecolour that far
+      // value is almost entirely the environment, not the material - so the environment is the knob.
+      // Target was far < 60, i.e. board-dark all the way out with the part the lightest thing present.
+      envMapIntensity: 0.03,
     });
     const substrateMat = new THREE.MeshPhysicalMaterial({
       color: 0x241f19,
