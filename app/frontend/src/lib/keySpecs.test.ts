@@ -265,3 +265,50 @@ describe("isCuratedOnly", () => {
     expect(isCuratedOnly(new Set(["Package"]), {}, "Diodes", "Breakdown Voltage")).toBe(false);
   });
 });
+
+// --- A pin must survive across the parts of its category. ---------------------------------------
+// Owner, 2026-07-26: "spec pinning must persist across ALL items of that group." Pins are already
+// stored per CATEGORY, so the write was never the problem - the READ matched by exact key, and two
+// parts sourced from different distributors spell the same spec differently.
+
+describe("a pin applied to another part in the same category", () => {
+  // A spec the CURATED set does not contain, so what these assert is the PIN and nothing else.
+  // The first draft used "Breakdown Voltage (Min)", which the Diodes curated terms match anyway -
+  // three of the four tests passed before the fix, for the wrong reason.
+  const PIN = "Factory Pack Quantity";
+  const pinnedOn = { Diodes: [PIN] };
+
+  const other = (key: string, label?: string) =>
+    [
+      {
+        title: "ELECTRICAL",
+        rows: [{ key, label: label ?? key, value: "3000" }],
+      },
+    ] as unknown as SpecGroup[];
+
+  it("is not promoted at all without the pin (the control)", () => {
+    expect(keySpecRows(other(PIN), "Diodes", {})).toEqual([]);
+  });
+
+  it("matches when the other part spells the key identically", () => {
+    expect(keySpecRows(other(PIN), "Diodes", pinnedOn).map((r) => r.key)).toEqual([PIN]);
+  });
+
+  it("matches across CASE, spacing and punctuation differences", () => {
+    // the same spec, as a different distributor writes it
+    const rows = keySpecRows(other("factory  pack quantity"), "Diodes", pinnedOn);
+    expect(rows.map((r) => r.key)).toEqual(["factory  pack quantity"]);
+  });
+
+  it("matches when the other part carries the pinned wording as its LABEL", () => {
+    const rows = keySpecRows(other("FactoryPackQty", "Factory Pack Quantity"), "Diodes", pinnedOn);
+    expect(rows.map((r) => r.key)).toEqual(["FactoryPackQty"]);
+  });
+
+  it("does NOT promote a different spec that merely shares a word", () => {
+    // the precision the exact-key rule was protecting, kept: normalization bridges spelling, it
+    // never turns a pin into a substring search
+    const rows = keySpecRows(other("Factory Lead Time"), "Diodes", pinnedOn);
+    expect(rows.map((r) => r.key)).not.toContain("Factory Lead Time");
+  });
+});
