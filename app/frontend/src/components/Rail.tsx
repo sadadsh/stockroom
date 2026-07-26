@@ -15,6 +15,7 @@ import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
+import { useModalDismiss } from "../lib/useModalDismiss";
 
 function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
@@ -256,9 +257,21 @@ export function Rail() {
 }
 
 // The About window: what this is + who made it, with links out. Opaque bg-popover over a scrim,
-// same idiom as the app's other modals; Esc / a scrim click closes it.
+// the same idiom as the app's other modals.
+//
+// The comment here used to claim "Esc / a scrim click closes it". Only the scrim click was true.
+// FOUND BY `windrive.py tour` 2026-07-25, which could not get past it: the sweep clicked About,
+// then reported every control behind the scrim as unreachable and every later surface as
+// UNREACHABLE, because nothing it tried would dismiss this dialog. Driven live, it carried
+// **zero buttons** and ignored Escape, so the only way out was clicking a backdrop that advertises
+// nothing. Seven other modals already adopted `useModalDismiss`; this one never did, while still
+// declaring `role="dialog" aria-modal`. A modal that traps you is worse than a panel that does not
+// claim to be one.
 function AboutModal({ onClose }: { onClose: () => void }) {
   const aboutLabel = useText("modal.about.aria", "About Stockroom");
+  // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
+  // the focus move into the dialog and the focus restore on the way out.
+  const dialogRef = useModalDismiss(true, onClose);
   return (
     <div
       data-dev-id="about.scrim"
@@ -267,13 +280,30 @@ function AboutModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={aboutLabel}
         data-dev-id="about.root"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop"
+        className="relative w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop focus-visible:outline-none"
       >
+        {/* A VISIBLE way out. Escape and the scrim both work now, and neither is discoverable by
+            looking - this dialog had no control of any kind in it. */}
+        <button
+          type="button"
+          data-dev-id="about.close"
+          onClick={onClose}
+          aria-label="Close About"
+          title="Close About"
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control text-t3 transition-colors hover:bg-[var(--c-hover)] hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+        >
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
+            <path d="M1 1l9 9M10 1l-9 9" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round" />
+          </svg>
+        </button>
         <div
           data-dev-id="about.icon"
           className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card"
