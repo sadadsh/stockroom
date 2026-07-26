@@ -258,8 +258,8 @@ class LiveServer:
         lib_root = self.scratch_root / "libraries"
         _build_scratch_library(lib_root)
 
-        from stockroom.api.context import build_context
         from stockroom.api.app import create_app
+        from stockroom.api.context import build_context
         from stockroom.enrich.scrape_adapter import default_rendered_dom_fetcher
         from stockroom.store.machine_config import MachineConfig
 
