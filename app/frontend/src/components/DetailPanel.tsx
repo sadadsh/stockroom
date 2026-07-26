@@ -2237,8 +2237,11 @@ function SpecSection({
         />
         <span className={`min-w-0 truncate ${EYEBROW_DENSE}`}>{title}</span>
         {/* The count is the whole point of a closed section, so it is always present rather than
-            only while closed - a number that appears and disappears reads as a state change. */}
-        <span className="ml-auto flex-none text-2xs tabular-nums text-t3">{count}</span>
+            only while closed - a number that appears and disappears reads as a state change.
+            It sits NEXT TO its label, not flushed right: `ml-auto` put it at the far edge of a
+            530px column, measured ~500px from the word it counts, so four numbers hung in a
+            column with nothing tying them to anything. A count belongs to its noun. */}
+        <span className="flex-none text-2xs tabular-nums text-t3">{count}</span>
       </button>
       {open ? children : null}
     </section>

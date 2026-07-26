@@ -509,7 +509,14 @@ export function TabStrip<T extends string>({
           onKeyDown={(e) => onKeyDown(e, i)}
           className={cx(
             "rounded-control px-3 py-1 text-sm transition-colors",
-            active === t.id ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
+            // An UNSELECTED tab is available; only a disabled one should look unavailable. At t3
+            // (40% alpha dark / 46% light - the dimmest tier, the one carrying genuinely secondary
+            // text) `Handoff`, `Enrich` and `Timeline` read as greyed out beside the active chip,
+            // so the sheet looked like it had one tab and three dead labels. t2 states "not
+            // selected" without stating "not available", and selection loses nothing: the active
+            // tab still carries a soft accent FILL, medium WEIGHT and the brightest tier, so three
+            // independent signals separate it rather than one contrast step.
+            active === t.id ? "bg-acc-soft font-medium text-t1" : "text-t2 hover:text-t1",
           )}
         >
           {t.label}
