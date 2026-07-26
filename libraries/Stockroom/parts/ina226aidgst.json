@@ -1,0 +1,210 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "250"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "Current & Power Monitors & Regulators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "IC CURRENT MONITOR 0.02% 10VSSOP"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "16"
+      }
+    ]
+  },
+  "category": "ICs",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fina226"
+  },
+  "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR",
+  "display_name": "Current",
+  "eda": {},
+  "enrichment": {},
+  "hashes": null,
+  "id": "ina226aidgst",
+  "manufacturer": "Texas Instruments",
+  "mpn": "INA226AIDGST",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "manual",
+    "source_url": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fina226"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "595-INA226AIDGST",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 4.27,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 3.24,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 2.98,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 2.69,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 2.69,
+          "qty": 250
+        }
+      ],
+      "stock": 11852,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/INA226AIDGST?qs=tQG3bEuiOZB3Ay2BJOjnEQ%3D%3D",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "296-29100-2-ND",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 2.55308,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 2.47104,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 2.42996,
+          "qty": 750
+        },
+        {
+          "currency": "USD",
+          "price": 2.38442,
+          "qty": 1250
+        },
+        {
+          "currency": "USD",
+          "price": 2.35782,
+          "qty": 1750
+        },
+        {
+          "currency": "USD",
+          "price": 2.33224,
+          "qty": 2500
+        }
+      ],
+      "stock": 12433,
+      "url": "https://www.digikey.com/en/products/detail/texas-instruments/INA226AIDGST/2688425",
+      "vendor": "DigiKey"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Accuracy": "±0.02%",
+    "Assembly Country of Origin": "China",
+    "Country of Diffusion": "Japan",
+    "Country of Origin": "China",
+    "Current - Output": "10mA",
+    "ECCN": "EAR99",
+    "Function": "Current Monitor",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (EU TARIC)": "8542399000",
+    "HTS Code (JP)": "854239099",
+    "HTS Code (MX)": "8542399999",
+    "HTS Code (US)": "8542390090",
+    "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_MSOP-10_DGS_t.jpg",
+    "Maximum Order Quantity": "160",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Type": "Surface Mount",
+    "Operating Temperature": "-40°C ~ 125°C",
+    "Order Multiple": "1",
+    "Package / Case": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product Category": "Current & Power Monitors & Regulators",
+    "REACH": "REACH Unaffected",
+    "RoHS": "RoHS Compliant",
+    "Sensing Method": "High/Low-Side",
+    "Standard Pack Qty": "250",
+    "Supplier Device Package": "10-VSSOP",
+    "Unit Weight (kg)": "2.37e-05",
+    "Voltage - Input": "0V ~ 36V"
+  },
+  "tags": [],
+  "value": ""
+}
