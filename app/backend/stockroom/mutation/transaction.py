@@ -9,6 +9,7 @@ trace (spec sections 5 and 9). Git is the commit boundary and the undo system.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 from stockroom.sexp.document import SexpDocument
@@ -28,6 +29,7 @@ class Transaction:
         self._paths: list[Path] = []
         self._dirs: list[Path] = []
         self._committed = False
+        self._lock: threading.RLock | None = None
 
     def track(self, *paths: Path) -> None:
         for p in paths:
@@ -79,9 +81,27 @@ class Transaction:
         return sha
 
     def __enter__(self) -> "Transaction":
+        # The whole window is exclusive, not just the commit. Locking only `GitRepo.commit` would
+        # stop two commits colliding on `.git/index.lock` and still let two transactions interleave
+        # their WRITES - so one could stage a file the other had already half-rewritten, or roll
+        # back paths the other had just committed. The atomicity contract is per transaction, so
+        # the lock has to span the transaction. Re-entrant, so `commit` taking it again is free.
+        self._lock = self.repo._write_lock()
+        self._lock.acquire()
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
+        try:
+            self._body(exc_type, exc, tb)
+        finally:
+            # Released even if rollback itself raises: leaking this lock would wedge every later
+            # write to the repo with no error to explain it.
+            if self._lock is not None:
+                self._lock.release()
+                self._lock = None
+        return False  # never suppress exceptions
+
+    def _body(self, exc_type, exc, tb) -> None:
         if not self._committed:
             self.repo.restore_paths(self._paths)
             # prune freshly-created dirs that rollback left empty (deepest first), so a
@@ -92,4 +112,3 @@ class Transaction:
                         d.rmdir()
                 except OSError:
                     pass
-        return False  # never suppress exceptions

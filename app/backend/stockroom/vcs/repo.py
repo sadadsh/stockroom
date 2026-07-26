@@ -9,14 +9,38 @@ backend requires git on PATH (present in dev and CI).
 
 from __future__ import annotations
 
+import functools
 import shutil
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 # CREATE_NO_WINDOW on Windows so a git subprocess never flashes a console window (the frozen
 # exe is windowed); a harmless 0 on POSIX. Mirrors kicad/checks.py's _NO_WINDOW.
 _NO_WINDOW = 0x08000000 if hasattr(subprocess, "STARTUPINFO") else 0
+
+# ONE write lock per repository, shared by every GitRepo object pointing at it.
+#
+# Git takes an exclusive `.git/index.lock` for the duration of any index write, so two of our own
+# writes arriving together fail with "Unable to create '.git/index.lock': File exists" - a hard
+# error surfaced to the user as a failed mutation. That is not exotic here: FastAPI runs sync route
+# handlers in a threadpool, so Prepare, Sync Hygiene, Library Pin and Restore can all be in flight
+# at once against one project, and every library mutation shares the library repo the same way.
+#
+# Keyed by RESOLVED root, so two GitRepo instances for the same repo share a lock while two
+# different repos still write in parallel (the library must not block a project).
+#
+# RLock, not Lock: `Transaction` holds this for its whole stage/validate/commit window and then
+# calls `repo.commit`, which takes it again on the same thread. A plain Lock would deadlock the app
+# on its own most common write path - a trap to disarm here rather than discover in a hung window.
+#
+# Process-local, and honestly so: this serializes THIS process against itself. A second Stockroom
+# or a git command the user runs by hand is still outside it, which is what git's own index.lock is
+# for. Every construction site passes a repo ROOT (`rec.git_root`, `libraries_root`), so the key is
+# the repo; a GitRepo built on a SUBDIRECTORY would key separately and is not a supported shape.
+_WRITE_LOCKS: dict[str, threading.RLock] = {}
+_WRITE_LOCKS_GUARD = threading.Lock()
 
 
 class GitError(Exception):
@@ -67,6 +91,20 @@ class PushResult:
     reason: str
 
 
+def _serialized(method):
+    """Run `method` holding this repository's write lock, so two of our own index writes queue
+    instead of colliding on `.git/index.lock`. See `_WRITE_LOCKS` above for why it is per-repo and
+    re-entrant. Applied to every method that WRITES the index, working tree or refs; read-only
+    methods are deliberately left unlocked so status, log and diff never queue behind a commit."""
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._write_lock():
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class GitRepo:
     def __init__(self, root: Path, git_binary: str | None = None):
         resolved = shutil.which(git_binary or "git")
@@ -74,6 +112,19 @@ class GitRepo:
             raise GitError(f"git not found: {git_binary or 'git'}")
         self.git = resolved
         self.root = Path(root)
+
+    def _write_lock(self) -> threading.RLock:
+        """The write lock for THIS repository. See `_WRITE_LOCKS` above."""
+        # `str()` of the resolved path, not the Path object: Path hashes by its parts, which is
+        # fine, but a string key is what the dict is documented to hold and survives a Path
+        # subclass. Resolution normalizes symlinks and, on Windows, case.
+        key = str(Path(self.root).resolve())
+        with _WRITE_LOCKS_GUARD:
+            lock = _WRITE_LOCKS.get(key)
+            if lock is None:
+                lock = threading.RLock()
+                _WRITE_LOCKS[key] = lock
+            return lock
 
     def _run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         proc = subprocess.run(
@@ -95,6 +146,7 @@ class GitRepo:
             self._run("config", "user.email", "stockroom@localhost")
             self._run("config", "user.name", "Stockroom")
 
+    @_serialized
     def init(self, *, bare: bool = False) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         args = ["init", "-b", "main"]
@@ -105,6 +157,7 @@ class GitRepo:
         if not bare:
             self._set_test_identity_if_missing()
 
+    @_serialized
     def clone_from(self, origin: Path) -> None:
         self.root.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.run(
@@ -182,6 +235,7 @@ class GitRepo:
             args += [str(p) for p in paths]
         return not [line for line in self._run(*args).stdout.splitlines() if line.strip()]
 
+    @_serialized
     def commit(self, message: str, paths: list[Path], force: bool = False) -> str:
         if not message.strip():
             raise GitError("commit message must not be empty")
@@ -233,6 +287,7 @@ class GitRepo:
         self._run("commit", "-m", message, "--only", "--", *[str(p) for p in committable])
         return self.head()
 
+    @_serialized
     def commit_staged(self, message: str) -> str:
         """Commit exactly what is in the INDEX, with no pathspec. Returns the new head, or the
         current head when nothing is staged.
@@ -255,6 +310,7 @@ class GitRepo:
         self._run("commit", "-m", message)
         return self.head()
 
+    @_serialized
     def untrack(self, paths) -> None:
         """Stop tracking `paths` while LEAVING them on disk (`git rm --cached`).
 
@@ -332,6 +388,7 @@ class GitRepo:
             return None
         raise GitError(f"git show {rev}:{self._rel(path)} failed: {proc.stderr.strip()}")
 
+    @_serialized
     def restore_paths(self, paths: list[Path]) -> None:
         """Roll back exactly these paths: revert tracked modifications to HEAD,
         and delete anything untracked that was created. This is the transaction
@@ -348,6 +405,7 @@ class GitRepo:
                 elif path.exists():
                     path.unlink()
 
+    @_serialized
     def revert(self, sha: str) -> str:
         """Revert commit `sha` as a NEW commit (git-native, non-destructive undo, spec section 9):
         history is preserved and any later commits stand. On a conflict (a later commit changed the
@@ -373,6 +431,7 @@ class GitRepo:
         behind, ahead = proc.stdout.split()
         return int(ahead), int(behind)
 
+    @_serialized
     def pull_ff(self) -> PullResult:
         before = self.head()
         proc = self._run("pull", "--ff-only", check=False)
@@ -384,6 +443,7 @@ class GitRepo:
             return PullResult(ok=False, updated=False, reason=reason)
         return PullResult(ok=True, updated=self.head() != before, reason="")
 
+    @_serialized
     def pull_rebase(self) -> PullResult:
         """Pull, REBASING local commits onto the upstream. For the in-repo library (which shares
         one repo with the app code), a local part commit + a remote app-code commit touch DISJOINT
