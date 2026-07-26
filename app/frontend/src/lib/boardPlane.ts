@@ -163,8 +163,14 @@ export function boardExtent(
  * than as a board; and per-axis with no floor gave a long thin part a long thin sliver, which is the
  * same fault again. Per-axis reach WITH a floor ratio is the version that survived.
  */
-/** How far past the footprint's own extent the board reaches, per axis. */
-export const BOARD_PLANE_REACH = 1.8;
+/** How far past the footprint's own extent the board reaches, per axis.
+ *
+ * 1.15 by the owner's decision (2026-07-26), chosen from previews after the framing was measured:
+ * at 1.8 their 3.5x1.4mm USON sat on a ~6.4x4.0mm plane and read as a part lost on a table. The
+ * plane is meant to say "this is the surface it mounts to", and it only needs to clear the pads to
+ * say it. This is the FOURTH sizing attempt and the first the owner picked rather than had shown
+ * to them, so do not re-tune it without asking - the three before it were all reverted. */
+export const BOARD_PLANE_REACH = 1.15;
 /** A floor in millimetres, so a tiny 0402 still gets a board rather than a chip of one. */
 export const BOARD_PLANE_MIN_HALF_MM = 1.2;
 /** The narrow axis may not fall below this fraction of the wide one, or the plane reads as a sliver. */
