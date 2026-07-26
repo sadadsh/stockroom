@@ -584,3 +584,47 @@ describe("mergeSameConcept", () => {
     expect(mergeSameConcept(fam, {}).groups[0].rows).toHaveLength(2);
   });
 });
+
+describe("vendor bookkeeping keys", () => {
+  it("does not render a distributor's internal record id as a parameter", () => {
+    // The owner saw `Brand Id 100` sitting in the Other group beside real parameters. LCSC's
+    // __NEXT_DATA__ carries brandId / catalogId / parentCatalogId / wmCatalogId, and the
+    // adapter's uncurated fallback Title-cases any webData scalar into a spec label. The
+    // record KEEPS them (the owner's explicit "store everything the source exposes"); the
+    // sheet must not present them as properties of the part.
+    const groups = groupSpecs("Resistors", {
+      Resistance: "10 kOhm",
+      "Brand Id": "396",
+      "Catalog Id": "1199",
+      "Parent Catalog Id": "308",
+      "Wm Catalog Id": "1199",
+    });
+    const labels = groups.flatMap((g) => g.rows.map((r) => r.label));
+    expect(labels).toContain("Resistance");
+    for (const gone of ["Brand Id", "Catalog Id", "Parent Catalog Id", "Wm Catalog Id"]) {
+      expect(labels).not.toContain(gone);
+    }
+  });
+
+  it("keeps an identifier a person actually uses to order", () => {
+    // The rule is about an INTERNAL id, not about every identifier. LCSC's own product code
+    // is how you buy the part, and it is curated deliberately (note the uppercase "ID", which
+    // is what distinguishes a curated label from the humanized fallback).
+    const labels = groupSpecs("Resistors", {
+      "LCSC Product ID": "61542",
+      "HTS Code (US)": "8533210020",
+    }).flatMap((g) => g.rows.map((r) => r.label));
+    expect(labels.join(" ")).toContain("LCSC Product ID");
+  });
+
+  it("does not drop a real spec whose label merely ENDS in something id-like", () => {
+    // Exactness check: the rule matches a trailing " Id" word, not the letters anywhere. A
+    // pattern that fired on "id" inside a word would eat real specs.
+    const labels = groupSpecs("ICs", {
+      Grid: "0.5 mm",
+      "Bridge Type": "Full",
+      Humidity: "85%",
+    }).flatMap((g) => g.rows.map((r) => r.label));
+    expect(labels).toEqual(expect.arrayContaining(["Grid", "Bridge Type", "Humidity"]));
+  });
+});

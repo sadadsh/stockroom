@@ -17,9 +17,10 @@ import { distributorLabel } from "../lib/sourced";
 import { Badge, Button, Card, Dot } from "./primitives";
 import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
 
-// where a shown conflict value came from: a distributor, or the dropped files' side
-const conflictSourceLabel = (source: string) =>
-  source === "files" ? "Files" : distributorLabel(source);
+// where a shown conflict value came from: a distributor, or the dropped files' side.
+// `files` is in the shared label table now, so this no longer carries its own copy of that
+// one answer - a second place deciding the same thing is a second place to drift.
+const conflictSourceLabel = (source: string) => distributorLabel(source);
 
 const EMPTY_PROVENANCE = {
   source: "manual",
