@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { TabStrip } from "./primitives";
+import { PanelTitle, TabStrip } from "./primitives";
 
 const TABS = [
   { id: "specs", label: "Specs" },
@@ -55,5 +55,24 @@ describe("TabStrip devIdBase passthrough", () => {
     for (const tab of screen.getAllByRole("tab")) {
       expect(tab).not.toHaveAttribute("data-dev-id");
     }
+  });
+});
+
+describe("PanelTitle's count", () => {
+  it("sits NEXT TO the panel name, not flushed to the far edge", () => {
+    // Same defect as the spec-group counts, in the twin nobody looked at. On the owner's real
+    // window the Components panel is 320px wide and `justify-between` put its "1" about 290px
+    // from the word it counts - while the "Diodes 1" group header 100px below it now reads
+    // adjacent. One screen, two treatments, and the inconsistency was introduced by fixing only
+    // one of them.
+    //
+    // Every call site passes a COUNT (a number, "N of M", "N active"), never a control, so there
+    // is nothing here that wants to be flushed right.
+    render(<PanelTitle right="1">Components</PanelTitle>);
+    const title = screen.getByText("Components");
+    const bar = title.parentElement!;
+    expect(bar.className).not.toContain("justify-between");
+    const spans = Array.from(bar.querySelectorAll("span"));
+    expect(spans[spans.indexOf(title) + 1]?.textContent).toBe("1");
   });
 });
