@@ -1197,11 +1197,35 @@ class LibraryOps:
         """Rebuild a part in ONE atomic commit: refresh its procurement data AND re-derive its
         spec-aware display name (what it IS), so a whole-library rebuild lands fresh data + a proper
         name per part in a single commit. A change-free rebuild is a true no-op (no empty commit)."""
+        from stockroom.enrich.pipeline import refile_category
         from stockroom.enrich.refresh import apply_procurement_refresh
         from stockroom.ingest.component_naming import propose_component_name_from_record
+        from stockroom.text import fullest_name
 
         record = self.load_record(part_id)
         changed = apply_procurement_refresh(record, per_vendor, now_iso)
+        # RE-FILE an unclassified record, after the refresh so it classifies from the freshest
+        # vendor answer. `9bcb033` taught the ADD path to do this; a record added BEFORE that
+        # kept "Other" forever, because nothing re-derived a category the way this method already
+        # re-derives the display name, and Move Category (by hand, per part) was the only route
+        # back. Runs before the rename on purpose: the name is spec-aware and a correctly filed
+        # part can name itself better.
+        new_category = refile_category(record)
+        if new_category:
+            record.category = new_category
+            changed = True
+        # Prefer the SPELLED-OUT maker among the answers sources actually gave. Whichever source
+        # answers first decides the form, so a part can sit under "TI" while another
+        # distributor's "Texas Instruments" waits in `alternates` - and the Altium DbLib's
+        # Manufacturer column reads this field verbatim, so the abbreviation reaches a placed
+        # component too. Never invents a name: `fullest_name` only reorders answers on record.
+        maker = fullest_name(
+            [record.manufacturer]
+            + [a.value for a in (record.alternates.get("manufacturer") or [])]
+        )
+        if maker and maker != record.manufacturer:
+            record.manufacturer = maker
+            changed = True
         new_name = propose_component_name_from_record(record)
         if new_name and new_name != record.display_name:
             record.display_name = new_name

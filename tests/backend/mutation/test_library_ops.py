@@ -827,3 +827,103 @@ def test_add_part_persists_provenance_and_alternates(tmp_path, fixtures_dir):
     assert [a.value for a in on_disk.alternates["description"]] == [
         "3A buck", "Step-Down Regulator, 3 A",
     ]
+
+
+def test_rebuild_refiles_an_unclassified_part_its_vendors_can_name(tmp_path, fixtures_dir):
+    """An ALREADY-ADDED record stuck on "Other" gets re-filed by a rebuild.
+
+    `9bcb033` taught the ADD path to classify from the distributors' Product Category, but a
+    record added before that keeps "Other" forever: nothing re-derives a category the way
+    `rebuild_part` already re-derives the display name. The owner's own library holds exactly
+    this - one part filed "Other" while all three distributors name its kind - and Move Category
+    (a manual re-file) was the only route back.
+
+    Same guard as the add path: only an UNCLASSIFIED record is touched, so a category a person
+    chose on purpose is never overwritten by a vendor's idea of it.
+    """
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.category = "Other"
+    rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage an unclassified record",
+                [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+
+    assert out.category == "Diodes", f"the rebuild left it filed as {out.category!r}"
+    assert ops.load_record("tps62130rgtr").category == "Diodes"  # and it PERSISTED
+
+
+def test_rebuild_never_overwrites_a_category_a_person_chose(tmp_path, fixtures_dir):
+    """The guard, tested on its own: a record already filed somewhere real keeps that filing even
+    when a distributor's Product Category says otherwise. A vendor's taxonomy is a suggestion for
+    an unfiled part, never an override of a human decision."""
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.category = "ICs"
+    rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage a deliberately filed record",
+                [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert out.category == "ICs"
+
+
+def test_rebuild_prefers_the_spelled_out_manufacturer_a_source_already_gave(tmp_path, fixtures_dir):
+    """`TI` loses the slot to `Texas Instruments` when a source actually said the latter.
+
+    Whichever source answers first decides the FORM of the manufacturer name, so a part can end
+    up filed under an abbreviation while another distributor's spelled-out answer sits in
+    `alternates` doing nothing. It reaches Altium that way too: the DbLib's Manufacturer column
+    reads `record.manufacturer` verbatim, so a placed component carried `TI`.
+
+    Nothing is invented here - the fuller name has to be an answer a source really gave.
+    """
+    from datetime import datetime, timezone
+
+    from stockroom.model.part import SourcedValue
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.manufacturer = "TI"
+    rec.alternates["manufacturer"] = [
+        SourcedValue(value="TI", source="lcsc", confidence="high"),
+        SourcedValue(value="Texas Instruments", source="mouser", confidence="high"),
+    ]
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage an abbreviated maker",
+                [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert out.manufacturer == "Texas Instruments"
+    assert ops.load_record("tps62130rgtr").manufacturer == "Texas Instruments"
+
+
+def test_rebuild_leaves_a_maker_alone_when_no_source_offered_a_fuller_name(tmp_path, fixtures_dir):
+    """The guard: with nothing to promote to, the stored name stands. This never reaches for a
+    lookup table - there is no industry standard for these names to look them up in."""
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.manufacturer = "TI"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage a lone abbreviation",
+                [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert out.manufacturer == "TI"
