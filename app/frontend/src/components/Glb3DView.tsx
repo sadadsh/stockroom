@@ -150,14 +150,14 @@ export function Glb3DView({
         // are all just pushed to one corner" - which was literally the CSS: every cluster crammed left
         // with the rest of the bar empty. Now the layer + shading clusters hold the left and the view
         // cluster holds the right, so the bar reads as two ends rather than one heap.
-        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 border-t border-line bg-[var(--c-popover)]/60 px-2 py-1"
+        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-1 gap-y-0.5 border-t border-line bg-[var(--c-popover)]/60 px-1.5 py-1"
       >
       {/* flex-wrap + min-w-0: this inner group holds the layer chips AND the shading chips, and
           without wrapping it forced both onto ONE line - measured 262px of content inside a 226px
           stage, i.e. a horizontal overflow the tile then clipped. The outer bar wrapping is not
           enough when a child refuses to break. */}
-      <div data-dev-id="detail.model-layers" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <div className="flex items-center gap-0.5">
+      <div data-dev-id="detail.model-layers" className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
+        <div className="flex items-center gap-px">
           <LayerToggle
             devId="detail.model-show-model"
             icon="layer.model"
@@ -211,7 +211,7 @@ export function Glb3DView({
           // NO border-l. On a bar that wraps, a left border on a flex child becomes a stray vertical
           // tick floating at the start of the new row - visible in the owner's real shot as a glitch
           // beside "Realistic". Grouping is carried by the gap instead, which cannot wrap wrongly.
-          className="flex items-center gap-0.5"
+          className="flex items-center gap-px"
         >
           {SHADING.map((r) => (
             <LayerToggle
@@ -379,7 +379,7 @@ function ViewControls({
       data-dev-id="detail.model-views"
       // the whole strip swallows the tile's open-on-click, not just the buttons
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-0.5"
+      className="flex items-center gap-px"
     >
       {VIEWS.map((v) => (
         <button
