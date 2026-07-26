@@ -1725,6 +1725,9 @@ function AssetTile({
             interactiveStage ? (
               <button
                 type="button"
+                // Addressable: since the stage stopped being a button, this eye is the ONLY way
+                // into the preview modal, and the shot harness could not reach it.
+                data-dev-id={devId ? `${devId}-open` : undefined}
                 onClick={onOpen}
                 aria-label={`Open ${name} Preview`}
                 className="-m-1 flex items-center rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"

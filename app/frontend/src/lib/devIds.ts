@@ -68,6 +68,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.handoff-tab", label: "Handoff tab panel", area: "detail" },
   { id: "detail.key-specs", label: "Key Specifications block", area: "detail" },
   { id: "detail.description-lede", label: "Description at the head of the specs column", area: "detail" },
+  { id: "detail.asset-hero-open", label: "Open the 3D preview modal (the tile's only opener)", area: "detail" },
   { id: "detail.specs-collapse", label: "Collapse the Specifications pane", area: "detail" },
   { id: "detail.specs-expand", label: "Expand the collapsed Specifications pane", area: "detail" },
   { id: "detail.sourcing-collapse", label: "Collapse the Sourcing pane", area: "detail" },
