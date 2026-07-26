@@ -685,7 +685,13 @@ export function DetailPanel({
           so the three panes read as one workspace. Then the padded body. */}
       <div
         data-dev-id="detail.title-strip"
-        className="flex h-[38px] flex-none items-center gap-4 border-b border-line bg-band px-6"
+        // h-[34px], the SAME as PanelTitle, the rail header and the Projects strip. It was 38 while
+        // the comment above claimed it matched them, and on the owner's real Windows window that 4px
+        // put this header's ink centre at 17.8 against 16.2 for "Components" and the rail toggle -
+        // three docked panel headers on one band, one of them sitting low. Measured, not guessed.
+        // The literal stays a literal: a Tailwind arbitrary value built from a template literal
+        // generates NO CSS, so a shared constant here would silently remove the height entirely.
+        className="flex h-[34px] flex-none items-center gap-4 border-b border-line bg-band px-6"
       >
         <TitleBlock
           headline={headline}
