@@ -1,6 +1,10 @@
 from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 from stockroom.scrape.validate import (
-    is_pdf_bytes, sane_price_breaks, valid_mpn, valid_url, validate_product,
+    is_pdf_bytes,
+    sane_price_breaks,
+    valid_mpn,
+    valid_url,
+    validate_product,
 )
 
 

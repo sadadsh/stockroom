@@ -227,7 +227,7 @@ def test_symbol_preview_at_rev_rejects_a_garbage_rev_as_400(app_ctx):
 
 
 def test_symbol_preview_at_rev_404_when_part_absent_at_that_rev(app_ctx):
-    from stockroom.model.part import AssetRef, EdaAssets, PartRecord
+    from stockroom.model.part import AssetRef, PartRecord
 
     seed = _seed_sha(app_ctx)  # before the latecomer existed
     rec = PartRecord(id="latecomer", display_name="LATECOMER", category="ICs")

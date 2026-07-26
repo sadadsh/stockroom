@@ -1,4 +1,3 @@
-import pytest
 
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.registry import SourceRegistry

@@ -1,6 +1,10 @@
 from stockroom.scrape.extract.structured import (
-    extract_jsonld_product, extract_microdata, extract_next_data, extract_nuxt,
-    extract_opengraph, structured_blobs,
+    extract_jsonld_product,
+    extract_microdata,
+    extract_next_data,
+    extract_nuxt,
+    extract_opengraph,
+    structured_blobs,
 )
 
 _JSONLD = (

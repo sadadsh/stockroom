@@ -12,7 +12,6 @@ import json
 
 from stockroom.projects import checks
 
-
 # ---- parse_erc_json ---------------------------------------------------------
 
 

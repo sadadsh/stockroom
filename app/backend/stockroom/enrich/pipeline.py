@@ -18,7 +18,6 @@ from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
 from stockroom.enrich.distributor_url import distributor_mpn_from_url
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.extract import extract_all
-from stockroom.scrape.validate import validate_product
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
 from stockroom.enrich.progress import Stage, emit, monotonic, stage_callback
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
@@ -28,6 +27,7 @@ from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.part import Provenance, Purchase
 from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
+from stockroom.scrape.validate import validate_product
 
 # Canonical field -> StagingCandidate attribute it fills. Only these simple text
 # fields flow straight onto the M3 candidate; price/URL become a Purchase.
@@ -683,9 +683,8 @@ class EnrichmentPipeline:
         the link was dead or not a PDF (never raises: enrichment never blocks).
         force=True refetches even when a cached PDF exists: an EXPLICITLY pasted URL
         must win over a stale earlier download."""
-        from stockroom.enrich.schema import normalize_mpn
-
         from stockroom.enrich.datasheet import looks_like_pdf
+        from stockroom.enrich.schema import normalize_mpn
 
         self._datasheet_dir.mkdir(parents=True, exist_ok=True)
         key = normalize_mpn(candidate.mpn or candidate.entry_name or candidate.display_name or "part")

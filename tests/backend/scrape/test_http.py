@@ -1,7 +1,7 @@
 import asyncio
 
 from stockroom.scrape.fetch.http import HttpClient
-from stockroom.scrape.model import Page, FetchError
+from stockroom.scrape.model import FetchError, Page
 from stockroom.scrape.stealth.fingerprint import Fingerprint, FingerprintRotator
 
 

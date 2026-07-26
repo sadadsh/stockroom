@@ -25,8 +25,8 @@ def test_build_refresh_adapters_enables_only_the_configured_vendors():
 
 
 def test_refresh_endpoint_updates_a_part_via_the_api_adapters(client, app_ctx, monkeypatch):
-    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
     import stockroom.api.routers.library as lib_router
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 
     class FakeAdapter:
         enabled = True

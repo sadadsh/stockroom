@@ -1,5 +1,8 @@
 from stockroom.scrape.crawl.governor import (
-    BREAKER_THRESHOLD, MAX_RATE, MIN_RATE, HostGovernor,
+    BREAKER_THRESHOLD,
+    MAX_RATE,
+    MIN_RATE,
+    HostGovernor,
 )
 
 

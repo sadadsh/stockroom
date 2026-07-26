@@ -17,10 +17,10 @@ from __future__ import annotations
 import re
 
 from stockroom.projects.bom import (
+    _board_count,
     _bom_consolidated_csv,
     _bom_line_qty,
     _bom_project_csv,
-    _board_count,
     _coerce_price,
     _dist_pn,
     _lead_weeks,

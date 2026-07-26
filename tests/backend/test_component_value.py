@@ -16,7 +16,6 @@ import pytest
 
 from stockroom.component_value import parse_component_value, same_component_value
 
-
 # -- plain engineering notation ------------------------------------------------
 
 

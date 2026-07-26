@@ -212,9 +212,13 @@ def test_prepare_apply_project_wide_unique_across_sheets(tmp_path):
     ops.prepare_apply(rec.id, library_parts=_parts())
     ta = (proj / "a.kicad_sch").read_text(encoding="utf-8")
     tb = (proj / "b.kicad_sch").read_text(encoding="utf-8")
-    refs = {ta.count('"R1"'), tb.count('"R2"')}
     assert '(property "Reference" "R1"' in ta
-    assert '(property "Reference" "R2"' in tb  # no collision across sheets
+    assert '(property "Reference" "R2"' in tb
+    # The claim in this test's NAME, which nothing checked: the designators are unique ACROSS
+    # sheets, so neither sheet may carry the other's reference. A dead `refs = {...}` sat here
+    # instead, computing the evidence and dropping it.
+    assert '"R2"' not in ta
+    assert '"R1"' not in tb
 
 
 def test_prepare_apply_progress_is_reported(tmp_path):

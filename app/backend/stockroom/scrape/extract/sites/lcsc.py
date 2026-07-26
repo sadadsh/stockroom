@@ -96,7 +96,6 @@ _WEBDATA_LABELS: dict[str, str] = {
     "split": "Order Multiple",
     "reelPrice": "Reel Setup Fee",
     "productId": "LCSC Product ID",
-    "productArrange": "Packaging",
 }
 
 # webData keys already surfaced as first-class LcscProduct fields (do not re-capture

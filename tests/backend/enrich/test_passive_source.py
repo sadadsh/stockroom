@@ -9,8 +9,6 @@ returns real passive data even when every network source is dead.
 
 from __future__ import annotations
 
-import pytest
-
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.pipeline import EnrichmentPipeline, PassiveFastPathSource
 from stockroom.enrich.registry import DEFAULT_WANT

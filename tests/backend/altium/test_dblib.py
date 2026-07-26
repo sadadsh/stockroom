@@ -1,6 +1,5 @@
 from stockroom.altium.dblib import FIELD_MAP, emit_dblib, render_dblib
 
-
 _ABS = "C:\\lib\\Stockroom\\altium\\stockroom-parts.db"
 
 

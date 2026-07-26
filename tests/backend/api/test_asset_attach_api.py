@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import zipfile
 
-import pytest
-
 from stockroom.model.part import Datasheet, PartRecord, Purchase
 from tests.backend.conftest import requires_kicad_cli
 

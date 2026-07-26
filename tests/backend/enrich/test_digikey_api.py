@@ -5,7 +5,7 @@ import urllib.request
 
 import pytest
 
-from stockroom.enrich.digikey_api import _parse_digikey_part, DigiKeyAdapter, _default_requester
+from stockroom.enrich.digikey_api import DigiKeyAdapter, _default_requester, _parse_digikey_part
 from stockroom.enrich.errors import EnrichError
 
 _PRODUCT = {

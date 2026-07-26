@@ -1,19 +1,7 @@
 import shutil
 
-import pytest
-
 from stockroom.kicad.lib_table import LibTable
 from stockroom.verify.semdiff import semantic_diff
-
-
-def _load(tmp_path, name):
-    src = pytest.importorskip  # noqa: keep import structure simple
-    dst = tmp_path / name
-    shutil.copyfile(
-        __import__("pathlib").Path(__file__).parent.parent / "fixtures" / "kicad" / (name + ".sample"),
-        dst,
-    )
-    return dst
 
 
 def test_reads_existing_entries(tmp_fixture, fixtures_dir, tmp_path):

@@ -8,12 +8,13 @@ and the enrich->price adapter. Pure compute: no kicad-cli, no network.
 from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 from stockroom.projects import kibom
 from stockroom.projects.bom import (
-    _bom_components,
     _board_count,
+    _bom_components,
+    _coerce_price,
+    _price_rows,
     _row_cost_at_qty,
     annotate_build_pricing,
     bom_build_rollup,
-    reprice_bom,
     bom_cost_at_qty,
     bom_cost_by_source,
     bom_cost_summary,
@@ -27,8 +28,7 @@ from stockroom.projects.bom import (
     price_at_qty,
     price_line_at_build,
     project_bom,
-    _coerce_price,
-    _price_rows,
+    reprice_bom,
 )
 
 

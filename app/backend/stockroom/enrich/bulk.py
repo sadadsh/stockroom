@@ -13,7 +13,6 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.mutation.library_ops import staged_missing_fields

@@ -9,7 +9,8 @@ import socket
 import subprocess
 from pathlib import Path
 
-from stockroom.api.context import AppContext, build_context as _build_context
+from stockroom.api.context import AppContext
+from stockroom.api.context import build_context as _build_context
 from stockroom.api.security import mint_token
 from stockroom.store.machine_config import MachineConfig
 

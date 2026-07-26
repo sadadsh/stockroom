@@ -17,19 +17,19 @@ from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
 from stockroom.kicad.footprint import Footprint
-from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.part import PartRecord
-from stockroom.kicad.stock import (
-    stock_footprint_file,
-    stock_model_file,
-    stock_symbol_lib_file,
-)
 from stockroom.kicad.model_convert import (
     GLB_MAGIC,
     ModelConversionError,
     ModelToolingMissing,
     model_to_glb,
 )
+from stockroom.kicad.stock import (
+    stock_footprint_file,
+    stock_model_file,
+    stock_symbol_lib_file,
+)
+from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.model.part import PartRecord
 from stockroom.vcs.repo import GitError
 
 

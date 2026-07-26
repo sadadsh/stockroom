@@ -12,8 +12,8 @@ from stockroom.projects.bom_diff import (
     _bom_line_key,
     bom_diff,
     bom_diff_cost,
-    bom_diff_lead,
     bom_diff_csv,
+    bom_diff_lead,
     project_bom_diff,
 )
 

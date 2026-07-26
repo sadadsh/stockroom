@@ -14,7 +14,6 @@ from stockroom.host.run import EXIT_RESTART
 from stockroom.launcher import launch, splash
 from stockroom.launcher.launch import app_workdir, ensure_clone, supervise
 
-
 # -- app_workdir ---------------------------------------------------------------
 
 

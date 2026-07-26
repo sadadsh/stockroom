@@ -5,8 +5,9 @@ actually requested. None of these tests need a real kicad-cli — discovery is m
 
 from pathlib import Path
 
-import stockroom.kicad.cli as cli_mod
 import pytest
+
+import stockroom.kicad.cli as cli_mod
 from stockroom.kicad.cli import KiCadCli, find_kicad_cli
 from stockroom.kicad.errors import KiCadCliError
 

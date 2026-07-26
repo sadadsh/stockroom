@@ -2,8 +2,8 @@ from tests.backend.api.conftest import _drain_job
 
 
 def test_rescan_endpoint_refreshes_the_library_via_the_adapters(client, app_ctx, monkeypatch):
-    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
     import stockroom.api.routers.library as lib_router
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 
     class FakeAdapter:
         enabled = True

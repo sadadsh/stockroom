@@ -136,7 +136,6 @@ def test_http_parses_retry_after_on_a_block():  # [10]
 
 def test_run_timeout_cancels_the_underlying_coroutine():  # [9]
     import threading
-    import time
 
     class _Slow:
         def __init__(self):

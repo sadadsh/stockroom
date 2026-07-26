@@ -7,7 +7,6 @@ from stockroom.enrich.bulk import (
     parse_mpn_list,
 )
 from stockroom.enrich.schema import EnrichmentResult, Sourced
-from stockroom.ingest.staging import StagingCandidate
 
 FIX = Path(__file__).parent / "fixtures"
 

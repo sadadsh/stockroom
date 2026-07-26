@@ -17,10 +17,10 @@ No em dashes anywhere (standing owner rule).
 from __future__ import annotations
 
 from stockroom.projects.bom import (
-    _bom_line_qty,
     _board_count,
-    _lead_weeks,
+    _bom_line_qty,
     _coerce_price,
+    _lead_weeks,
     bom_cost_at_qty,
     bom_cost_summary,
 )

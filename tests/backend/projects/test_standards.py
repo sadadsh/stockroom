@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from stockroom.projects import standards as st
 
-
 # --- reconcile_classes -------------------------------------------------------
 
 def test_reconcile_updates_an_existing_class_by_name_field_merge():
