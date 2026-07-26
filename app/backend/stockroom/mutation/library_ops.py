@@ -572,7 +572,7 @@ class LibraryOps:
         return ready, skipped
 
     def ensure_altium_datasource(self, allow_tracked: bool = False) -> dict:
-        """Make the derived SQLite data source on disk match the library, committing NOTHING.
+        """Make BOTH derived Altium artifacts on disk match the library, committing NOTHING.
 
         This is what replaced committing the `.db` (Batch 2 item 3). The commit had been bought to
         keep a fresh clone placeable with no regenerate step; rebuilding on demand buys the same
@@ -599,7 +599,13 @@ class LibraryOps:
         db_path = altium_dir / "stockroom-parts.db"
         ready, _skipped = self._altium_place_ready()
         if not allow_tracked and db_path.exists() and self.repo._is_tracked(db_path):
-            return {"path": db_path, "rows": len(ready), "written": False, "reason": "shared"}
+            # A still-tracked data source means this library has not been migrated, so the
+            # automatic ensure touches NOTHING here - not even the .DbLib, whose absence would
+            # otherwise be "fixed" by dropping a fresh untracked file into a tree with no ignore
+            # rule for it yet. An explicit regenerate migrates both and writes both.
+            return {"path": db_path, "rows": len(ready), "written": False, "reason": "shared",
+                    "dblib": {"path": db_path.parent / "Stockroom.DbLib", "written": False,
+                              "reason": "shared"}}
 
         with tempfile.TemporaryDirectory() as td:
             candidate = Path(td) / "stockroom-parts.db"
@@ -612,15 +618,43 @@ class LibraryOps:
                 reason, written = "current", False
             if written:
                 shutil.copyfile(candidate, db_path)
-        return {"path": db_path, "rows": rows, "written": written, "reason": reason}
+        return {"path": db_path, "rows": rows, "written": written, "reason": reason,
+                "dblib": self._ensure_altium_dblib(db_path, allow_tracked)}
+
+    def _ensure_altium_dblib(self, db_path: Path, allow_tracked: bool) -> dict:
+        """Write the .DbLib beside its data source. Derived since 2026-07-26, for the reason in
+        `altium/dblib.py`: its connection string must name the database ABSOLUTELY or real Altium
+        cannot open it, and a machine-specific path cannot be shared through git.
+
+        Written at BOOT rather than only on an explicit regenerate, because Altium is opened by a
+        person and not by Stockroom: a fresh clone whose .DbLib only appears after someone happens
+        to press Regenerate is a library that silently does not work on a new machine.
+
+        `allow_tracked=False` refuses to touch a copy git still tracks, exactly as for the `.db` -
+        a pre-migration library gets dirtied by nothing until an explicit regenerate migrates it.
+        """
+        from stockroom.altium.dblib import emit_dblib, render_dblib
+
+        path = db_path.parent / "Stockroom.DbLib"
+        if not allow_tracked and path.exists() and self.repo._is_tracked(path):
+            return {"path": path, "written": False, "reason": "shared"}
+        wanted = render_dblib("Parts", db_path.name, db_path=str(db_path.resolve()))
+        if path.exists() and path.read_text(encoding="utf-8") == wanted:
+            return {"path": path, "written": False, "reason": "current"}
+        reason = "stale" if path.exists() else "missing"
+        emit_dblib("Parts", db_path.name, path, db_path=db_path)
+        return {"path": path, "written": True, "reason": reason}
 
     def regenerate_altium_dblib(self) -> dict:
-        """Regenerate the derived SQLite data source and the .DbLib for every place-ready part.
+        """Regenerate BOTH derived Altium artifacts for every place-ready part.
 
-        Only the `.DbLib` is COMMITTED. The `.db` is derived from the JSON records and is written
-        to disk untracked (see `eda.registry` `_ALTIUM.derived` for the measurement behind that).
+        NEITHER is committed. The `.db` stopped being shared on 2026-07-25 (two peers adding
+        different parts produce unmergeable binaries carrying nothing the records do not already
+        hold); the `.DbLib` followed on 2026-07-26, because real Altium cannot open a data source
+        named by a relative path and the absolute one it needs is machine-specific. See
+        `eda.registry` `_ALTIUM.derived` and `altium/dblib.py` for both measurements.
 
-        A library from before 2026-07-25 still has the derived copy COMMITTED, and an ignore rule
+        A library from before those dates still has a derived copy COMMITTED, and an ignore rule
         has no effect on a file git already tracks, so this MIGRATES it first by running the
         library's own workspace hygiene: that writes the ignore rule and untracks the file in one
         commit, leaving a clean tree. Hygiene is reused rather than reimplemented here because a
@@ -629,10 +663,8 @@ class LibraryOps:
         refusal is REPORTED as `migration_blocked` rather than swallowed.
 
         Parts missing Altium assets or the required data fields are excluded and reported (never
-        half-placed). An unchanged .DbLib produces no commit.
+        half-placed). With nothing left to share, an ordinary regenerate makes no commit at all.
         """
-        from stockroom.altium.dblib import emit_dblib
-
         altium_dir = self._altium_dir()
         altium_dir.mkdir(parents=True, exist_ok=True)
         db_path = altium_dir / "stockroom-parts.db"
@@ -647,7 +679,9 @@ class LibraryOps:
         (altium_dir / "stockroom-parts.xlsx").unlink(missing_ok=True)
 
         migration_blocked = ""
-        if db_path.exists() and self.repo._is_tracked(db_path):
+        # BOTH derived artifacts migrate the same way. Checking only the `.db` left a library that
+        # had committed the `.DbLib` (every library made before 2026-07-26) sharing it forever.
+        if any(p.exists() and self.repo._is_tracked(p) for p in (db_path, dblib_path)):
             try:
                 self.hygiene_apply()
             except ValueError as exc:
@@ -656,8 +690,6 @@ class LibraryOps:
         ready, skipped = self._altium_place_ready()
         self.ensure_altium_datasource(allow_tracked=True)
         with Transaction(self.repo) as txn:
-            emit_dblib("Parts", db_path.name, dblib_path)
-            txn.track(dblib_path)
             if retire_ignore:
                 txn.track(gitignore_path)  # tracked-but-deleted: stages the removal
             txn.commit(f"Regenerate Altium DbLib: {len(ready)} place-ready parts")

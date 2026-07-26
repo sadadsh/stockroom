@@ -1,8 +1,27 @@
-"""Render the Altium Database Library (.DbLib) as deterministic INI text. Committed +
-stable; points at the committed stockroom-parts.db by a repo-relative path so the folder
-is portable. The connection reaches the SQLite ODBC driver through the OLE DB -> ODBC
-bridge (MSDASQL); if real Altium rejects the string the fix is a one-line change here
-(fallbacks: a raw ODBC driver string, or a user DSN - see the 2026-07-23 migration spec)."""
+"""Render the Altium Database Library (.DbLib) as deterministic INI text.
+
+The connection reaches the SQLite ODBC driver through the OLE DB -> ODBC bridge (MSDASQL),
+and it names the database by an ABSOLUTE path. That is not a style choice:
+
+**Measured against real Altium (AD26 26.8.1) on the owner's machine, 2026-07-26.** With the
+repo-relative `Database=.\\stockroom-parts.db` this file had shipped with, Altium opened the
+document, parsed every section correctly, and reported "Connection Failed. Check your connection
+settings." A single-variable ADO probe against the same driver isolated why: the SQLite ODBC
+driver resolves a relative `Database=` against the PROCESS working directory, and Altium's is
+never the .DbLib's own folder.
+
+    relative + cwd = the .DbLib's folder  -> connects
+    relative + cwd = anywhere else        -> connect failed
+    absolute                              -> connects
+
+Rewriting the real file with an absolute path and reopening it turned the red "Connection Failed"
+into "Connected", with the field grid populated. Altium's own writer does exactly this: an
+Altium-authored .DbLib carries an ABSOLUTE data source in ConnectionString while keeping
+`LibraryDatabasePath` relative beside it (checked against two Altium-written files in the wild).
+
+Because the connection is therefore machine-specific, the .DbLib is a DERIVED artifact, rebuilt
+locally like the `.db` it points at, rather than shared through git. See `eda.registry` `_ALTIUM`.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -54,28 +73,42 @@ NON_FIELD_COLUMNS: dict[str, str] = {
 }
 
 
-def _connection_string(data_filename: str) -> str:
+def _connection_string(db_path: str) -> str:
     return (
         "Provider=MSDASQL.1;Persist Security Info=False;"
         f'Extended Properties="DRIVER={SQLITE3_ODBC_DRIVER};'
-        f"Database=.\\{data_filename};"
+        f"Database={db_path};"
         'LongNames=0;Timeout=1000;NoTXN=0;SyncPragma=NORMAL;StepAPI=0;"'
     )
 
 
-def render_dblib(table_name: str, data_filename: str) -> str:
+def render_dblib(table_name: str, data_filename: str, *, db_path: str) -> str:
+    """`db_path` is the ABSOLUTE path of the SQLite file, and is required: see the module
+    docstring for the measurement that makes a relative one a connection failure. Keeping it
+    required means no caller can quietly re-emit the broken form."""
     lines = [
         "[OutputDatabaseLinkFile]",
         "Version=1.1",
         "[DatabaseLinks]",
-        f"ConnectionString={_connection_string(data_filename)}",
+        f"ConnectionString={_connection_string(str(db_path))}",
         "AddMode=3", "RemoveMode=1", "UpdateMode=2", "ViewMode=0",
         "LeftQuote=[", "RightQuote=]", "QuoteTableNames=1",
         "UseTableSchemaName=0", "DefaultColumnType=VARCHAR(255)",
         "LibraryDatabaseType=",
+        # Relative, beside the absolute connection: this is the path Altium re-relativizes
+        # against the .DbLib's own folder, and matching Altium's convention is what keeps a
+        # regenerate and an Altium save from fighting over the file.
         f"LibraryDatabasePath=.\\{data_filename}",
         "DatabasePathRelative=1",
+        # The four keys below plus LastFocusedTable are what Altium ITSELF writes into this
+        # section on save (measured from a real AD26 save, 2026-07-26). Emitting them means an
+        # owner who opens the library in Altium and saves produces no diff at all.
+        "TopPanelCollapsed=0",
         "LibrarySearchPath=.",
+        "OrcadMultiValueDelimiter=,",
+        "SearchSubDirectories=1",
+        "SchemaName=",
+        f"LastFocusedTable={table_name}",
         "[Table1]",
         "SchemaName=",
         f"TableName={table_name}",
@@ -94,8 +127,10 @@ def render_dblib(table_name: str, data_filename: str) -> str:
     return "\r\n".join(lines) + "\r\n"
 
 
-def emit_dblib(table_name: str, data_filename: str, out_path) -> None:
+def emit_dblib(table_name: str, data_filename: str, out_path, *, db_path) -> None:
+    """`db_path` is the data source's real location; its absolute form is what the connection
+    string carries, so no caller has to know how to spell a machine-specific path."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8", newline="") as fh:
-        fh.write(render_dblib(table_name, data_filename))
+        fh.write(render_dblib(table_name, data_filename, db_path=str(Path(db_path).resolve())))

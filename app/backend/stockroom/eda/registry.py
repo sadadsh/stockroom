@@ -365,9 +365,14 @@ _ALTIUM = EdaTool(
     # would still conflict, because two peers adding DIFFERENT parts genuinely produce different
     # content in a binary git cannot merge. The clone stays placeable because
     # LibraryOps.ensure_altium_datasource rebuilds it whenever it is missing or stale.
-    # The .DbLib itself is NOT derived in this sense: deterministic INI text that changes only when
-    # the column map does, and a human reviews it, so it stays shared.
-    derived=("stockroom-parts.db",),
+    # The .DbLib joined it 2026-07-26, SUPERSEDING the decision that it "stays shared because it is
+    # deterministic INI text a human reviews". That decision rested on the file being PORTABLE, and
+    # it is not: real Altium (AD26) cannot open a data source named by a relative path, because the
+    # SQLite ODBC driver resolves one against the process working directory and Altium's is never
+    # the .DbLib's folder. The connection must therefore carry a MACHINE-SPECIFIC absolute path
+    # (Altium's own writer does the same), which a shared file cannot hold. See altium/dblib.py for
+    # the measurement. What a human reviews is now the emitter and its FIELD_MAP, in this repo.
+    derived=("stockroom-parts.db", "Stockroom.DbLib"),
     # OLE2 compound documents: unmergeable, and a line-ending rewrite is unrecoverable.
     binary=(
         "*.PcbLib",
