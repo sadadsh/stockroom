@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import math
 
+from stockroom.text import counted
+
 # KiCad's generic FR4 dielectric constants, the neutral default the retired presets ship. Surfaced
 # and per-dielectric-editable in the editor; the verify_note tells the user to confirm them.
 _FR4_ER = 4.5
@@ -117,7 +119,7 @@ def validate_preset_apply(preset_key: str, board_copper_count: int) -> dict:
     if p["layers"] != board_copper_count:
         raise ValueError(
             f"the {p['label']} preset is {p['layers']}-layer but this board has "
-            f"{board_copper_count} copper layer(s); pick a preset that matches the board"
+            f"{counted(board_copper_count, 'copper layer')}; pick a preset that matches the board"
         )
     return p
 

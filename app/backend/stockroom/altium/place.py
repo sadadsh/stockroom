@@ -47,6 +47,7 @@ from pathlib import Path
 from stockroom.altium.driver import AltiumDriver, RunOutcome
 from stockroom.altium.embed3d import delphi_quote
 from stockroom.altium.schdoc import read_schdoc_components
+from stockroom.text import counted
 
 # The document kind strings Altium's own API takes. Named so a reader does not have to know that
 # 'SCH' is a document kind while 'PCBLIB' is a MODEL type; they are different vocabularies that
@@ -555,7 +556,7 @@ def place_from_dblib(
     return PlaceResult(
         "ok",
         f"Placed {design_item_id} from {dblib.name} onto {out_doc.name} "
-        f"({len(placed)} component(s), footprint {footprints[0] if footprints else 'MISSING'}).",
+        f"({counted(len(placed), 'component')}, footprint {footprints[0] if footprints else 'MISSING'}).",
         placed_design_item_ids=ids,
         placed_footprints=footprints,
         placed_parameters=params,

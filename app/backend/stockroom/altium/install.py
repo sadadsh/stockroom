@@ -55,6 +55,7 @@ from pathlib import Path
 
 from stockroom.altium.driver import AltiumDriver, RunOutcome
 from stockroom.altium.embed3d import delphi_quote
+from stockroom.text import counted
 
 
 @dataclass(frozen=True)
@@ -238,7 +239,8 @@ def install_library(
         return InstallResult("already", f"{dblib.name} was already installed.", before, after, log)
     return InstallResult(
         "ok",
-        f"Installed {dblib.name} into Altium ({len(before)} library(s) before, {len(after)} after).",
+        f"Installed {dblib.name} into Altium "
+        f"({counted(len(before), 'library', 'libraries')} before, {len(after)} after).",
         before,
         after,
         log,
