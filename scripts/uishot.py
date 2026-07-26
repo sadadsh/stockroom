@@ -146,6 +146,15 @@ MEASURE_JS = """(ids) => {
 _UI_TIMEOUT_MS = 10_000
 
 
+def _api_path(url: str) -> str:
+    """The path of `url` with its per-launch host and query stripped, so repeats of the same
+    failing endpoint collapse into one counted line instead of N unique ones."""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    return parts.path or url
+
+
 def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
     """True once `locator` is actually visible, polled. False if it never shows within the ceiling.
 
@@ -162,6 +171,22 @@ def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
         return True
     except PlaywrightTimeoutError:
         return False
+
+
+# The `lib_symbols` block a real .kicad_sch always carries: KiCad copies every symbol it places
+# INTO the file, so the sheet stands alone. The seed omitted it, and kicanvas threw
+# `Cannot read properties of undefined (reading 'by_name')` out of `get lib_symbol` on EVERY
+# Projects shot - so the viewer in those screenshots had crashed mid-paint and nobody could tell.
+# Proven not to be a viewer bug: the same vendored bundle paints KiCad 10's own pic_programmer
+# demo (.kicad_sch 20260101 and .kicad_pcb 20260206) with zero console errors.
+# Text is Device:R and Device:C verbatim from KiCad 10.0.4's `Device.kicad_sym`, whitespace
+# collapsed and renamed to the lib-id form a schematic uses.
+_LIB_SYMBOLS = (
+    "\t(lib_symbols\n"
+    "\t\t(symbol \"Device:R\" (pin_numbers (hide yes)) (pin_names (offset 0)) (exclude_from_sim no) (in_bom yes) (on_board yes) (property \"Reference\" \"R\" (at 2.032 0 90) (effects (font (size 1.27 1.27)))) (property \"Value\" \"R\" (at 0 0 90) (effects (font (size 1.27 1.27)))) (property \"Footprint\" \"\" (at -1.778 0 90) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Datasheet\" \"~\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Description\" \"Resistor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_keywords\" \"R res resistor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_fp_filters\" \"R_*\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (symbol \"R_0_1\" (rectangle (start -1.016 -2.54) (end 1.016 2.54) (stroke (width 0.254) (type default)) (fill (type none)))) (symbol \"R_1_1\" (pin passive line (at 0 3.81 270) (length 1.27) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"1\" (effects (font (size 1.27 1.27))))) (pin passive line (at 0 -3.81 90) (length 1.27) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"2\" (effects (font (size 1.27 1.27)))))) (embedded_fonts no))\n"
+    "\t\t(symbol \"Device:C\" (pin_numbers (hide yes)) (pin_names (offset 0.254)) (exclude_from_sim no) (in_bom yes) (on_board yes) (property \"Reference\" \"C\" (at 0.635 2.54 0) (effects (font (size 1.27 1.27)) (justify left))) (property \"Value\" \"C\" (at 0.635 -2.54 0) (effects (font (size 1.27 1.27)) (justify left))) (property \"Footprint\" \"\" (at 0.9652 -3.81 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Datasheet\" \"~\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"Description\" \"Unpolarized capacitor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_keywords\" \"cap capacitor\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (property \"ki_fp_filters\" \"C_*\" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes))) (symbol \"C_0_1\" (polyline (pts (xy -2.032 0.762) (xy 2.032 0.762)) (stroke (width 0.508) (type default)) (fill (type none))) (polyline (pts (xy -2.032 -0.762) (xy 2.032 -0.762)) (stroke (width 0.508) (type default)) (fill (type none)))) (symbol \"C_1_1\" (pin passive line (at 0 3.81 270) (length 2.794) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"1\" (effects (font (size 1.27 1.27))))) (pin passive line (at 0 -3.81 90) (length 2.794) (name \"~\" (effects (font (size 1.27 1.27)))) (number \"2\" (effects (font (size 1.27 1.27)))))) (embedded_fonts no))\n"
+    "\t)\n"
+)
 
 
 def _seed_workspace(base: Path) -> tuple[Path, Path]:
@@ -281,11 +306,19 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
 
     bind_field = field_for("kicad")
 
+    placed = [0]  # placement index, so no two symbols land on the same coordinate
+
     def sym(ref, lib_id, value, footprint, uid, *, bound="", mpn=""):
         """One placed symbol. `bound` stamps the durable binding an earlier assignment would have
         left; `mpn` writes an MPN property, so a bound placement whose MPN disagrees with its part
         renders the DRIFT state. `uid=""` omits the uuid entirely, which is the legacy file that can
         only be bound by designator (the weak-link state)."""
+        # Laid out on a real grid. Every symbol used to be written `(at 10 10 0)`, so the viewer
+        # drew ten parts stacked on one another - which no KiCad-authored sheet ever looks like,
+        # and which made the Projects screenshot useless as a picture of the viewer working.
+        i = placed[0]
+        placed[0] += 1
+        x, y = 25.4 + (i % 5) * 25.4, 25.4 + (i // 5) * 25.4
         extra = ""
         if bound:
             extra += f'\t\t(property "{bind_field}" "{bound}" (at 0 0 0) (hide yes))\n'
@@ -293,13 +326,13 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
             extra += f'\t\t(property "MPN" "{mpn}" (at 0 0 0) (hide yes))\n'
         return (
             "\t(symbol\n"
-            f'\t\t(lib_id "{lib_id}")\n\t\t(at 10 10 0)\n\t\t(unit 1)\n'
+            f'\t\t(lib_id "{lib_id}")\n\t\t(at {x} {y} 0)\n\t\t(unit 1)\n'
             "\t\t(in_bom yes)\n\t\t(dnp no)\n"
             + (f'\t\t(uuid "{uid}")\n' if uid else "")
-            + f'\t\t(property "Reference" "{ref}" (at 10 8 0))\n'
-            f'\t\t(property "Value" "{value}" (at 12 10 0))\n'
-            f'\t\t(property "Footprint" "{footprint}" (at 10 10 0))\n'
-            '\t\t(property "Datasheet" "~" (at 10 10 0))\n'
+            + f'\t\t(property "Reference" "{ref}" (at {x} {y - 2.54} 0))\n'
+            f'\t\t(property "Value" "{value}" (at {x + 2.54} {y} 0))\n'
+            f'\t\t(property "Footprint" "{footprint}" (at {x} {y} 0) (effects (font (size 1.27 1.27)) (hide yes)))\n'
+            f'\t\t(property "Datasheet" "~" (at {x} {y} 0) (effects (font (size 1.27 1.27)) (hide yes)))\n'
             + extra
             + '\t\t(instances\n\t\t\t(project "SeedBoard"\n'
             f'\t\t\t\t(path "/seed"\n\t\t\t\t\t(reference "{ref}")\n\t\t\t\t\t(unit 1)\n'
@@ -322,7 +355,7 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
         sym("C3", "Device:C", "100n", c_fp, "s-c3", bound="c100n-deleted"),
     ])
     (proj / "SeedBoard.kicad_sch").write_text(
-        "(kicad_sch\n\t(version 20260306)\n" + body + ")\n", encoding="utf-8")
+        "(kicad_sch\n\t(version 20260306)\n" + _LIB_SYMBOLS + body + ")\n", encoding="utf-8")
 
     # The per-user files a real KiCad project accumulates and, crucially, COMMITS: `.kicad_prl` is
     # one person's window layout and `fp-info-cache` is a regenerated machine cache, so both change
@@ -743,7 +776,36 @@ def run(args) -> int:
             )
             console: list[str] = []
             page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
-            page.on("pageerror", lambda e: console.append(str(e)))
+            # WITH the stack. An uncaught "Cannot read properties of undefined" names neither the
+            # file nor the frame, so the message alone cannot start a diagnosis - and the kicanvas
+            # throw sat unread in every Projects shot for exactly that reason.
+            page.on(
+                "pageerror",
+                lambda e: console.append(
+                    f"{e.message}\n      {getattr(e, 'stack', '') or ''}".rstrip()
+                ),
+            )
+            # A failing REQUEST is invisible in the console when the app swallows it (an <img> that
+            # 500s, a fetch inside a try/catch), so the harness watched the page and could not see
+            # the API break underneath it. `GET /api/previews/model/*.glb` 500ed in the live app for
+            # weeks with every shot reported clean.
+            http: dict[str, int] = {}
+
+            def _note_response(r) -> None:
+                if r.status >= 400:
+                    http[f"{r.status} {r.request.method} {_api_path(r.url)}"] = (
+                        http.get(f"{r.status} {r.request.method} {_api_path(r.url)}", 0) + 1
+                    )
+
+            page.on("response", _note_response)
+            def _note_failed(req) -> None:
+                # `requestfailed` hands back a Request, NOT a Response - so `.request` does not
+                # exist on it and reaching for it raised INSIDE the event handler, which surfaced
+                # as an unrelated `Locator.count` failure several calls later.
+                key = f"FAILED {req.method} {_api_path(req.url)}"
+                http[key] = http.get(key, 0) + 1
+
+            page.on("requestfailed", _note_failed)
 
             page.goto(base_url, wait_until="networkidle")
             page.wait_for_timeout(1200)
@@ -761,6 +823,14 @@ def run(args) -> int:
                     print(f"  !! could not reach surface: {surface}")
                     failures.append(surface)
                     continue
+                # Reaching a surface means CLICKING its nav item, which lives in the rail - so the
+                # pointer and the focus ring are both left sitting on the rail afterwards. Parking
+                # used to happen only after a theme switch, so a dark-only run photographed a rail
+                # that no user had touched (`railHovered: true` in the probe of every such shot).
+                parked = _park_pointer_off_rail(page)
+                if parked:
+                    print(f"  !! {parked}")
+                    failures.append(f"{surface}:rail")
                 # ONCE per surface, before the theme loop. Clicking per theme TOGGLED a popover
                 # shut on the second theme, so the dark shot showed it open and the light shot
                 # showed it closed; a comment in this very function claimed the opposite was safer.
@@ -833,6 +903,12 @@ def run(args) -> int:
                 )
             if console:
                 print(f"  console errors ({len(console)}): {console[:4]}")
+            for label, n in sorted(http.items()):
+                # A 5xx is OUR backend breaking and is never acceptable; a 4xx can be legitimate
+                # (asking for a preview a part genuinely has no asset for), so it is reported
+                # without the alarm rather than hidden.
+                mark = "  !! " if label.startswith("5") or label.startswith("FAILED") else "  http "
+                print(f"{mark}{label} x{n}")
             browser.close()
 
     sys.path.insert(0, str(REPO / "app" / "backend"))
