@@ -74,13 +74,91 @@ def _glb_mesh_count(data: bytes) -> int:
     return 0
 
 
-def _step_to_glb(src: Path) -> bytes:
-    """Convert a STEP with cascadio and return its bytes UNTOUCHED.
+# The surface finish a STEP-derived material is given when it states none of its own.
+#
+# STEP carries COLOUR and nothing else - there is no metalness or roughness anywhere in
+# the format - so glTF's own defaults decide, and they are the worst possible pair for a
+# component: `metallicFactor: 1.0`, `roughnessFactor: 1.0`. A fully metallic surface has
+# no diffuse response at all; its reflectance IS its base colour. So the black epoxy an
+# IC package is made of (measured on the owner's TPD6E05U06RVZR: baseColorFactor 0.0097)
+# became a metal that reflects almost nothing, and rendered as a black silhouette with no
+# form - the "model renders pure black" symptom that had been attributed to the ambient
+# occlusion pass for two sessions. Disabling that pass changes the measured body colour by
+# nothing at all (rgb(4,4,4) either way); these two numbers are the whole cause.
+#
+# A DIELECTRIC is the right default because most of a package's visible surface is moulded
+# plastic or ceramic. The leads genuinely are metal and will read as light grey rather than
+# as chrome; that is accepted deliberately, because the only signal available to tell metal
+# from plastic is the colour, and "grey means metal" is a guess that would repaint every
+# grey ceramic body as steel. cascadio names its materials mat_0..mat_n, so there is no
+# material name to read either.
+_STEP_METALLIC = 0.0
+_STEP_ROUGHNESS = 0.45
 
-    Passing the bytes through is the whole point: cascadio writes one material per STEP
+# The GLB JSON chunk's type, as the little-endian u32 the container stores it as.
+_CHUNK_JSON = 0x4E4F534A
+
+
+def _with_gltf_json(data: bytes, gltf: dict) -> bytes:
+    """Re-emit GLB `data` carrying `gltf` as its JSON chunk.
+
+    The container is rebuilt rather than patched in place because the JSON almost always
+    changes LENGTH, and both the chunk header and the file header carry that length. Each
+    chunk is padded to a 4-byte boundary with its own mandated filler (spaces for JSON,
+    zeros for BIN), which is what keeps the BIN chunk's accessor offsets valid. A chunk's
+    stored length already INCLUDES its padding, so the walk needs no extra alignment step;
+    the re-emit is where the padding has to be recomputed."""
+    offset = 12
+    chunks: list[tuple[int, bytes]] = []
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from("<II", data, offset)
+        payload = data[offset + 8 : offset + 8 + length]
+        chunks.append((kind, json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+                       if kind == _CHUNK_JSON else payload))
+        offset += 8 + length
+
+    out = bytearray(b"glTF" + struct.pack("<II", 2, 0))
+    for kind, payload in chunks:
+        pad = -len(payload) % 4
+        filler = b" " if kind == _CHUNK_JSON else b"\x00"
+        out += struct.pack("<II", len(payload) + pad, kind) + payload + filler * pad
+    struct.pack_into("<I", out, 8, len(out))
+    return bytes(out)
+
+
+def _state_surface_finish(data: bytes) -> bytes:
+    """Fill in the metalness/roughness a STEP cannot state (see _STEP_METALLIC).
+
+    Only a property cascadio left UNSET is written, so if a future converter version ever
+    does describe a surface, what it says wins over this default."""
+    offset = 12
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from("<II", data, offset)
+        if kind == _CHUNK_JSON:
+            gltf = json.loads(data[offset + 8 : offset + 8 + length])
+            touched = False
+            for material in gltf.get("materials", []):
+                pbr = material.setdefault("pbrMetallicRoughness", {})
+                if "metallicFactor" not in pbr:
+                    pbr["metallicFactor"] = _STEP_METALLIC
+                    touched = True
+                if "roughnessFactor" not in pbr:
+                    pbr["roughnessFactor"] = _STEP_ROUGHNESS
+                    touched = True
+            return _with_gltf_json(data, gltf) if touched else data
+        offset += 8 + length
+    return data
+
+
+def _step_to_glb(src: Path) -> bytes:
+    """Convert a STEP with cascadio, keeping every byte of its geometry.
+
+    Passing the geometry through is the whole point: cascadio writes one material per STEP
     colour and a NORMAL attribute per primitive, and re-encoding the result through any
     scene model risks losing exactly those (which is what trimesh did). cascadio only
-    writes to a path, so it goes to a temp file that is read back and discarded."""
+    writes to a path, so it goes to a temp file that is read back and discarded. The one
+    edit made on the way out is the surface finish above, which adds two numbers per
+    material to the JSON chunk and touches no buffer."""
     try:
         import cascadio
     except Exception as exc:  # ImportError, or a broken partial install
@@ -103,7 +181,7 @@ def _step_to_glb(src: Path) -> bytes:
         raise ModelConversionError("the 3D exporter did not produce a valid GLB")
     if _glb_mesh_count(data) == 0:
         raise ModelConversionError("the 3D model has no geometry to show")
-    return data
+    return _state_surface_finish(data)
 
 
 def model_to_glb(src: Path) -> bytes:
