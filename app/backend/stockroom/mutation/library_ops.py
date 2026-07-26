@@ -633,12 +633,16 @@ class LibraryOps:
         `allow_tracked=False` refuses to touch a copy git still tracks, exactly as for the `.db` -
         a pre-migration library gets dirtied by nothing until an explicit regenerate migrates it.
         """
-        from stockroom.altium.dblib import emit_dblib, render_dblib
+        from stockroom.altium.dblib import absolute_data_source, emit_dblib, render_dblib
 
         path = db_path.parent / "Stockroom.DbLib"
         if not allow_tracked and path.exists() and self.repo._is_tracked(path):
             return {"path": path, "written": False, "reason": "shared"}
-        wanted = render_dblib("Parts", db_path.name, db_path=str(db_path.resolve()))
+        # The SAME path computation the write uses. This line used to call `.resolve()`
+        # independently, so the "is it current?" comparison and the file it compares against
+        # were two copies of one rule: any divergence rewrites the file on every check or never
+        # rewrites it at all, and neither failure is visible.
+        wanted = render_dblib("Parts", db_path.name, db_path=absolute_data_source(db_path))
         if path.exists() and path.read_text(encoding="utf-8") == wanted:
             return {"path": path, "written": False, "reason": "current"}
         reason = "stale" if path.exists() else "missing"

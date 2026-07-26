@@ -57,7 +57,13 @@ docs/research/
 # outside the repo already; these are belt-and-suspenders for any in-repo fallback path)
 /.stockroom-stm-index/
 *.stm-index.sqlite
-# Derived Altium data sources (regenerated from the JSON records; the .DbLib IS committed).
+# Derived Altium data sources, regenerated from the JSON records. NEITHER is committed.
+# The .DbLib was committed until 2026-07-26, on the premise that it is portable. It is not: its
+# ConnectionString names the SQLite file by an ABSOLUTE path (the SQLite ODBC driver resolves a
+# relative one against the process working directory, which is never the library folder, so Altium
+# answers it with "Connection Failed"). A committed copy is therefore one machine's file, and the
+# one in this repo had gone stale in exactly that way: it still carried the broken relative form
+# AND no key field, so a fresh clone got a library that connects to nothing and indexes nothing.
 # The .db was committed until 2026-07-25 so a fresh clone was placeable with no regenerate step.
 # That traded one benefit for a worse problem: SQLite stamps its own library version into the file
 # header, so two peers on different SQLite builds emit different bytes for identical content, and
@@ -66,6 +72,7 @@ docs/research/
 # every profile switch, which keeps a fresh clone placeable without sharing the file.
 libraries/*/altium/*.xlsx
 libraries/*/altium/stockroom-parts.db
+libraries/*/altium/*.DbLib
 
 # Agent tooling: installed skills + SuperDesign workspace (never committed)
 .agents/

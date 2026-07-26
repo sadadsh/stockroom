@@ -108,3 +108,51 @@ def test_emit_writes_the_absolute_path_of_the_db_beside_it(tmp_path):
     emit_dblib("Parts", db.name, out, db_path=db)
     text = out.read_text(encoding="utf-8")
     assert f"Database={db}" in text
+
+
+# -- the key field: what makes Altium INDEX the table rather than merely connect to it ----
+
+
+def test_exactly_one_column_is_the_key_field_and_it_is_the_MPN():
+    """`FieldType=0` marks a table's KEY field; every other column is `FieldType=1`.
+
+    MEASURED 2026-07-26 in real AD26 on the owner's library, through
+    `IDatabaseLibDocument`: with every column emitted as FieldType=1, Altium reported
+    `GetKeyFieldCount=0` and `GetAllComponentKeys` returned ZERO components, so nothing could be
+    browsed or placed even though the connection was green and the field grid populated. That is
+    the second time this library looked healthy while being unusable: connecting is not indexing.
+
+    Confirmed against an Altium-authored library in the wild (Wurth Elektronik's official
+    Altium-Library, `WE - Active Components.DbLib`): exactly one FieldType=0 per table, and it is
+    the Manufacturer Part Number.
+    """
+    text = render_dblib("Parts", "stockroom-parts.db", db_path=_ABS)
+    keys = [ln for ln in text.splitlines() if "FieldType=0" in ln]
+    assert len(keys) == 1, f"a table needs exactly one key field, found {len(keys)}"
+    assert "FieldNameOnly=MPN|" in keys[0]
+    # And nothing else may claim to be one.
+    assert text.count("FieldType=1") == len(FIELD_MAP) - 1
+
+
+def test_a_path_that_cannot_be_made_absolute_here_is_REFUSED_not_silently_mangled():
+    """`emit_dblib` used to call `Path(db_path).resolve()`, which on a non-Windows host prepends
+    the CURRENT WORKING DIRECTORY to a Windows path.
+
+    This is not hypothetical: on 2026-07-26 it silently rewrote the owner's real library with
+    `Database=/home/sadad/git/stockroom/C:\\stockroom-fresh-device\\...`, which parses, looks
+    plausible, and fails at connect time with the exact error the absolute-path fix existed to
+    remove. A machine-specific artifact must refuse a path it cannot spell rather than emit a
+    broken one, because the breakage surfaces far from its cause.
+    """
+    import pytest
+
+    with pytest.raises(ValueError, match="absolute"):
+        emit_dblib("Parts", "stockroom-parts.db", "/tmp/x.DbLib", db_path="stockroom-parts.db")
+
+
+def test_an_already_absolute_windows_path_survives_verbatim(tmp_path):
+    """The complement, so the guard cannot be satisfied by refusing everything: a Windows-absolute
+    path must reach the connection string byte-identical, on any host."""
+    out = tmp_path / "Stockroom.DbLib"
+    emit_dblib("Parts", "stockroom-parts.db", out, db_path="C:\\lib\\Stockroom\\stockroom-parts.db")
+    assert "Database=C:\\lib\\Stockroom\\stockroom-parts.db;" in out.read_text(encoding="utf-8")
