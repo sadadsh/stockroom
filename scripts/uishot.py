@@ -49,8 +49,18 @@ PROBE_JS = """() => {
     const el = document.querySelector(sel);
     return el ? getComputedStyle(el)[prop] : null;
   };
+  // The RESOLVED size of real text, not the declared token. A custom property holding a calc()
+  // reports its declared text verbatim, so `--fs-base: calc(12px * clamp(...))` looked identical at
+  // every window width and proved nothing about whether the responsive scale actually responds.
+  // This reads the computed font-size off elements that USE the scale.
+  const fs = {
+    base: pick('.text-base', 'fontSize') || pick('body', 'fontSize'),
+    xs: pick('.text-xs', 'fontSize'),
+    title: pick('.text-title', 'fontSize'),
+  };
   return {
     vars,
+    fs,
     bandBg: pick('.bg-band', 'backgroundColor'),
     controlRadius: pick('.rounded-control', 'borderRadius'),
     docScrollW: document.documentElement.scrollWidth,

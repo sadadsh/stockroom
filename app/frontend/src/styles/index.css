@@ -133,13 +133,44 @@
        bundled with each step in tailwind.config.js, and the body sets the 13px root.
        Hierarchy here is the whole point -- 2xs is the eyebrow/microcopy tier and title
        the page headline, so these must stay distinct steps rather than collapse. */
-    --fs-2xs: 10px;
-    --fs-xs: 11px;
-    --fs-sm: 11.5px;
-    --fs-base: 12px;
-    --fs-lg: 13.5px;
-    --fs-xl: 15px;
-    --fs-title: 18px;
+    /* THE WHOLE SCALE FOLLOWS THE WINDOW (owner, 2026-07-26: "i want to avoid text wrapping as
+       much as i can in any of our content, resize text based on windows size so everything fits
+       without wrapping").
+
+       ONE multiplier, applied to every step, so the hierarchy above is preserved exactly - the
+       steps shrink together rather than converging, which is what would happen if each were
+       clamped independently. Tokens only, no JavaScript: CSS cannot measure overflow, but it can
+       be told how much room there is, and the window IS the input the owner named.
+
+       0.90 at 1024px up to 1.00 at 1600px, then flat. Deliberately a narrow range: this buys back
+       roughly a character per ten at the small end, which is the difference between a spec value
+       fitting its column and wrapping, without making the app illegible on a small screen.
+
+       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort,
+       because a value cut to "100 ..." has lost the data - that is why wrapping was chosen in the
+       first place, and this reduces how often it is reached rather than replacing it with
+       truncation. */
+    /* ONE ratio per step, expressed as a clamp on the SIZE ITSELF.
+
+       A shared unitless multiplier is the obvious shape and is INVALID CSS: `calc(0.9 + (100vw -
+       1024px) / 5760)` adds a number to a length, so the declaration is dropped, every --fs-* that
+       referenced it became invalid, and all text silently fell back to the 13px root. Caught by
+       adding a COMPUTED font-size readout to the shot probe - the declared token reports its calc()
+       text verbatim, so it looked identical at every width and proved nothing.
+
+       Each step therefore carries its own clamp: 0.90x at 1024px, rising to 1.00x at 1600px, flat
+       above. They share one ratio, so the hierarchy is preserved rather than converging.
+
+       It SHRINKS, it never CLIPS. `break-words` stays on the value rows as the last resort, since a
+       value cut to "100 ..." has lost the data - this reduces how often wrapping is reached rather
+       than replacing it with truncation. */
+    --fs-2xs: clamp(9.0px, calc(9.0px + (100vw - 1024px) * 0.001736), 10px);
+    --fs-xs: clamp(9.9px, calc(9.9px + (100vw - 1024px) * 0.00191), 11px);
+    --fs-sm: clamp(10.35px, calc(10.35px + (100vw - 1024px) * 0.001997), 11.5px);
+    --fs-base: clamp(10.8px, calc(10.8px + (100vw - 1024px) * 0.002083), 12px);
+    --fs-lg: clamp(12.15px, calc(12.15px + (100vw - 1024px) * 0.002344), 13.5px);
+    --fs-xl: clamp(13.5px, calc(13.5px + (100vw - 1024px) * 0.002604), 15px);
+    --fs-title: clamp(16.2px, calc(16.2px + (100vw - 1024px) * 0.003125), 18px);
   }
 
   :root[data-theme="light"] {
