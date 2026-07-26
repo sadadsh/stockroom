@@ -67,6 +67,11 @@ export function Glb3DView({
   const [view, setView] = useState<ViewMode | null>(null);
   const [showLand, setShowLand] = useState(false);
   const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
+  // The idle spin. Owner 2026-07-26 asked for "an option to stop rotation" - and the same switch closes
+  // a logged accessibility defect, since the perpetual rotation ignored prefers-reduced-motion while
+  // the 300ms view tween honoured it. `setSpin` returns the state actually in force, which is false
+  // under reduced motion whatever is asked, so the chip can never claim to be spinning when it is not.
+  const [spinning, setSpinning] = useState(true);
   const [showModel, setShowModel] = useState(true);
   const [showBoard, setShowBoard] = useState(false);
 
@@ -136,7 +141,11 @@ export function Glb3DView({
         // click. The controls have to opt back in, or they render perfectly and do nothing.
         // They did exactly that when they moved from floating chips (which each carried this) into
         // this bar - every screenshot looked right and not one control could be clicked.
-        className="pointer-events-auto flex flex-none flex-wrap items-center justify-start gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
+        // justify-BETWEEN, not start. Owner 2026-07-26: "the settings should look clean, the buttons
+        // are all just pushed to one corner" - which was literally the CSS: every cluster crammed left
+        // with the rest of the bar empty. Now the layer + shading clusters hold the left and the view
+        // cluster holds the right, so the bar reads as two ends rather than one heap.
+        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
       >
       {/* flex-wrap + min-w-0: this inner group holds the layer chips AND the shading chips, and
           without wrapping it forced both onto ONE line - measured 262px of content inside a 226px
@@ -188,7 +197,8 @@ export function Glb3DView({
         {showShading ? (
         <div
           data-dev-id="detail.model-shading"
-          className="flex items-center gap-0.5"
+          // a hairline separates the two clusters; without it nine chips read as one undifferentiated run
+          className="flex items-center gap-0.5 border-l border-line pl-2"
         >
           {SHADING.map((r) => (
             <LayerToggle
@@ -207,13 +217,27 @@ export function Glb3DView({
         ) : null}
       </div>
       {showViews ? (
-        <ViewControls
-          active={view}
-          onPick={(mode) => {
-            setView(mode);
-            sceneRef.current?.setView(mode);
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <LayerToggle
+            devId="detail.model-spin"
+            label="Spin"
+            on={spinning}
+            hint="Stop or resume the idle rotation"
+            onToggle={() => {
+              const next = !spinning;
+              // trust the SCENE's answer, not the request: under prefers-reduced-motion it stays off
+              const inForce = sceneRef.current?.setSpin(next) ?? next;
+              setSpinning(inForce);
+            }}
+          />
+          <ViewControls
+            active={view}
+            onPick={(mode) => {
+              setView(mode);
+              sceneRef.current?.setView(mode);
+            }}
+          />
+        </div>
       ) : null}
       </div>
     </div>

@@ -117,6 +117,18 @@ export interface ModelSceneHandle {
   /** Move to a canonical view. Stops the idle spin, because a chosen view that then rotates away
    *  from itself is worse than no control at all. */
   setView: (mode: ViewMode) => void;
+  /** Turn the idle spin on or off; returns the state actually in force (always false under
+   *  prefers-reduced-motion, whatever was asked for). */
+  setSpin: (wanted: boolean) => boolean;
+}
+
+/** The OS-level reduced-motion preference. Read at the moment it matters rather than cached, so a
+ *  person who changes it does not have to reopen the viewer. */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  );
 }
 
 /** A pad as real extruded geometry: rounded corners for a roundrect/oval, square for a rect, and
@@ -244,7 +256,11 @@ export function mountModelScene(
     next.dampingFactor = 0.08;
     // Gently auto-spin like SnapEDA's viewer; the per-frame controls.update() in the
     // render loop advances it. Dragging still works and simply overrides the spin.
-    next.autoRotate = true;
+    // Gated on BOTH the user's own preference and the OS one. The 300ms view tween below already
+    // honoured prefers-reduced-motion while this PERPETUAL rotation ignored it - exactly the wrong way
+    // round, since a continuous spin is what that media query exists to stop (vestibular safety). The
+    // owner separately asked for "an option to stop rotation", and one switch serves both.
+    next.autoRotate = spinWanted && !prefersReducedMotion();
     next.autoRotateSpeed = 1.6;
     return next;
   }
@@ -278,6 +294,13 @@ export function mountModelScene(
   // The Y of the model's underside, captured when it is framed, so the land pattern lands exactly
   // under the body rather than at an arbitrary y=0.
   let modelBaseY = 0;
+  // Whether the idle spin is WANTED. Separate from `controls.autoRotate`, which is also turned off by
+  // the fixed views: a "top" view that rotates away from top is not a top view, so the two reasons to
+  // stop spinning must not overwrite each other.
+  let spinWanted = true;
+  // The view currently in force. `setView` knew it only as an argument, but the spin switch has to
+  // know whether spinning is even legal right now (only the free iso view may spin).
+  let viewMode: ViewMode = "iso";
   let modelSize: THREE.Vector3 | null = null;
   // The land pattern most recently handed in, kept so it can be REBUILT once the model's bounds are
   // known. `Glb3DView` calls setLandPattern synchronously right after mountModelScene returns, but
@@ -683,10 +706,12 @@ export function mountModelScene(
    *  snaps - reduced motion means less movement, not a missing feature. */
   function setView(mode: ViewMode) {
     if (!fitDistance) return;
+    viewMode = mode;
     // 3D IS the spinning view - it is the free orbit, and stopping the spin when the user asks for
     // it made the control look broken. The FIXED views (top/front) are the ones that must hold
     // still, because a "top" view that rotates away from top is not a top view.
-    controls.autoRotate = mode === "iso";
+    // iso is the free orbit and the only view that may spin - but only if the user still wants it.
+    controls.autoRotate = mode === "iso" && spinWanted && !prefersReducedMotion();
     // Swap the projection with the view. OrbitControls binds a camera at construction, so its
     // `object` has to be reassigned too, or the user would orbit the camera that is not rendering.
     activeCamera = mode === "top" ? orthoCamera : camera;
@@ -895,7 +920,10 @@ export function mountModelScene(
     // SILKSCREEN + COURTYARD. Pads alone are not the land pattern: the silk outline and the pin-1
     // marker are how a person recognises the part, and the courtyard is the keep-out it gets
     // checked against. Drawn a hair above the mask so they are not z-fighting with it.
-    const silkY = 0.012;
+    // Ink thickness. Silk is ~10-15um of cured epoxy, so it stands very slightly off the mask - enough
+    // that it is not co-planar (which z-fights) and enough for the key light to find its edge now that
+    // the material is lit rather than flat.
+    const silkY = 0.014;
     for (const g of land.graphics ?? []) {
       // DOCUMENTATION layers never exist on a physical board, so they have no place in a physical
       // render. F.Fab was already excluded on exactly that reasoning; the COURTYARD is the same kind
@@ -912,10 +940,21 @@ export function mountModelScene(
       // boardPlane.silkQuad for the geometry and for why LineSegments2 was rejected.
       const q = silkQuad(g.start, g.end, g.width);
       if (!q) continue;
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0xf2f4f7,
-        transparent: true,
-        opacity: 0.95,
+      const mat = new THREE.MeshPhysicalMaterial({
+        // Silkscreen is MATTE EPOXY INK, not paint on a screen. This was MeshBasicMaterial, which is
+        // UNLIT by definition: it ignored the key light, the environment and every shadow, so it stayed
+        // the same flat grey whatever the board did and read as a sticker laid over a lit render. The
+        // owner's "the silkscreen needs to look realistic" is mostly this one material class.
+        //
+        // Real silk is slightly off-white (never paper white), rough enough to kill any mirror
+        // reflection, and dielectric. A trace of clearcoat is what makes it read as CURED ink sitting
+        // on the mask rather than as bare pigment.
+        color: 0xe8e9e6,
+        roughness: 0.82,
+        metalness: 0.0,
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.6,
+        envMapIntensity: 0.5,
         // ink lies ON the mask; without this the underside vanishes when the board is seen from below
         side: THREE.DoubleSide,
       });
@@ -926,6 +965,8 @@ export function mountModelScene(
       const mesh = new THREE.Mesh(geo, mat);
       mesh.rotation.y = q.angleY;
       mesh.position.set(q.cx * MM_TO_SCENE, silkY, q.cz * MM_TO_SCENE);
+      // lit ink takes the board's shadow like anything else on the surface
+      mesh.receiveShadow = true;
       group.add(mesh);
     }
 
@@ -1005,6 +1046,14 @@ export function mountModelScene(
       disposeScene();
     },
     setView,
+    /** Turn the idle spin on or off. Returns the state actually in force, which is false whenever the
+     *  OS asks for reduced motion no matter what was requested. */
+    setSpin: (wanted: boolean) => {
+      spinWanted = wanted;
+      const on = wanted && !prefersReducedMotion();
+      controls.autoRotate = on && viewMode === "iso";
+      return on;
+    },
     setLandPattern,
     setRenderMode: applyRenderMode,
     setLayers,

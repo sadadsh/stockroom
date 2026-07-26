@@ -16,7 +16,7 @@ import { CaptureProvider } from "./lib/capture";
 // carries identity + prose; JetBrains Mono is the machine-data readout face (MPN,
 // specs, stock, prices, pins) so every value aligns on tabular figures.
 import "@fontsource-variable/work-sans";
-import "@fontsource-variable/jetbrains-mono";
+import "@fontsource-variable/geist-mono";
 import "./styles/index.css";
 
 // One shared client. Reads are cheap (served from the warm index) so a short

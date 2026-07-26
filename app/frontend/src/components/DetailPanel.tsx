@@ -659,6 +659,12 @@ export function DetailPanel({
                       isError={modelGlb.isError}
                       error={modelGlb.error}
                       land={landPattern.data ?? null}
+                      // THE MINI TILE GETS EVERYTHING (owner 2026-07-26: "the mini 3d window should
+                      // also be interactable with with all the same settings"). These two default to
+                      // false and only the modal passed them, so the tile had the layer chips and
+                      // nothing else - no views, no shading, no spin control.
+                      showViews
+                      showShading
                     />
                   </div>
                 ) : undefined
