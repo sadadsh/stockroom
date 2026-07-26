@@ -1549,6 +1549,10 @@ function SpecificationsSection({
   alternates: Record<string, SourcedAlternate[]>;
   onUseSpecValue?: (key: string, value: string, source: string) => void;
 }) {
+  // Only the groups the user has EXPLICITLY toggled live here; everything else falls back to the
+  // index-based default below. Storing the default in state instead would make it a snapshot that
+  // goes stale the moment a different part arrives with different groups.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   if (groups.length === 0) {
     return (
       <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
@@ -1559,31 +1563,108 @@ function SpecificationsSection({
   // never grows.
   return (
     <div data-dev-id="detail.specs" className="flex flex-col gap-3.5">
-      {groups.map((group) => (
+      {groups.map((group, index) => (
         // px-1.5 ABSORBS THE ROW HOVER BLEED, and belongs on the row's DIRECT container. Each spec
         // row is `-mx-1.5 px-1.5` so its hover highlight extends past the text column; with no
         // padding to land in, that bleed pushed 6px outside (measured: clientWidth 486, scrollWidth
         // 492) and put a horizontal scrollbar under a column with nothing to scroll to.
-        <section key={group.title} data-dev-id="detail.spec-group" className="px-1.5">
-          {/* Altium property-grid feel: clean rows with no per-row hairline (that ledger look is
-              gone) - separation is spacing plus a live row hover, and the value reads in the mono
-              data face.
-              The group name is TYPE ONLY, matching every other eyebrow in the panel. It used to be a
-              filled sticky bar with a bottom border while its siblings (VOLUME PRICING, LINKS) were
-              bare, which is the box the owner asked to remove (punch 14). The fill existed only to
-              stop rows showing through while it was sticky, so the fill and the stickiness went
-              together: nothing here scrolls far enough for a pinned group label to earn a box. */}
-          <Eyebrow dense className="mb-1">
-            {group.title}
-          </Eyebrow>
+        // Altium property-grid feel: clean rows with no per-row hairline (that ledger look is
+        // gone) - separation is spacing plus a live row hover, and the value reads in the mono
+        // data face. The group name stays TYPE ONLY, matching every other eyebrow in the panel;
+        // punch 14 removed the box behind it and nothing here re-adds one.
+        //
+        // The FIRST group is open and the rest are closed. It is the group that identifies the part
+        // (Electrical for a diode, and whatever `groupSpecs` ranks first otherwise), so the column
+        // opens on the specs someone came to read and holds the rest one click away rather than
+        // throwing all 21 rows at them. An explicit toggle always wins over that default.
+        <SpecSection
+          key={group.title}
+          title={group.title}
+          count={group.rows.length}
+          open={openGroups[group.title] ?? defaultOpen(group, index)}
+          onToggle={() =>
+            setOpenGroups((prev) => ({
+              ...prev,
+              [group.title]: !(prev[group.title] ?? defaultOpen(group, index)),
+            }))
+          }
+        >
           <SpecRowList
             rows={group.rows}
             alternates={alternates}
             onUseSpecValue={onUseSpecValue}
           />
-        </section>
+        </SpecSection>
       ))}
     </div>
+  );
+}
+
+/**
+ * Which spec groups start open.
+ *
+ * The FIRST group, because it is the one that identifies the part (Electrical for a diode, and
+ * whatever `groupSpecs` ranks first otherwise) - the column should open on what someone came to
+ * read. And any group small enough that collapsing it saves nothing: a disclosure holding one row
+ * costs a header, a caret and a click to reveal a single value, which is more chrome than the value
+ * it is hiding. `OTHER 1` was exactly that.
+ */
+function defaultOpen(group: SpecGroup, index: number): boolean {
+  return index === 0 || group.rows.length <= 2;
+}
+
+/**
+ * A DENSE collapsible section, for the reference columns.
+ *
+ * Owner, 2026-07-25: *"some specs and sourcing is just data vomit not organized cleanly or doesnt
+ * have things hidden behind buttons. its so much thrown in your face."* Measured on their part: 21
+ * spec rows across 5 groups plus a 10-row trade block plus a 6-tier ladder, every one of them
+ * expanded at once, with no affordance anywhere to put any of it away.
+ *
+ * NOT `SettingsDisclosure`, deliberately: that one is a 44px row that wraps its content in a `Card`,
+ * which is the right weight for a settings page and roughly four times the weight of a spec row. The
+ * contract here is the panel's existing eyebrow rhythm, so this borrows that component's ANATOMY
+ * (caret, title, right-aligned summary, aria-expanded) at the density this column already uses.
+ *
+ * The count lives in the header because a closed section must still say how much it is holding -
+ * a disclosure that hides an unknown quantity just moves the problem.
+ */
+function SpecSection({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section data-dev-id="detail.spec-group" className="px-1.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        data-dev-id="detail.spec-group-toggle"
+        className="-mx-1.5 mb-1 flex w-full items-center gap-1.5 rounded-control px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+      >
+        <Icon
+          id="detail.chevron-right"
+          className={
+            "h-3 w-3 flex-none text-t3 transition-transform duration-150 " +
+            (open ? "rotate-90" : "")
+          }
+        />
+        <span className={`min-w-0 truncate ${EYEBROW_DENSE}`}>{title}</span>
+        {/* The count is the whole point of a closed section, so it is always present rather than
+            only while closed - a number that appears and disappears reads as a state change. */}
+        <span className="ml-auto flex-none text-2xs tabular-nums text-t3">{count}</span>
+      </button>
+      {open ? children : null}
+    </section>
   );
 }
 
@@ -1661,22 +1742,80 @@ function TradeCompliance({
   alternates: Record<string, SourcedAlternate[]>;
   onUseSpecValue?: (key: string, value: string, source: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
     // px-1.5 for the same reason as the specs column: these are SpecRows, and their -mx-1.5 hover
     // bleed needs padding to land in or it overflows the block (measured 527 vs 533).
-    <section data-dev-id="detail.trade" className="mt-5 border-t border-line px-1.5 pt-3.5">
-      <div className={`mb-0.5 ${EYEBROW_DENSE}`}>
-        Trade And Compliance
-      </div>
-      {/* Says WHOSE facts these are. Sitting directly under the last distributor's price ladder,
-          the block read as that distributor's tariff rather than the part's own classification. */}
-      <p className="mb-2 text-2xs text-t3">Part-level, from the distributor pages.</p>
-      <SpecRowList
-        rows={group.rows}
-        alternates={alternates}
-        onUseSpecValue={onUseSpecValue}
-      />
+    // CLOSED by default. Ten rows of classification, country of origin and order minima are
+    // reference material you look up perhaps twice in a part's life, and they were being given the
+    // same standing as the price - which is the whole of the owner's "data vomit" reading of this
+    // column. The header still states the count, so nothing is hidden without saying how much.
+    <section data-dev-id="detail.trade" className="mt-5 border-t border-line pt-3.5">
+      <SpecSection
+        title="Trade And Compliance"
+        count={group.rows.length}
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
+      >
+        {/* Says WHOSE facts these are. Sitting directly under the last distributor's price ladder,
+            the block read as that distributor's tariff rather than the part's own classification. */}
+        <p className="mb-2 text-2xs text-t3">Part-level, from the distributor pages.</p>
+        <SpecRowList
+          rows={group.rows}
+          alternates={alternates}
+          onUseSpecValue={onUseSpecValue}
+        />
+      </SpecSection>
     </section>
+  );
+}
+
+/**
+ * One distributor's price ladder, CLOSED by default.
+ *
+ * The unit price and the stock count stay on the vendor's own line, always visible, because that
+ * is what the Sourcing column exists to answer. The ladder is the follow-up question - what does it
+ * cost at quantity - and printing six tiers per distributor under every part is most of why this
+ * column read as a wall. Closed it costs one line and states how many tiers it holds.
+ */
+function VendorLadder({
+  tiers,
+  currency,
+}: {
+  tiers: { qty: number; price: number }[];
+  // The record's own field is optional, and `formatPrice` already treats an empty currency as USD,
+  // so the default is stated here rather than widening that function's contract.
+  currency?: string;
+}) {
+  const money = (value: number) => formatPrice(value, currency ?? "");
+  const [open, setOpen] = useState(false);
+  return (
+    <SpecSection
+      title="Volume Pricing"
+      count={tiers.length}
+      open={open}
+      onToggle={() => setOpen((o) => !o)}
+    >
+      {/* The qty-1 unit price is already the headline beside the stock, so the ladder normally
+          starts at the first bulk tier (10+, 100+, ...). It reads from 1+ instead whenever that is
+          what keeps the count EVEN, because this is a two-column flow and an odd count leaves a
+          hole in the bottom-right cell (punch 5). Parity is reached by showing MORE, never by
+          hiding a price. */}
+      <div
+        className="grid grid-flow-col gap-x-10"
+        style={{ gridTemplateRows: `repeat(${tiers.length / 2}, auto)` }}
+      >
+        {tiers.map((b) => (
+          <div
+            key={b.qty}
+            className="tnum flex items-baseline justify-between py-[3.5px] font-mono text-xs"
+          >
+            <span className="text-t3">{b.qty}+</span>
+            <span className="font-semibold text-t1">{money(b.price)}</span>
+          </div>
+        ))}
+      </div>
+    </SpecSection>
   );
 }
 
@@ -1776,30 +1915,7 @@ function Sourcing({
             ) : null}
             {tiers.length > 0 ? (
               <div className="mt-3">
-                <div className={`mb-2 ${EYEBROW_DENSE}`}>
-                  Volume Pricing
-                </div>
-                {/* The qty-1 unit price is already the headline beside the stock, so the ladder
-                    normally starts at the first bulk tier (10+, 100+, ...). It reads from 1+
-                    instead whenever that is what keeps the count EVEN, because this is a
-                    two-column flow and an odd count leaves a hole in the bottom-right cell
-                    (punch 5). Parity is reached by showing MORE, never by hiding a price. */}
-                <div
-                  className="grid grid-flow-col gap-x-10"
-                  style={{ gridTemplateRows: `repeat(${tiers.length / 2}, auto)` }}
-                >
-                  {tiers.map((b) => (
-                    <div
-                      key={b.qty}
-                      className="tnum flex items-baseline justify-between py-[3.5px] font-mono text-xs"
-                    >
-                      <span className="text-t3">{b.qty}+</span>
-                      <span className="font-semibold text-t1">
-                        {formatPrice(b.price, p.currency)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <VendorLadder tiers={tiers} currency={p.currency} />
               </div>
             ) : null}
           </div>

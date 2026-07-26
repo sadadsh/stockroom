@@ -15,6 +15,7 @@ export function ModelViewer({ partId }: { partId: string }) {
   return (
     <Glb3DView
       showViews
+      showShading
       data={query.data as ArrayBuffer | undefined}
       isLoading={query.isLoading}
       isError={query.isError}

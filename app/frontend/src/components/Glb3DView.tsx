@@ -25,6 +25,7 @@ export function Glb3DView({
   error,
   land,
   showViews = false,
+  showShading = false,
 }: {
   data: ArrayBuffer | undefined;
   isLoading: boolean;
@@ -43,6 +44,18 @@ export function Glb3DView({
    * keeps the layer and shading toggles. No feature is lost; it moves to where it is usable.
    */
   showViews?: boolean;
+  /**
+   * Whether the SHADING controls (Realistic / Studio / X-Ray) appear here.
+   *
+   * Off for the inline detail tile for the same reason the views are, and by the owner's reading of
+   * the result: *"the new ui u developed looks so uneven in some parts, like the buttons in 3d model
+   * viewer"*. Measured, the tile carried THREE stacked strips under its render - layer chips,
+   * shading chips, then the tile's own label bar - while the Symbol and Footprint tiles beside it
+   * carried one. Shading is a viewing PREFERENCE, not a per-part action: nobody sets it to answer a
+   * question about this diode. It belongs on the big stage next to the views, and the tile is left
+   * with the one group that is genuinely per-part, the layers.
+   */
+  showShading?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState(false);
@@ -172,6 +185,7 @@ export function Glb3DView({
             </>
           ) : null}
         </div>
+        {showShading ? (
         <div
           data-dev-id="detail.model-shading"
           className="flex items-center gap-0.5"
@@ -190,6 +204,7 @@ export function Glb3DView({
             />
           ))}
         </div>
+        ) : null}
       </div>
       {showViews ? (
         <ViewControls

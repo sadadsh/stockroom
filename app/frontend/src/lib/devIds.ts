@@ -98,6 +98,11 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "detail.tab-history", label: "History tab", area: "detail" },
   { id: "detail.specs", label: "Specifications sheet", area: "detail" },
   { id: "detail.spec-group", label: "Spec group block", area: "detail" },
+  {
+    id: "detail.spec-group-toggle",
+    label: "Spec group disclosure",
+    area: "detail",
+  },
   { id: "detail.spec-list", label: "Multi-option spec value", area: "detail" },
   { id: "detail.spec-family", label: "Repeated spec family row", area: "detail" },
   { id: "detail.alternates", label: "Other sources for a value", area: "detail" },

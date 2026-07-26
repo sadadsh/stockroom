@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { api } from "../api/client";
@@ -174,12 +174,18 @@ describe("DetailPanel files previews (M6d)", () => {
     expect(screen.queryByText("Device:R")).not.toBeInTheDocument();
   });
 
-  it("renders every spec at once (no collapse) (B2)", () => {
+  it("never truncates or caps the rows inside a spec group (B2)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
     wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
-    // the spec sheet is never collapsed: every spec shows at once, shallow AND deep (the
-    // attributes band shows a capped highlight glance, but the spec sheet does not collapse).
+    // B2 originally read "renders every spec at once (no collapse)". NARROWED 2026-07-25, and the
+    // narrowing is deliberate rather than incidental: the owner asked for the opposite of "no
+    // collapse" - *"doesnt have things hidden behind buttons. its so much thrown in your face"* -
+    // so groups past the first are now closed by default and each states its row count.
+    //
+    // What B2 was really protecting still holds and is what this asserts: an OPEN group shows ALL
+    // of its rows, however many there are. No "+12 more", no cap, no scroll-to-reveal. A part with
+    // fifteen specs in one group shows fifteen.
     expect(screen.getByText("Spec 0")).toBeInTheDocument();
     expect(screen.getByText("Spec 7")).toBeInTheDocument();
     expect(screen.getByText("Spec 14")).toBeInTheDocument();
@@ -497,8 +503,12 @@ describe("DetailPanel spec sheet + identity", () => {
     for (const label of ["Country of Origin", "Malaysia", "Reel", "US Tariff"]) {
       expect(sheet.textContent).not.toContain(label);
     }
-    // ...and they are NOT lost: the same values are in the trade block
+    // ...and they are NOT lost: the same values are in the trade block, one click away. The block
+    // is CLOSED by default (2026-07-25, the owner's "data vomit" pass), so opening it is part of
+    // the assertion now - which also proves the disclosure actually reveals what its count claims.
     const trade = document.querySelector('[data-dev-id="detail.trade"]')!;
+    expect(trade.textContent).toContain("3"); // the header states how much it is holding
+    fireEvent.click(trade.querySelector("button")!);
     expect(trade.textContent).toContain("Country of Origin");
     expect(trade.textContent).toContain("Malaysia");
     expect(trade.textContent).toContain("US Tariff");
