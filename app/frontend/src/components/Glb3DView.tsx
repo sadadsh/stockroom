@@ -107,7 +107,12 @@ export function Glb3DView({
       <div ref={mountRef} className="min-h-0 w-full flex-1" data-testid="model-canvas" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex flex-none flex-wrap items-center justify-start gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
+        // pointer-events-auto is LOAD-BEARING: the detail panel wraps this whole view in a
+        // `pointer-events-none` box so the render never swallows the tile's own open-preview
+        // click. The controls have to opt back in, or they render perfectly and do nothing.
+        // They did exactly that when they moved from floating chips (which each carried this) into
+        // this bar - every screenshot looked right and not one control could be clicked.
+        className="pointer-events-auto flex flex-none flex-wrap items-center justify-start gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
       >
       <div data-dev-id="detail.model-layers" className="flex items-center gap-2">
         <div className="flex items-center gap-0.5">

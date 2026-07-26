@@ -180,3 +180,45 @@ export function halfExtents(boxes: Box[]): [number, number, number] | null {
   if (!lo.every(Number.isFinite) || !hi.every(Number.isFinite)) return null;
   return [(hi[0] - lo[0]) / 2, (hi[1] - lo[1]) / 2, (hi[2] - lo[2]) / 2];
 }
+
+/**
+ * The half-HEIGHT an orthographic frustum needs to contain the box from a given direction.
+ *
+ * A technical top view wants an ORTHOGRAPHIC camera. Under perspective, a "top" view still shows
+ * the sides of a package - the further a face is from the optical axis the more of its side you
+ * see - so a pad and the body above it do not line up, which is the one thing a top view exists to
+ * check. Orthographic projection has no vanishing point, so a footprint reads as its true outline.
+ *
+ * There is no distance term here: an orthographic frustum's size is the projection, so moving the
+ * camera along the view axis changes nothing. That is also why this cannot reuse `fitDistanceForBox`
+ * - that function solves for a DISTANCE, which is meaningless here.
+ *
+ * Returns the half-height; the caller derives half-width as `halfHeight * aspect`.
+ */
+export function fitOrthoHalfHeight(
+  half: [number, number, number],
+  dir: [number, number, number],
+  aspect: number,
+  pad = FIT_MARGIN,
+): number {
+  const [hx, hy, hz] = half.map(Math.abs) as [number, number, number];
+  const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+  const d: [number, number, number] = [dir[0] / len, dir[1] / len, dir[2] / len];
+  const horiz = Math.hypot(d[0], d[2]);
+  const right: [number, number, number] =
+    horiz < 1e-6 ? [1, 0, 0] : [d[2] / horiz, 0, -d[0] / horiz];
+  const up: [number, number, number] = [
+    d[1] * right[2] - d[2] * right[1],
+    d[2] * right[0] - d[0] * right[2],
+    d[0] * right[1] - d[1] * right[0],
+  ];
+  // The largest projection of the box onto each screen axis: every corner's contribution is the
+  // sum of |extent * axis component|, which is exact for an axis-aligned box under any direction.
+  const extentAlong = (axis: [number, number, number]) =>
+    hx * Math.abs(axis[0]) + hy * Math.abs(axis[1]) + hz * Math.abs(axis[2]);
+  const a = aspect > 0 ? aspect : 1;
+  const vertical = extentAlong(up);
+  const horizontal = extentAlong(right);
+  // whichever axis binds: a wide subject in a narrow frame is width-limited
+  return Math.max(Math.max(vertical, horizontal / a) * pad, 1e-4);
+}

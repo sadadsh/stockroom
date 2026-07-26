@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitDistanceForBox, halfExtents, fitDistance, visibleBounds } from "./cameraFit";
+import { fitOrthoHalfHeight, fitDistanceForBox, halfExtents, fitDistance, visibleBounds } from "./cameraFit";
 
 /**
  * The 3D viewer framed itself from the MODEL's bounds alone, captured once at load. The board and
@@ -201,5 +201,43 @@ describe("fitDistanceForBox", () => {
     // x spans -3..1 => half 2; y spans -1..1 => half 1; z spans -2..2 => half 2
     expect(h).toEqual([2, 1, 2]);
     expect(halfExtents([])).toBeNull();
+  });
+});
+
+describe("fitOrthoHalfHeight", () => {
+  const PART: [number, number, number] = [1.75, 0.3, 0.7];
+
+  it("frames the footprint's own extent from directly above", () => {
+    // Looking straight down, the screen axes are X and Z, so the frame is set by the land pattern's
+    // outline and NOT by the package height - which is the whole point of a top view.
+    const h = fitOrthoHalfHeight(PART, [0, 1, 0.0001], 1);
+    // square frame, so the larger of the two horizontal half-extents binds, plus the margin
+    expect(h).toBeCloseTo(1.75 * 1.15, 3);
+  });
+
+  it("ignores the height of the part when looking down", () => {
+    // A taller package must not change a top view's framing: its silhouette from above is the same.
+    const short = fitOrthoHalfHeight([1.75, 0.05, 0.7], [0, 1, 0.0001], 1);
+    const tall = fitOrthoHalfHeight([1.75, 3.0, 0.7], [0, 1, 0.0001], 1);
+    expect(tall).toBeCloseTo(short, 6);
+  });
+
+  it("is width-limited in a narrow frame", () => {
+    // A wide subject in a wide frame fits on height; squeeze the frame and the width binds.
+    const wide = fitOrthoHalfHeight(PART, [0, 1, 0.0001], 4);
+    const narrow = fitOrthoHalfHeight(PART, [0, 1, 0.0001], 0.5);
+    expect(narrow).toBeGreaterThan(wide);
+  });
+
+  it("has no distance term, unlike the perspective fit", () => {
+    // Stated as a test because it is the property that makes a top view honest: the projection is
+    // the frustum, so nothing about the camera's position along the view axis can change the size.
+    const a = fitOrthoHalfHeight(PART, [0, 1, 0.0001], 2);
+    const b = fitOrthoHalfHeight(PART, [0, 2, 0.0002], 2); // same direction, different magnitude
+    expect(a).toBeCloseTo(b, 9);
+  });
+
+  it("never returns a zero or negative frustum", () => {
+    expect(fitOrthoHalfHeight([0, 0, 0], [0, 1, 0], 1)).toBeGreaterThan(0);
   });
 });

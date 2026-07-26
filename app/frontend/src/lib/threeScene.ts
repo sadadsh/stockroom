@@ -21,6 +21,7 @@ import { orientUpright } from "./modelOrient";
 import {
   type Box,
   fitDistanceForBox,
+  fitOrthoHalfHeight,
   halfExtents,
   visibleBounds,
 } from "./cameraFit";
@@ -181,6 +182,15 @@ export function mountModelScene(
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 1000);
+  // A TECHNICAL top view needs an ORTHOGRAPHIC camera. Under perspective, "top" still shows the
+  // sides of the package - the further a face sits from the optical axis the more of its side is
+  // visible - so a pad and the body above it do not line up, and lining them up is the one thing a
+  // top view is for. Orthographic has no vanishing point, so the footprint reads as its true
+  // outline. The frustum is sized in refitCamera; these bounds are placeholders.
+  const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 1000);
+  // Which camera is rendering. Swapped by setView, and every consumer (the render pass, the resize
+  // handler, the controls, the fit) must read THIS rather than capturing one at construction.
+  let activeCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera = camera;
 
   // IMAGE-BASED LIGHTING: a neutral studio room supplies realistic reflections + soft occlusion,
   // so the monochrome surface actually reads as a lit 3D object (the single biggest legibility win
@@ -404,8 +414,12 @@ export function mountModelScene(
     controls.update();
     // Realistic mode goes through the composer (GTAO); the cheaper modes render direct, so the
     // AO cost is paid only when it is the thing being asked for.
+    // both paths follow the ACTIVE camera: leaving the pass bound to the perspective one rendered
+    // a perspective image through an orthographic view's controls, which looks like the view
+    // control simply not working.
+    renderPass.camera = activeCamera;
     if (renderMode === "realistic") composer.render();
-    else renderer.render(scene, camera);
+    else renderer.render(scene, activeCamera);
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
@@ -417,6 +431,7 @@ export function mountModelScene(
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
     composer.setSize(w, h);
+    // the orthographic frustum is re-derived from the new aspect by refitCamera below
     // REFIT, do not just restretch. The required distance is a function of the ASPECT
     // (`fitDistanceForBox(half, dir, fov, aspect)`), because a perspective fov is VERTICAL and a
     // wide frame is therefore width-limited while a tall one is height-limited. Updating the
@@ -525,6 +540,16 @@ export function mountModelScene(
     fitDistance = half
       ? fitDistanceForBox(half, direction.toArray(), camera.fov, camera.aspect)
       : bounds.radius * 4;
+    // The orthographic frustum is sized from the same visible set. Done on EVERY refit, not only
+    // when the top view is active, so switching to it never shows one frame of a stale frustum.
+    if (half) {
+      const halfH = fitOrthoHalfHeight(half, direction.toArray(), camera.aspect);
+      const halfW = halfH * (camera.aspect || 1);
+      orthoCamera.left = -halfW;
+      orthoCamera.right = halfW;
+      orthoCamera.top = halfH;
+      orthoCamera.bottom = -halfH;
+    }
     // Orbit the CENTRE of what is visible, not the origin. The part is centred on the origin but
     // the board and pads hang below it, so an origin-locked target framed the subject low with a
     // large empty band above it.
@@ -534,6 +559,15 @@ export function mountModelScene(
     camera.near = Math.max(bounds.radius / 100, 1e-4);
     camera.far = bounds.radius * 100;
     camera.updateProjectionMatrix();
+    // The orthographic camera shares the position and target. Its distance does not affect the
+    // projection, but it still has to sit OUTSIDE the geometry or near-plane clipping slices the
+    // subject in half - hence a generous near/far around the same standoff.
+    orthoCamera.position.copy(camera.position);
+    orthoCamera.near = 0.01;
+    orthoCamera.far = Math.max(bounds.radius * 200, 10);
+    orthoCamera.up.copy(camera.up);
+    orthoCamera.lookAt(centre);
+    orthoCamera.updateProjectionMatrix();
     controls.update();
   }
 
@@ -556,6 +590,10 @@ export function mountModelScene(
     // it made the control look broken. The FIXED views (top/front) are the ones that must hold
     // still, because a "top" view that rotates away from top is not a top view.
     controls.autoRotate = mode === "iso";
+    // Swap the projection with the view. OrbitControls binds a camera at construction, so its
+    // `object` has to be reassigned too, or the user would orbit the camera that is not rendering.
+    activeCamera = mode === "top" ? orthoCamera : camera;
+    controls.object = activeCamera;
     // orbit whatever the fit chose as the centre, so a canonical view frames the same subject the
     // free view does instead of snapping back to a fixed origin the content may not sit on.
     const target = new THREE.Vector3(...VIEW_DIRECTIONS[mode])
@@ -567,19 +605,20 @@ export function mountModelScene(
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
-      camera.position.copy(target);
+      activeCamera.position.copy(target);
+      activeCamera.lookAt(fitTarget);
       controls.target.copy(fitTarget);
       controls.update();
       return;
     }
-    const from = camera.position.clone();
+    const from = activeCamera.position.clone();
     const start = performance.now();
     const DURATION = 260;
     const step = () => {
       const t = Math.min(1, (performance.now() - start) / DURATION);
       // easeOutQuint: a strong ease-out, the curve family the built-in `ease-out` is too weak for
       const e = 1 - Math.pow(1 - t, 5);
-      camera.position.lerpVectors(from, target, e);
+      activeCamera.position.lerpVectors(from, target, e);
       controls.target.copy(fitTarget);
       controls.update();
       if (t < 1) viewTween = requestAnimationFrame(step);
