@@ -110,6 +110,31 @@ def test_model_to_glb_keeps_the_vertex_normals_the_conversion_produced():
     assert missing == [], f"{path}: primitives with no NORMAL attribute: {missing}"
 
 
+@requires_glb_tooling
+def test_model_to_glb_states_a_surface_finish_instead_of_taking_gltfs_metal_default():
+    """A STEP carries COLOUR, and nothing else. glTF's defaults for the two properties it
+    therefore leaves unstated are `metallicFactor: 1.0` and `roughnessFactor: 1.0` - a
+    fully metallic, fully rough surface - so a black epoxy body arrives as a metal whose
+    reflectance is its own near-black colour and renders as a silhouette with no form.
+    MEASURED in the running viewer on the owner's TPD6E05U06RVZR: the package's top face
+    and its front face both read rgb(4,4,4) and rgb(2,2,2), identical with the ambient
+    occlusion pass on and off, so the pass was never the cause.
+
+    Omitting the factors is not neutrality: glTF fills them in either way. The converter
+    states the finish a moulded/machined part actually has, and states it only where
+    cascadio left the property unset, so a source that ever does declare one still wins."""
+    path, _ = _find_step_with_colours(minimum=1)
+    materials = _gltf_json(model_to_glb(path))["materials"]
+    assert materials, f"{path}: converted with no materials at all"
+    for mat in materials:
+        pbr = mat["pbrMetallicRoughness"]
+        assert "metallicFactor" in pbr, f"{path}: {mat.get('name')} defaults to metal"
+        assert "roughnessFactor" in pbr, f"{path}: {mat.get('name')} defaults to fully rough"
+        assert pbr["metallicFactor"] < 1.0, (
+            f"{path}: {mat.get('name')} is fully metallic, which renders a dark colour black"
+        )
+
+
 def test_model_to_glb_gives_wrl_an_honest_message_not_install_cascadio(tmp_path):
     # WRL is a format the library legitimately stores, but trimesh has no VRML loader.
     # The failure must say STEP-only, NEVER tell the user to install cascadio (which is

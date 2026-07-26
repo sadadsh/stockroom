@@ -128,7 +128,9 @@ _SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, sy
 # all, so a converter fix reached only a machine with a cold cache while every test passed.
 # (C1: STEP converted by cascadio directly instead of round-tripped through trimesh, which
 # was merging away every material past the first and dropping NORMAL attributes -> "c1".)
-_MODEL_CONVERT_VERSION = "c1"
+# (C2: a STEP-derived material states its metalness/roughness instead of inheriting glTF's
+# fully-metallic default, which rendered a black epoxy package as an unlit silhouette.)
+_MODEL_CONVERT_VERSION = "c2"
 
 
 def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:
