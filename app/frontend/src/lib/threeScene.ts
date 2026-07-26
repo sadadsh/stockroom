@@ -218,13 +218,48 @@ export function mountModelScene(
   fill.position.set(-1.2, -0.2, -0.9);
   scene.add(fill);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  // Gently auto-spin like SnapEDA's viewer; the per-frame controls.update() in the
-  // render loop advances it. Dragging still works and simply overrides the spin.
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = 1.6;
+  /**
+   * OrbitControls derives its whole orbit FRAME from `object.up` **in its constructor**
+   * (`_quat = setFromUnitVectors(object.up, [0,1,0])`, r169 line 132) and never rebuilds it. It
+   * then re-derives the camera's position from spherical coordinates in that frame on every
+   * `update()`, which the render loop calls every frame.
+   *
+   * So the moment the bound camera changes, or the bound camera's `up` changes, the controls are
+   * driving the camera in one frame while the renderer draws it in another - the two literally
+   * fight each other, every frame, and a static screenshot cannot show it because the end state
+   * of a settled tween still looks correct. Rebinding is the only fix that uses public API: the
+   * constructor is the one place that frame is ever computed.
+   */
+  let controls = makeControls(camera);
+  function makeControls(cam: THREE.PerspectiveCamera | THREE.OrthographicCamera) {
+    const next = new OrbitControls(cam, renderer.domElement);
+    next.enableDamping = true;
+    next.dampingFactor = 0.08;
+    // Gently auto-spin like SnapEDA's viewer; the per-frame controls.update() in the
+    // render loop advances it. Dragging still works and simply overrides the spin.
+    next.autoRotate = true;
+    next.autoRotateSpeed = 1.6;
+    return next;
+  }
+  /** The `up` the live controls were BUILT with, so a change to it can be detected. */
+  const boundUp = new THREE.Vector3(0, 1, 0);
+
+  /**
+   * Re-bind the controls when the camera they must drive, or that camera's up, has changed.
+   * Cheap and rare - at most once per view change - and it preserves the orbit target and the
+   * spin state, so the user sees continuity rather than a reset.
+   */
+  function rebindControls(cam: THREE.PerspectiveCamera | THREE.OrthographicCamera) {
+    if (controls.object === cam && boundUp.equals(cam.up)) return;
+    const target = controls.target.clone();
+    const spinning = controls.autoRotate;
+    controls.dispose();
+    controls = makeControls(cam);
+    controls.target.copy(target);
+    controls.autoRotate = spinning;
+    boundUp.copy(cam.up);
+    controls.update();
+  }
 
   // Captured once the model is framed, so a view change re-uses the SAME fit distance and the
   // part cannot appear to grow or shrink when you merely look at it from a different side.
@@ -562,9 +597,13 @@ export function mountModelScene(
     // and the fit picks whichever turn needs the smaller frustum. The extents therefore have to be
     // measured before the cameras are oriented, not after.
     const half = halfExtents(boxes);
-    const up = screenUpFor(direction.toArray(), half, camera.aspect);
-    camera.up.set(...up);
-    orthoCamera.up.set(...up);
+    // ONLY the orthographic camera's up is ever touched. The perspective camera keeps world up
+    // for its whole life, because it is the camera OrbitControls was built against and its up is
+    // baked into the controls' orbit frame at construction - mutating it made the controls drive
+    // the free 3/4 view about one axis while it rendered about another. For every direction the
+    // perspective camera is actually used from, `screenUpFor` returns world up anyway, so nothing
+    // is lost by leaving it alone; the pole is the ortho camera's case exclusively.
+    orthoCamera.up.set(...screenUpFor(direction.toArray(), half, camera.aspect));
     // Fit the BOX, not its enclosing sphere. A sphere fit is exact for a sphere and wasteful for a
     // component package: its radius comes from the long diagonal while the on-screen silhouette
     // comes from the short one, so the camera backed off for space nothing occupied. MEASURED on
@@ -604,6 +643,9 @@ export function mountModelScene(
     orthoCamera.near = 0.01;
     orthoCamera.far = Math.max(bounds.radius * 200, 10);
     orthoCamera.lookAt(centre);
+    // the ortho camera's up may just have changed, and the controls' orbit frame is derived from
+    // it at construction only, so they have to be rebuilt or they will fight the camera
+    rebindControls(activeCamera);
     orthoCamera.updateProjectionMatrix();
     controls.update();
   }
@@ -630,7 +672,10 @@ export function mountModelScene(
     // Swap the projection with the view. OrbitControls binds a camera at construction, so its
     // `object` has to be reassigned too, or the user would orbit the camera that is not rendering.
     activeCamera = mode === "top" ? orthoCamera : camera;
-    controls.object = activeCamera;
+    // NOT `controls.object = activeCamera`. Reassigning the object leaves the orbit frame the
+    // constructor computed from the OLD camera's up in place, so the controls keep driving the new
+    // camera about the previous camera's axis.
+    rebindControls(activeCamera);
     // Re-fit for the direction we are moving TO, not the one we are leaving.
     refitCamera(VIEW_DIRECTIONS[mode]);
     // The bare shadow-catcher is a horizontal plane. Edge-on from a top view it contributes
