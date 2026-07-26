@@ -236,6 +236,16 @@ export function mountModelScene(
   const fill = new THREE.DirectionalLight(0xffffff, 0.4);
   fill.position.set(-1.2, -0.2, -0.9);
   scene.add(fill);
+  // A RIM light, behind and above, aimed back at the camera side. This is the single biggest realism
+  // lever for a DARK body and the reason the owner's USON read as "a flat dark box": a near-black
+  // moulded package lit only from the front has no edge - its silhouette dissolves into a dark
+  // background, so there is no form to see, however good the material is. A rim puts a bright sliver
+  // along the top and far edges, which is what separates object from background in every real product
+  // photograph. Deliberately cool and modest: warm or strong reads as a second key and flattens the
+  // key's own modelling.
+  const rim = new THREE.DirectionalLight(0xdce6f5, 1.5);
+  rim.position.set(-0.9, 1.6, -1.5);
+  scene.add(rim);
 
   /**
    * OrbitControls derives its whole orbit FRAME from `object.up` **in its constructor**
@@ -590,7 +600,22 @@ export function mountModelScene(
       // one-colour part (a bare metal battery clip measures exactly one), and painting it black
       // epoxy would be the lie the override was meant to prevent.
       for (const m of modelMeshes) {
-        m.material = originalMaterials.get(m) ?? (realisticMaterial as THREE.Material);
+        const original = originalMaterials.get(m);
+        m.material = original ?? (realisticMaterial as THREE.Material);
+        // The VENDOR's colour is kept - that is what realism means here, and substituting an invented
+        // epoxy was the mistake this mode was built to stop. But a STEP carries colour and NOTHING
+        // else, so the converter has to supply every surface property, and an extreme value it guessed
+        // is not vendor intent: roughness 1.0 is a chalk-matte that kills every highlight, 0.0 is a
+        // mirror. Neither is moulded epoxy. Only the extremes are corrected; anything the converter
+        // stated in a plausible range is left exactly as it is.
+        if (original && "roughness" in original) {
+          const std = original as THREE.MeshStandardMaterial;
+          if (std.roughness >= 0.98) std.roughness = 0.55;
+          else if (std.roughness <= 0.02) std.roughness = 0.25;
+          // a moulded body picks up the studio room; leaving this at a default 1.0 with a dark
+          // basecolour is most of why the surface showed no reflection at all
+          if (std.envMapIntensity < 1) std.envMapIntensity = 1.15;
+        }
       }
     } else {
       const next = mode === "xray" ? xrayMaterial : studioMaterial;
@@ -621,7 +646,11 @@ export function mountModelScene(
     };
     add(root.visible ? root : null);
     add(landGroup);
-    add(boardMesh);
+    // THE BOARD IS DELIBERATELY NOT IN THE FIT. Owner 2026-07-26: "the view should be zoomed in and
+    // centered on the model". The plane is effectively infinite (boardPlane.BOARD_PLANE_HALF_MM), so
+    // fitting it would zoom out to 250mm and render the part as a speck - and even at the old, modest
+    // sizes it was the board that decided the frame, which is why the part kept reading as lost on a
+    // table. The subject is the part and its pads; the surface it stands on is context, not content.
     const bounds = visibleBounds(boxes);
     if (!bounds || bounds.radius <= 0) return; // all hidden: hold the last good frame, don't lurch
     const centre = new THREE.Vector3(...bounds.centre);
