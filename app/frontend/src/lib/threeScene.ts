@@ -250,14 +250,13 @@ export function mountModelScene(
   // fillet or a package-to-board gap should darken. The library defaults assume a metre-ish world
   // and would occlude a 3.5mm part completely.
   gtao.updateGtaoMaterial({ screenSpaceRadius: true, radius: 18, distanceExponent: 1, thickness: 1, scale: 1 });
-  // DISABLED, deliberately, and not silently: GTAOPass renders the MODEL pure black in this scene
-  // while the pads and board (same pass, same materials) come out correct. MEASURED on the real
-  // part: body pixels (0,0,0) with the pass on, (187,188,191) with it off; unchanged by a light
-  // material, by dropping clearcoat, and by switching from a world-space to a screen-space radius,
-  // so it is NOT the scene scale and NOT the material. The remaining suspect is the renderer's
-  // `alpha: true` transparent backdrop interacting with the AO pass's depth/normal targets.
-  // Shipping a mode that renders black is worse than shipping one without AO, so the pass stays
-  // wired and off until that is settled. See the punch list.
+  // ON. A long-standing comment here claimed this pass was what rendered the model pure black, and
+  // that claim is now DISPROVEN by measurement rather than argued away: with the pass forced off and
+  // nothing else changed, the same package still measured rgb(4,4,4) on its top face and rgb(2,2,2)
+  // on its front - identical to the pass being on. The black came from the GLB's own materials
+  // taking glTF's `metallicFactor: 1.0` default, which the converter now states explicitly. The
+  // comment is deleted rather than softened because a plausible-sounding cause written down as fact
+  // is exactly what kept the real one hidden for two sessions.
   gtao.enabled = true;
   composer.addPass(gtao);
   composer.addPass(new OutputPass());
@@ -418,6 +417,18 @@ export function mountModelScene(
     // a perspective image through an orthographic view's controls, which looks like the view
     // control simply not working.
     renderPass.camera = activeCamera;
+    // GTAO renders its OWN depth/normal G-buffer, from its OWN camera reference - which the pass
+    // captures at construction and never updates. Left alone, the orthographic top view drew its
+    // beauty pass through one camera while the occlusion multiplied over it was computed through
+    // another, still sitting at the three-quarter position: an AO map aligned to nothing on screen.
+    // The `PERSPECTIVE_CAMERA` define has to move with it, because the shader reconstructs view
+    // position from depth differently for the two projections and the pass only sets that define in
+    // its constructor.
+    if (gtao.camera !== activeCamera) {
+      gtao.camera = activeCamera;
+      gtao.gtaoMaterial.defines.PERSPECTIVE_CAMERA = activeCamera === camera ? 1 : 0;
+      gtao.gtaoMaterial.needsUpdate = true;
+    }
     if (renderMode === "realistic") composer.render();
     else renderer.render(scene, activeCamera);
     raf = requestAnimationFrame(tick);
