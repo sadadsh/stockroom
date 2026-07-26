@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PAD_THICKNESS_MM, boardPlaneThickness, boardStack } from "./boardPlane";
+import { PAD_THICKNESS_MM, boardPlaneThickness, boardStack, silkQuad } from "./boardPlane";
 
 // Owner 2026-07-26: "the 3d model clips into the pads and pcb. the pcb should be a plane less than
 // its own component." Both halves are geometry, so both are testable without a GL context.
@@ -84,6 +84,54 @@ describe("boardStack (the clipping fix, as an invariant)", () => {
     for (const v of [s.boardThickness, s.padGroupY, s.boardCenterY, s.padTopY]) {
       expect(Number.isFinite(v)).toBe(true);
     }
+  });
+});
+
+// Owner: "the footprint needs to be accurate to whats downloaded, not just the pads." The graphics
+// were all extracted correctly by the backend (fp_line/rect/circle/poly/arc) and then drawn with
+// THREE.Line, whose width WebGL ignores - so every one became a 1px hairline that vanished at tile
+// size. These lock the quad that replaces it, including the widths that must NOT be lost.
+describe("silkQuad (the footprint's real ink width)", () => {
+  it("centres the quad on the segment and takes its length", () => {
+    const q = silkQuad([0, 0], [2, 0], 0.12);
+    expect(q).not.toBeNull();
+    expect(q?.cx).toBeCloseTo(1, 10);
+    expect(q?.cz).toBeCloseTo(0, 10);
+    expect(q?.length).toBeCloseTo(2, 10);
+  });
+
+  it("KEEPS the footprint's own stroke width rather than discarding it", () => {
+    // the whole point: 0.15mm silk must render 0.15mm wide, not one pixel
+    expect(silkQuad([0, 0], [1, 0], 0.15)?.width).toBeCloseTo(0.15, 10);
+    expect(silkQuad([0, 0], [1, 0], 0.05)?.width).toBeCloseTo(0.05, 10);
+  });
+
+  it("substitutes the board default for a zero or missing width, never a zero-area quad", () => {
+    // KiCad treats width 0 as "use the default"; a 0-width quad would draw nothing at all.
+    for (const bad of [0, -1, Number.NaN]) {
+      expect(silkQuad([0, 0], [1, 0], bad)?.width).toBeCloseTo(0.12, 10);
+    }
+  });
+
+  it("orients along the segment for each axis and diagonal", () => {
+    expect(silkQuad([0, 0], [1, 0], 0.12)?.angleY).toBeCloseTo(0, 10);
+    // +z direction: a rotation about +Y turns +z toward +x, so this is -90 degrees
+    expect(silkQuad([0, 0], [0, 1], 0.12)?.angleY).toBeCloseTo(-Math.PI / 2, 10);
+    expect(silkQuad([0, 0], [1, 1], 0.12)?.angleY).toBeCloseTo(-Math.PI / 4, 10);
+  });
+
+  it("is direction-agnostic: a segment drawn backwards covers the same ground", () => {
+    const a = silkQuad([1, 2], [3, 4], 0.12);
+    const b = silkQuad([3, 4], [1, 2], 0.12);
+    expect(a?.cx).toBeCloseTo(b?.cx ?? -1, 10);
+    expect(a?.cz).toBeCloseTo(b?.cz ?? -1, 10);
+    expect(a?.length).toBeCloseTo(b?.length ?? -1, 10);
+    // the quad is symmetric, so the two angles describe the same line
+    expect(Math.abs((a?.angleY ?? 0) - (b?.angleY ?? 0))).toBeCloseTo(Math.PI, 10);
+  });
+
+  it("drops a zero-length segment instead of emitting a degenerate quad", () => {
+    expect(silkQuad([1, 1], [1, 1], 0.12)).toBeNull();
   });
 });
 

@@ -17,7 +17,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { PAD_THICKNESS_MM, boardStack } from "./boardPlane";
+import { PAD_THICKNESS_MM, boardStack, silkQuad } from "./boardPlane";
 import { orientUpright } from "./modelOrient";
 import {
   type Box,
@@ -895,16 +895,29 @@ export function mountModelScene(
       // would show something the real part does not have.
       if (g.layer.endsWith("Fab")) continue;
       const isCourtyard = g.layer.endsWith("CrtYd");
-      const mat = new THREE.LineBasicMaterial({
+      // A FLAT QUAD at the footprint's own stroke width, not a THREE.Line. WebGL ignores
+      // `LineBasicMaterial.linewidth`, so every graphic used to render as a 1-pixel hairline no
+      // matter the zoom: the silkscreen outline and the pin-1 marker were in the scene graph and
+      // invisible on screen, which is exactly why the land pattern read as "just the pads". The
+      // width the backend extracted from the footprint was being thrown away here. See
+      // boardPlane.silkQuad for the geometry and for why LineSegments2 was rejected.
+      const q = silkQuad(g.start, g.end, g.width);
+      if (!q) continue;
+      const mat = new THREE.MeshBasicMaterial({
         color: isCourtyard ? 0xff8fb1 : 0xf2f4f7,
         transparent: true,
         opacity: isCourtyard ? 0.5 : 0.95,
+        // ink lies ON the mask; without this the underside vanishes when the board is seen from below
+        side: THREE.DoubleSide,
       });
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(g.start[0] * MM_TO_SCENE, silkY, g.start[1] * MM_TO_SCENE),
-        new THREE.Vector3(g.end[0] * MM_TO_SCENE, silkY, g.end[1] * MM_TO_SCENE),
-      ]);
-      group.add(new THREE.Line(geo, mat));
+      const geo = new THREE.PlaneGeometry(q.length * MM_TO_SCENE, q.width * MM_TO_SCENE);
+      // PlaneGeometry is authored in XY. Lay it into the board plane (XZ), then turn it along the
+      // segment. Order matters: rotate into the plane FIRST, then spin about the plane's normal.
+      geo.rotateX(-Math.PI / 2);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.y = q.angleY;
+      mesh.position.set(q.cx * MM_TO_SCENE, silkY, q.cz * MM_TO_SCENE);
+      group.add(mesh);
     }
 
     // THE PCB the pads sit on. Without a substrate the pads float in space, which is the other

@@ -43,6 +43,60 @@ export function boardPlaneThickness(componentHeightMm: number): number {
   return Math.min(MAX_BOARD_MM, componentHeightMm * FRACTION_OF_COMPONENT);
 }
 
+/** A silkscreen / courtyard segment as a flat quad lying in the board plane. */
+export interface SilkQuad {
+  /** centre of the quad, in board-plane coordinates (scene x and z) */
+  cx: number;
+  cz: number;
+  /** along-the-segment length; the quad's other dimension is the stroke width */
+  length: number;
+  /** rotation about the scene Y axis, radians, so the quad runs along the segment */
+  angleY: number;
+}
+
+/** Widths a footprint can legally carry that would render as nothing. KiCad treats width 0 as
+ *  "use the board default", so it must become a real width rather than a zero-area quad. */
+const DEFAULT_STROKE_MM = 0.12;
+
+/**
+ * One footprint graphic segment, as a flat quad on the board surface.
+ *
+ * The owner's "the footprint needs to be accurate to whats downloaded, not just the pads": every
+ * graphic was being drawn with `THREE.Line`, whose width WebGL ignores, so a 0.12mm silkscreen line
+ * rendered as a 1-pixel hairline at every zoom - present in the scene graph and invisible on screen,
+ * which is why the land pattern read as pads only. The footprint's own stroke width was extracted by
+ * the backend and then discarded here.
+ *
+ * REJECTED: `LineSegments2` + `LineMaterial({ worldUnits: true })`, the maintained three.js answer to
+ * line width. It draws a CAMERA-FACING ribbon, so flat silkscreen ink would read as a raised wire at
+ * grazing angles and in this viewer's front elevation; and its `resolution` has to be maintained by
+ * hand for objects that are not currently visible (three.js#29666), which these toggleable layers
+ * are. A flat quad is what ink on a mask actually is.
+ *
+ * Returns null when the segment has no length - a degenerate quad renders as nothing and would
+ * silently drop a graphic instead of drawing it.
+ */
+export function silkQuad(
+  start: readonly [number, number],
+  end: readonly [number, number],
+  width: number,
+): (SilkQuad & { width: number }) | null {
+  const dx = end[0] - start[0];
+  const dz = end[1] - start[1];
+  const length = Math.hypot(dx, dz);
+  if (!Number.isFinite(length) || length <= 0) return null;
+  const w = Number.isFinite(width) && width > 0 ? width : DEFAULT_STROKE_MM;
+  return {
+    cx: (start[0] + end[0]) / 2,
+    cz: (start[1] + end[1]) / 2,
+    length,
+    // atan2(dz, dx) is the angle in the x/z plane. Negated because a rotation about +Y turns from
+    // +z toward +x, i.e. opposite to the direction atan2 measures here.
+    angleY: -Math.atan2(dz, dx),
+    width: w,
+  };
+}
+
 /** Where each piece of the board / pad / part stack sits, in scene Y. */
 export interface BoardStack {
   /** board box height */
