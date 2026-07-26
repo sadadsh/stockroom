@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { KEY_SPEC_LIMIT, keySpecRows, togglePinned, withoutPromoted } from "./keySpecs";
+import {
+  KEY_SPEC_LIMIT,
+  effectiveKeySpecKeys,
+  isCuratedOnly,
+  keySpecRows,
+  togglePinned,
+  withoutPromoted,
+} from "./keySpecs";
 import type { SpecGroup } from "./specSchema";
 
 // Owner 2026-07-26: "the important specifications should be where the eda handoff is, formatted like
@@ -196,5 +203,65 @@ describe("togglePinned", () => {
     const before = { Diodes: ["A"] };
     togglePinned(before, "Diodes", "B");
     expect(before).toEqual({ Diodes: ["A"] });
+  });
+});
+
+// --- The star must read the EFFECTIVE state, not just the user's own pins. -----------------------
+// Owner, 2026-07-26: "the pin system lets you pin a spec that is ALREADY in Top Specifications ...
+// the star must read the EFFECTIVE state (curated-by-registry OR user-pinned)". Since the reversal
+// to copy-not-promote, a curated row appears in BOTH places, and its star showed hollow in both -
+// so the sheet offered to pin a row that was already at the top, and doing it burned one of the
+// capped Top Specifications slots on a row that already had one.
+
+describe("effectiveKeySpecKeys", () => {
+  const groups = [
+    {
+      title: "ELECTRICAL",
+      rows: [
+        { key: "Breakdown Voltage", label: "Breakdown Voltage", value: "6", unit: "V" },
+        { key: "Package", label: "Package", value: "USON-14" },
+        { key: "Diode Capacitance Cd", label: "Diode Capacitance Cd", value: "0.5", unit: "pF" },
+      ],
+    },
+  ] as unknown as Parameters<typeof effectiveKeySpecKeys>[0];
+
+  it("includes a row the REGISTRY curated, which no user pin mentions", () => {
+    const keys = effectiveKeySpecKeys(groups, "Diodes", {});
+    // whatever the curated set for Diodes contains, the answer must equal what actually renders
+    expect(keys).toEqual(new Set(keySpecRows(groups, "Diodes", {}).map((r) => r.key)));
+    expect(keys.size).toBeGreaterThan(0);
+  });
+
+  it("includes a row the USER pinned", () => {
+    const keys = effectiveKeySpecKeys(groups, "Diodes", {
+      Diodes: ["Diode Capacitance Cd"],
+    });
+    expect(keys.has("Diode Capacitance Cd")).toBe(true);
+  });
+
+  it("is exactly the set of rows Top Specifications renders, so the star can never disagree", () => {
+    const pinned = { Diodes: ["Package"] };
+    expect(effectiveKeySpecKeys(groups, "Diodes", pinned)).toEqual(
+      new Set(keySpecRows(groups, "Diodes", pinned).map((r) => r.key)),
+    );
+  });
+});
+
+describe("isCuratedOnly", () => {
+  it("is true for a row that is up there by curation and NOT by a user pin", () => {
+    // this is the row whose star must not offer to pin it again
+    expect(isCuratedOnly(new Set(["Breakdown Voltage"]), {}, "Diodes", "Breakdown Voltage")).toBe(
+      true,
+    );
+  });
+
+  it("is false for a row the user pinned themselves, which stays unpinnable", () => {
+    expect(
+      isCuratedOnly(new Set(["Package"]), { Diodes: ["Package"] }, "Diodes", "Package"),
+    ).toBe(false);
+  });
+
+  it("is false for a row that is not up there at all", () => {
+    expect(isCuratedOnly(new Set(["Package"]), {}, "Diodes", "Breakdown Voltage")).toBe(false);
   });
 });
