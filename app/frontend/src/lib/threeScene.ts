@@ -17,6 +17,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { PAD_THICKNESS_MM, boardStack } from "./boardPlane";
 import { orientUpright } from "./modelOrient";
 import {
   type Box,
@@ -272,6 +273,12 @@ export function mountModelScene(
   // under the body rather than at an arbitrary y=0.
   let modelBaseY = 0;
   let modelSize: THREE.Vector3 | null = null;
+  // The land pattern most recently handed in, kept so it can be REBUILT once the model's bounds are
+  // known. `Glb3DView` calls setLandPattern synchronously right after mountModelScene returns, but
+  // `loader.parse` is callback-based - so at that moment `modelSize` is still null and the board
+  // thickness (now derived from the component's height) would silently take its unknown-height
+  // fallback on every single part. The fix would have looked correct in the diff and done nothing.
+  let lastLand: LandPatternInput | null = null;
   let modelRoot: THREE.Object3D | null = null;
   let placement: LandPatternInput["model_placement"] = null;
   let modelCenter: THREE.Vector3 | null = null;
@@ -438,6 +445,11 @@ export function mountModelScene(
       // as a model that changes size when a layer is toggled.
       camera.position.set(...VIEW_DIRECTIONS.iso);
       refitCamera();
+      // The component's height is only knowable HERE, and the board's thickness is derived from it.
+      // Any land pattern handed in before this point was built against the unknown-height fallback
+      // and against a `modelBaseY` of 0, so rebuild it now that both are real. Fires at most once
+      // (this callback runs once), and setLandPattern re-fits the camera itself.
+      if (lastLand) setLandPattern(lastLand);
     },
     () => {
       // GLTFLoader rejected the GLB (a format three does not accept, or a truncated
@@ -780,6 +792,8 @@ export function mountModelScene(
   }
 
   function setLandPattern(land: LandPatternInput | null) {
+    // remembered so the model-loaded callback can rebuild it against the real component height
+    lastLand = land;
     if (groundPlane) groundPlane.visible = true;
     if (boardMesh) {
       scene.remove(boardMesh);
@@ -811,8 +825,18 @@ export function mountModelScene(
     // coordinates need no conversion at all. Kept as a named constant so the unit contract is
     // stated rather than implied by bare arithmetic.
     const MM_TO_SCENE = 1;
-    // declared before the pad loop, because a back-side pad is positioned relative to it
-    const boardThickness = 0.6 * MM_TO_SCENE;
+    // declared before the pad loop, because a back-side pad is positioned relative to it.
+    // DERIVED from the part, not fixed at 0.6mm: the owner's "the pcb should be a plane less than its
+    // own component". A USON-14 body is ~0.55mm, so the old flat 0.6mm board was thicker than the
+    // component standing on it. `boardPlaneThickness` guarantees strictly-thinner at every height.
+    // ONE source of truth for the whole stack, pure and unit-tested (boardPlane.ts): a perspective
+    // 3/4 render cannot settle these relationships, so they are asserted there rather than eyeballed
+    // here. `padThickness` is hoisted out of the pad loop because the STACK needs it too.
+    // modelBaseY, not a fresh `-modelSize.y/2`: one definition of the model's base, so a second copy
+    // cannot drift from the one the shadow plane and the camera fit already use.
+    const stack = boardStack(modelBaseY, (modelSize?.y ?? 0) * MM_TO_SCENE);
+    const boardThickness = stack.boardThickness * MM_TO_SCENE;
+    const padThickness = PAD_THICKNESS_MM * MM_TO_SCENE;
     const group = new THREE.Group();
     // ENIG gold over copper, the finish most real boards ship with, and metallic enough that the
     // studio environment puts a highlight on each pad - flat brown planes were part of why the
@@ -831,7 +855,7 @@ export function mountModelScene(
       // the pads read as stickers rather than metal.
       const pw = w * MM_TO_SCENE;
       const ph = h * MM_TO_SCENE;
-      const thickness = 0.05 * MM_TO_SCENE;
+      const thickness = padThickness;
       // The footprint's OWN corner ratio, not a guess. KiCad's roundrect_rratio is a fraction of
       // the pad's shorter side; circles and ovals are fully rounded by definition.
       const radius =
@@ -921,8 +945,15 @@ export function mountModelScene(
       // BoxGeometry material order: +x, -x, +y(top), -y(bottom), +z, -z
       [substrateMat, substrateMat, maskMat, maskMat, substrateMat, substrateMat],
     );
-    // top face flush with the pad underside, so pads sit ON the mask rather than inside it
-    boardMesh.position.set(0, modelBaseY - boardT / 2, 0);
+    // The stack, bottom to top: board, then pads ON the board, then the part ON the pads. So the
+    // board's TOP face is one pad-thickness BELOW the component's base, not level with it.
+    //
+    // This is the clipping bug (owner 2026-07-26: "the 3d model clips into the pads and pcb"). Both
+    // the board top AND the pad group used to sit at `modelBaseY`, and pad geometry extrudes UPWARD
+    // from its group origin - so every pad occupied `modelBaseY .. modelBaseY + padThickness`, i.e.
+    // the full pad thickness was buried inside the component body. A real reflowed joint does the
+    // opposite: the pad holds the part up off the board.
+    boardMesh.position.set(0, stack.boardCenterY, 0);
     boardMesh.receiveShadow = true;
     boardMesh.visible = layers.board;
     scene.add(boardMesh);
@@ -930,9 +961,12 @@ export function mountModelScene(
     // catches the same light a few hundredths of a millimetre lower and reads as a dark seam right
     // where the pads meet the surface - which is exactly what "the pads are not flush" looks like.
     if (groundPlane) groundPlane.visible = false;
-    // The board plane sits at the model's base, so the body rests ON the pads instead of
-    // intersecting them or hovering above.
-    group.position.y = modelBaseY;
+    // One pad-thickness below the model's base, so a front pad's TOP face lands exactly on the body's
+    // underside: the part rests ON the pads instead of having them driven up into it. The group's
+    // origin remains the board's top face, which is the contract the pad loop's positions rely on
+    // (a back-side pad is placed at `-boardThickness - thickness` relative to this origin, and that
+    // stays flush against the board's underside because both moved together).
+    group.position.y = stack.padGroupY;
     group.visible = layers.pads;
     scene.add(group);
     landGroup = group;
