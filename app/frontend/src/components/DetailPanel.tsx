@@ -1881,17 +1881,66 @@ const ALT_ROW_GRID =
  *   - fewer than two parts is not a list.
  * Anything that fails those is rendered exactly as it arrived.
  */
+function AtomicValue({ text }: { text: string }) {
+  const tokens = text.split(/(\s+)/);
+  const atRisk = tokens.some(
+    (tok) => BREAKABLE_INSIDE.test(tok) && tok.length <= SPEC_TOKEN_MAX,
+  );
+  if (!atRisk) return <>{text}</>;
+  return (
+    <>
+      {tokens.map((tok, i) =>
+        BREAKABLE_INSIDE.test(tok) && tok.length <= SPEC_TOKEN_MAX ? (
+          <span key={i} className="whitespace-nowrap">
+            {tok}
+          </span>
+        ) : (
+          tok
+        ),
+      )}
+    </>
+  );
+}
+
+// A token this long cannot fit the value track at any realistic width, so it is left breakable:
+// an overflowing row is worse than an ugly break. Sized from the measurement below (a ~48px track
+// fits about 6 monospace characters, and real protected tokens are 8-12).
+const SPEC_TOKEN_MAX = 20;
+
+/** Values whose tokens contain a character the browser treats as a break opportunity. */
+const BREAKABLE_INSIDE = /\//;
+
+/** The value with only its AT-RISK tokens held together.
+ *
+ * MEASURED in real Chromium (a width sweep over the actual value at 12px monospace), because jsdom
+ * does no layout and this question cannot be answered by the unit suite:
+ *
+ *     track 60px+  break-word -> ["2.5A ", "(8/20us)"]            fine
+ *     track 48px   break-word -> ["2.5A ", "(8/20u", "s)"]        BREAKS INSIDE
+ *     track 40px   break-word -> ["2.5A ", "(8/20", "us)"]        BREAKS INSIDE
+ *     any width    nowrap span -> ["2.5A ", "(8/20us)"]           fixed
+ *
+ * `word-break: keep-all` was measured and does NOTHING here (byte-identical output at every
+ * width), so it is not the fix despite reading like it should be. A reader cannot tell "8/20us"
+ * from "8/20u s", which makes this a correctness problem rather than a cosmetic one.
+ *
+ * ONLY at-risk tokens are wrapped. Splitting every value into spans fragments the text node, and
+ * `getByText` matches an element by its DIRECT text children - so a blanket split silently broke
+ * every existing query for a spec value. A value with no `/` is returned as plain text, unchanged.
+ */
 function SpecValue({ value }: { value: string }) {
   const text = (value ?? "").trim();
   const parts = text.split(",").map((p) => p.trim());
   const isList =
     parts.length > 1 &&
     parts.every((p) => p.length > 0 && p.length <= 24 && /^[A-Za-z][A-Za-z0-9 ./+-]*$/.test(p));
-  if (!isList) return <>{text}</>;
+  if (!isList) return <AtomicValue text={text} />;
   return (
     <span data-dev-id="detail.spec-list" className="flex flex-col gap-0.5">
       {parts.map((p) => (
-        <span key={p}>{p}</span>
+        <span key={p}>
+          <AtomicValue text={p} />
+        </span>
       ))}
     </span>
   );
