@@ -260,12 +260,17 @@ class Drive:
 # quota and burns an Altium licence seat - and does it in the first ten seconds. Anything that acts
 # on the world is skipped by default and NAMED in the report, never silently passed over, so the
 # report can never read as "everything was exercised" when it was not.
-DESTRUCTIVE = (
-    "delete", "remove", "detach", "clear", "reset",
-    "apply", "adopt", "commit", "regenerate", "embed", "attach", "complete",
-    "refresh", "enrich", "ingest", "add-", "capture", "prepare", "restore",
-    "assign", "pin", "hygiene", "lfs", "sync", "rescan", "update", "activate",
-)
+# NARROWED 2026-07-25 on the owner's explicit instruction: *"no button not clicked besides delete
+# part"*. Only the irreversible-destruction family is skipped now.
+#
+# Everything else IS pressed, including actions that write to the real library, commit to git, spend
+# a distributor API call or take an Altium licence seat. That is the owner's call and it is what
+# makes the sweep worth anything - a tester who only presses the safe half tests the safe half. The
+# things it will now touch are named in the report so the consequences are never a surprise.
+#
+# `delete` and `remove` stay out until there is an UNDO to press instead (owner's suggestion, not
+# yet built): a delete is the one action on this surface with no way back.
+DESTRUCTIVE = ("delete", "remove")
 
 
 def _is_destructive(dev_id: str) -> bool:
