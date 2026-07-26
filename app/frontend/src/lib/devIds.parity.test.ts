@@ -131,7 +131,14 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "detail.photo",
   "ingest.pulled-photo",
   "ingest.candidate-photo",
-]; // 12
+  // DetailPanel.tsx CollapsePaneButton / CollapsedPaneRail: devId= string prop on the controls that
+  // close and reopen the Specifications and Sourcing panes. Each id is spelled out in full at its
+  // call site, so it stays greppable even though the attribute itself is an expression.
+  "detail.specs-collapse",
+  "detail.specs-expand",
+  "detail.sourcing-collapse",
+  "detail.sourcing-expand",
+]; // 16
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));
