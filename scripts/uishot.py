@@ -449,6 +449,39 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
     raise SystemExit(f"unknown surface: {surface}")
 
 
+def _set_theme(page, theme: str) -> str | None:
+    """Switch the theme through the app's OWN toggle, and return an error string on failure.
+
+    This used to be `documentElement.setAttribute('data-theme', t)`, which is a LIE for anything
+    theme-dependent that is not pure CSS. Stamping the attribute flips the CSS variable set, so a
+    shot looks convincingly light or dark - but `ThemeProvider`'s React state never moves, so every
+    component that branches on `useTheme().theme` keeps rendering the theme it booted in.
+
+    MEASURED 2026-07-25, and it silently invalidated a real verification: `PreviewImage`,
+    `StockAssetPreview`, `SvgViewport` and `SvgDiffViewport` all pick their CSS `filter` from
+    `theme === "dark"`. Under attribute-stamping, a "light" capture still carried `invert(1)`, so
+    black KiCad line-art rendered as pure white rgb(255) on a light rgb(245) card in BOTH shots. A
+    fix to that very filter measured as having made things WORSE, when what was actually being
+    photographed was this function.
+
+    So: read the real state back off the root (ThemeProvider mirrors its state there, so the
+    attribute is a faithful readout even though it is not a control), and click the real toggle
+    until it agrees. Fails LOUDLY - a theme that cannot be reached must never be photographed as
+    though it had been, because a wrong shot reads as evidence.
+    """
+    for _ in range(3):
+        current = page.evaluate("() => document.documentElement.dataset.theme || ''")
+        if current == theme:
+            return None
+        toggle = page.locator('[data-dev-id="rail.theme-toggle"]')
+        if not _appears(toggle):
+            return f"rail.theme-toggle not reachable, cannot switch to {theme}"
+        toggle.click()
+        page.wait_for_timeout(250)
+    final = page.evaluate("() => document.documentElement.dataset.theme || ''")
+    return None if final == theme else f"theme stuck at {final!r}, wanted {theme!r}"
+
+
 def _click_dev_ids(page, dev_ids: list[str]) -> list[str]:
     """Click each `data-dev-id` in turn, so a shot can reach a control behind a popover.
 
@@ -589,9 +622,12 @@ def run(args) -> int:
                         print(f"  !! no such data-dev-id: {', '.join(absent)}")
                         failures.append(f"{surface}:click")
                 for theme in themes:
-                    page.evaluate(
-                        "t => document.documentElement.setAttribute('data-theme', t)", theme
-                    )
+                    # Through the real toggle, never by stamping the attribute: see _set_theme.
+                    theme_err = _set_theme(page, theme)
+                    if theme_err:
+                        print(f"  !! {theme_err}")
+                        failures.append(f"{surface}:{theme}")
+                        continue
                     page.wait_for_timeout(600)
                     # Hover LAST and per theme, unlike --click: a theme switch does not unmount
                     # anything, but moving the pointer is not sticky the way an open popover is, and
