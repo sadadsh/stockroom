@@ -170,6 +170,17 @@ class Drive:
         out.write_bytes(base64.b64decode(data))
         return out
 
+    def flush_events(self) -> None:
+        """Make sure every console event the page has already emitted has ARRIVED.
+
+        A sleep here would be a clock standing in for a signal. CDP delivers replies and events in
+        order on one websocket, so a completed round trip IS the signal: once the reply to this
+        evaluate comes back, everything the page emitted before it has already been handed to
+        `_on_event`. It also returns as fast as the connection allows instead of always costing a
+        fixed wait.
+        """
+        self.client.evaluate("0")
+
     def close(self) -> None:
         self.client.close()
 
@@ -267,6 +278,11 @@ def _run_steps(drive: Drive, steps: list[str], out_dir: Path) -> int:
             print(f"eval: {drive.eval(arg)}")
         elif verb == "wait":
             time.sleep(float(arg or 0.4))
+        elif verb == "console":
+            # mid-batch console read, so a click's own errors can be seen at the point they happen
+            # rather than only in the dump at the end of the run
+            drive.flush_events()
+            print("console so far: " + ("; ".join(drive.console) or "(nothing logged)"))
         elif verb == "shot":
             shot_n += 1
             path = Path(arg) if arg else out_dir / f"drive-{shot_n}.png"
@@ -328,8 +344,7 @@ def main() -> int:
         if args.single == "do":
             return _run_steps(drive, args.steps, out_dir)
         if args.single == "console":
-            # give the tap a moment to receive anything already queued
-            time.sleep(0.4)
+            drive.flush_events()
             for line in drive.console or ["(nothing logged)"]:
                 print(line)
             return 0
