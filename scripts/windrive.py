@@ -342,6 +342,32 @@ def cmd_up(args) -> int:
     python = install / ".venv" / "Scripts" / "python.exe"
     if not python.exists():
         raise SystemExit(f"no install python at {python}")
+
+    # THE PORT MUST BE FREE FIRST, and this check is the difference between a tour that means
+    # something and one that quietly describes somebody else's window.
+    #
+    # RESEARCHED, not guessed (MicrosoftEdge/WebView2Feedback #3449, #2750, and Microsoft's own
+    # debugging guidance): two WebView2 controls CANNOT share a remote-debugging port. The first
+    # one to open it keeps it, and a later instance fails to open CDP at all - #3449 reports a
+    # COMException, "the group or resource is not in the correct state". Microsoft's guidance is
+    # explicit that only ONE WebView2 control may have a CDP port open before you attach.
+    #
+    # So without this check `up` would launch a new host, find the OLD host still answering on the
+    # port, and report OK - which is exactly what happened on 2026-07-25: three cycles of testing a
+    # stale bundle, with `about.close` never appearing because the window under test was one that
+    # had been running since before the fix existed.
+    try:
+        existing = list_targets(args.port)
+    except Exception:
+        existing = []
+    if existing:
+        print(
+            f"PORT {args.port} IS ALREADY OWNED by a Stockroom window this command did not start.\n"
+            "  Two WebView2 controls cannot share a debugging port, so a new window would open with\n"
+            "  no CDP at all and everything you drove afterwards would be the OLD one.\n"
+            f"  Either stop it (`windrive.py down`) or use a free port (`--port {args.port + 1}`)."
+        )
+        return 1
     env = dict(os.environ, STOCKROOM_CDP_PORT=str(args.port))
     proc = subprocess.Popen(
         [str(python), "-m", "stockroom.host.run"],
