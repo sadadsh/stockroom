@@ -133,7 +133,9 @@ _SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, sy
 # (C3: that stated finish becomes MATTE (0.45 -> 0.8). A semi-gloss lobe on a near-black
 # body handed back a clean reflection of the studio environment, so the package's top face
 # measured rgb(144,144,144) - the viewer was rendering the room rather than the part.)
-_MODEL_CONVERT_VERSION = "c3"
+# (C4: the finish is decided PER SURFACE, so a recognised pin colour - or a solid the vendor named
+# as its leadframe - is stated as metal instead of rendering as coloured plastic.)
+_MODEL_CONVERT_VERSION = "c4"
 
 
 def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:
