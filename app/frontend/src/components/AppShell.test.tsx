@@ -119,6 +119,21 @@ describe("AppShell status bar", () => {
     expect(screen.queryByText("Components Loaded")).toBeNull();
   });
 
+  it("agrees with its number at exactly one component", async () => {
+    // Measured on the owner's real window: the bar read "1 Components" on 10 of the 12 captured
+    // screens. A one-part library is the DEFAULT state of a new install, so this was the first
+    // thing most users would ever read in that bar.
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    } as never);
+    renderShell();
+    expect(await screen.findByText(/1 Component\b/)).toBeTruthy();
+    expect(screen.queryByText(/1 Components/)).toBeNull();
+  });
+
   it("flags the incomplete ones, because that is the number worth acting on", async () => {
     mockApi.facets.mockResolvedValue({
       by_category: { ICs: 5 },

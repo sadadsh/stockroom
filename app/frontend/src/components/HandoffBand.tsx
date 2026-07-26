@@ -151,13 +151,18 @@ export function HandoffBand({
         </span>
         <span className="ml-auto min-w-0 truncate text-2xs text-t3">
           {/* States the SET, so the band is answerable at a glance without reading every cell.
-              The count is of curated fields actually filled - it is the sentence a person needs
-              before placing the part, and nothing on the sheet used to say it. */}
+              The count is of curated fields actually FILLED.
+
+              It said "7 of 7 ready", and that word was doing three different jobs within one
+              window: here it meant non-empty TEXT FIELDS, the CAD chip 12px away said
+              "Incomplete" about ASSETS, and Settings said "0 of 1 parts ready to place" about
+              PLACEABILITY. One part, three verdicts, all using the same vocabulary. "Ready" now
+              belongs to placement alone; this band says what it actually counts. */}
           <span
             data-dev-id="detail.handoff-ready"
             className={ready === total ? "font-medium text-ok" : "font-medium text-warn"}
           >
-            {ready} of {total} ready
+            {ready} of {total} filled
           </span>
           {/* hidden in a narrow band: the COUNT is the load-bearing half, and the tool names
               are what push the header into a truncation nobody can read */}
