@@ -285,12 +285,20 @@ export function PanelTitle({
   return (
     <div
       className={cx(
-        "flex h-[34px] flex-none items-center justify-between gap-2 border-b border-line bg-band px-3.5",
+        // NOT `justify-between`. Every call site passes a COUNT here (a number, "N of M",
+        // "N active") and never a control, so flushing it to the panel's far edge only separated
+        // a number from the noun it counts - measured at ~290px on the owner's 320px Components
+        // panel, while the "Diodes 1" group header a hundred pixels below it reads adjacent. One
+        // screen, two treatments. If this slot ever holds a real control, that control can carry
+        // its own `ml-auto` rather than the header assuming every occupant wants the edge.
+        "flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3.5",
         className,
       )}
       {...rest}
     >
-      <span className="truncate text-xs font-semibold text-t2">{children}</span>
+      {/* min-w-0 so `truncate` still has something to shrink against now that the span sizes to
+          its content instead of being stretched by justify-between. */}
+      <span className="min-w-0 truncate text-xs font-semibold text-t2">{children}</span>
       {right != null ? (
         <span className="flex-none text-2xs tabular-nums text-t3">{right}</span>
       ) : null}
