@@ -2065,7 +2065,7 @@ function VendorLadder({
           hiding a price. */}
       <div
         className="grid grid-flow-col gap-x-10"
-        style={{ gridTemplateRows: `repeat(${tiers.length / 2}, auto)` }}
+        style={{ gridTemplateRows: `repeat(${Math.ceil(tiers.length / 2)}, auto)` }}
       >
         {tiers.map((b) => (
           <div
@@ -2145,7 +2145,8 @@ function Sourcing({
         // The tier IN FORCE at the needed quantity, not the qty-1 tier: the headline price now answers
         // "what does it cost me", which is the question the quantity box asks.
         const unit = breakForQuantity(breaks, needQty) ?? breaks[0] ?? null;
-        const tiers = ladderRows(breaks);
+        // the in-force qty goes in so the ladder can never hide the tier the headline names
+        const tiers = ladderRows(breaks, unit?.qty);
         const isBest = recommended === p;
         const short = p.stock != null && p.stock < needQty;
         const name = vendorLabel(p.vendor, p.url);
