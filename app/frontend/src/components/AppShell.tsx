@@ -102,7 +102,7 @@ function ShellStatusBar() {
               <span className="text-line2">|</span>
               {/* the number worth ACTING on, so it earns the warn tone rather than a quiet grey */}
               <span className="tnum text-warn">
-                {incomplete} <Text id="shell.status.incomplete">Incomplete</Text>
+                {incomplete} <Text id="shell.status.incomplete">Missing Data</Text>
               </span>
             </>
           ) : null}

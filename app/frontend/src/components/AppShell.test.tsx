@@ -142,7 +142,10 @@ describe("AppShell status bar", () => {
       incomplete: 3,
     } as never);
     renderShell();
-    expect(await screen.findByText(/3 Incomplete/)).toBeTruthy();
+    // "Missing Data", not "Incomplete" (owner's decision, 2026-07-26). The sheet's CAD row says
+    // "Incomplete" about ASSETS while this counts the DATA passport, and one part carrying two
+    // verdicts twelve pixels apart read as a contradiction. Each now names what it counts.
+    expect(await screen.findByText(/3 Missing Data/)).toBeTruthy();
   });
 
   it("says so honestly while loading and when the load fails", async () => {

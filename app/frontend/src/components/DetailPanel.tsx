@@ -2421,10 +2421,12 @@ function VendorLadder({
           what keeps the count EVEN, because this is a two-column flow and an odd count leaves a
           hole in the bottom-right cell (punch 5). Parity is reached by showing MORE, never by
           hiding a price. */}
-      <div
-        className="grid grid-flow-col gap-x-10"
-        style={{ gridTemplateRows: `repeat(${Math.ceil(tiers.length / 2)}, auto)` }}
-      >
+      {/* ROW-major (owner's decision, 2026-07-26, from previews). `grid-flow-col` filled the
+          columns first, so the first ROW read "1+ $1.22 | 500+ $0.56" - two tiers five steps
+          apart sitting side by side, while a person reads a price table across. The DOM order was
+          always correct; only the flow was newspaper-style. The even-count logic above still
+          matters: it keeps the bottom-right cell from being a hole. */}
+      <div className="grid grid-cols-2 gap-x-10">
         {tiers.map((b) => (
           <div
             key={b.qty}
