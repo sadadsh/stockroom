@@ -49,6 +49,7 @@ export function StockAssetPreview({ footprintLibId }: { footprintLibId: string }
       <Panel label="3D Model">
         <Glb3DView
           showViews
+          showShading
           data={glb.data as ArrayBuffer | undefined}
           isLoading={glb.isLoading}
           isError={glb.isError}
