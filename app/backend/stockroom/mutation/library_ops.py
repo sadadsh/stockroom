@@ -1230,9 +1230,16 @@ class LibraryOps:
         # distributor's "Texas Instruments" waits in `alternates` - and the Altium DbLib's
         # Manufacturer column reads this field verbatim, so the abbreviation reaches a placed
         # component too. Never invents a name: `fullest_name` only reorders answers on record.
+        # Every answer ON THE RECORD, in priority order: the stored field, the answers it
+        # displaced, then the distributors' own Manufacturer / Brand specs. That last pair is
+        # where the spelled-out name actually lives - measured on the owner's real part, the field
+        # held LCSC's shorthand `TI` while `specs["Manufacturer"]` and `specs["Brand"]` both read
+        # "Texas Instruments" with provenance recorded against them. Consulting only `alternates`
+        # missed it entirely, which is why this needs no network and no lookup table.
         maker = fullest_name(
             [record.manufacturer]
             + [a.value for a in (record.alternates.get("manufacturer") or [])]
+            + [record.specs.get("Manufacturer"), record.specs.get("Brand")]
         )
         if maker and maker != record.manufacturer:
             record.manufacturer = maker
