@@ -114,7 +114,11 @@ export function Glb3DView({
         // this bar - every screenshot looked right and not one control could be clicked.
         className="pointer-events-auto flex flex-none flex-wrap items-center justify-start gap-x-2 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
       >
-      <div data-dev-id="detail.model-layers" className="flex items-center gap-2">
+      {/* flex-wrap + min-w-0: this inner group holds the layer chips AND the shading chips, and
+          without wrapping it forced both onto ONE line - measured 262px of content inside a 226px
+          stage, i.e. a horizontal overflow the tile then clipped. The outer bar wrapping is not
+          enough when a child refuses to break. */}
+      <div data-dev-id="detail.model-layers" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <div className="flex items-center gap-0.5">
           <LayerToggle
             devId="detail.model-show-model"
