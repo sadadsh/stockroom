@@ -35,6 +35,34 @@ import {
   visibleBounds,
 } from "./cameraFit";
 
+/**
+ * Ambient-occlusion settings for a part whose bounding-sphere radius is `modelRadius` SCENE units
+ * (1 unit == 1mm). This is the contact darkening that makes a part read as sitting ON the board,
+ * and it is the ONLY mechanism that can: a surface-mount body is far too thin for a cast shadow to
+ * ground it (measured on the owner's USON - 0.55mm tall, key light at 49.8 degrees, so the shadow is
+ * 0.46mm long and falls entirely underneath the part where no camera can see it).
+ *
+ * WHY IT PRODUCED NOTHING FOR THREE SESSIONS, since a plausible wrong answer here has already
+ * survived several: the pass was set to `screenSpaceRadius: true, radius: 18`, and in that mode the
+ * shader multiplies the radius by a scale derived from the view position 100px off centre
+ * (`GTAOShader`, SCREEN_SPACE_RADIUS branch). At the distance this viewer frames a part from, 100px
+ * is about 0.4mm of world, so radius 18 became a ~7mm sampling sphere around a 3.5mm part. Every
+ * sample escaped into empty space, found no occluder, and returned "not occluded" everywhere.
+ * MEASURED on the pass's own AO buffer: `stdev 0.00, 2 distinct levels` before, `stdev 3.20, 114
+ * levels` after - and the render then changed across 7,326 pixels, all of them at the pad-to-body
+ * contact where geometry actually converges.
+ *
+ * DERIVED, not a constant, and that is the point: the old value was tuned in millimetres for one
+ * package, and this app shows everything from an 0402 to a 50mm connector. A fifth of the part's own
+ * radius puts the sampling sphere at the scale of ITS OWN features at any size; the thickness is
+ * half of that, so a sample is treated as an occluder only while it is genuinely close to the
+ * surface rather than something across the board.
+ */
+export function aoSettings(modelRadius: number) {
+  const radius = Math.max(modelRadius * 0.2, 1e-4);
+  return { screenSpaceRadius: false, radius, distanceExponent: 1, thickness: radius * 0.5, scale: 1 };
+}
+
 /** The canonical viewing directions. `iso` is the default 3/4; `top` looks straight down at the
  *  land pattern; `front` is the side elevation, which is how a datasheet draws package height. */
 export type ViewMode = "iso" | "top" | "front";
@@ -340,10 +368,10 @@ export function mountModelScene(
   composer.addPass(renderPass);
   const gtao = new GTAOPass(scene, camera, width, height);
   gtao.output = GTAOPass.OUTPUT.Default;
-  // Tuned for a MILLIMETRE scene: a fraction of a millimetre is the distance over which a lead
-  // fillet or a package-to-board gap should darken. The library defaults assume a metre-ish world
-  // and would occlude a 3.5mm part completely.
-  gtao.updateGtaoMaterial({ screenSpaceRadius: true, radius: 18, distanceExponent: 1, thickness: 1, scale: 1 });
+  // Placeholder only: the real radius is DERIVED FROM THE MODEL once it loads (see `aoRadius`
+  // below), because a fixed millimetre value is right for one package and wrong for every other
+  // size of part this app has to show.
+  gtao.updateGtaoMaterial(aoSettings(1));
   // ON. A long-standing comment here claimed this pass was what rendered the model pure black, and
   // that claim is now DISPROVEN by measurement rather than argued away: with the pass forced off and
   // nothing else changed, the same package still measured rgb(4,4,4) on its top face and rgb(2,2,2)
@@ -479,6 +507,11 @@ export function mountModelScene(
       ground.receiveShadow = true;
       groundPlane = ground;
       scene.add(ground);
+      // Size the ambient occlusion to THIS part, now that its real extent is known. Same reasoning
+      // as the shadow frustum immediately below: a radius that is right for one package is wrong
+      // for every other size, and here that failure is silent - the AO simply returns "nothing is
+      // occluded" and looks like a pass that is switched off.
+      gtao.updateGtaoMaterial(aoSettings(radius));
       // aim the key + scale its shadow frustum to the model so the shadow is crisp, not clipped
       key.position.set(radius * 1.6, radius * 2.6, radius * 1.5);
       kd.left = kd.bottom = -radius * 2.2;
