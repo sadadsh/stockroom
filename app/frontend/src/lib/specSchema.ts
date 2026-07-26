@@ -24,6 +24,28 @@ export const SPEC_HIDDEN_KEYS = new Set([
   "Image",
 ]);
 
+// A distributor's INTERNAL record id is not a property of the part.
+//
+// LCSC's product payload carries brandId / catalogId / parentCatalogId / wmCatalogId, and the
+// scrape adapter Title-cases any uncurated field into a spec label - so `Brand Id 100` rendered
+// in the Other group beside real parameters. The record deliberately KEEPS every field the
+// source exposed (the owner's explicit "store everything", locked by
+// tests/backend/enrich/test_lcsc_product.py); this is only about what the sheet PRESENTS.
+//
+// A trailing " Id" WORD, anchored, case-sensitive. Exact on purpose:
+//   * "Grid" / "Humidity" keep their rows, because the letters must be their own word;
+//   * "LCSC Product ID" keeps its row, because a CURATED label spells it "ID" while the
+//     humanized fallback that produces the junk spells it "Id". That difference is what
+//     separates an identifier a person orders by from one only LCSC's database uses.
+const VENDOR_RECORD_ID = / Id$/;
+
+/** True for a key the sheet must not present: an asset reference, the pinout, or a
+ * distributor's internal record id. One predicate so every consumer filters identically -
+ * the two call sites in this file drifted apart once already. */
+export function isVendorBookkeeping(key: string): boolean {
+  return SPEC_HIDDEN_KEYS.has(key) || VENDOR_RECORD_ID.test(key);
+}
+
 // Spec values that mean "the distributor did not fill this" - dropped so an
 // empty-in-disguise spec never takes a row (compared lowercased + trimmed).
 export const EMPTY_SPEC_VALUES = new Set([
@@ -566,7 +588,7 @@ export function groupSpecs(
   const families = new Map<string, { family: SpecFamily; rows: SpecRow[]; seq: number }>();
   let seq = 0;
   for (const [key, value] of Object.entries(specs)) {
-    if (SPEC_HIDDEN_KEYS.has(key)) continue;
+    if (isVendorBookkeeping(key)) continue;
     if (!isPresentableValue(value)) continue;
     const inFamily = resolveFamily(key);
     if (inFamily) {
@@ -656,7 +678,7 @@ export function deriveFacets(
   let seq = 0;
   for (const part of parts) {
     for (const [key, value] of Object.entries(part.specs)) {
-      if (SPEC_HIDDEN_KEYS.has(key)) continue;
+      if (isVendorBookkeeping(key)) continue;
       if (!isPresentableValue(value)) continue;
       const bucket = acc.get(key);
       if (bucket) {
