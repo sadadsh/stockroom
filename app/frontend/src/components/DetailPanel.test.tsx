@@ -888,14 +888,16 @@ describe("DetailPanel spec row pairing", () => {
   it("puts the value in its own column next to the label, not flung to the far edge", () => {
     wrap(
       <DetailPanel
-        detail={detail({ category: "ICs", specs: { "Operating Temperature": "-40 ~ 85 C" } })}
+        // Slew Rate deliberately: it is NOT in the curated ICs key set, so "promote not copy" leaves
+        // it in the Specifications list, which is the list whose row anatomy this test is about.
+        detail={detail({ category: "ICs", specs: { "Slew Rate": "13 V/us" } })}
         {...BASE}
       />,
     );
     // Scoped to the full Specifications list: Key Specifications now renders the same spec at the
     // head of this column (a hero summary above the full table), so an unscoped query matches twice.
     const list = document.querySelector('[data-dev-id="detail.specs-list"]') as HTMLElement;
-    const row = within(list).getByText("Operating Temperature").closest("div")!;
+    const row = within(list).getByText("Slew Rate").closest("div")!;
     // a grid with a bounded label track, so every value in the group starts at the same x and sits
     // adjacent to its label - not `justify-between`, which pushes them to opposite edges
     expect(row.className).toContain("grid");
