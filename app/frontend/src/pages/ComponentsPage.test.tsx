@@ -130,7 +130,10 @@ describe("ComponentsPage", () => {
     // The part appears in the list (the rail carries the library count now, not a header).
     expect(await screen.findByText("LM358")).toBeInTheDocument();
     // The detail panel is the only surface that renders the description.
-    expect(await screen.findByText("Dual Operational Amplifier")).toBeInTheDocument();
+    // findAllByText, not findByText: the description now appears BOTH as the lede at the head
+    // of the Specifications column and as the editable field in the Handoff tab. Only one is
+    // visible at a time (they are alternative tabs), but both are in the DOM.
+    expect((await screen.findAllByText("Dual Operational Amplifier")).length).toBeGreaterThan(0);
   });
 
   it("badges MPN duplicates and the Duplicates filter narrows to just them (D2)", async () => {
@@ -272,7 +275,7 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
-    await screen.findByText("Dual Operational Amplifier");
+    await screen.findAllByText("Dual Operational Amplifier");
     expect(mockApi.partDetail).toHaveBeenCalledTimes(1);
 
     await user.click(await screen.findByRole("button", { name: "Delete Part?" }));
