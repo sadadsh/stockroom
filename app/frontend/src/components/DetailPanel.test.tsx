@@ -1088,3 +1088,47 @@ describe("the 3D tile's click target", () => {
     expect(document.querySelector('[data-dev-id="detail.asset-symbol"]')!.tagName).toBe("BUTTON");
   });
 });
+
+describe("a spec value never breaks INSIDE one of its tokens", () => {
+  // Measured on the owner's real window: "Peak Pulse Current (10/1000us)" rendered as
+  // "2.5A / (8/20us / )" with an orphaned ")" on its own line, and elsewhere split the unit itself
+  // into "8/20u" + "s". A reader cannot tell "8/20us" from "8/20u s", so this is correctness.
+  //
+  // jsdom does NO layout, so the width at which it breaks was measured separately in real Chromium
+  // (see the comment on SpecValue): a 60px value track is fine, 48px and below breaks inside, and
+  // `word-break: keep-all` changes nothing. What is asserted HERE is the DOM contract that fix
+  // rests on, which is the part jsdom can actually see.
+  it("holds a token containing a slash together", () => {
+    wrap(
+      <DetailPanel detail={detail({ specs: { "Peak Pulse": "2.5A (8/20us)" } })} {...BASE} />,
+    );
+    // Asserted through the CLASS rather than the exact string: the spec pipeline prettifies a
+    // value on its way to the row, so pinning the rendered text here would be testing the
+    // prettifier. What matters is that the bracketed token arrives as ONE unbreakable unit.
+    const held = Array.from(document.querySelectorAll("span.whitespace-nowrap")).map(
+      (el) => el.textContent ?? "",
+    );
+    const token = held.find((s) => s.includes("8/20"));
+    expect(token, `no unbreakable token held 8/20; got ${JSON.stringify(held)}`).toBeTruthy();
+    // Both brackets in the SAME token, so the closing one can never be orphaned onto its own line.
+    expect(token).toContain("(");
+    expect(token).toContain(")");
+  });
+
+  it("leaves an ordinary value as a PLAIN text node", () => {
+    // The regression that killed the first attempt: wrapping every token in a span fragments the
+    // text node, and `getByText` matches an element by its DIRECT text children, so a blanket
+    // split silently broke every existing query for a spec value. A value with no break-risk must
+    // stay exactly as it was.
+    wrap(<DetailPanel detail={detail({ specs: { Resistance: "1.1 kΩ" } })} {...BASE} />);
+    const el = screen.getByText("1.1 kΩ");
+    expect(el.tagName).toBe("DD");
+    expect(el.querySelector("span.whitespace-nowrap")).toBeNull();
+  });
+
+  it("still lets a token too long for any track break rather than overflowing", () => {
+    const long = `${"A".repeat(30)}/${"B".repeat(30)}`;
+    wrap(<DetailPanel detail={detail({ specs: { Weird: long } })} {...BASE} />);
+    expect(screen.getByText(long).querySelector("span.whitespace-nowrap")).toBeNull();
+  });
+});
