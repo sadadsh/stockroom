@@ -54,11 +54,21 @@ export function useCompleteOnboarding() {
   });
 }
 
+// The app reconciles with the remote in the background now (AppContext.start_background_sync), so
+// a collaborator's part can land in the library while this window is open. Without a refetch the
+// list would still only change on navigation, and the owner's complaint - "it shouldnt need to
+// relaunch" - would be half-answered: pulled on disk, invisible on screen.
+//
+// Same shape and the same reasoning as useUpdateCheck below, which already runs on an interval for
+// exactly this class of bug. `refetchOnWindowFocus` is what makes the common case feel instant:
+// coming back to the window after adding a part elsewhere shows it immediately.
 export function usePartsQuery(args: ListPartsArgs) {
   return useQuery({
     queryKey: ["parts", args.q ?? "", args.category ?? "", !!args.completeOnly],
     queryFn: () => api.listParts(args),
     placeholderData: keepPreviousData,
+    refetchInterval: 2 * 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 

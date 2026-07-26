@@ -5,6 +5,7 @@ derived index is kept warm and rebuilt on load, on profile switch, and after a p
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -128,6 +129,50 @@ class AppContext:
         except Exception:  # noqa: BLE001 - auto-push is best-effort; never break the write
             pass
 
+    def reconcile(self) -> bool:
+        """Sync with the remote and REBUILD the derived indexes when a pull brought anything in.
+
+        The rebuild is the half that makes a pull visible: part records and project registrations
+        are both committed into this same library repo, so new files on disk mean a stale SQLite
+        index and a UI that shows the old library. `POST /api/sync` has always done this; the
+        automatic paths call THIS so they cannot drift from the button.
+
+        Returns True when something was pulled. Never raises: offline, no remote, no credential and
+        a rejected fast-forward are all ordinary outcomes.
+        """
+        if not getattr(self.config, "sync_enabled", True):
+            return False
+        try:
+            result = self.sync.sync()
+        except Exception:  # noqa: BLE001 - reconciling must never break a launch or a running app
+            return False
+        if getattr(result, "pulled", False):
+            self.rebuild_index()
+            self.rebuild_project_index()
+            return True
+        return False
+
+    def start_background_sync(self, interval_seconds: float = 120.0) -> "threading.Event":
+        """Keep reconciling for as long as the app runs, not only at launch.
+
+        Owner, 2026-07-26: "it shouldnt need to relaunch". A launch-only pull still leaves a window
+        that has been open for an hour showing a library from an hour ago, which is the same
+        staleness in slower motion. Mirrors the update check the rail already runs on an interval
+        for exactly this reason.
+
+        A daemon thread on a stoppable Event, so nothing has to be torn down on exit and a test can
+        stop it deterministically. The per-repo write lock added earlier makes a background pull
+        safe against a concurrent local write: they queue rather than collide on `.git/index.lock`.
+        """
+        stop = threading.Event()
+
+        def loop() -> None:
+            while not stop.wait(interval_seconds):
+                self.reconcile()
+
+        threading.Thread(target=loop, name="stockroom-sync-loop", daemon=True).start()
+        return stop
+
     def sync_on_launch(self) -> None:
         """Reconcile this machine's library with the remote once, at startup.
 
@@ -149,12 +194,7 @@ class AppContext:
         no credential and a rejected fast-forward are all ordinary, and none of them may stop the
         window opening.
         """
-        if not getattr(self.config, "sync_enabled", True):
-            return
-        try:
-            self.sync.sync()
-        except Exception:  # noqa: BLE001 - a launch must never fail because the network did
-            pass
+        self.reconcile()
 
     def rebuild_project_index(self) -> None:
         # Projects live repo-level (profile-independent), so this rebuilds from the same

@@ -142,6 +142,9 @@ def run_windowed(
     # problem. In a daemon thread because it talks to the network: the window must never wait on it,
     # and `sync_on_launch` is already best-effort and cannot raise.
     threading.Thread(target=ctx.sync_on_launch, name="stockroom-launch-sync", daemon=True).start()
+    # ...and KEEP reconciling while the window is open. Owner: "it shouldnt need to relaunch".
+    # A launch-only pull still leaves a window open for an hour showing an hour-old library.
+    ctx.start_background_sync()
 
     app = create_app(ctx)
     port = pick_free_port()

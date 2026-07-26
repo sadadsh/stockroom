@@ -59,6 +59,7 @@ def test_a_real_launch_actually_calls_it(tmp_path, monkeypatch):
     from stockroom.host import run as run_mod
 
     called = threading.Event()
+    looping = threading.Event()
 
     class _Ctx:
         rendered_dom_fetcher = object()
@@ -67,6 +68,12 @@ def test_a_real_launch_actually_calls_it(tmp_path, monkeypatch):
 
         def sync_on_launch(self):
             called.set()
+
+        def start_background_sync(self, *a, **k):
+            # Asserted too: a one-shot at launch without the loop is the owner's exact complaint
+            # ("it shouldnt need to relaunch") only slowed down, not fixed.
+            looping.set()
+            return threading.Event()
 
     ctx = _Ctx()
     # `create_app` is imported INSIDE run_windowed, so it is patched on its own module.
@@ -86,3 +93,66 @@ def test_a_real_launch_actually_calls_it(tmp_path, monkeypatch):
     run_mod.run_windowed(libraries_root=tmp_path, ctx=ctx, open_window=lambda url, token: None)
 
     assert called.wait(timeout=5), "launching the app did not reconcile the library"
+    assert looping.is_set(), "the launch did not start the background sync loop"
+
+
+def test_a_pull_refreshes_the_derived_indexes(app_ctx):
+    """The half that makes a pull VISIBLE.
+
+    New part records on disk mean a stale SQLite index and a UI still showing the old library.
+    `POST /api/sync` has always rebuilt both indexes after a pull; the automatic paths did not, so
+    the first version of the launch sync would have pulled a collaborator's part and shown nothing.
+    """
+    class _Pulled:
+        pulled = True
+
+    class _S:
+        def sync(self):
+            return _Pulled()
+
+    rebuilt = []
+    app_ctx.sync = _S()
+    app_ctx.rebuild_index = lambda: rebuilt.append("index")
+    app_ctx.rebuild_project_index = lambda: rebuilt.append("projects")
+    assert app_ctx.reconcile() is True
+    assert rebuilt == ["index", "projects"], f"a pull left the indexes stale: {rebuilt}"
+
+
+def test_nothing_is_rebuilt_when_nothing_came_in(app_ctx):
+    class _S:
+        def sync(self):
+            return type("R", (), {"pulled": False})()
+
+    rebuilt = []
+    app_ctx.sync = _S()
+    app_ctx.rebuild_index = lambda: rebuilt.append("index")
+    assert app_ctx.reconcile() is False
+    assert rebuilt == [], "an unchanged sync rebuilt the index for nothing"
+
+
+def test_it_keeps_reconciling_while_the_app_runs(app_ctx):
+    """Owner: "it shouldnt need to relaunch". A launch-only pull leaves a window that has been open
+    an hour showing an hour-old library - the same staleness, slower."""
+    import time
+
+    calls = []
+    app_ctx.reconcile = lambda: calls.append(1)
+    stop = app_ctx.start_background_sync(interval_seconds=0.05)
+    deadline = time.time() + 5
+    while len(calls) < 2 and time.time() < deadline:
+        time.sleep(0.02)
+    stop.set()
+    assert len(calls) >= 2, f"the background loop did not keep running (calls={len(calls)})"
+
+
+def test_the_loop_stops_when_asked(app_ctx):
+    import time
+
+    calls = []
+    app_ctx.reconcile = lambda: calls.append(1)
+    stop = app_ctx.start_background_sync(interval_seconds=0.05)
+    time.sleep(0.2)
+    stop.set()
+    settled = len(calls)
+    time.sleep(0.3)
+    assert len(calls) == settled, "the loop kept going after stop"
