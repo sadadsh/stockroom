@@ -774,7 +774,15 @@ def test_add_part_derives_a_human_name_when_the_name_is_only_the_mpn(tmp_path, f
 
     assert record.display_name != staged.mpn, "still just the MPN"
     assert "Buck Converter" in record.display_name  # singularized functional descriptor
-    assert record.mpn in record.display_name  # the MPN is kept, not thrown away
+    # SUPERSEDED 2026-07-26: this line used to assert `record.mpn in record.display_name`.
+    # The original complaint was that the name was ONLY the MPN and therefore unreadable, which the
+    # descriptor above fixes; carrying the MPN inside the name was incidental to that fix, never the
+    # requirement. The owner then asked for the opposite explicitly: "the MPN always shows under the
+    # title so u can humanize the name as much as possible based off the description or specs". So
+    # the name is now purely human and the MPN is NOT in it.
+    # The floor that still matters, and is asserted here: a part is never left anonymous.
+    assert record.display_name.strip(), "a part must always end up with some name"
+    assert record.mpn not in record.display_name
 
 
 def test_add_part_never_overwrites_a_name_the_user_actually_typed(tmp_path, fixtures_dir):
