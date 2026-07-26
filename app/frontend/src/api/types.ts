@@ -1602,7 +1602,9 @@ export interface LibraryPinRecord {
 // Registry data, so the surface never hardcodes that `SR_LIB` is a KiCad concept.
 export interface LibraryPathContract {
   // "env_var": a named variable must be set on each machine. "relative": nothing to set.
-  kind: "env_var" | "relative";
+  // "derived": the file carrying the references is machine-specific, so Stockroom rebuilds it
+  // locally. Nothing to set, but the rebuild is not optional (this is Altium's .DbLib).
+  kind: "env_var" | "relative" | "derived";
   variable: string;
   config_file: string;
   prefix: string;
