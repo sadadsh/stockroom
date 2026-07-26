@@ -142,8 +142,29 @@ export function mergeResultIntoCandidate(
     purchase = candidate.purchase;
   }
 
+  // KEEP THE DISAGREEMENTS. `pulledSpecConflicts` is what the review modal renders, so storing
+  // exactly its output means the record can never disagree with what the person was shown. The
+  // canonical FIELD conflicts (description, ...) ride along too, because the refresh lane
+  // persists spec_conflicts AND field_conflicts (backend `apply.conflict_entries`) and the two
+  // lanes producing different records for one part is the bug this closes.
+  const alternates: NonNullable<StagingCandidate["alternates"]> = {
+    ...(candidate.alternates ?? {}),
+  };
+  for (const { key, values } of pulledSpecConflicts(candidate, result)) {
+    alternates[key] = values.map((v) => ({ value: v.value, source: v.source, confidence: "" }));
+  }
+  for (const [key, sourced] of Object.entries(result.field_conflicts ?? {})) {
+    if (sourced.length < 2) continue;
+    alternates[key] = sourced.map((s) => ({
+      value: String(s.value ?? ""),
+      source: s.source,
+      confidence: s.confidence ?? "",
+    }));
+  }
+
   return {
     ...candidate,
+    alternates,
     mpn: mpn || candidate.mpn,
     manufacturer: manufacturer || candidate.manufacturer,
     description: description || candidate.description,
