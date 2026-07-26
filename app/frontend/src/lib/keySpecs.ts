@@ -127,12 +127,43 @@ export function keySpecRows(
     if (out.length >= KEY_SPEC_LIMIT) break;
     take(
       all.find((r) => {
-        const key = r.key.toLowerCase();
-        return key.includes(term) || term.includes(key);
+        // BOTH the raw key and the human label. Records key a spec the way the DISTRIBUTOR writes it
+        // ("Voltage - Breakdown (Min)"), while these terms are written the way a person says it
+        // ("breakdown voltage") - so matching the key alone promoted 2 of 7 curated specs on a real
+        // diode and left the rest sitting below, which is what the render showed.
+        const candidates = [r.key.toLowerCase(), (r.label ?? "").toLowerCase()];
+        return candidates.some((c) => c.length > 0 && (c.includes(term) || term.includes(c)));
       }),
     );
   }
   return out;
+}
+
+/**
+ * The Specifications groups with the promoted rows REMOVED - "promote, not copy" (owner 2026-07-26).
+ *
+ * A spec lifted into Key Specifications leaves the list below rather than appearing twice in the same
+ * column. Researched before implementing rather than argued from taste: duplication in a data display
+ * "adds extra items without any value", and NN/G frame progressive disclosure as SEQUENCING what
+ * matters most rather than hiding it - so moving a row up the column loses nothing, while repeating it
+ * costs a reader two lookups to discover the two entries are the same fact.
+ *
+ * Two things this has to get right, both of which were the argument AGAINST promoting:
+ *   - the group's count must not lie. It cannot: every count is derived from `rows.length`, so
+ *     filtering the rows updates the count by construction.
+ *   - a group emptied by promotion is DROPPED, not rendered as a titled disclosure holding nothing.
+ *
+ * Pure and non-mutating: the panel re-renders on every pin, and mutating the caller's groups would
+ * compound the removal until the list emptied itself.
+ */
+export function withoutPromoted(
+  groups: readonly SpecGroup[],
+  promoted: ReadonlySet<string>,
+): SpecGroup[] {
+  if (promoted.size === 0) return groups.map((g) => ({ ...g }));
+  return groups
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !promoted.has(r.key)) }))
+    .filter((g) => g.rows.length > 0);
 }
 
 /**

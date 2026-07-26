@@ -13,7 +13,13 @@
  * instead of a tall rail, and the spec sheet no longer dominates the page. Everything degrades
  * honestly when a field is absent, and no data is fabricated.
  */
-import { useCallback, useEffect, useState, type HTMLAttributes, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import type {
   PartDetail,
   PurchaseRef,
@@ -46,7 +52,13 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { HandoffBand } from "./HandoffBand";
-import { type PinnedSpecs, isPinned, keySpecRows, togglePinned } from "../lib/keySpecs";
+import {
+  type PinnedSpecs,
+  isPinned,
+  keySpecRows,
+  togglePinned,
+  withoutPromoted,
+} from "../lib/keySpecs";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
 import { Glb3DView } from "./Glb3DView";
@@ -177,8 +189,14 @@ function KeySpecificationsBlock({
             className="group flex items-baseline gap-3 py-[3px] text-xs leading-[16px]"
           >
             <span className="min-w-0 flex-1 truncate text-t2">{row.label}</span>
-            <span className="tnum flex-none font-mono text-t1">{row.value}</span>
-            {row.unit ? <span className="flex-none font-mono text-t3">{row.unit}</span> : null}
+            {/* The SAME renderer the Specifications list uses, on the same combined value+unit
+                string. The owner asked for this block "formatted like the specifications", and two
+                lists that split the unit differently do not match - it also meant a value read as
+                one string below and as two spans up here, which broke a text query that had every
+                right to expect them identical. */}
+            <span className="tnum min-w-0 flex-none break-words font-mono text-xs text-t1">
+              <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
+            </span>
             <PinStar
               pinned={isPinned(pinned, category, row.key)}
               onToggle={() => onTogglePin(category, row.key)}
@@ -442,6 +460,16 @@ export function DetailPanel({
       rows: group.rows.filter((row) => !isReferenceOnlySpecKey(row.key)),
     }))
     .filter((group) => group.rows.length > 0);
+  // The keys Key Specifications is showing, derived from the SAME inputs that block uses, so the two
+  // can never disagree about what was promoted. One source, or a row could vanish from the list below
+  // without appearing above it - which would silently DELETE a spec from the sheet.
+  // NOT a useMemo. This sits below the panel's loading / error / no-selection early returns, so a
+  // hook here is called on some renders and not others - React caught it immediately as "Rendered
+  // more hooks than during the previous render", which corrupts the hook order for every hook after
+  // it. The work is a handful of scans over a few dozen rows; there was nothing to memoise anyway.
+  const promotedSpecKeys = new Set(
+    keySpecRows(allSpecGroups, detail.category, pinnedSpecs).map((r) => r.key),
+  );
   // The procurement facts (origin, the page's own tariff rate, export classification, order
   // quantities) go to SOURCING, not here. They are real vendor data the owner asked to stop
   // losing, but they are not physical parameters - and this is the one place the reference-only
@@ -725,7 +753,11 @@ export function DetailPanel({
               title={<Text id="detail.specifications">Specifications</Text>}
             >
               <SpecificationsSection
-                groups={specGroups}
+                // PROMOTE, NOT COPY (owner 2026-07-26): a spec shown in Key Specifications above is
+                // removed from its group here, so no fact appears twice in one column. The group
+                // counts stay honest because they derive from `rows.length`, and a group emptied by
+                // promotion is dropped rather than left as an empty disclosure.
+                groups={withoutPromoted(specGroups, promotedSpecKeys)}
                 alternates={detail.alternates ?? {}}
                 onUseSpecValue={onUseSpecValue}
                 category={detail.category}
@@ -1516,10 +1548,14 @@ function AssetTile({
 // Specifications track is the WIDE one (537px measured at an 825px container), and holding the
 // narrow 7rem track there truncated real labels - "Operating Tempera...", "Moisture Sensitivit...".
 // A label clipped to an ellipsis has lost the same information a clipped value would.
+// THREE tracks: label, value, and a fixed lane for the pin star. The star used to be a third child of
+// a TWO-column grid, so it wrapped onto a new implicit row and doubled the height of every spec row -
+// visible instantly in a render, invisible to every test, because jsdom does no layout. The lane is a
+// fixed 16px and is always present so a list WITHOUT pinning keeps identical row geometry.
 const SPEC_ROW_GRID =
-  "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] " +
-  "@2xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)] " +
-  "@4xl:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] items-baseline gap-3";
+  "grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_16px] " +
+  "@2xl:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)_16px] " +
+  "@4xl:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_16px] items-baseline gap-3";
 const ALT_ROW_GRID =
   "grid grid-cols-[minmax(0,calc(7rem-7px))_minmax(0,1fr)_auto] " +
   "@2xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] " +
@@ -1902,13 +1938,17 @@ function SpecRowList({
               {/* Promotes this spec into Key Specifications at the head of the column. Hidden until
                   the row is hovered or the star is focused, so ~30 of these do not compete with the
                   values they sit beside. */}
+              {/* the lane is always here so row geometry never depends on whether this list can
+                  be pinned from; only the control inside it is conditional */}
               {onTogglePin && category ? (
                 <PinStar
                   pinned={isPinned(pinned ?? {}, category, row.key)}
                   onToggle={() => onTogglePin(category, row.key)}
                   label={typeof row.label === "string" ? row.label : row.key}
                 />
-              ) : null}
+              ) : (
+                <span aria-hidden />
+              )}
             </div>
             {/* a spec two distributors disagree about keeps both answers, swappable. `raw` and not
                 `value`: "1%" renders as "±1%", and comparing the presented string made the answer
