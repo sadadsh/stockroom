@@ -7,6 +7,10 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ModelSceneHandle, RenderMode, ViewMode } from "../lib/threeScene";
+// VALUE import, and deliberately from boardPlane rather than threeScene: threeScene
+// top-level-imports three and is loaded lazily so three lands in its own chunk, so importing a
+// value from it here would pull the whole library into the main bundle. boardPlane is three-free.
+import { DEFAULT_LAYERS } from "../lib/boardPlane";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 import { Icon } from "./Icon";
@@ -66,19 +70,19 @@ export function Glb3DView({
   const [renderError, setRenderError] = useState(false);
   const sceneRef = useRef<ModelSceneHandle | null>(null);
   // read inside the mount effect without making the scene remount when the toggle flips
-  const showLandRef = useRef(false);
+  const showLandRef = useRef(DEFAULT_LAYERS.pads);
   // Which canonical view is in force. Tracked in React (not read back off the camera) so the
   // control can show the CURRENT answer rather than just issuing commands into the scene.
   const [view, setView] = useState<ViewMode | null>(null);
-  const [showLand, setShowLand] = useState(false);
+  const [showLand, setShowLand] = useState(DEFAULT_LAYERS.pads);
   const [renderMode, setRenderMode] = useState<RenderMode>("realistic");
   // The idle spin. Owner 2026-07-26 asked for "an option to stop rotation" - and the same switch closes
   // a logged accessibility defect, since the perpetual rotation ignored prefers-reduced-motion while
   // the 300ms view tween honoured it. `setSpin` returns the state actually in force, which is false
   // under reduced motion whatever is asked, so the chip can never claim to be spinning when it is not.
   const [spinning, setSpinning] = useState(true);
-  const [showModel, setShowModel] = useState(true);
-  const [showBoard, setShowBoard] = useState(false);
+  const [showModel, setShowModel] = useState(DEFAULT_LAYERS.model);
+  const [showBoard, setShowBoard] = useState(DEFAULT_LAYERS.board);
 
   useEffect(() => {
     const container = mountRef.current;
