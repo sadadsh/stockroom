@@ -26,11 +26,31 @@ const PEEK_LABEL =
   "[@media(hover:hover)]:group-hover/rail:delay-150 " +
   "group-focus-within/rail:w-auto group-focus-within/rail:opacity-100";
 
-/** A collapsed rail control becomes a labelled row during the peek. */
-const PEEK_ROW =
-  "[@media(hover:hover)]:group-hover/rail:justify-start " +
-  "[@media(hover:hover)]:group-hover/rail:px-2.5 " +
-  "group-focus-within/rail:justify-start group-focus-within/rail:px-2.5";
+/** A collapsed rail control becomes a labelled row during the peek.
+ *
+ * The peek REVEALS a label; it must not MOVE the glyph. It used to do both: the row switched from
+ * `justify-center` to `justify-start px-2.5` on hover while the panel's own padding went px-2 ->
+ * px-3, so every glyph jumped 10px right the moment the pointer arrived and back when it left
+ * (MEASURED: glyph centre 20.5 collapsed, 30.5 hovered).
+ *
+ * Worse, NEITHER position was the rail's centre line, which is 26 for a 52px rail. The glyph sat
+ * at 20.5 because the label is `w-0` rather than `display:none` - so it is still a flex item, and
+ * the row's 10px `gap` was being centred along with it, dragging the glyph 5px left. A control
+ * with no label had no gap to drag it and sat somewhere else again, which is the uneven collapsed
+ * rail recorded earlier as "spread 11.67px".
+ *
+ * So the row is left-aligned in BOTH states and the glyph gets a fixed-width box (PEEK_GLYPH)
+ * that centres it on the rail's centre line. The gap and the label then live to its right, where
+ * growing them cannot move it. */
+const PEEK_ROW = "justify-start px-0";
+
+/** The glyph box of a collapsed rail control: it fills the panel's content width, so its centre is
+ * the rail's centre no matter what follows it, and it is identical while the peek is open.
+ *
+ * 35px, not 36: the 52px panel spends 16 on padding AND 1 on its right border, so its content box
+ * is 35 wide. A 36px box overflowed it by exactly one pixel - invisible under the panel's own
+ * clipping, and precisely the kind of "harmless" overflow that gets explained away later. */
+const PEEK_GLYPH = "flex w-[35px] flex-none items-center justify-center";
 
 function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
@@ -173,10 +193,12 @@ export function Rail() {
             // straight through the panel. Composite the tint over an opaque canvas base in one
             // element, so the peek is opaque and still exactly the rail's colour.
             "bg-canvas [background-image:linear-gradient(var(--c-rail),var(--c-rail))] " +
-            "[@media(hover:hover)]:hover:w-[190px] [@media(hover:hover)]:hover:px-3 " +
-            "[@media(hover:hover)]:hover:shadow-pop [@media(hover:hover)]:hover:delay-150 " +
-            "focus-within:w-[190px] focus-within:px-3 focus-within:shadow-pop"
-          : "bg-rail w-[190px] px-3")
+            // WIDTH ONLY. The padding stayed px-2 (it used to go px-3, which moved every row 4px)
+            // and the drop shadow is gone at the owner's request - the peek is already an
+            // opaque panel with a border, so the shadow only added weight to a hover state.
+            "[@media(hover:hover)]:hover:w-[190px] [@media(hover:hover)]:hover:delay-150 " +
+            "focus-within:w-[190px]"
+          : "bg-rail h-full w-[190px] px-3")
       }
     >
       {/* wordmark (north-star .wm): the rail's panel-title bar - same band + bottom hairline as every
@@ -272,10 +294,11 @@ export function Rail() {
           onClick={() => setAboutOpen(true)}
           className={
             "flex h-[34px] items-center gap-2.5 rounded-control text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
-            (collapsed ? "justify-center px-0 " + PEEK_ROW : "px-2.5")
+            (collapsed ? "" + PEEK_ROW : "px-2.5")
           }
         >
-          <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
+          <span aria-hidden className={"flex h-[17px] flex-none items-center justify-center "
+        + (collapsed ? PEEK_GLYPH : "w-[17px]")}>
             <Icon id="nav.about" className="h-full w-full" />
           </span>
           <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
@@ -308,7 +331,7 @@ export function Rail() {
                 // bare 34px nav icons is what made the collapsed rail read as botched.
                 "flex items-center gap-2.5 rounded-control text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 " +
                 (collapsed
-                  ? "h-[34px] justify-center px-0 hover:bg-[var(--c-hover)] " + PEEK_ROW
+                  ? "h-[34px] hover:bg-[var(--c-hover)] " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5 disabled:hover:bg-raise")
               }
             >
@@ -327,7 +350,7 @@ export function Rail() {
               className={
                 "flex items-center gap-2.5 rounded-control text-xs font-medium text-t2 " +
                 (collapsed
-                  ? "h-[34px] justify-center px-0 " + PEEK_ROW
+                  ? "h-[34px] " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5")
               }
               title="You have the latest version"
@@ -493,14 +516,15 @@ function RailItem({
       className={
         "flex h-[32px] items-center gap-2.5 rounded-control text-left text-base transition " +
         (collapsed
-          ? "justify-center px-0 " + PEEK_ROW + " "
+          ? "" + PEEK_ROW + " "
           : "px-2.5 ") +
         (selected
           ? "bg-acc-soft font-semibold text-t1 shadow-[inset_2px_0_0_var(--c-acc)]"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
       }
     >
-      <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
+      <span aria-hidden className={"flex h-[17px] flex-none items-center justify-center "
+        + (collapsed ? PEEK_GLYPH : "w-[17px]")}>
         {NAV_ICONS[item.route] ?? null}
       </span>
       {/* ALWAYS rendered, so the peek has something to reveal and the accessible name is real text
