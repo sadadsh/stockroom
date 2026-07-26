@@ -2180,13 +2180,6 @@ function Sourcing({
                   </span>
                 ) : null}
               </div>
-              {p.part_number ? (
-                <div className="tnum mt-0.5 break-all font-mono text-2xs text-t3">
-                  {/* NOT truncated. A part number clipped to "595-TPD6E05U06R..." cannot be checked
-                      against a vendor page or pasted into a cart, which is the only thing it is for. */}
-                  {p.part_number}
-                </div>
-              ) : null}
             </div>
             <div className="tnum whitespace-nowrap text-right font-mono text-xs text-t2">
               {p.stock != null ? (
@@ -2235,6 +2228,17 @@ function Sourcing({
               </a>
             </div>
             </div>
+            {/* THE VENDOR PART NUMBER, on its own full-width line under the grid. It lived in the grid's
+                first column, which is sized for a vendor NAME - truncated there it read
+                "595-TPD6E05U06R..." and could not be checked against a vendor page or pasted into a
+                cart, and `break-all` in a ~90px column shattered it into five lines. Neither is a
+                font-size problem: a 14-character part number simply does not belong in that column,
+                and the card is 300px wide. */}
+            {p.part_number ? (
+              <div className="tnum mt-1 truncate font-mono text-2xs text-t3" title={p.part_number}>
+                {p.part_number}
+              </div>
+            ) : null}
             {/* A vendor with a part number but NO price and NO stock renders as a bare line with
                 two empty columns, which reads as a broken row rather than as missing data. A real
                 zero-stock answer arrives as `stock: 0` and takes the branch above, dot and all. */}
