@@ -1132,3 +1132,23 @@ describe("a spec value never breaks INSIDE one of its tokens", () => {
     expect(screen.getByText(long).querySelector("span.whitespace-nowrap")).toBeNull();
   });
 });
+
+describe("a spec group's count", () => {
+  it("sits NEXT TO the label it counts, not flushed to the far edge", async () => {
+    // Measured on a 1600px window: `detail.specs` is 530px wide and the count was `ml-auto`, so
+    // "5" rendered ~500px from the word "Electrical". Four of those hung in a right-hand column
+    // with nothing tying each number to its noun. jsdom has no layout, so this asserts the
+    // STRUCTURE that produces the adjacency: the count is the title's immediate next sibling,
+    // and nothing in the header pushes it away with an auto margin.
+    wrap(<DetailPanel detail={detail({ specs: { "Breakdown Voltage": "6.5 V" } })} {...BASE} />);
+    const header = await screen.findByText("Electrical");
+    const button = header.closest("button");
+    expect(button).not.toBeNull();
+    const spans = Array.from(button!.querySelectorAll("span"));
+    const titleIndex = spans.findIndex((s) => s.textContent === "Electrical");
+    expect(titleIndex).toBeGreaterThanOrEqual(0);
+    const count = spans[titleIndex + 1];
+    expect(count?.textContent).toMatch(/^\d+$/);
+    expect(count?.className ?? "").not.toContain("ml-auto");
+  });
+});
