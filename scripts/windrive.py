@@ -393,12 +393,62 @@ def cmd_up(args) -> int:
     return 1
 
 
+def _host_pids() -> list[int]:
+    """Every running Stockroom host, by pid.
+
+    PowerShell CIM, never `wmic` (removed from current Windows) and never the webview IMAGE NAME:
+    measured on this machine, only 5 of 17 `msedgewebview2.exe` belonged to Stockroom and the rest
+    were Windows Widgets and SearchHost.
+    """
+    out = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+         "Where-Object { $_.CommandLine -like '*stockroom.host.run*' } | "
+         "Select-Object -ExpandProperty ProcessId"],
+        capture_output=True, text=True,
+    ).stdout
+    return [int(line) for line in out.split() if line.strip().isdigit()]
+
+
+def cmd_hosts(args) -> int:
+    """List the running hosts, so 'which window am I driving' is a command and not a guess.
+
+    Promoted from a PowerShell one-liner retyped three times in one session. Knowing there is MORE
+    THAN ONE is the whole point: two WebView2 controls cannot share a debugging port, so a second
+    host means whatever answers CDP is not necessarily the one you just started.
+    """
+    pids = _host_pids()
+    if not pids:
+        print("no Stockroom host is running")
+        return 0
+    owned = "yes" if _port_busy(args.port) else "no"
+    print(f"{len(pids)} Stockroom host(s) running: {pids}")
+    print(f"debugging port {args.port} answering: {owned}")
+    if len(pids) > 1:
+        print("  more than one host is up, so the window answering CDP may not be the newest -"
+              " stop the others before trusting a tour")
+    return 0
+
+
+def _port_busy(port: int) -> bool:
+    try:
+        return bool(list_targets(port))
+    except Exception:
+        return False
+
+
 def cmd_down(args) -> int:
     """Kill Stockroom by its process TREE from the owning python pid.
 
     NEVER `taskkill /IM msedgewebview2.exe`: measured on this machine, only 5 of 17 such processes
     were Stockroom's and the rest belonged to Windows Widgets and SearchHost.
     """
+    if getattr(args, "all", False):
+        pids = _host_pids()
+        for p in pids:
+            subprocess.run(["taskkill", "/PID", str(p), "/T", "/F"], capture_output=True)
+        print(f"stopped {len(pids)} host(s): {pids}" if pids else "no host was running")
+        return 0
     pid = getattr(args, "pid", 0)
     if not pid:
         try:
@@ -413,14 +463,7 @@ def cmd_down(args) -> int:
         # PowerShell CIM, not `wmic`: wmic is deprecated and REMOVED from current Windows, so the
         # first version of this raised `FileNotFoundError: [WinError 2]` and stopped nothing.
         # Discovered by running it, not by reading a compatibility note.
-        out = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-Command",
-             "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-             "Where-Object { $_.CommandLine -like '*stockroom.host.run*' } | "
-             "Select-Object -ExpandProperty ProcessId"],
-            capture_output=True, text=True,
-        ).stdout
-        pids = [int(line) for line in out.split() if line.strip().isdigit()]
+        pids = _host_pids()
         if len(pids) > 1:
             print(f"{len(pids)} Stockroom hosts are running ({pids}). Pass --pid to say which; "
                   "guessing could stop a window you are using.")
@@ -601,7 +644,10 @@ def main() -> int:
 
     down = sub.add_parser("down", help="stop the host by its process tree")
     down.add_argument("--pid", type=int, default=0, help="which host to stop, when several run")
+    down.add_argument("--all", action="store_true", help="stop every running host")
     down.set_defaults(func=cmd_down)
+
+    sub.add_parser("hosts", help="list running hosts and who owns the port").set_defaults(func=cmd_hosts)
 
     tour = sub.add_parser("tour", help="click through the app like a tester and report what breaks")
     tour.add_argument("--surface", action="append", default=[],
