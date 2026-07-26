@@ -431,7 +431,7 @@ export function DetailPanel({
               flex-1 (no min-h-0): the canvas absorbs the pane's slack so the hero grows to fill
               the column beside a tall specs pane, and still scrolls when content genuinely
               overflows (min-height:auto keeps it from compressing below its content). */}
-          <div data-dev-id="detail.canvas" className="flex flex-1 flex-col gap-2.5">
+          <div data-dev-id="detail.canvas" className="flex flex-none flex-col gap-2.5">
             <AssetTile
               devId="detail.asset-hero"
               stageDevId="detail.asset-stage"
@@ -458,7 +458,14 @@ export function DetailPanel({
               // proportion is therefore part of the COLUMN BALANCE slice (the owner's "sourcing is
               // squished, specifications is too large" and "do not look cramped"), not a change
               // that can be made on its own. See the Batch Plan.
-              className={hasModel ? "min-h-[300px] flex-1" : "h-[142px]"}
+              // A FIXED 300px, not `flex-1` (owner's choice, 2026-07-25). With flex-1 the stage
+              // stretched to whatever height the Specifications column happened to need - measured
+              // 266x618, aspect 0.43, a portrait stage for a part that is inherently landscape,
+              // which is the "grotesquely out of proportion" complaint. Pinning the height keeps
+              // the 3D tile clearly dominant over its 142px siblings without letting a long spec
+              // sheet stretch it. The column ends above the pane bottom as a result; that dead
+              // space is the accepted trade, chosen over a portrait stage.
+              className={hasModel ? "h-[300px]" : "h-[142px]"}
               art={<CubeArt />}
               thumb={
                 hasModel ? (
