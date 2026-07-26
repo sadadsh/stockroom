@@ -19,7 +19,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 264 as of 2026-07-26: the four pane collapse/expand controls (`detail.specs-collapse` /
 // `-expand`, `detail.sourcing-collapse` / `-expand`) for the owner's closable Specifications and
 // Sourcing panes. A deliberate re-baseline, which is what this gate is for.
-const EXPECTED_ENTRIES = 264;
+// 263 as of 2026-07-26: -detail.sourcing-qty, the amount-needed input the owner removed ("the need
+// box in the library should be removed"). The quantity-AWARE pricing it fed is untouched.
+const EXPECTED_ENTRIES = 263;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

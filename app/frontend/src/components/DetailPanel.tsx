@@ -200,9 +200,22 @@ function KeySpecificationsBlock({
         <span className={EYEBROW_DENSE}>
           <Text id="detail.top-specifications">Top Specifications</Text>
         </span>
-        <span className="ml-auto flex-none text-2xs text-t3">
-          {/* what the block is FOR, in three words, because "Top" invites "top by what?" */}
-          <Text id="detail.top-specifications-hint">What This Part Is</Text>
+        {/* A PIN, marking what this block IS: the rows pinned up out of the list below. Owner,
+            2026-07-26, replacing the "What This Part Is" caption that used to sit here - the caption
+            explained the block in words, the pin says the same thing in the same glyph the row
+            control uses, and it does not compete with the section title for the eye.
+            NOT a button: pinning happens on the rows themselves, and a control here would imply an
+            action this header does not have. */}
+        <span
+          className="ml-auto flex-none text-t3"
+          title="Pinned to Top Specifications"
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 16 16" className="h-[12px] w-[12px]" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            {/* a drawing pin seen side-on: head, shaft, point */}
+            <path d="M6 1.8h4l-.6 3.4 2.1 2.1v1.2H4.5V7.3l2.1-2.1z" />
+            <path d="M8 8.5v5.7" />
+          </svg>
         </span>
       </header>
       {/* gap-px on a line-coloured background draws the cell grid with no per-cell borders */}
@@ -2244,8 +2257,12 @@ function Sourcing({
   // BLANK by default (owner 2026-07-26). Empty means "no quantity asked", which reads as qty 1 below,
   // so the panel looks and prices exactly as it did before anyone types - the quantity feature costs
   // nothing until it is used.
-  const [qtyText, setQtyText] = useState("");
-  const needQty = Math.max(1, Math.floor(Number(qtyText) || 1));
+  // The quantity the sourcing maths prices against. The owner removed the visible input
+  // (2026-07-26) but NOT the quantity-aware selection it fed: `recommendVendor` and `extendedPrice`
+  // still decide Recommended by what an order actually costs rather than by the qty-1 price, which
+  // was a real bug when it was fixed. One named constant, so the day a quantity arrives from
+  // somewhere real (a project BOM line) there is exactly one place to feed it.
+  const needQty = 1;
   const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
     return (
@@ -2263,41 +2280,12 @@ function Sourcing({
   const recommended = orderable.length > 1 ? recommendVendor(orderable, needQty) : null;
   return (
     <div data-dev-id="detail.sourcing" className="flex flex-col">
-      {/* THE QUANTITY BOX. Owner: "an amount input box thats small and doesnt disturb the ui" - so it
-          is a 56px field on the header line the section already had, not a new band, and it defaults
-          to 1 so nothing about this panel changes until a quantity is actually entered. Typing
-          re-prices every row and re-decides Recommended; there is no button to press, because a button
-          would be a second thing to remember after typing the number. */}
-      {orderable.length > 0 ? (
-        <div className="mb-2 flex items-center gap-2">
-          <label className={EYEBROW_DENSE + " flex items-center gap-1.5"}>
-            <Text id="detail.sourcing-qty">Need</Text>
-            <input
-              data-dev-id="detail.sourcing-qty"
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={qtyText}
-              onChange={(e) => setQtyText(e.target.value)}
-              aria-label="Amount needed"
-              // NO placeholder. A greyed "1" sitting in the box reads as a value at a glance, which
-              // is the opposite of the "default to blank" the owner asked for - the NEED label already
-              // says what the field is for.
-              // SIZES TO ITS CONTENT, so a long quantity is never cut off and a blank field stays
-              // small. `field-sizing: content` is supported on the owner's runtime - checked, not
-              // assumed: their WebView2 reports Chromium 150 and CSS.supports("field-sizing",
-              // "content") is true. min/max keep it a recognisable field when empty and stop a pasted
-              // 12-digit number stretching the header.
-              className="tnum [field-sizing:content] min-w-[44px] max-w-[104px] rounded-control border border-line bg-field px-1.5 py-0.5 text-right font-mono text-xs text-t1 placeholder:text-t3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-          </label>
-          {needQty > 1 ? (
-            <span className="text-2xs text-t3">
-              prices and Recommended are for {needQty.toLocaleString()}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+      {/* THE QUANTITY BOX IS GONE (owner, 2026-07-26: "the need box in the library should be
+          removed"). The quantity-AWARE logic stays exactly as it was - `recommendVendor` and
+          `extendedPrice` still decide Recommended by what an order actually costs, at `needQty`,
+          which is now simply always 1. Only the visible control was removed, so nothing about the
+          pricing maths regressed and re-introducing an input elsewhere (a project BOM quantity, say)
+          is a matter of feeding this same number from another source. */}
       {orderable.map((p, i) => {
         const breaks = normalizePriceBreaks(p.price_breaks);
         // The tier IN FORCE at the needed quantity, not the qty-1 tier: the headline price now answers
