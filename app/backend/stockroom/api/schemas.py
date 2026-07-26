@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from stockroom.store.index import Facets as _Facets
 from stockroom.store.index import IndexRow
+from stockroom.store.parametric import ParametricFacets as _ParametricFacets
 from stockroom.store.project_index import ProjectIndexRow
 
 
@@ -35,6 +36,79 @@ class PartSummary(BaseModel):
         )
 
 
+def _scalar_specs(specs: dict) -> dict:
+    """The scalar spec values only (str / number / bool, non-empty) - the structured entries
+    in the bag (the pinout list, per-key provenance) are not table columns, so they are dropped
+    from the search row. Mirrors the parametric aggregator's notion of a facetable value, so a
+    column and its facet always agree on what counts as a spec."""
+    out: dict = {}
+    for key, value in (specs or {}).items():
+        if isinstance(value, str):
+            if value.strip():
+                out[key] = value
+        elif isinstance(value, (int, float, bool)):
+            out[key] = value
+    return out
+
+
+def _row_sourcing(record) -> tuple[int | None, float | None, str]:
+    """A flat ``(stock, unit_price, currency)`` from a record's stored purchase list for the
+    Stock / Unit columns: the qty-1 (lowest tier) price off the purchase that carries breaks,
+    else the first purchase's stock. Null-safe - a part with no purchase reports ``(None, None,
+    "")`` rather than raising. Mirrors ``library_price_index``'s best-purchase choice."""
+    purchases = list(getattr(record, "purchase", None) or [])
+    best = next((p for p in purchases if getattr(p, "price_breaks", None)), None)
+    if best is None:
+        best = purchases[0] if purchases else None
+    if best is None:
+        return None, None, ""
+    breaks = []
+    for b in (getattr(best, "price_breaks", None) or []):
+        try:
+            breaks.append((int(b["qty"]), float(b["price"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    breaks.sort(key=lambda qp: qp[0])
+    unit_price = breaks[0][1] if breaks else None
+    return getattr(best, "stock", None), unit_price, getattr(best, "currency", "") or ""
+
+
+class SearchRow(BaseModel):
+    """A RICH results row for the modular search table: the lean identity plus the part's own
+    spec bag and a flattened sourcing summary. The table picks its columns from ``specs`` on the
+    frontend, so a new spec becomes a column with zero backend change - the endpoint hands over
+    the data, never a hardcoded per-category column list."""
+
+    id: str
+    display_name: str
+    category: str
+    mpn: str
+    manufacturer: str
+    is_complete: bool
+    missing: list[str] = []
+    specs: dict[str, Any] = {}
+    stock: int | None = None
+    unit_price: float | None = None
+    currency: str = ""
+
+    @classmethod
+    def from_row_and_record(cls, row: IndexRow, record) -> "SearchRow":
+        stock, unit_price, currency = _row_sourcing(record)
+        return cls(
+            id=row.id,
+            display_name=row.display_name,
+            category=row.category,
+            mpn=row.mpn,
+            manufacturer=row.manufacturer,
+            is_complete=row.is_complete,
+            missing=list(row.missing),
+            specs=_scalar_specs(getattr(record, "specs", None) or {}),
+            stock=stock,
+            unit_price=unit_price,
+            currency=currency,
+        )
+
+
 class FacetsDTO(BaseModel):
     by_category: dict[str, int]
     by_manufacturer: dict[str, int]
@@ -48,6 +122,58 @@ class FacetsDTO(BaseModel):
             by_manufacturer=f.by_manufacturer,
             complete=f.complete,
             incomplete=f.incomplete,
+        )
+
+
+class FacetOptionDTO(BaseModel):
+    value: str
+    count: int
+
+
+class ParametricFacetDTO(BaseModel):
+    """One filter dimension GENERATED from the spec bag (never a hardcoded parameter
+    list). `kind` is "options" (top-N distinct values with counts) or "range" (a numeric
+    min/max, with `unit` when the values agree on one). Only the fields the kind uses are
+    populated; the others stay null (an options facet leaves min/max/unit null, a range
+    facet leaves options null)."""
+
+    key: str
+    label: str
+    kind: str
+    count: int
+    options: list[FacetOptionDTO] | None = None
+    min: float | None = None
+    max: float | None = None
+    unit: str | None = None
+
+
+class ParametricFacetsDTO(BaseModel):
+    category: str | None = None
+    facets: list[ParametricFacetDTO]
+    total: int
+
+    @classmethod
+    def from_aggregate(cls, agg: _ParametricFacets) -> "ParametricFacetsDTO":
+        return cls(
+            category=agg.category,
+            facets=[
+                ParametricFacetDTO(
+                    key=f.key,
+                    label=f.label,
+                    kind=f.kind,
+                    count=f.count,
+                    options=(
+                        [FacetOptionDTO(value=o.value, count=o.count) for o in f.options]
+                        if f.options is not None
+                        else None
+                    ),
+                    min=f.min,
+                    max=f.max,
+                    unit=f.unit,
+                )
+                for f in agg.facets
+            ],
+            total=agg.total,
         )
 
 
@@ -74,14 +200,15 @@ class MoveBody(BaseModel):
 
 
 class ProjectSummary(BaseModel):
-    """The list shape for a registered KiCad project (M7), served from the derived
-    project index. board_count/sheet_count and has_git are the digest fields the
-    Projects list renders; the full record (paths, git_root, audit_digest) loads on
-    detail. A presentation shape, never a second schema of record."""
+    """The list shape for a registered PCB project (M7, KiCad or Altium), served from
+    the derived project index. eda, board_count/sheet_count and has_git are the digest
+    fields the Projects list renders; the full record (paths, git_root, audit_digest)
+    loads on detail. A presentation shape, never a second schema of record."""
 
     id: str
     name: str
     root: str
+    eda: str
     board_count: int
     sheet_count: int
     has_git: bool
@@ -93,6 +220,7 @@ class ProjectSummary(BaseModel):
             id=row.id,
             name=row.name,
             root=row.root,
+            eda=row.eda,
             board_count=row.board_count,
             sheet_count=row.sheet_count,
             has_git=row.has_git,
@@ -101,10 +229,13 @@ class ProjectSummary(BaseModel):
 
 
 class RegisterProjectBody(BaseModel):
-    """Register an external KiCad project by its directory path (absolute). A bad or
-    non-project dir raises ValueError in the store, mapped to 400 by the error layer."""
+    """Register an external PCB project by its directory path (absolute). The EDA is
+    auto-detected from the files (KiCad vs Altium); a dir holding both needs `eda`
+    passed explicitly. A bad or non-project dir raises ValueError in the store,
+    mapped to 400 by the error layer."""
 
     root: str
+    eda: str | None = None
 
 
 class SetLibraryBody(BaseModel):
@@ -292,3 +423,267 @@ class ManualFillBody(BaseModel):
 
     ref: str
     part_id: str
+
+
+class AssignGroupBody(BaseModel):
+    """Assign one chosen shared-library part to a whole GROUP of identical placed components at once.
+
+    The bulk form of `ManualFillBody`: a project full of default-library passives groups into a handful
+    of (symbol, Value, Footprint) rows, and each row is one decision instead of one decision per
+    component. `refs` is every designator in the group. One atomic commit covers all of them, so the
+    project is never left half assigned. An unknown part, an empty `refs`, or any ref that names no
+    component in the project is a 400, and nothing is written."""
+
+    refs: list[str]
+    part_id: str
+
+
+class StmStatusDTO(BaseModel):
+    """The STM index build/health probe (stm-viewer INTERFACES.md section 4). Never gated on
+    409 - this IS the "is it built" check a 409-gated read endpoint routes the frontend to."""
+
+    built: bool
+    building: bool
+    source_path: str
+    source_present: bool
+    all_families: bool
+    device_xml_count: int
+    family_count: int
+    families: list[str] = []
+    mcu_count: int
+    classifier_rev: int
+    af_schema_rev: int
+    geometry_rev: int
+    source_sha256: str
+    built_at: str
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "StmStatusDTO":
+        return cls(
+            built=bool(d.get("built", False)),
+            building=bool(d.get("building", False)),
+            source_path=d.get("source_path", "") or "",
+            source_present=bool(d.get("source_present", False)),
+            all_families=bool(d.get("all_families", False)),
+            device_xml_count=int(d.get("device_xml_count", 0) or 0),
+            family_count=int(d.get("family_count", 0) or 0),
+            families=list(d.get("families", []) or []),
+            mcu_count=int(d.get("mcu_count", 0) or 0),
+            classifier_rev=int(d.get("classifier_rev", 0) or 0),
+            af_schema_rev=int(d.get("af_schema_rev", 0) or 0),
+            geometry_rev=int(d.get("geometry_rev", 0) or 0),
+            source_sha256=d.get("source_sha256", "") or "",
+            built_at=d.get("built_at", "") or "",
+        )
+
+
+class McuSpecRow(BaseModel):
+    """One spec-matrix row (ST-MCU-FINDER-shaped columns), stm-viewer INTERFACES.md section 4.
+    `part` (ref_name) is the addressable id used as the `?part=` query param; `mpn_example` is a
+    display-only expanded real MPN (the exact-match MPN resolution lives in stm.authority.
+    resolve_part, Phase 3 plan 03-02 - this is purely a readable example string for the table)."""
+
+    part: str
+    mpn_example: str
+    series: str
+    line: str
+    core: str
+    package: str
+    pin_count: int
+    io_count: int
+    flash_kb: int | None = None
+    ram_kb: int | None = None
+    max_freq_mhz: int | None = None
+    vdd_min: float | None = None
+    vdd_max: float | None = None
+    temp_min_c: int | None = None
+    temp_max_c: int | None = None
+    peripherals: dict[str, int] = {}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "McuSpecRow":
+        return cls(
+            part=d["part"],
+            mpn_example=d.get("mpn_example", "") or "",
+            series=d.get("series", "") or "",
+            line=d.get("line", "") or "",
+            core=d.get("core", "") or "",
+            package=d.get("package", "") or "",
+            pin_count=int(d.get("pin_count", 0) or 0),
+            io_count=int(d.get("io_count", 0) or 0),
+            flash_kb=d.get("flash_kb"),
+            ram_kb=d.get("ram_kb"),
+            max_freq_mhz=d.get("max_freq_mhz"),
+            vdd_min=d.get("vdd_min"),
+            vdd_max=d.get("vdd_max"),
+            temp_min_c=d.get("temp_min_c"),
+            temp_max_c=d.get("temp_max_c"),
+            peripherals=dict(d.get("peripherals", {}) or {}),
+        )
+
+
+class FamilyDTO(BaseModel):
+    family: str
+    lines: list[str] = []
+    mcu_count: int = 0
+    packages: list[str] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FamilyDTO":
+        return cls(
+            family=d["family"],
+            lines=list(d.get("lines", []) or []),
+            mcu_count=int(d.get("mcu_count", 0) or 0),
+            packages=list(d.get("packages", []) or []),
+        )
+
+
+class AfOptionDTO(BaseModel):
+    af_index: int
+    signal: str
+    peripheral: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "AfOptionDTO":
+        return cls(af_index=d["af_index"], signal=d["signal"], peripheral=d.get("peripheral"))
+
+
+class PinDTO(BaseModel):
+    """Every derived fact for one pin (VIZ-03), stm-viewer INTERFACES.md section 4."""
+
+    position: str
+    position_kind: str
+    lqfp_side: str | None = None
+    bga_row: str | None = None
+    bga_col: int | None = None
+    canonical_pin_name: str
+    raw_pin_name: str
+    pin_type: str | None = None
+    electrical_class: str
+    category: str
+    roles: list[dict] = []
+    functions: list[dict] = []
+    alternate_functions: list[AfOptionDTO] = []
+    five_v: dict | None = None
+    supply: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PinDTO":
+        return cls(
+            position=d["position"],
+            position_kind=d.get("position_kind", "numeric"),
+            lqfp_side=d.get("lqfp_side"),
+            bga_row=d.get("bga_row"),
+            bga_col=d.get("bga_col"),
+            canonical_pin_name=d["canonical_pin_name"],
+            raw_pin_name=d.get("raw_pin_name", "") or "",
+            pin_type=d.get("pin_type"),
+            electrical_class=d.get("electrical_class", "") or "",
+            category=d.get("category", "") or "",
+            roles=list(d.get("roles", []) or []),
+            functions=list(d.get("functions", []) or []),
+            alternate_functions=[
+                AfOptionDTO.from_dict(a) for a in (d.get("alternate_functions") or [])
+            ],
+            five_v=d.get("five_v"),
+            supply=d.get("supply"),
+        )
+
+
+class PinoutDTO(BaseModel):
+    part: str
+    mpn_example: str
+    package: str
+    geometry: dict
+    pins: list[PinDTO] = []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PinoutDTO":
+        return cls(
+            part=d["part"],
+            mpn_example=d.get("mpn_example", "") or "",
+            package=d.get("package", "") or "",
+            geometry=d.get("geometry", {}) or {},
+            pins=[PinDTO.from_dict(p) for p in (d.get("pins") or [])],
+        )
+
+
+class UnionPositionDTO(BaseModel):
+    """One socket-union position (COMPAT-02/03), classified at per-part grain -
+    never a package-majority collapse."""
+
+    position: str
+    position_kind: str
+    lqfp_side: str | None = None
+    bga_row: str | None = None
+    bga_col: int | None = None
+    classification: str
+    present_on: int
+    total: int
+    per_part: list[dict] = []
+    reconcile: dict | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "UnionPositionDTO":
+        return cls(
+            position=d["position"],
+            position_kind=d.get("position_kind", "numeric"),
+            lqfp_side=d.get("lqfp_side"),
+            bga_row=d.get("bga_row"),
+            bga_col=d.get("bga_col"),
+            classification=d.get("classification", "") or "",
+            present_on=int(d.get("present_on", 0) or 0),
+            total=int(d.get("total", 0) or 0),
+            per_part=list(d.get("per_part", []) or []),
+            reconcile=d.get("reconcile"),
+        )
+
+
+class UnionDTO(BaseModel):
+    """The socket-union computation's response (COMPAT-01/02/03/05)."""
+
+    parts: list[str] = []
+    resolved: list[dict] = []
+    package: str
+    # `family` is the display scope (joined names for a cross-family set); `families`
+    # is the real sorted list (owner amendment 2026-07-23: sets may span families).
+    family: str
+    families: list[str] = []
+    grain: str = "per-part"
+    positions: list[UnionPositionDTO] = []
+    verdict: dict
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "UnionDTO":
+        return cls(
+            parts=list(d.get("parts", []) or []),
+            resolved=list(d.get("resolved", []) or []),
+            package=d.get("package", "") or "",
+            family=d.get("family", "") or "",
+            families=list(d.get("families", []) or []),
+            grain=d.get("grain", "per-part") or "per-part",
+            positions=[UnionPositionDTO.from_dict(p) for p in (d.get("positions") or [])],
+            verdict=d.get("verdict", {}) or {},
+        )
+
+
+class SuggestionGroupDTO(BaseModel):
+    """One compatibility-suggestion group (COMPAT-04)."""
+
+    signature_id: str
+    tier: str
+    package: str
+    family: str
+    refs: list[str] = []
+    divergent_positions: int = 0
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SuggestionGroupDTO":
+        return cls(
+            signature_id=d.get("signature_id", "") or "",
+            tier=d.get("tier", "") or "",
+            package=d.get("package", "") or "",
+            family=d.get("family", "") or "",
+            refs=list(d.get("refs", []) or []),
+            divergent_positions=int(d.get("divergent_positions", 0) or 0),
+        )

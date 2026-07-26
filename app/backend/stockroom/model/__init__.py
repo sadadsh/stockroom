@@ -10,15 +10,18 @@ from stockroom.model.category import (
 )
 from stockroom.model.part import (
     KICAD_MIRROR_FIELDS,
+    AssetRef,
     Datasheet,
+    EdaAssets,
     EnrichmentField,
     Hashes,
-    LibRef,
-    ModelRef,
     PartRecord,
     Provenance,
     Purchase,
+    asset_present,
     new_part_id,
+    tool_assets_ready,
+    tool_place_ready,
 )
 
 __all__ = [
@@ -29,13 +32,16 @@ __all__ = [
     "is_valid_category",
     "slugify",
     "KICAD_MIRROR_FIELDS",
+    "AssetRef",
     "Datasheet",
+    "EdaAssets",
     "EnrichmentField",
     "Hashes",
-    "LibRef",
-    "ModelRef",
     "PartRecord",
     "Provenance",
     "Purchase",
+    "asset_present",
     "new_part_id",
+    "tool_assets_ready",
+    "tool_place_ready",
 ]

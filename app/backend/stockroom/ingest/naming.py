@@ -16,6 +16,10 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("oscillator", "Crystals & Oscillators"),
     ("resonator", "Crystals & Oscillators"),
     ("diode", "Diodes"),
+    # "driver" (LED / motor / gate / MOSFET driver) is an IC and MUST be checked before "led",
+    # or a distributor's "LED Lighting Drivers" category matches the bare "led" -> Diodes first
+    # and mis-classes a switching IC as a diode (first-hit-wins ordering).
+    ("driver", "ICs"),
     ("led", "Diodes"),
     ("transistor", "Transistors"),
     ("mosfet", "Transistors"),
@@ -57,6 +61,8 @@ def propose_display_name(symbol_name: str, mpn: str = "") -> str:
 def propose_category(text: str) -> str:
     low = text.lower()
     for keyword, category in _CATEGORY_KEYWORDS:
-        if re.search(rf"\b{re.escape(keyword)}\b", low):
+        # Tolerate a trailing plural 's' so a distributor's plural "Product Category" string
+        # ("Resistors", "Ceramic Capacitors", "Connectors") classifies, not just singular text.
+        if re.search(rf"\b{re.escape(keyword)}s?\b", low):
             return category
     return "Other"

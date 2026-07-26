@@ -1,9 +1,9 @@
 import json
 
 from stockroom.model.part import (
+    AssetRef,
     Datasheet,
-    LibRef,
-    ModelRef,
+    EdaAssets,
     PartRecord,
     Provenance,
     Purchase,
@@ -22,10 +22,74 @@ def _sample() -> PartRecord:
         manufacturer="Texas Instruments",
         datasheet=Datasheet(file="tps62130rgtr.pdf", source_url="https://ti.com/x.pdf", fetched_at="2026-07-12T00:00:00Z"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/x", price_breaks=[[1, "3.21"]], stock=42, currency="USD", fetched_at="2026-07-12T00:00:00Z")],
-        symbol=LibRef(lib="SR-ICs", name="TPS62130RGTR"),
-        footprint=LibRef(lib="SR-ICs", name="VQFN-16"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-ICs", name="TPS62130RGTR"),
+            footprint=AssetRef(lib="SR-ICs", name="VQFN-16"),
+        )},
         provenance=Provenance(source="samacsys", source_url="https://componentsearchengine.com/x", original_zip_sha256="abc123", ingested_at="2026-07-12T00:00:00Z"),
     )
+
+
+def _passive_sample() -> PartRecord:
+    # A file-less passive: symbol/footprint reference KiCad STOCK libs (Device:R,
+    # Resistor_SMD:R_0603_1608Metric), no owned 3D model, a datasheet URL (no PDF),
+    # and a Mouser purchase link. This is the "drop the MPN, no files" record.
+    return PartRecord(
+        id="erj-p03f1101v",
+        display_name="ERJ-P03F1101V",
+        category="Resistors",
+        description="Resistor, 1.1 kOhm, 1%, 0603",
+        mpn="ERJ-P03F1101V",
+        manufacturer="Panasonic",
+        passive=True,
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="Device", name="R"),
+            footprint=AssetRef(lib="Resistor_SMD", name="R_0603_1608Metric"),
+        )},
+        datasheet=Datasheet(source_url="https://mouser.com/erj.pdf"),
+        purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V")],
+        specs={"Resistance": "1.1 kOhm", "Tolerance": "1%", "Package": "0603", "Power": "0.2 W"},
+    )
+
+
+def test_passive_is_complete_with_stock_refs_url_datasheet_and_no_owned_model():
+    p = _passive_sample()
+    assert p.assets_for("kicad").model is None  # the stock footprint carries its own 3D
+    assert p.missing_fields() == []
+    assert p.is_complete()
+
+
+def test_passive_flag_round_trips():
+    p = _passive_sample()
+    again = PartRecord.from_dict(p.to_dict())
+    assert again.passive is True
+    assert again == p
+
+
+def test_datasheet_url_alone_satisfies_the_gate_for_any_part():
+    p = _sample()
+    p.datasheet = Datasheet(source_url="https://ti.com/x.pdf")  # URL, no downloaded PDF
+    assert "datasheet" not in " ".join(p.missing_fields())
+
+
+def test_assets_no_longer_gate_a_non_passive_part():
+    # owner 2026-07-16: symbol/footprint/3D model no longer gate entry. A non-passive
+    # with full identity + datasheet + purchase is COMPLETE even with no owned model,
+    # and missing_assets() reports what can still be attached after the fact.
+    p = _sample()
+    p.assets_for("kicad").model = None
+    assert p.passive is False
+    assert p.missing_fields() == []
+    assert p.is_complete()
+    # symbol+footprint present for KiCad, model not
+    assert p.missing_assets("kicad") == ["3D model"]
+
+
+def test_missing_assets_lists_every_unattached_asset():
+    p = PartRecord(id="x", display_name="X", category="ICs")
+    assert p.missing_assets("kicad") == ["symbol", "footprint", "3D model"]
+    p.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="X")
+    assert p.missing_assets("kicad") == ["footprint", "3D model"]
 
 
 def test_round_trip_preserves_every_field():
@@ -44,16 +108,18 @@ def test_dumps_is_canonical_json():
     assert parsed["purchase"][0]["stock"] == 42
 
 
-def test_is_complete_false_when_model_missing():
-    p = _sample()  # has full identity + assets + sourcing EXCEPT a 3D model
-    assert p.model is None
-    assert p.missing_fields() == ["3D model"]
-    assert not p.is_complete()
+def test_is_complete_true_without_owned_assets():
+    # a part with identity + description + datasheet + purchase is complete even with
+    # no symbol/footprint/3D model (assets are attached after entry now).
+    p = _sample()
+    assert p.assets_for("kicad").model is None
+    assert p.missing_fields() == []
+    assert p.is_complete()
 
 
 def test_is_complete_true_with_full_passport():
     p = _sample()
-    p.model = ModelRef(file="models/TPS62130RGTR.step")
+    p.assets_for("kicad").model = AssetRef(file="models/TPS62130RGTR.step")
     assert p.missing_fields() == []
     assert p.is_complete()
 
@@ -65,9 +131,6 @@ def test_missing_fields_lists_all_gaps_in_passport_order():
         "MPN",
         "manufacturer",
         "value/description",
-        "symbol",
-        "footprint",
-        "3D model",
         "datasheet",
         "purchase link",
     ]
@@ -84,7 +147,7 @@ def test_defaults_are_empty_not_none():
     assert d["tags"] == []
     assert d["purchase"] == []
     assert d["datasheet"] is None
-    assert d["model"] is None
+    assert d["eda"] == {}  # empty per-tool bundles are omitted, not serialized as nulls
     assert d["enrichment"] == {}
 
 
@@ -106,7 +169,7 @@ def test_specs_is_not_a_gate_field():
     # a pinout (or any spec) is optional: adding it never changes completeness, and
     # a complete part with no specs stays complete.
     p = _sample()
-    p.model = ModelRef(file="models/x.step")
+    p.assets_for("kicad").model = AssetRef(file="models/x.step")
     assert p.is_complete()
     p.specs = {"pinout": [{"pin": "1", "name": "VIN"}]}
     assert p.is_complete()
@@ -132,3 +195,54 @@ def test_new_part_id_handles_empty_base(tmp_path):
     # a base that slugifies to empty still yields a usable id
     got = new_part_id(tmp_path, "///")
     assert got == "part"
+
+
+# --- F2 spec hygiene: PartRecord normalizes specs at every boundary ---
+
+
+def test_partrecord_normalizes_specs_on_construction():
+    r = PartRecord(
+        id="x",
+        display_name="X",
+        category="ICs",
+        specs={
+            "Tolerance": "1 %",
+            "Temperature Coefficient": "100 PPM / C",
+            "Factory Pack Quantity: Factory Pack Quantity": "100",
+        },
+    )
+    assert r.specs["Tolerance"] == "1%"
+    assert r.specs["Temperature Coefficient"] == "100 PPM/C"
+    assert r.specs["Factory Pack Quantity"] == "100"
+    assert "Factory Pack Quantity: Factory Pack Quantity" not in r.specs
+
+
+def test_partrecord_from_dict_normalizes():
+    d = {"id": "x", "display_name": "X", "category": "ICs", "specs": {"Tolerance": "5 %"}}
+    assert PartRecord.from_dict(d).specs["Tolerance"] == "5%"
+
+
+def test_partrecord_to_dict_cleans_late_mutation():
+    # A spec added after construction (as the enrich pipeline does) is still clean on
+    # the way out to disk / the API, because to_dict normalizes too.
+    r = PartRecord(id="x", display_name="X", category="ICs")
+    r.specs["Temperature Coefficient"] = "200 PPM / C"
+    assert r.to_dict()["specs"]["Temperature Coefficient"] == "200 PPM/C"
+
+
+def test_partrecord_preserves_non_string_spec_value():
+    r = PartRecord(id="x", display_name="X", category="ICs", specs={"US Tariff %": 37.0})
+    assert r.specs["US Tariff %"] == 37.0
+    assert r.to_dict()["specs"]["US Tariff %"] == 37.0
+
+
+def test_partrecord_roundtrip_cleans_persisted_malformed_specs():
+    # A record loaded from already-persisted malformed JSON re-serializes clean.
+    malformed = {
+        "id": "x",
+        "display_name": "X",
+        "category": "ICs",
+        "specs": {"Tolerance": "1 %", "Factory Pack Quantity: Factory Pack Quantity": "100"},
+    }
+    reserialized = PartRecord.from_dict(malformed).to_dict()["specs"]
+    assert reserialized == {"Tolerance": "1%", "Factory Pack Quantity": "100"}

@@ -35,17 +35,46 @@ def config_dir() -> Path:
 
 @dataclass
 class MachineConfig:
-    active_profile: str = "Main"
+    active_profile: str = "Stockroom"
     # Where the library repo lives on this machine (M9a). Blank on a fresh install, so the
     # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.
     libraries_root: str = ""
+    # Where the STM32CubeMX MCU XML tree lives on this machine (stm-viewer workstream,
+    # Phase 3, API-02). Blank until the user points it there (the all-families source is
+    # Windows-side per research and is not bundled); stm.source.default_cubemx_source()
+    # prefers this setting ahead of its own STM32_CUBEMX env-var/candidate-path fallback.
+    # Not a secret - a plain filesystem path, echoed raw (never masked) in the settings DTO.
+    stm_cubemx_source: str = ""
     mouser_api_key: str = ""
+    # DigiKey Product Information API v4 OAuth2 client-credentials (opt-in, OFF by default —
+    # spec section 6). Both must be set for enrich/routers/enrich.py:_make_pipeline to build a
+    # live DigiKeyAdapter; either blank keeps DigiKey out of the enrichment source registry.
+    digikey_client_id: str = ""
+    digikey_client_secret: str = ""
+    # DigiKey ACCOUNT web login (distinct from the OAuth API creds above). The capture driver
+    # autofills this to sign into DigiKey.com and prepare a logged-in session for everything,
+    # so a saved account clears the sign-in wall before the in-DigiKey CAD providers are reached.
+    digikey_username: str = ""
+    digikey_password: str = ""
     # A GitHub personal access token (fine-grained, Contents: write on the library repo) used to
     # authenticate library push/pull for the in-repo library, so a part add can auto-push and a
     # collaborator's changes pull. Per-machine, stored in config.json (in the OS config dir, never
     # the repo), so it is a local secret and never committed. Blank = no auto-push, sign in later.
     github_token: str = ""
+    # Saved logins for the in-DigiKey CAD providers the guided capture window drives:
+    # Ultra Librarian, SnapEDA, and SamacSys. DigiKey's EDA/CAD Models section aggregates
+    # downloads from all three, and the driver prefers Ultra Librarian (it often bundles the
+    # complete KiCad + Altium + 3D set). The username is not a secret; the password is.
+    # Per-machine, stored in config.json (in the OS config dir, never the repo), so they are
+    # local and never committed. Blank = log in by hand in the capture window (session
+    # persistence keeps you signed in thereafter).
+    ul_username: str = ""
+    ul_password: str = ""
+    snapeda_username: str = ""
+    snapeda_password: str = ""
+    samacsys_username: str = ""
+    samacsys_password: str = ""
     kicad_config_override: str = ""
     # An explicit kicad-cli binary path, for a non-standard KiCad install that
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.
@@ -55,6 +84,20 @@ class MachineConfig:
     # or chose to continue with the default). Drives the one-time welcome screen (M9b).
     onboarded: bool = False
     window: dict = field(default_factory=dict)
+    # UI preferences (theme, rail_collapsed). MACHINE level, not profile level: they follow the
+    # person, not the library. They live here rather than in the browser because the host binds an
+    # EPHEMERAL PORT, so the page origin changes on every launch and origin-scoped localStorage
+    # starts empty each time - measured on real Windows, the theme reverted to dark on every single
+    # launch. A dict so a new preference needs no schema change. Kept separate from `window`, which
+    # is geometry.
+    ui: dict = field(default_factory=dict)
+    # Library-scale rescan (Phase-1b-2): a part is re-checked only when its last check is older
+    # than this many days (incremental), and each provider's calls are paced to <= N/min so a
+    # full-library rescan trickles within quota instead of tripping a 429. Sensible defaults; the
+    # settings UI can tune them later.
+    rescan_ttl_days: int = 7
+    rescan_mouser_per_min: int = 20
+    rescan_digikey_per_min: int = 60
 
     @classmethod
     def _path(cls, path: Path | None) -> Path:

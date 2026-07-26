@@ -8,9 +8,13 @@ and the enrich->price adapter. Pure compute: no kicad-cli, no network.
 from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 from stockroom.projects import kibom
 from stockroom.projects.bom import (
-    _bom_components,
     _board_count,
+    _bom_components,
+    _coerce_price,
+    _price_rows,
     _row_cost_at_qty,
+    annotate_build_pricing,
+    bom_build_rollup,
     bom_cost_at_qty,
     bom_cost_by_source,
     bom_cost_summary,
@@ -20,10 +24,11 @@ from stockroom.projects.bom import (
     enrichment_to_bom_lookup,
     is_basic_part,
     line_extended,
+    line_moq,
     price_at_qty,
+    price_line_at_build,
     project_bom,
-    _coerce_price,
-    _price_rows,
+    reprice_bom,
 )
 
 
@@ -77,6 +82,136 @@ def test_bom_from_project_merges_sheets(tmp_path):
     tenk = [r for r in bom["rows"] if r["value"] == "10k"][0]
     assert tenk["qty"] == 2 and set(tenk["refs"]) == {"R1", "R2"}
     assert bom["component_count"] == 3
+
+
+def test_multi_unit_symbols_count_one_physical_component(tmp_path):
+    # A multi-unit symbol (an op-amp's A and B units) appears as SEPARATE (symbol)
+    # nodes sharing one Reference in the sheet. That is ONE physical part: qty 1,
+    # never qty-per-unit (a qty of 2 would double the order and the cost).
+    f = _write_sch(
+        tmp_path / "s.kicad_sch",
+        _sym("U1", "LM358", lib="Device:U", mfr="TI"),
+        _sym("U1", "LM358", lib="Device:U", mfr="TI"),
+    )
+    rows = bom_from_kicad_schematic(str(f))["rows"]
+    assert len(rows) == 1
+    assert rows[0]["qty"] == 1 and rows[0]["refs"] == ["U1"]
+
+
+def test_multi_unit_symbols_dedupe_across_sheets_too(tmp_path):
+    # Units of one component can live on DIFFERENT pages (the power unit on the power
+    # sheet). References are project-unique, so the same ref on two sheets is still
+    # ONE physical part.
+    a = _write_sch(tmp_path / "a.kicad_sch", _sym("U1", "LM358", lib="Device:U", mfr="TI"))
+    b = _write_sch(tmp_path / "b.kicad_sch", _sym("U1", "LM358", lib="Device:U", mfr="TI"))
+    bom = bom_from_project([str(a), str(b)])
+    assert bom["component_count"] == 1
+    assert bom["rows"][0]["qty"] == 1 and bom["rows"][0]["refs"] == ["U1"]
+
+
+# -- Altium sheets through the same pipeline (EDA-neutral BOM) -----------------
+
+
+def _write_schdoc(path, *component_blocks):
+    import struct
+
+    from tests.backend.altium.cfb_writer import write_cfb
+
+    def rec(*pairs):
+        payload = ("|" + "|".join(pairs)).encode("latin-1") + b"\x00"
+        return struct.pack("<I", len(payload)) + payload
+
+    stream = rec("HEADER=Protel for Windows - Schematic Capture Binary File Version 5.0")
+    idx = 0
+    for block in component_blocks:
+        comp_idx = idx
+        stream += rec("RECORD=1", f"LIBREFERENCE={block['lib_ref']}",
+                      f"DESIGNITEMID={block.get('design_item_id', '')}",
+                      f"UNIQUEID={block.get('unique_id', '')}", "OWNERPARTID=-1")
+        idx += 1
+        stream += rec("RECORD=34", f"OWNERINDEX={comp_idx}", "NAME=Designator",
+                      f"TEXT={block['designator']}")
+        idx += 1
+        for name, text in block.get("params", {}).items():
+            stream += rec("RECORD=41", f"OWNERINDEX={comp_idx}", f"NAME={name}", f"TEXT={text}")
+            idx += 1
+        if block.get("footprint"):
+            stream += rec("RECORD=44", f"OWNERINDEX={comp_idx}")
+            stream += rec("RECORD=45", f"OWNERINDEX={idx}", f"MODELNAME={block['footprint']}",
+                          "MODELTYPE=PCBLIB", "ISCURRENT=T")
+            idx += 2
+    write_cfb(path, "FileHeader", stream)
+    return path
+
+
+def test_bom_from_project_reads_altium_sheets(tmp_path):
+    # The same pipeline serves both EDAs: a .SchDoc sheet feeds grouping, identity,
+    # and pricing exactly like a .kicad_sch. A DbLib-placed part carries the MPN and
+    # Manufacturer parameters, and its current PCBLIB implementation is the footprint.
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {
+            "designator": "U1",
+            "lib_ref": "LM358",
+            "design_item_id": "LM358DR",
+            "params": {"MPN": "LM358DR", "Manufacturer": "TI", "Value": "LM358DR"},
+            "footprint": "SOIC-8",
+        },
+        {
+            "designator": "R1",
+            "lib_ref": "RES",
+            "params": {"Value": "10k"},
+            "footprint": "RESC1005X40",
+        },
+    )
+    bom = bom_from_project([str(sheet)])
+    assert bom["component_count"] == 2
+    u1 = [r for r in bom["rows"] if r["refs"] == ["U1"]][0]
+    assert u1["mpn"] == "LM358DR"
+    assert u1["manufacturer"] == "TI"
+    assert u1["footprint"] == "SOIC-8"
+    assert u1["has_real_mpn"] is True
+    r1 = [r for r in bom["rows"] if r["refs"] == ["R1"]][0]
+    assert r1["value"] == "10k"
+    assert r1["mpn"] == ""  # a passive's Value is a value, never promoted to MPN
+
+
+def test_altium_design_item_id_backfills_a_missing_mpn_param(tmp_path):
+    # A DbLib placement's DesignItemId IS the Stockroom MPN; a part whose parameter
+    # set lacks an explicit MPN still identifies by it.
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {
+            "designator": "U2",
+            "lib_ref": "TPS2121",
+            "design_item_id": "TPS2121RUXR",
+            "params": {"Manufacturer": "TI"},
+        },
+    )
+    u2 = bom_from_project([str(sheet)])["rows"][0]
+    assert u2["mpn"] == "TPS2121RUXR"
+
+
+def test_altium_sheets_respect_the_kibom_exclusions(tmp_path):
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "TP1", "lib_ref": "TESTPOINT", "params": {"Value": "TP"}},
+        {"designator": "R1", "lib_ref": "RES", "params": {"Value": "10k", "Config": "DNF"}},
+        {"designator": "C1", "lib_ref": "CAP", "params": {"Value": "1uF"}},
+    )
+    bom = bom_from_project([str(sheet)])
+    assert [r["refs"] for r in bom["rows"]] == [["C1"]]
+
+
+def test_a_mixed_project_merges_kicad_and_altium_sheets(tmp_path):
+    a = _write_sch(tmp_path / "a.kicad_sch", _sym("R1", "10k"))
+    b = _write_schdoc(
+        tmp_path / "b.SchDoc",
+        {"designator": "R2", "lib_ref": "RES", "params": {"Value": "10k"}},
+    )
+    bom = bom_from_project([str(a), str(b)])
+    tenk = [r for r in bom["rows"] if r["value"] == "10k"][0]
+    assert tenk["qty"] == 2 and set(tenk["refs"]) == {"R1", "R2"}
 
 
 def test_bom_does_not_merge_different_manufacturers(tmp_path):
@@ -281,6 +416,140 @@ def test_price_at_qty_picks_applicable_break():
 def test_price_at_qty_tolerates_unsorted_ladder():
     ladder = [{"qty": 100, "price": 0.05}, {"qty": 1, "price": 0.10}, {"qty": 10, "price": 0.08}]
     assert price_at_qty(ladder, 50) == 0.08
+
+
+# --- Build-quantity + tax/tariff line economics (owner ask 2026-07-15) ---
+
+def test_line_moq_is_the_smallest_break_or_none():
+    assert line_moq([{"qty": 10, "price": 0.08}, {"qty": 1, "price": 0.10}]) == 1
+    assert line_moq([{"qty": 100, "price": 0.05}]) == 100
+    assert line_moq([]) is None
+    assert line_moq(None) is None
+
+
+def test_price_line_at_build_rounds_up_to_moq_and_prices_at_final_qty():
+    # 2 per board x 10 boards = 20 needed, but the part's MOQ (smallest break) is 100.
+    ladder = [{"qty": 100, "price": 0.05}, {"qty": 500, "price": 0.03}]
+    row = {"qty": 2, "price_breaks": ladder, "unit_price": 0.10}
+    line = price_line_at_build(row, build_qty=10, tax_rate=8.25)
+    assert line["moq"] == 100
+    assert line["final_qty"] == 100                 # raised from 20 up to the MOQ
+    assert line["final_unit_price"] == 0.05         # priced AT the 100-qty break
+    assert line["final_extended"] == 5.0            # 0.05 * 100
+    assert line["tax_tariff"] == round(5.0 * 8.25 / 100, 4)   # 0.4125
+    assert line["line_total"] == round(5.0 + 0.4125, 4)      # 5.4125
+    assert row == {"qty": 2, "price_breaks": ladder, "unit_price": 0.10}  # never mutated
+
+
+def test_price_line_at_build_uses_need_when_it_exceeds_moq():
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    # 30 per board x 5 boards = 150 needed, above the MOQ of 1
+    line = price_line_at_build({"qty": 30, "price_breaks": ladder}, build_qty=5, tax_rate=0)
+    assert line["final_qty"] == 150
+    assert line["final_unit_price"] == 0.05         # the 100-qty volume break applies
+    assert line["final_extended"] == 7.5
+    assert line["tax_tariff"] == 0.0                # a 0 rate adds nothing
+    assert line["line_total"] == 7.5
+
+
+def test_price_line_at_build_unpriced_line_keeps_qty_but_no_money():
+    line = price_line_at_build({"qty": 3}, build_qty=4, tax_rate=8.0)
+    assert line["final_qty"] == 12 and line["moq"] is None
+    assert line["final_unit_price"] is None
+    assert line["final_extended"] is None
+    assert line["tax_tariff"] is None and line["line_total"] is None
+
+
+def test_price_line_orders_more_when_a_higher_break_is_cheaper_total():
+    # needed 60; ordering 60 @ $0.10 = $6.00, but 100 @ $0.05 = $5.00 total -> order the 100.
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    line = price_line_at_build({"qty": 20, "price_breaks": ladder}, build_qty=3, tax_rate=0)
+    assert line["final_qty"] == 100
+    assert line["final_unit_price"] == 0.05
+    assert line["final_extended"] == 5.0
+
+
+def test_price_line_does_not_overbuy_when_ordering_more_costs_more_total():
+    # needed 60; the 1000 break is cheaper per-unit but 1000 x $0.04 = $40 > 60 x $0.10 = $6,
+    # so the engine keeps the exact need and does NOT overbuy for a worse total.
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 1000, "price": 0.04}]
+    line = price_line_at_build({"qty": 20, "price_breaks": ladder}, build_qty=3, tax_rate=0)
+    assert line["final_qty"] == 60
+    assert line["final_extended"] == 6.0
+
+
+def test_per_part_tariff_overrides_the_blanket_project_rate():
+    # A line with its own tariff_rate is taxed at THAT rate, not the project blanket rate.
+    row = {"qty": 1, "price_breaks": [{"qty": 1, "price": 1.00}], "tariff_rate": 25}
+    line = price_line_at_build(row, build_qty=1, tax_rate=10)
+    assert line["final_extended"] == 1.0
+    assert line["tax_tariff"] == 0.25  # 25% per-part, not the 10% blanket
+    assert line["line_total"] == 1.25
+
+
+def test_rollup_sums_per_line_tariffs_for_a_mixed_order():
+    # One line carries a 25% tariff, the other rides the 10% blanket: the roll-up sums each
+    # line's own tax, so a mixed-tariff order totals correctly.
+    rows = [
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 1.00}], "tariff_rate": 25},  # -> 0.25
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},                     # -> 0.20
+    ]
+    roll = bom_build_rollup(rows, build_qty=1, tax_rate=10)
+    assert roll["subtotal"] == 3.0
+    assert roll["tax_total"] == 0.45  # 0.25 + 0.20, not 3.0 * 10%
+    assert roll["grand_total"] == 3.45
+
+
+def test_price_line_break_optimization_can_be_turned_off():
+    ladder = [{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.05}]
+    line = price_line_at_build(
+        {"qty": 20, "price_breaks": ladder}, build_qty=3, optimize_breaks=False
+    )
+    assert line["final_qty"] == 60  # exact need, no volume upsell when optimization is off
+
+
+def test_bom_build_rollup_subtotal_tax_and_grand_total():
+    rows = [
+        {"qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]},   # -> 100 @ 0.05 = 5.00
+        {"qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},     # -> 10  @ 2.00 = 20.00
+        {"qty": 5, "unit_price": None},                              # unpriced
+    ]
+    roll = bom_build_rollup(rows, build_qty=10, tax_rate=10)
+    assert roll["build_qty"] == 10 and roll["tax_rate"] == 10.0
+    assert roll["subtotal"] == 25.0
+    assert roll["tax_total"] == 2.5
+    assert roll["grand_total"] == 27.5
+    assert roll["priced_lines"] == 2 and roll["unpriced_lines"] == 1
+
+
+def test_annotate_build_pricing_writes_the_columns_onto_each_row():
+    rows = [{"qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]}]
+    roll = annotate_build_pricing(rows, boards=10, tax_rate=8.25)
+    r = rows[0]
+    assert r["moq"] == 100 and r["final_qty"] == 100
+    assert r["final_unit_price"] == 0.05 and r["final_extended"] == 5.0
+    assert r["line_total"] == round(5.0 + 5.0 * 8.25 / 100, 4)
+    assert roll["grand_total"] == round(5.0 + 5.0 * 8.25 / 100, 2)
+
+
+def test_reprice_bom_recomputes_over_cached_lines_without_a_rebuild():
+    cached = {
+        "project": "P", "priced": True, "boards": 1, "line_count": 2, "component_count": 3,
+        "lines": [
+            {"mpn": "A", "qty": 2, "price_breaks": [{"qty": 100, "price": 0.05}]},
+            {"mpn": "B", "qty": 1, "price_breaks": [{"qty": 1, "price": 2.00}]},
+        ],
+        "summary": {"total_cost": 2.1}, "by_source": None, "cost_at_qty": None,
+    }
+    out = reprice_bom(cached, boards=10, tax_rate=10)
+    assert out["boards"] == 10 and out["tax_rate"] == 10.0
+    # per-line columns reflect the new build quantity
+    assert out["lines"][0]["final_qty"] == 100 and out["lines"][0]["final_extended"] == 5.0
+    assert out["lines"][1]["final_qty"] == 10 and out["lines"][1]["final_extended"] == 20.0
+    # the roll-up totals the re-costed lines + tax
+    assert out["build"]["subtotal"] == 25.0 and out["build"]["grand_total"] == 27.5
+    # the source result is not mutated (a new dict + copied rows)
+    assert cached["boards"] == 1 and "final_qty" not in cached["lines"][0]
 
 
 def test_price_rows_uses_volume_price_for_line_qty():
@@ -520,21 +789,28 @@ def test_consolidated_bom_sums_across_boards(tmp_path):
 
 # -- library combining (schematic + library) -----------------------------------
 
-from stockroom.model.part import Datasheet, LibRef, PartRecord, Purchase  # noqa: E402
+from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Purchase  # noqa: E402
 from stockroom.projects.bom import (  # noqa: E402
+    _bom_from_components,
     combined_price_lookup,
     library_enrich,
     library_match_index,
     library_price_index,
+    library_spec_index,
+    package_from_footprint,
+    rohs_from_specs,
 )
+from stockroom.projects.procurement import annotate_procurement_fields  # noqa: E402
 
 
 def _lib_resistor():
     return PartRecord(
         id="r10k", display_name="10k 0402", category="Resistors",
         description="10k 1% 0402", mpn="RC0402FR-0710KL", manufacturer="Yageo",
-        symbol=LibRef(lib="SR-Resistors", name="R_10k"),
-        footprint=LibRef(lib="SR-Resistors", name="R_0402"),
+        eda={"kicad": EdaAssets(
+            symbol=AssetRef(lib="SR-Resistors", name="R_10k"),
+            footprint=AssetRef(lib="SR-Resistors", name="R_0402"),
+        )},
         datasheet=Datasheet(file="r.pdf", source_url="https://yageo.com/r.pdf"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/r10k",
                            price_breaks=[{"qty": 1, "price": 0.10}, {"qty": 100, "price": 0.02}],
@@ -564,6 +840,38 @@ def test_library_enrich_passes_an_unmatched_component_through(tmp_path):
     comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]  # no library match
     _ref, _lib, props = library_enrich(comps, index)[0]
     assert "MPN" not in props  # nothing fabricated
+
+
+def test_library_enrich_stamps_the_matched_part_id_for_coverage():
+    # D1: a matched component records WHICH library part covered it, so the project
+    # BOM can flag coverage per line (not just fill blanks).
+    index = library_match_index([_lib_resistor()])
+    comps = [("R1", "SR-Resistors:R_10k", {"Reference": "R1", "Value": "10k"})]
+    _ref, _lib, props = library_enrich(comps, index)[0]
+    assert props["_sr_library_part_id"] == "r10k"
+
+
+def test_library_enrich_leaves_no_coverage_stamp_on_an_unmatched_component():
+    index = library_match_index([_lib_resistor()])
+    comps = [("R9", "Device:R", {"Reference": "R9", "Value": "47k"})]
+    _ref, _lib, props = library_enrich(comps, index)[0]
+    assert "_sr_library_part_id" not in props
+
+
+def test_bom_line_flags_library_coverage():
+    # D1: a line whose component carries a library-part stamp is in_library (with the id);
+    # an unstamped component's line is honestly not in the library.
+    comps = [
+        ("R1", "SR-Resistors:R_10k",
+         {"Reference": "R1", "Value": "10k", "MPN": "RC0402FR-0710KL", "_sr_library_part_id": "r10k"}),
+        ("R9", "Device:R", {"Reference": "R9", "Value": "47k"}),
+    ]
+    rows = _bom_from_components(comps)["rows"]
+    by_val = {r["value"]: r for r in rows}
+    assert by_val["10k"]["in_library"] is True
+    assert by_val["10k"]["library_part_id"] == "r10k"
+    assert by_val["47k"]["in_library"] is False
+    assert by_val["47k"]["library_part_id"] == ""
 
 
 def test_library_price_index_maps_mpn_to_stored_price():
@@ -601,3 +909,250 @@ def test_project_bom_combines_library_identity_and_price(tmp_path):
     assert line["qty"] == 2 and line["manufacturer"] == "Yageo"
     assert line["source"] == "library" and line["unit_price"] == 0.10
     assert result["by_source"]["sources"].get("library") is not None
+
+
+# -- wide-BOM fields: package / rohs / category + folded procurement (M7 wide table) ---
+
+
+def test_package_from_footprint_reads_passive_eia_and_ic_family():
+    assert package_from_footprint("Resistor_SMD:R_0603_1608Metric") == "0603"
+    assert package_from_footprint("Capacitor_SMD:C_0402_1005Metric") == "0402"
+    assert package_from_footprint("Resistor_SMD:R_0402") == "0402"  # no metric suffix
+    assert package_from_footprint("L_1210_3225Metric") == "1210"  # bare name, no lib prefix
+    assert package_from_footprint("Package_SO:SOIC-8_3.9x4.9mm_P1.27mm") == "SOIC-8"
+    assert package_from_footprint("Package_TO_SOT_SMD:SOT-23") == "SOT-23"
+    assert package_from_footprint("Package_QFP:TQFP-100_14x14mm_P0.5mm") == "TQFP-100"
+    # a single-letter device-class prefix (diodes) hides the package in the next token
+    assert package_from_footprint("Diode_SMD:D_SOD-123") == "SOD-123"
+    assert package_from_footprint("Diode_SMD:D_SOD-323") == "SOD-323"
+    assert package_from_footprint("Diode_SMD:D_SMA") == "SMA"
+    assert package_from_footprint("Diode_SMD:D_MELF") == "MELF"
+    assert package_from_footprint("MountingHole:MountingHole_3.2mm") == ""  # not a package
+    assert package_from_footprint("Device:Crystal") == ""  # a bare word is not a package
+    assert package_from_footprint("") == ""
+
+
+def test_rohs_from_specs_normalizes_compliance():
+    assert rohs_from_specs({"RoHS": "RoHS3 Compliant"}) == "Yes"
+    assert rohs_from_specs({"RoHS Status": "Lead Free"}) == "Yes"
+    assert rohs_from_specs({"EU RoHS": "Compliant"}) == "Yes"
+    assert rohs_from_specs({"RoHS": "Non-Compliant"}) == "No"
+    assert rohs_from_specs({"RoHS": "Not Compliant"}) == "No"
+    # a compliant value that merely opens with "non" is not non-compliance
+    assert rohs_from_specs({"RoHS": "Nonhalogenated, RoHS Compliant"}) == "Yes"
+    # an unknown / not-specified status is unknown, never a guessed "No"
+    assert rohs_from_specs({"RoHS Status": "Not Applicable"}) == ""
+    assert rohs_from_specs({"RoHS Status": "None"}) == ""
+    assert rohs_from_specs({"RoHS Status": "Not Reviewed"}) == ""
+    assert rohs_from_specs({"RoHS Status": "Unknown"}) == ""
+    assert rohs_from_specs({"Package": "0402"}) == ""  # no RoHS key -> blank
+    assert rohs_from_specs({"RoHS": ""}) == ""  # blank value -> blank
+    assert rohs_from_specs({}) == ""
+    assert rohs_from_specs(None) == ""
+
+
+def test_enrichment_to_bom_lookup_carries_package_rohs_and_category():
+    result = EnrichmentResult()
+    result.category = "Resistors"
+    result.mpn = Sourced("ERJ-P03F1101V", "mouser", "high")
+    result.package = Sourced("0603", "mouser", "high")
+    result.price_breaks = [PriceBreak(qty=1, price=0.10)]
+    result.specs = {"RoHS": Sourced("RoHS Compliant", "mouser", "high")}
+    row = enrichment_to_bom_lookup(result)
+    assert row["package"] == "0603"
+    assert row["rohs"] == "Yes"
+    assert row["category"] == "Resistors"
+
+
+def test_price_rows_overrides_footprint_package_and_fills_rohs():
+    # the enrich spec-table package (authoritative) wins over the footprint-derived baseline;
+    # rohs/category fill only when the row does not already carry them.
+    rows = [{"mpn": "X", "qty": 1, "package": "SOIC-8", "rohs": "", "category": ""}]
+    _price_rows(rows, lambda m: {"unit_price": 1.0, "package": "SO-8", "rohs": "Yes",
+                                 "category": "ICs"}, "qty")
+    assert rows[0]["package"] == "SO-8"  # enrich overrides the baseline
+    assert rows[0]["rohs"] == "Yes"
+    assert rows[0]["category"] == "ICs"
+
+
+def test_price_rows_keeps_footprint_package_when_enrich_has_none():
+    rows = [{"mpn": "X", "qty": 1, "package": "0603", "rohs": "Yes"}]
+    _price_rows(rows, lambda m: {"unit_price": 1.0, "rohs": "No"}, "qty")
+    assert rows[0]["package"] == "0603"  # no enrich package -> baseline stands
+    assert rows[0]["rohs"] == "Yes"  # a rohs already set is not clobbered
+
+
+def test_price_rows_threads_tariff_rate_and_country_of_origin():
+    # library_price_index sets entry["tariff_rate"] / entry["country_of_origin"] from a part's
+    # Mouser specs; _price_rows must copy them onto the row so the per-line import-tariff math
+    # (which reads row["tariff_rate"]) actually uses the part's own rate. A confirmed 0.0 rate
+    # propagates (a US-origin no-tariff part is real data, not a blank).
+    rows = [{"mpn": "X", "qty": 1}, {"mpn": "Y", "qty": 1}]
+
+    def lookup(m):
+        if m == "X":
+            return {"unit_price": 1.0, "tariff_rate": 25.0, "country_of_origin": "China"}
+        return {"unit_price": 1.0, "tariff_rate": 0.0, "country_of_origin": "United States"}
+
+    _price_rows(rows, lookup, "qty")
+    assert rows[0]["tariff_rate"] == 25.0
+    assert rows[0]["country_of_origin"] == "China"
+    assert rows[1]["tariff_rate"] == 0.0  # confirmed no-tariff propagates, not dropped
+    assert rows[1]["country_of_origin"] == "United States"
+
+
+def test_bom_rows_carry_package_from_footprint(tmp_path):
+    _write_sch(tmp_path / "b.kicad_sch",
+               _sym("R1", "10k", fp="Resistor_SMD:R_0603_1608Metric"))
+    rows = bom_from_project([str(tmp_path / "b.kicad_sch")])["rows"]
+    assert rows[0]["package"] == "0603"
+    assert rows[0]["rohs"] == "" and rows[0]["category"] == ""
+
+
+def test_library_price_index_carries_package_rohs_category():
+    p = PartRecord(id="r", display_name="10k", category="Resistors", mpn="RC0402FR-0710KL",
+                   specs={"Package": "0402", "RoHS": "RoHS Compliant"},
+                   purchase=[Purchase(vendor="Mouser", url="u",
+                                      price_breaks=[{"qty": 1, "price": 0.1}], stock=100)])
+    entry = library_price_index([p])["RC0402FR-0710KL"]
+    assert entry["package"] == "0402" and entry["rohs"] == "Yes"
+    assert entry["category"] == "Resistors"
+
+
+def test_library_spec_index_maps_mpn_to_package_rohs_category():
+    p = PartRecord(id="u", display_name="MCU", category="ICs", mpn="STM32",
+                   specs={"Package": "LQFP-48", "RoHS Status": "Compliant"})
+    idx = library_spec_index([p])
+    assert idx["STM32"] == {"package": "LQFP-48", "rohs": "Yes", "category": "ICs"}
+    # a part with no mpn is not indexed
+    assert library_spec_index([PartRecord(id="x", display_name="x", category="C")]) == {}
+
+
+def test_annotate_procurement_fields_mutates_rows_and_returns_rollups():
+    rows = [{"mpn": "A", "qty": 2, "unit_price": 1.0, "extended": 2.0, "stock": 0,
+             "lead_time": "10 Weeks"}]
+    roll = annotate_procurement_fields(rows, boards=1)
+    assert rows[0]["stock_risk"]["kind"] == "err"
+    assert rows[0]["orderable"] is False
+    assert roll["risks"]["no_stock"] == 1
+    assert roll["lead"]["max_weeks"] == 10
+
+
+def test_project_bom_folds_procurement_and_library_specs(tmp_path):
+    # a library part carries specs (Package/RoHS) that no schematic prop or footprint gives; the
+    # built BOM line surfaces them, plus the folded per-line stock risk + orderable + the roll-ups.
+    _write_sch(tmp_path / "b.kicad_sch",
+               _sym("U1", "STM32F103", lib="MCU:STM32", mpn="STM32F103", mfr="ST"))
+    part = PartRecord(id="u", display_name="MCU", category="ICs", mpn="STM32F103",
+                      manufacturer="ST",
+                      specs={"Package": "LQFP-48", "RoHS": "Compliant"},
+                      purchase=[Purchase(vendor="Mouser", url="https://mouser.com/u",
+                                         price_breaks=[{"qty": 1, "price": 2.0}], stock=0)])
+    result = project_bom(str(tmp_path), None, ["b.kicad_sch"], name="B", boards=1,
+                         library_parts=[part])
+    line = next(r for r in result["lines"] if r.get("mpn") == "STM32F103")
+    assert line["package"] == "LQFP-48"
+    assert line["rohs"] == "Yes"
+    assert line["category"] == "ICs"
+    # folded procurement: 0 stock -> stock risk err, not orderable
+    assert line["stock_risk"]["kind"] == "err"
+    assert line["orderable"] is False
+    # top-level risk/lead roll-ups fold onto the result
+    assert result["risks"]["no_stock"] == 1
+    assert result["lead"]["any"] is False
+
+
+def test_reprice_bom_refolds_procurement_risk():
+    cached = {
+        "project": "P", "priced": True, "boards": 1, "line_count": 1, "component_count": 1,
+        "lines": [{"mpn": "A", "qty": 40, "unit_price": 0.05, "stock": 100,
+                   "price_breaks": [{"qty": 1, "price": 0.05}]}],
+        "summary": {}, "by_source": None, "cost_at_qty": None,
+    }
+    # at 1 board (qty 40, stock 100) it is covered; at 4 boards (qty 160 > 100) it is short.
+    out1 = reprice_bom(cached, boards=1, tax_rate=0)
+    assert out1["lines"][0]["stock_risk"]["kind"] is None
+    assert out1["risks"]["insufficient_stock"] == 0
+    out4 = reprice_bom(cached, boards=4, tax_rate=0)
+    assert out4["lines"][0]["stock_risk"]["kind"] == "warn"
+    assert out4["risks"]["insufficient_stock"] == 1
+
+
+# -- the BOM READS a durable binding instead of re-deriving a match ------------
+#
+# A bound placement is a decision the user already made. Re-guessing it every build is how the
+# BOM ended up attributing a wrong MPN, manufacturer, price and stock to generic passives.
+
+
+def _bound_library():
+    from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
+
+    def res(pid, mpn, value, package, metric):
+        return PartRecord(
+            id=pid, display_name=f"{value} {package}", category="Resistors",
+            description=f"{value} 1% {package}", mpn=mpn, manufacturer="Yageo", passive=True,
+            eda={"kicad": EdaAssets(
+                symbol=AssetRef(lib="Device", name="R"),
+                footprint=AssetRef(lib="Resistor_SMD", name=f"R_{package}_{metric}"),
+            )},
+            datasheet=Datasheet(source_url=f"https://yageo.com/{mpn}.pdf"),
+            specs={"Resistance": value, "Package": package},
+        )
+    return [res("r10k", "RC0402FR-0710KL", "10 kOhm", "0402", "1005Metric"),
+            res("r47k", "RC0402FR-0747KL", "47 kOhm", "0402", "1005Metric")]
+
+
+def test_a_bound_placement_is_enriched_from_its_bound_part_not_from_a_guess(tmp_path):
+    from stockroom.projects.binding import field_for
+    from stockroom.projects.bom import library_match_index
+
+    # Two library resistors carry the same stock Device:R symbol, so NOTHING about this placement
+    # identifies it: without the binding it stays unmatched and the BOM line has no MPN.
+    field = field_for("kicad")
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", fp="Resistor_SMD:R_0402_1005Metric",
+                        extra=f'(property "{field}" "r47k" (at 0 0 0))'))
+    index = library_match_index(_bound_library())
+    rows = bom_from_project([str(f)], library_index=index)["rows"]
+    assert [r["mpn"] for r in rows] == ["RC0402FR-0747KL"]
+    assert rows[0]["manufacturer"] == "Yageo"
+
+
+def test_an_unbound_generic_passive_still_gets_no_guessed_mpn(tmp_path):
+    from stockroom.projects.bom import library_match_index
+
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", fp="Resistor_SMD:R_0402_1005Metric"))
+    index = library_match_index(_bound_library())
+    rows = bom_from_project([str(f)], library_index=index)["rows"]
+    assert rows[0]["mpn"] == ""
+
+
+def test_an_altium_binding_reaches_the_bom_from_the_project_record(tmp_path):
+    # Stockroom cannot write a .SchDoc, so the record is the only place the binding can live, and
+    # the BOM has to read it from there.
+    from stockroom.projects.bom import library_match_index
+
+    sheet = _write_schdoc(
+        tmp_path / "Amp.SchDoc",
+        {"designator": "R1", "lib_ref": "RES", "unique_id": "AAAAAAAA",
+         "params": {"Value": "10k"}, "footprint": "RESC1005X40"},
+    )
+    index = library_match_index(_bound_library())
+    plain = bom_from_project([str(sheet)], library_index=index)["rows"]
+    assert plain[0]["mpn"] == ""
+    bound = bom_from_project([str(sheet)], library_index=index,
+                             bindings={"AAAAAAAA": "r10k"})["rows"]
+    assert bound[0]["mpn"] == "RC0402FR-0710KL"
+
+
+def test_the_binding_field_never_leaks_into_a_bom_row(tmp_path):
+    """A Stockroom bookkeeping field is not part of the user's bill of materials."""
+    from stockroom.projects.binding import BOUND_PART, PLACEMENT_KEY, field_for
+
+    f = _write_sch(tmp_path / "s.kicad_sch",
+                   _sym("R1", "10k", extra=f'(property "{field_for("kicad")}" "r10k" (at 0 0 0))'))
+    built = bom_from_project([str(f)])
+    for reserved in (field_for("kicad"), BOUND_PART, PLACEMENT_KEY):
+        assert reserved not in built["csv"]
+        assert all(reserved not in row for row in built["rows"])

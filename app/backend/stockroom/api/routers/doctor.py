@@ -12,19 +12,6 @@ from stockroom.kicad.wiring import KiCadWiring
 def doctor_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/doctor", dependencies=[Depends(require_token)])
 
-    @r.get("/drift")
-    def drift(request: Request) -> dict:
-        ctx = request.app.state.ctx
-        report = ctx.ops.detect_drift()
-        return {
-            "items": [
-                {"part_id": i.part_id, "property": i.property,
-                 "json_value": i.json_value, "symbol_value": i.symbol_value}
-                for i in report.items
-            ],
-            "missing_symbol": list(report.missing_symbol),
-        }
-
     @r.get("/scan")
     def scan(request: Request) -> dict:
         """A read-only health pass: what the one-click repair would fix, what it can't
@@ -57,6 +44,7 @@ def doctor_router(require_token) -> APIRouter:
             "healed_drift": result.healed_drift,
             "fixed_paths": result.fixed_paths,
             "committed_files": result.committed_files,
+            "hidden_metadata": result.hidden_metadata,
             "commit": result.commit,
             "manual": [
                 {"kind": f.kind, "part_id": f.part_id, "detail": f.detail,
@@ -82,6 +70,8 @@ def doctor_router(require_token) -> APIRouter:
                 "restart_needed": report.restart_needed,
             }
 
-        return {"job_id": ctx.jobs.submit(work)}
+        # write=True: wiring rewrites the shared KiCad config (sym/fp-lib-table, SR_LIB), so
+        # it runs on the serialized write lane (two concurrent rewrites would interleave).
+        return {"job_id": ctx.jobs.submit(work, write=True)}
 
     return r

@@ -6,7 +6,9 @@ needs immediately. The complete-to-add gate lives in add_part, unchanged."""
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
@@ -14,11 +16,34 @@ from sse_starlette.sse import EventSourceResponse
 from stockroom.api.jobs import to_sse
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.ingest.staging import StagingCandidate
-from stockroom.model.part import Purchase
+from stockroom.model.part import Provenance, Purchase
 
 
 def _make_pipeline(ctx) -> IngestPipeline:
     return IngestPipeline(ctx.profile, ctx.repo, ctx.cli)
+
+
+def _make_enrich_pipeline(ctx):
+    # The same construction the enrich router uses (cache dir, rendered-DOM
+    # fetcher, optional Mouser); one seam so the two routers can never disagree.
+    from stockroom.api.routers.enrich import _make_pipeline as make
+
+    return make(ctx)
+
+
+_KNOWN_VENDOR_HOSTS = {"lcsc": "LCSC", "mouser": "Mouser", "digikey": "DigiKey"}
+
+
+def vendor_from_url(url: str) -> str:
+    """A display vendor for a pasted purchase link: the known distributors by
+    name, any other shop by its host, and a non-URL as a manual entry."""
+    host = (urlsplit(url).hostname or "").lower()
+    if not host:
+        return "manual"
+    for token, name in _KNOWN_VENDOR_HOSTS.items():
+        if token in host:
+            return name
+    return host.removeprefix("www.")
 
 
 def candidate_to_dto(c: StagingCandidate) -> dict:
@@ -41,16 +66,51 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         # frontend's StagingCandidate always has a purchase array (a missing key
         # crashes the review card), and edited/scraped purchase links survive commit.
         "purchase": [
-            {"vendor": p.vendor, "url": p.url, "price_breaks": list(p.price_breaks),
+            {"vendor": p.vendor, "url": p.url, "part_number": p.part_number,
+             "price_breaks": list(p.price_breaks),
              "stock": p.stock, "currency": p.currency, "fetched_at": p.fetched_at}
             for p in c.purchase
         ],
         "gaps": list(c.gaps),
+        # the enriched spec bag rides the inspect -> edit -> commit trip so every field
+        # a distributor page yielded reaches the committed record, not just identity
+        "specs": dict(c.specs),
+        # ...and so do the two maps that hang off it. `specs` alone crossed the wire, so a part
+        # ADDED saved `alternates: None` while the same part REFRESHED produced 13 alternates:
+        # the enrich layer computed the disagreements, StagingCandidate held them and
+        # to_staged_part forwarded them, and they died here. `enrichment` is the same drop,
+        # which is why the per-key provenance map was empty on every real part.
+        #
+        # Always emitted, even when empty, for the same reason `purchase` is: the review card
+        # reads these keys unconditionally and a missing key crashes it.
+        "alternates": {k: list(v) for k, v in c.alternates.items()},
+        "enrichment": dict(c.enrichment),
+        # provenance carries the datasheet source_url that to_staged_part records
+        # on the committed part, so it must survive the inspect -> edit -> commit trip
+        "provenance": (
+            {"source": c.provenance.source, "source_url": c.provenance.source_url,
+             "original_zip_sha256": c.provenance.original_zip_sha256,
+             "ingested_at": c.provenance.ingested_at}
+            if c.provenance is not None
+            else None
+        ),
     }
 
 
 def dto_to_candidate(d: dict) -> StagingCandidate:
+    prov = d.get("provenance")
+    provenance = (
+        Provenance(
+            source=str(prov.get("source", "")),
+            source_url=str(prov.get("source_url", "")),
+            original_zip_sha256=str(prov.get("original_zip_sha256", "")),
+            ingested_at=str(prov.get("ingested_at", "")),
+        )
+        if isinstance(prov, dict)
+        else None
+    )
     return StagingCandidate(
+        provenance=provenance,
         vendor=d.get("vendor", ""),
         symbol_lib_path=Path(d["symbol_lib_path"]) if d.get("symbol_lib_path") else None,
         symbol_name=d.get("symbol_name", ""),
@@ -66,7 +126,44 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
         description=d.get("description", ""),
         tags=list(d.get("tags", [])),
         purchase=[Purchase(**p) for p in d.get("purchase", [])],
+        gaps=list(d.get("gaps", [])),
+        specs=dict(d.get("specs", {})),
+        alternates={k: list(v) for k, v in (d.get("alternates") or {}).items()},
+        enrichment=dict(d.get("enrichment") or {}),
     )
+
+
+def _attach_local_datasheet(ctx, candidate: StagingCandidate, path: Path, notes: list[str]) -> None:
+    """Copy a user-picked PDF under the app's datasheet store and attach it to the
+    candidate. Refusals are stated in notes, never silent: a non-PDF or unreadable
+    file leaves the candidate untouched. The stored name carries a content hash so
+    two staged parts with the same normalized identity never clobber each other."""
+    import hashlib
+
+    from stockroom.enrich.datasheet import looks_like_pdf
+    from stockroom.enrich.schema import normalize_mpn
+
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(5)
+    except OSError:
+        notes.append(f"Could not read the datasheet file: {path.name}")
+        return
+    if not looks_like_pdf(head):
+        notes.append(f"{path.name} is not a PDF, so it was not attached")
+        return
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            digest.update(chunk)
+    dest_dir = Path(ctx.enrich_cache_dir) / "datasheets"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    key = normalize_mpn(
+        candidate.mpn or candidate.entry_name or candidate.display_name or path.stem
+    )
+    dst = dest_dir / f"{key}-{digest.hexdigest()[:8]}.pdf"
+    shutil.copyfile(path, dst)
+    candidate.datasheet_path = dst
 
 
 def ingest_router(require_token) -> APIRouter:
@@ -95,6 +192,45 @@ def ingest_router(require_token) -> APIRouter:
         record = pipeline.commit(candidate)  # IncompleteError -> 422 via the handler
         ctx.rebuild_index()
         ctx.auto_push()  # adding a part auto-pushes it to git so collaborators get it on next launch
+        return record.to_dict()
+
+    @r.post("/parts/{part_id}/assets/inspect")
+    def inspect_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
+        """Unpack a downloaded CAD ZIP for an EXISTING part (the owner's DigiKey-CAD
+        flow, spec section 5). Same read-lane job + candidate DTO as /ingest/inspect;
+        the only difference is the caller already knows the target part_id, so this
+        checks it exists up front instead of discovering it only at commit time.
+        Deliberately does NOT call pipeline.cleanup() here (same as /ingest/inspect):
+        a candidate's symbol/footprint/model paths point INTO the pipeline's owned
+        tempdir and a fresh pipeline instance handles the follow-up commit call, so
+        cleaning up here would delete the very files that commit still needs."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        paths = [Path(p) for p in (body.get("paths") or [])]
+
+        def work(progress):
+            progress({"pct": 5, "message": "unpacking"})
+            pipeline = _make_pipeline(ctx)
+            cands = pipeline.inspect(inputs=paths)
+            progress({"pct": 90, "message": "staged"})
+            return [candidate_to_dto(c) for c in cands]
+
+        return {"job_id": ctx.jobs.submit(work)}  # read lane (no git)
+
+    @r.post("/parts/{part_id}/assets/commit")
+    def commit_assets_for_part(request: Request, part_id: str, body: dict) -> dict:
+        """Attach the reviewed candidate's symbol/footprint/3D onto the existing part,
+        synchronously (one atomic Transaction whose added-or-rejected result the caller
+        needs immediately, same reasoning as /ingest/commit)."""
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        pipeline = _make_pipeline(ctx)
+        candidate = dto_to_candidate(body)
+        record = pipeline.attach_assets(part_id, candidate)
+        ctx.rebuild_index()
+        ctx.auto_push()  # attaching assets changes the part, so push it like any other mutation
         return record.to_dict()
 
     @r.get("/jobs/{job_id}/events")

@@ -29,6 +29,20 @@ _BOM_STOCK = {"ran_at": "2026-07-14T00:00:00Z", "boards": 1, "priced": True,
               "lines": [{"mpn": "X", "qty": 5, "stock": 0, "unit_price": 0.1,
                          "extended": 0.5, "lifecycle": "Active"}],
               "summary": {"unpriced_lines": 0}}
+_BOM_UNPRICED = {"ran_at": "2026-07-14T00:00:00Z", "boards": 1, "priced": False,
+                 "lines": [{"mpn": "X", "qty": 1, "stock": 100, "lifecycle": "Active"}],
+                 "summary": {"unpriced_lines": 2}}
+_BOM_LIFECYCLE = {"ran_at": "2026-07-14T00:00:00Z", "boards": 1, "priced": True,
+                  "lines": [{"mpn": "X", "qty": 1, "stock": 100, "unit_price": 0.1,
+                             "extended": 0.1, "lifecycle": "NRND"}],
+                  "summary": {"unpriced_lines": 0}}
+
+
+def _is_real_sentence(s: str) -> bool:
+    """A real sentence for the design contract: begins with an uppercase letter (a leading
+    interpolated count digit is allowed) and ends with a period."""
+    s = (s or "").strip()
+    return bool(s) and (s[0].isupper() or s[0].isdigit()) and s.endswith(".")
 
 
 def _ops(tmp_path):
@@ -196,3 +210,67 @@ def test_not_git_project_is_a_warning(tmp_path):
     v = ops.buildability(rec.id, checks=_CHECKS_OK, bom=_BOM_OK)
     assert v["signals"]["git"]["state"] == "not_git"
     assert any(w["kind"] == "not_git" for w in v["warnings"])
+
+
+def test_every_buildability_message_is_a_real_sentence(tmp_path):
+    # FIX-06: every blocker/warning detail + next_step reads as a real sentence (leading
+    # capital or count digit, trailing period). Gather across every reachable message path
+    # and assert the shape, so no lowercase fragment survives.
+    ops = _ops(tmp_path)
+    results: list[dict] = []
+
+    # fresh git project (external, under git): unannotated + checks_not_run + bom_not_built
+    # blockers and the identity_incomplete warning.
+    fresh, _ = _git_project(tmp_path / "ext" / "fresh")
+    results.append(ops.buildability(ops.register(fresh).id))
+
+    # a project with a .kicad_pro but NO schematic -> the no_schematic blocker.
+    nosch = tmp_path / "ext" / "nosch"
+    nosch.mkdir(parents=True)
+    (nosch / "proj.kicad_pro").write_text("{}", encoding="utf-8")
+    results.append(ops.buildability(ops.register(nosch).id))
+
+    # missing footprint blocker (annotated + complete identity, no footprint).
+    nofp, _ = _git_project(tmp_path / "ext" / "nofp", sheet=_NOFP)
+    results.append(ops.buildability(ops.register(nofp).id, checks=_CHECKS_OK, bom=_BOM_OK))
+
+    # checks failed + checks warnings.
+    done_err, _ = _git_project(tmp_path / "ext" / "err", sheet=_DONE)
+    results.append(ops.buildability(ops.register(done_err).id, checks=_CHECKS_ERR, bom=_BOM_OK))
+    done_warn, _ = _git_project(tmp_path / "ext" / "warn", sheet=_DONE)
+    results.append(ops.buildability(ops.register(done_warn).id, checks=_CHECKS_WARN, bom=_BOM_OK))
+
+    # bom stock, unpriced, lifecycle warnings.
+    done_stock, _ = _git_project(tmp_path / "ext" / "stock", sheet=_DONE)
+    results.append(ops.buildability(ops.register(done_stock).id, checks=_CHECKS_OK, bom=_BOM_STOCK))
+    done_unpriced, _ = _git_project(tmp_path / "ext" / "unpriced", sheet=_DONE)
+    results.append(ops.buildability(ops.register(done_unpriced).id, checks=_CHECKS_OK, bom=_BOM_UNPRICED))
+    done_life, _ = _git_project(tmp_path / "ext" / "life", sheet=_DONE)
+    results.append(ops.buildability(ops.register(done_life).id, checks=_CHECKS_OK, bom=_BOM_LIFECYCLE))
+
+    # dirty tree warning.
+    done_dirty, _ = _git_project(tmp_path / "ext" / "dirty", sheet=_DONE)
+    rec_dirty = ops.register(done_dirty)
+    (done_dirty / "proj.kicad_sch").write_text(_DONE.replace("opamp", "opamp v2"), encoding="utf-8")
+    results.append(ops.buildability(rec_dirty.id, checks=_CHECKS_OK, bom=_BOM_OK))
+
+    # not-git warning.
+    ungit = tmp_path / "ext" / "ungit"
+    ungit.mkdir(parents=True)
+    (ungit / "proj.kicad_pro").write_text("{}", encoding="utf-8")
+    (ungit / "proj.kicad_sch").write_text(_DONE, encoding="utf-8")
+    results.append(ops.buildability(ops.register(ungit).id, checks=_CHECKS_OK, bom=_BOM_OK))
+
+    seen_kinds: set[str] = set()
+    for v in results:
+        for msg in list(v["blockers"]) + list(v["warnings"]):
+            seen_kinds.add(msg["kind"])
+            assert _is_real_sentence(msg["detail"]), f"detail not a sentence: {msg!r}"
+            assert _is_real_sentence(msg["next_step"]), f"next_step not a sentence: {msg!r}"
+
+    # every message kind must have been exercised, so no string escapes the assertion.
+    assert seen_kinds >= {
+        "no_schematic", "unannotated", "missing_footprint", "identity_incomplete",
+        "checks_not_run", "checks_failed", "checks_warnings", "bom_not_built",
+        "bom_unpriced", "bom_stock", "bom_lifecycle", "dirty_tree", "not_git",
+    }

@@ -48,10 +48,51 @@ def to_sse(event: JobEvent) -> dict:
     return {"event": event.kind, "data": json.dumps(event.data)}
 
 
+def _offer(q: "queue.Queue[JobEvent]", event: JobEvent) -> None:
+    """Enqueue without ever blocking the producer. A disconnected SSE consumer stops draining
+    the bounded queue; a plain blocking put() would then wedge the producer forever (and once
+    the S6 render stage emits from the shared scrape-runtime loop thread, a stalled producer
+    would freeze every concurrent render). On a full queue we drop the OLDEST event to make room
+    for the newest. Progress is advisory, so dropping a stale mid-stage event is harmless; the
+    terminal result/error/done are always the LAST puts (no progress follows them), so make-room
+    only ever discards old progress and never a terminal - a consumer that (re)attaches still
+    sees the outcome and the closing 'done', so the stream always terminates cleanly."""
+    while True:
+        try:
+            q.put_nowait(event)
+            return
+        except queue.Full:
+            try:
+                q.get_nowait()  # drop the oldest queued (advisory) event, then retry
+            except queue.Empty:
+                # drained to empty between the Full and here; the retry will now succeed
+                pass
+
+
 class JobRunner:
-    def __init__(self, max_workers: int = 1):
+    """Two independent lanes so an interactive lookup never queues behind a long job.
+
+    READ jobs (enrich lookup/bulk, ingest inspect/enrich, project checks/BOM) touch no
+    git working tree, so they run concurrently on a small pool: a bulk enrich or a project
+    prepare in flight never makes an Add-A-Part lookup sit "queued".
+
+    WRITE jobs (project prepare -> an atomic commit on the project's git; doctor wire-kicad
+    -> a rewrite of the shared KiCad config) run on a dedicated single-worker pool, so two
+    git Transactions can never overlap and race on the index lock. A naive `max_workers`
+    bump on ONE pool would have let them - hence the split rather than a shared pool.
+
+    The two lanes are not mutually exclusive: a read may run alongside a write (they touch
+    disjoint state - the enrich cache vs. a project's git). The one narrow overlap left is
+    a `checks`/`bom` READ against a `prepare` WRITE on the SAME project; prepare evicts
+    those caches anyway, so a rare same-instant race only risks a stale advisory cache
+    entry, never a corrupt commit. Revisit only if that ever bites."""
+
+    def __init__(self, max_workers: int = 4):
         self._jobs: dict[str, Job] = {}
-        self._pool = ThreadPoolExecutor(max_workers=max_workers)
+        self._read_pool = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="job-read"
+        )
+        self._write_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="job-write")
         self._lock = threading.Lock()
 
     def get(self, job_id: str) -> Job:
@@ -68,29 +109,41 @@ class JobRunner:
         job.status = JobStatus.RUNNING
 
         def progress(data: dict) -> None:
-            job.queue.put(JobEvent("progress", dict(data)))
+            _offer(job.queue, JobEvent("progress", dict(data)))
 
         try:
             result = fn(progress)
             job.result = result
             job.status = JobStatus.DONE
-            job.queue.put(JobEvent("result", {"result": _jsonable(result)}))
+            _offer(job.queue, JobEvent("result", {"result": _jsonable(result)}))
         except Exception as exc:  # noqa: BLE001 - a job failure is a labeled event
             job.error = str(exc)
             job.status = JobStatus.ERROR
-            job.queue.put(JobEvent("error", {"detail": str(exc), "error": type(exc).__name__}))
+            _offer(job.queue, JobEvent("error", {"detail": str(exc), "error": type(exc).__name__}))
         finally:
-            job.queue.put(_SENTINEL)
+            _offer(job.queue, _SENTINEL)
 
     def run_sync(self, fn) -> Job:
         job = self._new_job()
         self._drive(job, fn)
         return job
 
-    def submit(self, fn) -> str:
+    def submit(self, fn, *, write: bool = False) -> str:
+        """Queue a job. `write=True` routes a git/config-mutating job to the serialized
+        write lane; the default read lane runs jobs concurrently."""
         job = self._new_job()
-        self._pool.submit(self._drive, job, fn)
+        pool = self._write_pool if write else self._read_pool
+        pool.submit(self._drive, job, fn)
         return job.id
+
+    def run_write(self, fn):
+        """Run fn() on the serialized write lane and BLOCK until it returns, propagating its result
+        or exception. Lets a long READ-lane job (a bulk rescan doing slow network lookups) push each
+        individual git commit onto the write lane - so commits stay serialized against every other
+        writer WITHOUT the network I/O ever occupying the single write worker. No deadlock: the read
+        pool and write pool are independent, so a read-lane thread blocking on a write future frees
+        no write capacity it needs."""
+        return self._write_pool.submit(fn).result()
 
     def events(self, job_id: str) -> Iterator[JobEvent]:
         job = self.get(job_id)

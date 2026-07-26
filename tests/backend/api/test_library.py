@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 
 def test_list_all_parts(client):
     r = client.get("/api/library/parts")
@@ -37,7 +39,7 @@ def test_part_detail_returns_full_record(client):
     assert r.status_code == 200
     body = r.json()
     assert body["mpn"] == "TPS62130"
-    assert body["symbol"]["name"] == "TPS62130"
+    assert body["eda"]["kicad"]["symbol"]["name"] == "TPS62130"
 
 
 def test_missing_part_detail_is_404(client):
@@ -122,3 +124,100 @@ def test_set_specs_rejects_a_malformed_specs_body(client):
     # 422 by the typed body, never an opaque 500 from specs.items() blowing up.
     r = client.post("/api/library/parts/tps62130/specs", json={"specs": ["pinout"]})
     assert r.status_code == 422
+
+
+# -- BOM match: paste a BOM, see what the library already has --------------------
+
+
+def test_attach_footprint_endpoint_files_it_under_kicad_and_nowhere_else(client):
+    r = client.post("/api/library/parts/mystery/footprint",
+                    json={"lib": "Package_SO", "name": "SOIC-8"})
+    assert r.status_code == 200
+    eda = r.json()["eda"]
+    assert eda["kicad"]["footprint"] == {"lib": "Package_SO", "name": "SOIC-8", "file": ""}
+    # A reference can no longer carry a `tool` tag that disagrees with the slot it sits in,
+    # so "which tool got this" is answered by the slot: nothing was filed for Altium.
+    assert "altium" not in eda
+    # persisted through the index rebuild
+    detail = client.get("/api/library/parts/mystery").json()
+    assert detail["eda"]["kicad"]["footprint"]["name"] == "SOIC-8"
+
+
+def test_attach_symbol_endpoint_requires_a_name(client):
+    r = client.post("/api/library/parts/mystery/symbol", json={"lib": "Device"})
+    assert r.status_code == 422
+
+
+def test_detach_asset_removes_one_element_and_400s_when_absent(client):
+    # the fixture library's tps62130 carries a symbol; removing it nulls the ref
+    detail = client.get("/api/library/parts/tps62130").json()
+    assert detail["eda"]["kicad"]["symbol"] is not None
+    # The kind names WHOSE symbol: `<tool>_<asset kind>` from the EDA registry, the same
+    # vocabulary capture requirements speak.
+    r = client.delete("/api/library/parts/tps62130/assets/kicad_symbol")
+    assert r.status_code == 200
+    assert r.json()["eda"]["kicad"]["symbol"] is None
+    # removing it again is an honest 400, never a silent no-op
+    assert client.delete("/api/library/parts/tps62130/assets/kicad_symbol").status_code == 400
+    # unknown kind -> 400; unknown part -> 404
+    assert client.delete("/api/library/parts/tps62130/assets/bogus").status_code == 400
+    # a bare kind with no tool is no longer a valid vocabulary word either
+    assert client.delete("/api/library/parts/tps62130/assets/symbol").status_code == 400
+    assert client.delete("/api/library/parts/nope/assets/kicad_symbol").status_code == 404
+
+
+def test_library_hygiene_endpoints_preview_then_apply(client, app_ctx):
+    """The library is what a peer CLONES, so a per-user file committed here reaches everyone. The
+    endpoints preview and then apply the union of every registered tool's rules."""
+    cache = app_ctx.repo.root / "fp-info-cache"
+    cache.write_text("machine cache\n", encoding="utf-8")
+    app_ctx.repo.commit("add a cache file the way a KiCad user would", [cache])
+
+    preview = client.get("/api/library/hygiene")
+    assert preview.status_code == 200, preview.text
+    assert "fp-info-cache" in preview.json()["untracked"]
+
+    applied = client.post("/api/library/hygiene")
+    assert applied.status_code == 200, applied.text
+    assert "fp-info-cache" in applied.json()["untracked"]
+    ignore = (app_ctx.repo.root / ".gitignore").read_text(encoding="utf-8")
+    assert "fp-info-cache" in ignore and "History/" in ignore  # both adapters contributed
+    # the file is still on disk; only git stopped sharing it
+    assert cache.exists()
+    assert client.post("/api/library/hygiene").json()["committed"] is None
+
+
+def test_library_lfs_endpoints_report_then_adopt(client, app_ctx):
+    """Batch 2 item 4, reachable from the app: the status is honest before adoption, adopting
+    writes the rules AND wires the filter, and the next binary is stored as a pointer."""
+    import shutil as _shutil
+    import subprocess as _subprocess
+
+    if _shutil.which("git") is None or _subprocess.run(
+        ["git", "lfs", "version"], capture_output=True
+    ).returncode != 0:
+        pytest.skip("git-lfs not installed")
+
+    before = client.get("/api/library/lfs")
+    assert before.status_code == 200, before.text
+    body = before.json()
+    assert body["installed"] is True
+    assert body["adopted"] is False
+    # the offer is concrete: it names what WOULD be routed through LFS
+    assert any("PcbLib" in p for p in body["covers"])
+    assert any(".step" in p for p in body["covers"])
+
+    applied = client.post("/api/library/lfs")
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["adopted"] is True
+
+    after = client.get("/api/library/lfs").json()
+    assert after["adopted"] is True
+    assert any("PcbLib" in p for p in after["tracked_patterns"])
+
+    root = app_ctx.repo.root
+    payload = root / "part.PcbLib"
+    payload.write_bytes(b"OLE2 compound bytes" * 200)
+    app_ctx.repo.commit("capture a part", [payload])
+    stored = app_ctx.repo._run("cat-file", "-p", "HEAD:part.PcbLib").stdout
+    assert stored.startswith("version https://git-lfs.github.com/spec/v1")

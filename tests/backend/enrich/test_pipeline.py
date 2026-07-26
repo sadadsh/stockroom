@@ -20,9 +20,33 @@ class _StubFetcher:
         return FetchResult(url, 200, self._html, self._html.encode(), "text/html", url)
 
 
+class _SequenceFetcher:
+    """Returns a different page on each successive call, to exercise fetch-to-fetch variance
+    (the A6 determinism concern: a link that pulls fully once and thin the next time)."""
+    def __init__(self, *pages):
+        self._pages = list(pages)
+        self.calls = 0
+
+    def rendered_html(self, url, timeout=20.0):
+        from stockroom.enrich.fetch import FetchResult
+        html = self._pages[min(self.calls, len(self._pages) - 1)]
+        self.calls += 1
+        return FetchResult(url, 200, html, html.encode(), "text/html", url)
+
+
 class _NoWaitLimiter:
     def acquire(self):
         pass
+
+
+class _NullJlc:
+    """A jlcsearch client that always misses, so LcscSource is inert in tests that
+    exercise the scrape/datasheet path and assert exact fetch counts (an injected
+    stub fetcher bypasses the conftest network guard, so LcscSource would otherwise
+    add a jlcsearch GET)."""
+
+    def search(self, mpn):
+        return None
 
 
 def _candidate(**kw):
@@ -111,6 +135,119 @@ def test_cache_round_trips_the_procurement_fields():  # M7d: lifecycle/lead/prod
     assert back.dist_pns == {"mouser": "595-TPS62130RGTR"}
 
 
+_MOUSER_LIKE_HTML = (
+    '<html><head><script type="application/ld+json">'
+    '{"@context":"https://schema.org","@type":"Product","sku":"667-ERJ-P03F1101V",'
+    '"mpn":"ERJ-P03F1101V","brand":{"name":"Panasonic"},"description":"1.1k 0.2W res",'
+    '"datasheet":"https://industrial.panasonic.com/ds.pdf",'
+    '"offers":{"@type":"Offer","price":"0.10","priceCurrency":"USD",'
+    '"availability":"http://schema.org/InStock","inventoryLevel":5000}}'
+    "</script></head><body><table>"
+    "<tr><td>Resistance</td><td>1.1 kOhm</td></tr>"
+    "<tr><td>Tolerance</td><td>1%</td></tr>"
+    "<tr><td>Power</td><td>0.2 W</td></tr>"
+    "</table></body></html>"
+)
+
+
+def test_pasted_product_url_carries_every_spec_to_the_candidate_and_staged_part(tmp_path):
+    # The owner's flow: paste a distributor link -> autofill EVERYTHING. The rich specs
+    # a page yields must land on the candidate AND survive into the staged part (they
+    # were previously extracted then discarded because the candidate had no spec bag).
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=_StubFetcher(_MOUSER_LIKE_HTML),
+        limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+        jlcsearch=_NullJlc(),
+    )
+    from stockroom.model.part import Purchase
+
+    c = _candidate(mpn="", manufacturer="", description="")
+    c.purchase = [Purchase(vendor="Mouser",
+                           url="https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V")]
+    pipe.enrich_from_product_url(c, c.purchase[0].url)
+
+    assert c.mpn == "ERJ-P03F1101V" and c.manufacturer == "Panasonic"
+    assert c.specs["Resistance"] == "1.1 kOhm"
+    assert c.specs["Tolerance"] == "1%"
+    assert c.specs["Power"] == "0.2 W"
+    # and the specs survive the hand-off to the committable staged part
+    c.symbol_lib_path = FIX / "nope.kicad_sym"  # to_staged_part only needs the paths set
+    c.footprint_variants = [FIX / "fp.kicad_mod"]
+    staged = c.to_staged_part()
+    assert staged.specs["Resistance"] == "1.1 kOhm"
+
+
+def test_extract_from_url_autofills_everything_from_a_mouser_page(tmp_path):
+    # The owner's headline flow: paste a Mouser URL alone -> get EVERYTHING (identity,
+    # price, datasheet, package, and the full parametric spec table) with no file.
+    html = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=_StubFetcher(html),
+        limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+        jlcsearch=_NullJlc(),
+    )
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
+    )
+    assert r.mpn.value == "ERJ-P03F1101V"
+    assert r.manufacturer.value == "Panasonic"
+    assert r.price_breaks and r.price_breaks[0].price > 0
+    assert r.datasheet_url is not None
+    assert r.package.value == "0603 (1608 Metric)"
+    assert r.specs["Resistance"].value == "1.1 kOhms"
+    assert r.specs["Tolerance"].value == "±1%"
+    assert "product_url" in r.specs
+
+
+def test_extract_from_url_is_empty_on_a_blocked_page(tmp_path):
+    # A 403/challenge page (what a plain HTTP client gets from Mouser) yields nothing,
+    # honestly - never a crash, never invented data.
+    class _Dead:
+        def rendered_html(self, url, timeout=20.0):
+            from stockroom.enrich.errors import EnrichError
+            raise EnrichError("akamai 403")
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_Dead(),
+                              limiter=_NoWaitLimiter(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url("https://www.mouser.com/x")
+    assert r.mpn is None and not r.specs
+
+
+_THIN = "<html><head><meta property='og:description' content='blocked challenge page'></head></html>"
+
+
+def test_extract_from_url_is_deterministic_via_the_url_cache(tmp_path):
+    # A6: once a link pulls a substantive result it is cached, so a SECOND lookup returns the
+    # SAME full result and never re-fetches - even if the page would now serve a thin/blocked body.
+    full = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    fetcher = _SequenceFetcher(full, _THIN)
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=fetcher,
+                              limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+                              jlcsearch=_NullJlc())
+    url = "https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V"
+    r1 = pipe.extract_from_url(url)
+    r2 = pipe.extract_from_url(url)
+    assert r1.mpn.value == "ERJ-P03F1101V"
+    assert r2.mpn is not None and r2.mpn.value == r1.mpn.value  # identical, not the thin page
+    assert fetcher.calls == 1  # the second lookup hit the cache; no re-fetch
+
+
+def test_a_thin_or_blocked_result_is_never_cached(tmp_path):
+    # A thin/blocked first fetch must NOT poison the cache: the retry re-fetches and can still
+    # get the full page (so a one-off block never becomes the permanent answer).
+    full = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    fetcher = _SequenceFetcher(_THIN, full)
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=fetcher,
+                              limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
+                              jlcsearch=_NullJlc())
+    url = "https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V"
+    r1 = pipe.extract_from_url(url)
+    r2 = pipe.extract_from_url(url)
+    assert r1.mpn is None  # thin -> not substantive
+    assert r2.mpn is not None and r2.mpn.value == "ERJ-P03F1101V"  # retry got the full page
+    assert fetcher.calls == 2  # thin was not cached, so the retry really re-fetched
+
+
 def test_datasheet_field_is_preferred_over_a_scrape_field():
     # datasheet gives the MPN at high confidence; a scrape gives a WRONG MPN.
     ds = EnrichmentResult(category="ICs")
@@ -164,10 +301,61 @@ class _StubHttpFetcher:
         return FetchResult(url, 200, data.decode("latin-1"), data, "application/pdf", url)
 
 
+class _UrlFetcher:
+    """A RenderedDomFetcher that serves different HTML per URL (a substring match),
+    so a test can prove WHICH url was actually fetched, not just that some fetch
+    happened."""
+    def __init__(self, by_url):
+        self._by_url = by_url
+        self.urls = []
+
+    def rendered_html(self, url, timeout=20.0):
+        from stockroom.enrich.fetch import FetchResult
+        self.urls.append(url)
+        html = next((h for pat, h in self._by_url.items() if pat in url), "<html></html>")
+        return FetchResult(url, 200, html, html.encode(), "text/html", url)
+
+
+_LD_PRODUCT_WITH_PRICE = (
+    '<html><head><script type="application/ld+json">'
+    '{"@context":"https://schema.org","@type":"Product","mpn":"TPS62130RGTR",'
+    '"brand":{"name":"Texas Instruments"},"description":"3A step-down converter",'
+    '"offers":{"@type":"Offer","price":"2.50","priceCurrency":"USD"}}'
+    "</script></head></html>"
+)
+
+
+def test_enrich_candidate_scrapes_the_pasted_purchase_url(tmp_path):
+    """The owner's Autofill flow: a candidate carrying only a purchase link (no MPN)
+    fills its identity by fetching THAT product page directly, not an MPN search."""
+    from stockroom.model.part import Purchase
+
+    purchase_url = "https://www.mouser.com/ProductDetail/xyz"
+    fetcher = _UrlFetcher({"mouser.com/ProductDetail": _LD_PRODUCT_WITH_PRICE})
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c", fetcher=fetcher, limiter=_NoWaitLimiter(),
+    )
+    c = _candidate(
+        entry_name="", display_name="Widget", mpn="", manufacturer="", description="",
+        purchase=[Purchase(vendor="Mouser", url=purchase_url)],
+    )
+    pipe.enrich_candidate(c)
+    # the exact pasted URL was fetched (not an LCSC search built from a blank MPN)
+    assert any("mouser.com/ProductDetail/xyz" in u for u in fetcher.urls)
+    # identity is filled straight from the scraped product page
+    assert c.mpn == "TPS62130RGTR"
+    assert c.manufacturer == "Texas Instruments"
+    assert c.description == "3A step-down converter"
+    # the pasted purchase link is preserved (vendor + url) and gains the scraped price
+    assert c.purchase[0].url == purchase_url
+    assert c.purchase[0].vendor == "Mouser"
+    assert c.purchase[0].price_breaks == [{"qty": 1, "price": 2.5}]
+
+
 def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
     http = _StubHttpFetcher(mode="pdf")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(_LD_WITH_DATASHEET),
-                              limiter=_NoWaitLimiter(), http_fetcher=http)
+                              limiter=_NoWaitLimiter(), http_fetcher=http, jlcsearch=_NullJlc())
     r = pipe.enrich("TPS62130RGTR", "ICs")
     assert r.datasheet_url.value == "https://ti.com/lit/ds/tps62130.pdf"
     # the DatasheetSource followed the URL, fetched the real PDF, extracted the package
@@ -179,7 +367,7 @@ def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
 def test_enrich_candidate_fetches_and_stores_the_datasheet_pdf(tmp_path):
     http = _StubHttpFetcher(mode="pdf")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(_LD_WITH_DATASHEET),
-                              limiter=_NoWaitLimiter(), http_fetcher=http)
+                              limiter=_NoWaitLimiter(), http_fetcher=http, jlcsearch=_NullJlc())
     c = _candidate(mpn="TPS62130RGTR", datasheet_path=None)
     pipe.enrich_candidate(c)
     # the passport's datasheet requirement is now satisfiable: a real stored PDF
@@ -242,3 +430,509 @@ def test_mouser_source_paces_the_api_with_its_limiter():
     for _ in range(3):
         src.enrich("STM32", "ICs", set())
     assert slept, "the 3rd Mouser lookup within the window must sleep (be rate-limited)"
+
+
+def test_copy_specs_normalizes_label_no_duplicated_twin():
+    # F2 review regression: an extractor that still emits the raw duplicated-label key
+    # must update the record's existing CLEAN key, never add a twin the persistence
+    # layer then silently collapses (dropping a value).
+    from stockroom.enrich.pipeline import _copy_specs
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+    from stockroom.model.part import PartRecord
+
+    twin = "Factory Pack Quantity: Factory Pack Quantity"
+    cand = PartRecord(id="x", display_name="X", category="ICs", specs={"Factory Pack Quantity": "100"})
+    result = EnrichmentResult()
+    result.specs[twin] = Sourced("999", "mouser_web", "medium")
+    # default merge (specs not opted into overwrite): existing clean key kept, no twin
+    _copy_specs(cand, result, set())
+    assert cand.specs["Factory Pack Quantity"] == "100"
+    assert twin not in cand.specs
+    # overwrite updates the clean key in place, still no twin
+    _copy_specs(cand, result, {"specs"})
+    assert cand.specs["Factory Pack Quantity"] == "999"
+    assert twin not in cand.specs
+
+
+def test_pipeline_uses_digikey_adapter_as_a_source(tmp_path):
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    class FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            r = EnrichmentResult()
+            r.lifecycle = Sourced("Active", "digikey", "high")
+            return r
+
+    pipe = EnrichmentPipeline(tmp_path, digikey=FakeDigiKey())
+    # no scrape/LCSC hit for this junk MPN, so the DigiKey source is what fills lifecycle
+    result = pipe.enrich("ZZZ-NO-SUCH-PART", "ICs")
+    assert result.lifecycle is not None and result.lifecycle.value == "Active"
+
+
+def test_extract_from_url_never_leaks_a_challenge_shell_as_description(tmp_path):
+    # A challenge shell (Cloudflare "Just a moment...") whose only extractable field is an
+    # og:description must NOT surface that text as the part description - honest degradation, the
+    # vendor-agnostic backstop below the marker-level detector.
+    from stockroom.enrich.fetch import FetchResult
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+
+    class ChallengeFetcher:
+        def rendered_html(self, url, **kw):
+            html = ('<html><head><meta property="og:description" '
+                    'content="Just a moment..."></head><body></body></html>')
+            return FetchResult(url=url, status=200, text=html, content=b"",
+                               content_type="text/html", final_url=url)
+
+    pipe = EnrichmentPipeline(tmp_path, fetcher=ChallengeFetcher())
+    result = pipe.extract_from_url("https://www.digikey.com/en/products/detail/x/Y/1")
+    assert result.description is None   # the challenge text is not fabricated into a description
+    assert result.mpn is None           # nothing real was pulled
+
+
+def test_extract_from_url_keeps_a_real_description_with_manufacturer_but_no_mpn(tmp_path):
+    # A real manufacturer/landing page whose JSON-LD carries brand + name but no MPN/specs is
+    # substantive - manufacturer is structured-only (a challenge shell can't produce it) - so its
+    # real product description must be KEPT, not dropped as if it were a challenge shell (F1).
+    from stockroom.enrich.fetch import FetchResult
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+
+    class RealPageFetcher:
+        def rendered_html(self, url, **kw):
+            html = ('<script type="application/ld+json">{"@type":"Product",'
+                    '"name":"BQ24074RGTT Battery Charger IC",'
+                    '"brand":{"@type":"Brand","name":"Texas Instruments"}}</script>')
+            return FetchResult(url=url, status=200, text=html, content=b"",
+                               content_type="text/html", final_url=url)
+
+    pipe = EnrichmentPipeline(tmp_path, fetcher=RealPageFetcher())
+    result = pipe.extract_from_url("https://www.ti.com/product/BQ24074")
+    assert result.manufacturer is not None and result.manufacturer.value == "Texas Instruments"
+    assert result.description is not None and "BQ24074RGTT" in result.description.value
+
+
+# --- API-first paste-a-link path (Mouser/DigiKey are Akamai-guarded; the official APIs answer
+# --- the exact part in one call, so a recognized distributor link resolves through them and
+# --- never renders the blocked page). ---------------------------------------------------------
+
+
+class _RaisingFetcher:
+    """A render fetcher that MUST NOT be called: the API path resolves without any render."""
+
+    def rendered_html(self, url, timeout=20.0, on_stage=None):
+        raise AssertionError("the render path was taken; the official API should have resolved")
+
+
+def _mouser_full():
+    from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
+
+    r = EnrichmentResult()
+    r.mpn = Sourced("TPD6E05U06RVZR", "mouser", "high")
+    r.manufacturer = Sourced("Texas Instruments", "mouser", "high")
+    r.description = Sourced("ESD Protection Diodes / TVS Diodes 6-CH lo cap", "mouser", "high")
+    r.stock = Sourced(12054, "mouser", "high")
+    r.price_breaks = [PriceBreak(qty=1, price=0.5)]
+    return r
+
+
+class _FakeMouser:
+    enabled = True
+
+    def __init__(self, result):
+        self._r = result
+        self.seen = []
+
+    def lookup(self, mpn):
+        self.seen.append(mpn)
+        return self._r
+
+
+def test_paste_mouser_link_resolves_via_the_official_api_without_rendering(tmp_path):
+    # The reported bug: pasting a Mouser link rendered the Akamai-guarded page and returned
+    # "Nothing was pulled". With a Mouser key configured it now resolves through the official
+    # API - fast, WAF-free - and never touches the browser render.
+    mouser = _FakeMouser(_mouser_full())
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=mouser, jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR?qs=x"
+    )
+    assert r.mpn.value == "TPD6E05U06RVZR"
+    assert r.manufacturer.value == "Texas Instruments"
+    assert r.stock.value == 12054
+    assert r.price_breaks and r.price_breaks[0].price > 0
+    assert mouser.seen == ["TPD6E05U06RVZR"]  # the MPN parsed from the URL drove the API
+    # the pasted link is preserved as the purchase link
+    assert r.specs["product_url"].value.startswith("https://www.mouser.com/")
+
+
+def test_paste_mouser_link_merges_digikey_datasheet_and_specs(tmp_path):
+    # Mouser gives identity/price/stock but no datasheet for this part; DigiKey fills the
+    # datasheet + electrical parametrics. Both official APIs, merged, from one pasted link.
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    mouser = _FakeMouser(_mouser_full())  # carries no datasheet_url
+
+    dk = EnrichmentResult()
+    dk.datasheet_url = Sourced("https://www.ti.com/lit/gpn/tpd6e05u06.pdf", "digikey", "high")
+    dk.specs["Voltage - Clamping (Max) @ Ipp"] = Sourced("14V", "digikey", "high")
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            return dk
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=mouser, digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+    assert r.price_breaks  # from Mouser
+    assert r.stock.value == 12054  # from Mouser
+    assert r.datasheet_url.value.endswith(".pdf")  # filled by DigiKey (Mouser had none)
+    assert r.specs["Voltage - Clamping (Max) @ Ipp"].value == "14V"  # DigiKey parametric
+
+
+def test_paste_digikey_link_resolves_via_api_using_the_path_mpn(tmp_path):
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    dk = EnrichmentResult()
+    dk.mpn = Sourced("TPD6E05U06RVZR", "digikey", "high")
+    dk.datasheet_url = Sourced("https://www.ti.com/lit/gpn/tpd6e05u06.pdf", "digikey", "high")
+    seen = []
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            seen.append(mpn)
+            return dk
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.digikey.com/en/products/detail/texas-instruments/TPD6E05U06RVZR/2094564"
+    )
+    assert r.mpn.value == "TPD6E05U06RVZR"
+    assert seen == ["TPD6E05U06RVZR"]  # parsed from the middle path segment
+
+
+def test_paste_link_captures_both_distributor_buy_links(tmp_path):
+    # The owner's ask: since we call BOTH APIs, store BOTH the Mouser and DigiKey buy links (and
+    # each vendor's own order number) on the part, not only the pasted link.
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    m = _mouser_full()
+    m.product_url = Sourced("https://www.mouser.com/ProductDetail/x", "mouser", "high")
+    m.dist_pns["mouser"] = "595-TPD6E05U06RVZR"
+
+    class _FakeDigiKey:
+        enabled = True
+
+        def lookup(self, mpn):
+            r = EnrichmentResult()
+            r.product_url = Sourced(
+                "https://www.digikey.com/en/products/detail/ti/TPD6E05U06RVZR/1", "digikey", "high"
+            )
+            r.dist_pns["digikey"] = "296-39349-2-ND"
+            return r
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_RaisingFetcher(),
+                              mouser=_FakeMouser(m), digikey=_FakeDigiKey(), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+    assert r.dist_urls["mouser"].startswith("https://www.mouser.com/")
+    assert r.dist_urls["digikey"].startswith("https://www.digikey.com/")
+    assert set(r.dist_pns) == {"mouser", "digikey"}
+
+
+def test_dist_urls_round_trip_through_the_cache():
+    # both buy links must survive caching, so a re-looked-up link keeps both distributors.
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult
+
+    r = EnrichmentResult()
+    r.dist_urls = {"mouser": "https://m/x", "digikey": "https://d/y"}
+    back = _result_from_cache(_result_to_cache(r), "")
+    assert back.dist_urls == {"mouser": "https://m/x", "digikey": "https://d/y"}
+
+
+def test_paste_link_falls_back_to_render_when_the_api_misses(tmp_path):
+    # If the official API has no data (a miss, or the part is not carried), the paste path still
+    # falls back to rendering the page - no regression for a link the API cannot resolve.
+    from stockroom.enrich.schema import EnrichmentResult
+
+    class _MissMouser:
+        enabled = True
+
+        def lookup(self, mpn):
+            return EnrichmentResult()  # empty = a clean miss
+
+    html = (FIX / "mouser_product.html").read_text(encoding="utf-8")
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(html),
+                              mouser=_MissMouser(), limiter=_NoWaitLimiter(),
+                              http_fetcher=_StubHttpFetcher(mode="pdf"), jlcsearch=_NullJlc())
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/en/ProductDetail/Panasonic/ERJ-P03F1101V"
+    )
+    assert r.mpn.value == "ERJ-P03F1101V"  # the RENDER filled it after the API missed
+
+
+def test_cache_round_trip_keeps_spec_conflicts(tmp_path):
+    # A cache hit must not silently resolve a kept disagreement (merge-only-identical).
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.specs = {"Vf": Sourced("0.7 V", "mouser", "high")}
+    r.spec_conflicts = {
+        "Vf": [Sourced("0.7 V", "mouser", "high"), Sourced("0.65 V", "digikey", "high")]
+    }
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    assert [(s.value, s.source) for s in back.spec_conflicts["Vf"]] == [
+        ("0.7 V", "mouser"), ("0.65 V", "digikey"),
+    ]
+
+
+def test_cache_round_trip_keeps_the_v2_import_fields_and_field_conflicts():
+    """The v2 import fields (country_of_origin / tariff_rate) were on the schema and filled
+    by the Mouser path, but _result_to_cache never wrote them - so a part's origin and its
+    real US tariff survived the first fresh lookup and were DROPPED on every cache hit
+    afterwards. Exactly the M7d bug 4255471 fixed for lifecycle/lead, in the same function,
+    for the fields added after it."""
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.country_of_origin = Sourced("Japan", "mouser", "high")
+    r.tariff_rate = Sourced(37.93, "mouser", "high")
+    r.description = Sourced("3A Buck Converter", "mouser", "high")
+    r.field_conflicts = {
+        "description": [
+            Sourced("3A Buck Converter", "mouser", "high"),
+            Sourced("Step-Down Regulator", "digikey", "high"),
+        ]
+    }
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    assert back.country_of_origin is not None and back.country_of_origin.value == "Japan"
+    assert back.tariff_rate is not None and back.tariff_rate.value == 37.93
+    assert [(s.value, s.source) for s in back.field_conflicts["description"]] == [
+        ("3A Buck Converter", "mouser"), ("Step-Down Regulator", "digikey"),
+    ]
+
+
+def test_every_canonical_field_survives_the_cache_round_trip():
+    """The GATE for the class of bug above, not another instance of it. A field added to
+    EnrichmentResult is cached by construction (both halves iterate SOURCED_FIELDS), and this
+    proves it for the whole set instead of naming a few by hand - the naming-a-few habit is
+    what dropped four fields across two separate slices."""
+    from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
+    from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    for i, name in enumerate(SOURCED_FIELDS):
+        setattr(r, name, Sourced(f"v{i}", "mouser", "high"))
+    back = _result_from_cache(_result_to_cache(r), "ICs")
+    dropped = [name for name in SOURCED_FIELDS if getattr(back, name) is None]
+    assert dropped == [], f"the cache silently dropped {dropped}"
+
+
+# -- What reaches the candidate, and therefore the record (Batch 3, punch 2). The audit's list
+# of fields "never persisted anywhere" was accurate, and the reason was this hop: the pulled
+# result carries lifecycle / lead_time / country_of_origin / tariff_rate as canonical fields,
+# per-spec provenance, and every kept disagreement - and the candidate had nowhere to put any
+# of it, so all of it stopped here.
+
+
+def _batch3_result():
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    r = EnrichmentResult(category="ICs")
+    r.description = Sourced("3A Buck Converter", "mouser", "high")
+    r.package = Sourced("WSON-8", "mouser", "high")
+    r.lifecycle = Sourced("Active", "mouser", "high")
+    r.lead_time = Sourced("16 Weeks", "mouser", "high")
+    r.country_of_origin = Sourced("Japan", "mouser", "high")
+    r.tariff_rate = Sourced(0.0, "mouser", "high")
+    r.specs["Product Category"] = Sourced("Buck Converters", "mouser", "high")
+    r.field_conflicts["description"] = [
+        Sourced("3A Buck Converter", "mouser", "high"),
+        Sourced("Step-Down Regulator, 3 A", "digikey", "high"),
+    ]
+    r.spec_conflicts["Product Category"] = [
+        Sourced("Buck Converters", "mouser", "high"),
+        Sourced("DC DC Converters", "digikey", "high"),
+    ]
+    return r
+
+
+def _batch3_candidate():
+    from stockroom.ingest.staging import StagingCandidate
+
+    return StagingCandidate(vendor="v", symbol_lib_path=None, symbol_name="",
+                            footprint_variants=[])
+
+
+def test_the_procurement_fields_reach_the_candidate_as_specs():
+    """lifecycle / lead_time / country_of_origin / tariff_rate are canonical FIELDS upstream and
+    have no top-level home on a record, so they are mirrored into the spec bag from ONE registry
+    map. Previously each extractor had to remember to mirror its own, and lead_time's never was:
+    DigiKey filled `r.lead_time` and nothing ever wrote it down."""
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.specs["Lifecycle"] == "Active"
+    assert cand.specs["Lead Time"] == "16 Weeks"
+    assert cand.specs["Country of Origin"] == "Japan"
+    # 0.0 is a MEANINGFUL tariff (the page's own confirmed no-tariff), never a missing value
+    assert cand.specs["US Tariff %"] == 0.0
+
+
+def test_per_spec_provenance_reaches_the_batch3_candidate():
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.enrichment["Product Category"] == {"source": "mouser", "confidence": "high"}
+    assert cand.enrichment["Lifecycle"]["source"] == "mouser"
+
+
+def test_every_kept_disagreement_reaches_the_batch3_candidate():
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    _copy_specs(cand, _batch3_result(), set())
+    assert [(a["value"], a["source"]) for a in cand.alternates["description"]] == [
+        ("3A Buck Converter", "mouser"), ("Step-Down Regulator, 3 A", "digikey"),
+    ]
+    assert [a["value"] for a in cand.alternates["Product Category"]] == [
+        "Buck Converters", "DC DC Converters",
+    ]
+
+
+def test_a_user_typed_spec_still_wins_over_a_mirrored_field():
+    """The per-field rule does not change: what is already on the candidate is kept unless the
+    caller opted into overwriting."""
+    from stockroom.enrich.pipeline import _copy_specs
+
+    cand = _batch3_candidate()
+    cand.specs["Lifecycle"] = "Obsolete"
+    _copy_specs(cand, _batch3_result(), set())
+    assert cand.specs["Lifecycle"] == "Obsolete"
+
+
+# --- The MPN lookup must classify from what the distributors actually said. -------------------
+# Owner, 2026-07-26, on their real Windows library: a part reads "Other" though all three
+# distributors classify it. TPD6E05U06RVZR carries Product Category "ESD Protection Diodes /
+# TVS Diodes" (LCSC) and "Circuit Protection" (DigiKey), and still landed in SR-Other with
+# Category=Other in the generated Altium DbLib. `fill_category` existed and was wired into the
+# paste-a-link path ONLY, so the MPN path returned the caller's default forever.
+
+class _CatOnlySource:
+    """A source that answers with nothing but the distributor's own Product Category, which is
+    exactly the shape the LCSC/DigiKey legs contribute for a part whose identity is already
+    known."""
+
+    def __init__(self, product_category: str, description: str = ""):
+        self._pc = product_category
+        self._desc = description
+
+    def enrich(self, mpn, category, remaining):
+        r = EnrichmentResult()
+        if self._pc:
+            r.specs["Product Category"] = Sourced(self._pc, "lcsc", "high")
+        if self._desc:
+            r.description = Sourced(self._desc, "lcsc", "high")
+        return r
+
+
+def _cat_pipeline(tmp_path, source):
+    from stockroom.enrich.registry import SourceRegistry
+
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(""),
+                              limiter=_NoWaitLimiter())
+    pipe.registry = SourceRegistry([source])
+    return pipe
+
+
+def test_enrich_by_mpn_classifies_from_the_distributor_product_category(tmp_path):
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_enrich_by_mpn_falls_back_to_the_description_when_the_category_is_generic(tmp_path):
+    """DigiKey answers "Circuit Protection", which names no component kind. The description
+    still does, so the classifier must not stop at the first unrecognized signal."""
+    pipe = _cat_pipeline(
+        tmp_path,
+        _CatOnlySource("Circuit Protection", description="TVS DIODE 5.5VWM 14VC 14USON"),
+    )
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_enrich_by_mpn_keeps_a_category_the_user_already_chose(tmp_path):
+    """A caller who states the category owns it; classification only fills a blank/Other."""
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    assert pipe.enrich("TPD6E05U06RVZR", "ICs").category == "ICs"
+
+
+def test_a_cached_lookup_is_classified_too(tmp_path):
+    """The cache is written by the same call that classifies, but an install carries entries
+    written BEFORE this fix, whose stored category is "Other" beside a perfectly good Product
+    Category. Reading one back must classify it rather than serve the stale verdict."""
+    pipe = _cat_pipeline(tmp_path, _CatOnlySource("ESD Protection Diodes / TVS Diodes"))
+    from stockroom.enrich.pipeline import _result_to_cache
+
+    stale = _result_to_cache(pipe.registry.enrich("TPD6E05U06RVZR", "Other"))
+    assert stale["category"] == "Other"  # the poisoned shape this test is about
+    pipe.cache.put("TPD6E05U06RVZR", stale)
+    assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
+
+
+def test_classification_uses_every_source_not_just_the_winner(tmp_path):
+    """Owner, 2026-07-26: "find the BEST classification across sources rather than taking one
+    and giving up". DigiKey's "Circuit Protection" names no component kind; LCSC's "ESD
+    Protection Diodes / TVS Diodes" does. Whichever of them happens to win the single Product
+    Category slot, the classifier must see both before it falls through to the description."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.specs["Product Category"] = Sourced("Circuit Protection", "digikey", "high")
+    r.spec_conflicts["Product Category"] = [
+        Sourced("Circuit Protection", "digikey", "high"),
+        Sourced("ESD Protection Diodes / TVS Diodes", "lcsc", "high"),
+    ]
+    fill_category(r)
+    assert r.category == "Diodes"
+
+
+def test_a_losing_description_can_classify_when_no_category_does(tmp_path):
+    """Same rule one tier down: the description that won the slot is generic, an alternate
+    description is not. Product Category still outranks both - this only widens each tier."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.description = Sourced("6-CH low cap IEC protection, 14USON", "jsonld", "low")
+    r.field_conflicts["description"] = [
+        Sourced("6-CH low cap IEC protection, 14USON", "jsonld", "low"),
+        Sourced("TVS DIODE 5.5VWM 14VC 14USON", "digikey", "high"),
+    ]
+    fill_category(r)
+    assert r.category == "Diodes"
+
+
+def test_a_product_category_still_outranks_any_description(tmp_path):
+    """The widening must not become a blend: a description naming another component kind
+    ("resistor divider" on a regulator) may never beat a Product Category that classifies."""
+    from stockroom.enrich.pipeline import fill_category
+
+    r = EnrichmentResult(category="Other")
+    r.specs["Product Category"] = Sourced("Voltage Regulators - Switching", "mouser", "high")
+    r.description = Sourced("Buck IC for a resistor divider feedback network", "lcsc", "low")
+    fill_category(r)
+    assert r.category == "ICs"

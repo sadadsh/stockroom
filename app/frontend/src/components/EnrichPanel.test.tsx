@@ -6,10 +6,14 @@ import { ApiError, api } from "../api/client";
 import type { EnrichmentResult } from "../api/types";
 import { EnrichPanel } from "./EnrichPanel";
 
-// The enrich lookup is the only api call this panel makes; mock it directly.
+// The enrich lookup is a background job now: the panel submits it (enrichPart -> {job_id})
+// and reads the sourced result off the job's SSE stream (openJobStream). Mock both.
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
-  return { ...actual, api: { ...actual.api, enrichPart: vi.fn() } };
+  return {
+    ...actual,
+    api: { ...actual.api, enrichPart: vi.fn(), openJobStream: vi.fn() },
+  };
 });
 
 const mockApi = vi.mocked(api);
@@ -30,6 +34,27 @@ function result(over: Partial<EnrichmentResult> = {}): EnrichmentResult {
   };
 }
 
+function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const s of chunks) c.enqueue(enc.encode(s));
+      c.close();
+    },
+  });
+}
+
+// A successful lookup: the submit returns a job ref, the stream carries the sourced result.
+function mockLookup(r: EnrichmentResult) {
+  mockApi.enrichPart.mockResolvedValue({ job_id: "e1" });
+  mockApi.openJobStream.mockResolvedValue(
+    streamOf([
+      `event: result\ndata: ${JSON.stringify({ result: r })}\n\n`,
+      "event: done\ndata: {}\n\n",
+    ]),
+  );
+}
+
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
@@ -39,7 +64,7 @@ const EMPTY_CURRENT = { manufacturer: "", description: "" };
 
 describe("EnrichPanel", () => {
   it("looks the part up by MPN and renders each sourced field with its source", async () => {
-    mockApi.enrichPart.mockResolvedValue(
+    mockLookup(
       result({
         manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
         description: { value: "Dual Op-Amp", source: "datasheet", confidence: "medium" },
@@ -65,7 +90,7 @@ describe("EnrichPanel", () => {
   });
 
   it("applies a sourced field into the record through onApply", async () => {
-    mockApi.enrichPart.mockResolvedValue(
+    mockLookup(
       result({
         manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
       }),
@@ -84,7 +109,7 @@ describe("EnrichPanel", () => {
   });
 
   it("does not offer Apply when the record already holds the sourced value", async () => {
-    mockApi.enrichPart.mockResolvedValue(
+    mockLookup(
       result({
         manufacturer: { value: "Texas Instruments", source: "jsonld", confidence: "high" },
       }),
@@ -110,7 +135,7 @@ describe("EnrichPanel", () => {
       { pin: "1", name: "OUT1" },
       { pin: "2", name: "IN1-" },
     ];
-    mockApi.enrichPart.mockResolvedValue(
+    mockLookup(
       result({
         specs: { pinout: { value: pins, source: "datasheet", confidence: "high" } },
       }),
@@ -140,7 +165,7 @@ describe("EnrichPanel", () => {
   });
 
   it("shows Already Set for the pinout when the record already has one", async () => {
-    mockApi.enrichPart.mockResolvedValue(
+    mockLookup(
       result({
         specs: {
           pinout: { value: [{ pin: "1", name: "OUT1" }], source: "datasheet", confidence: "high" },
@@ -166,7 +191,7 @@ describe("EnrichPanel", () => {
   });
 
   it("says so honestly when the lookup finds nothing new", async () => {
-    mockApi.enrichPart.mockResolvedValue(result());
+    mockLookup(result());
     wrap(
       <EnrichPanel mpn="MYSTERY-PART" category="Other" current={EMPTY_CURRENT} onApply={vi.fn()} />,
     );

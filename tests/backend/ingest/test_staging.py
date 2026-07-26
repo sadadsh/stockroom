@@ -1,13 +1,10 @@
 import shutil
 from pathlib import Path
 
-import pytest
-
-from tests.backend.conftest import requires_kicad_cli
-from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import DetectedSource
-from stockroom.ingest.staging import StagingCandidate, build_candidates
+from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
 from stockroom.model.part import Provenance, Purchase
+from tests.backend.conftest import requires_kicad_cli
 
 
 def _candidate(**kw):
@@ -61,16 +58,13 @@ def test_to_staged_part_purchase_defaults_empty():
     assert sp.purchase == []
 
 
-def test_to_staged_part_rejects_missing_symbol():
-    c = _candidate(symbol_lib_path=None)
-    with pytest.raises(IngestError):
-        c.to_staged_part()
-
-
-def test_to_staged_part_rejects_missing_footprint():
-    c = _candidate(footprint_variants=[])
-    with pytest.raises(IngestError):
-        c.to_staged_part()
+def test_to_staged_part_stages_without_a_symbol_or_footprint():
+    # The primary add flow (owner 2026-07-24) lands a part on its pulled identity +
+    # sourcing; the guided capture attaches both EDA formats afterwards. Staging a
+    # file-less candidate therefore carries None sources instead of refusing.
+    staged = _candidate(symbol_lib_path=None, footprint_variants=[]).to_staged_part()
+    assert staged.symbol_source is None
+    assert staged.footprint_source is None
 
 
 def _cli():
@@ -118,3 +112,125 @@ def test_build_candidates_partial_is_model_only():
     assert c.symbol_lib_path is None
     assert c.model_path == model
     assert any("only a 3D model" in g for g in c.gaps)
+
+
+# -- merge_candidates: a part often arrives split across two vendor files -------
+
+
+def _full(name="TESTPART", mpn="", model=None, datasheet=None) -> StagingCandidate:
+    gaps = []
+    if model is None:
+        gaps.append("no 3D model in this package")
+    if datasheet is None:
+        gaps.append("no datasheet in this package")
+    return StagingCandidate(
+        vendor="snapeda",
+        symbol_lib_path=Path("/stage/sym.kicad_sym"),
+        symbol_name=name,
+        footprint_variants=[Path("/stage/fp.kicad_mod")],
+        model_path=model,
+        datasheet_path=datasheet,
+        display_name=name,
+        entry_name=name,
+        mpn=mpn,
+        gaps=gaps,
+    )
+
+
+def _fragment(model=None, datasheet=None, mpn="") -> StagingCandidate:
+    return StagingCandidate(
+        vendor="partial",
+        symbol_lib_path=None,
+        symbol_name="",
+        footprint_variants=[],
+        model_path=model,
+        datasheet_path=datasheet,
+        mpn=mpn,
+        gaps=["package contains only a 3D model; attach it to an existing part"],
+    )
+
+
+def test_merge_folds_a_model_fragment_into_the_sole_full_candidate():
+    full = _full()
+    frag = _fragment(model=Path("/drop/only.step"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 1
+    assert merged[0].symbol_name == "TESTPART"
+    assert merged[0].model_path == Path("/drop/only.step")
+    # the absorbed asset's gap is gone, the datasheet gap honestly remains
+    assert not any("3D model" in g for g in merged[0].gaps)
+    assert any("datasheet" in g for g in merged[0].gaps)
+
+
+def test_merge_matches_a_named_fragment_by_mpn_among_many():
+    a = _full(name="PARTA", mpn="MPN-A")
+    b = _full(name="PARTB", mpn="MPN-B")
+    frag = _fragment(model=Path("/drop/b.step"), mpn="mpn-b")
+    merged = merge_candidates([a, b, frag])
+    assert len(merged) == 2
+    by_name = {c.symbol_name: c for c in merged}
+    assert by_name["PARTB"].model_path == Path("/drop/b.step")
+    assert by_name["PARTA"].model_path is None
+
+
+def test_merge_leaves_an_anonymous_fragment_when_ambiguous():
+    a = _full(name="PARTA")
+    b = _full(name="PARTB")
+    frag = _fragment(model=Path("/drop/x.step"))
+    merged = merge_candidates([a, b, frag])
+    # no identity and two possible owners: never guess, keep the attach card
+    assert len(merged) == 3
+
+
+def test_merge_never_overwrites_an_asset_the_full_candidate_already_has():
+    full = _full(model=Path("/zip/original.step"))
+    frag = _fragment(model=Path("/drop/other.step"))
+    merged = merge_candidates([full, frag])
+    # the full candidate keeps its own model; the fragment still needs a decision
+    assert len(merged) == 2
+    assert merged[0].model_path == Path("/zip/original.step")
+
+
+def test_merge_keeps_symbol_bearing_candidates_apart():
+    a = _full(name="PARTA", mpn="SAME")
+    b = _full(name="PARTB", mpn="SAME")
+    assert len(merge_candidates([a, b])) == 2
+
+
+def test_merge_folds_a_datasheet_fragment_too():
+    full = _full()
+    frag = _fragment(datasheet=Path("/drop/part.pdf"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 1
+    assert merged[0].datasheet_path == Path("/drop/part.pdf")
+    assert not any("datasheet" in g for g in merged[0].gaps)
+
+
+def test_merge_is_a_no_op_without_fragments():
+    a, b = _full(name="PARTA"), _full(name="PARTB")
+    assert merge_candidates([a, b]) == [a, b]
+
+
+def test_merge_partial_absorb_never_leaves_the_asset_on_two_cards():
+    # review #16/#31: a fragment carrying BOTH a model (target lacks) and a
+    # datasheet (target already has) must donate the model and NOT keep it, while
+    # the still-unclaimed datasheet keeps the fragment alive
+    full = _full(datasheet=Path("/zip/own.pdf"))  # has datasheet, lacks model
+    frag = _fragment(model=Path("/drop/m.step"), datasheet=Path("/drop/d.pdf"))
+    merged = merge_candidates([full, frag])
+    assert len(merged) == 2
+    target, leftover = merged[0], merged[1]
+    assert target.model_path == Path("/drop/m.step")  # model moved onto the target
+    assert leftover.model_path is None                # and REMOVED from the fragment
+    assert leftover.datasheet_path == Path("/drop/d.pdf")  # its datasheet still needs a home
+
+
+def test_merge_two_anonymous_models_with_one_full_is_ambiguous():
+    # review #17: sole-full does NOT absorb when two bare models were dropped -
+    # they cannot both belong to the one part, so neither is guessed
+    full = _full()
+    a = _fragment(model=Path("/drop/a.step"))
+    b = _fragment(model=Path("/drop/b.step"))
+    merged = merge_candidates([full, a, b])
+    assert len(merged) == 3
+    assert merged[0].model_path is None  # nothing attached

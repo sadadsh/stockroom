@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from stockroom.store.machine_config import MachineConfig, config_dir
 
 
@@ -26,7 +24,7 @@ def test_config_dir_uses_xdg_on_posix(monkeypatch, tmp_path):
 
 def test_missing_file_returns_defaults(tmp_path):
     cfg = MachineConfig.load(tmp_path / "nope.json")
-    assert cfg.active_profile == "Main"
+    assert cfg.active_profile == "Stockroom"
     assert cfg.mouser_api_key == ""
     assert cfg.sync_enabled is True
 
@@ -55,6 +53,15 @@ def test_load_ignores_unknown_keys(tmp_path):
     assert cfg.active_profile == "X"
 
 
+def test_rescan_config_defaults():
+    # Library-scale rescan (Phase-1b-2): a fresh install must trickle within each API's
+    # published quota out of the box, without the settings UI having to be touched first.
+    cfg = MachineConfig()
+    assert cfg.rescan_ttl_days == 7
+    assert cfg.rescan_mouser_per_min == 20
+    assert cfg.rescan_digikey_per_min == 60
+
+
 def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     # M9a: the per-machine library location. Blank on a fresh install (first-run onboarding);
     # persisted once the user picks/creates/clones a library.
@@ -63,3 +70,49 @@ def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     cfg = MachineConfig(libraries_root=str(tmp_path / "lib"))
     cfg.save(path)
     assert MachineConfig.load(path).libraries_root == str(tmp_path / "lib")
+
+
+def test_vendor_login_fields_round_trip(tmp_path):
+    path = tmp_path / "config.json"
+    cfg = MachineConfig(
+        ul_username="me@x.com",
+        ul_password="pw",
+        snapeda_username="s",
+        snapeda_password="q",
+    )
+    cfg.save(path)
+    loaded = MachineConfig.load(path)
+    assert loaded.ul_username == "me@x.com"
+    assert loaded.ul_password == "pw"
+    assert loaded.snapeda_username == "s"
+    assert loaded.snapeda_password == "q"
+
+
+def test_vendor_login_defaults_empty():
+    cfg = MachineConfig()
+    assert cfg.ul_username == "" and cfg.ul_password == ""
+    assert cfg.snapeda_username == "" and cfg.snapeda_password == ""
+
+
+def test_samacsys_and_digikey_account_fields_round_trip(tmp_path):
+    # SamacSys is a kept in-DigiKey CAD provider; the DigiKey account login is the
+    # web sign-in the capture driver autofills (distinct from the OAuth API creds).
+    path = tmp_path / "config.json"
+    cfg = MachineConfig(
+        samacsys_username="sam@x.com",
+        samacsys_password="sp",
+        digikey_username="dk@x.com",
+        digikey_password="dp",
+    )
+    cfg.save(path)
+    loaded = MachineConfig.load(path)
+    assert loaded.samacsys_username == "sam@x.com"
+    assert loaded.samacsys_password == "sp"
+    assert loaded.digikey_username == "dk@x.com"
+    assert loaded.digikey_password == "dp"
+
+
+def test_samacsys_and_digikey_account_defaults_empty():
+    cfg = MachineConfig()
+    assert cfg.samacsys_username == "" and cfg.samacsys_password == ""
+    assert cfg.digikey_username == "" and cfg.digikey_password == ""

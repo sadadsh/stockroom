@@ -1,158 +1,113 @@
 /**
- * Inline SVG icons lifted from the mockup (library-v2.html). Self contained so
- * the bundle needs no icon font or network fetch (WebView2 loads it offline).
+ * The named icon exports, kept as thin wrappers over <Icon id>. Every glyph now lives once in the
+ * registry (lib/iconRegistry.ts) and is drawn by <Icon> (components/Icon.tsx), so each of these is
+ * inspectable + editable in dev mode while every existing call site keeps working unchanged: same
+ * export names, same `{ className }` signature, pixel-identical output. Prefer <Icon id="..."> in
+ * new code; these wrappers exist so the current consumers need no edit.
  */
+import { Icon } from "./Icon";
 
 export function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4.3-4.3" />
-    </svg>
-  );
+  return <Icon id="action.search" className={className} />;
 }
 
 export function WarnIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path d="M12 3.4l9.3 16.1H2.7z" strokeLinejoin="round" />
-      <path d="M12 10v4.2" strokeLinecap="round" />
-      <circle cx="12" cy="17.4" r="0.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <Icon id="status.warn" className={className} />;
 }
 
 export function InfoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v5" strokeLinecap="round" />
-      <circle cx="12" cy="7.8" r="0.6" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <Icon id="status.info" className={className} />;
 }
 
 export function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.4}
-    >
-      <path d="M12 15V3m0 0L8 7m4-4l4 4" />
-      <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-    </svg>
-  );
+  return <Icon id="action.upload" className={className} />;
+}
+
+export function CloseIcon({ className }: { className?: string }) {
+  return <Icon id="action.close" className={className} />;
+}
+
+export function BackIcon({ className }: { className?: string }) {
+  return <Icon id="nav.back" className={className} />;
 }
 
 export function ExternalIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        d="M14 4h6v6M20 4l-9 9M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <Icon id="action.external" className={className} />;
 }
 
-// Simple line art for the Symbol, Footprint and 3D Model file cards (mockup).
-export function SymbolArt() {
-  return (
-    <svg viewBox="0 0 132 94" width="132" height="94">
-      <g style={{ stroke: "var(--c-icon-line)" }} strokeWidth="1.5" fill="none">
-        <rect x="40" y="20" width="52" height="54" rx="3" />
-        <path d="M40 33H24M40 47H24M40 61H24M92 33h16M92 47h16M92 61h16" />
-      </g>
-      <text
-        x="66"
-        y="51"
-        style={{ fill: "var(--c-icon-faint)" }}
-        fontSize="10"
-        textAnchor="middle"
-        fontFamily="monospace"
-      >
-        U1
-      </text>
-    </svg>
-  );
+export function EyeIcon({ className }: { className?: string }) {
+  return <Icon id="action.view" className={className} />;
 }
 
-export function FootprintArt() {
-  const pads = [34, 48, 62, 76, 90];
-  return (
-    <svg viewBox="0 0 132 94" width="132" height="94">
-      <g style={{ fill: "var(--c-icon-fill)" }}>
-        {pads.map((x) => (
-          <rect key={`t${x}`} x={x} y="26" width="9" height="7" rx="1" />
-        ))}
-        {pads.map((x) => (
-          <rect key={`b${x}`} x={x} y="61" width="9" height="7" rx="1" />
-        ))}
-      </g>
-      <rect
-        x="38"
-        y="37"
-        width="60"
-        height="20"
-        rx="2"
-        fill="none"
-        style={{ stroke: "var(--c-icon-edge)" }}
-        strokeWidth="1.3"
-      />
-    </svg>
-  );
+// Line art for the Symbol, Footprint and 3D Model file cards. Now registry glyphs; the wrappers
+// gain a `{ className }` prop for uniformity, but existing prop-less call sites are unaffected.
+export function SymbolArt({ className }: { className?: string }) {
+  return <Icon id="art.symbol" className={className} />;
 }
 
-export function CubeArt() {
-  return (
-    <svg
-      viewBox="0 0 90 90"
-      width="70"
-      height="70"
-      fill="none"
-      style={{ stroke: "var(--c-icon-cube)" }}
-      strokeWidth="1.4"
-    >
-      <path d="M45 12l30 17v32L45 78 15 61V29z" />
-      <path d="M45 12v18M45 30l30-17M45 30L15 13" opacity="0.5" />
-    </svg>
-  );
+export function FootprintArt({ className }: { className?: string }) {
+  return <Icon id="art.footprint" className={className} />;
+}
+
+export function CubeArt({ className }: { className?: string }) {
+  return <Icon id="art.model" className={className} />;
+}
+
+// -- Action + navigation icon set. Registry ids under action.* / nav.*; primary line icons that
+// carry `.ico` so dev mode's --icon-stroke retunes the whole set at once.
+
+export function LibraryIcon({ className }: { className?: string }) {
+  return <Icon id="nav.library" className={className} />;
+}
+
+export function AddPartIcon({ className }: { className?: string }) {
+  return <Icon id="action.add" className={className} />;
+}
+
+export function DuplicateIcon({ className }: { className?: string }) {
+  return <Icon id="action.duplicate" className={className} />;
+}
+
+export function ProjectsIcon({ className }: { className?: string }) {
+  return <Icon id="nav.projects.alt" className={className} />;
+}
+
+export function DoctorIcon({ className }: { className?: string }) {
+  return <Icon id="action.doctor" className={className} />;
+}
+
+export function SettingsIcon({ className }: { className?: string }) {
+  return <Icon id="action.settings" className={className} />;
+}
+
+export function DownloadIcon({ className }: { className?: string }) {
+  return <Icon id="action.download" className={className} />;
+}
+
+export function BuildIcon({ className }: { className?: string }) {
+  return <Icon id="action.build" className={className} />;
+}
+
+export function RefreshIcon({ className }: { className?: string }) {
+  return <Icon id="action.refresh" className={className} />;
+}
+
+export function EditIcon({ className }: { className?: string }) {
+  return <Icon id="action.edit" className={className} />;
+}
+
+export function TrashIcon({ className }: { className?: string }) {
+  return <Icon id="action.trash" className={className} />;
+}
+
+export function EnrichIcon({ className }: { className?: string }) {
+  return <Icon id="action.enrich" className={className} />;
+}
+
+export function GitIcon({ className }: { className?: string }) {
+  return <Icon id="action.git" className={className} />;
+}
+
+export function BoardIcon({ className }: { className?: string }) {
+  return <Icon id="nav.board" className={className} />;
 }

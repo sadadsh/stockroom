@@ -8,27 +8,38 @@
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ActivateResponse,
+  AltiumEmbedCapability,
+  AltiumEmbedResult,
+  AltiumModelsPending,
+  AltiumRegenerateResult,
+  DevSaveBody,
+  DevSaveResult,
+  AltiumStatus,
+  OdbcStatus,
   AuditResult,
   BomDiffResult,
   BomExportKind,
   BomResult,
+  CadSourceResponse,
   ChecksResult,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
-  EnrichmentResult,
   FabExportOptions,
   FabStatus,
   Facets,
+  ParametricFacets,
+  SearchResponse,
   HistoryResponse,
   JobRef,
   PartDetail,
+  PassiveAddBody,
+  PassivePreview,
   DesignResult,
   DesignRules,
   NetClass,
   PartsResponse,
   ProcurementExportOptions,
-  ProcurementResult,
   ConformBody,
   ConformCatalog,
   ConformPreview,
@@ -38,6 +49,15 @@ import type {
   StackupRead,
   StackupResult,
   PrepareRead,
+  AssignGroupBody,
+  AssignRead,
+  HygieneRead,
+  HygieneResult,
+  LibraryLfsResult,
+  LibraryLfsStatus,
+  LibraryPinRead,
+  LibraryPinResult,
+  AssignResult,
   ManualFillBody,
   ManualFillResult,
   RestoreResult,
@@ -52,6 +72,8 @@ import type {
   ProjectSummary,
   BoardSettings,
   RepairResult,
+  RescanStartResponse,
+  RescanStateResponse,
   RevisionsResult,
   SetBoardSettingsBody,
   SetBoardSettingsResult,
@@ -59,12 +81,24 @@ import type {
   SetNetclassPatternsResult,
   SetNetClassesResult,
   SettingsInfo,
+  SettingsPatch,
   StagingCandidate,
   SyncResult,
   SyncStatus,
   SystemInfo,
   UpdateApply,
   UpdateCheck,
+  StmStatusDTO,
+  McusResponse,
+  FamiliesResponse,
+  PinoutDTO,
+  CompatUnionBody,
+  UnionDTO,
+  PinAfResponse,
+  SignalCandidatesResponse,
+  SuggestionsResponse,
+  AfCheckBody,
+  AfCheckResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -81,7 +115,9 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  params?: Record<string, string>;
+  // A value may be a string, or a string[] for a REPEATED query param (?spec=a&spec=b),
+  // which the parametric spec filter needs.
+  params?: Record<string, string | string[]>;
   body?: unknown;
 }
 
@@ -93,7 +129,13 @@ async function request<T>(
   const url = new URL(apiBase() + path);
   if (opts.params) {
     for (const [k, v] of Object.entries(opts.params)) {
-      if (v !== "" && v != null) url.searchParams.set(k, v);
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item !== "" && item != null) url.searchParams.append(k, item);
+        }
+      } else if (v !== "" && v != null) {
+        url.searchParams.set(k, v);
+      }
     }
   }
   const token = apiToken();
@@ -110,11 +152,11 @@ async function request<T>(
     res = await fetch(url.toString(), init);
   } catch (err) {
     // network / connection refused: the server is not up. Surface it honestly.
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
 
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     let missing: string[] | undefined;
     try {
       const body = await res.json();
@@ -147,10 +189,10 @@ async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
   try {
     res = await fetch(apiBase() + path, { headers });
   } catch (err) {
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
       msg = body.detail || body.error || body.message || msg;
@@ -178,10 +220,10 @@ async function fetchDownload(
   try {
     res = await fetch(url.toString(), { headers });
   } catch (err) {
-    throw new ApiError(0, err instanceof Error ? err.message : "network error");
+    throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
   if (!res.ok) {
-    let msg = `request failed (${res.status})`;
+    let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
       msg = body.detail || body.error || body.message || msg;
@@ -208,10 +250,63 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+export interface LandPad {
+  number: string;
+  /** millimetres from the footprint origin, KiCad's frame (+Y down) */
+  at: [number, number];
+  size: [number, number];
+  shape: string;
+  /** degrees */
+  rotation: number;
+  /** hole diameter in mm; 0 for SMD */
+  drill: number;
+  /** thru_hole / smd / np_thru_hole */
+  pad_type: string;
+  /** front / back / both, from the pad's declared copper layer */
+  side: string;
+  /** KiCad's roundrect corner ratio */
+  rratio: number;
+}
+
+export interface LandGraphic {
+  start: [number, number];
+  end: [number, number];
+  /** KiCad layer, e.g. F.SilkS (the human-readable outline) or F.CrtYd (the keep-out). */
+  layer: string;
+  width: number;
+}
+
+export interface LandPattern {
+  units: string;
+  pads: LandPad[];
+  graphics: LandGraphic[];
+  model_placement: {
+    offset: [number, number, number];
+    scale: [number, number, number];
+    rotate: [number, number, number];
+  } | null;
+}
+
 export interface ListPartsArgs {
   q?: string;
   category?: string | null;
   completeOnly?: boolean;
+}
+
+export interface SearchArgs extends ListPartsArgs {
+  // repeated spec constraints: "<key>:<value>" (an option) or "<key>:<min>~<max>" (a range)
+  spec?: string[];
+}
+
+// The coarse server-side scope for GET /api/stm/mcus. Every field is optional; an omitted /
+// empty field is dropped from the query (like listParts), so a blank scope returns the FULL
+// spec matrix for client-side TanStack filtering (INTERFACES.md section 4).
+export interface StmMcusArgs {
+  q?: string;
+  family?: string;
+  core?: string;
+  package?: string;
+  series?: string;
 }
 
 export const api = {
@@ -225,6 +320,62 @@ export const api = {
 
   facets(): Promise<Facets> {
     return apiGet<Facets>("/api/library/facets");
+  },
+
+  // Dev mode (owner-only): persist the nudged design tokens + reworded copy to source so a
+  // saved change ships for everyone. Honest error when there is no source tree (a frozen exe).
+  devSave(body: DevSaveBody): Promise<DevSaveResult> {
+    return request<DevSaveResult>("POST", "/api/dev/save", { body });
+  },
+
+  // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by the
+  // same text/category/completeness AND the live rail `spec` selections so the counts narrow as the
+  // user picks (each facet excludes its own key server-side, so it still offers its other values).
+  parametricFacets({ q, category, completeOnly, spec }: SearchArgs): Promise<ParametricFacets> {
+    const params: Record<string, string | string[]> = {};
+    if (q) params.q = q;
+    if (category) params.category = category;
+    if (completeOnly) params.complete_only = "true";
+    if (spec && spec.length) params.spec = spec;
+    return request<ParametricFacets>("GET", "/api/library/facets/parametric", { params });
+  },
+
+  // The rich results rows for the search table: same scope + `spec` filter as the lean list, but
+  // each row carries its spec bag + a sourcing summary. `spec` is a repeated `<key>:<value>` /
+  // `<key>:<min>~<max>` param (request() serializes the array to ?spec=a&spec=b).
+  searchParts({ q, category, completeOnly, spec }: SearchArgs): Promise<SearchResponse> {
+    const params: Record<string, string | string[]> = {};
+    if (q) params.q = q;
+    if (category) params.category = category;
+    if (completeOnly) params.complete_only = "true";
+    if (spec && spec.length) params.spec = spec;
+    return request<SearchResponse>("GET", "/api/library/search", { params });
+  },
+
+  // Refresh every part's procurement data (price/stock/lifecycle) from the free distributor
+  // APIs, in one incremental background job (Phase-1b-3). force=true re-checks every part,
+  // ignoring the freshness window; already_running (instead of a new job_id) means a rescan
+  // was already in flight, so the caller attaches to that job rather than starting a second.
+  rescanLibrary(force = false): Promise<RescanStartResponse> {
+    return request<RescanStartResponse>("POST", "/api/library/rescan", {
+      params: force ? { force: "true" } : undefined,
+    });
+  },
+
+  // The last-known rescan outcome per part (empty before any rescan has run on this
+  // machine), for an honest "last refreshed" summary before the next run starts.
+  getRescanState(): Promise<RescanStateResponse> {
+    return apiGet<RescanStateResponse>("/api/library/rescan/state");
+  },
+
+  // Preview a file-less passive add (decode + resolve stock assets) without
+  // committing; and commit one. Both take a bare MPN or a Mouser product URL.
+  passivePreview(body: PassiveAddBody): Promise<PassivePreview> {
+    return request<PassivePreview>("POST", "/api/library/passive/preview", { body });
+  },
+
+  passiveAdd(body: PassiveAddBody): Promise<PartDetail> {
+    return request<PartDetail>("POST", "/api/library/passive", { body });
   },
 
   // Parts that share an MPN or a footprint name, straight from the derived index
@@ -273,6 +424,12 @@ export const api = {
     );
   },
 
+  /** The footprint's pads + the 3D model's placement, for the viewer's board mode. Both travel in
+   *  ONE response so the body and the land pattern it must line up with cannot disagree. */
+  landPattern(id: string): Promise<LandPattern> {
+    return apiGet<LandPattern>(`/api/previews/land/${encodeURIComponent(id)}.json`);
+  },
+
   async modelGlb(id: string): Promise<ArrayBuffer> {
     const blob = await fetchPreviewBlob(
       `/api/previews/model/${encodeURIComponent(id)}.glb`,
@@ -281,12 +438,62 @@ export const api = {
     return blob.arrayBuffer();
   },
 
+  // Preview a KiCad STOCK footprint / 3D model by its lib_id (e.g.
+  // "Resistor_SMD:R_0603_1608Metric"), with no committed part, so the Add-A-Part flow
+  // can show a passive's built-in footprint + model before it is added. A lib_id that
+  // is not installed is a 404, absent 3D tooling a 502, surfaced honestly by the viewer.
+  stockPreviewSvg(fp: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/previews/stock/footprint.svg?fp=${encodeURIComponent(fp)}&bw=true`,
+      "image/svg+xml",
+    );
+  },
+
+  async stockModelGlb(fp: string): Promise<ArrayBuffer> {
+    const blob = await fetchPreviewBlob(
+      `/api/previews/stock/model.glb?fp=${encodeURIComponent(fp)}`,
+      "model/gltf-binary",
+    );
+    return blob.arrayBuffer();
+  },
+
+  // The pulled product photo (specs["Image"]) through the backend proxy - the <img>
+  // fallback lane when the vendor CDN refuses the direct hotlink. Needs the bearer, so
+  // it comes back as a Blob (object-URL'd by the viewer). 400 = refused URL, 404 = the
+  // fetch yielded no real image; both surface as ApiError and the photo simply hides.
+  productImage(url: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/enrich/image?url=${encodeURIComponent(url)}`,
+      "image/*",
+    );
+  },
+
   // Edit one field (mirrored to the KiCad symbol where the field maps to a symbol
   // property; `tags` takes an array). Category is NOT edited here, it moves.
   editField(id: string, field: string, value: unknown): Promise<PartDetail> {
     return request<PartDetail>("PATCH", `/api/library/parts/${encodeURIComponent(id)}`, {
       body: { field, value },
     });
+  },
+
+  // Attach (or repoint) a symbol / footprint REFERENCE on an existing part AFTER it
+  // was added (assets no longer gate entry; they are attachable after). The reference
+  // is a lib_id (no file copied), tagged with the EDA tool it targets ("kicad" default).
+  // `name` is required; an empty name is a 422 from the gate. Returns the updated record.
+  attachSymbol(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/symbol`,
+      { body: { lib, name, tool } },
+    );
+  },
+
+  attachFootprint(id: string, lib: string, name: string, tool = "kicad"): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/footprint`,
+      { body: { lib, name, tool } },
+    );
   },
 
   // Persist canonical spec data (e.g. an enriched pinout) onto the record so a
@@ -317,6 +524,26 @@ export const api = {
     return request<void>("DELETE", `/api/library/parts/${encodeURIComponent(id)}`);
   },
 
+  // Remove ONE element from a part: "datasheet", or a `<tool>_<asset kind>` pair from the
+  // EDA registry (kicad_symbol, kicad_footprint, kicad_model, altium_symbol,
+  // altium_footprint). The file goes, the ref nulls, one scoped commit.
+  detachAsset(id: string, kind: string): Promise<PartDetail> {
+    return request<PartDetail>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/assets/${encodeURIComponent(kind)}`,
+    );
+  },
+
+  // Refresh one part's volatile procurement data (price/stock/lifecycle/lead/dist P/N)
+  // from the distributor APIs. A write-lane job: the record commits server-side and the
+  // job's terminal SSE result carries the updated record.
+  refreshSourcing(id: string): Promise<JobRef> {
+    return request<JobRef>(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(id)}/refresh`,
+    );
+  },
+
   // Look up a part by its MPN through the enrichment pipeline (scrape-first, spec
   // section 6.1). Returns the sourced candidate fields; the caller applies the ones
   // it wants through editField. A scrape miss returns null fields, never an error,
@@ -325,11 +552,22 @@ export const api = {
     mpn: string,
     category?: string,
     want?: string[],
-  ): Promise<EnrichmentResult> {
+  ): Promise<JobRef> {
     const body: Record<string, unknown> = { mpn };
     if (category) body.category = category;
     if (want && want.length > 0) body.want = want;
-    return request<EnrichmentResult>("POST", "/api/enrich/part", { body });
+    // A background job (spec section 8): the render tier can take seconds, so this returns a
+    // job ref and the sourced EnrichmentResult arrives on the job's SSE `result` event, with
+    // live fetching/rendering/extracting/validating stages streamed as progress in between.
+    return request<JobRef>("POST", "/api/enrich/part", { body });
+  },
+
+  // Paste a distributor product URL (a Mouser link) -> fetch it through the real
+  // browser and get back EVERY field the page exposes (identity, price, datasheet,
+  // package, full spec table). A blocked/dead page returns empty fields, not an error.
+  // Returns a job ref; the result + live stages stream over the job's SSE (openJobStream).
+  enrichFromUrl(url: string): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/enrich/from-url", { body: { url } });
   },
 
   // Inspect dropped file paths / LCSC ids into staging candidates. Returns a job
@@ -340,18 +578,41 @@ export const api = {
     });
   },
 
-  // Bulk-enrich a pasted list of MPNs (one per line) or a BOM CSV (spec section 8.1). Returns a
-  // job ref; the SSE stream ends with a BulkReport of per-MPN completeness. Triage only: it
-  // reports what enrichment found, it does not add parts (each still needs a symbol to pass the
-  // complete-to-add gate).
-  enrichBulk(input: { text?: string; csv?: string; category?: string }): Promise<JobRef> {
-    return request<JobRef>("POST", "/api/enrich/bulk", { body: input });
-  },
-
   // Add a staging candidate to the library. On success returns the new record; on
   // the complete-to-add gate failure it throws ApiError (422) with `missing` set.
   ingestCommit(candidate: StagingCandidate): Promise<PartDetail> {
     return request<PartDetail>("POST", "/api/ingest/commit", { body: candidate });
+  },
+
+  // Resolve an existing part's DigiKey CAD-download source from its MPN (Phase-2 asset
+  // download, spec section 5). A resolvable 200 either way; `url` is null when the part
+  // has no MPN, DigiKey is disabled, or nothing resolved - never an error.
+  partCadSource(id: string): Promise<CadSourceResponse> {
+    return apiGet<CadSourceResponse>(
+      `/api/library/parts/${encodeURIComponent(id)}/cad-source`,
+    );
+  },
+
+  // Unpack a downloaded CAD ZIP for an EXISTING part into staging candidates. Same
+  // read-lane job + candidate DTO shape as ingestInspect; the result arrives on the
+  // job's SSE result event (openJobStream).
+  assetsInspect(partId: string, paths: string[]): Promise<JobRef> {
+    return request<JobRef>(
+      "POST",
+      `/api/parts/${encodeURIComponent(partId)}/assets/inspect`,
+      { body: { paths } },
+    );
+  },
+
+  // Attach a reviewed candidate's symbol/footprint/3D onto the existing part,
+  // synchronously (one atomic Transaction). Only the assets the candidate actually
+  // carries are touched; an already-present asset is left alone.
+  assetsCommit(partId: string, candidate: StagingCandidate): Promise<PartDetail> {
+    return request<PartDetail>(
+      "POST",
+      `/api/parts/${encodeURIComponent(partId)}/assets/commit`,
+      { body: candidate },
+    );
   },
 
   // Open a job's Server-Sent Events stream. Native EventSource cannot send the
@@ -366,7 +627,7 @@ export const api = {
       { headers },
     );
     if (!res.ok || !res.body) {
-      throw new ApiError(res.status || 0, `job stream failed (${res.status})`);
+      throw new ApiError(res.status || 0, `Job stream failed (${res.status})`);
     }
     return res.body;
   },
@@ -378,8 +639,18 @@ export const api = {
     return apiGet<SettingsInfo>("/api/settings");
   },
 
-  updateSettings(patch: { mouser_api_key?: string; github_token?: string }): Promise<SettingsInfo> {
+  updateSettings(patch: SettingsPatch): Promise<SettingsInfo> {
     return request<SettingsInfo>("PATCH", "/api/settings", { body: patch });
+  },
+
+  // Dev convenience (the hidden Settings combo): load any API keys / logins from the per-machine
+  // dev-creds.json (in the OS config dir, never the public repo) into the config. Returns the
+  // redacted settings plus `loaded`, the field names that were applied.
+  loadDevCreds(): Promise<SettingsInfo & { loaded: string[]; config_path: string }> {
+    return request<SettingsInfo & { loaded: string[]; config_path: string }>(
+      "POST",
+      "/api/settings/load-dev-creds",
+    );
   },
 
   // Library profiles (spec section 5.3). Activating one rebuilds the index, so
@@ -476,10 +747,14 @@ export const api = {
     return apiGet<ProjectSummary[]>("/api/projects");
   },
 
-  // Register an external project directory by its absolute path. A bad/nonexistent
-  // dir, a dir with no KiCad files, or an already-registered root each returns 400.
-  registerProject(root: string): Promise<ProjectDetail> {
-    return request<ProjectDetail>("POST", "/api/projects", { body: { root } });
+  // Register an external project directory by its absolute path. The EDA is
+  // auto-detected (KiCad vs Altium); a dir holding both needs `eda` passed
+  // explicitly. A bad/nonexistent dir, a dir with no project files, an ambiguous
+  // dir, or an already-registered root each returns 400.
+  registerProject(root: string, eda?: string): Promise<ProjectDetail> {
+    return request<ProjectDetail>("POST", "/api/projects", {
+      body: eda ? { root, eda } : { root },
+    });
   },
 
   getProject(id: string): Promise<ProjectDetail> {
@@ -512,8 +787,12 @@ export const api = {
   // Build a grouped, priced BOM (M7c) off the request path as a job (the built BOM
   // arrives on the job's SSE result event). No kicad-cli needed; pricing is best-effort
   // through the enrich layer, so a line that cannot be sourced stays honestly unpriced.
-  runBom(id: string): Promise<JobRef> {
-    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`);
+  // `opts` carries the build quantity + tax/tariff rate the per-line economics cost at;
+  // both default server-side (1 board, 0% tax) when omitted.
+  runBom(id: string, opts?: { boards?: number; tax_rate?: number }): Promise<JobRef> {
+    return request<JobRef>("POST", `/api/projects/${encodeURIComponent(id)}/bom`, {
+      body: opts ?? {},
+    });
   },
 
   // The cached last build, or an honest not-built shape (ran_at null) before the first
@@ -522,10 +801,13 @@ export const api = {
     return apiGet<BomResult>(`/api/projects/${encodeURIComponent(id)}/bom`);
   },
 
-  // The per-line orderability + sourcing/stock risk + lead time computed over the cached
-  // BOM (M7d). Honest not-built shape (built false) before a build; never a fabricated risk.
-  getProcurement(id: string): Promise<ProcurementResult> {
-    return apiGet<ProcurementResult>(`/api/projects/${encodeURIComponent(id)}/procurement`);
+  // Re-cost the CACHED BOM for a new build quantity / tax/tariff rate, purely over the
+  // already-built lines (no schematic re-read, no network, no job/SSE): synchronous.
+  // Before any build it returns the same honest not-built shape as getBom.
+  repriceBom(id: string, opts: { boards?: number; tax_rate?: number }): Promise<BomResult> {
+    return request<BomResult>("POST", `/api/projects/${encodeURIComponent(id)}/bom/reprice`, {
+      body: opts,
+    });
   },
 
   // The Fab panel's honest gate (M7i): whether the project has a board to fabricate and
@@ -547,10 +829,10 @@ export const api = {
     try {
       res = await fetch(url.toString(), { headers });
     } catch (err) {
-      throw new ApiError(0, err instanceof Error ? err.message : "network error");
+      throw new ApiError(0, err instanceof Error ? err.message : "Network error");
     }
     if (!res.ok) {
-      let msg = `request failed (${res.status})`;
+      let msg = `Request failed (${res.status})`;
       try {
         const body = await res.json();
         msg = body.detail || body.error || body.message || msg;
@@ -778,8 +1060,199 @@ export const api = {
     );
   },
 
+  // The bulk-assign surface: every placed component with no identified library part, grouped so
+  // identical placements are one row, each with its ranked value-matched candidates. Read-only.
+  getAssign(id: string): Promise<AssignRead> {
+    return apiGet<AssignRead>(`/api/projects/${encodeURIComponent(id)}/assign`);
+  },
+
+  // Assign one library part to a whole group of identical placements, as ONE atomic commit. Either
+  // every ref is written or none is. `committed` is null when nothing changed.
+  assignGroup(id: string, body: AssignGroupBody): Promise<AssignResult> {
+    return request<AssignResult>(
+      "POST",
+      `/api/projects/${encodeURIComponent(id)}/assign`,
+      { body },
+    );
+  },
+
+  // Where the LIBRARY's binary payloads are stored (git-lfs). Read-only, no network.
+  getLibraryLfs(): Promise<LibraryLfsStatus> {
+    return apiGet<LibraryLfsStatus>("/api/library/lfs");
+  },
+
+  // Route the library's binary payloads through git-lfs, as one hygiene commit.
+  adoptLibraryLfs(): Promise<LibraryLfsResult> {
+    return request<LibraryLfsResult>("POST", "/api/library/lfs");
+  },
+
+  // What syncing the LIBRARY repo's workspace hygiene would change (the union of every tool's
+  // rules, because the library holds assets for all of them and is what a peer clones).
+  getLibraryHygiene(): Promise<HygieneRead> {
+    return apiGet<HygieneRead>("/api/library/hygiene");
+  },
+
+  syncLibraryHygiene(): Promise<HygieneResult> {
+    return request<HygieneResult>("POST", "/api/library/hygiene");
+  },
+
+  // Which library version this project is pinned to, versus the library on this machine.
+  getLibraryPin(id: string): Promise<LibraryPinRead> {
+    return apiGet<LibraryPinRead>(`/api/projects/${encodeURIComponent(id)}/library-pin`);
+  },
+
+  // Record the library's current commit as this project's pin (one commit on the project's git).
+  setLibraryPin(id: string): Promise<LibraryPinResult> {
+    return request<LibraryPinResult>("POST", `/api/projects/${encodeURIComponent(id)}/library-pin`);
+  },
+
+  // What syncing this project's workspace hygiene would change. Read-only.
+  getProjectHygiene(id: string): Promise<HygieneRead> {
+    return apiGet<HygieneRead>(`/api/projects/${encodeURIComponent(id)}/hygiene`);
+  },
+
+  // Write the ignore rules and untrack the per-user files they cover, as ONE commit.
+  syncProjectHygiene(id: string): Promise<HygieneResult> {
+    return request<HygieneResult>("POST", `/api/projects/${encodeURIComponent(id)}/hygiene`);
+  },
+
   // Undo the project's last Prepare / Fill by git-reverting that commit as a new commit (M7f-D).
   restore(id: string): Promise<RestoreResult> {
     return request<RestoreResult>("POST", `/api/projects/${encodeURIComponent(id)}/restore`);
+  },
+
+  // The Altium Database Library status for the active profile: place-ready count + per-part rows.
+  altiumStatus(): Promise<AltiumStatus> {
+    return apiGet<AltiumStatus>("/api/altium/status");
+  },
+
+  // Whether the 64-bit SQLite3 ODBC driver Altium needs to read the DbLib is registered on this
+  // machine (null off Windows), plus where to download it. Machine-level, not profile-scoped.
+  altiumOdbcStatus(): Promise<OdbcStatus> {
+    return apiGet<OdbcStatus>("/api/altium/odbc-status");
+  },
+
+  // Whether a 3D embed can run on this machine (Altium installed, license seat free), and the
+  // registry's reason when it cannot. Machine-level, not profile-scoped.
+  altiumEmbedCapability(): Promise<AltiumEmbedCapability> {
+    return apiGet<AltiumEmbedCapability>("/api/altium/embed-capability");
+  },
+
+  // Embed the part's 3D model into its Altium footprint's .PcbLib by driving the installed Altium.
+  // Synchronous and slow by nature (Altium boots), one atomic commit, and the result is verified by
+  // reading the container back from outside Altium.
+  altiumEmbedModel(partId: string, replace = false): Promise<AltiumEmbedResult> {
+    return request<AltiumEmbedResult>(
+      "POST",
+      `/api/altium/parts/${encodeURIComponent(partId)}/embed-model`,
+      { body: { replace } },
+    );
+  },
+
+  // Embed the 3D model of every part that still needs one. A JOB, not a plain call: each part that
+  // genuinely needs work costs an Altium boot, so a full library can run for minutes, and the
+  // stream names the part it is on. Parts already carrying a model are never attempted.
+  altiumEmbedModels(partIds?: string[]): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/altium/embed-models", {
+      body: partIds ? { part_ids: partIds } : {},
+    });
+  },
+
+  // How many parts a bulk embed would actually work on, so the action can state a number it will
+  // honour rather than one it might not.
+  altiumModelsPending(): Promise<AltiumModelsPending> {
+    return request<AltiumModelsPending>("GET", "/api/altium/models-pending");
+  },
+
+  // Regenerate the DbLib + its data source over every place-ready part (synchronous, one commit).
+  altiumRegenerate(): Promise<AltiumRegenerateResult> {
+    return request<AltiumRegenerateResult>("POST", "/api/altium/regenerate");
+  },
+
+  // Attach a part's Altium assets (a .SchLib + .PcbLib pair or a single .IntLib) by their native
+  // filesystem paths (host-captured, same as ingest). Synchronous, one atomic commit.
+  altiumAttach(partId: string, paths: string[]): Promise<unknown> {
+    return request<unknown>(
+      "POST",
+      `/api/altium/parts/${encodeURIComponent(partId)}/attach`,
+      { body: { paths } },
+    );
+  },
+
+  // --- STM Viewer (Phase 3 contract, section 4). Every read raises ApiError(409, "STM index
+  // not built") when the index is absent; the caller branches on .status === 409 to show the
+  // Build the index call to action instead of a raw error. ---
+
+  // The build/source/stamp state of the derived STM index (drives the 409 build gate + status).
+  getStmStatus(): Promise<StmStatusDTO> {
+    return apiGet<StmStatusDTO>("/api/stm/status");
+  },
+
+  // The families + their lines/packages/counts, for the FamilyPicker scope control.
+  getStmFamilies(): Promise<FamiliesResponse> {
+    return apiGet<FamiliesResponse>("/api/stm/families");
+  },
+
+  // The MCU spec matrix. Only the provided scope fields narrow server-side (omitting empty ones,
+  // exactly like listParts); every finer facet is a client-side TanStack column filter over the
+  // returned rows, so this fires once per coarse scope change, never per facet toggle (decision 3).
+  getStmMcus(args: StmMcusArgs = {}): Promise<McusResponse> {
+    const params: Record<string, string> = {};
+    if (args.q) params.q = args.q;
+    if (args.family) params.family = args.family;
+    if (args.core) params.core = args.core;
+    if (args.package) params.package = args.package;
+    if (args.series) params.series = args.series;
+    return apiGet<McusResponse>("/api/stm/mcus", params);
+  },
+
+  // One part's full pinout (every pin's derived facts inlined). `part` is a ref_name OR a real
+  // MPN, passed as a query param so the ref name's parentheses are never path-encoded (section 4).
+  getStmPinout(part: string): Promise<PinoutDTO> {
+    return apiGet<PinoutDTO>("/api/stm/pinout", { part });
+  },
+
+  // Submit the one-time index build as a READ-lane JobRunner job; progress streams over the
+  // job's SSE (useJob). A second submit while one is in flight returns the same job id.
+  buildStmIndex(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/stm/build");
+  },
+
+  // The socket-union of an assembled set + its set-level verdict (COMPAT-01/02/03/05). The body is
+  // EITHER an explicit ref list ({ parts }) OR a (family, package) group; both shapes the endpoint
+  // accepts (section 4). The result is ephemeral facts, not a stored resource, so nothing is
+  // invalidated after it resolves. A 409 raises ApiError(409) the caller routes to the build gate.
+  postStmCompatUnion(body: CompatUnionBody): Promise<UnionDTO> {
+    return request<UnionDTO>("POST", "/api/stm/compat/union", { body });
+  },
+
+  // One pin's complete AF0-15 set (SWAP-01). `part` is a ref_name OR an MPN, passed as a query
+  // param (never path-encoded), same as every other STM read.
+  getStmPinAf(part: string, position: string): Promise<PinAfResponse> {
+    return apiGet<PinAfResponse>("/api/stm/pin/af", { part, position });
+  },
+
+  // Every candidate pin a peripheral signal can be routed to across the part (SWAP-02).
+  getStmSignalCandidates(part: string, signal: string): Promise<SignalCandidatesResponse> {
+    return apiGet<SignalCandidatesResponse>("/api/stm/signal/candidates", { part, signal });
+  },
+
+  // Auto-discovered compatible sets grouped by pin-divergence signature (COMPAT-04), scoped to a
+  // (package, families) - `family` accepts one name or a comma-separated multi-family scope
+  // (owner amendment 2026-07-23). tolerance defaults to 0 server-side when omitted.
+  getStmCompatSuggestions(
+    pkg: string,
+    family: string,
+    tolerance?: number,
+  ): Promise<SuggestionsResponse> {
+    const params: Record<string, string> = { package: pkg, family };
+    if (tolerance != null) params.tolerance = String(tolerance);
+    return apiGet<SuggestionsResponse>("/api/stm/compat/suggestions", params);
+  },
+
+  // Conflict-check a client-held signal-to-pin assignment for one part (Layer B af_conflicts). A
+  // pure read over the assignment; nothing is written or persisted (CONTEXT decision 8).
+  postStmAfCheck(body: AfCheckBody): Promise<AfCheckResponse> {
+    return request<AfCheckResponse>("POST", "/api/stm/af-check", { body });
   },
 };

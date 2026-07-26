@@ -1,0 +1,66 @@
+{
+  "RC0402FR-0710KL": {
+    "components": [
+      {
+        "lcsc": 60490,
+        "mfr": "RC0402FR-0710KL",
+        "package": "0402",
+        "description": "",
+        "stock": 4377117,
+        "price": "[{\"qFrom\": 20, \"qTo\": 19980, \"price\": 0.000485714}, {\"qFrom\": 20000, \"qTo\": 59980, \"price\": 0.000357143}, {\"qFrom\": 60000, \"qTo\": 199980, \"price\": 0.0003}, {\"qFrom\": 200000, \"qTo\": 999980, \"price\": 0.000271429}, {\"qFrom\": 1000000, \"qTo\": 1003980, \"price\": 0.000228571}, {\"qFrom\": 1004000, \"qTo\": null, \"price\": 0.000228571}]",
+        "category": "Resistors",
+        "subcategory": "Chip Resistor - Surface Mount",
+        "is_basic": false,
+        "is_preferred": false
+      }
+    ]
+  },
+  "CL10A105KB8NNNC": {
+    "components": [
+      {
+        "lcsc": 15849,
+        "mfr": "CL10A105KB8NNNC",
+        "package": "0603",
+        "description": "",
+        "stock": 11240988,
+        "price": "[{\"qFrom\": 20, \"qTo\": 9980, \"price\": 0.004442857}, {\"qFrom\": 10000, \"qTo\": 29980, \"price\": 0.0034}, {\"qFrom\": 30000, \"qTo\": 79980, \"price\": 0.002942857}, {\"qFrom\": 80000, \"qTo\": 479980, \"price\": 0.0026}, {\"qFrom\": 480000, \"qTo\": 959980, \"price\": 0.002457143}, {\"qFrom\": 960000, \"qTo\": null, \"price\": 0.002357143}]",
+        "category": "Capacitors",
+        "subcategory": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+        "is_basic": true,
+        "is_preferred": false
+      }
+    ]
+  },
+  "0402WGF1002TCE": {
+    "components": [
+      {
+        "lcsc": 25744,
+        "mfr": "0402WGF1002TCE",
+        "package": "0402",
+        "description": "",
+        "stock": 20674699,
+        "price": "[{\"qFrom\": 20, \"qTo\": 19980, \"price\": 0.000485714}, {\"qFrom\": 20000, \"qTo\": 59980, \"price\": 0.000385714}, {\"qFrom\": 60000, \"qTo\": 199980, \"price\": 0.000328571}, {\"qFrom\": 200000, \"qTo\": 999980, \"price\": 0.0003}, {\"qFrom\": 1000000, \"qTo\": 1003980, \"price\": 0.000257143}, {\"qFrom\": 1004000, \"qTo\": null, \"price\": 0.000257143}]",
+        "category": "Resistors",
+        "subcategory": "Chip Resistor - Surface Mount",
+        "is_basic": true,
+        "is_preferred": false
+      }
+    ]
+  },
+  "C25804": {
+    "components": [
+      {
+        "lcsc": 25804,
+        "mfr": "0603WAF1002T5E",
+        "package": "0603",
+        "description": "",
+        "stock": 37165617,
+        "price": "[{\"qFrom\": 20, \"qTo\": 19980, \"price\": 0.000842857}, {\"qFrom\": 20000, \"qTo\": 99980, \"price\": 0.000642857}, {\"qFrom\": 100000, \"qTo\": 199980, \"price\": 0.000542857}, {\"qFrom\": 200000, \"qTo\": 999980, \"price\": 0.000485714}, {\"qFrom\": 1000000, \"qTo\": 1003980, \"price\": 0.000442857}, {\"qFrom\": 1004000, \"qTo\": null, \"price\": 0.000442857}]",
+        "category": "Resistors",
+        "subcategory": "Chip Resistor - Surface Mount",
+        "is_basic": true,
+        "is_preferred": false
+      }
+    ]
+  }
+}

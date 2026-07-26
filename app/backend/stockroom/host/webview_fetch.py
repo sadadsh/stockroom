@@ -22,7 +22,13 @@ class WebViewRenderedDomFetcher:
         # app window lazily so the API layer never imports pywebview.
         self._window_provider = window_provider or _default_window
 
-    def rendered_html(self, url: str, timeout: float = 20.0) -> FetchResult:
+    def rendered_html(
+        self, url: str, timeout: float = 20.0, wait_selector: str | None = None, on_stage=None
+    ) -> FetchResult:
+        # on_stage is accepted for RenderedDomFetcher-protocol conformance (the pipeline passes
+        # it to signal the render phase); WebView2 exposes no navigate->settle boundary to hook,
+        # so it is unused here rather than faked. Present so this fetcher can never TypeError if
+        # wired behind the progress-aware pipeline.
         window = self._window_provider()
         if window is None:
             # Honest failure, never a silent empty result: an enrich that cannot
@@ -31,8 +37,10 @@ class WebViewRenderedDomFetcher:
         window.load_url(url)
         # wait for the DOM to settle: a load plus a short quiescence. WebView2 does
         # not surface the HTTP status directly, so status is best-effort 200 and the
-        # extraction cascade tolerates a challenge page as an empty result.
-        _wait_for_settle(window, timeout)
+        # extraction cascade tolerates a challenge page as an empty result. wait_selector
+        # holds for a specific element (a distributor's price table, which loads via a LATER
+        # AJAX call than the page shell), so a stable-but-not-yet-priced page is not returned early.
+        _wait_for_settle(window, timeout, wait_selector)
         html = window.evaluate_js("document.documentElement.outerHTML") or ""
         final_url = window.evaluate_js("window.location.href") or url
         return FetchResult(
@@ -45,16 +53,85 @@ class WebViewRenderedDomFetcher:
         )
 
 
-def _wait_for_settle(window, timeout: float) -> None:
+# Text a bot-manager interstitial (Akamai / Cloudflare) shows while its JS proof of
+# work runs, BEFORE it redirects to the real page. If the DOM still reads like this we
+# must keep waiting, or we would return the challenge HTML and extract nothing.
+_CHALLENGE_MARKERS = (
+    "access denied",
+    "verifying you are human",
+    "checking your browser",
+    "enable javascript and cookies",
+    "unusual traffic",
+    "reference #",
+    "please wait while we verify",
+)
+
+
+def _looks_challenged(window) -> bool:
+    """True when the current DOM reads like a bot-manager interstitial rather than the
+    real product page. Defensive: any evaluate_js failure means "cannot tell", treated
+    as NOT challenged, so a page that simply has no body never blocks past readyState
+    complete (no regression for a normal page, which carries none of these markers)."""
+    try:
+        probe = window.evaluate_js(
+            "(document.title + ' ' + ((document.body && document.body.innerText) || ''))"
+            ".slice(0, 500).toLowerCase()"
+        ) or ""
+    except Exception:
+        return False
+    return any(marker in probe for marker in _CHALLENGE_MARKERS)
+
+
+# A bot interstitial (Akamai / Cloudflare) renders almost no VISIBLE text while its
+# JS runs the proof of work, then redirects to the real page. A real product page
+# renders thousands of characters. Verified live: the Mouser challenge page has 0 body
+# text (readyState already "complete", title just "mouser.com"), then the real page
+# loads with ~3500. So the load-detection signal is a substantial, STABLE body of text,
+# NOT readyState (which is "complete" on the challenge too) and NOT visible challenge
+# wording (this challenge shows none).
+_MIN_REAL_TEXT = 400
+
+
+def _has_selector(window, selector: str) -> bool:
+    """True when the live DOM contains an element matching `selector`. Defensive: an
+    evaluate_js failure reads as "present" so a JS quirk never hangs the wait past its
+    real content (the stable-text gate still applies)."""
+    import json as _json
+
+    try:
+        return bool(window.evaluate_js(f"!!document.querySelector({_json.dumps(selector)})"))
+    except Exception:
+        return True
+
+
+def _wait_for_settle(window, timeout: float, wait_selector: str | None = None) -> None:
+    """Return once the page has rendered a substantial, stable body of visible text and
+    no longer looks like a bot challenge, or the timeout elapses. Waiting past the
+    (text-less) challenge is what lets a real browser reach a page an HTTP client is
+    403'd from. On timeout we return whatever is there: a still-challenged page extracts
+    to an empty result, surfaced honestly as "nothing came back", never invented data.
+
+    When `wait_selector` is given, the page is not considered settled until that element
+    exists too: a distributor's price table loads via a LATER AJAX call than the shell, so
+    the body text can stabilize while the prices are still absent - returning then would
+    yield a real-but-unpriced page. The stable-text gate still bounds the extra wait."""
     deadline = time.monotonic() + timeout
     last = None
     while time.monotonic() < deadline:
         ready = window.evaluate_js("document.readyState")
-        length = window.evaluate_js("document.documentElement.outerHTML.length")
-        if ready == "complete" and length == last:
+        text_len = window.evaluate_js(
+            "(document.body && document.body.innerText || '').length"
+        ) or 0
+        if (
+            ready == "complete"
+            and text_len == last
+            and text_len >= _MIN_REAL_TEXT
+            and not _looks_challenged(window)
+            and (wait_selector is None or _has_selector(window, wait_selector))
+        ):
             return
-        last = length
-        time.sleep(0.25)
+        last = text_len
+        time.sleep(0.3)
 
 
 def _default_window():

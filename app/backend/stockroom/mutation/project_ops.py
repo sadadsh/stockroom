@@ -14,16 +14,30 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from stockroom.eda.registry import get_tool
 from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
 from stockroom.model.project import ProjectRecord
+from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
-from stockroom.projects import conform_ops, fab_export as fab_export_mod, fab_ops, fields as fields_mod, fill, settings_ops, standards
-from stockroom.sexp.document import SexpDocument
+from stockroom.projects import (
+    binding,
+    conform_ops,
+    fab_ops,
+    fill,
+    library_pin,
+    placements,
+    settings_ops,
+    standards,
+)
+from stockroom.projects import fab_export as fab_export_mod
+from stockroom.projects import fields as fields_mod
 from stockroom.projects.bom import project_bom
 from stockroom.projects.checks import project_checks
-from stockroom.projects.health import audit_project
+from stockroom.projects.health import audit_altium_project, audit_project
+from stockroom.sexp.document import SexpDocument
 from stockroom.store.project_store import ProjectStore
+from stockroom.text import counted, have, is_are
 from stockroom.vcs.repo import GitRepo
 
 
@@ -35,13 +49,34 @@ def _resolve_parts(library_parts):
     return list(parts or ())
 
 
+# What each EDA's registration can do in the Projects surface. The base set works for
+# any project (the audit reads the schematics, the BOM builds offline, git history is
+# git). The KiCad-only set needs KiCad files or kicad-cli: ERC/DRC, fab exports, the
+# .kicad_pro editors (setup/net classes), Prepare (annotate/fill writes), and the
+# board/schematic viewer. Altium binaries are read-only here, so those honestly stay off.
+KICAD_ONLY_CAPABILITIES = ("checks", "fab", "setup", "netclasses", "prepare", "viewer")
+
+
+def project_capabilities(rec: ProjectRecord) -> list[str]:
+    caps = ["audit", "bom", "revisions", "restore", "file"]
+    # Bulk assign is registry-generic: it needs a placement READER, not a design writer, because a
+    # tool Stockroom cannot write records its bindings on the project record instead. Gating it on
+    # `prepare` (a KiCad-only writer, as its name says) hid the whole surface from every Altium
+    # project that could in fact be assigned.
+    if placements.supported(rec.eda or "kicad"):
+        caps.append("assign")
+    if rec.eda == "kicad":
+        caps += list(KICAD_ONLY_CAPABILITIES)
+    return caps
+
+
 class ProjectOps:
     def __init__(self, store: ProjectStore, cli=None):
         self.store = store
         self.cli = cli
 
-    def register(self, root) -> ProjectRecord:
-        return self.store.register(root)
+    def register(self, root, eda: str | None = None) -> ProjectRecord:
+        return self.store.register(root, eda=eda)
 
     def list(self) -> list[ProjectRecord]:
         return self.store.list()
@@ -61,8 +96,11 @@ class ProjectOps:
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         root = Path(rec.root)
-        sheet_paths = [root / s for s in rec.sheet_paths]
-        au = audit_project(sheet_paths, footprint_dirs=footprint_dirs, model_dirs=model_dirs)
+        if rec.eda == "altium":
+            au = audit_altium_project(root, rec.pro_path, rec.sheet_paths)
+        else:
+            sheet_paths = [root / s for s in rec.sheet_paths]
+            au = audit_project(sheet_paths, footprint_dirs=footprint_dirs, model_dirs=model_dirs)
         au["project"] = rec.name
         return au
 
@@ -72,17 +110,15 @@ class ProjectOps:
         Buildability verdict read. Raises FileNotFoundError for an unknown id. A missing
         kicad-cli surfaces an honest per-check cli-absent result rather than a fabricated
         pass; the router gates on cli availability first for an immediate honest 502."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         cli = getattr(self.cli, "binary", self.cli)
         return project_checks(
             rec.root, rec.pro_path, rec.board_paths, rec.sheet_paths,
             cli, name=rec.name, progress=progress,
         )
 
-    def bom(self, project_id: str, boards=1, library_parts=None, price_lookup=None,
-            progress=None) -> dict:
+    def bom(self, project_id: str, boards=1, tax_rate=0.0, library_parts=None,
+            price_lookup=None, progress=None) -> dict:
         """Build a grouped, optionally priced BOM for the registered project, COMBINING the KiCad
         schematic with the Stockroom library (M7c). `library_parts` (the active profile's
         PartRecords, injected by the router) fills each component's blank identity from its matching
@@ -94,17 +130,20 @@ class ProjectOps:
             raise FileNotFoundError(f"no such project: {project_id}")
         return project_bom(
             rec.root, rec.pro_path, rec.sheet_paths,
-            name=rec.name, boards=boards, library_parts=_resolve_parts(library_parts),
+            name=rec.name, boards=boards, tax_rate=tax_rate,
+            library_parts=_resolve_parts(library_parts),
             price_lookup=price_lookup, progress=progress,
+            # The durable bindings for a tool whose design files Stockroom cannot write. A
+            # writable tool's bindings live in the design itself, so this is empty for it and the
+            # BOM reads them straight off each placement.
+            bindings=binding.stored_for(rec, rec.eda or "kicad"),
         )
 
     def fab_preview(self, project_id: str) -> dict:
         """The honest state the Fab panel gates on (M7i): whether the project has a board to
         fabricate and whether kicad-cli is available, plus the board file names for the
         picker. Read-only, no shell-out. Raises FileNotFoundError for an unknown id."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         cli = getattr(self.cli, "binary", self.cli)
         boards = [Path(b).name for b in rec.board_paths]
         return {
@@ -124,9 +163,7 @@ class ProjectOps:
         (no board / an unknown board name) and KiCadCliError (missing cli / failed plot).
         `board` selects one board file by name when the project has more than one; the first
         board is the default."""
-        rec = self.store.get(project_id)
-        if rec is None:
-            raise FileNotFoundError(f"no such project: {project_id}")
+        rec = self.require_kicad(project_id)
         if not rec.board_paths:
             raise ValueError("this project has no .kicad_pcb to fabricate")
         if board:
@@ -235,38 +272,51 @@ class ProjectOps:
         warnings: list[dict] = []
 
         # -- completeness (live read; no library) --
+        kicad = rec.eda == "kicad"
         sheets = self._sheet_abs(rec)
         has_sch = bool(sheets)
         comps: list[dict] = []
-        for p in sheets:
-            with open(p, encoding="utf-8", newline="") as fh:
-                comps.extend(fill.read_components(SexpDocument.parse(fh.read())))
+        if kicad:
+            for p in sheets:
+                with open(p, encoding="utf-8", newline="") as fh:
+                    comps.extend(fill.read_components(SexpDocument.parse(fh.read())))
+        else:
+            # Altium sheets read through the schdoc reader into the SAME component
+            # shape, so readiness computes identically for both EDAs.
+            from stockroom.projects.health import altium_project_components
+
+            comps = altium_project_components(Path(rec.root), rec.sheet_paths)
         cr = fill.project_readiness(comps)
         comp_state = "pass"
         if not has_sch:
             comp_state = "fail"
             blockers.append({"kind": "no_schematic",
-                             "detail": "this project has no schematic to build from",
-                             "next_step": "register a project that has a .kicad_sch"})
+                             "detail": "This project has no schematic to build from.",
+                             "next_step": "Register a project that has a "
+                                          + (".kicad_sch." if kicad else ".SchDoc.")})
         else:
             if cr["unannotated"]:
                 comp_state = "fail"
                 # Prepare auto-numbers single-unit refs but DEFERS multi-unit / repeated-hierarchy
                 # ones to KiCad (fill.annotate_document), so the count is a superset of what
                 # Prepare can fix; the remedy must name KiCad too, never a Prepare-only dead-end.
+                # An Altium schematic annotates in Altium (Prepare is a KiCad-only writer).
                 blockers.append({"kind": "unannotated",
-                                 "detail": f"{cr['unannotated']} reference(s) are not annotated",
-                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad"})
+                                 "detail": f"{counted(cr['unannotated'], 'reference')} {is_are(cr['unannotated'])} not annotated.",
+                                 "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad."
+                                 if kicad else "Annotate the schematic in Altium."})
             if cr["missing_footprint"]:
                 comp_state = "fail"
                 blockers.append({"kind": "missing_footprint",
-                                 "detail": f"{cr['missing_footprint']} component(s) have no footprint",
-                                 "next_step": "assign footprints (Prepare, or in KiCad)"})
+                                 "detail": f"{counted(cr['missing_footprint'], 'component')} {have(cr['missing_footprint'])} no footprint.",
+                                 "next_step": "Assign footprints (Prepare, or in KiCad)."
+                                 if kicad else "Assign footprints in Altium."})
             incomplete = cr["total"] - cr["complete"]
             if incomplete:
                 warnings.append({"kind": "identity_incomplete",
-                                 "detail": f"{incomplete} component(s) have incomplete library identity",
-                                 "next_step": "Prepare the project (Prepare section)"})
+                                 "detail": f"{counted(incomplete, 'component')} {have(incomplete)} incomplete library identity.",
+                                 "next_step": "Prepare the project (Prepare section)."
+                                 if kicad else "Complete the parts in Altium or the library."})
                 # A warning-only completeness must read amber "warn", agreeing with the Prepare
                 # section, not green "pass" (mirrors the BOM signal's soft-issue downgrade).
                 if comp_state == "pass":
@@ -277,12 +327,17 @@ class ProjectOps:
                         "incomplete_refs": cr["incomplete_refs"], "missing_counts": cr["missing_counts"]}
 
         # -- ERC/DRC (cached; cold cache = not run = HARD blocker, never a pass) --
-        if not checks or checks.get("ran_at") is None:
+        # An Altium project runs its rule checks inside Altium, not here: the signal
+        # says so honestly and never blocks (a not_applicable is not a cold cache).
+        if not kicad:
+            checks_signal = {"state": "not_applicable", "ran_at": None, "errors": 0,
+                             "warnings": 0, "checked": 0, "ok": True}
+        elif not checks or checks.get("ran_at") is None:
             checks_signal = {"state": "not_run", "ran_at": None, "errors": 0,
                              "warnings": 0, "checked": 0, "ok": False}
             blockers.append({"kind": "checks_not_run",
-                             "detail": "ERC and DRC have not been run",
-                             "next_step": "run the checks (Checks section)"})
+                             "detail": "ERC and DRC have not been run.",
+                             "next_step": "Run the checks (Checks section)."})
         else:
             summ = checks.get("summary") or {}
             errors, warns = summ.get("errors", 0), summ.get("warnings", 0)
@@ -291,24 +346,24 @@ class ProjectOps:
                              "warnings": warns, "checked": checked, "ok": ok}
             if errors > 0 or not ok:
                 checks_signal["state"] = "fail"
-                detail = (f"{errors} ERC/DRC error(s)" if errors > 0
-                          else "the last ERC/DRC run did not complete cleanly")
+                detail = (f"{counted(errors, 'ERC/DRC error')}." if errors > 0
+                          else "The last ERC/DRC run did not complete cleanly.")
                 blockers.append({"kind": "checks_failed", "detail": detail,
-                                 "next_step": "fix the errors and re-run (Checks section)"})
+                                 "next_step": "Fix the errors and re-run (Checks section)."})
             elif warns > 0:
                 # Amber "warn", agreeing with the Checks section's warning badge, not green "pass".
                 checks_signal["state"] = "warn"
                 warnings.append({"kind": "checks_warnings",
-                                 "detail": f"{warns} ERC/DRC warning(s)",
-                                 "next_step": "review the warnings (Checks section)"})
+                                 "detail": f"{counted(warns, 'ERC/DRC warning')}.",
+                                 "next_step": "Review the warnings (Checks section)."})
 
         # -- BOM (cached; cold cache = not built = HARD blocker, never a fabricated cost) --
         if not bom or bom.get("ran_at") is None:
             bom_signal = {"state": "not_built", "ran_at": None, "priced": False,
                           "line_count": 0, "unpriced_lines": 0, "risks": None}
             blockers.append({"kind": "bom_not_built",
-                             "detail": "the BOM has not been built",
-                             "next_step": "build the BOM (BOM section)"})
+                             "detail": "The BOM has not been built.",
+                             "next_step": "Build the BOM (BOM section)."})
         else:
             from stockroom.projects.procurement import project_procurement
 
@@ -321,19 +376,19 @@ class ProjectOps:
             if unpriced:
                 soft = True
                 warnings.append({"kind": "bom_unpriced",
-                                 "detail": f"{unpriced} BOM line(s) are unpriced",
-                                 "next_step": "price the BOM (BOM section)"})
+                                 "detail": f"{counted(unpriced, 'BOM line')} {is_are(unpriced)} unpriced.",
+                                 "next_step": "Price the BOM (BOM section)."})
             short = risks.get("no_stock", 0) + risks.get("insufficient_stock", 0)
             if short:
                 soft = True
                 warnings.append({"kind": "bom_stock",
-                                 "detail": f"{short} BOM line(s) are out of or short on stock",
-                                 "next_step": "review sourcing (Procurement)"})
+                                 "detail": f"{counted(short, 'BOM line')} {is_are(short)} out of or short on stock.",
+                                 "next_step": "Review sourcing (Procurement)."})
             if risks.get("not_active"):
                 soft = True
                 warnings.append({"kind": "bom_lifecycle",
-                                 "detail": f"{risks['not_active']} BOM line(s) are NRND or EOL",
-                                 "next_step": "review sourcing (Procurement)"})
+                                 "detail": f"{counted(risks['not_active'], 'BOM line')} {is_are(risks['not_active'])} NRND or EOL.",
+                                 "next_step": "Review sourcing (Procurement)."})
             if soft:
                 bom_signal["state"] = "warn"
 
@@ -341,8 +396,8 @@ class ProjectOps:
         if not rec.git_root:
             git_signal = {"state": "not_git", "under_git": False, "dirty": False}
             warnings.append({"kind": "not_git",
-                             "detail": "this project is not under version control",
-                             "next_step": "initialize a git repo for it"})
+                             "detail": "This project is not under version control.",
+                             "next_step": "Initialize a git repo for it."})
         else:
             root = Path(rec.root)
             proj_files = [root / rel for rel in
@@ -353,8 +408,8 @@ class ProjectOps:
             git_signal = {"state": "clean" if clean else "dirty", "under_git": True, "dirty": not clean}
             if not clean:
                 warnings.append({"kind": "dirty_tree",
-                                 "detail": "there are uncommitted changes; this build will not match a commit",
-                                 "next_step": "commit or discard your changes"})
+                                 "detail": "There are uncommitted changes; this build will not match a commit.",
+                                 "next_step": "Commit or discard your changes."})
 
         return {
             "project": rec.name,
@@ -373,6 +428,18 @@ class ProjectOps:
             raise FileNotFoundError(f"no such project: {project_id}")
         return rec
 
+    def require_kicad(self, project_id: str) -> ProjectRecord:
+        """The KiCad-only operations (ERC/DRC, fab exports, the .kicad_pro editors,
+        Prepare writes, the viewer) refuse an Altium registration with an honest 400
+        (ValueError) instead of failing deep in a file parser."""
+        rec = self._require(project_id)
+        if rec.eda != "kicad":
+            raise ValueError(
+                f"{rec.name} is an Altium project; this operation applies only to "
+                "KiCad projects"
+            )
+        return rec
+
     def _pro_path(self, rec: ProjectRecord) -> Path:
         if not rec.pro_path:
             raise ValueError("this project has no .kicad_pro to edit")
@@ -383,7 +450,7 @@ class ProjectOps:
         .kicad_pro, plus a fab-floor validation of the classes (M7e). Raises
         FileNotFoundError for an unknown id; a project with no .kicad_pro is an honest
         empty shape, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         data = {}
         if rec.pro_path:
             pro = Path(rec.root) / rec.pro_path
@@ -434,7 +501,7 @@ class ProjectOps:
         as a minimal diff, one scoped commit on the project's own git (M7e). Returns the
         reconciled classes + a fab-floor validation. Raises FileNotFoundError (unknown id)
         / ValueError (no .kicad_pro or not under git)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         pro = self._pro_path(rec)
         existing = []
         if pro.exists():
@@ -458,7 +525,7 @@ class ProjectOps:
         the project's own git (M7e). The size lists are replaced wholesale (the editor
         sends the full list); rules are field-merged so an unspecified rule is preserved.
         Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro or not under git)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         ds: dict = {"rules": dict(rules)}
         if track_widths is not None:
             ds["track_widths"] = list(track_widths)
@@ -506,7 +573,7 @@ class ProjectOps:
         netclass that exists among the project's classes (an unknown one is a ValueError ->
         400). Raises FileNotFoundError (unknown id) / ValueError (no .kicad_pro, not under git,
         or a bad row)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         pro = self._pro_path(rec)
         # Read the project's own classes to validate the netclass references. When the file is
         # gone from disk we cannot know the valid set, so membership is deferred and _write_pro
@@ -554,7 +621,7 @@ class ProjectOps:
         """The KiField bulk-field grid: every placed component across every sheet as a
         rows-by-fields table, Reference read-only (M7h). Read-only. Raises FileNotFoundError for
         an unknown id; a project with no schematic is an honest empty grid, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         grid = fields_mod.build_field_grid(self._placed_components(rec))
         return {
             "project": rec.name,
@@ -572,7 +639,7 @@ class ProjectOps:
         nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id); ValueError for a
         project not under git or with uncommitted schematic changes (the same dirty-tree guard as
         Prepare, so a user's in-progress sheet edits are never swept into the field commit)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing fields"
@@ -604,8 +671,8 @@ class ProjectOps:
         if not changed:  # every submitted value already matched on disk (byte no-op)
             return empty
         total_fields = sum(len(v) for v in changes_by_ref.values())
-        message = (f"Edit {rec.name} fields: {total_fields} value(s) on "
-                   f"{len(changes_by_ref)} component(s)")
+        message = (f"Edit {rec.name} fields: {counted(total_fields, 'value')} on "
+                   f"{counted(len(changes_by_ref), 'component')}")
         with Transaction(repo) as txn:
             for path, _doc in changed:
                 txn.track(path)
@@ -647,7 +714,7 @@ class ProjectOps:
         erc_pin_map is the file's matrix or None when absent: it is NEVER fabricated as an
         all-OK matrix, since that would silently disable every pin-conflict check KiCad's real
         default enforces (the editor only offers the matrix when the file already carries one)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         setup: dict = {}
         thickness = None
@@ -706,7 +773,7 @@ class ProjectOps:
         `erc_severities`/`drc_severities`/`erc_pin_map` treat an empty/None value as 'not
         submitted'; `text_variables` uses None for 'not submitted' so an empty {} is still a
         legitimate 'clear all vars'."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
 
         has_board_edit = bool(board_setup) or thickness is not None
         has_erc_sev = bool(erc_severities)
@@ -817,7 +884,7 @@ class ProjectOps:
         """The object-conform category catalog (Title Case labels + suggested sizes) plus the
         project's honest state (has a board / has a sheet / under git), for the editor's initial
         render (M7f-B). Read-only. Raises FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         boards, sheets = self._kicad_files(rec)
         return {
             "project": rec.name,
@@ -865,7 +932,7 @@ class ProjectOps:
         WITHOUT writing or touching git (M7f-B). Validates the targets (unknown category / bad
         size or thickness -> ValueError -> 400) and refuses an empty selection. Raises
         FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         conform_ops.validate_targets(pcb_targets, sch_targets)
         if not conform_ops.any_targets(pcb_targets, sch_targets):
             raise ValueError("select at least one object type to conform")
@@ -886,7 +953,7 @@ class ProjectOps:
         fabricated empty commit. Raises FileNotFoundError (unknown id); ValueError for an empty
         selection, a bad target, or a project not under git. Returns the per-file counts + the
         commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         conform_ops.validate_targets(pcb_targets, sch_targets)
         if not conform_ops.any_targets(pcb_targets, sch_targets):
             raise ValueError("select at least one object type to conform")
@@ -931,7 +998,7 @@ class ProjectOps:
         overall thickness, and the fab-preset catalog, for the Stackup editor's render (M7f-C).
         Read-only. Raises FileNotFoundError for an unknown id; a project with no board is an honest
         empty shape, never a crash."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         current = None
         copper_names: list[str] = []
@@ -1022,7 +1089,7 @@ class ProjectOps:
         touching git (M7f-C). Validates the request (bad/empty/conflicting mode, unknown or
         mismatched preset, field edit on a stackless board -> ValueError -> 400). Raises
         FileNotFoundError for an unknown id."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         board_path = self._primary_board(rec)
         if board_path is None:
             raise ValueError("this project has no .kicad_pcb to preview")
@@ -1048,7 +1115,7 @@ class ProjectOps:
         honest no-commit no-op ({committed: None, changed: False}). Raises FileNotFoundError (unknown
         id); ValueError for a bad request, no board, or a project not under git. Returns the re-read
         stackup + the commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before editing"
@@ -1114,6 +1181,8 @@ class ProjectOps:
             with open(p, encoding="utf-8", newline="") as fh:
                 texts.append(fh.read())
         used = fill.used_references(texts)  # seed project-wide before any sheet is numbered
+        tool = rec.eda or "kicad"
+        stored = binding.stored_for(rec, tool)
         staged: list[dict] = []
         pre_comps: list[dict] = []      # current on-disk designators (for the plan + current residual)
         final_comps: list[dict] = []    # post-annotate + post-fill (for the projected residual)
@@ -1125,15 +1194,17 @@ class ProjectOps:
             doc = SexpDocument.parse(text)
             # Read the CURRENT on-disk components (disk designators) BEFORE annotation, so the plan and
             # the manual-fill picker name refs that actually exist on disk (a manual fill matches disk,
-            # not the projected annotated ref). Matching is designator-independent (by lib_id / MPN).
-            for c in fill.read_components(doc):
+            # not the projected annotated ref). Matching is designator-independent (by binding /
+            # lib_id / MPN), and every read resolves the durable binding first so a component the user
+            # has already assigned is matched by that decision rather than re-guessed.
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 c["_sheet"] = rel
                 pre_comps.append(c)
             annotated = fill.annotate_document(doc, used)
             # Read AFTER annotation so the auto-fill keys off the FINAL designators annotation just
             # assigned (the doc it will save), not the R? placeholders.
             changes_by_ref: dict[str, dict[str, str]] = {}
-            for c in fill.read_components(doc):
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 m = fill.match_component(c, index)
                 if m["part"] is None:
                     continue
@@ -1145,7 +1216,7 @@ class ProjectOps:
             # the reported "fill_fields" is the number of property fields filled (its own count).
             filled_comps = fill.fill_document(doc, changes_by_ref)
             filled_fields = sum(len(v) for v in changes_by_ref.values())
-            for c in fill.read_components(doc):
+            for c in binding.resolve(fill.read_components(doc), tool, stored=stored):
                 final_comps.append(c)
             changed = (annotated + filled_comps) > 0
             staged.append({"path": rel, "_abs": path, "annotated": annotated,
@@ -1162,7 +1233,7 @@ class ProjectOps:
         or touching git (M7f-D). `library_parts` (the active profile's PartRecords, passed by the
         router) is the match library. Read-only. Raises FileNotFoundError for an unknown id; a project
         with no sheets is an honest empty shape, never a crash."""
-        rec = self._require(project_id)  # 404 before the (possibly large) library is loaded
+        rec = self.require_kicad(project_id)  # 404 before the (possibly large) library is loaded
         index = fill.library_match_records(_resolve_parts(library_parts))
         staged, plan, current, after = self._stage_prepare(rec, index)
         return {
@@ -1190,7 +1261,7 @@ class ProjectOps:
         ({committed: None}). `progress` (an SSE callback) reports the phase. Raises FileNotFoundError
         (unknown id); ValueError for a project not under git. Returns the counts + the residual passport
         + the commit sha (or None)."""
-        rec = self._require(project_id)
+        rec = self.require_kicad(project_id)
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before preparing"
@@ -1235,13 +1306,60 @@ class ProjectOps:
         return {**result, "committed": sha}
 
     def manual_fill(self, project_id: str, ref: str, part_id: str, library_parts=()) -> dict:
-        """Link a specific placed component `ref` to the library part `part_id`, filling ALL its
-        identity fields (overwrite allowed, since this is an explicit user choice, unlike the
-        conservative auto pass) and repointing its `(lib_id ...)`, as ONE atomic commit on the
-        project's own git (M7f-D). The residual filler for a component the auto pass could not match.
-        A link that changes nothing is an honest no-commit no-op. Raises FileNotFoundError (unknown id);
-        ValueError for a project not under git, an unknown library part, or no such component `ref`."""
+        """Link ONE placed component `ref` to the library part `part_id`. The single-ref entry point
+        onto `assign_refs`; see it for the semantics. Kept because a one-component fill is its own user
+        action with its own commit message, and because it is the shape the API has always exposed."""
+        result = self.assign_refs(project_id, [ref], part_id, library_parts=library_parts)
+        return {"project": result["project"], "committed": result["committed"],
+                "ref": ref, "part_id": part_id}
+
+    def assign_refs(self, project_id: str, refs, part_id: str, library_parts=()) -> dict:
+        """Link EVERY placed component in `refs` to the library part `part_id`, as ONE atomic
+        commit, and record the link DURABLY so it survives a re-annotate or a Value edit.
+
+        This is what makes the owner's scenario one action: a project's identical passives are grouped
+        by (symbol, Value, Footprint) and the whole group is assigned in a single decision and a single
+        commit, rather than one component at a time. All-or-nothing by construction, because it is one
+        Transaction: either every ref is written and committed, or every touched path is restored.
+
+        WHERE the binding is written is registry data, not a branch (see eda/registry.PlacementBinding
+        and projects/binding.py):
+
+          - A tool whose design Stockroom can write (KiCad) gets the binding stamped onto the
+            placement itself, hidden, alongside the identity fields and the repointed `(lib_id ...)`,
+            in the SAME byte-preserving commit on the project's own git. It is then atomic with the
+            fill it records, it travels to a peer through the project's own history, and it cannot
+            disagree with the design because it IS the design.
+          - A tool whose design Stockroom only reads (Altium) gets the binding recorded on the
+            Stockroom project record, one scoped commit on the library repo. No design file is
+            touched, which is the correct outcome and not a degraded one.
+
+        An assignment that changes nothing is an honest no-commit no-op. Raises FileNotFoundError
+        (unknown id); ValueError for a writable-tool project not under git, an unknown library part, an
+        empty ref list, or a ref that names no component in this project (reported with every missing
+        ref at once, so a partly-stale UI selection does not have to be fixed one round-trip at a time).
+        """
+        wanted = [str(r).strip() for r in (refs or []) if str(r).strip()]
+        if not wanted:
+            raise ValueError("no component references to assign")
         rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not placements.supported(tool):
+            raise ValueError(
+                f"{rec.name} is registered for {tool!r}, which Stockroom cannot assign parts in"
+            )
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        part = next((p for p in index if p["id"] == part_id), None)
+        if part is None:
+            raise ValueError(f"no such library part: {part_id}")
+        if binding.writes_into_design(tool):
+            return self._assign_in_design(rec, wanted, part, part_id)
+        return self._assign_on_record(rec, wanted, part_id)
+
+    def _assign_in_design(self, rec: ProjectRecord, wanted: list[str], part: dict,
+                          part_id: str) -> dict:
+        """Assign by writing the design: identity fields, the repointed symbol link, and the hidden
+        binding field, in one atomic commit on the project's own git."""
         if not rec.git_root:
             raise ValueError(
                 "this project is not under git; initialize a git repo for it before filling"
@@ -1255,37 +1373,259 @@ class ProjectOps:
             raise ValueError(
                 "this project has uncommitted changes to a schematic; commit or discard them before filling"
             )
-        index = fill.library_match_records(_resolve_parts(library_parts))
-        part = next((p for p in index if p["id"] == part_id), None)
-        if part is None:
-            raise ValueError(f"no such library part: {part_id}")
         lib_id = fill.lib_id_for(part)
-        found = False
+        binding_field = binding.field_for(rec.eda or "kicad")
+        remaining = set(wanted)
         changed: list[tuple[Path, SexpDocument]] = []
         for path in sheets:
             doc = SexpDocument.load(path)
             comps = {c["ref"]: c for c in fill.read_components(doc)}
-            comp = comps.get(ref)
-            if comp is None:
+            here = [r for r in wanted if r in comps]
+            if not here:
                 continue
-            found = True
-            changes = {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comp["props"])}
-            n = fill.fill_document(doc, {ref: changes} if changes else {},
-                                   lib_id_by_ref={ref: lib_id} if lib_id else None)
+            remaining.difference_update(here)
+            changes_by_ref = {
+                r: {ch["prop"]: ch["new"] for ch in fill.proposed_changes(part, comps[r]["props"])}
+                for r in here
+            }
+            for r in here:
+                changes_by_ref[r][binding_field] = part_id
+            n = fill.fill_document(doc, changes_by_ref,
+                                   lib_id_by_ref={r: lib_id for r in here} if lib_id else None,
+                                   hidden_props={binding_field})
             if n:
                 changed.append((path, doc))
-        if not found:
-            raise ValueError(f"no component {ref!r} in this project")
+        if remaining:
+            # Named all at once, and BEFORE anything is written, so a stale selection never leaves the
+            # project half assigned.
+            missing = ", ".join(sorted(remaining, key=fill.ref_sort_key))
+            raise ValueError(f"no component {missing} in this project")
+        result = {"project": rec.name, "refs": wanted, "part_id": part_id, "bound": len(wanted)}
         if not changed:
-            return {"project": rec.name, "committed": None, "ref": ref, "part_id": part_id}
-        message = f"Fill {rec.name}: {ref} from library"
+            return {**result, "committed": None}
+        label = wanted[0] if len(wanted) == 1 else f"{len(wanted)} components"
+        message = f"Fill {rec.name}: {label} from library"
         with Transaction(repo) as txn:
             for path, _doc in changed:
                 txn.track(path)
             for path, doc in changed:
                 doc.save(path)
             sha = txn.commit(message)
-        return {"project": rec.name, "committed": sha, "ref": ref, "part_id": part_id}
+        return {**result, "committed": sha}
+
+    def _assign_on_record(self, rec: ProjectRecord, wanted: list[str], part_id: str) -> dict:
+        """Assign by recording the binding on the Stockroom project record, for a tool whose design
+        files Stockroom reads but never writes. The design is left byte-identical on purpose."""
+        tool = rec.eda or "kicad"
+        comps = {c["ref"]: c for c in placements.read_placements(rec)}
+        missing = [r for r in wanted if r not in comps]
+        if missing:
+            names = ", ".join(sorted(set(missing), key=fill.ref_sort_key))
+            raise ValueError(f"no component {names} in this project")
+        updates = {binding.placement_key(comps[r]): part_id for r in wanted}
+        merged = binding.merged_bindings(rec, tool, updates)
+        label = wanted[0] if len(wanted) == 1 else f"{len(wanted)} components"
+        self.store.set_bindings(rec.id, merged, f"Bind {rec.name}: {label} to a library part")
+        return {"project": rec.name, "refs": wanted, "part_id": part_id,
+                "bound": len(wanted), "committed": None}
+
+    def assign_read(self, project_id: str, library_parts=()) -> dict:
+        """The reviewable bulk-assign surface: every placed component that carries no identified
+        library part, grouped so identical placements are ONE row, each with the ranked library
+        candidates a user could assign to it, PLUS every component that already carries a durable
+        binding, so an assignment can be re-verified later instead of being written and forgotten.
+        Read-only; no git, no writes.
+
+        Registry-generic: placements are read through the tool's own reader (`projects/placements`),
+        so an Altium registration is served here exactly like a KiCad one.
+
+        Only groups whose components are all unidentified are offered: a component the identity tiers
+        already matched is Prepare's job, not a guessing decision. Raises FileNotFoundError for an
+        unknown id; a project with no sheets is an honest empty shape.
+        """
+        rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not placements.supported(tool):
+            raise ValueError(
+                f"{rec.name} is registered for {tool!r}, which Stockroom cannot read placements for"
+            )
+        index = fill.library_match_records(_resolve_parts(library_parts))
+        by_id = {p["id"]: p for p in index}
+        comps = placements.read_placements(rec)
+        unmatched: list[dict] = []
+        bound: list[dict] = []
+        for comp in comps:
+            match = fill.match_component(comp, index)
+            if match["confidence"] in ("binding", "binding_missing"):
+                part_id = binding.bound_part_id(comp)
+                part = by_id.get(part_id)
+                key = binding.placement_key(comp)
+                bound.append({
+                    "ref": comp.get("ref", ""),
+                    "sheet": comp.get("_sheet", ""),
+                    "key": key,
+                    # A key derived from a designator does not survive a re-annotate. Saying so is
+                    # the difference between a durable binding and one that only looks durable.
+                    "weak_key": binding.is_weak_key(key),
+                    "part_id": part_id,
+                    "display_name": (part or {}).get("display_name", ""),
+                    "mpn": (part or {}).get("mpn", ""),
+                    "missing": part is None,
+                    # What re-verification MEANS: the fields whose schematic value CONTRADICTS the
+                    # part this placement is bound to. Overwrites only, never fills. A field the
+                    # placement simply does not carry yet is Prepare's job and says nothing about the
+                    # binding, and counting those as drift flagged every healthy assignment, which is
+                    # the same as flagging none.
+                    "drift": [c for c in fill.proposed_changes(part, comp.get("props") or {})
+                              if c["kind"] == "overwrite"] if part else [],
+                })
+                if part is not None:
+                    continue
+                # A DANGLING binding is reported above AND falls through to the assignable groups,
+                # because the placement really does carry no library part. Reporting it without
+                # offering the repair left it fixable only through the one-by-one fallback, which is
+                # a dead end dressed up as a diagnosis.
+            if match["part"] is None:
+                unmatched.append(comp)
+        groups = []
+        for group in fill.group_placements(unmatched):
+            first = next(c for c in unmatched if c["ref"] == group["refs"][0])
+            groups.append({**group,
+                           "sheets": sorted({c["_sheet"] for c in unmatched
+                                             if c["ref"] in set(group["refs"])}),
+                           "candidates": fill.candidate_matches(first, index)})
+        pb = get_tool(tool).placement_binding
+        return {
+            "project": rec.name,
+            "eda": tool,
+            "under_git": bool(rec.git_root),
+            # How this tool carries a binding, so the surface can say where an assignment lands
+            # instead of the user having to know.
+            "binding": {"field": pb.field, "writable": pb.writable, "reason": pb.reason},
+            "components": len(comps),
+            "unassigned": len(unmatched),
+            "bound": sorted(bound, key=lambda b: fill.ref_sort_key(b["ref"])),
+            "groups": groups,
+        }
+
+    def hygiene_read(self, project_id: str) -> dict:
+        """What syncing this project's workspace hygiene would change: {eda, under_git, writes,
+        untracked}. Read-only, no git, no writes. Raises FileNotFoundError for an unknown id.
+
+        The rules are the ones the project's OWN tool declares, so an Altium project never inherits
+        KiCad's per-user rules and the reverse cannot happen either."""
+        rec = self._require(project_id)
+        tool = rec.eda or "kicad"
+        if not rec.git_root:
+            return {"eda": tool, "under_git": False, "writes": [], "untracked": []}
+        plan = hygiene_preview(Path(rec.root), [tool], repo=GitRepo(Path(rec.git_root)))
+        return {"eda": tool, "under_git": True, **plan}
+
+    def hygiene_apply(self, project_id: str) -> dict:
+        """Write this project's workspace hygiene and untrack the per-user files it now covers, as
+        ONE commit on the project's own git.
+
+        This is the fix for the owner's KiCad peer-sync failures. Writing the ignore rules alone
+        would not have been one: an ignore rule has no effect on a file that is already tracked, and
+        those files are already committed, which is why two peers conflict on them at all.
+
+        Raises FileNotFoundError (unknown id); ValueError for a project not under git, a dirty tree,
+        or a hygiene file whose managed block was left unterminated by a hand edit."""
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git; initialize a git repo for it before syncing "
+                "workspace hygiene"
+            )
+        tool = rec.eda or "kicad"
+        result = apply_hygiene(Path(rec.root), [tool], repo=GitRepo(Path(rec.git_root)))
+        return {"project": rec.name, "eda": tool, **result}
+
+    def library_pin_read(self, project_id: str, *, profile: str) -> dict:
+        """Which library version this project is pinned to, and how that compares with the library
+        on THIS machine (Batch 2 item 2).
+
+        Read-only. Raises FileNotFoundError for an unknown id, and ValueError only when the pin file
+        exists but cannot be parsed, which is a real problem to report rather than a state to guess
+        past.
+
+        The tool's path contract rides along because the answer "your library is at the right
+        commit" is only half the peer-sync question: KiCad still has to have SR_LIB pointing at that
+        library, and knowing that is registry data, never something the surface should hardcode.
+        """
+        rec = self._require(project_id)
+        tool = get_tool(rec.eda or "kicad")
+        pc = tool.path_contract
+        pin = library_pin.read_pin(Path(rec.root))
+        verdict = library_pin.evaluate(pin, self.store.repo, profile=profile)
+        return {
+            "project": rec.name,
+            "eda": tool.key,
+            "under_git": bool(rec.git_root),
+            "pinned": pin.to_dict() if pin is not None else None,
+            "path_contract": {
+                "kind": pc.kind,
+                "variable": pc.variable,
+                "config_file": pc.config_file,
+                "prefix": pc.prefix,
+                "description": pc.description,
+            },
+            **verdict.to_dict(),
+        }
+
+    def library_pin_apply(self, project_id: str, *, profile: str, project_repo=None) -> dict:
+        """Record the library's CURRENT commit as this project's pin, as one commit on the
+        project's own git.
+
+        Returns {project, pinned, committed}; `committed` is None when the pin already named this
+        exact version, so re-running never churns the project's history.
+
+        Raises FileNotFoundError (unknown id); ValueError when the project is not under git (a pin
+        that cannot be committed can never reach a peer, which is the only thing it is for), when
+        the library is not under git or has no commit yet (there is no version to pin), or when the
+        pin on disk was written by a NEWER Stockroom (overwriting it would silently discard fields
+        this build does not understand).
+        """
+        rec = self._require(project_id)
+        if not rec.git_root:
+            raise ValueError(
+                "this project is not under git, so a library pin could never reach a peer; "
+                "initialize a git repo for it first"
+            )
+        library_repo = self.store.repo
+        if not library_repo.is_git_repo():
+            raise ValueError("the active library is not under git, so it has no version to pin")
+        head = library_repo.head()
+        if not head:
+            raise ValueError("the active library has no commit yet, so there is no version to pin")
+
+        root = Path(rec.root)
+        existing = library_pin.read_pin(root)
+        if existing is not None and existing.is_future_schema():
+            raise ValueError(
+                f"{library_pin.PIN_FILENAME} was written by a newer version of Stockroom "
+                f"(schema {existing.schema}); update Stockroom rather than overwriting it"
+            )
+        pin = library_pin.LibraryPin(
+            profile=profile,
+            remote=library_repo.remote_url(),
+            commit=head,
+            pinned_at=library_pin.now_iso(),
+        )
+        path = library_pin.pin_path(root)
+        # An unchanged pin is a no-op: compare everything EXCEPT the timestamp, which would
+        # otherwise make every read-and-repin a fresh commit saying nothing.
+        if existing is not None and (existing.profile, existing.remote, existing.commit) == (
+            pin.profile, pin.remote, pin.commit
+        ):
+            return {"project": rec.name, "pinned": existing.to_dict(), "committed": None}
+
+        repo = project_repo or GitRepo(Path(rec.git_root))
+        with Transaction(repo) as txn:
+            txn.track(path)
+            path.write_text(pin.dumps(), encoding="utf-8")
+            sha = txn.commit(f"Pin {rec.name} to library {head[:7]}")
+        return {"project": rec.name, "pinned": pin.to_dict(), "committed": sha}
 
     def restore(self, project_id: str) -> dict:
         """Undo the project's last Prepare / Fill by git-reverting that commit as a new commit

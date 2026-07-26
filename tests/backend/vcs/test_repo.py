@@ -187,3 +187,63 @@ def test_pull_ff_reports_non_fast_forward(tmp_path):
     res = b.pull_ff()
     assert not res.ok
     assert "fast-forward" in res.reason.lower() or "diverg" in res.reason.lower()
+
+
+def test_commit_records_a_tracked_deleted_path(tmp_path):
+    # A HEAD-tracked file deleted from disk: commit() must stage and record the deletion.
+    r = _repo(tmp_path)
+    f = tmp_path / "old.txt"
+    f.write_text("x", encoding="utf-8")
+    r.commit("Add old", [f])
+    f.unlink()
+    sha = r.commit("Remove old", [f])
+    assert len(sha) == 40
+    assert r._run("ls-files", "--", "old.txt").stdout.strip() == ""
+    assert r.is_clean()
+
+
+def test_commit_survives_a_staged_never_committed_path_deleted_from_disk(tmp_path):
+    # The winverify regenerate failure (2026-07-23): a path STAGED by an interrupted earlier run
+    # (in the index, never in HEAD) is deleted from disk and passed to commit() alongside real
+    # changes. ls-files calls it tracked, `add -A` then ERASES its index entry, and `commit
+    # --only` aborts on a pathspec git no longer knows - taking every sibling path down with it.
+    # The vanished path's net change is nothing, so commit() must drop it and land the rest.
+    r = _repo(tmp_path)
+    keep = tmp_path / "keep.txt"
+    keep.write_text("v1", encoding="utf-8")
+    r.commit("Add keep", [keep])
+    ghost = tmp_path / "ghost.txt"
+    ghost.write_text("staged only", encoding="utf-8")
+    r._run("add", "--", "ghost.txt")  # staged, never committed
+    ghost.unlink()  # ...and gone from disk
+
+    keep.write_text("v2", encoding="utf-8")
+    sha = r.commit("Update keep", [keep, ghost])
+
+    assert len(sha) == 40
+    assert r.show_file(sha, keep) == "v2"
+    assert r._run("ls-files", "--", "ghost.txt").stdout.strip() == ""
+    assert r.is_clean()
+
+
+def test_commit_with_only_ghost_paths_never_sweeps_foreign_staged_work(tmp_path):
+    # If every requested path is a ghost (vanished from git's knowledge), the staged diff
+    # that remains belongs to FOREIGN work outside the scoped paths. commit() must no-op
+    # (return head) rather than let a bare `commit --only --` sweep the foreign work in.
+    r = _repo(tmp_path)
+    base = tmp_path / "base.txt"
+    base.write_text("b", encoding="utf-8")
+    r.commit("base", [base])
+    foreign = tmp_path / "foreign.txt"
+    foreign.write_text("f", encoding="utf-8")
+    r._run("add", "--", "foreign.txt")  # someone else's staged, uncommitted work
+    ghost = tmp_path / "ghost.txt"
+    ghost.write_text("g", encoding="utf-8")
+    r._run("add", "--", "ghost.txt")
+    ghost.unlink()
+
+    head = r.head()
+    assert r.commit("ghosts only", [ghost]) == head  # no commit made
+    # the foreign staged work is untouched, still staged, still uncommitted
+    assert "foreign.txt" in r._run("ls-files", "--", "foreign.txt").stdout
+    assert r.show_file(r.head(), "foreign.txt") is None

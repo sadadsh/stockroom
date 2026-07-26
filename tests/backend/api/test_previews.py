@@ -227,11 +227,11 @@ def test_symbol_preview_at_rev_rejects_a_garbage_rev_as_400(app_ctx):
 
 
 def test_symbol_preview_at_rev_404_when_part_absent_at_that_rev(app_ctx):
-    from stockroom.model.part import LibRef, PartRecord
+    from stockroom.model.part import AssetRef, PartRecord
 
     seed = _seed_sha(app_ctx)  # before the latecomer existed
     rec = PartRecord(id="latecomer", display_name="LATECOMER", category="ICs")
-    rec.symbol = LibRef(lib="SR-ICs", name="LATECOMER")
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name="LATECOMER")
     parts_dir = app_ctx.profile.library.parts_dir
     (parts_dir / "latecomer.json").write_text(rec.dumps(), encoding="utf-8")
     app_ctx.repo.commit("add latecomer", [parts_dir / "latecomer.json"])
@@ -336,3 +336,346 @@ def test_model_glb_real_step_end_to_end(app_ctx):
         r = c.get("/api/previews/model/tps62130.glb")
     assert r.status_code == 200
     assert r.content[:4] == GLB_MAGIC
+
+
+def test_footprint_preview_hides_the_reference_and_value_text(app_ctx):
+    # the owner's complaint: the footprint preview splashed REF** and the value over
+    # the pad art. Give the fixture footprint visible Reference/Value properties and
+    # prove the copy handed to the renderer has them hidden (the real file is untouched).
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        '\t(property "Reference" "REF**" (at 0 -1 0) (layer "F.SilkS") (effects (font (size 1 1))))\n'
+        '\t(property "Value" "TPS62130" (at 0 1 0) (layer "F.Fab") (effects (font (size 1 1))))\n'
+        '\t(pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))\n'
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+    cli = _RevRecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        assert c.get("/api/previews/footprint/tps62130.svg").status_code == 200
+    rendered = cli.fp_texts[0]
+    # the copy the renderer saw has both metadata texts hidden...
+    rstart = rendered.index('(property "Reference"')
+    assert "(hide yes)" in rendered[rstart:rstart + 200]
+    vstart = rendered.index('(property "Value"')
+    assert "(hide yes)" in rendered[vstart:vstart + 200]
+    # ...while the real footprint file on disk keeps its visible refdes for a board
+    on_disk = fp_file.read_text(encoding="utf-8")
+    dstart = on_disk.index('(property "Reference"')
+    assert "(hide yes)" not in on_disk[dstart:dstart + 200]
+
+
+# --------------------------------------------------------------------------- #
+# Stock preview-by-lib_id (the unified Add-A-Part flow shows a passive's built-in
+# footprint + 3D model BEFORE it is committed, so there is no part id to key on).
+# --------------------------------------------------------------------------- #
+def test_stock_footprint_svg_400_on_a_bad_lib_id(client):
+    assert client.get("/api/previews/stock/footprint.svg?fp=Resistor_SMD").status_code == 400
+    assert client.get("/api/previews/stock/footprint.svg?fp=../../etc:passwd").status_code == 400
+
+
+def test_stock_footprint_svg_404_when_not_installed(client):
+    r = client.get("/api/previews/stock/footprint.svg?fp=No_Such_Lib:No_Such_Fp")
+    assert r.status_code == 404
+
+
+def test_stock_footprint_svg_renders_by_lib_id(app_ctx, monkeypatch, tmp_path):
+    mod = tmp_path / "Resistor_SMD.pretty" / "R_0603_1608Metric.kicad_mod"
+    mod.parent.mkdir(parents=True)
+    mod.write_text('(footprint "R_0603_1608Metric")', encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.stock_footprint_file", lambda lib, name: mod
+    )
+    cli = _RecordingCli()
+    with _client_with_cli(app_ctx, cli) as c:
+        r = c.get("/api/previews/stock/footprint.svg?fp=Resistor_SMD:R_0603_1608Metric")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/svg+xml")
+        assert c.get(
+            "/api/previews/stock/footprint.svg?fp=Resistor_SMD:R_0603_1608Metric&bw=true"
+        ).status_code == 200
+    # color then bw reach the renderer with distinct flags (distinct cache keys)
+    assert cli.fp_bw == [False, True]
+
+
+def test_stock_model_glb_renders_by_lib_id(app_ctx, monkeypatch, tmp_path):
+    from stockroom.kicad.model_convert import GLB_MAGIC
+
+    src = tmp_path / "R_0603_1608Metric.wrl"
+    src.write_text("stub", encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.stock_model_file", lambda lib, name: src
+    )
+    monkeypatch.setattr(
+        "stockroom.api.routers.previews.model_to_glb", lambda p: GLB_MAGIC + b"rest"
+    )
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        r = c.get("/api/previews/stock/model.glb?fp=Resistor_SMD:R_0603_1608Metric")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "model/gltf-binary"
+        assert r.content[:4] == GLB_MAGIC
+
+
+def test_stock_model_glb_404_when_not_installed(client):
+    r = client.get("/api/previews/stock/model.glb?fp=No_Such_Lib:No_Such")
+    assert r.status_code == 404
+
+
+class TestScalablePreviewSvg:
+    """A preview SVG must scale to its tile, which means it must NOT declare physical dimensions.
+
+    MEASURED in the real app (2026-07-25) with a real TI USON-14 footprint: `kicad-cli` emits
+    `width="2.641600mm" height="4.114800mm"`, so the browser gives the image an INTRINSIC SIZE of
+    10x16 CSS pixels. Inside a 127x110 tile with `object-fit: contain` that renders as a
+    near-invisible sliver - the long-standing "the footprint tile shows a few dots" bug, which was
+    never a failed render at all. Dropping the two physical attributes and letting the `viewBox`
+    drive sizing took the same file to an intrinsic 96x150, correctly proportioned.
+
+    The symbol has the same defect but hid it, because its intrinsic 175x94 is large enough to look
+    deliberate. Both go through `_svg_response`, so the fix belongs there and cannot be applied to
+    one preview and forgotten on the other.
+    """
+
+    def test_strips_physical_width_and_height_but_keeps_the_viewbox(self):
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="2.641600mm" '
+            'height="4.114800mm" viewBox="0.000000 0.000000 2.641600 4.114800">'
+            "<rect/></svg>"
+        )
+        out = scalable_svg(src)
+        assert 'width="2.641600mm"' not in out
+        assert 'height="4.114800mm"' not in out
+        assert 'viewBox="0.000000 0.000000 2.641600 4.114800"' in out
+        assert "<rect/>" in out, "the drawing itself must be untouched"
+
+    def test_leaves_a_width_inside_the_body_alone(self):
+        # Only the ROOT <svg> element's sizing is the problem. A width on a child (a rect, a
+        # nested svg) is part of the drawing, and stripping it would corrupt the render.
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="10mm" height="5mm" '
+            'viewBox="0 0 10 5"><rect width="3" height="2"/></svg>'
+        )
+        out = scalable_svg(src)
+        assert '<rect width="3" height="2"/>' in out
+        assert 'width="10mm"' not in out
+
+    def test_is_a_no_op_when_there_are_no_physical_dimensions(self):
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 2"><g/></svg>'
+        assert scalable_svg(src) == src
+
+    def test_keeps_a_document_without_a_viewbox_unchanged(self):
+        # Without a viewBox the physical size is the ONLY sizing information there is; removing it
+        # would collapse the image to nothing. Better a small render than an empty one.
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = '<svg xmlns="http://www.w3.org/2000/svg" width="8mm" height="4mm"><g/></svg>'
+        assert scalable_svg(src) == src
+
+    def test_handles_a_REAL_kicad_cli_preamble_and_multiline_root(self):
+        """The shape kicad-cli actually emits: an XML declaration, a DOCTYPE, and a root element
+        whose attributes span several lines. An earlier version of this anchored at offset 0 and so
+        did nothing at all on every real file, while the tidy single-line fixtures above passed."""
+        from stockroom.api.routers.previews import scalable_svg
+
+        src = (
+            '<?xml version="1.0" standalone="no"?>\n'
+            ' <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" \n'
+            ' "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"> \n'
+            "<svg\n"
+            '  xmlns:svg="http://www.w3.org/2000/svg"\n'
+            '  xmlns="http://www.w3.org/2000/svg"\n'
+            '  width="2.641600mm"\n'
+            '  height="4.114800mm"\n'
+            '  viewBox="0.000000 0.000000 2.641600 4.114800">\n'
+            "<rect/>\n</svg>\n"
+        )
+        out = scalable_svg(src)
+        assert "2.641600mm" not in out
+        assert "4.114800mm" not in out
+        assert 'viewBox="0.000000 0.000000 2.641600 4.114800"' in out
+        assert "<!DOCTYPE svg" in out, "the preamble must survive untouched"
+        assert "<rect/>" in out
+
+
+def test_every_preview_cache_key_carries_a_render_version_token():
+    """GATE. A preview cache key is content-addressed on the SOURCE file, which does not
+    change when the RENDER or CONVERSION code does. Without a version token in the key, a
+    fix ships green and is never seen: every machine with a warm cache keeps serving the
+    old blob. Both GLB keys were built that way and the 3D model conversion fix was
+    invisible until this gate existed. Scans the built key expressions rather than a
+    hand-listed set, so a NEW cache key cannot quietly omit its token."""
+    import ast
+    import inspect
+
+    from stockroom.api.routers import previews
+
+    source = inspect.getsource(previews)
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        # every cache key in this module is `key = f"..."` / `cached = _cache_dir(...) / f"..."`
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.JoinedStr):
+            continue
+        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if "key" not in names:
+            continue
+        literal = "".join(
+            part.value for part in node.value.values if isinstance(part, ast.Constant)
+        )
+        if not literal.endswith((".svg", ".glb")):
+            continue
+        referenced = {
+            n.id
+            for part in node.value.values
+            if isinstance(part, ast.FormattedValue)
+            for n in ast.walk(part)
+            if isinstance(n, ast.Name)
+        }
+        if not any(name.endswith("_VERSION") for name in referenced):
+            offenders.append((literal, sorted(referenced)))
+    assert offenders == [], (
+        "these preview cache keys carry no *_VERSION token, so a render/conversion change "
+        f"will never reach a warm cache: {offenders}"
+    )
+
+
+class TestRefitViewBox:
+    """kicad-cli sizes a footprint's viewBox from the footprint's FULL extent - including the
+    Reference/Value text and layers the preview deliberately does not draw. MEASURED on the real
+    TPD6E05U06RVZR: the viewBox is `0 0 11.049 6.4008` mm and is BYTE-IDENTICAL whether the text
+    is hidden or not and whether `--layers` is restricted or not, so it is not content-derived at
+    all. The drawn copper then occupies a few percent of it and the tile shows a tiny stamp in a
+    sea of empty space - which is what "the footprint preview looks broken" actually is. Stripping
+    width/height (scalable_svg) does not help: it makes the OVERSIZED box scale, not shrink."""
+
+    def _refit(self, src):
+        from stockroom.api.routers.previews import refit_viewbox
+
+        return refit_viewbox(src)
+
+    def _box(self, svg):
+        import re
+
+        m = re.search(r'viewBox="([^"]*)"', svg)
+        return [float(v) for v in m.group(1).replace(",", " ").split()]
+
+    def test_a_viewbox_far_larger_than_its_content_is_refit_to_the_content(self):
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<path style="fill:#c00;stroke:none;" d="M 40,40 42,40 42,42 40,42 Z"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        # the content is a 2x2 square at (40,40); the refit must bound it closely, never keep 100x100
+        assert w < 10 and h < 10, f"viewBox was not refit: {(x, y, w, h)}"
+        assert x <= 40 and y <= 40 and x + w >= 42 and y + h >= 42, "content fell outside the box"
+
+    def test_the_refit_keeps_a_stroked_edge_inside_the_box(self):
+        # a stroke straddles its path, so half of it sits OUTSIDE the geometric bbox. Refitting to
+        # the bare coordinates would shave the outer half of every courtyard line off the preview.
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<path style="fill:none;stroke:#000;stroke-width:2.000000;" d="M 40,40 60,40"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert x <= 39.0 and x + w >= 61.0, f"stroke half-width not accounted for: {(x, y, w, h)}"
+
+    def test_a_circle_counts_as_content(self):
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+            '<circle cx="50" cy="50" r="5"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert x <= 45 and y <= 45 and x + w >= 55 and y + h >= 55
+        assert w < 30 and h < 30
+
+    def test_an_svg_with_no_geometry_is_left_alone(self):
+        # never emit a degenerate or inverted viewBox; an empty drawing keeps whatever it had.
+        src = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><title>x</title></svg>'
+        assert self._refit(src) == src
+
+    def test_an_svg_with_no_viewbox_is_left_alone(self):
+        src = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M 1,1 2,2"/></svg>'
+        assert self._refit(src) == src
+
+    def test_content_already_filling_its_box_is_barely_changed(self):
+        # the refit must not ZOOM a symbol that kicad already framed sensibly.
+        src = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+            '<path style="stroke:none;" d="M 0,0 10,0 10,10 0,10 Z"/>'
+            "</svg>"
+        )
+        x, y, w, h = self._box(self._refit(src))
+        assert w >= 10 and h >= 10 and w < 13 and h < 13
+
+
+@requires_kicad_cli
+def test_footprint_preview_fills_its_frame_rather_than_stamping_a_speck(app_ctx):
+    """END TO END, through the real endpoint and the REAL kicad-cli: the served SVG's drawn
+    content must occupy a real fraction of its viewBox. The condition is reproduced exactly as
+    the owner's part hits it - small pads plus a Reference text far larger than them - because
+    kicad-cli sizes the viewBox from the text too, then the preview hides the text and draws
+    only copper. Measured on the real TPD6E05U06RVZR before the refit: under 10%."""
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
+
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        # a 2mm-tall refdes parked 6mm away: this is what inflates the viewBox, and it is
+        # hidden before anything is drawn, so nothing in the output accounts for it.
+        '\t(property "Reference" "REF**" (at 0 -6 0) (layer "F.SilkS") (effects (font (size 2 2))))\n'
+        '\t(property "Value" "TPS62130" (at 0 6 0) (layer "F.Fab") (effects (font (size 2 2))))\n'
+        # F.SilkS line work far outside the pads. The preview restricts itself to copper and
+        # courtyard, so this is NOT drawn - yet kicad-cli still counts it when sizing the
+        # viewBox. This is the half that hiding text could never fix, and it is why the refit
+        # works on the emitted SVG rather than on the footprint.
+        '\t(fp_line (start -8 -5) (end 8 -5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))\n'
+        '\t(fp_line (start -8 5) (end 8 5) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))\n'
+        '\t(pad "1" smd rect (at -0.5 0) (size 0.6 0.3) (layers "F.Cu"))\n'
+        '\t(pad "2" smd rect (at 0.5 0) (size 0.6 0.3) (layers "F.Cu"))\n'
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+    with TestClient(
+        create_app(app_ctx),
+        base_url="http://test",
+        raise_server_exceptions=False,
+        headers={"X-Stockroom-Token": "testtoken"},
+    ) as client:
+        response = client.get("/api/previews/footprint/tps62130.svg")
+    if response.status_code != 200:
+        pytest.skip(f"footprint preview unavailable here ({response.status_code})")
+    body = response.text
+    box = re.search(r'viewBox="([^"]*)"', body)
+    assert box, "the served footprint SVG has no viewBox"
+    vx, vy, vw, vh = (float(v) for v in box.group(1).replace(",", " ").split())
+    xs, ys = [], []
+    for d in re.findall(r'\sd="([^"]*)"', body):
+        nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", d)]
+        xs += nums[0::2]
+        ys += nums[1::2]
+    for cx, cy, cr in re.findall(r'<circle[^>]*cx="([\d.-]+)"[^>]*cy="([\d.-]+)"[^>]*r="([\d.-]+)"', body):
+        xs += [float(cx) - float(cr), float(cx) + float(cr)]
+        ys += [float(cy) - float(cr), float(cy) + float(cr)]
+    assert xs and ys, "the footprint SVG drew no geometry at all"
+    coverage = ((max(xs) - min(xs)) * (max(ys) - min(ys))) / (vw * vh)
+    assert coverage > 0.4, (
+        f"the footprint art fills only {coverage:.1%} of its viewBox "
+        f"(box {vw:.3f}x{vh:.3f}), so the tile renders a speck"
+    )

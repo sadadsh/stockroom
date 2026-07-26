@@ -2,7 +2,7 @@ import shutil
 
 import pytest
 
-from stockroom.vcs.repo import GitRepo, PullResult, PushResult
+from stockroom.vcs.repo import GitRepo, PullResult
 from stockroom.vcs.sync import SyncEngine, SyncState, _classify_failure
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")

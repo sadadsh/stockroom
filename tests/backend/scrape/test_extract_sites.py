@@ -1,0 +1,85 @@
+import json
+
+from stockroom.scrape.extract import extract_product
+from stockroom.scrape.extract.sites import SITE_ADAPTERS
+from stockroom.scrape.extract.sites.lcsc import LcscSite, parse_lcsc_product
+from stockroom.scrape.extract.sites.mouser_web import MouserWebSite, _extract_price_breaks
+
+
+def test_site_adapter_datasheet_supersedes_the_generic_json_walk():
+    # F8: DigiKey's CURATED datasheet (productOverview.datasheetUrl, redirect unwrapped) must win
+    # over whatever link the generic next_data walk surfaces from the same blob, so a redirect
+    # datasheet is not left as the un-followable raw one.
+    nd = {"props": {"pageProps": {"envelope": {"data": {"productOverview": {
+        "manufacturerProductNumber": "SN74X",
+        "datasheetUrl": ("https://www.ti.com/general/docs/suppproductinfo.tsp?gotoUrl="
+                         "https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74x"),
+    }}}}}}
+    html = ('<script id="__NEXT_DATA__" type="application/json">' + json.dumps(nd) + "</script>")
+    r = extract_product(html, "https://www.digikey.com/en/products/detail/ti/SN74X/1")
+    assert r.datasheet_url is not None
+    assert r.datasheet_url.value == "https://www.ti.com/lit/gpn/sn74x"
+    assert r.datasheet_url.source == "digikey_web"
+
+
+def test_site_adapters_registered():
+    assert len(SITE_ADAPTERS) == 3
+    assert any(isinstance(a, MouserWebSite) for a in SITE_ADAPTERS)
+    assert LcscSite().matches("https://www.lcsc.com/product-detail/C1.html")
+
+
+def test_mouser_matches_regional_tld_domains():
+    # A regional Mouser storefront (mouser.co.il, mouser.de, ...) renders the SAME product page
+    # as mouser.com, so the extractor must claim it - otherwise a co.il URL falls to the generic
+    # cascade and loses the whole parametric/compliance depth (corpus part tps259470lrpwr).
+    m = MouserWebSite()
+    assert m.matches("https://www.mouser.co.il/en/ProductDetail/TI/TPS259470LRPWR")
+    assert m.matches("https://www.mouser.de/ProductDetail/x")
+    assert m.matches("https://www.mouser.com/en/ProductDetail/x")
+    assert m.matches("https://mouser.co.il/ProductDetail/x")  # no www
+    # scheme-less URL still resolves its host (the fetcher can hand back a bare host)
+    assert m.matches("www.mouser.com/en/ProductDetail/x")
+
+
+def test_mouser_matches_only_the_registrable_mouser_domain():
+    # "mouser" must be the REGISTRABLE domain, not just any DNS label: a foreign eTLD+1 with a
+    # "mouser" subdomain, or a URL whose path/query merely contains mouser.com, is NOT Mouser and
+    # must be refused (extract_product runs EVERY matching adapter, so a false claim contaminates
+    # the result with spurious rows / price breaks).
+    m = MouserWebSite()
+    assert not m.matches("https://mouser.blogspot.com/post")
+    assert not m.matches("https://mouser.evil-reseller.com/fake")
+    assert not m.matches("https://mouser.example.com/")
+    assert not m.matches("https://www.notmouser.com/x")
+    assert not m.matches("https://www.digikey.com/x")
+    assert not m.matches("https://www.digikey.com/product?ref=www.mouser.com/x")
+    # scheme-less foreign URL whose query contains mouser.com must NOT be claimed
+    assert not m.matches("www.digikey.com/product?ref=www.mouser.com/x")
+
+
+def test_mouser_package_label_without_slash_spaces_is_promoted():
+    # The regional .co.il storefront renders the package row label as "Package/Case" (no spaces
+    # around the slash) where .com uses "Package / Case"; both must promote to the package field,
+    # not leave a stray "Package/Case" spec (corpus part tps259470lrpwr package = VQFN-HR-10).
+    html = ('<td class="attr-col"><label>Package/Case:</label></td>'
+            '<td class="attr-value-col">VQFN-HR-10</td>')
+    r = MouserWebSite().extract(html, "https://www.mouser.co.il/x")
+    assert r.package is not None and r.package.value == "VQFN-HR-10"
+    assert "Package/Case" not in r.specs
+
+
+def test_mouser_price_ladder_monotonic():
+    html = (
+        '<table class="pricing-table">'
+        '<tr data-testid="PricingTablePriceBreakRow"><td>1</td><td>$0.50</td></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><td>100</td><td>$0.30</td></tr>'
+        '<tr data-testid="PricingTablePriceBreakRow"><td>1,000</td><td>$0.10</td></tr>'
+        '</table>'
+    )
+    breaks = _extract_price_breaks(html)
+    assert [b.qty for b in breaks] == [1, 100, 1000]
+    assert [b.price for b in breaks] == [0.5, 0.3, 0.1]
+
+
+def test_lcsc_nextdata_missing_returns_none():
+    assert parse_lcsc_product("<html>no next</html>") is None

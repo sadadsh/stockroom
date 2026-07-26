@@ -7,19 +7,35 @@
     <script>
       // Set the theme attribute synchronously, before first paint, so a
       // persisted-light user never sees a dark flash while React boots. The
-      // ThemeProvider reads the same key and keeps it in sync thereafter.
+      // ThemeProvider reads the same source and keeps it in sync thereafter.
+      //
+      // The HOST's injected preferences win over localStorage. The host binds an
+      // ephemeral port, so the page origin differs on every launch and
+      // origin-scoped localStorage is always empty at boot - which is why the
+      // theme silently reverted to dark on every single launch. The host writes
+      // window.__STOCKROOM_UI__ immediately after <head>, so it is already set
+      // here. localStorage stays as the fallback for a browser-served dev run,
+      // where there is no host to inject anything.
       (function () {
+        var t;
         try {
-          var t = localStorage.getItem("sr-theme");
-          document.documentElement.dataset.theme =
-            t === "light" || t === "dark" ? t : "dark";
+          t = (window.__STOCKROOM_UI__ || {}).theme;
         } catch (e) {
-          document.documentElement.dataset.theme = "dark";
+          t = undefined;
         }
+        if (t !== "light" && t !== "dark") {
+          try {
+            t = localStorage.getItem("sr-theme");
+          } catch (e) {
+            t = undefined;
+          }
+        }
+        document.documentElement.dataset.theme =
+          t === "light" || t === "dark" ? t : "dark";
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-DkZd--Wr.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-7qxTjDog.css">
+    <script type="module" crossorigin src="./assets/index-hBYZxPYd.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-6Cg-YgYG.css">
   </head>
   <body>
     <div id="root"></div>

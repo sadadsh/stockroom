@@ -7,15 +7,36 @@ on:
 jobs:
   backend:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # A hard cap so a hung test (a browser launch that blocks on a headless Windows runner, a git
+    # op waiting on a credential prompt) fails the job in minutes instead of running for hours.
+    timeout-minutes: 30
+    env:
+      # Git must never block waiting for interactive credentials in CI (on Windows the credential
+      # manager can hang a push/pull); fail fast instead so a bad remote surfaces as an error.
+      GIT_TERMINAL_PROMPT: "0"
+      GCM_INTERACTIVE: "never"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - name: Sync
         run: uv sync
+      - name: Provision render browsers (Playwright Chromium + Camoufox)
+        # Linux only. The scrape engine renders through Playwright Chromium (BrowserFetcher) and
+        # the genuine-fingerprint Camoufox Firefox (CamoufoxFetcher, which defeats Akamai +
+        # DataDome), and the render path is validated on the Linux job. On the windows-latest
+        # runner these browser LAUNCHES hang (headless startup blocks), so browsers are NOT
+        # provisioned there and the `requires_browser` tests self-skip (conftest _browser_available)
+        # — keeping the Windows gate fast and focused on the Windows-specific engine (git file-lock
+        # retries, path handling, the Qt-free API), which is what it exists to catch.
+        if: runner.os == 'Linux'
+        run: |
+          uv run python -m playwright install --with-deps chromium
+          uv run python -m camoufox fetch
       - name: Zero-Qt / zero-pywebview import gate
         if: runner.os == 'Linux'
         run: |
@@ -31,6 +52,14 @@ jobs:
           if grep -REn '^[[:space:]]*(import|from)[[:space:]]+(py)?webview\b' \
               app/backend/stockroom/api/ ; then
             echo "stockroom/api must not import pywebview (host-only dependency)"; exit 1
+          fi
+          # stm-viewer workstream (API-04): nothing under stockroom/stm/ or the stm.py router
+          # may reference a board/switch-fabric concept (INTERFACES.md section 6's
+          # DO-NOT-REUSE row). Region-scoped to these two paths ONLY - the identifiers
+          # legitimately exist under legacy/tools/, which must NOT be grepped here.
+          if grep -rEn 'ADG714|switch_identity|classify_pin|SwitchDecision|TARGET_NET|CELL_|ZIF|CoreSight|lint_card|fabric_drc' \
+              app/backend/stockroom/stm/ app/backend/stockroom/api/routers/stm.py ; then
+            echo "stockroom/stm/ and api/routers/stm.py must not reference NETDECK/switch-fabric concepts"; exit 1
           fi
       - name: Run backend suite
         run: uv run pytest tests/backend -v

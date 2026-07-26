@@ -55,9 +55,8 @@ def _seed(
     it. The symbol name drives the on-disk assets; footprint_name (the LibRef name)
     drives the index's footprint grouping and is kept independent."""
     from stockroom.model.part import (
+        AssetRef,
         Datasheet,
-        LibRef,
-        ModelRef,
         PartRecord,
         Purchase,
     )
@@ -73,12 +72,12 @@ def _seed(
         mpn=mpn,
         manufacturer="TI" if complete else "",
     )
-    rec.symbol = LibRef(lib="SR-ICs", name=name)
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name=name)
     if footprint_name:
-        rec.footprint = LibRef(lib="SR-ICs", name=footprint_name)
+        rec.assets_for("kicad").footprint = AssetRef(lib="SR-ICs", name=footprint_name)
     if complete:
-        rec.footprint = LibRef(lib="SR-ICs", name=footprint_name or name)
-        rec.model = ModelRef(file="models/x.step")
+        rec.assets_for("kicad").footprint = AssetRef(lib="SR-ICs", name=footprint_name or name)
+        rec.assets_for("kicad").model = AssetRef(file="models/x.step")
         rec.datasheet = Datasheet(file="datasheets/x.pdf")
         rec.purchase = [Purchase(vendor="LCSC", url="https://x/p")]
     (lib.parts_dir / f"{part_id}.json").write_text(rec.dumps(), encoding="utf-8")

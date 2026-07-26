@@ -28,7 +28,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
-
 _SEV_ORDER = {"error": 0, "warning": 1, "exclusion": 2, "info": 3}
 
 

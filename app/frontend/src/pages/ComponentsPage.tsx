@@ -7,55 +7,83 @@
  * Honest degradation: a connection error shows a retry surface (not a crash), and
  * a genuinely empty library shows an empty state that names how to add parts.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
+  useDuplicates,
   usePartDetailQuery,
   useEditField,
   useMoveCategory,
   useDeletePart,
   useSetSpecs,
+  useAttachSymbol,
+  useAttachFootprint,
 } from "../api/queries";
 import { ApiError } from "../api/client";
 import type { SourcedField } from "../api/types";
 import { useToast } from "../lib/toast";
-import { onRequestedPart } from "../lib/partSelection";
+import { distributorLabel } from "../lib/sourced";
+import { useAddPart } from "../lib/addPart";
+import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { DetailPanel } from "../components/DetailPanel";
-import { UploadIcon } from "../components/icons";
-import { Button } from "../components/primitives";
+import { SearchOverlay } from "../components/SearchOverlay";
+import { AddPartIcon } from "../components/icons";
+import { Button, PanelTitle } from "../components/primitives";
+import { Text } from "../lib/copy";
 
 export function ComponentsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [completeOnly, setCompleteOnly] = useState(false);
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // A cross-page part request (from the Ctrl+K palette) is recorded here
-  // synchronously during the drain so the auto-select-first effect can honor it
-  // instead of racing it. On a warm-cache mount both effects run in the same
-  // commit and the auto-select effect's `selectedId` closure is still null, so a
-  // ref (updated by the drain, which is declared first) is the only thing it can
-  // read to know a request is pending before its own state has re-rendered.
-  const requestedRef = useRef<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
+  const duplicatesQuery = useDuplicates();
   const detailQuery = usePartDetailQuery(selectedId);
   const editField = useEditField();
   const moveCategory = useMoveCategory();
   const deletePart = useDeletePart();
   const setSpecs = useSetSpecs();
+  const attachSymbol = useAttachSymbol();
+  const attachFootprint = useAttachFootprint();
   const { toast } = useToast();
+  const { open: openAddPart } = useAddPart();
+  const { reopenPartId } = useCapture();
 
-  const parts = partsQuery.data?.parts ?? [];
+  // The background capture pill asks to reopen its part: select it here so the detail (and its
+  // Complete-Part modal) come up. DetailPanel finishes the handoff by opening the modal.
+  useEffect(() => {
+    if (reopenPartId) setSelectedId(reopenPartId);
+  }, [reopenPartId]);
+
+  // Ids that share an MPN with another part (a real accidental duplicate). Shared
+  // footprints are normal and never counted. Drives the Duplicate badges and the
+  // Duplicates filter; the filter is applied client-side over the server list.
+  const duplicateIds = useMemo(
+    () =>
+      new Set(
+        (duplicatesQuery.data?.by_mpn ?? []).flatMap((g) => g.parts.map((p) => p.id)),
+      ),
+    [duplicatesQuery.data],
+  );
+  const allParts = partsQuery.data?.parts ?? [];
+  const parts = duplicatesOnly
+    ? allParts.filter((p) => duplicateIds.has(p.id))
+    : allParts;
   const categories = Object.keys(facetsQuery.data?.by_category ?? {}).sort();
   const detailBusy =
     editField.isPending ||
     moveCategory.isPending ||
     deletePart.isPending ||
-    setSpecs.isPending;
+    setSpecs.isPending ||
+    attachSymbol.isPending ||
+    attachFootprint.isPending;
 
   function toastError(err: unknown, fallback: string) {
     toast(err instanceof ApiError ? err.message : fallback, "err");
@@ -77,7 +105,7 @@ export function ComponentsPage() {
     moveCategory.mutate(
       { id: selectedId, category: nextCategory },
       {
-        onSuccess: () => toast(`Moved To ${nextCategory}`, "ok"),
+        onSuccess: () => toast(`Moved to ${nextCategory}`, "ok"),
         onError: (err) => toastError(err, "Could not move"),
       },
     );
@@ -97,8 +125,47 @@ export function ComponentsPage() {
         },
       },
       {
-        onSuccess: () => toast("Pinout Saved", "ok"),
+        onSuccess: () => toast("Pinout saved", "ok"),
         onError: (err) => toastError(err, "Could not save the pinout"),
+      },
+    );
+  }
+
+  // Put a different source's answer in force for one spec. It goes through the specs seam with
+  // overwrite, so the record keeps WHICH distributor the chosen value came from (set_specs writes
+  // record.enrichment[key]) instead of silently becoming an anonymous manual edit.
+  function handleUseSpecValue(key: string, value: string, source: string) {
+    if (!selectedId) return;
+    setSpecs.mutate(
+      { id: selectedId, specs: { [key]: { value, source, confidence: "high" } }, overwrite: true },
+      {
+        onSuccess: () =>
+          // an alternate seeded from the record itself carries no source, so the message must not
+          // trail off into "set from "
+          toast(source ? `${key} set from ${distributorLabel(source)}` : `${key} set`, "ok"),
+        onError: (err) => toastError(err, `Could not set ${key}`),
+      },
+    );
+  }
+
+  function handleAttachSymbol(lib: string, name: string) {
+    if (!selectedId) return;
+    attachSymbol.mutate(
+      { id: selectedId, lib, name },
+      {
+        onSuccess: () => toast("Symbol attached", "ok"),
+        onError: (err) => toastError(err, "Could not attach the symbol"),
+      },
+    );
+  }
+
+  function handleAttachFootprint(lib: string, name: string) {
+    if (!selectedId) return;
+    attachFootprint.mutate(
+      { id: selectedId, lib, name },
+      {
+        onSuccess: () => toast("Footprint attached", "ok"),
+        onError: (err) => toastError(err, "Could not attach the footprint"),
       },
     );
   }
@@ -107,7 +174,7 @@ export function ComponentsPage() {
     if (!selectedId) return;
     deletePart.mutate(selectedId, {
       onSuccess: () => {
-        toast("Part Deleted", "ok");
+        toast("Part deleted", "ok");
         // Drop the selection; the auto-select effect picks the next part once the
         // invalidated list refetches.
         setSelectedId(null);
@@ -115,20 +182,6 @@ export function ComponentsPage() {
       onError: (err) => toastError(err, "Could not delete"),
     });
   }
-
-  // A cross-page "select this part" request (fired by the Ctrl+K palette on any
-  // route) arrives here. Record it in the ref FIRST (so the auto-select effect can
-  // honor it in the same commit), clear the filters so the requested part is
-  // guaranteed to be in the list, then select it.
-  useEffect(() => {
-    return onRequestedPart((id) => {
-      requestedRef.current = id;
-      setSearch("");
-      setCategory(null);
-      setCompleteOnly(false);
-      setSelectedId(id);
-    });
-  }, []);
 
   // Auto-select the first part when the current selection falls out of the list
   // (a new search, a category change, or the first successful load). Act only on
@@ -138,21 +191,6 @@ export function ComponentsPage() {
   const partsFetching = partsQuery.isFetching;
   useEffect(() => {
     if (partsFetching) return;
-    const requested = requestedRef.current;
-    if (requested) {
-      // Honor a pending cross-page request the moment its part is in the settled
-      // list. This must win over auto-select-first even on a warm-cache mount,
-      // where both effects run in the same commit and this effect's `selectedId`
-      // closure is still the pre-request value.
-      if (parts.some((p) => p.id === requested)) {
-        requestedRef.current = null;
-        if (selectedId !== requested) setSelectedId(requested);
-        return;
-      }
-      // The requested part is genuinely absent from the settled list (deleted, or
-      // a stale request): give up on it and fall back to the normal selection.
-      requestedRef.current = null;
-    }
     if (parts.length === 0) {
       if (selectedId !== null) setSelectedId(null);
       return;
@@ -162,21 +200,62 @@ export function ComponentsPage() {
     }
   }, [parts, selectedId, partsFetching]);
 
+  // Ctrl/Cmd+K (and "/" when not already typing) opens the full-screen parametric search.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (
+        e.key === "/" &&
+        !searchOpen &&
+        !(e.target instanceof HTMLElement &&
+          /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))
+      ) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [searchOpen]);
+
+  // Open a part chosen in the search overlay: scope the picker to its category and clear the
+  // narrowing filters so the row is present in the list, select it, and close the overlay.
+  function openFromSearch(id: string, cat: string) {
+    setCategory(cat);
+    setCompleteOnly(false);
+    setDuplicatesOnly(false);
+    setSearch("");
+    setSelectedId(id);
+    setSearchOpen(false);
+  }
+
   const selectedSummary = parts.find((p) => p.id === selectedId) ?? null;
 
+  // north-star .app: rail | list | detail, each column self-heading - no full-width page
+  // header band (the active rail item + the rail's library readout carry that).
   return (
-    <>
-      <div className="flex h-14 flex-none items-center px-[18px]">
-        <div className="text-lg font-semibold text-t1">Components</div>
-        <div className="ml-auto text-2xs text-t3">
-          {partsQuery.data ? `${partsQuery.data.count} Parts` : ""}
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1">
-        {/* picker */}
-        <div className="flex w-[348px] flex-none flex-col px-3.5 pt-1.5">
-          <div className="px-2 pt-2">
+    <div data-dev-id="components.root" className="flex min-h-0 flex-1">
+        {/* picker: a docked panel - an Altium title strip, then the padded body. The rail's
+            right border and the detail pane's left border frame this column, so it needs none. */}
+        <div data-dev-id="components.picker" className="flex w-[320px] flex-none flex-col">
+          <PanelTitle
+            data-dev-id="components.list-title"
+            right={parts.length ? parts.length.toLocaleString() : undefined}
+          >
+            <Text id="components.list-title">Components</Text>
+          </PanelTitle>
+          <div className="px-3 pt-3">
+            <Button
+              variant="soft"
+              data-dev-id="components.add-parts"
+              icon={<AddPartIcon />}
+              onClick={openAddPart}
+              className="mb-2.5 h-9 w-full justify-center"
+            >
+              <Text id="components.add-parts">Add Parts</Text>
+            </Button>
             <Finder
               search={search}
               onSearch={setSearch}
@@ -185,28 +264,35 @@ export function ComponentsPage() {
               onCategory={setCategory}
               completeOnly={completeOnly}
               onCompleteOnly={setCompleteOnly}
+              duplicatesOnly={duplicatesOnly}
+              onDuplicatesOnly={setDuplicatesOnly}
+              duplicateCount={duplicateIds.size}
+              onOpenSearch={() => setSearchOpen(true)}
             />
           </div>
-          <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+          <div data-dev-id="components.list-scroll" className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
             <PickerBody
               isLoading={partsQuery.isLoading}
               error={partsQuery.error}
               parts={parts}
+              duplicateIds={duplicateIds}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onRetry={() => partsQuery.refetch()}
-              hasSearchOrFilter={!!search || !!category || completeOnly}
+              hasSearchOrFilter={!!search || !!category || completeOnly || duplicatesOnly}
               onClearFilters={() => {
                 setSearch("");
                 setCategory(null);
                 setCompleteOnly(false);
+                setDuplicatesOnly(false);
               }}
             />
           </div>
         </div>
 
-        {/* detail */}
-        <div className="min-w-0 flex-1 overflow-y-auto border-l border-line px-[30px] pt-[22px]">
+        {/* detail: the panel owns its own height, padding, and internal scroll (a fixed
+            rail + a tabbed workbench), so this column is a non-scrolling viewport. */}
+        <div data-dev-id="components.detail-pane" className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
           {selectedId ? (
             <DetailPanel
               detail={detailQuery.data}
@@ -219,18 +305,27 @@ export function ComponentsPage() {
               categories={categories}
               onDelete={handleDelete}
               onApplyPinout={handleApplyPinout}
+              onUseSpecValue={handleUseSpecValue}
+              deleting={deletePart.isPending}
+              onAttachSymbol={handleAttachSymbol}
+              onAttachFootprint={handleAttachFootprint}
               busy={detailBusy}
             />
           ) : (
-            <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
-              {partsQuery.isLoading
-                ? "Loading Library..."
-                : "Select A Part To See Its Details."}
+            <div data-dev-id="components.select-prompt" className="flex h-full min-h-[300px] items-center justify-center text-sm text-t3">
+              {partsQuery.isLoading ? (
+                <Text id="components.loading">Loading components...</Text>
+              ) : (
+                <Text id="components.select-prompt">Select a part to see its details.</Text>
+              )}
             </div>
           )}
         </div>
-      </div>
-    </>
+
+        {searchOpen ? (
+          <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
+        ) : null}
+    </div>
   );
 }
 
@@ -238,6 +333,7 @@ function PickerBody({
   isLoading,
   error,
   parts,
+  duplicateIds,
   selectedId,
   onSelect,
   onRetry,
@@ -247,6 +343,7 @@ function PickerBody({
   isLoading: boolean;
   error: Error | null;
   parts: import("../api/types").PartSummary[];
+  duplicateIds: Set<string>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onRetry: () => void;
@@ -256,7 +353,7 @@ function PickerBody({
   if (isLoading) {
     return (
       <div className="px-3 py-8 text-center text-sm text-t3">
-        Loading Parts...
+        Loading parts...
       </div>
     );
   }
@@ -293,18 +390,25 @@ function PickerBody({
       );
     }
     return (
-      <div className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
+      <div data-dev-id="components.empty" className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
         <span className="text-t3">
-          <UploadIcon />
+          <AddPartIcon />
         </span>
         <div className="text-sm font-medium text-t2">
-          Your Library Is Empty
+          <Text id="components.empty-title">No Components Yet</Text>
         </div>
         <div className="text-xs text-t3">
-          Drop a vendor ZIP to add your first part.
+          <Text id="components.empty-hint">Add a part to get started.</Text>
         </div>
       </div>
     );
   }
-  return <PartsList parts={parts} selectedId={selectedId} onSelect={onSelect} />;
+  return (
+    <PartsList
+      parts={parts}
+      duplicateIds={duplicateIds}
+      selectedId={selectedId}
+      onSelect={onSelect}
+    />
+  );
 }

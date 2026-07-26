@@ -1,0 +1,592 @@
+/**
+ * The modular search's filter model - pure, React-free, and driven entirely by the parts' own
+ * parametric facets (never a hardcoded per-category parameter list). The overlay holds one
+ * SearchFilters value; these helpers encode it into the backend's repeatable `spec` tokens,
+ * derive the active-filter chips, and choose the results table's columns from whichever facets
+ * the data produced. A category that grows a new spec key gains a facet, a chip, and a column
+ * here with zero code change.
+ *
+ * Contract with the backend (store/parametric.py): an OPTIONS constraint is `<key>:<value>`
+ * (values on one key OR together); a RANGE constraint is `<key>:<min>~<max>` over SI-normalized
+ * magnitudes (either bound may be blank for open-ended). Category rides the `category` param,
+ * not a spec token.
+ */
+import type { ParametricFacet } from "../api/types";
+import { categoryPrimarySpecKey, PRIMARY_VALUE_KEYS } from "./derive";
+import { normalizeSpecKey, prettifyValue, resolveSpec, type SpecGroupName } from "./specSchema";
+
+// The synthetic column key for the mixed-list adaptive Value column (FIX-05). A sentinel, not a
+// real spec key, so cellValue / the sort control can recognize it and resolve each row's own value.
+export const VALUE_COLUMN_KEY = "__value__";
+
+// The primary-value parameters that collapse into the one Value column on a mixed list: the
+// shared passive keys (resistance/capacitance/inductance) plus impedance (a ferrite bead's primary
+// value). Built from the shared PRIMARY_VALUE_KEYS so the mapping is never forked.
+const _VALUE_COLLAPSE_KEYS = new Set<string>([
+  ...PRIMARY_VALUE_KEYS,
+  normalizeSpecKey("impedance"),
+]);
+
+// The order a row's own primary value is resolved when its category has no registered primary spec.
+const _VALUE_FALLBACK_ORDER = ["resistance", "capacitance", "inductance", "impedance"].map(
+  normalizeSpecKey,
+);
+
+function _isPrimaryValueKey(key: string): boolean {
+  return _VALUE_COLLAPSE_KEYS.has(normalizeSpecKey(key));
+}
+
+/** A row's OWN primary value for the adaptive Value column: its category's primary spec (a resistor
+ * -> its resistance, a cap -> its capacitance), prettified with units, resolved from the same
+ * registry the detail title uses. An em dash only when the row genuinely carries no primary value
+ * (an IC). Pure. */
+export function rowPrimaryValue(
+  category: string,
+  specs: Record<string, string | number | boolean>,
+): string {
+  const norm = new Map<string, string>();
+  for (const [k, v] of Object.entries(specs)) {
+    if (v == null || v === "") continue;
+    const nk = normalizeSpecKey(k);
+    if (!norm.has(nk)) norm.set(nk, String(v));
+  }
+  const primaryKey = categoryPrimarySpecKey(category);
+  let raw = primaryKey ? norm.get(normalizeSpecKey(primaryKey)) : undefined;
+  if (raw == null) {
+    for (const nk of _VALUE_FALLBACK_ORDER) {
+      const hit = norm.get(nk);
+      if (hit != null) {
+        raw = hit;
+        break;
+      }
+    }
+  }
+  return raw == null || raw === "" ? "—" : prettifyValue(String(raw));
+}
+
+export interface RangeSel {
+  min: number | null;
+  max: number | null;
+}
+
+export interface SearchFilters {
+  category: string | null;
+  // spec key -> selected option values (OR within a key)
+  options: Record<string, string[]>;
+  // spec key -> a numeric bound pair (either side may be null = open)
+  ranges: Record<string, RangeSel>;
+  inStock: boolean;
+}
+
+export function emptyFilters(): SearchFilters {
+  return { category: null, options: {}, ranges: {}, inStock: false };
+}
+
+// --- SI magnitude formatting ------------------------------------------------
+//
+// The facet + filter magnitudes are SI-normalized to the base unit (1 kΩ -> 1000 Ω), so a range
+// reads back in engineering notation only for units that actually take SI prefixes. A unit like
+// "%", "°C", or "ppm" is left un-prefixed (0.1% must never render as "100m%").
+
+const _PREFIXABLE = new Set(["Ω", "F", "H", "V", "A", "W", "Hz", "S", "J", "Wh", "Ah"]);
+const _PREFIXES: [number, string][] = [
+  [1e12, "T"], [1e9, "G"], [1e6, "M"], [1e3, "k"],
+  [1, ""], [1e-3, "m"], [1e-6, "µ"], [1e-9, "n"], [1e-12, "p"],
+];
+
+function _sig(n: number): string {
+  // up to 3 significant figures, trailing zeros trimmed ("1.10" -> "1.1", "1000" -> "1000")
+  const s = Math.abs(n) >= 1 ? n.toPrecision(4) : n.toPrecision(3);
+  return String(parseFloat(s));
+}
+
+/** Canonicalize a facet unit for display: a spelled-out "Ohm(s)" becomes the Ω symbol so it
+ * prefixes and reads like the rest of the app; everything else passes through. */
+export function normalizeUnit(unit: string | null | undefined): string {
+  const u = (unit ?? "").trim();
+  return /^ohms?$/i.test(u) ? "Ω" : u;
+}
+
+// The reserved facet key for the sourcing-derived Unit Price range: it filters client-side over
+// the rows' unit_price (not a spec), so it never becomes a `spec` token or a results column.
+export const PRICE_KEY = "__unit_price__";
+
+export function formatMagnitude(mag: number, unit: string | null | undefined): string {
+  const u = normalizeUnit(unit);
+  if (!Number.isFinite(mag)) return "";
+  if (u === "$") return `$${mag < 1 ? mag.toFixed(mag < 0.1 ? 3 : 2) : mag.toFixed(2)}`;
+  if (mag !== 0 && _PREFIXABLE.has(u)) {
+    const abs = Math.abs(mag);
+    for (const [scale, prefix] of _PREFIXES) {
+      // pico is the floor: a value below it still reads as fractional "pF", never as 7.5e-13
+      if (abs >= scale || scale === 1e-12) return `${_sig(mag / scale)} ${prefix}${u}`.trim();
+    }
+  }
+  return u ? `${_sig(mag)} ${u}`.replace(/\s+%/, "%") : _sig(mag);
+}
+
+const _SI_PARSE: Record<string, number> = {
+  p: 1e-12, n: 1e-9, u: 1e-6, "µ": 1e-6, "μ": 1e-6,
+  m: 1e-3, k: 1e3, K: 1e3, M: 1e6, G: 1e9, T: 1e12,
+};
+
+/** The SI-normalized magnitude of a spec value ("10 kΩ" -> 10000, "220 Ω" -> 220, "5%" -> 5),
+ * or null when it is not a leading number. Mirrors the backend `_parse_numeric` so the frontend
+ * sorts a numeric column exactly the way the range facet bounded it. */
+export function parseMagnitude(value: string): number | null {
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+))\s*(\S*)$/.exec(value.trim());
+  if (!m) return null;
+  let mag = parseFloat(m[1]);
+  if (!Number.isFinite(mag)) return null;
+  const unit = m[2];
+  if (unit.length >= 2 && unit[0] in _SI_PARSE) mag *= _SI_PARSE[unit[0]];
+  return mag;
+}
+
+// --- slider scale (log for decade-spanning ranges) --------------------------
+//
+// A resistance facet runs 100 Ω .. 1 MΩ - four decades. On a LINEAR track the whole lower half
+// is crushed into a few pixels, so a range that spans >= two decades (and starts above zero) maps
+// LOGARITHMICALLY; everything else stays linear. Both expose the same value<->percent pair plus a
+// handful of "nice" tick values to print under the track.
+
+export interface Scale {
+  toPct: (value: number) => number;
+  fromPct: (pct: number) => number;
+  ticks: number[];
+  log: boolean;
+}
+
+function _clampPct(p: number): number {
+  return Math.max(0, Math.min(100, p));
+}
+
+// Round "nice" tick values (…, 1, 2, 5, 10, …) spanning [min, max] - so a linear track prints
+// 200 / 400 / 600, never 1.325 / 2.55 / 3.775.
+function _niceTicks(min: number, max: number): number[] {
+  const span = max - min || 1;
+  const raw = span / 4;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const ticks: number[] = [];
+  for (let t = Math.ceil(min / step) * step; t <= max + step * 1e-9; t += step) {
+    ticks.push(Math.round(t / step) * step);
+  }
+  return ticks;
+}
+
+export function makeScale(fmin: number, fmax: number): Scale {
+  const span = fmax - fmin;
+  const useLog = fmin > 0 && fmax > 0 && fmax / fmin >= 100;
+  if (useLog) {
+    const lo = Math.log10(fmin);
+    const hi = Math.log10(fmax);
+    const denom = hi - lo || 1;
+    // the decade boundaries (10^n) within the range - the readout above the track already prints
+    // the exact min/max, so a non-round endpoint (3.32 Ω) is left off the ticks, not crammed in
+    const ticks: number[] = [];
+    for (let e = Math.ceil(lo - 1e-9); e <= Math.floor(hi + 1e-9); e++) ticks.push(10 ** e);
+    return {
+      log: true,
+      ticks,
+      toPct: (v) => _clampPct(((Math.log10(Math.max(v, fmin)) - lo) / denom) * 100),
+      fromPct: (p) => 10 ** (lo + (_clampPct(p) / 100) * denom),
+    };
+  }
+  const denom = span || 1;
+  return {
+    log: false,
+    ticks: _niceTicks(fmin, fmax),
+    toPct: (v) => _clampPct(((v - fmin) / denom) * 100),
+    fromPct: (p) => fmin + (_clampPct(p) / 100) * denom,
+  };
+}
+
+// --- spec-token encoding ----------------------------------------------------
+
+function _rangeToken(key: string, sel: RangeSel): string | null {
+  if (sel.min == null && sel.max == null) return null;
+  return `${key}:${sel.min ?? ""}~${sel.max ?? ""}`;
+}
+
+/** The repeatable `spec` params for GET /parts | /search. Category is NOT encoded here (it is
+ * its own param); the In Stock toggle is applied client-side over the rows, not as a spec. */
+export function toSpecParams(filters: SearchFilters): string[] {
+  const tokens: string[] = [];
+  for (const [key, values] of Object.entries(filters.options)) {
+    if (key.startsWith("__")) continue; // reserved client-side facet (Unit Price)
+    for (const value of values) tokens.push(`${key}:${value}`);
+  }
+  for (const [key, sel] of Object.entries(filters.ranges)) {
+    if (key.startsWith("__")) continue;
+    const t = _rangeToken(key, sel);
+    if (t) tokens.push(t);
+  }
+  return tokens;
+}
+
+/** Apply the filters the backend does NOT do - the In Stock toggle and the Unit Price range -
+ * client-side over the rows the server returned, so the facet counts stay stable as they toggle. */
+export function applyClientFilters<
+  T extends { stock: number | null; unit_price: number | null },
+>(rows: T[], filters: SearchFilters): T[] {
+  const price = filters.ranges[PRICE_KEY];
+  return rows.filter((r) => {
+    if (filters.inStock && !(r.stock != null && r.stock > 0)) return false;
+    if (price) {
+      const p = r.unit_price;
+      if (p == null) return false;
+      if (price.min != null && p < price.min) return false;
+      if (price.max != null && p > price.max) return false;
+    }
+    return true;
+  });
+}
+
+// --- active-filter chips ----------------------------------------------------
+
+export interface FilterChip {
+  id: string; // stable handle for removal
+  keyLabel: string; // "Category", "Package", "Resistance"
+  value: string; // "Resistors", "0603", "1 kΩ – 10 kΩ"
+  remove: SearchFilters; // the filters with exactly this chip removed
+}
+
+function _rangeLabel(sel: RangeSel, unit: string | null | undefined): string {
+  const lo = sel.min == null ? "" : formatMagnitude(sel.min, unit);
+  const hi = sel.max == null ? "" : formatMagnitude(sel.max, unit);
+  if (lo && hi) return `${lo} – ${hi}`;
+  if (lo) return `≥ ${lo}`;
+  if (hi) return `≤ ${hi}`;
+  return "";
+}
+
+/** The chips to render in the sub-bar, in a stable order: category first, then options, then
+ * ranges. Each chip carries the `remove` filters so a click never has to re-derive removal. */
+export function activeChips(
+  filters: SearchFilters,
+  facets: ParametricFacet[],
+): FilterChip[] {
+  const unitOf = (key: string) => facets.find((f) => f.key === key)?.unit ?? null;
+  const chips: FilterChip[] = [];
+  if (filters.category) {
+    chips.push({
+      id: "category",
+      keyLabel: "Category",
+      value: filters.category,
+      remove: { ...filters, category: null },
+    });
+  }
+  for (const [key, values] of Object.entries(filters.options)) {
+    for (const value of values) {
+      chips.push({
+        id: `opt:${key}:${value}`,
+        keyLabel: key,
+        value: prettifyValue(value),
+        remove: removeOption(filters, key, value),
+      });
+    }
+  }
+  for (const [key, sel] of Object.entries(filters.ranges)) {
+    if (sel.min == null && sel.max == null) continue;
+    chips.push({
+      id: `range:${key}`,
+      keyLabel: key === PRICE_KEY ? "Unit Price" : key,
+      value: _rangeLabel(sel, key === PRICE_KEY ? "$" : unitOf(key)),
+      remove: clearRange(filters, key),
+    });
+  }
+  return chips;
+}
+
+export function hasAnyFilter(filters: SearchFilters): boolean {
+  return (
+    filters.category != null ||
+    filters.inStock ||
+    Object.values(filters.options).some((v) => v.length > 0) ||
+    Object.values(filters.ranges).some((r) => r.min != null || r.max != null)
+  );
+}
+
+// --- immutable mutators -----------------------------------------------------
+
+export function isOptionOn(filters: SearchFilters, key: string, value: string): boolean {
+  return (filters.options[key] ?? []).includes(value);
+}
+
+export function toggleOption(
+  filters: SearchFilters,
+  key: string,
+  value: string,
+): SearchFilters {
+  const current = filters.options[key] ?? [];
+  const next = current.includes(value)
+    ? current.filter((v) => v !== value)
+    : [...current, value];
+  return _withOptions(filters, key, next);
+}
+
+export function removeOption(
+  filters: SearchFilters,
+  key: string,
+  value: string,
+): SearchFilters {
+  return _withOptions(filters, key, (filters.options[key] ?? []).filter((v) => v !== value));
+}
+
+function _withOptions(filters: SearchFilters, key: string, values: string[]): SearchFilters {
+  const options = { ...filters.options };
+  if (values.length) options[key] = values;
+  else delete options[key];
+  return { ...filters, options };
+}
+
+export function setRange(filters: SearchFilters, key: string, sel: RangeSel): SearchFilters {
+  const ranges = { ...filters.ranges };
+  if (sel.min == null && sel.max == null) delete ranges[key];
+  else ranges[key] = sel;
+  return { ...filters, ranges };
+}
+
+export function clearRange(filters: SearchFilters, key: string): SearchFilters {
+  if (!(key in filters.ranges)) return filters;
+  const ranges = { ...filters.ranges };
+  delete ranges[key];
+  return { ...filters, ranges };
+}
+
+export function clearAll(filters: SearchFilters): SearchFilters {
+  // keep the category (it scopes the schema); drop every parametric selection + the stock toggle
+  return { category: filters.category, options: {}, ranges: {}, inStock: false };
+}
+
+// --- schema-driven results columns ------------------------------------------
+
+export interface SpecColumn {
+  key: string;
+  label: string;
+  numeric: boolean; // range facet -> right-aligned mono column
+  unit: string | null;
+  // When set, a merged same-label column (e.g. two "Voltage Rating" spec keys): the table resolves
+  // each row's own value from the first of these keys it carries, via rowMergedValue (FIX-09).
+  keys?: string[];
+}
+
+// A parameter's worth as a table column comes from its spec GROUP, so the columns are the
+// meaningful electrical/physical parameters (Resistance, Tolerance, Power, Package) - never the
+// commercial/logistics noise (pack quantity, tariff, weight) that a raw count would surface. The
+// grouping is itself registry-driven, so a genuinely new *parameter* still ranks; provenance
+// junk stays out.
+const _GROUP_SCORE: Record<SpecGroupName, number> = {
+  Electrical: 400,
+  Physical: 250,
+  // A device characteristic (type, channels, topology) is a genuine parametric dimension people
+  // filter on, so it earns a column - unlike the commercial noise below.
+  Device: 200,
+  "Ratings & Compliance": 120,
+  // The procurement group IS the commercial/logistics noise this score exists to keep out of the
+  // columns (origin, tariff, packaging, order quantities), so it can never earn one.
+  "Trade & Compliance": -1,
+  Other: -1,
+};
+
+// Provenance / logistics / commercial keys that are never useful table columns even when the
+// data carries them for many parts. Matched as substrings of the normalized key so label
+// variants ("US Tariff %", "Factory Pack Quantity", "Unit Weight") are all caught.
+const _COMMERCIAL = /tariff|packaging|pack quantity|standard pack|country of origin|lead time|unit weight|gross weight|base product|catalog|reach|export control|eccn|\bhts\b|number of parts/;
+
+function _columnScore(facet: ParametricFacet, category: string): number {
+  if (_COMMERCIAL.test(normalizeSpecKey(facet.key))) return -Infinity;
+  const r = resolveSpec(facet.key, category);
+  const base = _GROUP_SCORE[r.group];
+  if (base < 0) {
+    // unregistered / "Other": a genuinely new parameter can still fill a tail slot (a numeric
+    // one leads a categorical one), but always below every registered electrical/physical param.
+    return facet.kind === "range" ? 10 : 3;
+  }
+  return base - (r.order ?? 100) / 100;
+}
+
+/** Choose the results table's spec columns from the facets the data produced, ranked by how much
+ * of a real PARAMETER each is (its spec group) so the table reads like a datasheet, not a
+ * shipping manifest. A single-valued option (the same for every part) is dropped - a useless
+ * column. Ties break on how many parts carry the parameter. Capped so the table stays legible;
+ * everything else lives in the facet rail and the part detail. */
+export function deriveColumns(
+  facets: ParametricFacet[],
+  category: string | null,
+  maxCols = 5,
+): SpecColumn[] {
+  const cat = category ?? "";
+  const scored = facets
+    .filter((f) => f.kind === "range" || (f.options?.length ?? 0) > 1)
+    .map((f) => ({ f, score: _columnScore(f, cat) }))
+    .filter((s) => s.score > -Infinity)
+    .sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
+  let cols: SpecColumn[] = scored.map(({ f }) => {
+    const r = resolveSpec(f.key, cat);
+    return {
+      key: f.key,
+      label: r.label,
+      numeric: f.kind === "range",
+      unit: f.unit ?? r.unit ?? null,
+    };
+  });
+  // On a MIXED list (no single category) two or more primary-value parameters (resistance /
+  // capacitance / inductance / impedance) would each be their own column, each an em dash for
+  // every part outside that category (the "dash soup"). Collapse them into ONE adaptive Value
+  // column in the highest-ranked primary column's slot, keeping every other ranked column; the
+  // table then resolves each row's own value via rowPrimaryValue. Single-category lists are left
+  // exactly as before (Resistance stays its own column). This implements FIX-05.
+  if (!cat) {
+    const primaryCount = cols.filter((c) => _isPrimaryValueKey(c.key)).length;
+    if (primaryCount >= 2) {
+      let inserted = false;
+      cols = cols.flatMap((c) => {
+        if (!_isPrimaryValueKey(c.key)) return [c];
+        if (inserted) return [];
+        inserted = true;
+        return [{ key: VALUE_COLUMN_KEY, label: "Value", numeric: false, unit: null }];
+      });
+    }
+  }
+  // Collapse columns that share a display label (e.g. "Voltage Rating" resolved from both the
+  // "voltage rating" and "voltage rating dc" spec keys) into ONE adaptive column - each row
+  // resolves its own value from whichever constituent key it carries (rowMergedValue). Same
+  // dash-soup fix as the Value collapse above, generalized to any duplicated label (FIX-09). The
+  // synthetic Value column is already merged, so it is skipped.
+  const labelCount = new Map<string, number>();
+  for (const c of cols) labelCount.set(c.label, (labelCount.get(c.label) ?? 0) + 1);
+  if ([...labelCount.values()].some((n) => n > 1)) {
+    const pre = cols;
+    const done = new Set<string>();
+    cols = pre.flatMap((c) => {
+      if (c.key === VALUE_COLUMN_KEY || (labelCount.get(c.label) ?? 0) < 2) return [c];
+      if (done.has(c.label)) return [];
+      done.add(c.label);
+      const group = pre.filter((g) => g.label === c.label);
+      const sameUnit = group.every((g) => (g.unit ?? "") === (group[0].unit ?? ""));
+      return [{ ...c, keys: group.map((g) => g.key), numeric: false, unit: sameUnit ? c.unit : null }];
+    });
+  }
+  return cols.slice(0, maxCols);
+}
+
+/** A merged same-label column (SpecColumn.keys) resolves each row's value from the first of its
+ * constituent keys that the row actually carries; falls back to an em dash when none apply. */
+export function rowMergedValue(
+  specs: Record<string, string | number | boolean>,
+  keys: string[],
+): string {
+  for (const k of keys) {
+    const v = cellValue(specs, k);
+    if (v !== "—") return v;
+  }
+  return "—";
+}
+
+// Where a facet sits in the rail: the same parameter-importance signal the columns use, but
+// kept finite for every facet so the whole rail just reorders - electrical ranges at the top,
+// commercial / provenance dimensions sunk to the bottom, never hidden.
+function _railScore(facet: ParametricFacet, category: string): number {
+  if (_COMMERCIAL.test(normalizeSpecKey(facet.key))) return -1;
+  const groupRank: Record<SpecGroupName, number> = {
+    Electrical: 4,
+    Physical: 3,
+    Device: 3,
+    "Ratings & Compliance": 2,
+    Other: 1,
+    // sunk below every parameter dimension, never hidden - the rail's stated rule for a
+    // commercial / provenance dimension
+    "Trade & Compliance": 0,
+  };
+  const r = resolveSpec(facet.key, category);
+  const kindBoost = facet.kind === "range" ? 0.5 : 0; // a quantitative dimension is a prime filter
+  // order is only a FINE within-group tiebreak (the fallback order is huge, so keep it << 1)
+  return groupRank[r.group] + kindBoost - (r.order ?? 100) / 1e6;
+}
+
+/** The facets in rail order: the meaningful parameters first (electrical ranges lead), provenance
+ * last. Every facet is kept - a parametric search rail is comprehensive - only reordered, so the
+ * first thing the eye lands on is Resistance, not Country of Origin. Stable within a tier. */
+export function orderFacetsForRail(
+  facets: ParametricFacet[],
+  category: string | null,
+): ParametricFacet[] {
+  const cat = category ?? "";
+  return facets
+    .map((f, i) => ({ f, i, s: _railScore(f, cat) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.f);
+}
+
+export interface RailSection {
+  title: string;
+  fromSpecs: boolean; // stamp the "from specs" badge (the generated parameter block)
+  facets: ParametricFacet[];
+}
+
+// Manufacturer / brand / supplier are sourcing dimensions, not parameters - they join Unit Price
+// in the Sourcing section rather than sinking into More Filters with the rest of the "Other" group.
+const _SOURCING_KEY = /^(manufacturer|brand|supplier|vendor|distributor)$/;
+
+// Which rail section a facet lands in. Sourcing (price + who-sells-it) and the commercial catch-all
+// are decided by key; everything else follows its registry spec group, so the sectioning stays
+// modular - a new electrical spec joins Parameters on its own, a new provenance one lands in More.
+function _sectionKey(facet: ParametricFacet, cat: string): string {
+  if (facet.key === PRICE_KEY) return "Sourcing";
+  const nk = normalizeSpecKey(facet.key);
+  if (_SOURCING_KEY.test(nk)) return "Sourcing";
+  if (_COMMERCIAL.test(nk)) return "More";
+  const group = resolveSpec(facet.key, cat).group;
+  return group === "Electrical"
+    ? "Parameters"
+    : group === "Physical"
+      ? "Package"
+      : group === "Ratings & Compliance"
+        ? "Ratings"
+        : "More";
+}
+
+/** Group the rail's facets into the north-star sections in a fixed order - Parameters (the
+ * electrical, generated block), Package & Form, Ratings & Compliance, Sourcing (who sells it +
+ * Unit Price), then a More Filters catch-all for provenance - ordered within each by importance.
+ * Empty sections are dropped. */
+export function sectionedRail(
+  facets: ParametricFacet[],
+  category: string | null,
+): RailSection[] {
+  const cat = category ?? "";
+  const buckets: Record<string, ParametricFacet[]> = {
+    Parameters: [],
+    Package: [],
+    Ratings: [],
+    Sourcing: [],
+    More: [],
+  };
+  for (const f of orderFacetsForRail(facets, cat)) buckets[_sectionKey(f, cat)].push(f);
+  const defs: [string, string, boolean][] = [
+    ["Parameters", cat ? `${cat} Parameters` : "Parameters", true],
+    ["Package", "Package & Form", false],
+    ["Ratings", "Ratings & Compliance", false],
+    ["Sourcing", "Sourcing", false],
+    ["More", "More Filters", false],
+  ];
+  const sections: RailSection[] = [];
+  for (const [key, title, fromSpecs] of defs) {
+    if (buckets[key].length) sections.push({ title, fromSpecs, facets: buckets[key] });
+  }
+  return sections;
+}
+
+/** A row's display value for a spec column: the part's own value, prettified (Ohms -> Ω, unit
+ * spacing), or an em dash when the part does not carry that spec. */
+export function cellValue(
+  specs: Record<string, string | number | boolean>,
+  key: string,
+): string {
+  const raw = specs[key];
+  if (raw == null || raw === "") return "—";
+  return prettifyValue(String(raw));
+}

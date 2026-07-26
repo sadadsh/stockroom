@@ -70,6 +70,100 @@ def test_bom_xlsx_unpriced_build_drops_the_priced_columns():
     sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
     assert "Unit Price" not in sheet
     assert "Lifecycle" not in sheet
+    assert "Final Qty" not in sheet  # no build economics on a value-only row
+
+
+def test_bom_xlsx_includes_the_build_economics_columns():
+    # A BOM built for a board count carries final_qty etc.; the XLSX (the primary deliverable)
+    # must expose the order quantity + its cost + tariff + total, the numbers you order and budget
+    # from - plus Package/RoHS. Numbers are real <v> cells so Excel can sum them.
+    rows = [{"mpn": "ERJ-P03F1101V", "value": "100", "refs": ["R1", "R2"], "qty": 2,
+             "unit_price": 0.10, "moq": 100, "final_qty": 100, "final_unit_price": 0.05,
+             "final_extended": 5.0, "tax_tariff": 0.4125, "line_total": 5.4125,
+             "package": "0603", "rohs": "Yes"}]
+    sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
+    for col in ("Package", "RoHS", "Min Qty", "Final Qty", "Cost @ Qty", "Tax/Tariff", "Total Cost"):
+        assert col in sheet, f"missing XLSX column: {col}"
+    assert "<v>100</v>" in sheet     # Final Qty (order quantity) as a real number
+    assert "<v>5.4125</v>" in sheet  # Total Cost as a real number Excel can sum
+
+
+def test_bom_xlsx_carries_mouser_link_origin_and_tariff():
+    # The Full BOM must surface the purchase link (canonical Mouser ProductDetail), the
+    # manufacturing country of origin, and the page's own per-part US import-tariff % - the
+    # real fields the owner buys and budgets from. A priced China-origin build carries all three.
+    rows = [{"mpn": "2N7002", "value": "2N7002", "refs": ["Q1"], "qty": 1, "unit_price": 1.09,
+             "source": "Mouser", "mouser_pn": "512-2N7002",
+             "url": "https://www.mouser.com/en/ProductDetail/onsemi/2N7002",
+             "country_of_origin": "China", "moq": 1, "final_qty": 3, "final_unit_price": 1.09,
+             "final_extended": 3.27, "tariff_rate": 7.98, "tax_tariff": 0.26, "line_total": 3.53}]
+    sheet = _unzip(bom_xlsx(rows))["xl/worksheets/sheet1.xml"]
+    for col in ("Mouser Link", "Country of Origin", "Tariff %"):
+        assert col in sheet, f"missing XLSX column: {col}"
+    assert "https://www.mouser.com/en/ProductDetail/onsemi/2N7002" in sheet
+    assert "China" in sheet
+    assert "<v>7.98</v>" in sheet  # tariff % as a real number Excel can sort/sum
+
+
+def test_bom_xlsx_money_columns_are_currency_and_a_total_row_sums_them():
+    # The Full BOM must look like an order sheet: money columns render as $#,##0.00 (currency
+    # style s=3), and a bold TOTAL row (s=1 label + s=4 bold-currency) sums the build economics.
+    rows = [{"mpn": "A", "value": "1", "refs": ["R1"], "qty": 1, "unit_price": 0.10, "moq": 1,
+             "final_qty": 3, "final_unit_price": 0.10, "final_extended": 0.30, "tax_tariff": 0.02,
+             "line_total": 0.32},
+            {"mpn": "B", "value": "2", "refs": ["R2"], "qty": 1, "unit_price": 1.00, "moq": 1,
+             "final_qty": 2, "final_unit_price": 1.00, "final_extended": 2.00, "tax_tariff": 0.10,
+             "line_total": 2.10}]
+    parts = _unzip(bom_xlsx(rows))
+    styles, sheet = parts["xl/styles.xml"], parts["xl/worksheets/sheet1.xml"]
+    assert '&quot;$&quot;#,##0.00' in styles          # currency number format registered
+    assert 's="3"' in sheet                            # money cells use the currency style
+    assert "TOTAL" in sheet and 's="4"' in sheet       # bold-currency TOTAL row
+    assert "<v>2.42</v>" in sheet                       # Total Cost summed (0.32 + 2.10)
+
+
+def test_bom_xlsx_derived_columns_are_live_formulas_and_min_qty_is_the_per_board_qty():
+    import re
+    rows = [{"mpn": "A", "value": "1", "refs": ["R1", "R2"], "qty": 2, "unit_price": 0.10,
+             "moq": 1, "final_qty": 6, "final_unit_price": 0.08, "final_extended": 0.48,
+             "tariff_rate": 8.0, "tax_tariff": 0.0384, "line_total": 0.5184}]
+    parts = _unzip(bom_xlsx(rows))
+    sheet = parts["xl/worksheets/sheet1.xml"]
+    fs = re.findall(r"<f>(.*?)</f>", sheet)
+    assert any("*" in f for f in fs)      # Ext Price / Cost @ Qty multiply their inputs
+    assert any("/100" in f for f in fs)   # Tax/Tariff = Cost @ Qty * Tariff % / 100
+    assert any("+" in f for f in fs)      # Total Cost = Cost @ Qty + Tax/Tariff
+    assert any(f.startswith("SUM(") for f in fs)               # TOTAL row sums a column
+    assert 'fullCalcOnLoad="1"' in parts["xl/workbook.xml"]    # Excel recalcs on open
+    # Min Qty column carries the per-board Qty (2), not the distributor MOQ (1)
+    hdr = re.search(r'<row r="1">(.*?)</row>', sheet, re.S).group(1)
+    names = re.findall(r'<t[^>]*>([^<]*)</t>', hdr)
+    assert names.index("Min Qty") >= 0 and "Qty" in names
+    row2 = re.search(r'<row r="2">(.*?)</row>', sheet, re.S).group(1)
+    cellvals = {re.search(r'r="([A-Z]+)2"', c).group(1): (re.search(r"<v>(.*?)</v>", c) or re.search(r"<t[^>]*>(.*?)</t>", c))
+                for c in re.findall(r"<c [^>]*?(?:/>|>.*?</c>)", row2, re.S) if re.search(r'r="([A-Z]+)2"', c)}
+    from stockroom.projects.bom_export import _xlsx_col
+    minq_col = _xlsx_col(names.index("Min Qty"))
+    assert cellvals[minq_col] and cellvals[minq_col].group(1) == "2"  # == the per-board Qty
+
+
+def test_bom_xlsx_url_columns_are_real_clickable_hyperlinks():
+    # A generated xlsx does NOT auto-linkify plain text, so the Datasheet + Mouser cells must be
+    # emitted as real external hyperlinks (a worksheet relationship + a <hyperlink> ref), or they
+    # are dead when clicked and read as "cut" in a narrow column.
+    rows = [{"mpn": "2N7002", "value": "2N7002", "refs": ["Q1"], "qty": 1, "unit_price": 1.09,
+             "source": "Mouser", "url": "https://www.mouser.com/c/?q=2N7002",
+             "datasheet": "https://www.onsemi.com/pub/x.pdf",
+             "moq": 1, "final_qty": 3, "final_unit_price": 1.09, "final_extended": 3.27,
+             "tax_tariff": 0.26, "line_total": 3.53}]
+    parts = _unzip(bom_xlsx(rows))
+    assert "xl/worksheets/_rels/sheet1.xml.rels" in parts  # the worksheet's own rels part
+    sheet = parts["xl/worksheets/sheet1.xml"]
+    assert "<hyperlink " in sheet and "r:id=" in sheet
+    rels = parts["xl/worksheets/_rels/sheet1.xml.rels"]
+    assert "https://www.mouser.com/c/?q=2N7002" in rels  # the Mouser link is a real target
+    assert "https://www.onsemi.com/pub/x.pdf" in rels     # the datasheet link is a real target
+    assert 'TargetMode="External"' in rels
 
 
 # -- procurement_xlsx ----------------------------------------------------------

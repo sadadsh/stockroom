@@ -29,7 +29,7 @@ def test_full_flow_over_every_router(client):
 
     # sync + doctor: no network, first-class states, not 500s
     assert client.post("/api/sync").json()["state"] == "no_remote"
-    assert "items" in client.get("/api/doctor/drift").json()
+    assert "fixable" in client.get("/api/doctor/scan").json()
 
     # profiles: create -> activate -> active-delete guard -> delete a non-active one
     assert client.post("/api/profiles", json={"name": "P2"}).status_code == 200
@@ -52,7 +52,7 @@ def test_every_router_is_mounted_and_token_guarded(anon_client):
         ("post", "/api/enrich/part", {}),
         ("get", "/api/profiles", None),
         ("get", "/api/sync/status", None),
-        ("get", "/api/doctor/drift", None),
+        ("get", "/api/doctor/scan", None),
         ("get", "/api/update/check", None),
     ]
     for method, path, body in guarded:

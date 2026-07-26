@@ -12,6 +12,7 @@ No em dashes anywhere (standing owner rule).
 from __future__ import annotations
 
 import sqlite3
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -69,15 +70,38 @@ class LibraryIndex:
 
     def __init__(self, conn: sqlite3.Connection):
         self._conn = conn
+        # Every read holds this. The connection is warm and long-lived, and FastAPI runs sync route
+        # handlers in a threadpool, so several requests read it at once (opening one part fires the
+        # symbol, footprint and model previews in parallel, and each resolves the part through `get`).
+        #
+        # A single `sqlite3.Connection` is NOT safe for concurrent use, and `check_same_thread=False`
+        # only silences Python's own guard; it does not make the connection safe. The sqlite3 module
+        # RELEASES the GIL around the SQLite C calls precisely so other threads can run, so two workers
+        # really are inside execute/fetch at the same time. SQLite answers that with SQLITE_MISUSE
+        # (surfacing as `InterfaceError: bad parameter or other API misuse`) and with torn reads that
+        # hand back values never stored, which is how `missing` came back None from a column declared
+        # NOT NULL DEFAULT ''. Both live-app 500s traced to exactly this.
+        #
+        # An RLock, not a Lock: a reader that ever calls another reader would deadlock on a plain one,
+        # and that is a trap to disarm now rather than discover later. Serializing costs nothing worth
+        # measuring here because these are in-memory reads.
+        #
+        # Thread-local connections were the obvious alternative and are WRONG for this index: the
+        # default db_path is ":memory:", so each thread would get its own EMPTY database.
+        self._lock = threading.RLock()
 
     # ---- build -----------------------------------------------------------------
 
     @classmethod
     def build(cls, parts_dir: Path, db_path: str | Path = ":memory:") -> "LibraryIndex":
-        # check_same_thread=False so the warm index can be read from the API's
-        # threadpool worker threads (FastAPI runs sync route handlers off the
-        # thread that built the connection); reads stay serialized by the GIL and
-        # every write still goes through the M2 atomic engine, not this connection.
+        # check_same_thread=False so the warm index can be read from the API's threadpool worker
+        # threads (FastAPI runs sync route handlers off the thread that built the connection).
+        # That flag only silences Python's own guard; the SERIALIZATION is `self._lock` in
+        # `__init__`, and every write still goes through the M2 atomic engine, not this connection.
+        #
+        # This comment used to read "reads stay serialized by the GIL". That was FALSE - sqlite3
+        # releases the GIL around its C calls - and it is why the torn-read 500s survived: it sat
+        # here reading as a reason not to look.
         conn = sqlite3.connect(str(db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(_SCHEMA)
@@ -99,7 +123,8 @@ class LibraryIndex:
     # ---- queries ---------------------------------------------------------------
 
     def count(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM parts").fetchone()[0]
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM parts").fetchone()[0]
 
     def search(
         self, query: str = "", category: str | None = None, complete_only: bool = False
@@ -117,28 +142,52 @@ class LibraryIndex:
         if complete_only:
             sql += " AND is_complete = 1"
         sql += " ORDER BY display_name COLLATE NOCASE"
-        return [_to_row(r) for r in self._conn.execute(sql, args)]
+        # The lock spans the COMPREHENSION, not just the execute: the cursor is consumed lazily, so
+        # releasing after execute would leave another thread free to reset the statement mid-iteration.
+        # Every reader below follows the same rule for the same reason.
+        with self._lock:
+            return [_to_row(r) for r in self._conn.execute(sql, args)]
 
     def get(self, part_id: str) -> IndexRow | None:
-        r = self._conn.execute("SELECT * FROM parts WHERE id = ?", (part_id,)).fetchone()
-        return _to_row(r) if r else None
+        with self._lock:
+            r = self._conn.execute("SELECT * FROM parts WHERE id = ?", (part_id,)).fetchone()
+            return _to_row(r) if r else None
+
+    def find_by_mpn(self, mpn: str) -> list[IndexRow]:
+        """Exact-part match for a BOM line: case and separator insensitive
+        (TPS-62130-RGTR matches tps62130rgtr) but never substring-loose, so a
+        prefix or a different suffix is honestly a miss."""
+        key = _mpn_key(mpn)
+        if not key:
+            return []
+        with self._lock:
+            return [
+                _to_row(r)
+                for r in self._conn.execute(
+                    "SELECT * FROM parts WHERE mpn <> '' ORDER BY display_name COLLATE NOCASE"
+                )
+                if _mpn_key(r["mpn"]) == key
+            ]
 
     def facets(self) -> Facets:
-        by_category = {
-            r["category"]: r["n"]
-            for r in self._conn.execute(
-                "SELECT category, COUNT(*) n FROM parts GROUP BY category ORDER BY category"
-            )
-        }
-        by_manufacturer = {
-            r["manufacturer"]: r["n"]
-            for r in self._conn.execute(
-                "SELECT manufacturer, COUNT(*) n FROM parts WHERE manufacturer <> '' "
-                "GROUP BY manufacturer ORDER BY manufacturer"
-            )
-        }
-        complete = self._conn.execute("SELECT COUNT(*) FROM parts WHERE is_complete = 1").fetchone()[0]
-        incomplete = self._conn.execute("SELECT COUNT(*) FROM parts WHERE is_complete = 0").fetchone()[0]
+        with self._lock:
+            by_category = {
+                r["category"]: r["n"]
+                for r in self._conn.execute(
+                    "SELECT category, COUNT(*) n FROM parts GROUP BY category ORDER BY category"
+                )
+            }
+            by_manufacturer = {
+                r["manufacturer"]: r["n"]
+                for r in self._conn.execute(
+                    "SELECT manufacturer, COUNT(*) n FROM parts WHERE manufacturer <> '' "
+                    "GROUP BY manufacturer ORDER BY manufacturer"
+                )
+            }
+            complete = self._conn.execute(
+                "SELECT COUNT(*) FROM parts WHERE is_complete = 1").fetchone()[0]
+            incomplete = self._conn.execute(
+                "SELECT COUNT(*) FROM parts WHERE is_complete = 0").fetchone()[0]
         return Facets(by_category, by_manufacturer, complete, incomplete)
 
     def duplicates_by_mpn(self) -> dict[str, list[str]]:
@@ -150,27 +199,41 @@ class LibraryIndex:
 
     def _group_duplicates(self, column: str) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {}
-        for r in self._conn.execute(
-            f"SELECT {column} AS key, GROUP_CONCAT(id) ids, COUNT(*) n "
-            f"FROM parts WHERE {column} <> '' GROUP BY {column} HAVING n > 1"
-        ):
-            out[r["key"]] = sorted(r["ids"].split(","))
+        with self._lock:
+            for r in self._conn.execute(
+                f"SELECT {column} AS key, GROUP_CONCAT(id) ids, COUNT(*) n "
+                f"FROM parts WHERE {column} <> '' GROUP BY {column} HAVING n > 1"
+            ):
+                out[r["key"]] = sorted(r["ids"].split(","))
         return out
 
     def incomplete(self) -> list[IndexRow]:
-        return [
-            _to_row(r)
-            for r in self._conn.execute(
-                "SELECT * FROM parts WHERE is_complete = 0 ORDER BY display_name COLLATE NOCASE"
-            )
-        ]
+        with self._lock:
+            return [
+                _to_row(r)
+                for r in self._conn.execute(
+                    "SELECT * FROM parts WHERE is_complete = 0 ORDER BY display_name COLLATE NOCASE"
+                )
+            ]
 
     def close(self) -> None:
-        self._conn.close()
+        # Closing while another thread is mid-read is the same misuse as reading concurrently, so it
+        # takes the lock too.
+        with self._lock:
+            self._conn.close()
+
+
+def _mpn_key(text: str) -> str:
+    """Case/separator-insensitive MPN token: alphanumerics only, lowercased."""
+    return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
 def _row_values(rec: PartRecord) -> tuple:
     missing = rec.missing_fields()
+    # The index's footprint_name / model_file columns exist for duplicate grouping and the
+    # doctor's dangling-file sweep, both of which operate on the KiCad library this app
+    # actually writes. Named explicitly rather than read off a tool-neutral-looking field.
+    kicad = rec.assets_for("kicad")
     purchase_url = rec.purchase[0].url if rec.purchase and rec.purchase[0].url else ""
     search_blob = " ".join(
         filter(
@@ -185,8 +248,8 @@ def _row_values(rec: PartRecord) -> tuple:
         rec.description,
         rec.mpn,
         rec.manufacturer,
-        rec.footprint.name if rec.footprint else "",
-        rec.model.file if rec.model else "",
+        kicad.footprint.name if kicad.footprint else "",
+        kicad.model.file if kicad.model else "",
         rec.datasheet.file if rec.datasheet else "",
         purchase_url,
         0 if missing else 1,

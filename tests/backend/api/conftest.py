@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import shutil
+import json
 from pathlib import Path
 
 import pytest
@@ -11,13 +11,42 @@ from stockroom.store.machine_config import MachineConfig
 from stockroom.vcs.repo import GitRepo
 
 
+def _drain_job(client, job_id):
+    """Consume a job's SSE stream and return the terminal payload (event: <kind> + data: <json>)
+    as {"status": "done"|"error"|"none", "result": ...}. Shared by every test that submits a
+    job and waits for it to finish, so both the rescan and refresh API tests drain the same
+    way instead of carrying their own copy of this loop."""
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            if line.startswith("event:"):
+                kind = line.split(":", 1)[1].strip()
+            elif line.startswith("data:"):
+                data = json.loads(line.split(":", 1)[1].strip() or "{}")
+                if kind == "result":
+                    return {"status": "done", "result": data["result"]}
+                if kind == "error":
+                    return {"status": "error", "result": data}
+    return {"status": "none", "result": None}
+
+
 @pytest.fixture(autouse=True)
 def _isolate_machine_config(tmp_path, monkeypatch):
     """Keep every config.save() (a profile switch, a settings write) inside the
     test's own tmp dir so the API suite never writes to the developer's real
     ~/.config/stockroom (or %APPDATA%/Stockroom). config_dir() reads this env on
-    every call, so it governs load() and save() alike."""
+    every call, so it governs load() and save() alike. XDG_CONFIG_HOME and APPDATA
+    are pinned too, so no code path (kicad_config_dir + the auto-wire that WRITES
+    there) can ever reach the developer's real ~/.config/kicad: the review caught
+    the suite doing exactly that through apply_kicad_settings."""
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    # The committed STM baked seed (data/stm/index.sqlite.xz) must not leak into the
+    # suite: build_context seed-restores when no index exists, which would turn every
+    # index-absent 409 test into a false "built" state. Point the seed at a
+    # nonexistent path; stm/test_seed.py covers the restore behavior explicitly.
+    monkeypatch.setenv("STOCKROOM_STM_SEED", str(tmp_path / "no-such-seed.sqlite.xz"))
 
 
 @pytest.fixture
@@ -91,13 +120,20 @@ def _write_category_libs(lib) -> None:
         _SYMBOL_LIB_HEADER + ")\n", encoding="utf-8", newline=""
     )
     lib.footprint_lib_path("Modules").mkdir(parents=True, exist_ok=True)
+    # every remaining category as a valid empty lib, so the auto KiCad wiring that
+    # now runs on switch/boot never needs kicad-cli inside the API suite
+    from stockroom.model.category import CATEGORIES
+
+    for cat in CATEGORIES:
+        sym = lib.symbol_lib_path(cat)
+        if not sym.exists():
+            sym.write_text(_SYMBOL_LIB_HEADER + ")\n", encoding="utf-8", newline="")
 
 
 def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
     from stockroom.model.part import (
+        AssetRef,
         Datasheet,
-        LibRef,
-        ModelRef,
         PartRecord,
         Purchase,
     )
@@ -112,10 +148,10 @@ def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
     )
     # every fixture part has a real symbol + footprint on disk (see _write_category_libs);
     # completeness is still driven by the passport fields below, so mystery stays incomplete.
-    rec.symbol = LibRef(lib="SR-ICs", name=part_id.upper())
-    rec.footprint = LibRef(lib="SR-ICs", name=part_id.upper())
+    rec.assets_for("kicad").symbol = AssetRef(lib="SR-ICs", name=part_id.upper())
+    rec.assets_for("kicad").footprint = AssetRef(lib="SR-ICs", name=part_id.upper())
     if complete:
-        rec.model = ModelRef(file="models/x.step")
+        rec.assets_for("kicad").model = AssetRef(file="models/x.step")
         rec.datasheet = Datasheet(file="datasheets/x.pdf")
         rec.purchase = [Purchase(vendor="LCSC", url="https://x/p")]
     (parts_dir / f"{part_id}.json").write_text(rec.dumps(), encoding="utf-8")

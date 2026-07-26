@@ -1,10 +1,9 @@
 import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
-import { ComponentsPage } from "./pages/ComponentsPage";
-import { DoctorPage } from "./pages/DoctorPage";
-import { DuplicatesPage } from "./pages/DuplicatesPage";
-import { IngestPage } from "./pages/IngestPage";
+import { CaptureStatusPill } from "./components/CaptureStatusPill";
+import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { StmViewerPage } from "./pages/StmViewerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
 import { useRouter, type Route } from "./lib/router";
@@ -21,26 +20,30 @@ export default function App() {
   if (onboarding.data?.first_run) {
     return <OnboardingGate status={onboarding.data} />;
   }
-  return <AppShell>{renderRoute(route)}</AppShell>;
+  return (
+    <>
+      <AppShell>{renderRoute(route)}</AppShell>
+      {/* The guided capture keeps running when the modal is closed; the pill is its handle. */}
+      <CaptureStatusPill />
+    </>
+  );
 }
 
 function renderRoute(route: Route) {
   switch (route) {
     case "components":
-      return <ComponentsPage />;
-    case "ingest":
-      return <IngestPage />;
-    case "duplicates":
-      return <DuplicatesPage />;
+      // The Components flagship is just the Parts view now: BOM Coverage moved to
+      // the project BOM, Duplicates is a Parts filter, and Doctor is in Settings.
+      return <LibraryPage />;
     case "projects":
       return <ProjectsPage />;
-    case "doctor":
-      return <DoctorPage />;
+    case "stm":
+      return <StmViewerPage />;
     case "settings":
       return <SettingsPage />;
     default:
-      // Unreachable in practice (the rail and palette only offer available
-      // routes); fall back to the Components home rather than a blank frame.
-      return <ComponentsPage />;
+      // Unreachable in practice (the rail only offers available routes); fall back
+      // to the Components home rather than a blank frame.
+      return <LibraryPage />;
   }
 }

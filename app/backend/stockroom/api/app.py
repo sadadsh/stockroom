@@ -12,8 +12,8 @@ from fastapi.responses import JSONResponse
 
 from stockroom.api.context import AppContext
 from stockroom.api.errors import error_body, status_for
-from stockroom.api.security import make_require_token
 from stockroom.api.routers import system as system_router
+from stockroom.api.security import make_require_token
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend-dist"
 
@@ -39,6 +39,9 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import library as library_router_mod
     app.include_router(library_router_mod.library_router(require_token))
 
+    from stockroom.api.routers import altium as altium_router_mod
+    app.include_router(altium_router_mod.altium_router(require_token))
+
     from stockroom.api.routers import previews as previews_router_mod
     app.include_router(previews_router_mod.previews_router(require_token))
 
@@ -54,8 +57,8 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import profiles as profiles_router_mod
     app.include_router(profiles_router_mod.profiles_router(require_token))
 
-    from stockroom.api.routers import sync as sync_router_mod
     from stockroom.api.routers import doctor as doctor_router_mod
+    from stockroom.api.routers import sync as sync_router_mod
     app.include_router(sync_router_mod.sync_router(require_token))
     app.include_router(doctor_router_mod.doctor_router(require_token))
 
@@ -70,6 +73,11 @@ def create_app(context: AppContext) -> FastAPI:
 
     from stockroom.api.routers import onboarding as onboarding_router_mod
     app.include_router(onboarding_router_mod.onboarding_router(require_token))
+
+    from stockroom.api.routers import dev as dev_router_mod
+    app.include_router(dev_router_mod.dev_router(require_token))
+    from stockroom.api.routers import stm as stm_router_mod
+    app.include_router(stm_router_mod.stm_router(require_token))
 
     if _FRONTEND_DIST.exists():
         from fastapi.staticfiles import StaticFiles

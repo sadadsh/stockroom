@@ -67,6 +67,48 @@ def test_default_window_uses_the_dedicated_fetch_window_not_the_spa_window(monke
     assert fetcher._window_provider() == "FETCH-WINDOW"
 
 
+def test_settle_waits_through_a_textless_bot_challenge_then_returns_the_real_page():
+    # Verified live on Windows: the Akamai challenge page has readyState "complete" but
+    # ZERO body text (a silent JS challenge, no "Access Denied" wording); the real page
+    # then loads with thousands of characters. So the settle must wait for substantial,
+    # stable visible text, not readyState and not challenge wording. Regression lock for
+    # the empty-page-returned bug.
+    class _ChallengeThenReal:
+        def __init__(self):
+            self.probes = 0
+            self.loaded = None
+
+        def load_url(self, url):
+            self.loaded = url
+
+        def _real(self):
+            return self.probes >= 4
+
+        def evaluate_js(self, script):
+            if "readyState" in script:
+                return "complete"
+            if "innerText" in script and "length" in script:  # the text-length probe
+                self.probes += 1
+                return 1500 if self._real() else 0  # challenge renders no text
+            if "slice" in script:  # the _looks_challenged probe (title + text)
+                return "cr0603 real product page" if self._real() else "mouser.com"
+            if "outerHTML" in script:
+                return (
+                    "<html><body>CR0603 real product __NEXT_DATA__</body></html>"
+                    if self._real()
+                    else "<html><body></body></html>"
+                )
+            if "location.href" in script:
+                return "https://www.mouser.com/x"
+            return None
+
+    win = _ChallengeThenReal()
+    fetcher = WebViewRenderedDomFetcher(window_provider=lambda: win)
+    r = fetcher.rendered_html("https://www.mouser.com/x", timeout=5.0)
+    assert "__NEXT_DATA__" in r.text  # the REAL page, not the empty interstitial
+    assert win.loaded == "https://www.mouser.com/x"
+
+
 @pytest.mark.windows_only
 def test_real_webview2_reads_a_rendered_dom():
     # Owner runs this on the Windows box against a real page; asserts the rendered

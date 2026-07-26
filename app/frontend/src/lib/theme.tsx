@@ -13,6 +13,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { readPref, writePref } from "./uiPrefs";
 
 export type Theme = "dark" | "light";
 
@@ -27,13 +28,15 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readStored(): Theme {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    if (v === "light" || v === "dark") return v;
-  } catch {
-    /* localStorage may be unavailable; fall back to the default */
-  }
-  return "dark";
+  // Host-injected preference first, localStorage only as the dev-server fallback: the host binds an
+  // ephemeral port, so localStorage is a fresh empty store on every launch and the saved theme was
+  // silently lost every time. See lib/uiPrefs.ts.
+  return readPref<Theme>(
+    "theme",
+    STORAGE_KEY,
+    (raw) => (raw === "light" || raw === "dark" ? raw : undefined),
+    "dark",
+  );
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -44,11 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // data-theme before React boots); this keeps it in sync on every toggle.
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem(STORAGE_KEY, theme);
-    } catch {
-      /* persistence is best-effort */
-    }
+    writePref("theme", theme, STORAGE_KEY);
   }, [theme]);
 
   const setTheme = useCallback((next: Theme) => setThemeState(next), []);
