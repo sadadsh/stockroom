@@ -557,11 +557,12 @@ export function mountModelScene(
       : activeCamera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(...VIEW_DIRECTIONS.iso);
     direction.normalize();
-    // ONE screen basis for the fit and for the cameras. `fitOrthoHalfHeight` derives its own right
-    // and up from the direction; if the cameras resolve a different in-plane rotation, the frustum
-    // is sized for a silhouette that is not the one being drawn. Straight down is exactly where
-    // they diverged, because world up is the view direction there.
-    const up = screenUpFor(direction.toArray());
+    // ONE screen basis for the fit and for the cameras, and it needs the SUBJECT to choose: looking
+    // straight down there is no horizon to keep level, so the in-plane rotation is a free choice
+    // and the fit picks whichever turn needs the smaller frustum. The extents therefore have to be
+    // measured before the cameras are oriented, not after.
+    const half = halfExtents(boxes);
+    const up = screenUpFor(direction.toArray(), half, camera.aspect);
     camera.up.set(...up);
     orthoCamera.up.set(...up);
     // Fit the BOX, not its enclosing sphere. A sphere fit is exact for a sphere and wasteful for a
@@ -570,7 +571,6 @@ export function mountModelScene(
     // the owner's 3.5x1.4x0.6mm part at a 494x240 stage: the part covered ~37% of the frame height
     // at a correct sphere fit. The box fit is still safe through the whole idle spin - it projects
     // the footprint's SWEPT circle, so no angle can grow out of the frame.
-    const half = halfExtents(boxes);
     fitDistance = half
       ? fitDistanceForBox(half, direction.toArray(), camera.fov, camera.aspect)
       : bounds.radius * 4;

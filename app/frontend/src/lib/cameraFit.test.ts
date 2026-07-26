@@ -295,3 +295,60 @@ describe("screenUpFor", () => {
     expect(screenUpFor([0, 0, 0]).every(Number.isFinite)).toBe(true);
   });
 });
+
+/**
+ * Owner's call, 2026-07-25, asked with previews rather than guessed at a second time: looking
+ * straight down, the view TURNS so the subject's longest extent runs along the stage's longest
+ * axis. "longest extent -> longest stage axis."
+ *
+ * It is needed because nothing upstream decides this. `orientUpright` only stands the SHORTEST
+ * bounding-box axis vertical, so which of the other two lands on world X and which on world Z is
+ * whatever the vendor authored - and the owner's TPD6E05U06RVZR is authored long in Z, so a
+ * 3.5 x 1.4mm package stood on end and used 411px of a 1704px stage.
+ *
+ * The choice is made by which basis needs the SMALLER frustum, not by a landscape rule of thumb,
+ * so a portrait stage correctly gets the opposite answer instead of a special case.
+ */
+describe("screenUpFor, choosing the in-plane rotation from the subject", () => {
+  // half-extents of a 3.5 x 1.4mm package authored LONG IN Z
+  const LONG_IN_Z: [number, number, number] = [0.7, 0.3, 1.75];
+  const LONG_IN_X: [number, number, number] = [1.75, 0.3, 0.7];
+  const extentAlong = (h: [number, number, number], v: [number, number, number]) =>
+    h[0] * Math.abs(v[0]) + h[1] * Math.abs(v[1]) + h[2] * Math.abs(v[2]);
+
+  it("turns a part authored long in Z so its length runs ACROSS a landscape stage", () => {
+    const up = screenUpFor([0, 1, 0], LONG_IN_Z, 1.4);
+    // the SHORT extent is what goes up the screen, which is what leaves the long one across it
+    expect(extentAlong(LONG_IN_Z, up)).toBeCloseTo(0.7, 9);
+  });
+
+  it("leaves a part already long in X alone on a landscape stage", () => {
+    const up = screenUpFor([0, 1, 0], LONG_IN_X, 1.4);
+    expect(extentAlong(LONG_IN_X, up)).toBeCloseTo(0.7, 9);
+  });
+
+  it("gives a PORTRAIT stage the opposite answer, because it is chosen by fit and not by a rule", () => {
+    const up = screenUpFor([0, 1, 0], LONG_IN_Z, 0.5);
+    // a tall narrow stage wants the long axis UP it, so the long extent is the vertical one
+    expect(extentAlong(LONG_IN_Z, up)).toBeCloseTo(1.75, 9);
+  });
+
+  it("shrinks the frustum it needs, which is the measurable point of turning at all", () => {
+    const turned = fitOrthoHalfHeight(LONG_IN_Z, [0, 1, 0], 1.4);
+    // what the un-turned basis would have needed: the long extent up the screen
+    expect(turned).toBeLessThan(1.75 * 1.15);
+    expect(turned).toBeCloseTo((1.75 / 1.4) * 1.15, 6);
+  });
+
+  it("does not turn a view that is not looking along the vertical", () => {
+    // Only the degenerate case has a free choice. Rotating an iso view to fit would tilt the
+    // horizon, which is a different thing entirely from choosing an undefined rotation.
+    expect(screenUpFor([0.55, 0.42, 1], LONG_IN_Z, 1.4)).toEqual([0, 1, 0]);
+  });
+
+  it("keeps the footprint-frame answer when the subject is square, so the choice is stable", () => {
+    // equal extents make both bases cost the same; the tie must not flap between frames
+    const square: [number, number, number] = [1, 0.3, 1];
+    expect(screenUpFor([0, 1, 0], square, 1.4)).toEqual([0, 0, -1]);
+  });
+});

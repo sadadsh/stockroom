@@ -75,12 +75,86 @@ export function visibleBounds(boxes: Box[]): Bounds | null {
  * is the frame the footprint preview is already drawn in (KiCad's `+X` right, `+Y` down, mapped to
  * the scene as `z`). So the top view and the footprint tile show the part the same way up.
  */
-export function screenUpFor(dir: [number, number, number]): [number, number, number] {
+export type ScreenBasis = {
+  right: [number, number, number];
+  up: [number, number, number];
+};
+
+/** A vec3 triple, as plain numbers. */
+type Vec3 = [number, number, number];
+
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+
+/**
+ * The screen basis (right and up) for a view along `dir` - the one BOTH the fit and the cameras
+ * adopt, so a frustum can never be sized for a silhouette other than the one being drawn.
+ *
+ * For any ordinary direction this is the usual world-up construction and `half`/`aspect` change
+ * nothing: rotating an iso view to fit better would tilt the horizon, which is not the same thing
+ * as choosing a rotation that was never defined.
+ *
+ * Looking straight down IS undefined, and that is the case this exists for. Two bases are equally
+ * valid there, 90 degrees apart, and nothing upstream picks between them: `orientUpright` only
+ * stands the SHORTEST bounding-box axis vertical, so which of the remaining two lands on world X
+ * and which on world Z is whatever the vendor authored. The owner's TPD6E05U06RVZR is authored
+ * long in Z, so its top view stood a 3.5 x 1.4mm package on end and filled 411px of a 1704px stage.
+ *
+ * Given the subject's half-extents and the stage aspect, the basis needing the SMALLER frustum
+ * wins - the owner's rule, "longest extent to the longest stage axis" (2026-07-25, chosen from
+ * previews rather than guessed at twice). Expressing it as a fit rather than as "landscape means
+ * horizontal" is what makes a PORTRAIT stage come out right without a special case. A tie keeps the
+ * footprint-frame basis, so a square subject cannot flap between frames.
+ */
+export function screenBasisFor(
+  dir: Vec3,
+  half?: Vec3 | null,
+  aspect = 1,
+): ScreenBasis {
+  const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+  const d: Vec3 = [dir[0] / len, dir[1] / len, dir[2] / len];
+  const horiz = Math.hypot(d[0], d[2]);
+  if (horiz >= 1e-6) {
+    const right: Vec3 = [d[2] / horiz, 0, -d[0] / horiz];
+    return { right, up: cross(d, right) };
+  }
+  // Degenerate: looking along the world vertical. `[1,0,0]` puts world X across the screen, which
+  // is the frame the footprint preview is drawn in (KiCad +X right, +Y down -> scene +Z down), so
+  // it is the default and the tie-break. `[0,0,1]` is the same view turned a quarter turn.
+  const candidates: ScreenBasis[] = [
+    { right: [1, 0, 0], up: cross(d, [1, 0, 0]) },
+    { right: [0, 0, 1], up: cross(d, [0, 0, 1]) },
+  ];
+  if (!half) return candidates[0];
+  const a = aspect > 0 ? aspect : 1;
+  const extentAlong = (axis: Vec3) =>
+    Math.abs(half[0] * axis[0]) + Math.abs(half[1] * axis[1]) + Math.abs(half[2] * axis[2]);
+  // the half-HEIGHT each basis would need; the width term is divided by the aspect exactly as
+  // fitOrthoHalfHeight does, which is what keeps the two in step
+  const cost = (b: ScreenBasis) => Math.max(extentAlong(b.up), extentAlong(b.right) / a);
+  return cost(candidates[1]) < cost(candidates[0]) ? candidates[1] : candidates[0];
+}
+
+/**
+ * The `up` HINT to hand a camera looking along `dir` - which is not the same thing as the basis's
+ * up vector, and the difference matters.
+ *
+ * A camera's `up` is a hint that `lookAt` orthogonalises against the view direction, so for any
+ * ordinary view WORLD up is the honest answer: it says "keep the horizon level" and lets the
+ * camera derive the rest. Handing it the already-perpendicular basis vector would compute the same
+ * orientation while implying a choice was made where none was.
+ *
+ * At the pole there is no horizon to keep level, so the hint has to BE the chosen rotation, and
+ * that is the one case where this returns the basis's own up.
+ */
+export function screenUpFor(dir: Vec3, half?: Vec3 | null, aspect = 1): Vec3 {
   const len = Math.hypot(dir[0], dir[1], dir[2]);
   if (len === 0) return [0, 1, 0];
-  // parallel to world up (either pole) means the horizontal component has vanished
-  const horizontal = Math.hypot(dir[0], dir[2]) / len;
-  return horizontal < 1e-6 ? [0, 0, -1] : [0, 1, 0];
+  if (Math.hypot(dir[0], dir[2]) / len >= 1e-6) return [0, 1, 0];
+  return screenBasisFor(dir, half, aspect).up;
 }
 
 /**
@@ -225,16 +299,10 @@ export function fitOrthoHalfHeight(
   pad = FIT_MARGIN,
 ): number {
   const [hx, hy, hz] = half.map(Math.abs) as [number, number, number];
-  const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
-  const d: [number, number, number] = [dir[0] / len, dir[1] / len, dir[2] / len];
-  const horiz = Math.hypot(d[0], d[2]);
-  const right: [number, number, number] =
-    horiz < 1e-6 ? [1, 0, 0] : [d[2] / horiz, 0, -d[0] / horiz];
-  const up: [number, number, number] = [
-    d[1] * right[2] - d[2] * right[1],
-    d[2] * right[0] - d[0] * right[2],
-    d[0] * right[1] - d[1] * right[0],
-  ];
+  // The SAME basis the cameras adopt, subject-aware and stage-aware. Deriving a second one here is
+  // exactly how the frustum came to be sized for a landscape silhouette while a portrait one was
+  // drawn inside it, so there is one function and both callers use it.
+  const { right, up } = screenBasisFor(dir, [hx, hy, hz], aspect);
   // The largest projection of the box onto each screen axis: every corner's contribution is the
   // sum of |extent * axis component|, which is exact for an axis-aligned box under any direction.
   const extentAlong = (axis: [number, number, number]) =>
