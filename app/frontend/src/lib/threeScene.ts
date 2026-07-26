@@ -1074,6 +1074,34 @@ export function mountModelScene(
       group.add(mesh);
     }
 
+    // ONE material for every silk segment. It was built INSIDE the loop, so a footprint with
+    // twenty silk graphics allocated twenty identical MeshPhysicalMaterials - each compiling its
+    // own shader program the first time it is drawn, and each needing disposal. They differ only in
+    // GEOMETRY, so there is nothing per-segment to carry.
+    let silkMat: THREE.MeshPhysicalMaterial | null = null;
+    const silkMaterial = () => {
+      if (silkMat) return silkMat;
+      silkMat = new THREE.MeshPhysicalMaterial({
+        // Silkscreen is MATTE EPOXY INK, not paint on a screen. This was MeshBasicMaterial, which is
+        // UNLIT by definition: it ignored the key light, the environment and every shadow, so it
+        // stayed the same flat grey whatever the board did and read as a sticker laid over a lit
+        // render. The owner's "the silkscreen needs to look realistic" is mostly this material class.
+        //
+        // Real silk is slightly off-white (never paper white), rough enough to kill any mirror
+        // reflection, and dielectric. A trace of clearcoat is what makes it read as CURED ink
+        // sitting on the mask rather than as bare pigment.
+        color: 0xe8e9e6,
+        roughness: 0.82,
+        metalness: 0.0,
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.6,
+        envMapIntensity: 0.5,
+        // ink lies ON the mask; without this the underside vanishes when the board is seen from below
+        side: THREE.DoubleSide,
+      });
+      return silkMat;
+    };
+
     // SILKSCREEN + COURTYARD. Pads alone are not the land pattern: the silk outline and the pin-1
     // marker are how a person recognises the part, and the courtyard is the keep-out it gets
     // checked against. Drawn a hair above the mask so they are not z-fighting with it.
@@ -1097,24 +1125,7 @@ export function mountModelScene(
       // boardPlane.silkQuad for the geometry and for why LineSegments2 was rejected.
       const q = silkQuad(g.start, g.end, g.width);
       if (!q) continue;
-      const mat = new THREE.MeshPhysicalMaterial({
-        // Silkscreen is MATTE EPOXY INK, not paint on a screen. This was MeshBasicMaterial, which is
-        // UNLIT by definition: it ignored the key light, the environment and every shadow, so it stayed
-        // the same flat grey whatever the board did and read as a sticker laid over a lit render. The
-        // owner's "the silkscreen needs to look realistic" is mostly this one material class.
-        //
-        // Real silk is slightly off-white (never paper white), rough enough to kill any mirror
-        // reflection, and dielectric. A trace of clearcoat is what makes it read as CURED ink sitting
-        // on the mask rather than as bare pigment.
-        color: 0xe8e9e6,
-        roughness: 0.82,
-        metalness: 0.0,
-        clearcoat: 0.18,
-        clearcoatRoughness: 0.6,
-        envMapIntensity: 0.5,
-        // ink lies ON the mask; without this the underside vanishes when the board is seen from below
-        side: THREE.DoubleSide,
-      });
+      const mat = silkMaterial();
       const geo = new THREE.PlaneGeometry(q.length * MM_TO_SCENE, q.width * MM_TO_SCENE);
       // PlaneGeometry is authored in XY. Lay it into the board plane (XZ), then turn it along the
       // segment. Order matters: rotate into the plane FIRST, then spin about the plane's normal.
