@@ -97,9 +97,24 @@ MEASURE_JS = """(ids) => {
       const lastBottom = kids.length
         ? Math.max(...kids.map((k) => k.getBoundingClientRect().bottom))
         : r.bottom - padB;
+      // WHERE the box sits, and where its glyph sits inside it. The batch plan flagged that this
+      // probe could say a box had no dead space at its FOOT while saying nothing about its
+      // position - so "why is this icon 11px right of the others" was unanswerable without
+      // reasoning about flex maths, which is exactly what burned a session's passes.
+      const svg = el.querySelector("svg");
+      const sr = svg && svg.getBoundingClientRect();
       return {
         w: Math.round(r.width),
         h: Math.round(r.height),
+        left: Math.round(r.left * 10) / 10,
+        top: Math.round(r.top * 10) / 10,
+        // the centre of the FIRST svg glyph inside the box, in page coordinates: the number that
+        // settles whether a row of icons shares one centre line.
+        glyphCx: sr ? Math.round((sr.left + sr.width / 2) * 10) / 10 : null,
+        padL: Math.round(parseFloat(cs.paddingLeft) || 0),
+        padR: Math.round(parseFloat(cs.paddingRight) || 0),
+        justify: cs.justifyContent,
+        gap: cs.columnGap,
         scrollW: el.scrollWidth,
         scrollH: el.scrollHeight,
         // dead space at the foot of the box, in CSS px. Negative would mean content overflows.
@@ -784,10 +799,17 @@ def run(args) -> int:
                                     [" OVERFLOW-X" if b["overflowX"] else "",
                                      " CLIPPED-Y" if b["clipped"] else ""]
                                 )
+                                glyph = (
+                                    f" glyphCx={b['glyphCx']}" if b.get("glyphCx") is not None
+                                    else ""
+                                )
                                 print(
                                     f"  measure {theme} {tag}: {b['w']}x{b['h']} "
+                                    f"@({b['left']},{b['top']}) "
                                     f"scroll={b['scrollW']}x{b['scrollH']} "
-                                    f"tail={b['tail']}px{flags}"
+                                    f"tail={b['tail']}px{glyph} "
+                                    f"pad={b['padL']}/{b['padR']} justify={b['justify']} "
+                                    f"gap={b['gap']}{flags}"
                                 )
                 _close_surface(page, surface)
 

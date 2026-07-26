@@ -261,7 +261,7 @@ export function Rail() {
               className={
                 // Collapsed: 34px and BARE, matching every other rail icon. Boxed 32px chips beside
                 // bare 34px nav icons is what made the collapsed rail read as botched.
-                "flex items-center gap-2 rounded-control text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 " +
+                "flex items-center gap-2.5 rounded-control text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 " +
                 (collapsed
                   ? "h-[34px] justify-center px-0 hover:bg-[var(--c-hover)] " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5 disabled:hover:bg-raise")
@@ -280,7 +280,7 @@ export function Rail() {
             <div
               data-dev-id="rail.update"
               className={
-                "flex items-center gap-2 rounded-control text-xs font-medium text-t2 " +
+                "flex items-center gap-2.5 rounded-control text-xs font-medium text-t2 " +
                 (collapsed
                   ? "h-[34px] justify-center px-0 " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5")
@@ -312,6 +312,15 @@ export function Rail() {
             }
           >
             <Icon id="nav.theme" className="h-4 w-4 flex-none" />
+            {/* The peek label every other collapsed control carries. It is not decoration: without
+                a second child this button had no flex GAP, so its glyph sat at the box centre
+                (25.5) while every other rail glyph sat at 20.5, pulled left by the gap to its own
+                zero-width label. Measured with `uishot --measure`, which now reports glyphCx.
+                It also earns its place - the rail peek names every other control and named this
+                one nothing. */}
+            <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : "sr-only"}>
+              <Text id="nav.theme">Theme</Text>
+            </span>
           </button>
         </div>
       </div>
