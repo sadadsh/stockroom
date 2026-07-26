@@ -46,6 +46,29 @@ public class SRWin {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+
+  /** Windows refuses SetForegroundWindow from a process that does not already own the foreground,
+   *  and refuses it SILENTLY. Attaching our input queue to the foreground window's thread makes us
+   *  count as that thread for the duration, which is the documented way to do this legitimately. */
+  public static bool ForceForeground(IntPtr target) {
+    IntPtr fg = GetForegroundWindow();
+    if (fg == target) return true;
+    uint me = GetCurrentThreadId();
+    uint pid;
+    // NOT `out uint pid` inline: PowerShell 5.1 compiles this with an older C# than that syntax.
+    uint other = GetWindowThreadProcessId(fg, out pid);
+    bool attached = (other != 0 && other != me) && AttachThreadInput(me, other, true);
+    try {
+      BringWindowToTop(target);
+      SetForegroundWindow(target);
+    } finally {
+      if (attached) AttachThreadInput(me, other, false);
+    }
+    return GetForegroundWindow() == target;
+  }
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr wp, IntPtr lp);
   [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(System.Drawing.Point p);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
@@ -171,15 +194,43 @@ switch ($Action) {
     # refuses SetForegroundWindow from a process that does not own the current foreground, and it
     # refuses SILENTLY by returning false while everything looks fine.
     $before = [SRWin]::GetForegroundWindow()
+    "  holder before: '$([SRWin]::TitleOf($before))'"
     [void][SRWin]::ShowWindow($hwnd, [SRWin]::SW_RESTORE)
-    [void][SRWin]::BringWindowToTop($hwnd)
-    $ok = [SRWin]::SetForegroundWindow($hwnd)
+    $ok = [SRWin]::ForceForeground($hwnd)
     Start-Sleep -Milliseconds 250
     $after = [SRWin]::GetForegroundWindow()
     "FOREGROUND before=$before after=$after target=$hwnd setfg=$ok"
     if ($after -ne $hwnd) {
       "FAIL: the window did not take focus, so any click sent to it will be swallowed."
       exit 5
+    }
+  }
+  "focusclick" {
+    # Focus and click in ONE process. Doing them as two invocations loses the race: measured
+    # 2026-07-26, Altium took the foreground correctly and the game had taken it back by the time
+    # the next PowerShell started ~1s later, so the click was swallowed by the re-focus. There is no
+    # amount of retrying that fixes a gap; the two have to be atomic.
+    $ok = [SRWin]::ForceForeground($hwnd)
+    if (-not $ok) { "FAIL: '$([SRWin]::TitleOf($hwnd))' would not take focus; the click would be swallowed."; exit 5 }
+    $sx = ToScreenX $X; $sy = ToScreenY $Y
+    # NO gap between taking focus and clicking. Another app that wants the foreground back takes it
+    # within milliseconds, and a click arriving at a re-deactivated window is spent on activating it
+    # rather than on the control. Re-asserting focus immediately before the press is what closes it.
+    [void][SRWin]::ForceForeground($hwnd)
+    [SRWin]::Click($sx, $sy)
+    "  foreground at click time: '$([SRWin]::TitleOf([SRWin]::GetForegroundWindow()))'"
+    "FOCUSCLICK shot($X,$Y) -> screen($sx,$sy) on '$([SRWin]::TitleOf($hwnd))'"
+    Start-Sleep -Seconds $Settle
+    if ($Shot) {
+      # Capture the WINDOW, not the desktop: the pointer may already have been taken back, and the
+      # window's own content is what the assertion is about.
+      $r = New-Object SRWin+RECT
+      [void][SRWin]::GetWindowRect($hwnd, [ref]$r)
+      $bmp = New-Object System.Drawing.Bitmap ($r.Right - $r.Left), ($r.Bottom - $r.Top)
+      $g = [System.Drawing.Graphics]::FromImage($bmp)
+      $hdc = $g.GetHdc(); [void][SRWin]::PrintWindow($hwnd, $hdc, 2); $g.ReleaseHdc($hdc)
+      $bmp.Save($Shot)
+      "SHOTWIN $Shot"
     }
   }
   "probe" {
