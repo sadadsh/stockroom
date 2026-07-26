@@ -2092,10 +2092,12 @@ function Sourcing({
   // Mouser leads, then DigiKey, then the rest (punch 4). The record's own order is whatever the
   // add flow stored - the pasted vendor led it - so a part bought once from DigiKey listed
   // DigiKey first forever, regardless of where the owner actually buys.
-  // The amount the reader actually needs. 1 by default, so the panel reads exactly as before until
-  // someone asks a quantity question. Held as a STRING so the field can be emptied while typing
-  // without the row prices flickering through 0.
-  const [qtyText, setQtyText] = useState("1");
+  // Held as a STRING so the field can be emptied while typing without the row prices flickering
+  // through 0, and so "blank" is a real state distinct from "1".
+  // BLANK by default (owner 2026-07-26). Empty means "no quantity asked", which reads as qty 1 below,
+  // so the panel looks and prices exactly as it did before anyone types - the quantity feature costs
+  // nothing until it is used.
+  const [qtyText, setQtyText] = useState("");
   const needQty = Math.max(1, Math.floor(Number(qtyText) || 1));
   const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
@@ -2131,7 +2133,13 @@ function Sourcing({
               value={qtyText}
               onChange={(e) => setQtyText(e.target.value)}
               aria-label="Amount needed"
-              className="tnum w-[56px] rounded-control border border-line bg-field px-1.5 py-0.5 text-right font-mono text-xs text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+              placeholder="1"
+              // SIZES TO ITS CONTENT, so a long quantity is never cut off and a blank field stays
+              // small. `field-sizing: content` is supported on the owner's runtime - checked, not
+              // assumed: their WebView2 reports Chromium 150 and CSS.supports("field-sizing",
+              // "content") is true. min/max keep it a recognisable field when empty and stop a pasted
+              // 12-digit number stretching the header.
+              className="tnum [field-sizing:content] min-w-[44px] max-w-[104px] rounded-control border border-line bg-field px-1.5 py-0.5 text-right font-mono text-xs text-t1 placeholder:text-t3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </label>
           {needQty > 1 ? (
