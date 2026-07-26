@@ -61,6 +61,29 @@ export function visibleBounds(boxes: Box[]): Bounds | null {
 }
 
 /**
+ * The screen-UP vector a view along `dir` should use - the one BOTH the fit and the camera adopt.
+ *
+ * World up works for every direction except the one that is parallel to it. Looking straight down,
+ * `up = [0,1,0]` is the view direction, so the in-plane rotation is undefined and three.js resolves
+ * it from whatever epsilon happens to be in the direction vector. That is not a small cosmetic
+ * detail: the ortho fit's own basis falls back to a right vector of `[1,0,0]` in exactly that case,
+ * so a camera that resolved its rotation differently was drawing a portrait silhouette inside a
+ * frustum sized for a landscape one. MEASURED in the preview modal on a 3.5 x 1.4mm package: ~400px
+ * of a 1704px stage used across, 87% used up it.
+ *
+ * `[0,0,-1]` is not an arbitrary substitute. It makes screen-right `+X` and screen-DOWN `+Z`, which
+ * is the frame the footprint preview is already drawn in (KiCad's `+X` right, `+Y` down, mapped to
+ * the scene as `z`). So the top view and the footprint tile show the part the same way up.
+ */
+export function screenUpFor(dir: [number, number, number]): [number, number, number] {
+  const len = Math.hypot(dir[0], dir[1], dir[2]);
+  if (len === 0) return [0, 1, 0];
+  // parallel to world up (either pole) means the horizontal component has vanished
+  const horizontal = Math.hypot(dir[0], dir[2]) / len;
+  return horizontal < 1e-6 ? [0, 0, -1] : [0, 1, 0];
+}
+
+/**
  * How far back the camera must sit for a sphere of `radius` to fit in the frame.
  *
  * A perspective camera's `fov` is VERTICAL, so the vertical extent binds on any frame at least as

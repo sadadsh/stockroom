@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { fitOrthoHalfHeight, fitDistanceForBox, halfExtents, fitDistance, visibleBounds } from "./cameraFit";
+import {
+  fitOrthoHalfHeight,
+  fitDistanceForBox,
+  halfExtents,
+  fitDistance,
+  screenUpFor,
+  visibleBounds,
+} from "./cameraFit";
 
 /**
  * The 3D viewer framed itself from the MODEL's bounds alone, captured once at load. The board and
@@ -239,5 +246,52 @@ describe("fitOrthoHalfHeight", () => {
 
   it("never returns a zero or negative frustum", () => {
     expect(fitOrthoHalfHeight([0, 0, 0], [0, 1, 0], 1)).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The fit and the CAMERA have to share one screen basis, and until this existed they did not.
+ *
+ * `fitOrthoHalfHeight` looking straight down falls back to a fixed right vector of [1,0,0], so it
+ * sizes the frustum for a view with world X across the screen. The camera meanwhile kept a world-up
+ * of [0,1,0], which for a straight-down view is PARALLEL to the view direction, so its in-plane
+ * rotation fell out of an epsilon instead of being chosen. The two disagreed by 90 degrees:
+ * MEASURED in the preview modal, a 3.5 x 1.4mm package came out standing on end, ~400px wide in a
+ * 1704px stage - a frustum sized for a landscape silhouette with a portrait one drawn inside it.
+ */
+describe("screenUpFor", () => {
+  it("is perpendicular to a straight-down view, where world up is not", () => {
+    const up = screenUpFor([0, 1, 0]);
+    expect(up[0] * 0 + up[1] * 1 + up[2] * 0).toBeCloseTo(0, 9);
+    expect(Math.hypot(...up)).toBeCloseTo(1, 9);
+  });
+
+  it("puts a part's LONGER horizontal extent across the screen, not up it", () => {
+    // The land pattern of a 3.5 x 1.4mm package: half-extents 1.75 in x, 0.7 in z. Seen from
+    // above in a landscape stage the 3.5mm side must run across, which means the screen's UP axis
+    // has to be the SHORT one.
+    const up = screenUpFor([0, 1, 0]);
+    const alongUp = 1.75 * Math.abs(up[0]) + 0.3 * Math.abs(up[1]) + 0.7 * Math.abs(up[2]);
+    expect(alongUp).toBeCloseTo(0.7, 9);
+  });
+
+  it("agrees with the frustum the ortho fit computes, which is the whole point", () => {
+    const part: [number, number, number] = [1.75, 0.3, 0.7];
+    const up = screenUpFor([0, 1, 0]);
+    const alongUp = part[0] * Math.abs(up[0]) + part[1] * Math.abs(up[1]) + part[2] * Math.abs(up[2]);
+    // a frame WIDE enough that the height binds (the width term is divided by the aspect), so the
+    // returned half-height is exactly the extent along the basis the camera is about to adopt
+    expect(fitOrthoHalfHeight(part, [0, 1, 0], 20)).toBeCloseTo(alongUp * 1.15, 6);
+  });
+
+  it("keeps world up for a view that is not looking along the vertical", () => {
+    // Only the degenerate case needs a substitute. An iso or front view must keep the ordinary
+    // horizon, or the whole scene would appear tilted.
+    expect(screenUpFor([0.55, 0.42, 1])).toEqual([0, 1, 0]);
+    expect(screenUpFor([0, 0, 1])).toEqual([0, 1, 0]);
+  });
+
+  it("handles a zero direction without producing NaN", () => {
+    expect(screenUpFor([0, 0, 0]).every(Number.isFinite)).toBe(true);
   });
 });
