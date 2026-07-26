@@ -61,16 +61,25 @@ def _parse_records(raw: bytes) -> list[dict]:
 
 
 def _parse_pipe_record(payload: bytes) -> dict:
-    """`|KEY=VALUE|...` -> {KEY: VALUE}. Values decode latin-1; a `%UTF8%KEY` twin
-    decodes utf-8 and overrides the latin-1 spelling."""
+    """`|KEY=VALUE|...` -> {KEY: VALUE}, keys UPPERCASED. Values decode latin-1; a `%UTF8%KEY`
+    twin decodes utf-8 and overrides the latin-1 spelling.
+
+    Keys are case-normalised because ALTIUM'S OWN CASING IS MIXED and this reader matched
+    uppercase only. Measured 2026-07-26 against a component placed by hand in AD26 26.8.1: the
+    file says `LibReference`, `DesignItemId`, `OwnerIndex`, `Text`, `Name`, `ModelName`,
+    `ModelType`, `IsCurrent` - not one of them uppercase. So every genuine Altium schematic came
+    back as a component with every field blank, which silently emptied the Altium BOM and project
+    health. The whole test suite passed throughout, because every fixture in it was synthesised in
+    uppercase: a test that cannot fail on the real artifact is worse than no test.
+    """
     fields: dict[str, str] = {}
     utf8_keys: set[str] = set()
     for part in payload.split(b"|"):
         if not part or b"=" not in part:
             continue
         rk, rv = part.split(b"=", 1)
-        key = rk.decode("latin-1")
-        if key.upper().startswith("%UTF8%"):
+        key = rk.decode("latin-1").upper()
+        if key.startswith("%UTF8%"):
             real = key[len("%UTF8%") :]
             fields[real] = rv.decode("utf-8", errors="replace")
             utf8_keys.add(real)

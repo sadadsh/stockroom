@@ -147,3 +147,82 @@ def test_read_schdoc_components_raises_on_a_non_ole_file(tmp_path):
     path.write_text("plain text", encoding="utf-8")
     with pytest.raises(Exception):
         read_schdoc_components(path)
+
+
+# -- key CASE: what a real Altium writes, versus what these tests used to assume ----
+
+
+def _real_world_stream() -> bytes:
+    """Records spelled the way real AD26 spells them: MIXED CASE.
+
+    Every other test in this file synthesises UPPERCASE keys, and the reader matched uppercase, so
+    the whole suite passed while the reader returned blank fields for every genuine Altium file.
+    Captured 2026-07-26 from a component placed by hand in AD26 26.8.1 from the Stockroom DbLib
+    (`C:\\srplace\\Placed.SchDoc`): `LibReference`, `DesignItemId`, `OwnerIndex`, `Text`, `Name`,
+    `ModelName`, `ModelType`, `IsCurrent`. Not one of them is uppercase.
+    """
+    return (
+        _rec("HEADER=Protel for Windows - Schematic Capture Binary File Version 5.0", "Weight=82")
+        + _rec(
+            "RECORD=1",
+            "LibReference=TPD6E05U06RVZR",
+            "DesignItemId=TPD6E05U06RVZR",
+            "SourceLibraryName=Stockroom.DbLib",
+            "DatabaseTableName=Parts",
+            "UniqueID=DCIJNTYU",
+            "OwnerPartId=-1",
+            "PartCount=2",
+            "CurrentPartId=1",
+        )
+        + _rec("RECORD=34", "OwnerIndex=0", "Name=Designator", "Text=U?")
+        + _rec("RECORD=41", "OwnerIndex=0", "Name=MPN", "Text=TPD6E05U06RVZR")
+        + _rec("RECORD=41", "OwnerIndex=0", "Name=Manufacturer", "Text=TI")
+        + _rec("RECORD=44", "OwnerIndex=0")
+        + _rec("RECORD=45", "OwnerIndex=4", "ModelName=RVZ0014A", "ModelType=PCBLIB", "IsCurrent=T")
+    )
+
+
+def test_reads_a_component_written_with_REAL_altium_key_casing():
+    """The reader must not care how Altium capitalises its keys.
+
+    This failed before 2026-07-26: a real placed component came back with every field empty
+    (designator '', lib_ref '', footprint ''), which silently emptied the Altium BOM and project
+    health. It went unnoticed because no test had ever been run against a file Altium wrote.
+    """
+    comps = _components_from_stream(_real_world_stream())
+    assert len(comps) == 1
+    c = comps[0]
+    assert c["lib_ref"] == "TPD6E05U06RVZR"
+    assert c["design_item_id"] == "TPD6E05U06RVZR"
+    assert c["designator"] == "U?"
+    assert c["footprint"] == "RVZ0014A"
+    assert c["params"]["MPN"] == "TPD6E05U06RVZR"
+    assert c["params"]["Manufacturer"] == "TI"
+    assert c["unique_id"] == "DCIJNTYU"
+
+
+def test_reads_a_REAL_ad26_file_placed_from_the_stockroom_dblib():
+    """The anti-vacuity test: a file Altium itself wrote, not one this suite invented.
+
+    Every other fixture here is synthesised, and that is exactly how the mixed-case bug survived -
+    the suite could not fail on the artifact it exists to read. This one was produced on
+    2026-07-26 by placing TPD6E05U06RVZR onto a sheet by hand in AD26 26.8.1, from the generated
+    Stockroom DbLib, and saving. If Altium changes its framing or its casing, this fails.
+
+    It also pins the whole Altium handoff end to end: the symbol resolved, the footprint attached,
+    and all twenty database columns rode onto the placement - including `Stockroom ID`, which is
+    the durable binding back to the library record.
+    """
+    fixture = Path(__file__).resolve().parent / "fixtures" / "ad26-dblib-placed.SchDoc"
+    comps = read_schdoc_components(fixture)
+    assert len(comps) == 1
+    c = comps[0]
+    assert c["designator"] == "U?"
+    assert c["lib_ref"] == "TPD6E05U06RVZR"
+    assert c["design_item_id"] == "TPD6E05U06RVZR"
+    assert c["footprint"] == "RVZ0014A"
+    assert c["unique_id"]
+    assert c["params"]["MPN"] == "TPD6E05U06RVZR"
+    assert c["params"]["Manufacturer"] == "TI"
+    # The placement binding, which is the whole point of shipping a Stockroom ID column.
+    assert c["params"]["Stockroom ID"] == "tpd6e05u06rvzr"
