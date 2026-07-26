@@ -26,9 +26,11 @@ both paths), so the viewer's millimetre normalisation is unaffected by the route
 from __future__ import annotations
 
 import json
+import re
 import struct
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 # GLB (binary glTF) starts with the ASCII magic "glTF"; named here so the converter
 # and its tests share one contract for "this really is a GLB".
@@ -114,6 +116,82 @@ _STEP_METALLIC = 0.0
 # unchanged and still deliberate.
 _STEP_ROUGHNESS = 0.8
 
+# The finish of a surface the converter has decided is PLATED METAL rather than moulded plastic.
+# A lead left dielectric renders as coloured PLASTIC, and a dark matte body beside genuinely
+# specular metal is most of what makes a real component photograph read as real. Not a mirror:
+# a reflowed tin or gold plating is satin, and 0.0 would make every lead a chrome bead.
+_METAL_METALLIC = 1.0
+_METAL_ROUGHNESS = 0.35
+
+# Colours that ARE metal, matched EXACTLY (within rounding). MEASURED over 130 real KiCad models,
+# which between them use only 41 distinct colours - the ecosystem emits a small fixed palette, so an
+# exact table covers most of it. `(209,208,198)` appears in 84 of those 130 models and
+# `(218,187,126)` in 42; both were confirmed as pins/leads by bounding volume on real parts
+# (Molex_KK-254, PinHeader, an LED, a tantalum cap).
+#
+# EXACTNESS IS THE WHOLE DESIGN, and this is the case that forces it: `(227,226,206)` is WHITE
+# NYLON - the 344.7mm3 housing of Molex_KK-254, beside its 28.9mm3 tin pins. It sits 18/18/8 away
+# from the tin colour, and BOTH are light and achromatic, so any saturation-or-lightness rule that
+# catches the tin also chrome-plates the connector body. That is why the broader "grey means metal"
+# rule was rejected before, and re-rejected here on measurement rather than on principle.
+_METAL_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (209, 208, 198),  # tin / silver plating - the generator's default pin finish
+    (218, 187, 126),  # gold
+    (218, 187, 125),  # gold, the other rounding the generator emits
+)
+# Tolerance per channel. Small deliberately: it absorbs sRGB rounding and nothing else. The nearest
+# NON-metal in the corpus is 8 away on its closest channel, so this cannot reach it.
+_METAL_MATCH_TOLERANCE = 3
+
+# Words a vendor uses for the LEADFRAME in its own STEP assembly, as a fallback for a part whose
+# colours are not in any generator palette. cascadio preserves the vendor's solid names, and the
+# owner's TPD6E05U06RVZR splits into `FRAME` and `BODY` with leads stated as (255,157,132), which no
+# palette knows.
+#
+# This fires RARELY and fails SAFE, which is the only thing that makes it defensible rather than a
+# "works on my one file" feature: MEASURED across 24 sampled KiCad models, every single one has
+# exactly ONE mesh named after the FOOTPRINT (`PinHeader_2x29_P254mm_Vertical`), so the vocabulary
+# never matches there and they fall through to the palette. Matched as whole TOKENS, never as
+# substrings, so `MAINFRAMEWORK` is not a leadframe.
+_LEADFRAME_WORDS = frozenset(
+    {"FRAME", "LEADFRAME", "LEAD", "LEADS", "PIN", "PINS", "TERMINAL", "TERMINALS", "CONTACT",
+     "CONTACTS"}
+)
+
+
+class SurfaceFinish(NamedTuple):
+    """The two properties a STEP cannot state, decided per surface rather than per file."""
+
+    metallic: float
+    roughness: float
+
+
+def _tokens(name: str) -> set[str]:
+    """Upper-case word tokens of a mesh/solid name, split on anything that is not alphanumeric."""
+    return {t for t in re.split(r"[^A-Za-z0-9]+", name.upper()) if t}
+
+
+def surface_finish(srgb: tuple[int, int, int], mesh_name: str = "") -> SurfaceFinish:
+    """Decide one surface's finish from the only two signals a converted STEP actually carries:
+    its colour, and the name the vendor gave the solid it belongs to.
+
+    Order matters. The PALETTE wins, because it is an ecosystem fact measured over a corpus; the
+    NAME is only consulted when the colour is unrecognised, so a vocabulary word can never override
+    a colour already known to be non-metal."""
+    for metal in _METAL_PALETTE:
+        if all(abs(a - b) <= _METAL_MATCH_TOLERANCE for a, b in zip(srgb, metal)):
+            return SurfaceFinish(_METAL_METALLIC, _METAL_ROUGHNESS)
+    if _tokens(mesh_name) & _LEADFRAME_WORDS:
+        return SurfaceFinish(_METAL_METALLIC, _METAL_ROUGHNESS)
+    return SurfaceFinish(_STEP_METALLIC, _STEP_ROUGHNESS)
+
+
+def _srgb8(base_color: list[float]) -> tuple[int, int, int]:
+    """glTF states baseColorFactor in LINEAR light; the palette above is written in the sRGB bytes
+    a person reads off a colour picker, so the comparison happens in sRGB."""
+    return tuple(round((max(c, 0.0) ** (1 / 2.2)) * 255) for c in base_color[:3])  # type: ignore[return-value]
+
+
 # The GLB JSON chunk's type, as the little-endian u32 the container stores it as.
 _CHUNK_JSON = 0x4E4F534A
 
@@ -155,14 +233,28 @@ def _state_surface_finish(data: bytes) -> bytes:
         length, kind = struct.unpack_from("<II", data, offset)
         if kind == _CHUNK_JSON:
             gltf = json.loads(data[offset + 8 : offset + 8 + length])
+            # Which SOLID each material belongs to. A material carries no name worth reading
+            # (cascadio emits mat_0..mat_n), but the MESH it is used by keeps the vendor's own
+            # name, and that is the leadframe signal. A material used by more than one mesh gets
+            # all their names, so a leadframe word anywhere it is used counts.
+            names: dict[int, set[str]] = {}
+            for mesh in gltf.get("meshes", []):
+                for prim in mesh.get("primitives", []):
+                    index = prim.get("material")
+                    if index is not None:
+                        names.setdefault(index, set()).add(mesh.get("name") or "")
             touched = False
-            for material in gltf.get("materials", []):
+            for index, material in enumerate(gltf.get("materials", [])):
                 pbr = material.setdefault("pbrMetallicRoughness", {})
+                finish = surface_finish(
+                    _srgb8(pbr.get("baseColorFactor", [0.0, 0.0, 0.0, 1.0])),
+                    " ".join(sorted(names.get(index, set()))),
+                )
                 if "metallicFactor" not in pbr:
-                    pbr["metallicFactor"] = _STEP_METALLIC
+                    pbr["metallicFactor"] = finish.metallic
                     touched = True
                 if "roughnessFactor" not in pbr:
-                    pbr["roughnessFactor"] = _STEP_ROUGHNESS
+                    pbr["roughnessFactor"] = finish.roughness
                     touched = True
             return _with_gltf_json(data, gltf) if touched else data
         offset += 8 + length

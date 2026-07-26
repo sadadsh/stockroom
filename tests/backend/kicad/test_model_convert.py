@@ -32,6 +32,11 @@ def _gltf_json(data: bytes) -> dict:
     raise AssertionError("GLB has no JSON chunk")
 
 
+def _srgb(base_color):
+    """glTF states baseColorFactor in LINEAR light; a colour a person can reason about is sRGB."""
+    return [round((max(c, 0.0) ** (1 / 2.2)) * 255) for c in base_color[:3]]
+
+
 def _find_step_with_colours(minimum: int = 2):
     """A system KiCad STEP whose own conversion yields >= `minimum` materials.
 
@@ -130,9 +135,14 @@ def test_model_to_glb_states_a_surface_finish_instead_of_taking_gltfs_metal_defa
         pbr = mat["pbrMetallicRoughness"]
         assert "metallicFactor" in pbr, f"{path}: {mat.get('name')} defaults to metal"
         assert "roughnessFactor" in pbr, f"{path}: {mat.get('name')} defaults to fully rough"
-        assert pbr["metallicFactor"] < 1.0, (
-            f"{path}: {mat.get('name')} is fully metallic, which renders a dark colour black"
-        )
+        # A material may legitimately be fully metallic now (a recognised pin colour, see
+        # surface_finish), but a DARK one may not: metal has no diffuse response, so its
+        # reflectance IS its base colour and a near-black metal renders as an unlit silhouette.
+        if pbr["metallicFactor"] >= 1.0:
+            assert max(_srgb(pbr.get("baseColorFactor", [0, 0, 0, 1]))) > 120, (
+                f"{path}: {mat.get('name')} is fully metallic with a dark base colour, "
+                "which renders as a black silhouette"
+            )
 
 
 @requires_glb_tooling
@@ -157,12 +167,71 @@ def test_model_to_glb_states_a_matte_finish_so_a_dark_body_is_not_a_mirror():
     materials = _gltf_json(model_to_glb(path))["materials"]
     assert materials, f"{path}: converted with no materials at all"
     for mat in materials:
-        roughness = mat["pbrMetallicRoughness"]["roughnessFactor"]
+        pbr = mat["pbrMetallicRoughness"]
+        # metals are deliberately smoother than moulded plastic; the matte band is about the
+        # DIELECTRIC default, which is what a package body gets.
+        if pbr["metallicFactor"] >= 1.0:
+            continue
+        roughness = pbr["roughnessFactor"]
         assert 0.7 <= roughness < 0.95, (
             f"{path}: {mat.get('name')} is stated at roughness {roughness}, outside the "
             "matte-moulded-plastic band; a semi-gloss default makes a near-black body "
             "render as a mid-grey mirror of the studio environment"
         )
+
+
+@requires_glb_tooling
+def test_model_to_glb_states_metal_for_a_known_pin_colour_but_not_for_nylon():
+    """Leads are METAL and the converter has to say so, because STEP cannot.
+
+    A tinned lead left at `metallicFactor 0` renders as salmon-coloured PLASTIC, and a dark matte
+    body beside genuinely specular metal is most of what makes a real component photograph read as
+    real. The signal is an EXACT match against the small palette the ecosystem actually emits -
+    MEASURED over 130 real KiCad models, which between them use only 41 distinct colours, of which
+    `(209,208,198)` (84 models) and `(218,187,126)` (42 models) are the tin and gold the generator
+    gives pins.
+
+    Exactness is the whole point, and this is the case that proves it: `(227,226,206)` is WHITE
+    NYLON. It differs from the tin colour by 18/18/8 and any saturation-or-lightness rule that
+    catches the tin catches the nylon too (both are achromatic and light). Verified on
+    Molex_KK-254 by bounding volume - the nylon is the 344.7mm3 housing, the tin is the 28.9mm3
+    pins - so a fuzzy rule would chrome-plate a connector body."""
+    from stockroom.kicad.model_convert import surface_finish
+
+    tin = surface_finish((209, 208, 198), "")
+    gold = surface_finish((218, 187, 126), "")
+    nylon = surface_finish((227, 226, 206), "")
+    epoxy = surface_finish((42, 42, 42), "")
+
+    assert tin.metallic == 1.0, "KiCad's tin pin colour must read as metal"
+    assert gold.metallic == 1.0, "KiCad's gold pin colour must read as metal"
+    assert nylon.metallic == 0.0, "white nylon housing must NOT be metal (Molex KK-254 body)"
+    assert epoxy.metallic == 0.0, "black epoxy body must NOT be metal"
+    # a metal is smoother than moulded plastic, but a plated lead is not a mirror
+    assert 0.2 <= tin.roughness <= 0.5
+    assert 0.7 <= epoxy.roughness < 0.95
+
+
+@requires_glb_tooling
+def test_model_to_glb_reads_a_vendors_leadframe_mesh_name_when_the_palette_is_unknown():
+    """The palette table is a KiCad-ecosystem fact and a vendor STEP does not follow it.
+
+    The owner's TPD6E05U06RVZR states its leads as (255,157,132), which is in no generator palette,
+    so the colour table alone leaves them plastic. cascadio DOES preserve the vendor's own solid
+    names though, and TI splits that part into `FRAME` (the leadframe) and `BODY`.
+
+    This fallback fires RARELY and fails SAFE, which is the only reason it is defensible: MEASURED
+    across 24 sampled KiCad models, every single one has exactly ONE mesh named after the FOOTPRINT
+    (`PinHeader_2x29_P254mm_Vertical`), so the vocabulary never matches and they fall through to the
+    palette. It must never override a colour the palette already recognises as non-metal."""
+    from stockroom.kicad.model_convert import surface_finish
+
+    assert surface_finish((255, 157, 132), "FRAME").metallic == 1.0
+    assert surface_finish((255, 157, 132), "BODY").metallic == 0.0
+    # a footprint-named mesh is the ordinary KiCad case and must not be read as a leadframe
+    assert surface_finish((42, 42, 42), "PinHeader_2x29_P254mm_Vertical").metallic == 0.0
+    # the vocabulary must not fire on a substring inside an unrelated word
+    assert surface_finish((42, 42, 42), "MAINFRAMEWORK").metallic == 0.0
 
 
 def test_model_to_glb_gives_wrl_an_honest_message_not_install_cascadio(tmp_path):
