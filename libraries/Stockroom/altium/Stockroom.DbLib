@@ -57,3 +57,5 @@ Options=FieldName=Parts.Stock|TableNameOnly=Parts|FieldNameOnly=Stock|FieldType=
 Options=FieldName=Parts.Lifecycle|TableNameOnly=Parts|FieldNameOnly=Lifecycle|FieldType=1|ParameterName=Lifecycle|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
 [FieldMap18]
 Options=FieldName=Parts.Category|TableNameOnly=Parts|FieldNameOnly=Category|FieldType=1|ParameterName=Category|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
+[FieldMap19]
+Options=FieldName=Parts.Stockroom ID|TableNameOnly=Parts|FieldNameOnly=Stockroom ID|FieldType=1|ParameterName=Stockroom ID|VisibleOnAdd=False|AddMode=0|RemoveMode=0|UpdateMode=0
