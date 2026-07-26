@@ -117,6 +117,6 @@
     (property "MPN" "TPD6E05U06RVZR" (at 0 0 0) (effects (hide yes)))
     (property "Manufacturer" "Texas Instruments" (at 0 0 0) (effects (hide yes)))
     (property "Description" "ESD Protection Diodes / TVS Diodes 6-CH lo cap IEC ESD protect diodes" (at 0 0 0) (effects (hide yes)))
-    (property "Purchase" "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPD6E05U06RVZR?qs=QCUnHQQYO1pCeVGx6Ibw%252BQ%3D%3D" (at 0 0 0) (effects (hide yes)))
+    (property "Purchase" "https://www.mouser.com/ProductDetail/Texas-Instruments/TPD6E05U06RVZR?qs=QCUnHQQYO1pCeVGx6Ibw%252BQ%3D%3D" (at 0 0 0) (effects (hide yes)))
   )
 )
