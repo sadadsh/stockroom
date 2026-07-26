@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  BOARD_PLANE_MIN_ASPECT,
-  BOARD_PLANE_MIN_HALF_MM,
-  BOARD_PLANE_REACH,
+  BOARD_PLANE_HALF_MM,
   PAD_THICKNESS_MM,
   boardExtent,
   boardPlaneHalfExtents,
@@ -176,42 +174,27 @@ describe("boardExtent", () => {
   });
 });
 
-describe("boardPlaneHalfExtents", () => {
-  it("reaches WELL past the footprint, so it reads as a surface not a coaster", () => {
-    const e = boardPlaneHalfExtents({ halfX: 1, halfZ: 0.5 });
-    expect(e.halfX).toBeCloseTo(BOARD_PLANE_REACH, 10);
+// RE-BASELINED 2026-07-26. Owner: "The plane should be like infinite, and the view should be zoomed in
+// and centered on the model." That pair replaces three attempts at SIZING the board (footprint-cropped,
+// square 2.6x, per-axis with a floor ratio) - every one of which was solving the wrong problem, because
+// the board only looked wrong relative to the part while the CAMERA was framing the board. The camera
+// now ignores it, so the plane just runs past the frame.
+describe("boardPlaneHalfExtents (effectively infinite)", () => {
+  it("is the same vast surface whatever stands on it, like a real bench", () => {
+    const tiny = boardPlaneHalfExtents({ halfX: 0.3, halfZ: 0.15 });
+    const big = boardPlaneHalfExtents({ halfX: 12, halfZ: 4 });
+    expect(tiny).toEqual(big);
+    expect(tiny.halfX).toBeCloseTo(BOARD_PLANE_HALF_MM, 10);
   });
 
-  // RE-BASELINED 2026-07-26, and the square it replaces was wrong for the reason the owner saw: on a
-  // real USON-14 (3.5 x 1.4mm) a square plane came out 4.5x the part's short axis and the part read as
-  // lost. Now each axis grows from its own extent, with a floor ratio so it never becomes a sliver.
-  it("grows each axis from its OWN extent, so an elongated part keeps its presence", () => {
-    const e = boardPlaneHalfExtents({ halfX: 3, halfZ: 1 });
-    expect(e.halfX).toBeGreaterThan(e.halfZ);
+  it("is far larger than any package this app handles, so no frame reaches its edge", () => {
+    // the longest thing realistically placed here is a few tens of mm; 250mm half-extent is ~70x that
+    expect(BOARD_PLANE_HALF_MM).toBeGreaterThan(100);
   });
 
-  it("never lets one axis become a sliver of the other", () => {
+  it("is square, since an edge that is never visible has no aspect to get wrong", () => {
     const e = boardPlaneHalfExtents({ halfX: 8, halfZ: 0.1 });
-    expect(e.halfZ / e.halfX).toBeGreaterThanOrEqual(BOARD_PLANE_MIN_ASPECT - 1e-9);
-  });
-
-  it("always contains what stands on it, in both axes", () => {
-    for (const src of [
-      { halfX: 1, halfZ: 0.5 },
-      { halfX: 0.3, halfZ: 0.3 },
-      { halfX: 8, halfZ: 1 },
-      { halfX: 0.05, halfZ: 4 },
-    ]) {
-      const e = boardPlaneHalfExtents(src);
-      expect(e.halfX).toBeGreaterThan(src.halfX);
-      expect(e.halfZ).toBeGreaterThan(src.halfZ);
-    }
-  });
-
-  it("gives a tiny part a real surface rather than a stamp", () => {
-    expect(boardPlaneHalfExtents({ halfX: 0.3, halfZ: 0.15 }).halfX).toBeGreaterThanOrEqual(
-      BOARD_PLANE_MIN_HALF_MM,
-    );
+    expect(e.halfX).toBeCloseTo(e.halfZ, 10);
   });
 });
 

@@ -135,36 +135,33 @@ export function boardExtent(
 }
 
 /**
- * How far past the footprint the board plane extends, as a MULTIPLE of the footprint's own reach.
+ * The board plane's half-extent, in mm. Effectively INFINITE.
  *
- * Owner 2026-07-26: "the pcb render should legitimately add a plane to the 3d view not just another
- * floating component." A board cropped to the footprint plus a hair reads as a coaster the part is
- * balanced on. A real board continues past the part in every direction, so the eye takes it as
- * surface rather than object. Bounded, because the camera re-fits to the whole visible set: an
- * unbounded plane would simply shrink the part it exists to support.
+ * Owner 2026-07-26: "The plane should be like infinite, and the view should be zoomed in and centered
+ * on the model." Those two go together and they replace three earlier attempts at SIZING the board:
+ * cropped to the footprint (read as a coaster), a square 2.6x reach (dwarfed the part), then per-axis
+ * with a floor ratio (still 4.5x the short axis of a 3.5 x 1.4mm USON).
+ *
+ * Every one of those was solving the wrong problem. The board looked wrong relative to the part only
+ * because the CAMERA framed the board; once the fit ignores it (see `refitCamera`, which no longer adds
+ * `boardMesh`), the plane can simply run past the frame in every direction and the part is the subject.
+ * A surface with no visible edge reads as a workbench rather than as an object, which is what "like
+ * infinite" asks for.
+ *
+ * 250mm is not literally infinite but is ~70x the longest package this app handles, so no frame the
+ * camera can take of a part will ever reach its edge. A truly unbounded plane is not free: it would
+ * need shader tricks or a camera-following quad, and both cost more than a big number.
  */
-export const BOARD_PLANE_REACH = 1.8;
+export const BOARD_PLANE_HALF_MM = 250;
 
-/** The minimum half-extent in mm, so a tiny 0402 still gets a surface rather than a stamp. */
-export const BOARD_PLANE_MIN_HALF_MM = 1.2;
 
-/** Neither axis may fall below this fraction of the longer one, so the plane never becomes a sliver
- *  that reads as footprint-shaped rather than as board. */
-export const BOARD_PLANE_MIN_ASPECT = 0.62;
 
 /** The board plane's half-extents: the footprint's reach, grown so it reads as a surface. */
-export function boardPlaneHalfExtents(extent: BoardExtent): BoardExtent {
-  // PER-AXIS, then squared UP to a floor ratio - not a plain square.
-  //
-  // It was fully square, on the reasoning that "a board is not footprint-shaped". True, but measured on
-  // the owner's real USON-14 (3.5 x 1.4mm) that produced a 6.3mm square: 1.8x the part along its length
-  // and 4.5x across its width, so the part read as lost on a table rather than placed on a board.
-  // Growing each axis from its OWN extent keeps the part's presence, and the floor ratio stops a long
-  // thin part getting a long thin sliver that would read as footprint-shaped again.
-  const x = Math.max(extent.halfX * BOARD_PLANE_REACH, BOARD_PLANE_MIN_HALF_MM);
-  const z = Math.max(extent.halfZ * BOARD_PLANE_REACH, BOARD_PLANE_MIN_HALF_MM);
-  const floor = Math.max(x, z) * BOARD_PLANE_MIN_ASPECT;
-  return { halfX: Math.max(x, floor), halfZ: Math.max(z, floor) };
+export function boardPlaneHalfExtents(_extent: BoardExtent): BoardExtent {
+  // The footprint's extent no longer decides this - the plane is the same effectively-infinite surface
+  // whatever stands on it, exactly as a real bench is. The argument is kept so callers do not change
+  // and so `boardExtent` (which also guards against a graphic hanging off an edge) stays meaningful.
+  return { halfX: BOARD_PLANE_HALF_MM, halfZ: BOARD_PLANE_HALF_MM };
 }
 
 /** Where each piece of the board / pad / part stack sits, in scene Y. */
