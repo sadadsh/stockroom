@@ -196,9 +196,15 @@ export function Rail() {
         </button>
         <div
           data-dev-id="rail.utility"
+          // COLLAPSED, this row must join the icon rhythm above it rather than keeping its own:
+          // `mt-1.5` + `gap-1.5` + 32px children measured a 36 / 39 / 38px pitch against the nav
+          // items' 36, which is the "some things are uneven there" the owner reported. Collapsed it
+          // now uses the footer's own `gap-0.5` and no top margin, so every control in the rail sits
+          // on ONE 36px step. Expanded keeps the tighter pill row, where the update chip and the
+          // theme button genuinely are a side-by-side utility pair with labels to justify the boxes.
           className={
-            "mt-1.5 flex gap-1.5 " +
-            (collapsed ? "flex-col items-stretch" : "items-center")
+            "flex " +
+            (collapsed ? "flex-col items-stretch gap-0.5" : "mt-1.5 items-center gap-1.5")
           }
         >
           {hasUpdate ? (
@@ -210,8 +216,12 @@ export function Rail() {
               onClick={onApplyUpdate}
               disabled={apply.isPending}
               className={
-                "flex h-[32px] items-center gap-2 rounded-control border border-line bg-raise text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-raise " +
-                (collapsed ? "justify-center px-0" : "flex-1 px-2.5")
+                // Collapsed: 34px and BARE, matching every other rail icon. Boxed 32px chips beside
+                // bare 34px nav icons is what made the collapsed rail read as botched.
+                "flex items-center gap-2 rounded-control text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 " +
+                (collapsed
+                  ? "h-[34px] justify-center px-0 hover:bg-[var(--c-hover)]"
+                  : "h-[32px] flex-1 border border-line bg-raise px-2.5 disabled:hover:bg-raise")
               }
             >
               <Icon id="nav.update" className="h-4 w-4 flex-none" />
@@ -225,8 +235,10 @@ export function Rail() {
             <div
               data-dev-id="rail.update"
               className={
-                "flex h-[32px] items-center gap-2 rounded-control border border-line bg-raise text-xs font-medium text-t2 " +
-                (collapsed ? "justify-center px-0" : "flex-1 px-2.5")
+                "flex items-center gap-2 rounded-control text-xs font-medium text-t2 " +
+                (collapsed
+                  ? "h-[34px] justify-center px-0"
+                  : "h-[32px] flex-1 border border-line bg-raise px-2.5")
               }
               title="You have the latest version"
             >
@@ -245,7 +257,12 @@ export function Rail() {
             onClick={toggle}
             aria-label="Toggle light or dark theme"
             title="Toggle light or dark theme"
-            className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-control border border-line bg-raise text-t2 transition hover:bg-raise2 hover:text-t1"
+            className={
+              "flex flex-none items-center justify-center rounded-control text-t2 transition hover:text-t1 " +
+              (collapsed
+                ? "h-[34px] w-full hover:bg-[var(--c-hover)]"
+                : "h-[32px] w-[32px] border border-line bg-raise hover:bg-raise2")
+            }
           >
             <Icon id="nav.theme" className="h-4 w-4 flex-none" />
           </button>

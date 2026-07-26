@@ -130,12 +130,26 @@ describe("partPhotos + the carousel", () => {
       { Image: { value: "https://mouser.com/a.jpg", source: "mouser" } },
       { Image: [{ value: "https://digikey.com/b.jpg", source: "digikey", confidence: "high" }] },
     );
-    expect(shots.map((s) => s.url)).toEqual([
-      "https://mouser.com/a.jpg",
-      "https://digikey.com/b.jpg",
-    ]);
+    // The ORIGINAL guarantee, unchanged: both photographs survive. Asserted as a set so it states
+    // "nothing was dropped" without also pinning an order, which is what this test is really for.
+    expect(new Set(shots.map((s) => s.url))).toEqual(
+      new Set(["https://mouser.com/a.jpg", "https://digikey.com/b.jpg"]),
+    );
     // and each names its vendor, because WHICH shot you are looking at is the reason to page
-    expect(shots.map((s) => s.vendor)).toEqual(["Mouser", "DigiKey"]);
+    expect(new Set(shots.map((s) => s.vendor))).toEqual(new Set(["Mouser", "DigiKey"]));
+  });
+
+  // RE-BASELINED 2026-07-26, and the order this replaces was correct at the time: it asserted
+  // Mouser-then-DigiKey, i.e. `setdefault` arrival order. The owner's complaint is precisely that
+  // ("the digikey one is much better than mouser"), so quality order now decides the hero slot.
+  it("leads with the higher-quality DigiKey photograph, not whoever won the specs slot", () => {
+    const shots = partPhotos(
+      { Image: { value: "https://mouser.com/a.jpg", source: "mouser" } },
+      { Image: [{ value: "https://digikey.com/b.jpg", source: "digikey", confidence: "high" }] },
+    );
+    expect(shots.map((s) => s.vendor)).toEqual(["DigiKey", "Mouser"]);
+    // the hero slot is the FIRST entry, so this is the thumbnail and the carousel's opening frame
+    expect(shots[0].url).toBe("https://digikey.com/b.jpg");
   });
 
   it("humanises an internal source key rather than showing the lane suffix", () => {

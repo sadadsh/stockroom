@@ -493,7 +493,13 @@ export function DetailPanel({
               }
               onOpen={hasModel ? () => setPreview("model") : undefined}
             />
-            <div className="grid h-[200px] grid-cols-2 gap-2.5">
+            {/* Content-sized, NOT `h-[200px]`. That literal sat here holding two `h-[142px]` tiles,
+                so it guaranteed 58px of empty row under the cards on every part, forever - and with
+                the column's own `gap-4` on top of it that is the 74px void the owner reported as
+                "odd spacing underneath the model symbol and footprint before the cad complete
+                button" (measured 75px on their window, 89px ink-to-ink here including the CAD row's
+                own padding). Two hardcoded heights that disagreed by 58px, in the same element. */}
+            <div className="grid grid-cols-2 gap-2.5">
               <AssetTile
                 devId="detail.asset-symbol"
                 name="Symbol"
@@ -1788,7 +1794,12 @@ function VendorLadder({
   currency?: string;
 }) {
   const money = (value: number) => formatPrice(value, currency ?? "");
-  const [open, setOpen] = useState(false);
+  // OPEN by default, per the owner 2026-07-26: "the sourcing pricing should be maximized always".
+  // This overrides the reasoning in the comment above, which was written when the ladder was judged
+  // to be most of why this column read as a wall - the owner has since decided the price ladder is
+  // the point of the column, not clutter in it. The toggle stays so a single view can be quietened,
+  // but every part and every vendor now OPENS maximized rather than needing two clicks to compare.
+  const [open, setOpen] = useState(true);
   return (
     <SpecSection
       title="Volume Pricing"

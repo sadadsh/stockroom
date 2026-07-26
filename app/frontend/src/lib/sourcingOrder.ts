@@ -38,6 +38,38 @@ export function orderPurchases<T extends { vendor: string }>(purchases: readonly
     .map((e) => e.row);
 }
 
+// Where each distributor sits for IMAGE QUALITY, best first. This is deliberately NOT `VENDOR_RANK`
+// above and the two must never be merged: that one is a PURCHASE preference (the owner buys from
+// Mouser), so reusing it here would hand the hero photo slot to the weakest image of the three.
+//
+// Owner 2026-07-26: "the view photo should always prioritize the higher quality image, the digikey
+// one is much better than mouser." DigiKey serve large, evenly-lit product photography; LCSC sit in
+// the middle; Mouser's are the smallest and most inconsistent. Until a photo's real pixel dimensions
+// are known this ranking IS the quality signal - see the note in `orderPhotos`.
+const PHOTO_RANK: Record<string, number> = { digikey: 0, lcsc: 1, mouser: 2 };
+
+/**
+ * Every photograph in QUALITY order, best first, so the hero slot and the carousel's first frame
+ * are the best image on record rather than whichever adapter happened to win `setdefault`.
+ *
+ * Never drops or reorders beyond the rank: an unranked vendor keeps its given order after the
+ * ranked ones, exactly like `orderPurchases`.
+ *
+ * KNOWN LIMIT, deliberately not solved here: this ranks by SOURCE, not by measured resolution. The
+ * true signal is the image's own intrinsic width, which is only knowable after the bytes arrive -
+ * so using it would mean either a fetch per candidate before first paint, or re-ordering the
+ * carousel after load, which moves the hero image under the reader's eye. Source rank is a stable
+ * proxy that costs nothing and is right for the three vendors that actually ship photos today.
+ */
+export function orderPhotos<T extends { vendor: string }>(photos: readonly T[]): T[] {
+  const photoRank = (vendor: string): number =>
+    PHOTO_RANK[(vendor || "").trim().toLowerCase()] ?? UNRANKED;
+  return photos
+    .map((photo, index) => ({ photo, index }))
+    .sort((a, b) => photoRank(a.photo.vendor) - photoRank(b.photo.vendor) || a.index - b.index)
+    .map((e) => e.photo);
+}
+
 /**
  * The volume-pricing tiers to render, always an EVEN count so the two-column flow never leaves
  * a ragged hole.

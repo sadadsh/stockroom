@@ -10,6 +10,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useProductImage } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
+import { orderPhotos } from "../lib/sourcingOrder";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { Text } from "../lib/copy";
 import type { SourcedAlternate } from "../api/types";
@@ -82,7 +83,12 @@ export function partPhotos(
     const v = alt?.value;
     if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) push(v, alt.source ?? "");
   }
-  return out;
+  // Quality order, not arrival order. Which adapter won the `specs["Image"]` slot is a race decided
+  // by `setdefault`, so the in-force photo was simply whoever answered first - and the owner's
+  // complaint (2026-07-26) is exactly that: the DigiKey photograph is much better than the Mouser
+  // one, and Mouser was winning the hero slot. Sorted here rather than at the call site so the
+  // carousel, the thumbnail and any future consumer all agree on which image leads.
+  return orderPhotos(out);
 }
 
 export function ProductPhoto({

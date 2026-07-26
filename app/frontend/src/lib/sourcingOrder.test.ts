@@ -1,5 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { ladderRows, orderPurchases } from "./sourcingOrder";
+import { ladderRows, orderPhotos, orderPurchases } from "./sourcingOrder";
+
+// Owner 2026-07-26: "the view photo should always prioritize the higher quality image, the digikey
+// one is much better than mouser". This is a DIFFERENT axis from orderPurchases: that one puts
+// Mouser first because that is where the owner BUYS. Ranking photos by the purchase order would
+// hand the hero slot to the worst image, so the two must never be unified.
+describe("orderPhotos (image quality, NOT purchase preference)", () => {
+  const ph = (vendor: string) => ({ url: `https://${vendor}.example.com/i.jpg`, vendor });
+
+  it("puts the DigiKey photograph first even though Mouser leads the purchase order", () => {
+    const out = orderPhotos([ph("Mouser"), ph("DigiKey"), ph("LCSC")]);
+    expect(out.map((x) => x.vendor)).toEqual(["DigiKey", "LCSC", "Mouser"]);
+  });
+
+  it("is the OPPOSITE of the purchase order for the same two vendors", () => {
+    const vendors = ["Mouser", "DigiKey"];
+    const photos = orderPhotos(vendors.map(ph)).map((x) => x.vendor);
+    expect(photos).toEqual(["DigiKey", "Mouser"]);
+  });
+
+  it("keeps an unranked vendor after the ranked ones, in the order given", () => {
+    const out = orderPhotos([ph("Arrow"), ph("Newark"), ph("DigiKey")]);
+    expect(out.map((x) => x.vendor)).toEqual(["DigiKey", "Arrow", "Newark"]);
+  });
+
+  it("never drops or invents a photo", () => {
+    const input = [ph("Mouser"), ph("DigiKey"), ph("Arrow")];
+    expect(orderPhotos(input)).toHaveLength(3);
+    expect(new Set(orderPhotos(input).map((x) => x.url))).toEqual(
+      new Set(input.map((x) => x.url)),
+    );
+  });
+
+  it("leaves an empty list alone", () => {
+    expect(orderPhotos([])).toEqual([]);
+  });
+});
 
 const p = (vendor: string, breaks: { qty: number; price: number }[] = []) => ({
   vendor,
