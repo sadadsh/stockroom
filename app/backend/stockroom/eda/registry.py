@@ -252,6 +252,23 @@ class EdaTool:
     # How this tool's stored library references stay portable across machines (see PathContract).
     path_contract: PathContract = PathContract()
 
+    # WHICH FORMS OF A DATASHEET THIS TOOL CAN ACTUALLY OPEN, best first.
+    #
+    #   "file" - a datasheet PDF stored in the library, referenced so the tool resolves it on any
+    #            machine. Only a tool with a path contract that survives the trip can offer this.
+    #   "url"  - the vendor's link. Always resolvable, always a round trip to the internet.
+    #
+    # A fact about the TOOL, so it lives here rather than as two hand-written orders in two
+    # modules - which is what it was, and they had drifted into opposites. KiCad resolves
+    # `${SR_LIB}/datasheets/<file>` through a path variable it holds in its own config, so a local
+    # file is BETTER there. A .DbLib link column carries a plain string with no such variable, so
+    # Altium can use a URL and nothing else - and the old fallback put a bare "X.pdf" in that
+    # column, a link that resolves to nothing while the row still said "Datasheet" beside it.
+    #
+    # A form this tool cannot use is simply ABSENT here, so generic code offers nothing rather
+    # than something broken. Adding a third tool is a registry entry, never a branch.
+    datasheet_sources: tuple[str, ...] = ("url",)
+
     def ignored_patterns(self) -> tuple[str, ...]:
         """Every pattern this tool contributes to a workspace `.gitignore`, per-user AND derived.
 
@@ -286,6 +303,10 @@ class EdaTool:
 _KICAD = EdaTool(
     key="kicad",
     label="KiCad",
+    # A stored PDF wins: KiCad resolves `${SR_LIB}/datasheets/<file>` through the path variable it
+    # holds in its own config, so the local copy opens instantly and works with no network. The
+    # vendor URL is the fallback for a part whose PDF was never fetched.
+    datasheet_sources=("file", "url"),
     ignore=(
         "*.kicad_prl",  # PROJECT-LOCAL per-user settings; KiCad's docs say do not commit
         "fp-info-cache",  # regenerated footprint cache, machine-specific and large

@@ -178,10 +178,15 @@ describe("DetailPanel files previews (M6d)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
     wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
-    // B2 originally read "renders every spec at once (no collapse)". NARROWED 2026-07-25, and the
-    // narrowing is deliberate rather than incidental: the owner asked for the opposite of "no
-    // collapse" - *"doesnt have things hidden behind buttons. its so much thrown in your face"* -
-    // so groups past the first are now closed by default and each states its row count.
+    // B2 originally read "renders every spec at once (no collapse)". NARROWED 2026-07-25 when the
+    // owner asked for the opposite of "no collapse" - *"doesnt have things hidden behind buttons.
+    // its so much thrown in your face"* - so groups past the first closed by default.
+    //
+    // THAT IS NO LONGER TRUE and this comment asserted it long after it stopped being: on
+    // 2026-07-26 the owner overruled it with *"the specifications should all be expanded by
+    // default"*, and `defaultOpen` has returned true for every group since. A stale comment that
+    // reads as a reason is exactly what lets a wrong belief survive, so it is corrected rather
+    // than left describing a behaviour the app does not have.
     //
     // What B2 was really protecting still holds and is what this asserts: an OPEN group shows ALL
     // of its rows, however many there are. No "+12 more", no cap, no scroll-to-reveal. A part with

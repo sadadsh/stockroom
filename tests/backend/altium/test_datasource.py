@@ -111,3 +111,41 @@ def test_the_row_carries_the_stockroom_part_id_so_a_placement_is_born_bound():
     row = row_for(rec)
     assert row[field_for("altium")] == rec.id
     assert field_for("altium") in ALTIUM_COLUMNS
+
+
+def test_a_local_only_datasheet_does_not_become_a_dead_altium_link():
+    """A DbLib link column can carry a URL and nothing else.
+
+    `_datasheet_url` fell back to `record.datasheet.file` - a BARE FILENAME like
+    "TPD6E05U06RVZR.pdf" - which Altium cannot resolve to anything, while
+    `ComponentLink1Description` was set to "Datasheet" beside it. So a part whose datasheet is a
+    local PDF advertised a link that goes nowhere, which is worse than no link: the person clicks
+    it before finding out.
+
+    KiCad has the opposite capability and keeps the opposite precedence: it resolves
+    `${SR_LIB}/datasheets/<file>` through a path variable it holds in its own config, so a local
+    file there is BETTER than a URL. The difference is a fact about each tool, so it is registry
+    data now (`EdaTool.datasheet_sources`), not two hand-written orders that drifted apart.
+    """
+
+    rec = PartRecord(id="x", display_name="X", category="ICs", mpn="X", manufacturer="M")
+    rec.datasheet = Datasheet(file="X.pdf", source_url="")
+    row = row_for(rec)
+    assert row["ComponentLink1URL"] == ""
+    assert row["ComponentLink1Description"] == "", (
+        "a link description with no link advertises a datasheet that is not there"
+    )
+
+    # ...and a URL still works exactly as before.
+    rec.datasheet = Datasheet(file="X.pdf", source_url="https://ti.com/ds.pdf")
+    row = row_for(rec)
+    assert row["ComponentLink1URL"] == "https://ti.com/ds.pdf"
+    assert row["ComponentLink1Description"] == "Datasheet"
+
+
+def test_each_tool_states_which_datasheet_forms_it_can_actually_use():
+    """The precedence lives on the adapter as DATA, so adding a third tool is a registry entry."""
+    from stockroom.eda.registry import get_tool
+
+    assert get_tool("kicad").datasheet_sources == ("file", "url")
+    assert get_tool("altium").datasheet_sources == ("url",)

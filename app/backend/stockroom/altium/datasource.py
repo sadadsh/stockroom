@@ -34,10 +34,24 @@ ALTIUM_COLUMNS: list[str] = [
 
 
 def _datasheet_url(record) -> str:
+    """The datasheet reference Altium can actually open, or "" when there is none it can.
+
+    Reads `EdaTool.datasheet_sources` rather than hardcoding an order. Altium declares ("url",):
+    a .DbLib link column carries a plain string with no path variable behind it, so a stored PDF
+    has no resolvable form here. This used to fall back to `ds.file` - a bare "X.pdf" - and
+    `ComponentLink1Description` said "Datasheet" beside it, so the row advertised a link that
+    went nowhere. No link is better than a dead one.
+    """
+    from stockroom.eda.registry import get_tool
+
     ds = record.datasheet
     if ds is None:
         return ""
-    return ds.source_url or (ds.file or "")
+    for form in get_tool("altium").datasheet_sources:
+        value = (ds.source_url if form == "url" else ds.file) or ""
+        if value.strip():
+            return value
+    return ""
 
 
 def _first_purchase(record):
