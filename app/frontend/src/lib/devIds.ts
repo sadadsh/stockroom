@@ -271,7 +271,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "preview.photo-count", label: "Photo carousel counter", area: "preview" },
   { id: "preview.photo-prev", label: "Photo carousel previous", area: "preview" },
   { id: "preview.photo-next", label: "Photo carousel next", area: "preview" },
-  { id: "preview.photo-vendor", label: "Photo vendor attribution", area: "preview" },
   { id: "diff.root", label: "Diff dialog", area: "diff" },
   { id: "diff.header", label: "Diff header", area: "diff" },
   { id: "diff.tabs", label: "Diff type tabs", area: "diff" },
