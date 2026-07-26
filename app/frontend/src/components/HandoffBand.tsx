@@ -312,6 +312,13 @@ function HandoffValue({
         placeholder={`Add ${label}`}
         multiline={edit.multiline}
         clampLines={edit.multiline ? 2 : undefined}
+        // TRUNCATE every single-line value. MEASURED in the owner's REAL window (1423px viewport,
+        // 2026-07-25): the datasheet cell reported clientWidth 261 against scrollWidth 357 - the URL
+        // pushed 96px past its own box and dragged the whole handoff block into overflow. Offscreen
+        // shots at 1600px never showed it because the cell was wide enough there. `break-words` is
+        // EditableText's default and is right for prose; a URL has no spaces to break at, so it
+        // simply runs. The full value stays reachable: the editor opens on it and `title` holds it.
+        truncate={!edit.multiline}
         disabled={busy}
         displayClassName="text-xs font-medium text-t1"
         // The DISPLAY is shortened while the EDITOR still opens on the full value: a person
