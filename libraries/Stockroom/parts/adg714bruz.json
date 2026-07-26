@@ -93,7 +93,25 @@
   },
   "description": "Analog Switch ICs SERIAL SPI, OCTAL SPST",
   "display_name": "ADG714BRUZ",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "ADG714BRUZ"
+      },
+      "model": {
+        "file": "models/ADG714BRUZ.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "ADG714BRUZ"
+      }
+    }
+  },
   "enrichment": {},
   "hashes": null,
   "id": "adg714bruz",
