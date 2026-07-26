@@ -247,6 +247,36 @@ export const ICON_REGISTRY: IconEntry[] = [
     // text-labelled chips wrapped to three rows there, taking a third of the stage; the owner chose
     // icon-only for the tile (2026-07-26) so the stage keeps its height. The modal still shows text.
     // Names stay reachable: every chip keeps its `title` and an aria-label.
+    // PURPOSE-DRAWN AT 14px. The first cut reused `art.model` / `art.footprint`, which are authored in
+    // a 70-90px box for the file cards - at 14px the cube collapsed to a plain hexagon and the
+    // footprint to an equals-sign. A glyph has to be drawn for the size it is used at.
+    id: "layer.model",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // a solid little package body with its top face read separately
+    body: '<path d="M4 9l8-4 8 4v6l-8 4-8-4z"/><path d="M4 9l8 4 8-4"/>',
+  },
+  {
+    id: "layer.pads",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.6,
+    // a land pattern: two rows of pads, which is what the layer actually is
+    body:
+      '<rect x="4" y="6" width="5" height="2.6" rx="1"/><rect x="15" y="6" width="5" height="2.6" rx="1"/>' +
+      '<rect x="4" y="11" width="5" height="2.6" rx="1"/><rect x="15" y="11" width="5" height="2.6" rx="1"/>' +
+      '<rect x="4" y="16" width="5" height="2.6" rx="1"/><rect x="15" y="16" width="5" height="2.6" rx="1"/>',
+  },
+  {
+    id: "layer.board",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.7,
+    // a substrate slab seen slightly from the side, so it reads as the thing pads sit ON
+    body: '<path d="M3 10l9-4 9 4-9 4z"/><path d="M3 10v3l9 4 9-4v-3"/>',
+  },
+  {
     id: "view.shade-realistic",
     category: "primary",
     viewBox: "0 0 24 24",

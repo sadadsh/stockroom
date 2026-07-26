@@ -160,7 +160,7 @@ export function Glb3DView({
         <div className="flex items-center gap-0.5">
           <LayerToggle
             devId="detail.model-show-model"
-            icon="art.model"
+            icon="layer.model"
             compact={compact}
             label="Model"
             on={showModel}
@@ -175,7 +175,7 @@ export function Glb3DView({
             <>
               <LayerToggle
                 devId="detail.model-board"
-            icon="art.footprint"
+            icon="layer.pads"
             compact={compact}
                 label="Pads"
                 on={showLand}
@@ -191,7 +191,7 @@ export function Glb3DView({
               />
               <LayerToggle
                 devId="detail.model-show-board"
-            icon="nav.board"
+            icon="layer.board"
             compact={compact}
                 label="PCB"
                 on={showBoard}
@@ -248,6 +248,7 @@ export function Glb3DView({
             }}
           />
           <ViewControls
+            compact={compact}
             active={view}
             onPick={(mode) => {
               setView(mode);
@@ -364,9 +365,14 @@ const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon:
 function ViewControls({
   active,
   onPick,
+  compact = false,
 }: {
   active: ViewMode | null;
   onPick: (mode: ViewMode) => void;
+  /** ICON-ONLY in the narrow tile. This component renders its own buttons rather than LayerToggle, so
+   *  it did NOT inherit the tile's compact mode and its three chips stayed text while the other seven
+   *  became icons - the bar sat at two rows for that reason alone. */
+  compact?: boolean;
 }) {
   return (
     <div
@@ -381,7 +387,8 @@ function ViewControls({
           type="button"
           data-dev-id={v.devId}
           aria-pressed={active === v.mode}
-          title={v.hint}
+          aria-label={compact ? v.label : undefined}
+          title={compact ? `${v.label} - ${v.hint}` : v.hint}
           onClick={(e) => {
             // The tile that hosts this canvas is ITSELF a click target that opens the preview
             // modal, so without stopping here, choosing a view ALSO opened the modal - the
@@ -392,14 +399,17 @@ function ViewControls({
           className={
             // 160ms ease-out + a 0.97 press: a control with no press feedback does not feel like
             // it heard the click. transform/opacity only, so it stays off the layout path.
-            "rounded-[2px] px-1.5 py-0.5 text-2xs font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
+            "rounded-[2px] font-medium transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] " +
             "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+            (compact
+              ? "flex h-[22px] w-[22px] items-center justify-center "
+              : "px-1.5 py-0.5 text-2xs ") +
             (active === v.mode
               ? "bg-raise2 text-t1"
               : "text-t3 hover:bg-[var(--c-hover)] hover:text-t1")
           }
         >
-          {v.label}
+          {compact ? <Icon id={v.icon} className="h-3.5 w-3.5" /> : v.label}
         </button>
       ))}
     </div>
