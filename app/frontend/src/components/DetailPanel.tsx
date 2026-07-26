@@ -465,7 +465,18 @@ export function DetailPanel({
               // the 3D tile clearly dominant over its 142px siblings without letting a long spec
               // sheet stretch it. The column ends above the pane bottom as a result; that dead
               // space is the accepted trade, chosen over a portrait stage.
-              className={hasModel ? "h-[300px]" : "h-[142px]"}
+              // GROWS with the column, but BOUNDED (owner, 2026-07-25). Unbounded `flex-1` is what
+              // produced the 266x618 portrait stage: it took every pixel a long spec sheet gave the
+              // column. A flex SHARE with a max-height lets the tiles fill the space when there is
+              // some, while the ceiling stops the stage ever going portrait again. The hero keeps
+              // twice the share of the pair below it, so it stays clearly dominant at any height.
+              // GROWN, but not stretchy. A flex share with a max-height did grow the tiles, and
+              // left 132px of slack INSIDE the column - a hole between the footprint tiles and the
+              // CAD row, which reads worse than the same space falling below the column's end.
+              // Fixed heights take the growth (stage 268 -> ~250 tall at 266 wide, aspect ~1.06
+              // instead of the original 0.43) and let the leftover land at the bottom, where an
+              // ended column simply looks ended.
+              className={hasModel ? "h-[340px]" : "h-[142px]"}
               art={<CubeArt />}
               thumb={
                 hasModel ? (
@@ -482,7 +493,7 @@ export function DetailPanel({
               }
               onOpen={hasModel ? () => setPreview("model") : undefined}
             />
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid h-[200px] grid-cols-2 gap-2.5">
               <AssetTile
                 devId="detail.asset-symbol"
                 name="Symbol"
@@ -1345,6 +1356,39 @@ const ALT_ROW_GRID =
   "@2xl:grid-cols-[minmax(0,calc(10.5rem-7px))_minmax(0,1fr)_auto] " +
   "@4xl:grid-cols-[minmax(0,calc(13rem-7px))_minmax(0,1fr)_auto] items-baseline gap-3";
 
+
+/**
+ * A spec value, with a comma-separated LIST rendered one option per line.
+ *
+ * Owner, 2026-07-25. "Packaging: Reel, Cut Tape, MouseReel" is three separate options, and as one
+ * run of text it wrapped mid-phrase into "Reel, Cut" / "Tape," / "MouseReel" - which reads as a
+ * sentence that ran out of room rather than as three things. Same height, but each line is now a
+ * whole answer.
+ *
+ * Deliberately conservative about what counts as a list, because a comma inside a value is common
+ * and splitting one would corrupt the reading:
+ *   - every part must be short and word-like, so "-40°C ~ 125°C (TA)" and "2.5A (8/20us)" are left
+ *     alone even where they contain a comma;
+ *   - a number with thousands separators ("1,000") is one value, never two;
+ *   - fewer than two parts is not a list.
+ * Anything that fails those is rendered exactly as it arrived.
+ */
+function SpecValue({ value }: { value: string }) {
+  const text = (value ?? "").trim();
+  const parts = text.split(",").map((p) => p.trim());
+  const isList =
+    parts.length > 1 &&
+    parts.every((p) => p.length > 0 && p.length <= 24 && /^[A-Za-z][A-Za-z0-9 ./+-]*$/.test(p));
+  if (!isList) return <>{text}</>;
+  return (
+    <span data-dev-id="detail.spec-list" className="flex flex-col gap-0.5">
+      {parts.map((p) => (
+        <span key={p}>{p}</span>
+      ))}
+    </span>
+  );
+}
+
 // Where two sources disagreed, the panel says so and lets the reader put the other answer in
 // force (punch 9: "keep BOTH sourcing descriptions / swap between them"). Quiet until asked,
 // because most fields have one answer and a wall of vendor attributions would drown the data.
@@ -1583,7 +1627,7 @@ function SpecRowList({
                   value clipped to "100 …" has lost the data. Two lines costs nothing; a hidden value
                   costs the whole point of the row. */}
               <dd className="tnum min-w-0 break-words font-mono text-xs text-t1">
-                {row.unit ? `${row.value} ${row.unit}` : row.value}
+                <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
               </dd>
             </div>
             {/* a spec two distributors disagree about keeps both answers, swappable. `raw` and not

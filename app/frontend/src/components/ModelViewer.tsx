@@ -14,6 +14,7 @@ export function ModelViewer({ partId }: { partId: string }) {
   const land = useLandPattern(partId, true);
   return (
     <Glb3DView
+      showViews
       data={query.data as ArrayBuffer | undefined}
       isLoading={query.isLoading}
       isError={query.isError}

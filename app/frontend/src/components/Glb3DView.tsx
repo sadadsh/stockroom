@@ -24,6 +24,7 @@ export function Glb3DView({
   isError,
   error,
   land,
+  showViews = false,
 }: {
   data: ArrayBuffer | undefined;
   isLoading: boolean;
@@ -32,6 +33,16 @@ export function Glb3DView({
   /** The part's land pattern, when one could be read. Absent simply hides the Board toggle:
    *  a part with no footprint has nothing to check the body against. */
   land?: LandPattern | null;
+  /**
+   * Whether the canonical VIEW controls (3D / Top / Front) appear here.
+   *
+   * Off for the inline detail tile (owner, 2026-07-25). At 266px the control bar wrapped to three
+   * rows and took about a third of a 268px tile, leaving the render less room than its own chrome.
+   * The views are the least-used of the three groups and the ones that most want a big stage to
+   * be worth switching to, so they live in the preview modal - where there is room - and the tile
+   * keeps the layer and shading toggles. No feature is lost; it moves to where it is usable.
+   */
+  showViews?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderError, setRenderError] = useState(false);
@@ -180,13 +191,15 @@ export function Glb3DView({
           ))}
         </div>
       </div>
-      <ViewControls
-        active={view}
-        onPick={(mode) => {
-          setView(mode);
-          sceneRef.current?.setView(mode);
-        }}
-      />
+      {showViews ? (
+        <ViewControls
+          active={view}
+          onPick={(mode) => {
+            setView(mode);
+            sceneRef.current?.setView(mode);
+          }}
+        />
+      ) : null}
       </div>
     </div>
   );
