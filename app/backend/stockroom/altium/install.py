@@ -1,0 +1,245 @@
+"""Install the generated `.DbLib` into Altium, so its parts are actually reachable.
+
+Why this exists
+---------------
+Stockroom generates a correct `.DbLib` and then stops, and a correct file nobody has told Altium
+about is worth nothing. MEASURED 2026-07-26 on the owner's real machine: Altium's Installed
+Libraries list was COMPLETELY EMPTY, so the Components panel offered only the Altium 365 workspace
+and two stock SPICE entries. Not one Stockroom part could be browsed or dragged, however perfect
+the database was. Installing it by hand made the part appear immediately.
+
+This is the Altium half of what `kicad/wiring.py` already does for KiCad, which writes
+`sym-lib-table`, `fp-lib-table` and the `SR_LIB` path variable. Until now the tool-agnostic registry
+promised parity it did not have: one tool got wired, the other got a file on disk.
+
+NOT YET WIRED INTO THE APP, and here is the measured reason
+-----------------------------------------------------------
+**A scripted Altium session does not see the same installed-library list as the windowed one.**
+Measured 2026-07-26 on the owner's machine, immediately after a GUI install that had survived a
+full restart: a scripted run reported ONE installed library, the stock
+`Simulation Generic Components.IntLib`, with no trace of `Stockroom.DbLib`. So `InstallLibrary`
+called from a script writes into a scope the user's real Altium never reads, and wiring this to a
+button would produce a feature that reports success and changes nothing. That is the exact shape of
+failure this codebase keeps getting caught by, so it stays unwired until the scope question is
+settled.
+
+The leading hypothesis, untested: the list is tied to the Altium 365 WORKSPACE session. A scripted
+run is not signed in, and a GUI launch that came up "Not Connected" is the case to check. Testing it
+needs the Components panel driven in a windowed Altium, which needs real pointer input.
+
+Why not write the preference file directly: it could not be found, and guessing at one is how you
+corrupt somebody's install. Searched after an install that demonstrably persisted: the whole of
+`%APPDATA%\\Altium` and `%LOCALAPPDATA%\\Altium` for the path in ASCII and in UTF-16LE, the
+`IntegratedLibrary` registry keys, the `LastWorkspace` group file, and `DXP.RCS` / `DXP.RAF` (both
+untouched, timestamps older than the install). The registry holds only Components-panel view state.
+
+What IS proven here: the module drives the API correctly, confirms the outcome from the resulting
+library list rather than from the absence of an error, and is idempotent. What is NOT proven is that
+the scope it writes to is the one the user sees.
+
+The one detail that makes it stick
+----------------------------------
+**The script must NOT call `TerminateWithExitCode`.** Altium flushes its preferences on a clean
+shutdown, so a script that kills the process takes the new library list with it. Every scripted
+`InstallLibrary` run before this one left the Installed list empty, while the identical action
+through the GUI survived a full restart. The script therefore ends by writing its marker and
+returning, and the driver's own graceful `stop()` closes Altium properly.
+
+No em dashes anywhere (standing owner rule).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from stockroom.altium.driver import AltiumDriver, RunOutcome
+from stockroom.altium.embed3d import delphi_quote
+
+
+@dataclass(frozen=True)
+class InstallResult:
+    """What the installed-library list held before and after, plus how it went.
+
+    Both lists are reported rather than a bare boolean, because "it is installed" is a claim and
+    the list is the observation behind it. A run that reports success while the `after` list does
+    not contain the library comes back `not-installed`.
+    """
+
+    status: str  # ok | already | not-installed | not-found | busy | dialog | exited | timeout
+    detail: str
+    before: tuple[str, ...] = ()
+    after: tuple[str, ...] = ()
+    altium_log: str = ""
+    _extra: dict = field(default_factory=dict, repr=False)
+
+    @property
+    def ok(self) -> bool:
+        return self.status in ("ok", "already")
+
+
+def parse_installed(log: str, prefix: str) -> tuple[str, ...]:
+    """The `SR-<prefix>N=<path>` lines from the script's log, in index order."""
+    out: list[tuple[int, str]] = []
+    for line in (log or "").splitlines():
+        line = line.strip()
+        if not line.startswith(f"SR-{prefix}") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        digits = key[len(f"SR-{prefix}") :]
+        if digits.isdigit() and value:
+            out.append((int(digits), value.strip()))
+    return tuple(v for _i, v in sorted(out))
+
+
+def _same_library(a: str, b: str) -> bool:
+    """Windows paths compare case-insensitively, and a trailing separator is not a difference."""
+    return a.replace("/", "\\").rstrip("\\").lower() == b.replace("/", "\\").rstrip("\\").lower()
+
+
+def is_installed(paths, dblib_win: str) -> bool:
+    return any(_same_library(p, dblib_win) for p in paths)
+
+
+def render_install_script(
+    *, dblib_win: str, marker_win: str, uninstall: bool = False, procedure: str = "SRInstall"
+) -> str:
+    """The DelphiScript that installs (or uninstalls) the library and reports both lists."""
+    return _TEMPLATE.format(
+        procedure=procedure,
+        dblib=delphi_quote(dblib_win),
+        marker=delphi_quote(marker_win),
+        action="UninstallLibrary" if uninstall else "InstallLibrary",
+        verb=delphi_quote("uninstall" if uninstall else "install"),
+    )
+
+
+_TEMPLATE = """{{ GENERATED by stockroom.altium.install -- do not hand-edit.
+  Installs a .DbLib into Altium's available libraries and reports the list before and after.
+
+  IT DELIBERATELY DOES NOT CALL TerminateWithExitCode. Altium writes its preferences on a clean
+  shutdown, so terminating the process here discards the very change this script exists to make:
+  every scripted install before 2026-07-26 left the Installed list EMPTY, while the identical
+  action through the GUI survived a restart. The driver stops Altium gracefully after the marker
+  appears, and that is what makes the install persist. }}
+Procedure {procedure};
+Var
+    ILM  : IIntegratedLibraryManager;
+    L    : TStringList;
+    Path : String;
+    i    : Integer;
+Begin
+    Path := {dblib};
+    L := TStringList.Create;
+    Try
+        Try
+            If Not FileExists(Path) Then L.Add('FAIL: the .DbLib is not readable: ' + Path)
+            Else
+            Begin
+                ILM := IntegratedLibraryManager;
+                If ILM = Nil Then L.Add('FAIL: no IntegratedLibraryManager')
+                Else
+                Begin
+                    L.Add('SR-Action=' + {verb});
+                    L.Add('SR-Library=' + Path);
+                    For i := 0 To ILM.InstalledLibraryCount - 1 Do
+                        L.Add('SR-Before' + IntToStr(i) + '=' + ILM.InstalledLibraryPath(i));
+                    ILM.{action}(Path);
+                    For i := 0 To ILM.InstalledLibraryCount - 1 Do
+                        L.Add('SR-After' + IntToStr(i) + '=' + ILM.InstalledLibraryPath(i));
+                End;
+            End;
+        Except
+            L.Add('FAIL: Altium raised an exception during the ' + {verb});
+        End;
+    Finally
+        L.Add('DONE');
+        L.SaveToFile({marker});
+        L.Free;
+    End;
+End;
+"""
+
+
+def install_library(
+    dblib: Path,
+    *,
+    uninstall: bool = False,
+    driver: AltiumDriver | None = None,
+    workdir: Path | None = None,
+    timeout: int = 300,
+) -> InstallResult:
+    """Install `dblib` into Altium and confirm from the resulting library list.
+
+    Installing an already-installed library returns `already` WITHOUT booting Altium a second
+    time; the check happens inside the same run, so being idempotent costs nothing extra.
+    """
+    drv = driver or AltiumDriver()
+    dblib = Path(dblib)
+    if not dblib.exists():
+        return InstallResult("not-found", f"There is no database library at {dblib.as_posix()}.")
+
+    work = Path(workdir) if workdir else drv.host.windows_temp() / "stockroom-install"
+    work.mkdir(parents=True, exist_ok=True)
+    pas = work / "SRInstall.pas"
+    prj = work / "SRInstall.PrjScr"
+    marker = work / "SRInstall.txt"
+    marker.unlink(missing_ok=True)
+
+    dblib_win = drv.host.to_windows_path(str(dblib))
+    pas.write_text(
+        render_install_script(
+            dblib_win=dblib_win,
+            marker_win=drv.host.to_windows_path(str(marker)),
+            uninstall=uninstall,
+        ),
+        encoding="utf-8",
+        newline="\r\n",
+    )
+    prj.write_text(
+        "[Design]\r\nVersion=1.0\r\nHierarchyMode=0\r\n[Document1]\r\n"
+        f"DocumentPath={pas.name}\r\n",
+        encoding="utf-8",
+    )
+
+    outcome: RunOutcome = drv.run_script(
+        project=prj, proc=f"{pas.name}>SRInstall", marker=marker, timeout=timeout
+    )
+    log = outcome.marker_text
+    before = parse_installed(log, "Before")
+    after = parse_installed(log, "After")
+    if not outcome.ok:
+        return InstallResult(outcome.status, outcome.detail, before, after, log)
+    if "FAIL" in log:
+        first = next((ln for ln in log.splitlines() if "FAIL" in ln), "the script reported a failure")
+        return InstallResult("not-installed", first.strip(), before, after, log)
+
+    present = is_installed(after, dblib_win)
+    if uninstall:
+        if present:
+            return InstallResult(
+                "not-installed",
+                f"Altium still lists {dblib.name} after the uninstall.",
+                before,
+                after,
+                log,
+            )
+        return InstallResult("ok", f"Removed {dblib.name} from Altium.", before, after, log)
+    if not present:
+        return InstallResult(
+            "not-installed",
+            f"Altium reported no error but does not list {dblib.name} afterwards, so it is not "
+            "installed. Do not treat this as done.",
+            before,
+            after,
+            log,
+        )
+    if is_installed(before, dblib_win):
+        return InstallResult("already", f"{dblib.name} was already installed.", before, after, log)
+    return InstallResult(
+        "ok",
+        f"Installed {dblib.name} into Altium ({len(before)} library(s) before, {len(after)} after).",
+        before,
+        after,
+        log,
+    )
