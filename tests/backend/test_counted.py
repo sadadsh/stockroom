@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from stockroom.text import counted, plural
+from stockroom.text import counted, fullest_name, is_abbreviation_of, plural
 
 
 @pytest.mark.parametrize(
@@ -49,9 +49,6 @@ def test_an_irregular_plural_is_passed_explicitly_never_guessed():
 # TXN, Texas, Tex and TexasInst across databases, and every component search engine truncates
 # differently. So this never INVENTS a name - it only decides, between two answers real sources
 # actually gave, whether one is a shorter spelling of the other.
-
-from stockroom.text import is_abbreviation_of, fullest_name  # noqa: E402
-
 
 def test_initials_are_an_abbreviation_of_the_name_they_stand_for():
     assert is_abbreviation_of("TI", "Texas Instruments")
