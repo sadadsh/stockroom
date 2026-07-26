@@ -65,6 +65,10 @@ export const DEV_IDS: DevIdEntry[] = [
   // DERIVED (`detail.handoff-<field key>`) from the generated EDA registry, so a new registry
   // field brings its own cell id and this catalogue needs no edit.
   { id: "detail.handoff", label: "EDA handoff block", area: "detail" },
+  { id: "detail.handoff-tab", label: "Handoff tab panel", area: "detail" },
+  { id: "detail.key-specs", label: "Key Specifications block", area: "detail" },
+  { id: "detail.specs-list", label: "Full specifications list", area: "detail" },
+  { id: "detail.spec-pin", label: "Pin spec to Key Specifications", area: "detail" },
   { id: "detail.handoff-ready", label: "Handoff readiness count", area: "detail" },
   { id: "detail.title", label: "Part headline", area: "detail" },
   { id: "detail.canvas", label: "Part canvas / asset strip", area: "detail" },

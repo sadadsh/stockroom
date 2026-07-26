@@ -13,7 +13,7 @@
  * instead of a tall rail, and the spec sheet no longer dominates the page. Everything degrades
  * honestly when a field is absent, and no data is fabricated.
  */
-import { useEffect, useState, type HTMLAttributes, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type HTMLAttributes, type ReactNode } from "react";
 import type {
   PartDetail,
   PurchaseRef,
@@ -46,6 +46,8 @@ import { PartTimeline } from "./PartTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PreviewImage } from "./PreviewImage";
 import { HandoffBand } from "./HandoffBand";
+import { type PinnedSpecs, isPinned, keySpecRows, togglePinned } from "../lib/keySpecs";
+import { readPref, writePref } from "../lib/uiPrefs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
 import { Glb3DView } from "./Glb3DView";
 import {
@@ -116,7 +118,124 @@ function vendorLabel(vendor: string, url: string): string {
   return v.charAt(0).toUpperCase() + v.slice(1);
 }
 
-type WorkbenchTab = "specs" | "sourcing" | "pinout" | "enrich" | "history";
+type WorkbenchTab = "specs" | "sourcing" | "pinout" | "enrich" | "history" | "handoff";
+
+const PINNED_SPECS_KEY = "stockroom.pinned-specs";
+
+/** The pinned-spec map, host-injected first then the localStorage mirror (see uiPrefs.ts). Unlike the
+ *  scalar prefs this one is JSON, so a malformed mirror must degrade to "nothing pinned" rather than
+ *  throwing during the first render of the sheet. */
+function readPinnedSpecs(): PinnedSpecs {
+  return readPref<PinnedSpecs>(
+    "pinned_specs",
+    PINNED_SPECS_KEY,
+    (raw) => {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as PinnedSpecs)
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    {},
+  );
+}
+
+/**
+ * KEY SPECIFICATIONS - the block that replaced the EDA handoff at the head of the Specifications
+ * column. Same 22px row rhythm and the same label/value/unit split as the Specifications list below
+ * it, because the owner asked for it "formatted like the specifications": two lists on one sheet
+ * that measure the same thing must not read as two different widget species.
+ */
+function KeySpecificationsBlock({
+  groups,
+  category,
+  pinned,
+  onTogglePin,
+}: {
+  groups: SpecGroup[];
+  category: string;
+  pinned: PinnedSpecs;
+  onTogglePin: (category: string, specKey: string) => void;
+}) {
+  const rows = keySpecRows(groups, category, pinned);
+  // Nothing to lead with: render NOTHING rather than an empty card. A titled card with no rows in the
+  // sheet's most prominent slot reads as a failure, which is exactly what the old empty-state faults
+  // in the punch list were about.
+  if (rows.length === 0) return null;
+  return (
+    <DetailSection
+      data-dev-id="detail.key-specs"
+      title={<Text id="detail.key-specifications">Key Specifications</Text>}
+    >
+      <div className="flex flex-col">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className="group flex items-baseline gap-3 py-[3px] text-xs leading-[16px]"
+          >
+            <span className="min-w-0 flex-1 truncate text-t2">{row.label}</span>
+            <span className="tnum flex-none font-mono text-t1">{row.value}</span>
+            {row.unit ? <span className="flex-none font-mono text-t3">{row.unit}</span> : null}
+            <PinStar
+              pinned={isPinned(pinned, category, row.key)}
+              onToggle={() => onTogglePin(category, row.key)}
+              label={row.label}
+            />
+          </div>
+        ))}
+      </div>
+    </DetailSection>
+  );
+}
+
+/**
+ * The star that pins a spec into Key Specifications.
+ *
+ * Visible at rest ONLY when it is pinned; otherwise it appears on hover or keyboard focus. A star on
+ * every row at full strength would put ~30 identical controls down the sheet and compete with the
+ * values, and this is a rarely-used affordance - but it must still be REACHABLE without a pointer,
+ * which `focus-visible` is what buys.
+ */
+function PinStar({
+  pinned,
+  onToggle,
+  label,
+}: {
+  pinned: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-dev-id="detail.spec-pin"
+      onClick={onToggle}
+      aria-pressed={pinned}
+      aria-label={pinned ? `Unpin ${label}` : `Pin ${label}`}
+      title={pinned ? "Unpin From Key Specifications" : "Pin To Key Specifications"}
+      className={
+        "flex h-[16px] w-[16px] flex-none items-center justify-center rounded-control transition " +
+        "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 " +
+        "focus-visible:outline-acc " +
+        (pinned
+          ? "text-warn opacity-100"
+          : "text-t3 opacity-0 hover:text-t1 group-hover:opacity-100 focus-visible:opacity-100")
+      }
+    >
+      <svg viewBox="0 0 16 16" aria-hidden className="h-[11px] w-[11px]">
+        <path
+          d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"
+          fill={pinned ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth="1.3"
+        />
+      </svg>
+    </button>
+  );
+}
 
 interface Props {
   detail: PartDetail | undefined;
@@ -186,6 +305,16 @@ export function DetailPanel({
   // Which workbench tab is showing. It resets to Specs whenever the active id falls out
   // of the available set (a part switch that drops the Pinout / Enrich tab).
   const [tab, setTab] = useState<WorkbenchTab>("specs");
+  // Pinned specs, per category, persisted through the machine config like the theme and the rail:
+  // localStorage alone resets on every launch because the host binds an ephemeral port (uiPrefs.ts).
+  const [pinnedSpecs, setPinnedSpecs] = useState<PinnedSpecs>(readPinnedSpecs);
+  const togglePin = useCallback((category: string, specKey: string) => {
+    setPinnedSpecs((current) => {
+      const next = togglePinned(current, category, specKey);
+      writePref("pinned_specs", next, PINNED_SPECS_KEY);
+      return next;
+    });
+  }, []);
   // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
   // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
   // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
@@ -329,6 +458,10 @@ export function DetailPanel({
   const hasEnrich = !!onEditField && !!detail.mpn;
   const tabs: TabItem<WorkbenchTab>[] = [
     { id: "specs", label: "Details" },
+    // Its own tab (owner's choice from previews, 2026-07-26), rather than a band at the head of the
+    // Specifications column. That slot now carries Key Specifications, which is what a person opens
+    // a part to read; the handoff is what a person needs once they are about to PLACE it.
+    { id: "handoff", label: "Handoff" },
     ...(pinout.length > 0 ? [{ id: "pinout" as const, label: "Pinout" }] : []),
     ...(hasEnrich ? [{ id: "enrich" as const, label: "Enrich" }] : []),
     // Labelled Timeline (the component IS PartTimeline) - "History" broke the no-y copy rule.
@@ -576,28 +709,28 @@ export function DetailPanel({
               full-width band across the sheet. An earlier attempt did the latter and rearranged
               the whole sheet around it, which moved a great deal nobody had asked to move. */}
           <div className="flex min-h-0 flex-col overflow-y-auto border-l border-line px-5">
-            <HandoffBand
-              detail={detail}
-              onEditField={onEditField}
-              onMoveCategory={onMoveCategory}
-              categories={categories}
-              busy={busy}
-              slots={{
-                // the disagreement follows the value it is about
-                description: (
-                  <AlternatesDisclosure
-                    entries={detail.alternates?.description ?? []}
-                    current={detail.description}
-                    onUse={onEditField ? (value) => onEditField("description", value) : undefined}
-                  />
-                ),
-              }}
+            {/* KEY SPECIFICATIONS lead this column now, where the EDA handoff band used to sit. The
+                owner's ask: "the important specifications should be where the eda handoff is,
+                formatted like the specifications, but the most important details people care about
+                when looking at this component". Curated per category (lib/keySpecs.ts) with a star on
+                any Specifications row below to pin one up here. */}
+            <KeySpecificationsBlock
+              groups={allSpecGroups}
+              category={detail.category}
+              pinned={pinnedSpecs}
+              onTogglePin={togglePin}
             />
-            <DetailSection title={<Text id="detail.specifications">Specifications</Text>}>
+            <DetailSection
+              data-dev-id="detail.specs-list"
+              title={<Text id="detail.specifications">Specifications</Text>}
+            >
               <SpecificationsSection
                 groups={specGroups}
                 alternates={detail.alternates ?? {}}
                 onUseSpecValue={onUseSpecValue}
+                category={detail.category}
+                pinned={pinnedSpecs}
+                onTogglePin={togglePin}
               />
             </DetailSection>
           </div>
@@ -703,6 +836,36 @@ export function DetailPanel({
             />
           </WorkbenchPanel>
         ) : null}
+
+        {/* THE HANDOFF TAB. It was a band at the head of the Specifications column; the owner chose
+            (from previews) to give it a tab of its own, which also gives it room to state each tool's
+            readiness instead of one shared "N of N ready" count. */}
+        <WorkbenchPanel
+          id="handoff"
+          devId="detail.handoff-tab"
+          active={activeTab}
+          className="mt-3 min-h-0 flex-1 overflow-y-auto"
+        >
+          <div className="max-w-[760px] px-1">
+            <HandoffBand
+              detail={detail}
+              onEditField={onEditField}
+              onMoveCategory={onMoveCategory}
+              categories={categories}
+              busy={busy}
+              slots={{
+                // the disagreement follows the value it is about
+                description: (
+                  <AlternatesDisclosure
+                    entries={detail.alternates?.description ?? []}
+                    current={detail.description}
+                    onUse={onEditField ? (value) => onEditField("description", value) : undefined}
+                  />
+                ),
+              }}
+            />
+          </div>
+        </WorkbenchPanel>
 
         <WorkbenchPanel
           id="history"
@@ -1550,10 +1713,18 @@ function SpecificationsSection({
   groups,
   alternates,
   onUseSpecValue,
+  category,
+  pinned,
+  onTogglePin,
 }: {
   groups: SpecGroup[];
   alternates: Record<string, SourcedAlternate[]>;
   onUseSpecValue?: (key: string, value: string, source: string) => void;
+  // Pinning is threaded down to the ROW because that is where the star lives: the owner's chosen
+  // model is "a star on any Specifications row promotes it into Key Specifications".
+  category: string;
+  pinned: PinnedSpecs;
+  onTogglePin: (category: string, specKey: string) => void;
 }) {
   // Only the groups the user has EXPLICITLY toggled live here; everything else falls back to the
   // index-based default below. Storing the default in state instead would make it a snapshot that
@@ -1599,6 +1770,9 @@ function SpecificationsSection({
             rows={group.rows}
             alternates={alternates}
             onUseSpecValue={onUseSpecValue}
+            category={category}
+            pinned={pinned}
+            onTogglePin={onTogglePin}
           />
         </SpecSection>
       ))}
@@ -1680,10 +1854,19 @@ function SpecRowList({
   rows,
   alternates,
   onUseSpecValue,
+  category,
+  pinned,
+  onTogglePin,
 }: {
   rows: SpecRow[];
   alternates: Record<string, SourcedAlternate[]>;
   onUseSpecValue?: (key: string, value: string, source: string) => void;
+  // OPTIONAL, because not every list can be pinned FROM. Trade & Compliance renders through this
+  // same component, and those are procurement facts rather than part parameters - `keySpecs`
+  // deliberately excludes them, so offering a star there would promise something it would not do.
+  category?: string;
+  pinned?: PinnedSpecs;
+  onTogglePin?: (category: string, specKey: string) => void;
 }) {
   return (
     <dl className="flex flex-col">
@@ -1716,6 +1899,16 @@ function SpecRowList({
               <dd className="tnum min-w-0 break-words font-mono text-xs text-t1">
                 <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
               </dd>
+              {/* Promotes this spec into Key Specifications at the head of the column. Hidden until
+                  the row is hovered or the star is focused, so ~30 of these do not compete with the
+                  values they sit beside. */}
+              {onTogglePin && category ? (
+                <PinStar
+                  pinned={isPinned(pinned ?? {}, category, row.key)}
+                  onToggle={() => onTogglePin(category, row.key)}
+                  label={typeof row.label === "string" ? row.label : row.key}
+                />
+              ) : null}
             </div>
             {/* a spec two distributors disagree about keeps both answers, swappable. `raw` and not
                 `value`: "1%" renders as "±1%", and comparing the presented string made the answer

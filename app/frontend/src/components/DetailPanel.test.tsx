@@ -491,9 +491,11 @@ describe("DetailPanel spec sheet + identity", () => {
         {...BASE}
       />,
     );
-    // the real spec shows (unit prettified for display)
-    expect(screen.getByText("Resistance")).toBeInTheDocument();
-    expect(screen.getByText("1.1 kΩ")).toBeInTheDocument();
+    // the real spec shows (unit prettified for display). getAllBy, because Key Specifications now
+    // surfaces the leading parametric spec at the head of this column as well as the full list
+    // below it - a hero summary, so the label legitimately appears twice.
+    expect(screen.getAllByText("Resistance").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1.1 kΩ").length).toBeGreaterThan(0);
     // The distributor-page metadata never reaches the PHYSICAL spec sheet. Scoped to the sheet
     // rather than the whole document since Batch 3: the procurement facts (origin, tariff,
     // packaging) are real vendor data the owner asked to stop discarding, so they now render in the
@@ -731,6 +733,8 @@ describe("DetailPanel alternates", () => {
 
   it("says how many answers a field has, without spending space until asked", async () => {
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
+    // description + datasheet now live on the Handoff TAB (owner's choice 2026-07-26)
+    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
     expect(screen.getByRole("button", { name: /2 Sources/i })).toBeTruthy();
     // the other distributor's wording stays out of the way until the disclosure is opened
     expect(screen.queryByText("Step-Down Regulator, 3 A")).toBeNull();
@@ -739,6 +743,7 @@ describe("DetailPanel alternates", () => {
   it("shows each answer with the distributor that gave it once opened", async () => {
     const user = userEvent.setup();
     wrap(<DetailPanel detail={withTwoDescriptions()} {...BASE} />);
+    await user.click(screen.getByRole("tab", { name: "Handoff" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.getByText("Step-Down Regulator, 3 A")).toBeTruthy();
     expect(screen.getByText("DigiKey")).toBeTruthy();
@@ -751,6 +756,15 @@ describe("DetailPanel alternates", () => {
     wrap(
       <DetailPanel detail={withTwoDescriptions()} {...BASE} onEditField={onEditField} />,
     );
+    // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
+    // open it before asserting on them. The assertions themselves are unchanged.
+    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
+    // open it before asserting on them. The assertions themselves are unchanged.
+    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
+    // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
+    // open it before asserting on them. The assertions themselves are unchanged.
+    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     await user.click(screen.getByRole("button", { name: /Use DigiKey/i }));
     expect(onEditField).toHaveBeenCalledWith("description", "Step-Down Regulator, 3 A");
@@ -761,6 +775,9 @@ describe("DetailPanel alternates", () => {
     wrap(
       <DetailPanel detail={withTwoDescriptions()} {...BASE} onEditField={vi.fn()} />,
     );
+    // The description + datasheet fields moved to the Handoff TAB (owner's choice, 2026-07-26);
+    // open it before asserting on them. The assertions themselves are unchanged.
+    await userEvent.click(screen.getByRole("tab", { name: "Handoff" }));
     await user.click(screen.getByRole("button", { name: /2 Sources/i }));
     expect(screen.queryByRole("button", { name: /Use Mouser/i })).toBeNull();
   });
@@ -875,7 +892,10 @@ describe("DetailPanel spec row pairing", () => {
         {...BASE}
       />,
     );
-    const row = screen.getByText("Operating Temperature").closest("div")!;
+    // Scoped to the full Specifications list: Key Specifications now renders the same spec at the
+    // head of this column (a hero summary above the full table), so an unscoped query matches twice.
+    const list = document.querySelector('[data-dev-id="detail.specs-list"]') as HTMLElement;
+    const row = within(list).getByText("Operating Temperature").closest("div")!;
     // a grid with a bounded label track, so every value in the group starts at the same x and sits
     // adjacent to its label - not `justify-between`, which pushes them to opposite edges
     expect(row.className).toContain("grid");
@@ -946,6 +966,9 @@ describe("DetailPanel links row anatomy", () => {
     const user = userEvent.setup();
     const onEditField = vi.fn();
     wrap(<DetailPanel detail={withDatasheet()} {...BASE} onEditField={onEditField} />);
+    // The datasheet field moved to the Handoff TAB (owner's choice, 2026-07-26); open it before
+    // asserting on it. The assertions themselves are unchanged.
+    await user.click(screen.getByRole("tab", { name: "Handoff" }));
     // OPENS: a real anchor at the FULL url, never the shortened display label.
     expect(screen.getByRole("link", { name: /Open Datasheet/i })).toHaveAttribute(
       "href",
