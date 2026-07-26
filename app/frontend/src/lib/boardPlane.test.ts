@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOARD_PLANE_MIN_ASPECT,
   BOARD_PLANE_MIN_HALF_MM,
   BOARD_PLANE_REACH,
   PAD_THICKNESS_MM,
@@ -181,9 +182,17 @@ describe("boardPlaneHalfExtents", () => {
     expect(e.halfX).toBeCloseTo(BOARD_PLANE_REACH, 10);
   });
 
-  it("is SQUARE, so it does not read as a footprint-shaped tile", () => {
-    const e = boardPlaneHalfExtents({ halfX: 3, halfZ: 0.4 });
-    expect(e.halfX).toBeCloseTo(e.halfZ, 10);
+  // RE-BASELINED 2026-07-26, and the square it replaces was wrong for the reason the owner saw: on a
+  // real USON-14 (3.5 x 1.4mm) a square plane came out 4.5x the part's short axis and the part read as
+  // lost. Now each axis grows from its own extent, with a floor ratio so it never becomes a sliver.
+  it("grows each axis from its OWN extent, so an elongated part keeps its presence", () => {
+    const e = boardPlaneHalfExtents({ halfX: 3, halfZ: 1 });
+    expect(e.halfX).toBeGreaterThan(e.halfZ);
+  });
+
+  it("never lets one axis become a sliver of the other", () => {
+    const e = boardPlaneHalfExtents({ halfX: 8, halfZ: 0.1 });
+    expect(e.halfZ / e.halfX).toBeGreaterThanOrEqual(BOARD_PLANE_MIN_ASPECT - 1e-9);
   });
 
   it("always contains what stands on it, in both axes", () => {

@@ -145,7 +145,7 @@ export function Glb3DView({
         // are all just pushed to one corner" - which was literally the CSS: every cluster crammed left
         // with the rest of the bar empty. Now the layer + shading clusters hold the left and the view
         // cluster holds the right, so the bar reads as two ends rather than one heap.
-        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-line bg-[var(--c-popover)]/60 px-3 py-1"
+        className="pointer-events-auto flex flex-none flex-wrap items-center justify-between gap-x-2.5 gap-y-0.5 border-t border-line bg-[var(--c-popover)]/60 px-2 py-1"
       >
       {/* flex-wrap + min-w-0: this inner group holds the layer chips AND the shading chips, and
           without wrapping it forced both onto ONE line - measured 262px of content inside a 226px
@@ -197,8 +197,10 @@ export function Glb3DView({
         {showShading ? (
         <div
           data-dev-id="detail.model-shading"
-          // a hairline separates the two clusters; without it nine chips read as one undifferentiated run
-          className="flex items-center gap-0.5 border-l border-line pl-2"
+          // NO border-l. On a bar that wraps, a left border on a flex child becomes a stray vertical
+          // tick floating at the start of the new row - visible in the owner's real shot as a glitch
+          // beside "Realistic". Grouping is carried by the gap instead, which cannot wrap wrongly.
+          className="flex items-center gap-0.5"
         >
           {SHADING.map((r) => (
             <LayerToggle

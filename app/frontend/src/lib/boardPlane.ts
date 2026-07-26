@@ -148,13 +148,23 @@ export const BOARD_PLANE_REACH = 1.8;
 /** The minimum half-extent in mm, so a tiny 0402 still gets a surface rather than a stamp. */
 export const BOARD_PLANE_MIN_HALF_MM = 1.2;
 
+/** Neither axis may fall below this fraction of the longer one, so the plane never becomes a sliver
+ *  that reads as footprint-shaped rather than as board. */
+export const BOARD_PLANE_MIN_ASPECT = 0.62;
+
 /** The board plane's half-extents: the footprint's reach, grown so it reads as a surface. */
 export function boardPlaneHalfExtents(extent: BoardExtent): BoardExtent {
-  const reach = Math.max(extent.halfX, extent.halfZ) * BOARD_PLANE_REACH;
-  const half = Math.max(reach, BOARD_PLANE_MIN_HALF_MM);
-  // SQUARE on purpose. A board is not footprint-shaped, and matching the footprint's aspect is what
-  // made it read as a part-sized tile; a square surface under an oblong part reads as board.
-  return { halfX: half, halfZ: half };
+  // PER-AXIS, then squared UP to a floor ratio - not a plain square.
+  //
+  // It was fully square, on the reasoning that "a board is not footprint-shaped". True, but measured on
+  // the owner's real USON-14 (3.5 x 1.4mm) that produced a 6.3mm square: 1.8x the part along its length
+  // and 4.5x across its width, so the part read as lost on a table rather than placed on a board.
+  // Growing each axis from its OWN extent keeps the part's presence, and the floor ratio stops a long
+  // thin part getting a long thin sliver that would read as footprint-shaped again.
+  const x = Math.max(extent.halfX * BOARD_PLANE_REACH, BOARD_PLANE_MIN_HALF_MM);
+  const z = Math.max(extent.halfZ * BOARD_PLANE_REACH, BOARD_PLANE_MIN_HALF_MM);
+  const floor = Math.max(x, z) * BOARD_PLANE_MIN_ASPECT;
+  return { halfX: Math.max(x, floor), halfZ: Math.max(z, floor) };
 }
 
 /** Where each piece of the board / pad / part stack sits, in scene Y. */
