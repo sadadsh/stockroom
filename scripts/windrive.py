@@ -170,6 +170,74 @@ class Drive:
         out.write_bytes(base64.b64decode(data))
         return out
 
+    def controls(self) -> list[dict]:
+        """Every visible, clickable control on the current screen."""
+        raw = self.eval(_ENUMERATE_JS)
+        try:
+            return json.loads(raw) if isinstance(raw, str) else []
+        except json.JSONDecodeError:
+            return []
+
+    def settle(self, *, tries: int = 20, gap: float = 0.1) -> bool:
+        """Wait until the screen STOPS CHANGING, then return.
+
+        The signal is two identical fingerprints in a row - a real property of the page - so a fast
+        machine continues immediately and a slow one is still waited for. `tries * gap` is only the
+        backstop, and returning False says the UI never settled, which is itself a finding.
+        """
+        previous = None
+        stable = 0
+        for _ in range(tries):
+            current = self.eval(_FINGERPRINT_JS)
+            if current == previous:
+                stable += 1
+                if stable >= 1:
+                    return True
+            else:
+                stable = 0
+            previous = current
+            time.sleep(gap)
+        return False
+
+    def dialog(self) -> str:
+        """The dev-id of the open modal, or "" when none is open.
+
+        Load-bearing for the tour's honesty. A control sitting behind an open modal's scrim is
+        CORRECTLY unclickable, and reporting it as "renders but cannot be clicked" is a false
+        positive - the first run of `tour` produced six of them from one About dialog it had opened
+        itself. The sweep has to know the difference between a covered control and a modal.
+        """
+        found = self.eval(
+            "(() => { const d = document.querySelector('[role=\"dialog\"]');"
+            " return d ? (d.getAttribute('data-dev-id') || 'dialog') : ''; })()"
+        )
+        return found if isinstance(found, str) else ""
+
+    def escape(self) -> str:
+        """Dismiss an open modal and say whether it actually went.
+
+        Returns "" when the screen is clear, or the dialog's id when it REFUSED to close - which is
+        a real finding rather than a reason to keep sweeping into a scrim. Escape is dispatched with
+        rawKeyDown as well as keyDown: a React handler bound to keydown sees the former, and without
+        it the key silently does nothing.
+        """
+        if not self.dialog():
+            return ""
+        for kind in ("rawKeyDown", "keyDown", "keyUp"):
+            self.client.send("Input.dispatchKeyEvent", {
+                "type": kind, "key": "Escape", "code": "Escape",
+                "windowsVirtualKeyCode": 27, "nativeVirtualKeyCode": 27,
+            })
+        self.settle()
+        still = self.dialog()
+        if still:
+            # second chance: press the dialog's own close control, the way a person would
+            for close_id in (f"{still.split('.')[0]}.close", "preview.close", "dialog.close"):
+                if self.click(close_id) == "clicked":
+                    self.settle()
+                    break
+        return self.dialog()
+
     def flush_events(self) -> None:
         """Make sure every console event the page has already emitted has ARRIVED.
 
@@ -183,6 +251,72 @@ class Drive:
 
     def close(self) -> None:
         self.client.close()
+
+
+# Controls a sweep must NOT press on a real library, matched against the dev-id.
+#
+# This is the whole reason `tour` is safe to point at the owner's own machine. A tester who clicks
+# literally everything deletes a part, commits to git, rewrites the machine config, spends an API
+# quota and burns an Altium licence seat - and does it in the first ten seconds. Anything that acts
+# on the world is skipped by default and NAMED in the report, never silently passed over, so the
+# report can never read as "everything was exercised" when it was not.
+DESTRUCTIVE = (
+    "delete", "remove", "detach", "clear", "reset",
+    "apply", "adopt", "commit", "regenerate", "embed", "attach", "complete",
+    "refresh", "enrich", "ingest", "add-", "capture", "prepare", "restore",
+    "assign", "pin", "hygiene", "lfs", "sync", "rescan", "update", "activate",
+)
+
+
+def _is_destructive(dev_id: str) -> bool:
+    lowered = dev_id.lower()
+    return any(word in lowered for word in DESTRUCTIVE)
+
+
+# The page-side sweep. Returns every VISIBLE, enabled, genuinely clickable control with its dev-id,
+# tag, accessible name and whether something is covering it. Written as one expression so it costs a
+# single round trip per screen rather than one per control.
+_ENUMERATE_JS = """
+(() => {
+  const out = [];
+  for (const el of document.querySelectorAll('[data-dev-id]')) {
+    const id = el.getAttribute('data-dev-id');
+    const tag = el.tagName.toLowerCase();
+    const clickable =
+      tag === 'button' || tag === 'a' || tag === 'summary' ||
+      el.getAttribute('role') === 'button' || el.hasAttribute('onclick') ||
+      el.tabIndex >= 0;
+    if (!clickable) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    if (r.bottom < 0 || r.top > innerHeight) continue;
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    out.push({
+      id,
+      tag,
+      name: (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 60),
+      disabled: !!el.disabled || el.getAttribute('aria-disabled') === 'true',
+      covered: !!(top && !el.contains(top) && !top.contains(el)),
+    });
+  }
+  return JSON.stringify(out);
+})()
+"""
+
+# A cheap fingerprint of what is on screen. Two identical readings in a row mean the UI has SETTLED,
+# which is a real signal; a fixed sleep after every click would be a clock pretending to be one.
+_FINGERPRINT_JS = """
+(() => {
+  const d = document;
+  return [
+    d.readyState,
+    d.querySelectorAll('*').length,
+    (d.body.innerText || '').length,
+    !!d.querySelector('[role="dialog"]'),
+    location.hash,
+  ].join('|');
+})()
+"""
 
 
 def _install_dir() -> Path:
@@ -261,6 +395,124 @@ def cmd_down(args) -> int:
     return 0
 
 
+def cmd_tour(args) -> int:
+    """Click through the app like a tester and report what is wrong.
+
+    Not a screenshot script. It ENUMERATES every visible clickable control on each surface, presses
+    the safe ones one at a time, waits for the screen to settle, and records what happened: did the
+    click land, did something cover the control, did the page log an error, did the screen change at
+    all. A control that renders perfectly and does nothing is invisible to a screenshot and obvious
+    here - which is exactly the bug that cost a whole session when the viewer's chips were
+    unclickable and every shot looked correct.
+
+    Destructive controls are SKIPPED and listed, so the report never implies coverage it lacks.
+    """
+    out_dir = Path(args.out)
+    try:
+        drive = Drive(args.port)
+    except NoWindow as exc:
+        print(f"NO WINDOW: {exc}")
+        return 2
+
+    surfaces = args.surface or ["rail.nav-components", "rail.nav-projects", "rail.nav-stm"]
+    findings: list[str] = []
+    skipped: list[str] = []
+    pressed = 0
+    shot_n = 0
+
+    try:
+        for surface in surfaces:
+            # Start each surface from a clear screen. A modal left open by the previous surface -
+            # or by a previous RUN, since the app keeps running between them - sits over the rail
+            # and makes every navigation report as unreachable, which is a fact about the leftover
+            # dialog and not about the app.
+            leftover = drive.escape()
+            if leftover:
+                findings.append(
+                    f"STUCK MODAL on arrival: {leftover} was open and would not close, so "
+                    f"{surface} could not be reached from a clean screen"
+                )
+            if drive.click(surface) != "clicked":
+                findings.append(f"UNREACHABLE surface: {surface}")
+                continue
+            drive.settle()
+            seen: set[str] = set()
+            # Re-enumerate after every click: pressing something can reveal, hide or replace
+            # controls, and a list captured once would press stale elements and miss new ones.
+            for _ in range(args.max_clicks):
+                candidates = [
+                    c for c in drive.controls()
+                    if c["id"] not in seen and not c["disabled"]
+                ]
+                if not candidates:
+                    break
+                control = candidates[0]
+                seen.add(control["id"])
+                if _is_destructive(control["id"]) and not args.include_destructive:
+                    skipped.append(f'{surface} > {control["id"]} ({control["name"]})')
+                    continue
+                if control["covered"]:
+                    # Only a finding when NOTHING is legitimately over the page. Behind an open
+                    # modal's scrim, being uncovered would be the bug.
+                    if not drive.dialog():
+                        findings.append(
+                            f'COVERED: {control["id"]} ({control["name"]}) is behind another '
+                            f"element on {surface} - it renders but cannot be clicked"
+                        )
+                    continue
+                before = drive.eval(_FINGERPRINT_JS)
+                errors_before = len(drive.console)
+                result = drive.click(control["id"])
+                pressed += 1
+                if result != "clicked":
+                    findings.append(f'{surface} > {control["id"]}: {result}')
+                    continue
+                if not drive.settle():
+                    findings.append(
+                        f'NEVER SETTLED: {control["id"]} ({control["name"]}) left the screen '
+                        "still changing - an animation that does not finish, or a render loop"
+                    )
+                after = drive.eval(_FINGERPRINT_JS)
+                new_errors = drive.console[errors_before:]
+                for line in new_errors:
+                    if line.startswith("error"):
+                        findings.append(f'ERROR after clicking {control["id"]}: {line}')
+                # Re-pressing the surface you are already on correctly does nothing. Reporting that
+                # is the detector firing on RELEVANCE rather than on a real miss.
+                if after == before and not new_errors and control["id"] != surface:
+                    findings.append(
+                        f'NO EFFECT: {control["id"]} ({control["name"]}) changed nothing on screen '
+                        "and logged nothing - a control that does not appear to do anything"
+                    )
+                if args.shots:
+                    shot_n += 1
+                    drive.shot(out_dir / f'{surface}-{shot_n:02d}-{control["id"]}.png')
+                stuck = drive.escape()
+                if stuck:
+                    findings.append(
+                        f"STUCK MODAL: {stuck} opened by {control['id']} would not close on Escape "
+                        "or by its own close control - everything behind it is unreachable"
+                    )
+                    # leave the surface and come back, so one stuck dialog cannot end the sweep
+                    drive.click(surface)
+                drive.settle()
+    finally:
+        drive.close()
+
+    print(f"\n=== TOUR: pressed {pressed} controls across {len(surfaces)} surfaces ===")
+    if skipped:
+        print(f"\nSKIPPED as destructive ({len(skipped)}) - NOT exercised, say so in any report:")
+        for line in skipped:
+            print(f"  {line}")
+    if findings:
+        print(f"\nFINDINGS ({len(findings)}):")
+        for line in findings:
+            print(f"  {line}")
+    else:
+        print("\nNo findings: every control pressed landed, settled, and changed something.")
+    return 1 if findings else 0
+
+
 def _run_steps(drive: Drive, steps: list[str], out_dir: Path) -> int:
     """Run a batch of steps over ONE connection. `click:x`, `text:x`, `eval:js`, `shot`, `wait:0.5`."""
     shot_n = 0
@@ -309,6 +561,15 @@ def main() -> int:
     up.set_defaults(func=cmd_up)
 
     sub.add_parser("down", help="stop the host by its process tree").set_defaults(func=cmd_down)
+
+    tour = sub.add_parser("tour", help="click through the app like a tester and report what breaks")
+    tour.add_argument("--surface", action="append", default=[],
+                      help="rail dev-id to visit (repeatable); defaults to every rail surface")
+    tour.add_argument("--max-clicks", type=int, default=40, help="controls to press per surface")
+    tour.add_argument("--shots", action="store_true", help="capture the window after every click")
+    tour.add_argument("--include-destructive", action="store_true",
+                      help="ALSO press deletes, commits and writes. Never on a real library.")
+    tour.set_defaults(func=cmd_tour)
 
     for name, help_text in (
         ("click", "click a data-dev-id"),
