@@ -8,13 +8,21 @@
  * the other library-wide maintenance surfaces in this same status + action shape.
  */
 import { useState } from "react";
-import { useAltiumRegenerate, useAltiumStatus, useOdbcStatus } from "../api/queries";
+import {
+  useAltiumEmbedCapability,
+  useAltiumEmbedModels,
+  useAltiumModelsPending,
+  useAltiumRegenerate,
+  useAltiumStatus,
+  useOdbcStatus,
+} from "../api/queries";
 import { useToast } from "../lib/toast";
 import { Text } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 import { AltiumSetupModal } from "./AltiumSetupModal";
 import { Button, Dot } from "./primitives";
 import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon } from "./icons";
+import { Icon } from "./Icon";
 
 export function AltiumDbLibSection() {
   const status = useAltiumStatus();
@@ -116,6 +124,7 @@ export function AltiumDbLibSection() {
           >
             {regenerate.isPending ? "Regenerating..." : "Regenerate DbLib"}
           </Button>
+          <EmbedAllModelsButton />
           <Button
             onClick={() => setOpen(true)}
             disabled={!data}
@@ -135,6 +144,68 @@ export function AltiumDbLibSection() {
       <AltiumSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
 
     </>
+  );
+}
+
+// Embed every pending 3D model in one action, so a whole library does not cost one click per part
+// (owner's deadline ask: "no work on my end"). It states the number it will work on, because an
+// action that promises a count it cannot honour is worse than one that promises none, and it hides
+// itself entirely when nothing is pending rather than offering a no-op.
+//
+// Disabled with the REASON when Altium cannot run here: not installed, or a windowed Altium holding
+// the single On-Demand license seat. Both come from the capability probe, which re-checks on window
+// focus, so closing Altium and coming back enables the button with no manual refresh.
+function EmbedAllModelsButton() {
+  const pending = useAltiumModelsPending();
+  const capability = useAltiumEmbedCapability();
+  const embed = useAltiumEmbedModels();
+  const { toast } = useToast();
+
+  const count = pending.data?.count ?? 0;
+  if (count === 0) return null;
+
+  const cap = capability.data;
+  const blocked = cap && !cap.available
+    ? cap.busy
+      ? `Close Altium first: ${cap.busy} is holding the license seat.`
+      : cap.reason || "Altium is not installed on this machine."
+    : "";
+  const running = embed.status === "running";
+
+  async function onEmbed() {
+    try {
+      await embed.start();
+      const r = embed.result;
+      if (!r) return;
+      // A partial run is reported as a FAILURE tone, not a success with a footnote: the owner
+      // walked away from this, so the one line they read has to say that something needs them.
+      if (r.failed > 0) {
+        const first = r.results.find((x) => x.status === "failed");
+        toast(
+          `Embedded ${r.embedded} of ${r.attempted}. ${r.failed} failed` +
+            (first?.detail ? `, starting with ${first.part_id}: ${first.detail}` : "."),
+          "err",
+        );
+        return;
+      }
+      toast(`Embedded ${r.embedded} 3D ${r.embedded === 1 ? "model" : "models"}.`, "ok");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not embed the 3D models.", "err");
+    }
+  }
+
+  return (
+    <Button
+      onClick={onEmbed}
+      disabled={running || Boolean(blocked)}
+      title={blocked || undefined}
+      data-dev-id="altiumdb.embed-all"
+      icon={<Icon id="layer.model" className="h-3.5 w-3.5" />}
+    >
+      {running
+        ? embed.progress?.message || "Embedding..."
+        : `Embed 3D Models (${count})`}
+    </Button>
   );
 }
 

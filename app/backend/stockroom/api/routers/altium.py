@@ -139,6 +139,50 @@ def altium_router(require_token) -> APIRouter:
             ctx.auto_push()
         return result
 
+    @r.post("/embed-models")
+    def embed_models_route(request: Request, body: dict | None = None) -> dict:
+        """Embed the 3D model of every part that still needs one, as a background job.
+
+        A job rather than a plain call because each part that genuinely needs work costs an Altium
+        boot, so a full library can run for minutes; the SSE stream names the part it is on, since
+        a silent multi-minute bar is indistinguishable from a hang. Parts already carrying a model
+        are not attempted at all, so a re-run costs nothing.
+        """
+        ctx = request.app.state.ctx
+        options = body or {}
+        part_ids = options.get("part_ids")
+
+        def work(progress):
+            with _WRITE_LOCK:
+                def on_progress(done: int, total: int, part_id: str) -> None:
+                    if progress is None:
+                        return
+                    # The part NAME, not just a percentage: each part costs an Altium boot, so
+                    # "embedding tps62130 (3 of 40)" is the difference between a slow job and one
+                    # the owner cannot tell from a hang.
+                    progress({
+                        "stage": "embedding",
+                        "pct": (done / total) if total else 1.0,
+                        "message": f"embedding {part_id} ({done} of {total})",
+                    })
+
+                report = ctx.ops.embed_altium_models(
+                    part_ids=part_ids, replace=bool(options.get("replace")),
+                    on_progress=on_progress,
+                )
+                ctx.rebuild_index()
+                ctx.auto_push()
+            return report
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/models-pending")
+    def models_pending(request: Request) -> dict:
+        """The parts a bulk embed would work on, so the action can state a number it will honour."""
+        ctx = request.app.state.ctx
+        pending = ctx.ops.altium_models_pending()
+        return {"pending": pending, "count": len(pending)}
+
     @r.post("/parts/{part_id}/attach")
     def attach(request: Request, part_id: str, body: dict) -> dict:
         ctx = request.app.state.ctx

@@ -214,3 +214,96 @@ def test_status_reports_whether_the_derived_data_source_is_built(client, app_ctx
 
     app_ctx.ops.ensure_altium_datasource()
     assert client.get("/api/altium/status").json()["datasource_present"] is True
+
+
+# --- The bulk embed: one action for a whole library. ---------------------------------------------
+
+
+def _drain_altium_job(client, job_id):
+    """Consume a job's SSE stream, keeping the progress MESSAGES as well as the terminal payload.
+    The enrich helper keeps only stage names, and here the message IS the contract: it has to name
+    the part being embedded."""
+    import json as _json
+
+    messages: list[str] = []
+    kind = None
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as s:
+        for line in s.iter_lines():
+            line = line.strip()
+            if line.startswith("event:"):
+                kind = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data = _json.loads(line[len("data:"):].strip())
+                if kind == "progress" and data.get("message"):
+                    messages.append(data["message"])
+                elif kind == "result":
+                    return {"result": data["result"], "messages": messages}
+    raise AssertionError("the job stream ended without a result")
+
+
+def test_models_pending_requires_token(anon_client):
+    assert anon_client.get("/api/altium/models-pending").status_code == 401
+
+
+def test_embed_models_requires_token(anon_client):
+    assert anon_client.post("/api/altium/embed-models", json={}).status_code == 401
+
+
+def test_models_pending_reports_what_the_action_would_work_on(client, monkeypatch):
+    ctx = client.app.state.ctx
+    monkeypatch.setattr(ctx.ops, "altium_models_pending", lambda: ["a", "b"])
+    body = client.get("/api/altium/models-pending").json()
+    assert body == {"pending": ["a", "b"], "count": 2}
+
+
+def test_embed_models_runs_as_a_job_and_reports_the_whole_run(client, monkeypatch):
+    """The owner walks away from this one, so the report must carry every part's outcome - not
+    just a count, and not just the first failure."""
+    report = {
+        "embedded": 2, "failed": 1, "attempted": 3, "skipped": ["kicad-only"],
+        "results": [
+            {"part_id": "a", "status": "ok"},
+            {"part_id": "b", "status": "ok"},
+            {"part_id": "c", "status": "failed", "detail": "Altium could not load c.step"},
+        ],
+    }
+    seen = {}
+    ctx = client.app.state.ctx
+
+    def fake_bulk(part_ids=None, *, replace=False, on_progress=None):
+        seen["part_ids"] = part_ids
+        seen["replace"] = replace
+        if on_progress:
+            on_progress(1, 2, "a")
+            on_progress(2, 2, "b")
+        return report
+
+    monkeypatch.setattr(ctx.ops, "embed_altium_models", fake_bulk)
+
+    job = client.post("/api/altium/embed-models", json={}).json()
+    assert "job_id" in job
+    out = _drain_altium_job(client, job["job_id"])
+
+    assert out["result"]["embedded"] == 2 and out["result"]["failed"] == 1
+    assert out["result"]["skipped"] == ["kicad-only"]
+    # the failing part's REASON survives to the report; a bulk run the owner walked away from is
+    # exactly where "it did not work" without the reason is useless
+    failed = next(r for r in out["result"]["results"] if r["status"] == "failed")
+    assert "could not load" in failed["detail"]
+    assert seen == {"part_ids": None, "replace": False}
+    # it named the part it was on, because a silent multi-minute bar reads as a hang
+    assert any("embedding a (1 of 2)" == m for m in out["messages"]), out["messages"]
+
+
+def test_embed_models_can_be_scoped_to_named_parts(client, monkeypatch):
+    seen = {}
+    ctx = client.app.state.ctx
+    monkeypatch.setattr(
+        ctx.ops, "embed_altium_models",
+        lambda part_ids=None, *, replace=False, on_progress=None: seen.setdefault(
+            "ids", part_ids) or {"embedded": 0, "failed": 0, "attempted": 0,
+                                 "skipped": [], "results": []},
+    )
+    job = client.post("/api/altium/embed-models", json={"part_ids": ["x"]}).json()
+    _drain_altium_job(client, job["job_id"])
+    assert seen["ids"] == ["x"]

@@ -1721,6 +1721,31 @@ export interface AltiumEmbedResult {
   commit: string;
 }
 
+// One part's outcome inside a bulk run. `status` is "ok" for an embed that was verified in the
+// container, "failed" for one that was not; a failure carries Altium's own words in `detail`,
+// because a run the owner walked away from is exactly where "it did not work" is useless.
+export interface AltiumBulkEmbedItem {
+  part_id: string;
+  status: string;
+  detail?: string;
+}
+
+// POST /api/altium/embed-models -> the whole run. `skipped` is the parts that were never
+// candidates (no Altium footprint, no 3D model file, or a model already embedded); those are not
+// failures, and keeping them separate is what makes "2 of 40" explicable rather than alarming.
+export interface AltiumBulkEmbedResult {
+  embedded: number;
+  failed: number;
+  attempted: number;
+  skipped: string[];
+  results: AltiumBulkEmbedItem[];
+}
+
+export interface AltiumModelsPending {
+  pending: string[];
+  count: number;
+}
+
 export interface AltiumRegenerateResult {
   emitted: number;
   skipped: string[];

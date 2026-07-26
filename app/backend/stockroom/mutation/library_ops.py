@@ -840,6 +840,97 @@ class LibraryOps:
             "commit": sha,
         }
 
+    def _altium_embed_candidate(self, record: PartRecord) -> bool:
+        """True when this part COULD gain an embedded 3D body and does not have one yet.
+
+        Three ways to not be a candidate, none of them an error: no Altium footprint (a 3D body
+        lives inside the footprint's `.PcbLib`, so there is nowhere to put it), no 3D model file
+        on the record at all, or an Altium model slot that is already filled. A real library is a
+        mixture of all four states, and calling the first three "failures" would bury the one
+        thing the owner actually needs to read.
+
+        Decided from the RECORD, never by opening the OLE container. Parsing every `.PcbLib` to
+        answer "how many are pending" would make a status call cost the whole library in disk
+        reads. Both ways of being wrong are already safe: a record that claims a model the
+        container lost is simply not offered (and the per-part action still works), while a record
+        missing the ref for a container that HAS the payload costs one embed attempt, which detects
+        the payload from outside Altium and no-ops in 0.055s without taking a license seat.
+        """
+        altium = _altium(record)
+        footprint = altium.footprint
+        if footprint is None or not footprint.lib:
+            return False
+        if altium.model is not None:
+            return False
+        if self._model_source(record) is None:
+            return False
+        return (self.lib.parts_dir.parent / "altium" / footprint.lib).exists()
+
+    def altium_models_pending(self) -> list[str]:
+        """The part ids a bulk embed would actually work on, so a button never promises work it
+        cannot do or hides work it will. Sorted, so the number and the order are stable."""
+        pending = []
+        for path in sorted(self.lib.parts_dir.glob("*.json")):
+            try:
+                record = self.load_record(path.stem)
+            except Exception:  # noqa: BLE001 - one unreadable record never hides the rest
+                continue
+            if self._altium_embed_candidate(record):
+                pending.append(record.id)
+        return pending
+
+    def embed_altium_models(self, part_ids: list[str] | None = None, *, replace: bool = False,
+                            driver=None, on_progress=None) -> dict:
+        """Embed the 3D model of EVERY part that needs one, in a single action.
+
+        The owner's deadline ask was "no work on my end", and a whole library at one click per part
+        is work. Each part is still its own atomic transaction, so a failure in the middle leaves
+        the parts already done committed and the failing one untouched - the alternative, one giant
+        transaction, would throw away an hour of successful embeds because part 41 had a bad
+        container.
+
+        This LOOPS the single-part embed rather than generating one DelphiScript that does every
+        job in a single Altium boot. The script is the hard-won part (nine ruled-out hypotheses,
+        and the breakthrough that a body must be added to the BOARD, not the footprint), each
+        iteration on it costs an Altium boot and a license seat, and an already-embedded model is
+        detected from OUTSIDE Altium and skipped in 0.055s with no boot at all. So a re-run is
+        nearly free and only genuinely new work costs time. One-boot-many-jobs is a real
+        optimisation, but it is an optimisation, not a prerequisite.
+
+        `on_progress(done, total, part_id)` fires after each part, because this can run for
+        minutes and a silent bar is indistinguishable from a hang.
+        """
+        if part_ids is None:
+            targets, skipped = self.altium_models_pending(), []
+        else:
+            targets, skipped = [], []
+            for pid in part_ids:
+                record = self.load_record(pid)
+                (targets if self._altium_embed_candidate(record) else skipped).append(pid)
+        if part_ids is None:
+            # Report the non-candidates too, so "3 of 40" is explained rather than mysterious.
+            skipped = [p.stem for p in sorted(self.lib.parts_dir.glob("*.json"))
+                       if p.stem not in set(targets)]
+
+        results: list[dict] = []
+        embedded = failed = 0
+        for i, pid in enumerate(targets, start=1):
+            try:
+                result = self.embed_altium_model(pid, replace=replace, driver=driver)
+                embedded += 1
+            except Exception as exc:  # noqa: BLE001 - one bad part never abandons the rest
+                failed += 1
+                # Altium's own words survive to the report: "it did not work" without the reason
+                # is what made this feature take ten boots to diagnose in the first place.
+                result = {"part_id": pid, "status": "failed", "detail": str(exc)}
+            results.append(result)
+            if on_progress is not None:
+                on_progress(i, len(targets), pid)
+        return {
+            "embedded": embedded, "failed": failed, "attempted": len(targets),
+            "skipped": skipped, "results": results,
+        }
+
     def detach_asset(self, part_id: str, kind: str) -> PartRecord:
         """Remove ONE element from a part (owner 2026-07-24): the file goes, the record
         ref nulls, one scoped commit; everything else on the part stands.
