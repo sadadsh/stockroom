@@ -47,6 +47,16 @@ public class SRWin {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool ScreenToClient(IntPtr h, ref System.Drawing.Point p);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr wp, IntPtr lp);
+  public const uint WM_MOUSEACTIVATE = 0x0021, WM_SETCURSOR = 0x0020;
+
+  public static string ClassOf(IntPtr h) {
+    var sb = new StringBuilder(256);
+    GetClassName(h, sb, sb.Capacity);
+    return sb.ToString();
+  }
   [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
   [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
 
@@ -203,6 +213,43 @@ switch ($Action) {
     if ($after -ne $hwnd) {
       "FAIL: the window did not take focus, so any click sent to it will be swallowed."
       exit 5
+    }
+  }
+  "bgclick" {
+    # A click that NEVER touches the shared mouse pointer, so somebody using the machine is not
+    # interrupted and no other app can steal it mid-gesture.
+    #
+    # The earlier `mclick` posted to the TOP-LEVEL window and did nothing, because a VCL app such as
+    # Altium builds its controls as CHILD windows and the button never saw the message. The fix is
+    # to resolve the deepest child AT THAT SCREEN POINT and post to it, in ITS OWN client
+    # coordinates. WM_MOUSEACTIVATE first, because a control that believes it is inactive ignores
+    # the press.
+    $sx = ToScreenX $X; $sy = ToScreenY $Y
+    $pt = New-Object System.Drawing.Point $sx, $sy
+    $child = [SRWin]::WindowFromPoint($pt)
+    if ($child -eq [IntPtr]::Zero) { "FAIL: no window at screen ($sx,$sy)"; exit 6 }
+    $cp = New-Object System.Drawing.Point $sx, $sy
+    [void][SRWin]::ScreenToClient($child, [ref]$cp)
+    $lp = [IntPtr](($cp.Y -shl 16) -bor ($cp.X -band 0xFFFF))
+    [void][SRWin]::SendMessage($child, [SRWin]::WM_MOUSEACTIVATE, $hwnd, $lp)
+    [void][SRWin]::PostMessage($child, [SRWin]::WM_MOUSEMOVE, [IntPtr]::Zero, $lp)
+    [void][SRWin]::PostMessage($child, [SRWin]::WM_LBUTTONDOWN, [IntPtr]1, $lp)
+    Start-Sleep -Milliseconds 60
+    [void][SRWin]::PostMessage($child, [SRWin]::WM_LBUTTONUP, [IntPtr]::Zero, $lp)
+    # Some controls act on BM_CLICK and ignore a synthesised DOWN/UP pair, because they track a
+    # press they never saw begin. Harmless on a control that does not implement it.
+    Start-Sleep -Milliseconds 80
+    [void][SRWin]::SendMessage($child, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)  # BM_CLICK
+    "BGCLICK shot($X,$Y) -> screen($sx,$sy) -> child=$child class='$([SRWin]::ClassOf($child))' client=($($cp.X),$($cp.Y))"
+    "  pointer untouched: $([System.Windows.Forms.Cursor]::Position)"
+    Start-Sleep -Seconds $Settle
+    if ($Shot) {
+      $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+      $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+      $g = [System.Drawing.Graphics]::FromImage($bmp)
+      $g.CopyFromScreen($b.X, $b.Y, 0, 0, $bmp.Size)
+      $bmp.Save($Shot)
+      "SHOT $Shot $($b.Width)x$($b.Height)"
     }
   }
   "focusclick" {
