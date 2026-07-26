@@ -164,6 +164,13 @@ export function PhotoTrigger({
   );
 
   if (variant === "panel") {
+    // OWNER, 2026-07-26, two asks about this one control: "product photos: do not show the source"
+    // and "just a View Photos BUTTON, with an icon". So the card that used to sit here - a 48px
+    // thumbnail, the count, the vendor line and a chevron - is now a button carrying a camera and
+    // the verb. The vendor is gone entirely: it named WHOSE photograph it was, which is a fact
+    // about sourcing rather than about the part, and the viewer itself still shows it per photo.
+    // The thumbnail goes with it because the ask was "just a button"; the icon is what says what
+    // opens. Full width, because it is the whole row's control rather than a chip inside one.
     return (
       <>
         <button
@@ -175,39 +182,14 @@ export function PhotoTrigger({
               ? `View ${count} Photos of ${partName || "this part"}`
               : `View Photo of ${partName || "this part"}`
           }
-          className="group flex w-full items-center gap-3 rounded-control border border-line bg-field p-2 text-left transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="group flex w-full items-center justify-center gap-2 rounded-control border border-line bg-field px-2 py-2 text-xs font-medium text-t2 transition-colors hover:border-line2 hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
-          {/* the photograph itself is the affordance. A white chamber for the same reason the
-              viewer uses one: these are white-matte JPEGs and would punch a hole in the dark theme */}
-          <span className="flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-control bg-white">
-            <ProductPhoto
-              url={shots[0].url}
-              alt=""
-              className="h-full w-full object-contain p-0.5"
-              fallback={
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="text-neutral-400">
-                  <rect x="3" y="5" width="18" height="14" rx="2" />
-                  <circle cx="9" cy="11" r="2" />
-                  <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
-                </svg>
-              }
-            />
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate text-xs font-medium text-t1">
-              {count > 1 ? `View ${count} Photos` : "View Photo"}
-            </span>
-            <span className="truncate text-2xs text-t3">
-              {/* say WHOSE photographs they are: with two distributors these are genuinely
-                  different shots, and the vendor is the reason to page through them */}
-              {count > 1
-                ? shots.map((s) => s.vendor).filter(Boolean).join(" and ") || "From the distributors"
-                : shots[0].vendor || "From the distributor"}
-            </span>
-          </span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="ml-auto flex-none text-t3 transition-colors group-hover:text-t1">
-            <path d="M9 18l6-6-6-6" />
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="flex-none">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="9" cy="11" r="2" />
+            <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
           </svg>
+          {count > 1 ? `View ${count} Photos` : "View Photo"}
         </button>
         {card}
       </>
