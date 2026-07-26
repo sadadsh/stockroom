@@ -665,6 +665,9 @@ export function DetailPanel({
                       // nothing else - no views, no shading, no spin control.
                       showViews
                       showShading
+                      // ICON chips here: this tile is ~280px, where ten text-labelled controls wrapped
+                      // to three rows and took a third of the stage. The modal keeps its labels.
+                      compact
                     />
                   </div>
                 ) : undefined

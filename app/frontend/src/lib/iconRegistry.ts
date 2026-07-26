@@ -243,6 +243,65 @@ export const ICON_REGISTRY: IconEntry[] = [
     body: '<path d="M20 6 9 17l-5-5"/>',
   },
   {
+    // The 3D viewer's SHADING and VIEW controls, as glyphs. The mini tile is ~280px and ten
+    // text-labelled chips wrapped to three rows there, taking a third of the stage; the owner chose
+    // icon-only for the tile (2026-07-26) so the stage keeps its height. The modal still shows text.
+    // Names stay reachable: every chip keeps its `title` and an aria-label.
+    id: "view.shade-realistic",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // a lit sphere: outline plus a terminator arc and a highlight, i.e. shading itself
+    body:
+      '<circle cx="12" cy="12" r="8"/>' +
+      '<path d="M12 4a8 8 0 0 1 0 16 6 10 0 0 0 0-16" fill="currentColor" stroke="none" opacity="0.55"/>' +
+      '<circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/>',
+  },
+  {
+    id: "view.shade-studio",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // FLAT shading: the same sphere with no gradient, just an even outline and a hard equator
+    body: '<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/>',
+  },
+  {
+    id: "view.shade-xray",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // see-through: a dashed sphere with an interior edge showing through it
+    body:
+      '<circle cx="12" cy="12" r="8" stroke-dasharray="3 2.4"/>' +
+      '<path d="M12 6v12" opacity="0.7"/>',
+  },
+  {
+    id: "view.iso",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // a cube seen three-quarter, which is what the iso view is
+    body:
+      '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/>' +
+      '<path d="M12 3v9l8-4.5M12 12l-8-4.5M12 12v9" opacity="0.75"/>',
+  },
+  {
+    id: "view.top",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // looking straight DOWN a face: the face square with the axis coming at you
+    body: '<rect x="4.5" y="4.5" width="15" height="15" rx="1.5"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>',
+  },
+  {
+    id: "view.front",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.8,
+    // an ELEVATION: the face square standing on a ground line, which is how a datasheet draws height
+    body: '<rect x="4.5" y="4" width="15" height="12" rx="1.5"/><path d="M3 20h18"/>',
+  },
+  {
     id: "nav.theme",
     category: "primary",
     viewBox: "0 0 24 24",
