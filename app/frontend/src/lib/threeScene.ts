@@ -512,7 +512,7 @@ export function mountModelScene(
    * viewport. Only the DISTANCE changes here - moving the camera's angle when someone toggles a
    * layer would read as the viewer wrestling them for control.
    */
-  function refitCamera() {
+  function refitCamera(forDirection?: [number, number, number]) {
     const boxes: Box[] = [];
     const add = (object: THREE.Object3D | null) => {
       if (!object || !object.visible) return;
@@ -527,7 +527,14 @@ export function mountModelScene(
     if (!bounds || bounds.radius <= 0) return; // all hidden: hold the last good frame, don't lurch
     const centre = new THREE.Vector3(...bounds.centre);
     // preserve the current viewing DIRECTION relative to the target; only the distance moves.
-    const direction = camera.position.clone().sub(controls.target);
+    // `forDirection` overrides it for a view the camera has not MOVED to yet: setView tweens over
+    // ~260ms, so fitting from the live position would size the frame for the direction being left
+    // behind. That is what left the orthographic top view framed by the ISO fit - a frustum sized
+    // for a three-quarter silhouette, with the subject small inside it and the shadow plane's own
+    // edge visible in the corner.
+    const direction = forDirection
+      ? new THREE.Vector3(...forDirection).normalize()
+      : camera.position.clone().sub(controls.target);
     if (direction.lengthSq() === 0) direction.set(...VIEW_DIRECTIONS.iso);
     direction.normalize();
     // Fit the BOX, not its enclosing sphere. A sphere fit is exact for a sphere and wasteful for a
@@ -555,7 +562,9 @@ export function mountModelScene(
     // large empty band above it.
     fitTarget.copy(centre);
     controls.target.copy(centre);
-    camera.position.copy(centre).add(direction.multiplyScalar(fitDistance));
+    if (!forDirection) {
+      camera.position.copy(centre).add(direction.clone().multiplyScalar(fitDistance));
+    }
     camera.near = Math.max(bounds.radius / 100, 1e-4);
     camera.far = bounds.radius * 100;
     camera.updateProjectionMatrix();
@@ -594,6 +603,12 @@ export function mountModelScene(
     // `object` has to be reassigned too, or the user would orbit the camera that is not rendering.
     activeCamera = mode === "top" ? orthoCamera : camera;
     controls.object = activeCamera;
+    // Re-fit for the direction we are moving TO, not the one we are leaving.
+    refitCamera(VIEW_DIRECTIONS[mode]);
+    // The bare shadow-catcher is a horizontal plane. Edge-on from a top view it contributes
+    // nothing and its own edge reads as a stray quad behind the part, so it stands down for the
+    // views that look along an axis and returns for the free 3/4 view where it grounds the model.
+    if (groundPlane) groundPlane.visible = mode === "iso" && !boardMesh;
     // orbit whatever the fit chose as the centre, so a canonical view frames the same subject the
     // free view does instead of snapping back to a fixed origin the content may not sit on.
     const target = new THREE.Vector3(...VIEW_DIRECTIONS[mode])
