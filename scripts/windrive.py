@@ -373,20 +373,33 @@ def cmd_down(args) -> int:
     NEVER `taskkill /IM msedgewebview2.exe`: measured on this machine, only 5 of 17 such processes
     were Stockroom's and the rest belonged to Windows Widgets and SearchHost.
     """
-    try:
-        pid = int(Drive(args.port).eval("window.__STOCKROOM_HOST_PID__ || 0") or 0)
-    except Exception:
-        pid = 0
+    pid = getattr(args, "pid", 0)
     if not pid:
-        # fall back to the python running the host module, still never the webview image name
+        try:
+            pid = int(Drive(args.port).eval("window.__STOCKROOM_HOST_PID__ || 0") or 0)
+        except Exception:
+            pid = 0
+    if not pid:
+        # Fall back to finding the python that is running the host module - still never the webview
+        # IMAGE NAME, because only 5 of 17 `msedgewebview2.exe` on this machine were Stockroom's and
+        # the rest belonged to Windows Widgets and SearchHost.
+        #
+        # PowerShell CIM, not `wmic`: wmic is deprecated and REMOVED from current Windows, so the
+        # first version of this raised `FileNotFoundError: [WinError 2]` and stopped nothing.
+        # Discovered by running it, not by reading a compatibility note.
         out = subprocess.run(
-            ["wmic", "process", "where", "name='python.exe'", "get", "ProcessId,CommandLine"],
+            ["powershell.exe", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+             "Where-Object { $_.CommandLine -like '*stockroom.host.run*' } | "
+             "Select-Object -ExpandProperty ProcessId"],
             capture_output=True, text=True,
         ).stdout
-        for line in out.splitlines():
-            if "stockroom.host.run" in line:
-                pid = int(line.strip().split()[-1])
-                break
+        pids = [int(line) for line in out.split() if line.strip().isdigit()]
+        if len(pids) > 1:
+            print(f"{len(pids)} Stockroom hosts are running ({pids}). Pass --pid to say which; "
+                  "guessing could stop a window you are using.")
+            return 1
+        pid = pids[0] if pids else 0
     if not pid:
         print("no running Stockroom host found")
         return 1
@@ -560,7 +573,9 @@ def main() -> int:
     up.add_argument("--timeout", type=float, default=60.0)
     up.set_defaults(func=cmd_up)
 
-    sub.add_parser("down", help="stop the host by its process tree").set_defaults(func=cmd_down)
+    down = sub.add_parser("down", help="stop the host by its process tree")
+    down.add_argument("--pid", type=int, default=0, help="which host to stop, when several run")
+    down.set_defaults(func=cmd_down)
 
     tour = sub.add_parser("tour", help="click through the app like a tester and report what breaks")
     tour.add_argument("--surface", action="append", default=[],
