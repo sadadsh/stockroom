@@ -695,6 +695,23 @@ export function DetailPanel({
             </div>
           </div>
 
+          {/* THE PHOTOGRAPH, directly above the CAD row (owner 2026-07-26: "place product photo above
+              the cad complete"). It used to sit in the Sourcing column on the reasoning that it is the
+              distributor's own image, pulled from the same page as the price - true, but it puts all
+              FOUR views of the part (3D body, symbol, land pattern, photograph) in one column, which
+              is why they now read as one set of embodiments rather than as commercial trivia. */}
+          {partPhotoSet.length ? (
+            <div className="flex flex-none flex-col gap-1.5">
+              <Eyebrow dense>Product Photo</Eyebrow>
+              <PhotoTrigger
+                devId="detail.photo"
+                variant="panel"
+                photos={partPhotoSet}
+                partName={detail.display_name}
+              />
+            </div>
+          ) : null}
+
           {/* the CAD status + Filing as ONE tight cluster of matching property rows */}
           <div className="flex flex-col gap-1.5">
             <ReadinessBlock
@@ -811,20 +828,6 @@ export function DetailPanel({
               }
             >
               <Sourcing purchase={detail.purchase} hasMpn={!!detail.mpn} />
-              {/* The product photo belongs WITH the distributor data: it is the distributor's own
-                  image of the part, pulled from the same page as the price. It used to float
-                  between the MPN line and the tab strip, anchored to nothing (punch 7). */}
-              {partPhotoSet.length ? (
-                <div className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3">
-                  <Eyebrow dense>Product Photo</Eyebrow>
-                  <PhotoTrigger
-                    devId="detail.photo"
-                    variant="panel"
-                    photos={partPhotoSet}
-                    partName={detail.display_name}
-                  />
-                </div>
-              ) : null}
               {tradeGroup ? (
                 <TradeCompliance
                   group={tradeGroup}
@@ -2119,7 +2122,7 @@ function Sourcing({
                       background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
                     }}
                   >
-                    Best
+                    Recommended
                   </span>
                 ) : null}
               </div>
