@@ -92,7 +92,7 @@
     "source_url": "https://www.ti.com/lit/ds/symlink/tps62918.pdf"
   },
   "description": "Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck",
-  "display_name": "Switching Voltage Regulator",
+  "display_name": "Switching Voltage Regulator 14-VQFN-HR",
   "eda": {},
   "enrichment": {},
   "hashes": null,
