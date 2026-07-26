@@ -190,6 +190,14 @@ describe("AppShell status bar", () => {
 // window was spent on nav labels whether or not they were wanted - and at narrow widths that is
 // exactly the space the detail sheet needs.
 describe("Rail collapse", () => {
+  // These drive the rail's EXPANDED starting state ("Collapse Rail"), which is now conditional:
+  // below RAIL_NEEDS_COLLAPSE_BELOW an untouched rail starts collapsed so the detail sheet keeps
+  // its three columns, and jsdom's default window is 1024px. Stating the width these tests always
+  // implicitly assumed, rather than letting the new default silently change what they assert.
+  beforeEach(() => {
+    Object.defineProperty(window, "innerWidth", { value: 1600, configurable: true, writable: true });
+  });
+
   // The preference PERSISTS by design, so each case has to start from a known slate - without this
   // the first case's collapse leaked into the next one, which is a test-isolation bug and not a
   // product one (it did prove the persistence works).
