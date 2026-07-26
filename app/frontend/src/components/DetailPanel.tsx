@@ -36,6 +36,7 @@ import {
 } from "../lib/specSchema";
 import {
   breakForQuantity,
+  extendedPrice,
   ladderRows,
   orderPurchases,
   recommendVendor,
@@ -2149,6 +2150,7 @@ function Sourcing({
         const tiers = ladderRows(breaks, unit?.qty);
         const isBest = recommended === p;
         const short = p.stock != null && p.stock < needQty;
+        const orderTotal = extendedPrice(breaks, needQty);
         const name = vendorLabel(p.vendor, p.url);
         return (
           <div
@@ -2163,7 +2165,7 @@ function Sourcing({
             }
           >
             <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
-            <div className="min-w-0">
+            <div className="min-w-0 pr-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-t1">{name}</span>
                 {isBest ? (
@@ -2179,7 +2181,9 @@ function Sourcing({
                 ) : null}
               </div>
               {p.part_number ? (
-                <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
+                <div className="tnum mt-0.5 break-all font-mono text-2xs text-t3">
+                  {/* NOT truncated. A part number clipped to "595-TPD6E05U06R..." cannot be checked
+                      against a vendor page or pasted into a cart, which is the only thing it is for. */}
                   {p.part_number}
                 </div>
               ) : null}
@@ -2205,8 +2209,19 @@ function Sourcing({
             </div>
             <div className="flex items-center justify-end gap-2.5">
               {unit ? (
-                <span className="tnum font-mono text-base font-semibold text-t1">
-                  {formatPrice(unit.price, p.currency)}
+                <span className="flex flex-col items-end">
+                  <span className="tnum font-mono text-base font-semibold text-t1">
+                    {formatPrice(unit.price, p.currency)}
+                  </span>
+                  {/* The ORDER TOTAL, shown only once a quantity is actually being asked about. This is
+                      the number `recommendVendor` ranks on, so showing it makes the badge checkable
+                      instead of an assertion the reader has to take on trust - the old "Best" tag never
+                      said best at what, which is the fault this whole slice exists to close. */}
+                  {needQty > 1 && orderTotal != null ? (
+                    <span className="tnum font-mono text-2xs text-t3">
+                      {formatPrice(orderTotal, p.currency)} total
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
               <a
