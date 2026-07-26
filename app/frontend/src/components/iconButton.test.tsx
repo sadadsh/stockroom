@@ -81,8 +81,12 @@ describe("IconButton compact", () => {
         pendingLabel="Deleting"
       />,
     );
-    // pinned open by a real class rather than by hover state, which a running action cannot rely on
-    expect(screen.getByRole("button").querySelector("span")?.className).toContain("max-w-[10rem]");
+    // Pinned open by a real class rather than by hover state, which a running action cannot rely
+    // on. Re-baselined 2026-07-25 from `max-w-[10rem]`: the reveal now animates 0fr -> 1fr so it
+    // travels the label's OWN width. Animating to a fixed 10rem while the label was ~72px meant
+    // the visible motion finished in under half the duration and read as a snap - the owner's
+    // "delete part animation doesnt exist".
+    expect(screen.getByRole("button").querySelector("span")?.className).toContain("grid-cols-[1fr]");
   });
 
   it("runs its action on click when idle", async () => {

@@ -220,14 +220,27 @@ function CompactIconButton({
       )}
     >
       {icon}
+      {/*
+        The reveal animates to the label's OWN width, via a one-column grid going 0fr -> 1fr.
+
+        It used to animate `max-width` from 0 to 10rem. That is why the owner reported "delete part
+        animation doesnt exist" while the reveal demonstrably worked: 10rem is 160px and the label
+        is about 72px, so the growing max-width passed the text's real width at roughly 45% of the
+        transition and the remaining 55% animated a box the text had already stopped filling. The
+        visible motion was over in ~70ms of a 150ms transition and read as a snap, not a reveal.
+
+        `0fr -> 1fr` is the standard way to transition to content-derived width: the whole duration
+        maps onto the distance actually travelled, so the label wipes open over its own width and
+        the button grows with it. No JS measurement, no magic number to drift.
+      */}
       <span
         className={cx(
-          "overflow-hidden whitespace-nowrap text-xs transition-all duration-150 " +
+          "grid transition-[grid-template-columns,opacity,margin] duration-200 ease-spring " +
             "motion-reduce:transition-none",
-          revealed ? "ml-0.5 max-w-[10rem] opacity-100" : "max-w-0 opacity-0",
+          revealed ? "ml-0.5 grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0",
         )}
       >
-        {shown}
+        <span className="overflow-hidden whitespace-nowrap text-xs">{shown}</span>
       </span>
     </button>
   );
