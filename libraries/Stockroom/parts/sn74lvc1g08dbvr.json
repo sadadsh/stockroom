@@ -80,7 +80,7 @@
     "source_url": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fsn74lvc1g08"
   },
   "description": "Logic Gates Single 2 Input A 595 -SN74LVC1G08DBVT A A 595-SN74LVC1G08DBVT",
-  "display_name": "Logic Gate",
+  "display_name": "Logic Gate SOT-23-5",
   "eda": {
     "altium": {
       "footprint": {
