@@ -461,11 +461,11 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
     for (const p of SPEC_PATTERNS) {
       const hit = p.leading ? first === p.token : present.has(p.token);
       if (hit) {
-        return { key: rawKey, label: rawKey, group: p.group, order: p.order };
+        return { key: rawKey, label: cleanSpecLabel(rawKey), group: p.group, order: p.order };
       }
     }
   }
-  return { key: rawKey, label: rawKey, group: FALLBACK_GROUP, order: FALLBACK_ORDER };
+  return { key: rawKey, label: cleanSpecLabel(rawKey), group: FALLBACK_GROUP, order: FALLBACK_ORDER };
 }
 
 // Leading "number [unit]" matcher: a number (optional sign, thousands, decimal,
@@ -715,4 +715,43 @@ function classifyFacet(
     .map(([value, count]) => ({ value, count }))
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
   return { kind: "checkbox", values: distinct };
+}
+
+/**
+ * Tidy a distributor's own parameter name into something a person reads naturally.
+ *
+ * Owner, 2026-07-25, on being offered a wider Sourcing column: "why not clean up the names". Right
+ * answer - the column was not too narrow, the labels were needlessly long and awkwardly ordered.
+ *
+ * Distributors lead with the QUANTITY and hang the qualifier off a dash, because that is how their
+ * parametric search sorts: "Voltage - Clamping (Max) @ Ipp". Nobody says that out loud. Swapping
+ * around the dash gives the phrase English word order - "Clamping Voltage (Max) @ Ipp" - at the
+ * same length, so it costs no width and reads at a glance.
+ *
+ * Deliberately NOT a rename table. A table only fixes the names someone has already seen, and every
+ * distributor invents new ones; this is the shape they all share. A specific name that still reads
+ * badly gets an exact `SPEC_REGISTRY` row with its own `label`, which wins over this.
+ *
+ * Conservative by design: it only reorders around a single dash, only when both sides are real
+ * words, and it never touches a name without one. Anything it does not recognise is returned
+ * untouched, because a distributor's own wording is accurate even when it is ugly, and a wrong
+ * "cleanup" loses meaning that a long label merely obscures.
+ */
+export function cleanSpecLabel(raw: string): string {
+  const text = (raw ?? "").trim();
+  if (!text) return "";
+  // Hold back any trailing qualifier - "(Max)", "(10/1000us)", "@ Ipp" - so the swap happens on the
+  // NAME and the condition stays where it belongs, at the end.
+  const m = /^(.*?)(\s*(?:\((?:[^()]*)\)|@\s*\S+)(?:\s*(?:\([^()]*\)|@\s*\S+))*)\s*$/.exec(text);
+  const base = (m ? m[1] : text).trim();
+  const suffix = (m ? m[2] : "").trim();
+
+  const parts = base.split(/\s+-\s+/);
+  if (parts.length !== 2) return text;
+  const [quantity, qualifier] = parts.map((p) => p.trim());
+  // both halves must be words; a numeric or symbol half is not a phrase to reorder
+  if (!/^[A-Za-z][A-Za-z /]*$/.test(quantity) || !/^[A-Za-z][A-Za-z /]*$/.test(qualifier)) {
+    return text;
+  }
+  return [`${qualifier} ${quantity}`, suffix].filter(Boolean).join(" ");
 }

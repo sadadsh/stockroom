@@ -9,6 +9,7 @@ import {
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
   resolveSpec,
+  cleanSpecLabel,
   type SpecGroupName,
 } from "./specSchema";
 
@@ -419,12 +420,16 @@ describe("token patterns keep real distributor parameters out of Other", () => {
     expect(stragglers).toEqual([]);
   });
 
-  it("keeps the distributor's own wording as the label", () => {
-    // The pattern decides WHERE a key goes, never what it is called: the vendor's phrasing carries
-    // the precision ("Max" vs "Typ" vs "Min"), and renaming it would quietly lose that.
+  it("tidies the distributor's wording without losing any of it", () => {
+    // SUPERSEDED 2026-07-25 by the owner: "why not clean up the names". The earlier rule here kept
+    // the vendor phrasing verbatim on the grounds that its precision matters. The precision is in
+    // the QUALIFIERS - Max / Typ / Min / the pulse shape - and reordering around the dash keeps
+    // every one of them while giving the phrase English word order at the same length.
     expect(resolveSpec("Voltage - Clamping (Max) @ Ipp", "Diodes").label).toBe(
-      "Voltage - Clamping (Max) @ Ipp",
+      "Clamping Voltage (Max) @ Ipp",
     );
+    // nothing is dropped: the condition survives verbatim
+    expect(resolveSpec("Current - Peak Pulse (10/1000µs)", "Diodes").label).toContain("10/1000µs");
   });
 
   it("still lets an EXACT registry row win over a pattern", () => {
@@ -439,5 +444,57 @@ describe("token patterns keep real distributor parameters out of Other", () => {
     // worse than one that matches nothing, because a wrong group is harder to notice than a
     // missing one.
     expect(resolveSpec("Brand Id", "Diodes").group).toBe("Other");
+  });
+});
+
+describe("cleanSpecLabel", () => {
+  it("puts a distributor's dashed parameter name into English word order", () => {
+    // The owner's point: the Sourcing column was not too narrow, the names were badly ordered.
+    // Same length, reads at a glance, costs no width.
+    expect(cleanSpecLabel("Voltage - Breakdown (Min)")).toBe("Breakdown Voltage (Min)");
+    expect(cleanSpecLabel("Voltage - Reverse Standoff (Typ)")).toBe(
+      "Reverse Standoff Voltage (Typ)",
+    );
+    expect(cleanSpecLabel("Power - Peak Pulse")).toBe("Peak Pulse Power");
+  });
+
+  it("keeps a trailing condition at the END, where it belongs", () => {
+    expect(cleanSpecLabel("Voltage - Clamping (Max) @ Ipp")).toBe(
+      "Clamping Voltage (Max) @ Ipp",
+    );
+    expect(cleanSpecLabel("Current - Peak Pulse (10/1000µs)")).toBe(
+      "Peak Pulse Current (10/1000µs)",
+    );
+  });
+
+  it("leaves a name with no dash completely alone", () => {
+    for (const name of ["Applications", "Mounting Type", "Operating Temperature", "Package / Case"]) {
+      expect(cleanSpecLabel(name)).toBe(name);
+    }
+  });
+
+  it("refuses to reorder when a half is not a phrase", () => {
+    // A numeric or symbolic half is not two words to swap, and guessing would lose meaning that a
+    // long label merely obscures.
+    expect(cleanSpecLabel("Voltage - 5V")).toBe("Voltage - 5V");
+    expect(cleanSpecLabel("A - 1/2")).toBe("A - 1/2");
+  });
+
+  it("never touches a name with more than one dash", () => {
+    // Ambiguous: which dash is the pivot? Returning it untouched is the honest answer.
+    const messy = "Voltage - Clamping - Peak";
+    expect(cleanSpecLabel(messy)).toBe(messy);
+  });
+
+  it("is empty only for empty input", () => {
+    expect(cleanSpecLabel("")).toBe("");
+    expect(cleanSpecLabel("   ")).toBe("");
+  });
+
+  it("is what resolveSpec hands the sheet for an unregistered key", () => {
+    // The wiring, not just the helper: a pattern-matched key must arrive tidied.
+    expect(resolveSpec("Voltage - Clamping (Max) @ Ipp", "Diodes").label).toBe(
+      "Clamping Voltage (Max) @ Ipp",
+    );
   });
 });
