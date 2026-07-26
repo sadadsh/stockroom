@@ -123,6 +123,13 @@ def describe(pixels: list[tuple[int, int, int]], step: int, top: int) -> dict:
     }
 
 
+def luma(rgb: tuple[int, int, int]) -> float:
+    """Perceived brightness (Rec. 709). One number, so two regions can be ORDERED rather than
+    compared channel by channel - which is what "is this darker" actually means."""
+    r, g, b = rgb
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
 def mean_colour(pixels: list[tuple[int, int, int]]) -> tuple[int, int, int]:
     n = len(pixels)
     return tuple(round(sum(p[i] for p in pixels) / n) for i in range(3))  # type: ignore[return-value]
@@ -190,6 +197,12 @@ def main(argv: list[str] | None = None) -> int:
         info = describe(pixels, args.step, args.top)
         w, h = box[2] - box[0], box[3] - box[1]
         print(f"\n== {name}  ({w}x{h} = {info['total']} px)")
+        # The MEAN colour of the whole region, reported always. It is the question every
+        # lighting / shading change actually asks - "is this area darker than that one" - and it
+        # was being answered by a hand-written Pillow loop each time, three times in one session.
+        # A dominant-colour list cannot answer it: clustering reports the most COMMON colour, while
+        # a shading gradient is a change in the AVERAGE that may have no repeated value at all.
+        print(f"   mean       rgb{mean_colour(pixels)}  (luma {luma(mean_colour(pixels)):.1f})")
         print(f"   background rgb{info['background']}")
         print(f"   ink        {info['ink']} px = {100 * info['ink'] / info['total']:.2f}% of region")
         for colour, n in info["clusters"]:
