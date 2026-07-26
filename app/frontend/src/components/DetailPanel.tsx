@@ -1725,8 +1725,12 @@ function AssetTile({
   );
   const footer = (
     <div className="flex items-center gap-2 px-3 py-2">
-      <span className="text-2xs font-semibold text-t1">{name}</span>
-      <span className="ml-auto inline-flex items-center gap-1.5 text-2xs text-t3">
+      <span className="min-w-0 truncate text-2xs font-semibold text-t1">{name}</span>
+      {/* The STATUS never wraps: "Not Linked" broke as "Not / Linked" across two lines in the
+          130px Symbol and Footprint tiles, which made a two-word state read as two states and
+          pushed the footer to a second row. It is two short words and a dot, so it is the NAME
+          on the left that should give way (truncate) if anything has to. */}
+      <span className="ml-auto inline-flex flex-none items-center gap-1.5 whitespace-nowrap text-2xs text-t3">
         {present ? (
           // no green "present" dot (owner's call - the render itself already reads as present).
           // An openable tile shows an EYE rather than spelling out "View" (punch 11): the tile is
