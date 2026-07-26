@@ -24,6 +24,7 @@ from pathlib import Path
 from stockroom.eda import workspace
 from stockroom.eda.registry import _resolve, workspace_gitattributes, workspace_gitignore
 from stockroom.mutation.transaction import Transaction
+from stockroom.text import counted
 from stockroom.vcs import lfs as lfs_backend
 from stockroom.vcs.repo import GitRepo
 
@@ -172,7 +173,7 @@ def apply_hygiene(root, tool_keys, repo: GitRepo | None = None, lfs=None, lockab
     if writes:
         label.append("ignore rules")
     if untrack:
-        label.append(f"{len(untrack)} per-user file(s) untracked")
+        label.append(f"{counted(len(untrack), 'per-user file')} untracked")
     with Transaction(repo) as txn:
         for path in touched:
             txn.track(path)

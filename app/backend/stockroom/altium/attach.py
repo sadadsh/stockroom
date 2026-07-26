@@ -14,6 +14,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from stockroom.text import counted
+
 _USAGE = "usage: python -m stockroom.altium.attach <part_id> <file> [<file> ...]"
 
 
@@ -24,7 +26,7 @@ def _parse_args(argv) -> tuple[str, list[Path]]:
     sources = [Path(a) for a in argv[1:]]
     missing = [str(s) for s in sources if not s.exists()]
     if missing:
-        raise SystemExit(f"file(s) not found: {', '.join(missing)}")
+        raise SystemExit(f"{counted(len(missing), 'file')} not found: {', '.join(missing)}")
     return part_id, sources
 
 

@@ -37,6 +37,7 @@ from stockroom.projects.checks import project_checks
 from stockroom.projects.health import audit_altium_project, audit_project
 from stockroom.sexp.document import SexpDocument
 from stockroom.store.project_store import ProjectStore
+from stockroom.text import counted, have, is_are
 from stockroom.vcs.repo import GitRepo
 
 
@@ -301,19 +302,19 @@ class ProjectOps:
                 # Prepare can fix; the remedy must name KiCad too, never a Prepare-only dead-end.
                 # An Altium schematic annotates in Altium (Prepare is a KiCad-only writer).
                 blockers.append({"kind": "unannotated",
-                                 "detail": f"{cr['unannotated']} reference(s) are not annotated.",
+                                 "detail": f"{counted(cr['unannotated'], 'reference')} {is_are(cr['unannotated'])} not annotated.",
                                  "next_step": "Prepare the project (Prepare section), or annotate the schematic in KiCad."
                                  if kicad else "Annotate the schematic in Altium."})
             if cr["missing_footprint"]:
                 comp_state = "fail"
                 blockers.append({"kind": "missing_footprint",
-                                 "detail": f"{cr['missing_footprint']} component(s) have no footprint.",
+                                 "detail": f"{counted(cr['missing_footprint'], 'component')} {have(cr['missing_footprint'])} no footprint.",
                                  "next_step": "Assign footprints (Prepare, or in KiCad)."
                                  if kicad else "Assign footprints in Altium."})
             incomplete = cr["total"] - cr["complete"]
             if incomplete:
                 warnings.append({"kind": "identity_incomplete",
-                                 "detail": f"{incomplete} component(s) have incomplete library identity.",
+                                 "detail": f"{counted(incomplete, 'component')} {have(incomplete)} incomplete library identity.",
                                  "next_step": "Prepare the project (Prepare section)."
                                  if kicad else "Complete the parts in Altium or the library."})
                 # A warning-only completeness must read amber "warn", agreeing with the Prepare
@@ -345,7 +346,7 @@ class ProjectOps:
                              "warnings": warns, "checked": checked, "ok": ok}
             if errors > 0 or not ok:
                 checks_signal["state"] = "fail"
-                detail = (f"{errors} ERC/DRC error(s)." if errors > 0
+                detail = (f"{counted(errors, 'ERC/DRC error')}." if errors > 0
                           else "The last ERC/DRC run did not complete cleanly.")
                 blockers.append({"kind": "checks_failed", "detail": detail,
                                  "next_step": "Fix the errors and re-run (Checks section)."})
@@ -353,7 +354,7 @@ class ProjectOps:
                 # Amber "warn", agreeing with the Checks section's warning badge, not green "pass".
                 checks_signal["state"] = "warn"
                 warnings.append({"kind": "checks_warnings",
-                                 "detail": f"{warns} ERC/DRC warning(s).",
+                                 "detail": f"{counted(warns, 'ERC/DRC warning')}.",
                                  "next_step": "Review the warnings (Checks section)."})
 
         # -- BOM (cached; cold cache = not built = HARD blocker, never a fabricated cost) --
@@ -375,18 +376,18 @@ class ProjectOps:
             if unpriced:
                 soft = True
                 warnings.append({"kind": "bom_unpriced",
-                                 "detail": f"{unpriced} BOM line(s) are unpriced.",
+                                 "detail": f"{counted(unpriced, 'BOM line')} {is_are(unpriced)} unpriced.",
                                  "next_step": "Price the BOM (BOM section)."})
             short = risks.get("no_stock", 0) + risks.get("insufficient_stock", 0)
             if short:
                 soft = True
                 warnings.append({"kind": "bom_stock",
-                                 "detail": f"{short} BOM line(s) are out of or short on stock.",
+                                 "detail": f"{counted(short, 'BOM line')} {is_are(short)} out of or short on stock.",
                                  "next_step": "Review sourcing (Procurement)."})
             if risks.get("not_active"):
                 soft = True
                 warnings.append({"kind": "bom_lifecycle",
-                                 "detail": f"{risks['not_active']} BOM line(s) are NRND or EOL.",
+                                 "detail": f"{counted(risks['not_active'], 'BOM line')} {is_are(risks['not_active'])} NRND or EOL.",
                                  "next_step": "Review sourcing (Procurement)."})
             if soft:
                 bom_signal["state"] = "warn"
@@ -670,8 +671,8 @@ class ProjectOps:
         if not changed:  # every submitted value already matched on disk (byte no-op)
             return empty
         total_fields = sum(len(v) for v in changes_by_ref.values())
-        message = (f"Edit {rec.name} fields: {total_fields} value(s) on "
-                   f"{len(changes_by_ref)} component(s)")
+        message = (f"Edit {rec.name} fields: {counted(total_fields, 'value')} on "
+                   f"{counted(len(changes_by_ref), 'component')}")
         with Transaction(repo) as txn:
             for path, _doc in changed:
                 txn.track(path)
