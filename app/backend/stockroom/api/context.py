@@ -128,6 +128,34 @@ class AppContext:
         except Exception:  # noqa: BLE001 - auto-push is best-effort; never break the write
             pass
 
+    def sync_on_launch(self) -> None:
+        """Reconcile this machine's library with the remote once, at startup.
+
+        `auto_push` above only ever runs AFTER a local write, so a device that has not added a part
+        never pulls at all. That is not theoretical: this owner's library existed as TWO diverged
+        checkouts on ONE machine, and the one the app actually READ sat ten commits behind, showing
+        a single part and looking complete. Nothing had failed; nothing had pulled.
+
+        Reuses `LibrarySync.sync()` - pull fast-forward, then push when ahead - rather than
+        reimplementing it, so this and the Sync button cannot drift apart. Fast-forward only, so a
+        launch never rebases or merges anything behind the user's back; a genuine divergence still
+        surfaces on the Sync surface where it can be read and decided.
+
+        Deliberately NOT gated on a GitHub token, unlike `auto_push`: pushing needs a credential,
+        PULLING a public library does not, and gating both on the token is what would leave a
+        read-only collaborator permanently stale.
+
+        Best-effort and silent about failure, for the same reason auto_push is: offline, no remote,
+        no credential and a rejected fast-forward are all ordinary, and none of them may stop the
+        window opening.
+        """
+        if not getattr(self.config, "sync_enabled", True):
+            return
+        try:
+            self.sync.sync()
+        except Exception:  # noqa: BLE001 - a launch must never fail because the network did
+            pass
+
     def rebuild_project_index(self) -> None:
         # Projects live repo-level (profile-independent), so this rebuilds from the same
         # <libraries_root>/.projects dir the store writes to; called after register/delete.

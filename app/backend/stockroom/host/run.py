@@ -136,6 +136,13 @@ def run_windowed(
 
     ctx.request_restart = _request_restart
 
+    # Reconcile this device with the remote on EVERY launch, not only after a local write.
+    # `auto_push` covers the write path; without this a machine that adds nothing never pulls, and
+    # two checkouts on one machine drifted ten commits apart with neither of them reporting a
+    # problem. In a daemon thread because it talks to the network: the window must never wait on it,
+    # and `sync_on_launch` is already best-effort and cannot raise.
+    threading.Thread(target=ctx.sync_on_launch, name="stockroom-launch-sync", daemon=True).start()
+
     app = create_app(ctx)
     port = pick_free_port()
     base_url = f"http://127.0.0.1:{port}"
