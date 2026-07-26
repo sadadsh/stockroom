@@ -1,0 +1,271 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "Analog Switch ICs"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/1014/1/ADG714_715.pdf"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://www.analog.com/media/en/technical-documentation/data-sheets/ADG714_715.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Analog Switch ICs SERIAL SPI, OCTAL SPST"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "IC SW SPST-NOX8 4.5OHM 24TSSOP"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "133 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "15"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Analog Devices"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Analog Devices Inc."
+      }
+    ]
+  },
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/1014/1/ADG714_715.pdf"
+  },
+  "description": "Analog Switch ICs SERIAL SPI, OCTAL SPST",
+  "display_name": "ADG714BRUZ",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "ADG714BRUZ"
+      },
+      "model": {
+        "file": "models/ADG714BRUZ.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "ADG714BRUZ"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "adg714bruz",
+  "manufacturer": "Analog Devices",
+  "mpn": "ADG714BRUZ",
+  "passive": false,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "manual",
+    "source_url": "https://www.mouser.com/datasheet/3/1014/1/ADG714_715.pdf"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "584-ADG714BRUZ",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 6.18,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 4.74,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 4.22,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 3.98,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 3.79,
+          "qty": 248
+        },
+        {
+          "currency": "USD",
+          "price": 3.68,
+          "qty": 558
+        },
+        {
+          "currency": "USD",
+          "price": 3.64,
+          "qty": 1054
+        },
+        {
+          "currency": "USD",
+          "price": 3.58,
+          "qty": 2542
+        }
+      ],
+      "stock": 188,
+      "url": "https://www.mouser.com/en/ProductDetail/Analog-Devices/ADG714BRUZ?qs=BpaRKvA4VqGDXlunIweTkQ%3D%3D",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "505-ADG714BRUZ-ND",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 6.34,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 4.867,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 4.21565,
+          "qty": 62
+        },
+        {
+          "currency": "USD",
+          "price": 4.04323,
+          "qty": 124
+        },
+        {
+          "currency": "USD",
+          "price": 3.86129,
+          "qty": 310
+        },
+        {
+          "currency": "USD",
+          "price": 3.76695,
+          "qty": 558
+        },
+        {
+          "currency": "USD",
+          "price": 3.68099,
+          "qty": 1054
+        },
+        {
+          "currency": "USD",
+          "price": 3.58473,
+          "qty": 2542
+        }
+      ],
+      "stock": 37,
+      "url": "https://www.digikey.com/en/products/detail/analog-devices-inc/ADG714BRUZ/820111",
+      "vendor": "DigiKey"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "-3db Bandwidth": "155MHz",
+    "Assembly Country of Origin": "Not available",
+    "Channel Capacitance (CS(off), CD(off))": "11pF, 11pF",
+    "Charge Injection": "3pC",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "Crosstalk": "-90dB @ 1MHz",
+    "Current - Leakage (IS(off)) (Max)": "100pA",
+    "ECCN": "EAR99",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (EU TARIC)": "8542399000",
+    "HTS Code (JP)": "854239099",
+    "HTS Code (MX)": "8542399999",
+    "HTS Code (US)": "8542390090",
+    "Image": "https://www.mouser.com/images/adi/images/ITP_ADI_TSSOP-24_RU-24_t.jpg",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Multiplexer/Demultiplexer Circuit": "1:1",
+    "Number of Circuits": "8",
+    "On-State Resistance (Max)": "4.5Ohm",
+    "Operating Temperature": "-40°C ~ 85°C (TA)",
+    "Order Multiple": "1",
+    "Package / Case": "24-TSSOP (0.173\", 4.40mm Width)",
+    "Package Type": "Tube",
+    "Packaging": "Tube",
+    "Product Category": "Analog Switch ICs",
+    "REACH": "REACH Unaffected",
+    "RoHS": "RoHS Compliant",
+    "Standard Pack Qty": "62",
+    "Supplier Device Package": "24-TSSOP",
+    "Switch Circuit": "SPST - NO",
+    "Switch Time (Ton, Toff) (Max)": "20ns, 8ns (Typ)",
+    "Unit Weight (kg)": "0.000212",
+    "Voltage - Supply, Dual (V±)": "±2.5V",
+    "Voltage - Supply, Single (V+)": "2.7V ~ 5.5V"
+  },
+  "tags": [],
+  "value": ""
+}
