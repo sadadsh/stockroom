@@ -5,7 +5,9 @@ the real distributor spec shapes (units, parentheticals, plurals) the library ac
 
 from __future__ import annotations
 
-from stockroom.ingest.component_naming import propose_component_name
+import pytest
+
+from stockroom.ingest.component_naming import _singular, propose_component_name
 
 
 def test_resistor_value_tolerance_power_package():
@@ -67,13 +69,106 @@ def test_switch_keeps_a_single_switch_suffix():
 
 def test_ic_verbose_product_type_is_shortened():
     specs = {"Product Type": "Encoders, Decoders, Multiplexers & Demultiplexers", "Package": "TSSOP-16"}
-    assert propose_component_name("ICs", specs, "SN74LVC138AQPWREP") == "Encoder SN74LVC138AQPWREP TSSOP-16"
+    assert propose_component_name("ICs", specs, "SN74LVC138AQPWREP") == "Encoder TSSOP-16"
 
 
 def test_junk_product_type_falls_back_to_type():
     specs = {"Product Type": "Tray", "Type": "Cylindrical Battery Contacts"}
-    assert propose_component_name("Electromechanical", specs, "1043") == "Cylindrical Battery Contact 1043"
+    assert propose_component_name("Electromechanical", specs, "1043") == "Cylindrical Battery Contact"
 
 
 def test_empty_specs_degrade_to_mpn():
     assert propose_component_name("ICs", {}, "STM32H753ZIT6") == "STM32H753ZIT6"
+
+
+# -- the name is HUMAN, built from the richest category field (owner, 2026-07-26) ----------
+#
+# "the MPN always shows under the title so u can humanize the name as much as possible based off
+# the description or specs".
+
+
+def test_a_protection_diode_is_named_by_what_it_IS_not_by_a_parameter():
+    """The owner's real part read "Steering TPD6E05U06RVZR USON-14".
+
+    `Steering` is a fragment of `Type = "Steering (Rail to Rail)"`, which is a TVS PARAMETER rather
+    than a function, while the SAME record carried `Product Category = "ESD Protection Diodes / TVS
+    Diodes"` and `Number of Channels = 6` that nothing ever read. Ordering the descriptor sources so
+    the category fields beat `Type` is the whole fix, and it is general: any part whose `Type` holds
+    a parameter now falls through to a field that holds a purpose.
+    """
+    specs = {
+        "Type": "Steering (Rail to Rail)",
+        "Product Category": "ESD Protection Diodes / TVS Diodes",
+        "Number of Channels": "6",
+        "Package": "USON-14",
+    }
+    assert propose_component_name("Other", specs, "TPD6E05U06RVZR") == (
+        "6-Channel ESD Protection Diode USON-14"
+    )
+
+
+def test_a_slash_separated_category_takes_its_FIRST_segment():
+    """"ESD Protection Diodes / TVS Diodes" is two names for one thing. Only `&`, `,` and ` - `
+    were treated as separators, so the whole string would have become the name."""
+    specs = {"Product Category": "ESD Protection Diodes / TVS Diodes", "Package": "SOT-23"}
+    assert propose_component_name("ICs", specs, "X") == "ESD Protection Diode SOT-23"
+
+
+def test_a_single_channel_part_does_not_say_so():
+    """"1-Channel" is noise; a channel count earns its place only when there is more than one."""
+    specs = {"Product Category": "Op Amps", "Number of Channels": "1", "Package": "SOT-23-5"}
+    assert propose_component_name("ICs", specs, "X") == "Op Amp SOT-23-5"
+
+
+def test_a_junk_product_type_falls_THROUGH_to_a_real_one():
+    """`Product Type = "Tray"` describes the packaging, not the part. It must not win over a `Type`
+    that actually says what the thing is."""
+    specs = {"Product Type": "Tray", "Type": "Cylindrical Battery Contacts"}
+    assert propose_component_name("Electromechanical", specs, "1043") == "Cylindrical Battery Contact"
+
+
+def test_a_record_with_no_usable_description_still_degrades_to_its_MPN():
+    """The floor. Humanising must never make a part ANONYMOUS: with nothing to describe it, the
+    name is the MPN exactly as before."""
+    assert propose_component_name("ICs", {}, "STM32H753ZIT6") == "STM32H753ZIT6"
+
+
+def test_the_human_description_is_the_last_resort_before_the_mpn():
+    specs = {"Package": "SOT-23"}
+    assert propose_component_name(
+        "ICs", specs, "X", "Low-dropout regulator, 3.3V fixed"
+    ) == "Low-dropout regulator SOT-23"
+
+
+def test_a_PASSIVE_still_leads_with_its_VALUE_and_never_shows_an_mpn():
+    """The half that must NOT change. A resistor's identity is its value, and the owner has
+    consistently wanted "100kΩ 1% 0603"."""
+    specs = {"Resistance": "100 kOhms", "Tolerance": "1%", "Power Rating": "0.1 W",
+             "Case Code - in": "0603"}
+    assert propose_component_name("Resistors", specs, "RC0603FR-07100KL") == "100kΩ 1% 0.1W 0603"
+
+
+def test_an_LED_keeps_its_colour_lead():
+    """A named colour is what a person scans an LED list for, so that branch keeps its lead."""
+    specs = {"Illumination Color": "Green", "Vf - Forward Voltage": "3.2 V", "Package": "0603"}
+    assert propose_component_name("Diodes", specs, "150060GS75000") == "Green LED 3.2V 0603"
+
+
+@pytest.mark.parametrize(
+    "word,expected",
+    [
+        ("Diodes", "Diode"), ("Op Amps", "Op Amp"), ("ESD Suppressors", "ESD Suppressor"),
+        ("Thyristors", "Thyristor"), ("ESD Protection Diodes", "ESD Protection Diode"),
+        # Singular words that merely END in "s". Each of these was measured breaking: "Lens"
+        # became "Len" and "Series" became "Serie", and "Series" is a spec key on a real record.
+        ("Bus", "Bus"), ("Class", "Class"), ("Chassis", "Chassis"), ("Gas", "Gas"),
+        ("Lens", "Lens"), ("Series", "Series"),
+        # A plural MODIFIER must survive; only the head noun is singularised.
+        ("Communications Modules", "Communications Module"),
+        ("Analog", "Analog"), ("IC", "IC"),
+    ],
+)
+def test_the_generic_singulariser_only_touches_a_real_plural_head_noun(word, expected):
+    """The explicit map cannot keep up with the vocabulary distributors invent, so a generic rule
+    backs it. A generic rule is exactly where over-reach happens, hence the negative cases."""
+    assert _singular(word) == expected

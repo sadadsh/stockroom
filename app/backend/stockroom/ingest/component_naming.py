@@ -1,7 +1,20 @@
 """Derive a proper, spec-aware component name from a part's scraped data — "what it IS", not an
 opaque MPN (owner directive 2026-07-19). Passives lead with value + the defining specs (X7R
 dielectric + voltage for a cap, power for a resistor, impedance@frequency for a ferrite); actives
-lead with a concise function (from the `Type`/`Product Type` spec) + MPN; the package always trails.
+lead with a HUMAN description built from the richest category field the distributors gave us; the
+package always trails.
+
+**The name carries no MPN and should be as human as the data allows (owner, 2026-07-26): "the MPN
+always shows under the title so u can humanize the name as much as possible based off the
+description or specs".** A real part read "Steering TPD6E05U06RVZR USON-14": `Steering` is a
+fragment of `Type = "Steering (Rail to Rail)"`, which is a TVS PARAMETER, not a function, and the
+same record carried `Product Category = "ESD Protection Diodes / TVS Diodes"` and
+`Number of Channels = 6` that nothing read. It now reads "6-Channel ESD Protection Diode USON-14".
+
+THE TRADEOFF, STATED: two parts with the same function and package now share a name. That is
+deliberate, because the detail sheet prints the MPN on its own line directly beneath the headline
+and the list carries it too. A part whose data yields no real descriptor still degrades to its MPN,
+so nothing becomes anonymous.
 
 Pure + deterministic: same specs -> same name. Used by the rebuild to re-name the library
 consistently, and by ingest so new parts are named the same way. The MPN stays the stable anchor
@@ -65,18 +78,71 @@ def _pkg(f: dict) -> str:
     return re.sub(r"\s*mm\b", "mm", p)
 
 
+# Endings where a trailing "s" is NOT a plural, so the generic rule below must leave them alone:
+# "Bus", "Class", "Chassis", "Bias", "Gas". Checked against the WHOLE word, not just its last two
+# letters, so a genuine plural ending in one of these letter pairs still singularises.
+_NOT_PLURAL_ENDINGS = ("ss", "us", "is", "as")
+
+# Words the ending rule gets WRONG, because they are singular and end in a bare "s". Measured, not
+# imagined: "Lens" became "Len" and "Series" became "Serie", and both appear in real distributor
+# fields ("Series" is a spec key on the owner's own record).
+_NOT_PLURAL_WORDS = frozenset({"lens", "series", "news", "means", "species"})
+
+
 def _singular(t: str) -> str:
     t = _PAREN.sub("", str(t or "")).strip()
     for a, b in _SINGULAR.items():
         t = re.sub(rf"\b{a}\b", b, t)
+    # Then a conservative generic rule on the HEAD NOUN only, because the explicit map above cannot
+    # keep up with the vocabulary distributors invent ("Op Amps", "ESD Suppressors", "Thyristors").
+    # Only the last word is touched: in "ESD Protection Diodes" the head noun is what pluralises,
+    # and a modifier such as "Communications" is legitimately plural.
+    words = t.split()
+    if words:
+        head = words[-1]
+        low = head.lower()
+        if (
+            low.endswith("s")
+            and not low.endswith(_NOT_PLURAL_ENDINGS)
+            and low not in _NOT_PLURAL_WORDS
+            and len(head) > 3
+        ):
+            words[-1] = head[:-1]
+            t = " ".join(words)
     return t
+
+
+# Where a FUNCTION description can be found, best first. Ordered deliberately: the category fields
+# say what a part IS, while `Type` is often a parameter of the part rather than its purpose. Reading
+# `Type` first is what produced "Steering" for an ESD protection array whose own `Product Category`
+# said "ESD Protection Diodes / TVS Diodes".
+_DESCRIPTOR_KEYS: tuple[str, ...] = (
+    "Product Category", "Product Type", "Product", "Subcategory",
+    "LCSC Category", "LCSC Warehouse Category", "Type",
+)
+
+
+def _descriptor(g, description: str = "") -> str:
+    """The most human function name the record can support, or "" if it can support none."""
+    for key in _DESCRIPTOR_KEYS:
+        candidate = _short_type(g(key, ""))
+        if candidate and candidate not in _JUNK:
+            return candidate
+    # Last resort: the leading clause of the human description.
+    return (description or "").split(",")[0][:32].strip()
+
+
+def _channels(g) -> str:
+    """"6-Channel" for a multi-channel part. A single channel is not worth saying."""
+    raw = re.sub(r"\D", "", str(g("Number of Channels", "") or ""))
+    return f"{raw}-Channel" if raw and raw != "1" else ""
 
 
 def _short_type(v: str) -> str:
     """A concise functional descriptor from a verbose distributor Product Type: keep the first
     segment before an "&"/","/" - " list, then singularize ("Encoders, Decoders, ..." -> "Encoder",
     "Buffers & Line Drivers" -> "Buffer", "ARM Microcontrollers - MCU" -> "ARM Microcontroller")."""
-    v = re.split(r"\s*[&,]\s*| - ", str(v or ""))[0]
+    v = re.split(r"\s*[&,/]\s*| - ", str(v or ""))[0]
     return _singular(v)
 
 
@@ -115,10 +181,15 @@ def propose_component_name(category: str, specs: dict, mpn: str = "", descriptio
         color = g("Illumination Color", "")
         if color or "LED" in str(g("Product Type", "") or ""):
             return _join(color, "LED", _tight(g("Vf - Forward Voltage", "")), P) or mpn
-        return _join(_singular(g("Type", "") or "Diode"), _tight(g("Vf - Forward Voltage", "")), P) or mpn
+        # An LED is looked up by COLOUR, so that branch above keeps its lead. Every other diode
+        # takes the richest available description rather than its `Type`, which for a protection
+        # diode is a parameter ("Steering (Rail to Rail)") and not a function.
+        return _join(_channels(g), _descriptor(g, description) or "Diode",
+                     _tight(g("Vf - Forward Voltage", "")), P) or mpn
 
     if category == "Transistors":
-        return _join(g("Transistor Polarity", ""), _singular(g("Product Category", "") or "Transistor"),
+        return _join(g("Transistor Polarity", ""),
+                     _singular(g("Product Category", "") or "Transistor"),
                      _tight(g("Vds - Drain-Source Breakdown Voltage", "")), mpn, P) or mpn
 
     if category == "Connectors":
@@ -137,14 +208,9 @@ def propose_component_name(category: str, specs: dict, mpn: str = "", descriptio
             typ = f"{typ} Switch"
         return _join(g("Contact Form", ""), typ or _short_type(g("Product Type", "")), mpn, P) or mpn
 
-    # ICs, Modules, Electromechanical, and anything else: a concise function + MPN + package.
-    t = _short_type(g("Product Type", "") or g("Type", ""))
-    if t in _JUNK:
-        alt = _singular(g("Type", ""))
-        t = alt if alt not in _JUNK else ""
-    if not t:  # last resort: the leading clause of the human description
-        t = (description or "").split(",")[0][:24].strip()
-    return _join(t, mpn, P) or mpn
+    # ICs, Modules, Electromechanical, and anything else: the most human function the record can
+    # support, plus a channel count where the part has one, plus the package.
+    return _join(_channels(g), _descriptor(g, description), P) or mpn
 
 
 def propose_component_name_from_record(record) -> str:
