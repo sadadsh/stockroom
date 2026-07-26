@@ -155,6 +155,25 @@ def main(argv: list[str] | None = None) -> int:
         help="report how many pixels sit within --tol of this colour; repeatable. Use it to "
         "assert a colour REACHED the screen; a dominant-colour list misses a small area.",
     )
+    ap.add_argument(
+        "--zoom",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="also WRITE each --region as an upscaled PNG into DIR, named zoom-<region>.png. "
+        "Measuring a region and then LOOKING at it are the same two steps every time, and the "
+        "crop-and-upscale half was being retyped as a throwaway Pillow snippet once per slice "
+        "(three times in one session before this existed). A number says a preview is 2.34:1; only "
+        "the image says the strokes are invisible - both are needed, so both come from one command.",
+    )
+    ap.add_argument(
+        "--zoom-width",
+        type=int,
+        default=800,
+        help="target width in px for --zoom output (800). Upscaled NEAREST when enlarging, so a "
+        "pixel boundary stays a hard edge instead of being smoothed into a gradient that the eye "
+        "then reads as antialiasing that is not in the source.",
+    )
     ap.add_argument("--tol", type=int, default=40, help="euclidean tolerance for --match (40)")
     ap.add_argument("--step", type=int, default=18, help="colour cluster width (18)")
     ap.add_argument("--top", type=int, default=8, help="how many clusters to list (8)")
@@ -207,6 +226,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"   ink        {info['ink']} px = {100 * info['ink'] / info['total']:.2f}% of region")
         for colour, n in info["clusters"]:
             print(f"     ~rgb{colour}  {100 * n / max(info['ink'], 1):5.1f}% of ink")
+        if args.zoom is not None:
+            args.zoom.mkdir(parents=True, exist_ok=True)
+            safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in name).strip("-")
+            crop = im.crop(box)
+            # NEAREST only when ENLARGING. Shrinking with NEAREST drops whole rows of pixels, which
+            # can delete a one-pixel rule entirely and make a real misalignment invisible.
+            scale = args.zoom_width / max(w, 1)
+            target = (max(int(w * scale), 1), max(int(h * scale), 1))
+            resample = Image.NEAREST if scale >= 1 else Image.LANCZOS
+            out_path = args.zoom / f"zoom-{safe or 'region'}.png"
+            crop.resize(target, resample).save(out_path)
+            print(f"   zoom       {out_path}  ({target[0]}x{target[1]}, {scale:.2f}x)")
         for want in wanted:
             hits = [
                 p for p in pixels if sum((p[i] - want[i]) ** 2 for i in range(3)) <= args.tol**2
