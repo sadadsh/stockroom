@@ -249,6 +249,20 @@ export function mountModelScene(
    * of a settled tween still looks correct. Rebinding is the only fix that uses public API: the
    * constructor is the one place that frame is ever computed.
    */
+  // DECLARED BEFORE `makeControls` IS CALLED. `let` bindings are hoisted but UNINITIALISED, so a
+  // function that closes over one and is invoked before the declaration line runs throws
+  // "Cannot access 'spinWanted' before initialization". These sat below `let controls =
+  // makeControls(camera)` and did exactly that: mountModelScene threw, Glb3DView caught it, and the
+  // whole viewer degraded to "This device could not render the 3D preview." Nothing in the suite can
+  // see it - jsdom has no WebGL, so threeScene is mocked in every test.
+  //
+  // Whether the idle spin is WANTED, separate from `controls.autoRotate`, which the fixed views also
+  // turn off: a "top" view that rotates away from top is not a top view, so the two reasons to stop
+  // spinning must not overwrite each other.
+  let spinWanted = true;
+  // The view in force, so the spin switch knows whether spinning is even legal (only free iso spins).
+  let viewMode: ViewMode = "iso";
+
   let controls = makeControls(camera);
   function makeControls(cam: THREE.PerspectiveCamera | THREE.OrthographicCamera) {
     const next = new OrbitControls(cam, renderer.domElement);
@@ -294,13 +308,6 @@ export function mountModelScene(
   // The Y of the model's underside, captured when it is framed, so the land pattern lands exactly
   // under the body rather than at an arbitrary y=0.
   let modelBaseY = 0;
-  // Whether the idle spin is WANTED. Separate from `controls.autoRotate`, which is also turned off by
-  // the fixed views: a "top" view that rotates away from top is not a top view, so the two reasons to
-  // stop spinning must not overwrite each other.
-  let spinWanted = true;
-  // The view currently in force. `setView` knew it only as an argument, but the spin switch has to
-  // know whether spinning is even legal right now (only the free iso view may spin).
-  let viewMode: ViewMode = "iso";
   let modelSize: THREE.Vector3 | null = null;
   // The land pattern most recently handed in, kept so it can be REBUILT once the model's bounds are
   // known. `Glb3DView` calls setLandPattern synchronously right after mountModelScene returns, but
