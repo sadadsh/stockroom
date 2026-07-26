@@ -94,7 +94,6 @@ import {
 } from "./icons";
 import {
   EYEBROW_DENSE,
-  Eyebrow,
   IconButton,
   TabStrip,
   tabButtonId,
@@ -890,7 +889,10 @@ export function DetailPanel({
               is why they now read as one set of embodiments rather than as commercial trivia. */}
           {partPhotoSet.length ? (
             <div className="flex flex-none flex-col gap-1.5">
-              <Eyebrow dense>Product Photo</Eyebrow>
+              {/* NO eyebrow. The button already says "View 2 Photos", so a PRODUCT PHOTO label above
+                  it put the noun twice within a couple of centimetres - and neither neighbour in this
+                  column (the Symbol/Footprint tiles, the CAD row) carries one either, so the label
+                  was the odd element rather than the consistent one. */}
               <PhotoTrigger
                 devId="detail.photo"
                 variant="panel"

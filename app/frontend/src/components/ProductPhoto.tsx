@@ -182,14 +182,23 @@ export function PhotoTrigger({
               ? `View ${count} Photos of ${partName || "this part"}`
               : `View Photo of ${partName || "this part"}`
           }
-          className="group flex w-full items-center justify-center gap-2 rounded-control border border-line bg-field px-2 py-2 text-xs font-medium text-t2 transition-colors hover:border-line2 hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="group flex w-full items-center gap-2 rounded-control border border-line bg-field px-3 py-2 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="flex-none">
+          {/* Anatomy DELIBERATELY matched to the CAD row directly beneath it: glyph and label on the
+              left, affordance on the right. Measured on the first cut, which centred its content and
+              set the label in `text-t2`: it was the only centred control between two label-left /
+              value-right neighbours, and in light theme its label measured rgb(90,90,90) against the
+              rgb(18,18,36) of the STATUS word beside it - so the one ACTION in the stack was the
+              quietest text in it. */}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="flex-none text-t3 transition-colors group-hover:text-t1">
             <rect x="3" y="5" width="18" height="14" rx="2" />
             <circle cx="9" cy="11" r="2" />
             <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
           </svg>
           {count > 1 ? `View ${count} Photos` : "View Photo"}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="ml-auto flex-none text-t3 transition-colors group-hover:text-t1">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
         </button>
         {card}
       </>
