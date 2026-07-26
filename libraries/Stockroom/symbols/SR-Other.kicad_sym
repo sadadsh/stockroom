@@ -57,7 +57,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "14VC Clamp 2.5A@8/20us Ipp ESD DIODE USON-14(1.4x3.5)"
+		(property "Description" "TPD6E05U06RVZR Texas Instruments ESD Protection Diodes / TVS Diodes 6-CH lo cap IEC ESD protect diodes datasheet, inventory, & pricing."
 			(at 0 0 0)
 			(show_name no)
 			(do_not_autoplace no)
