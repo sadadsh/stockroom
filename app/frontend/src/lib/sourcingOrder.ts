@@ -85,3 +85,97 @@ export function ladderRows(breaks: readonly PriceTier[]): PriceTier[] {
   const bulk = breaks.slice(1);
   return bulk.length % 2 === 0 ? bulk : [...breaks];
 }
+
+/**
+ * The price break in force for a needed quantity: the highest break whose qty is at or below `needed`.
+ *
+ * Falls back to the SMALLEST break when the need is below it, because that is the smallest amount the
+ * vendor will actually sell - a 3000-piece reel is a reel even if you need five.
+ *
+ * Sorts defensively rather than trusting the stored order: `price_breaks` are scraped, and one vendor
+ * emitting them descending would otherwise silently return the wrong tier.
+ */
+export function breakForQuantity(
+  breaks: readonly PriceTier[],
+  needed: number,
+): PriceTier | null {
+  const sorted = [...breaks].filter((b) => b.qty > 0).sort((a, b) => a.qty - b.qty);
+  if (sorted.length === 0) return null;
+  const want = Number.isFinite(needed) && needed > 0 ? needed : 1;
+  let chosen = sorted[0];
+  for (const b of sorted) {
+    if (b.qty <= want) chosen = b;
+  }
+  return chosen;
+}
+
+/**
+ * What `needed` units actually COST at this vendor, or null if it cannot be priced.
+ *
+ * Billed on `max(needed, smallest break qty)`, because you cannot buy below the vendor's minimum. That
+ * matters for the comparison, not just for the number: costing a reel-only vendor at `5 x unit` would
+ * make the most expensive option look like the cheapest one.
+ */
+export function extendedPrice(breaks: readonly PriceTier[], needed: number): number | null {
+  const tier = breakForQuantity(breaks, needed);
+  if (!tier) return null;
+  const sorted = [...breaks].filter((b) => b.qty > 0).sort((a, b) => a.qty - b.qty);
+  const minimum = sorted[0]?.qty ?? 1;
+  const want = Number.isFinite(needed) && needed > 0 ? needed : 1;
+  return tier.price * Math.max(want, minimum);
+}
+
+/** What `recommendVendor` needs off a purchase row: who, how many, at what prices. */
+interface RecommendableRow {
+  vendor: string;
+  stock?: number | null;
+  price_breaks?: unknown;
+}
+
+/**
+ * Which distributor to recommend for `needed` units.
+ *
+ * Owner 2026-07-26: a quantity box plus "a button to choose best based on amount needed". This is what
+ * finally gives the badge a stated axis - it used to compare `breaks[0].price`, the qty-1 price, so it
+ * ignored quantity entirely, and the screen critique caught LCSC badged "Best" while holding the
+ * LOWEST stock with nothing saying best at what.
+ *
+ * Two rules, in order:
+ *   1. CAN they supply it. A vendor with enough stock beats a cheaper one that would leave you short.
+ *      Unknown stock (`null`) counts as usable - "not reported" is not "zero", and excluding it would
+ *      silently drop a good distributor.
+ *   2. Then cheapest TOTAL for the quantity, not cheapest unit price.
+ * If nobody can supply it, the cheapest is still recommended rather than none - the UI says the stock
+ * is short; refusing to answer would be less useful than answering with a caveat.
+ */
+export function recommendVendor<T extends RecommendableRow>(
+  rows: readonly T[],
+  needed: number,
+): T | null {
+  const priced = rows
+    .map((row) => ({
+      row,
+      total: extendedPrice(normalizeTiers(row.price_breaks), needed),
+      enough: row.stock == null || row.stock >= (needed > 0 ? needed : 1),
+    }))
+    .filter((c): c is { row: T; total: number; enough: boolean } => c.total != null);
+  if (priced.length === 0) return null;
+  const pool = priced.some((c) => c.enough) ? priced.filter((c) => c.enough) : priced;
+  return pool.reduce((best, c) => (c.total < best.total ? c : best)).row;
+}
+
+/** Tolerates the scraped shapes `price_breaks` arrives in: {qty,price} objects or [qty,price] pairs. */
+function normalizeTiers(raw: unknown): PriceTier[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PriceTier[] = [];
+  for (const item of raw) {
+    if (Array.isArray(item) && item.length >= 2) {
+      const [qty, price] = item;
+      if (typeof qty === "number" && typeof price === "number") out.push({ qty, price });
+    } else if (item && typeof item === "object") {
+      const { qty, price } = item as { qty?: unknown; price?: unknown };
+      if (typeof qty === "number" && typeof price === "number") out.push({ qty, price });
+    }
+  }
+  return out;
+}

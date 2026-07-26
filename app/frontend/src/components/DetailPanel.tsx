@@ -34,7 +34,12 @@ import {
   type SpecGroup,
   type SpecRow,
 } from "../lib/specSchema";
-import { ladderRows, orderPurchases } from "../lib/sourcingOrder";
+import {
+  breakForQuantity,
+  ladderRows,
+  orderPurchases,
+  recommendVendor,
+} from "../lib/sourcingOrder";
 import { distributorLabel } from "../lib/sourced";
 import {
   assetReadiness,
@@ -2086,6 +2091,11 @@ function Sourcing({
   // Mouser leads, then DigiKey, then the rest (punch 4). The record's own order is whatever the
   // add flow stored - the pasted vendor led it - so a part bought once from DigiKey listed
   // DigiKey first forever, regardless of where the owner actually buys.
+  // The amount the reader actually needs. 1 by default, so the panel reads exactly as before until
+  // someone asks a quantity question. Held as a STRING so the field can be emptied while typing
+  // without the row prices flickering through 0.
+  const [qtyText, setQtyText] = useState("1");
+  const needQty = Math.max(1, Math.floor(Number(qtyText) || 1));
   const orderable = orderPurchases(purchase.filter((p) => p.url));
   if (orderable.length === 0) {
     return (
@@ -2096,20 +2106,61 @@ function Sourcing({
       </div>
     );
   }
-  // The cheapest unit price across the orderable distributors earns the "Best" tag (only
-  // meaningful with more than one to compare).
-  const units = orderable.map((p) => normalizePriceBreaks(p.price_breaks)[0]?.price ?? null);
-  const cheapest = Math.min(...units.filter((v): v is number => v != null));
+  // RECOMMENDED IS QUANTITY-AWARE (owner 2026-07-26). It used to compare `breaks[0].price` - the
+  // qty-1 price - so the badge ignored quantity entirely and could name a vendor that is the most
+  // expensive at the amount you actually need. `recommendVendor` costs the whole order and prefers a
+  // vendor that can supply it; see lib/sourcingOrder.
+  const recommended = orderable.length > 1 ? recommendVendor(orderable, needQty) : null;
   return (
     <div data-dev-id="detail.sourcing" className="flex flex-col">
+      {/* THE QUANTITY BOX. Owner: "an amount input box thats small and doesnt disturb the ui" - so it
+          is a 56px field on the header line the section already had, not a new band, and it defaults
+          to 1 so nothing about this panel changes until a quantity is actually entered. Typing
+          re-prices every row and re-decides Recommended; there is no button to press, because a button
+          would be a second thing to remember after typing the number. */}
+      {orderable.length > 0 ? (
+        <div className="mb-2 flex items-center gap-2">
+          <label className={EYEBROW_DENSE + " flex items-center gap-1.5"}>
+            <Text id="detail.sourcing-qty">Need</Text>
+            <input
+              data-dev-id="detail.sourcing-qty"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={qtyText}
+              onChange={(e) => setQtyText(e.target.value)}
+              aria-label="Amount needed"
+              className="tnum w-[56px] rounded-control border border-line bg-field px-1.5 py-0.5 text-right font-mono text-xs text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+            />
+          </label>
+          {needQty > 1 ? (
+            <span className="text-2xs text-t3">
+              prices and Recommended are for {needQty.toLocaleString()}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {orderable.map((p, i) => {
         const breaks = normalizePriceBreaks(p.price_breaks);
-        const unit = breaks[0] ?? null;
+        // The tier IN FORCE at the needed quantity, not the qty-1 tier: the headline price now answers
+        // "what does it cost me", which is the question the quantity box asks.
+        const unit = breakForQuantity(breaks, needQty) ?? breaks[0] ?? null;
         const tiers = ladderRows(breaks);
-        const isBest = orderable.length > 1 && unit != null && unit.price === cheapest;
+        const isBest = recommended === p;
+        const short = p.stock != null && p.stock < needQty;
         const name = vendorLabel(p.vendor, p.url);
         return (
-          <div key={`${p.vendor}-${i}`} className="border-b border-line py-[11px] last:border-0">
+          <div
+            key={`${p.vendor}-${i}`}
+            // A CARD per distributor (owner: "give the sourcing cards a different style than current").
+            // Was a bare row on a hairline, with four data types on one line and no headers - a fault
+            // the screen critique logged. The recommended one is bordered in the ok tint so the badge
+            // is not the only thing carrying that state.
+            className={
+              "mb-1.5 rounded-card border px-2.5 py-2 transition-colors last:mb-0 " +
+              (isBest ? "border-ok/50 bg-ok/[0.05]" : "border-line bg-surface hover:bg-raise2")
+            }
+          >
             <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -2137,10 +2188,18 @@ function Sourcing({
                 <>
                   <span
                     className="mr-1.5 inline-block h-[5px] w-[5px] rounded-full align-middle"
-                    style={{ background: "var(--c-ok)" }}
+                    style={{ background: short ? "var(--c-warn)" : "var(--c-ok)" }}
                   />
-                  {p.stock.toLocaleString()}
+                  <span className={short ? "text-warn" : undefined}>
+                    {p.stock.toLocaleString()}
+                  </span>
                 </>
+              ) : null}
+              {/* THE VOLUME the headline price belongs to (owner: "add the volume displayed next to the
+                  stock"). Without it the row showed a unit price with nothing saying at what quantity,
+                  which is the difference between $1.22 and $0.49 on the same part. */}
+              {unit ? (
+                <span className="ml-2 text-2xs text-t3">at {unit.qty.toLocaleString()}+</span>
               ) : null}
             </div>
             <div className="flex items-center justify-end gap-2.5">
