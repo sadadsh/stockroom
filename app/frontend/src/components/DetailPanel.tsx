@@ -2164,72 +2164,67 @@ function Sourcing({
               (isBest ? "border-ok/50 bg-ok/[0.05]" : "border-line bg-surface hover:bg-raise2")
             }
           >
-            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
-            {/* overflow-hidden + min-w-0 on the column AND flex-none on the badge: without all three a
-                flex child refuses to shrink and simply DRAWS OVER the next grid column, which is how
-                the Recommended badge ended up printed on top of the stock figure ("Rec2,810ded"). */}
-            <div className="min-w-0 overflow-hidden pr-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-sm font-semibold text-t1">{name}</span>
-                {isBest ? (
-                  <span
-                    className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-bold"
-                    style={{
-                      color: "var(--c-ok)",
-                      background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
-                    }}
-                  >
-                    Recommended
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="tnum whitespace-nowrap text-right font-mono text-xs text-t2">
-              {p.stock != null ? (
-                <>
-                  <span
-                    className="mr-1.5 inline-block h-[5px] w-[5px] rounded-full align-middle"
-                    style={{ background: short ? "var(--c-warn)" : "var(--c-ok)" }}
-                  />
-                  <span className={short ? "text-warn" : undefined}>
-                    {p.stock.toLocaleString()}
-                  </span>
-                </>
-              ) : null}
-              {/* THE VOLUME the headline price belongs to (owner: "add the volume displayed next to the
-                  stock"). Without it the row showed a unit price with nothing saying at what quantity,
-                  which is the difference between $1.22 and $0.49 on the same part. */}
-              {unit ? (
-                <span className="ml-2 text-2xs text-t3">at {unit.qty.toLocaleString()}+</span>
-              ) : null}
-            </div>
-            <div className="flex items-center justify-end gap-2.5">
-              {unit ? (
-                <span className="flex flex-col items-end">
-                  <span className="tnum font-mono text-base font-semibold text-t1">
-                    {formatPrice(unit.price, p.currency)}
-                  </span>
-                  {/* The ORDER TOTAL, shown only once a quantity is actually being asked about. This is
-                      the number `recommendVendor` ranks on, so showing it makes the badge checkable
-                      instead of an assertion the reader has to take on trust - the old "Best" tag never
-                      said best at what, which is the fault this whole slice exists to close. */}
-                  {needQty > 1 && orderTotal != null ? (
-                    <span className="tnum font-mono text-2xs text-t3">
-                      {formatPrice(orderTotal, p.currency)} total
-                    </span>
-                  ) : null}
+            {/* TWO LINES, not one. Seven things want this row - vendor, Recommended, stock, the volume
+                the price belongs to, the unit price, the order total and the link - and they do not fit
+                in 300px. Three attempts at cramming them proved it: the badge first collided with the
+                stock figure, then printed ON TOP of it, then clipped to "Recor" and took the vendor name
+                with it. The original screen critique had already called "four data types on one line
+                with no headers" a fault, so the fix is the structural one rather than a fourth nudge.
+                Line 1 is WHO (and whether it is recommended), line 2 is the commercial answer. */}
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate text-sm font-semibold text-t1">{name}</span>
+              {isBest ? (
+                <span
+                  className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-bold"
+                  style={{
+                    color: "var(--c-ok)",
+                    background: "color-mix(in srgb, var(--c-ok) 16%, transparent)",
+                  }}
+                >
+                  Recommended
                 </span>
               ) : null}
-              <a
-                href={p.url}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Open on ${name}`}
-                className="text-t3 transition-colors hover:text-t1"
-              >
-                <ExternalIcon />
-              </a>
             </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="tnum whitespace-nowrap font-mono text-xs text-t2">
+                {p.stock != null ? (
+                  <>
+                    <span
+                      className="mr-1.5 inline-block h-[5px] w-[5px] rounded-full align-middle"
+                      style={{ background: short ? "var(--c-warn)" : "var(--c-ok)" }}
+                    />
+                    <span className={short ? "text-warn" : undefined}>
+                      {p.stock.toLocaleString()}
+                    </span>
+                  </>
+                ) : null}
+                {unit ? (
+                  <span className="ml-2 text-2xs text-t3">at {unit.qty.toLocaleString()}+</span>
+                ) : null}
+              </span>
+              <span className="ml-auto flex items-baseline gap-2.5">
+                {unit ? (
+                  <span className="flex flex-col items-end">
+                    <span className="tnum font-mono text-base font-semibold leading-none text-t1">
+                      {formatPrice(unit.price, p.currency)}
+                    </span>
+                    {needQty > 1 && orderTotal != null ? (
+                      <span className="tnum mt-0.5 font-mono text-2xs text-t3">
+                        {formatPrice(orderTotal, p.currency)} total
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open on ${name}`}
+                  className="flex-none text-t3 transition-colors hover:text-t1"
+                >
+                  <ExternalIcon />
+                </a>
+              </span>
             </div>
             {/* THE VENDOR PART NUMBER, on its own full-width line under the grid. It lived in the grid's
                 first column, which is sized for a vendor NAME - truncated there it read
