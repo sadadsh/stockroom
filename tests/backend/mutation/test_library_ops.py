@@ -992,3 +992,49 @@ def test_refiling_during_a_rebuild_RELOCATES_the_assets_not_just_the_field(tmp_p
     assert name not in old_sym.read_text(encoding="utf-8"), "the symbol was left in the old library"
     new_fp = profile.library.footprint_lib_path("Diodes") / f"{name}.kicad_mod"
     assert new_fp.exists(), "the footprint did not move with the part"
+
+
+def test_rebuild_takes_the_spelled_out_maker_from_the_vendor_SPECS_too(tmp_path, fixtures_dir):
+    """The distributors' own `Manufacturer` / `Brand` specs are answers too.
+
+    Measured on the owner's real record: the top-level `manufacturer` field held LCSC's brand
+    shorthand `TI`, while `specs["Manufacturer"]` and `specs["Brand"]` BOTH read
+    "Texas Instruments" with enrichment provenance recorded against them. So the spelled-out name
+    was on the record the whole time and nothing looked at it - the promotion only consulted
+    `alternates["manufacturer"]`, which that record does not have.
+
+    Still invents nothing: every candidate is a value a source supplied, and the abbreviation only
+    loses when one of them PROVES it is a shorter spelling (initials, or a prefix inside the first
+    word). This is why the fix needs no network and no lookup table.
+    """
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.manufacturer = "TI"
+    rec.specs["Manufacturer"] = "Texas Instruments"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage the real shape", [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert out.manufacturer == "Texas Instruments"
+
+
+def test_a_vendor_spec_naming_a_DIFFERENT_company_never_replaces_the_maker(tmp_path, fixtures_dir):
+    """The guard. A `Brand` spec that is not a longer spelling of the stored maker is a different
+    claim, not a better one, and must not silently rewrite who makes the part."""
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    ops.add_part(staged)
+    rec = ops.load_record("tps62130rgtr")
+    rec.manufacturer = "TI"
+    rec.specs["Brand"] = "Toshiba"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage a disagreeing brand", [profile.library.parts_dir / "tps62130rgtr.json"])
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+    assert out.manufacturer == "TI"
