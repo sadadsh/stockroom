@@ -80,7 +80,7 @@
     "source_url": "https://www.ti.com/general/docs/suppproductinfo.tsp?distId=10&gotoUrl=https%3A%2F%2Fwww.ti.com%2Flit%2Fgpn%2Fina226"
   },
   "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR",
-  "display_name": "Current",
+  "display_name": "Current & Power Monitor 10-VSSOP",
   "eda": {
     "altium": {
       "footprint": {
