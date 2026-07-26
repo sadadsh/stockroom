@@ -92,7 +92,7 @@
     "source_url": "https://www.mouser.com/datasheet/3/1014/1/ADG714_715.pdf"
   },
   "description": "Analog Switch ICs SERIAL SPI, OCTAL SPST",
-  "display_name": "ADG714BRUZ",
+  "display_name": "Analog Switch IC 24-TSSOP",
   "eda": {
     "kicad": {
       "footprint": {
