@@ -17,6 +17,21 @@ import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { useModalDismiss } from "../lib/useModalDismiss";
 
+// The peek's label reveal, in ONE place. Every label in the rail uses it, because the first cut wired
+// only the primary nav and Settings - so hovering produced a panel where three of the bottom controls
+// were still bare icons, which reads as broken rather than as compact.
+const PEEK_LABEL =
+  "w-0 overflow-hidden opacity-0 transition-opacity duration-150 motion-reduce:transition-none " +
+  "[@media(hover:hover)]:group-hover/rail:w-auto [@media(hover:hover)]:group-hover/rail:opacity-100 " +
+  "[@media(hover:hover)]:group-hover/rail:delay-150 " +
+  "group-focus-within/rail:w-auto group-focus-within/rail:opacity-100";
+
+/** A collapsed rail control becomes a labelled row during the peek. */
+const PEEK_ROW =
+  "[@media(hover:hover)]:group-hover/rail:justify-start " +
+  "[@media(hover:hover)]:group-hover/rail:px-2.5 " +
+  "group-focus-within/rail:justify-start group-focus-within/rail:px-2.5";
+
 function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
 }
@@ -87,13 +102,36 @@ export function Rail() {
   }
 
   return (
+    // COLLAPSED, the outer shell holds a FIXED 52px of layout and the rail itself overlays on top of
+    // it, so hovering reveals the labels WITHOUT reflowing the page (the owner's choice from previews,
+    // 2026-07-26). Pinned open, there is no overlay at all and the content reflows exactly once.
+    <div className={collapsed ? "relative z-[60] w-[52px] flex-none" : "flex-none"}>
     <nav
       aria-label="Primary"
       data-dev-id="rail.root"
       className={
-        "flex flex-none flex-col border-r border-line bg-rail py-4 transition-[width] duration-150 " +
-        "motion-reduce:transition-none " +
-        (collapsed ? "w-[52px] px-2" : "w-[190px] px-3")
+        // NOTE: no `bg-*` here. Two background utilities in one class list are resolved by STYLESHEET
+        // order, not by the order they appear in the attribute - so a `bg-canvas` added alongside the
+        // old `bg-rail` silently lost, and the overlay stayed see-through. Each branch owns its own.
+        "group/rail flex flex-col border-r border-line py-4 " +
+        "transition-[width,padding] duration-150 motion-reduce:transition-none " +
+        (collapsed
+          // The peek. `@media (hover:hover)` so a touch device never gets a state it cannot leave -
+          // there the toggle is the only way, which is why the toggle stays. `focus-within` gives the
+          // same expansion to the keyboard, and it is NOT paired with forcing focus inside: research
+          // is explicit that auto-opening AND moving focus is what disorients people. The 150ms
+          // hover-intent delay stops a pointer merely crossing the rail from opening it; leaving is
+          // instant, because a panel that lingers over content reads as stuck.
+          ? "absolute inset-y-0 left-0 h-full w-[52px] overflow-hidden px-2 " +
+            // --c-rail is a translucent TINT (rgba .032 dark / .5 light). That was fine while the rail
+            // sat IN the flex flow over the canvas; overlaying content it let the parts list read
+            // straight through the panel. Composite the tint over an opaque canvas base in one
+            // element, so the peek is opaque and still exactly the rail's colour.
+            "bg-canvas [background-image:linear-gradient(var(--c-rail),var(--c-rail))] " +
+            "[@media(hover:hover)]:hover:w-[190px] [@media(hover:hover)]:hover:px-3 " +
+            "[@media(hover:hover)]:hover:shadow-pop [@media(hover:hover)]:hover:delay-150 " +
+            "focus-within:w-[190px] focus-within:px-3 focus-within:shadow-pop"
+          : "bg-rail w-[190px] px-3")
       }
     >
       {/* wordmark (north-star .wm): the rail's panel-title bar - same band + bottom hairline as every
@@ -108,14 +146,17 @@ export function Rail() {
       >
         {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
             ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
-        {collapsed ? null : (
+        <span className={collapsed ? PEEK_LABEL + " flex-none" : "flex-none"}>
           <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
-        )}
-        {collapsed ? null : (
-          <span className="text-base font-semibold tracking-[-0.01em] text-t1">
-            <Text id="nav.brand">Stockroom</Text>
-          </span>
-        )}
+        </span>
+        <span
+          className={
+            "text-base font-semibold tracking-[-0.01em] text-t1 whitespace-nowrap " +
+            (collapsed ? PEEK_LABEL : "")
+          }
+        >
+          <Text id="nav.brand">Stockroom</Text>
+        </span>
         {/* The rail's collapse control lives HERE, in its panel-title bar, because that is where a
             docked panel's own controls belong - the same place Altium puts them. It used to sit at
             the foot as 10px t3 text beside a raw mono guillemet, which made the one control that
@@ -186,13 +227,15 @@ export function Rail() {
           onClick={() => setAboutOpen(true)}
           className={
             "flex h-[34px] items-center gap-2.5 rounded-control text-left text-base font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
-            (collapsed ? "justify-center px-0" : "px-2.5")
+            (collapsed ? "justify-center px-0 " + PEEK_ROW : "px-2.5")
           }
         >
           <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
             <Icon id="nav.about" className="h-full w-full" />
           </span>
-          {collapsed ? null : <Text id="nav.about">About</Text>}
+          <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
+            <Text id="nav.about">About</Text>
+          </span>
         </button>
         <div
           data-dev-id="rail.utility"
@@ -220,16 +263,18 @@ export function Rail() {
                 // bare 34px nav icons is what made the collapsed rail read as botched.
                 "flex items-center gap-2 rounded-control text-xs font-semibold text-t1 transition hover:bg-raise2 disabled:cursor-not-allowed disabled:opacity-50 " +
                 (collapsed
-                  ? "h-[34px] justify-center px-0 hover:bg-[var(--c-hover)]"
+                  ? "h-[34px] justify-center px-0 hover:bg-[var(--c-hover)] " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5 disabled:hover:bg-raise")
               }
             >
               <Icon id="nav.update" className="h-4 w-4 flex-none" />
-              {collapsed ? null : apply.isPending ? (
-                <Text id="nav.update-busy">Updating...</Text>
-              ) : (
-                <Text id="nav.update">Update</Text>
-              )}
+              <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
+                {apply.isPending ? (
+                  <Text id="nav.update-busy">Updating...</Text>
+                ) : (
+                  <Text id="nav.update">Update</Text>
+                )}
+              </span>
             </button>
           ) : (
             <div
@@ -237,7 +282,7 @@ export function Rail() {
               className={
                 "flex items-center gap-2 rounded-control text-xs font-medium text-t2 " +
                 (collapsed
-                  ? "h-[34px] justify-center px-0"
+                  ? "h-[34px] justify-center px-0 " + PEEK_ROW
                   : "h-[32px] flex-1 border border-line bg-raise px-2.5")
               }
               title="You have the latest version"
@@ -248,7 +293,9 @@ export function Rail() {
               <span className="flex flex-none" style={{ color: "var(--c-ok)" }}>
                 <Icon id="nav.up-to-date" className="h-4 w-4 flex-none" />
               </span>
-              {collapsed ? null : <Text id="nav.up-to-date">Up to Date!</Text>}
+              <span className={collapsed ? PEEK_LABEL + " whitespace-nowrap" : ""}>
+                <Text id="nav.up-to-date">Up to Date!</Text>
+              </span>
             </div>
           )}
           <button
@@ -260,7 +307,7 @@ export function Rail() {
             className={
               "flex flex-none items-center justify-center rounded-control text-t2 transition hover:text-t1 " +
               (collapsed
-                ? "h-[34px] w-full hover:bg-[var(--c-hover)]"
+                ? "h-[34px] w-full gap-2.5 hover:bg-[var(--c-hover)] " + PEEK_ROW
                 : "h-[32px] w-[32px] border border-line bg-raise hover:bg-raise2")
             }
           >
@@ -270,6 +317,7 @@ export function Rail() {
       </div>
       {aboutOpen ? <AboutModal onClose={() => setAboutOpen(false)} /> : null}
     </nav>
+    </div>
   );
 }
 
@@ -383,12 +431,16 @@ function RailItem({
       aria-current={selected ? "page" : undefined}
       // Collapsed, the glyph is all there is, so the name has to come from aria-label (and `title`
       // gives the pointer the same thing). Without it every nav item reads as an unlabelled button.
-      aria-label={collapsed ? item.title : undefined}
+      // `title` still gives the pointer a native tooltip at rest. No aria-label: the visible label
+      // below is in the DOM even while collapsed (it is only visually hidden), so adding one would
+      // announce every nav item twice.
       title={collapsed ? item.title : undefined}
       onClick={onSelect}
       className={
         "flex h-[32px] items-center gap-2.5 rounded-control text-left text-base transition " +
-        (collapsed ? "justify-center px-0 " : "px-2.5 ") +
+        (collapsed
+          ? "justify-center px-0 " + PEEK_ROW + " "
+          : "px-2.5 ") +
         (selected
           ? "bg-acc-soft font-semibold text-t1 shadow-[inset_2px_0_0_var(--c-acc)]"
           : "font-medium text-t2 hover:bg-[var(--c-hover)] hover:text-t1")
@@ -397,7 +449,16 @@ function RailItem({
       <span aria-hidden className="flex h-[17px] w-[17px] flex-none items-center justify-center">
         {NAV_ICONS[item.route] ?? null}
       </span>
-      {collapsed ? null : <Text id={`nav.${item.route}`}>{item.title}</Text>}
+      {/* ALWAYS rendered, so the peek has something to reveal and the accessible name is real text
+          rather than an aria-label. Collapsed it is clipped to zero width by the panel's
+          `overflow-hidden` and faded out; the peek gives it both back. */}
+      <span
+        className={
+          "truncate whitespace-nowrap " + (collapsed ? PEEK_LABEL : "")
+        }
+      >
+        <Text id={`nav.${item.route}`}>{item.title}</Text>
+      </span>
     </button>
   );
 }
