@@ -60,6 +60,8 @@ import { PreviewImage } from "./PreviewImage";
 import { HandoffBand } from "./HandoffBand";
 import {
   type PinnedSpecs,
+  effectiveKeySpecKeys,
+  isCuratedOnly,
   isPinned,
   keySpecRows,
   togglePinned,
@@ -178,6 +180,10 @@ function KeySpecificationsBlock({
   onTogglePin: (category: string, specKey: string) => void;
 }) {
   const rows = keySpecRows(groups, category, pinned);
+  // What is EFFECTIVELY up here, so a row's star tells the truth in both this block and the list
+  // below. Derived from the same call that produced `rows`, never recomputed, or the two could
+  // disagree the moment either rule changed.
+  const effective = effectiveKeySpecKeys(groups, category, pinned);
   // Nothing to lead with: render NOTHING rather than an empty card. A titled card with no rows in the
   // sheet's most prominent slot reads as a failure, which is exactly what the old empty-state faults
   // in the punch list were about.
@@ -229,12 +235,20 @@ function KeySpecificationsBlock({
               <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
             </span>
             {/* corner-anchored so it never displaces the value it belongs to */}
+            {/* Only a row the USER pinned carries a star up here, and it is the control that takes
+                it back down. A curated row gets NONE: every row in this block is by definition in
+                this block, so a star on each says nothing the header's pin has not already said,
+                and five identical filled stars that cannot be pressed are noise that looks like
+                five controls. The star that carries information is the one in the list BELOW,
+                where it distinguishes a row already up here from one that is not. */}
             <span className="absolute right-1.5 top-1.5">
-              <PinStar
-                pinned={isPinned(pinned, category, row.key)}
-                onToggle={() => onTogglePin(category, row.key)}
-                label={row.label}
-              />
+              {isCuratedOnly(effective, pinned, category, row.key) ? null : (
+                <PinStar
+                  pinned={isPinned(pinned, category, row.key)}
+                  onToggle={() => onTogglePin(category, row.key)}
+                  label={row.label}
+                />
+              )}
             </span>
           </div>
         ))}
@@ -343,27 +357,43 @@ function CollapsePaneButton({ devId, label, onCollapse }: { devId: string; label
  */
 function PinStar({
   pinned,
+  locked,
   onToggle,
   label,
 }: {
   pinned: boolean;
+  // Already in Top Specifications because the REGISTRY curated it, not because this user pinned it
+  // (owner, 2026-07-26). It reads as pinned - which it is - and does not offer to pin it again:
+  // that would add a redundant user pin, change nothing visible, and spend one of the capped slots
+  // on a row that already had one.
+  locked?: boolean;
   onToggle: () => void;
   label: string;
 }) {
+  const on = pinned || Boolean(locked);
   return (
     <button
       type="button"
       data-dev-id="detail.spec-pin"
-      onClick={onToggle}
-      aria-pressed={pinned}
-      aria-label={pinned ? `Unpin ${label}` : `Pin ${label}`}
-      title={pinned ? "Unpin From Key Specifications" : "Pin To Key Specifications"}
+      onClick={locked ? undefined : onToggle}
+      disabled={locked}
+      aria-pressed={on}
+      aria-label={
+        locked ? `${label} is already in Top Specifications` : on ? `Unpin ${label}` : `Pin ${label}`
+      }
+      title={
+        locked
+          ? "Already In Top Specifications"
+          : on
+            ? "Unpin From Key Specifications"
+            : "Pin To Key Specifications"
+      }
       className={
         "flex h-[16px] w-[16px] flex-none items-center justify-center rounded-control transition " +
         "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 " +
         "focus-visible:outline-acc " +
-        (pinned
-          ? "text-warn opacity-100"
+        (on
+          ? "text-warn opacity-100" + (locked ? " cursor-default" : "")
           : "text-t3 opacity-0 hover:text-t1 group-hover:opacity-100 focus-visible:opacity-100")
       }
     >
@@ -1941,6 +1971,10 @@ function SpecificationsSection({
   // index-based default below. Storing the default in state instead would make it a snapshot that
   // goes stale the moment a different part arrives with different groups.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // What Top Specifications is ALREADY showing. Declared above the empty-group return, because a
+  // hook below an early return is the trap this file has paid for before; `effectiveKeySpecKeys`
+  // is pure so it costs nothing here.
+  const effective = effectiveKeySpecKeys(groups, category, pinned);
   if (groups.length === 0) {
     return (
       <div data-dev-id="detail.specs" className="text-sm text-t3">No parametric specs on record for this part.</div>
@@ -1983,6 +2017,7 @@ function SpecificationsSection({
             onUseSpecValue={onUseSpecValue}
             category={category}
             pinned={pinned}
+            effectivePinned={effective}
             onTogglePin={onTogglePin}
           />
         </SpecSection>
@@ -2071,6 +2106,7 @@ function SpecRowList({
   onUseSpecValue,
   category,
   pinned,
+  effectivePinned,
   onTogglePin,
 }: {
   rows: SpecRow[];
@@ -2081,6 +2117,10 @@ function SpecRowList({
   // deliberately excludes them, so offering a star there would promise something it would not do.
   category?: string;
   pinned?: PinnedSpecs;
+  // The keys Top Specifications is already showing, so a row that is up there by CURATION reads as
+  // pinned down here too instead of offering to pin what is already pinned (owner, 2026-07-26).
+  // Absent for the lists that cannot be pinned from at all.
+  effectivePinned?: ReadonlySet<string>;
   onTogglePin?: (category: string, specKey: string) => void;
 }) {
   return (
@@ -2122,6 +2162,9 @@ function SpecRowList({
               {onTogglePin && category ? (
                 <PinStar
                   pinned={isPinned(pinned ?? {}, category, row.key)}
+                  locked={isCuratedOnly(
+                    effectivePinned ?? new Set<string>(), pinned ?? {}, category, row.key,
+                  )}
                   onToggle={() => onTogglePin(category, row.key)}
                   label={typeof row.label === "string" ? row.label : row.key}
                 />

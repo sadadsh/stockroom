@@ -189,3 +189,39 @@ export function togglePinned(
 export function isPinned(pinned: PinnedSpecs, category: string, specKey: string): boolean {
   return (pinned[category] ?? []).includes(specKey);
 }
+
+/**
+ * The keys Top Specifications actually renders - a user pin OR a registry-curated match.
+ *
+ * Derived from `keySpecRows` rather than recomputed, so the star and the block can never disagree:
+ * the cap, the ordering and the substring matching are all applied once, in one place. Recomputing
+ * "is this curated" independently would drift the moment either rule changed, and the symptom would
+ * be a star that lies rather than an obvious break.
+ */
+export function effectiveKeySpecKeys(
+  groups: readonly SpecGroup[],
+  category: string,
+  pinned: PinnedSpecs,
+): Set<string> {
+  return new Set(keySpecRows(groups, category, pinned).map((r) => r.key));
+}
+
+/**
+ * Whether a row sits in Top Specifications because the REGISTRY curated it, not because the user
+ * pinned it (owner, 2026-07-26: "the pin system lets you pin a spec that is ALREADY in Top
+ * Specifications").
+ *
+ * Such a row's star reads as filled but must not offer to pin it AGAIN: `togglePinned` would add a
+ * redundant user pin, which changes nothing visible and silently spends one of the capped slots on
+ * a row that already had one. It is deliberately not made UNpinnable either - removing a curated
+ * row is not something the owner asked for, and inventing an exclusion list to allow it would be a
+ * broader change than the instruction.
+ */
+export function isCuratedOnly(
+  effective: ReadonlySet<string>,
+  pinned: PinnedSpecs,
+  category: string,
+  specKey: string,
+): boolean {
+  return effective.has(specKey) && !(pinned[category] ?? []).includes(specKey);
+}
