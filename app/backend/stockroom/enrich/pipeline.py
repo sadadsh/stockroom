@@ -80,7 +80,6 @@ def fill_category(result: EnrichmentResult) -> None:
     untouched (never a wrong guess), so the user still picks it in review."""
     if result.category and result.category != "Other":
         return
-    from stockroom.ingest.naming import propose_category
 
     # The distributor "Product Category" is the authoritative signal; classify from it ALONE
     # first, and only fall back to the description when it yields nothing. Blending them let a
@@ -94,13 +93,62 @@ def fill_category(result: EnrichmentResult) -> None:
     # classified at all. DigiKey's "Circuit Protection" names no component kind while LCSC's "ESD
     # Protection Diodes / TVS Diodes" does, and the real library had the unclassifiable one in the
     # slot. The tiers stay ordered, so this widens the search without blending it.
-    guess = "Other"
-    for text in _classification_signals(result):
+    guess = _best_category(_classification_signals(result))
+    if guess:
+        result.category = guess
+
+
+def _best_category(texts) -> str:
+    """The first text that classifies to something real, or "" when none does.
+
+    Shared by the ADD path (`fill_category`, on an EnrichmentResult) and the REBUILD path
+    (`refile_category`, on a PartRecord) so the two lanes cannot disagree about what a part is.
+    """
+    from stockroom.ingest.naming import propose_category
+
+    for text in texts:
         guess = propose_category(text)
         if guess != "Other":
-            break
-    if guess != "Other":
-        result.category = guess
+            return guess
+    return ""
+
+
+def refile_category(record) -> str:
+    """The category an UNCLASSIFIED record should be filed under, or "" to leave it alone.
+
+    The record-shaped twin of `fill_category`. A part added before `9bcb033` kept "Other"
+    forever: the add path learned to classify from the distributors' Product Category, and
+    nothing re-derived it for a record already on disk.
+
+    Same guard, and it is the important half: a record already filed somewhere real is NEVER
+    touched. A vendor taxonomy is a suggestion for an unfiled part, never an override of a
+    filing a person chose.
+    """
+    if record.category and record.category != "Other":
+        return ""
+    return _best_category(_record_classification_signals(record))
+
+
+def _record_classification_signals(record):
+    """Every text worth classifying a stored record from, most authoritative first: its
+    distributor Product Category and every answer that lost that slot, then its description and
+    the same. Mirrors `_classification_signals`, reading the record's `alternates` where the
+    result reads its conflict maps - they hold the same losers."""
+    seen: set[str] = set()
+
+    def tier(primary, alternates):
+        out = []
+        for value in [primary, *[a.value for a in alternates]]:
+            text = str(value or "").strip()
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+        return out
+
+    alternates = getattr(record, "alternates", {}) or {}
+    yield from tier(record.specs.get("Product Category"),
+                    alternates.get("Product Category", []))
+    yield from tier(record.description, alternates.get("description", []))
 
 
 def _classification_signals(result: EnrichmentResult):
