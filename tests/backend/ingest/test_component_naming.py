@@ -53,7 +53,8 @@ def test_led_uses_illumination_color():
 def test_transistor_polarity_type_voltage_mpn():
     specs = {"Transistor Polarity": "N-Channel", "Product Category": "MOSFETs",
              "Vds - Drain-Source Breakdown Voltage": "60 V", "Package": "SOT-23-3"}
-    assert propose_component_name("Transistors", specs, "2N7002") == "N-Channel MOSFET 60V 2N7002 SOT-23-3"
+    # MPN dropped, same standing rule as the switch above: the title already shows it.
+    assert propose_component_name("Transistors", specs, "2N7002") == "N-Channel MOSFET 60V SOT-23-3"
 
 
 def test_connector_positions_are_per_row():
@@ -63,8 +64,12 @@ def test_connector_positions_are_per_row():
 
 
 def test_switch_keeps_a_single_switch_suffix():
+    # The trailing MPN is GONE, and that is the owner's standing rule rather than a regression:
+    # "the MPN always shows under the title so u can humanize the name as much as possible".
+    # Every other category had already dropped it; Switches and Transistors were the last two
+    # branches still trailing it, so two categories named their parts unlike all the others.
     specs = {"Type": "Slide Switch", "Contact Form": "SPDT"}
-    assert propose_component_name("Switches", specs, "EG1218") == "SPDT Slide Switch EG1218"
+    assert propose_component_name("Switches", specs, "EG1218") == "SPDT Slide Switch"
 
 
 def test_ic_verbose_product_type_is_shortened():
@@ -172,3 +177,76 @@ def test_the_generic_singulariser_only_touches_a_real_plural_head_noun(word, exp
     """The explicit map cannot keep up with the vocabulary distributors invent, so a generic rule
     backs it. A generic rule is exactly where over-reach happens, hence the negative cases."""
     assert _singular(word) == expected
+
+
+# --- Names measured on the owner's REAL library, 2026-07-26 -----------------------------------
+#
+# Owner, after adding five parts through the app: "names oversimplified". They were, and each had
+# a distinct cause. Every spec bag below is copied from the record on their disk, not invented.
+
+def test_a_compound_type_keeps_its_head_noun():
+    """`INA226AIDGST` was named **"Current"**.
+
+    Its Product Category is "Current & Power Monitors & Regulators". `_short_type` splits a list
+    on "&" and keeps the first item - correct for "Buffers & Line Drivers", wrong here, because
+    "Current" is a MODIFIER of the noun that follows, not a list entry. Splitting threw the head
+    noun away and left an adjective as the part's name.
+
+    The discriminator is exact and needs no word list: a real list of component types is written
+    in the PLURAL ("Buffers & Line Drivers", "Encoders, Decoders"). A SINGULAR first segment is a
+    modifier, so the phrase is kept whole.
+    """
+    name = propose_component_name("ICs", {
+        "Product Category": "Current & Power Monitors & Regulators",
+        "Supplier Device Package": "10-VSSOP",
+    }, mpn="INA226AIDGST")
+    assert "Current" in name and name != "Current"
+    assert "Monitor" in name, f"the head noun was dropped: {name!r}"
+    assert "10-VSSOP" in name
+
+
+def test_a_genuine_list_still_takes_its_first_entry():
+    """The behaviour the split exists for, which must not regress."""
+    assert propose_component_name("ICs", {"Product Category": "Buffers & Line Drivers"},
+                                  mpn="X") .startswith("Buffer")
+    assert propose_component_name("ICs", {"Product Category": "Encoders, Decoders, Multiplexers"},
+                                  mpn="X").startswith("Encoder")
+
+
+def test_the_package_comes_from_the_keys_a_distributor_actually_uses():
+    """Four of the owner's five parts had NO package in their name.
+
+    `_pkg` read only "Case Code - in" or a bare "Package". A DigiKey record carries
+    "Supplier Device Package" (the concise one: "SOT-23-5") and "Package / Case" (the verbose one:
+    'SC-74A, SOT-753'), and only the one part whose record happened to have a bare "Package" key
+    got a package in its name.
+    """
+    name = propose_component_name("ICs", {
+        "Product Category": "Switching Voltage Regulators",
+        "Package / Case": "14-PowerVFQFN",
+        "Supplier Device Package": "14-VQFN-HR (2.5x3)",
+    }, mpn="TPS62914RPYR")
+    assert "Switching Voltage Regulator" in name
+    assert "14-VQFN-HR" in name, f"no package in {name!r}"
+
+
+def test_a_switch_reads_its_product_category_rather_than_falling_back_to_the_mpn():
+    """`ADG714BRUZ` was named "ADG714BRUZ" - the namer produced nothing at all.
+
+    The Switches branch consulted "Type", "Contact Form" and "Product Type"; this record states
+    its function in "Product Category" ("Analog Switch ICs"), which that branch never read.
+    """
+    name = propose_component_name("Switches", {
+        "Product Category": "Analog Switch ICs",
+        "Supplier Device Package": "24-TSSOP",
+    }, mpn="ADG714BRUZ")
+    assert name != "ADG714BRUZ"
+    assert "Switch" in name and "24-TSSOP" in name
+
+
+def test_the_richest_record_is_unchanged():
+    """The one part that was already named well must stay named exactly that."""
+    assert propose_component_name("Diodes", {
+        "Number of Channels": "6", "Product Category": "ESD Protection Diodes / TVS Diodes",
+        "Package": "USON-14",
+    }, mpn="TPD6E05U06RVZR") == "6-Channel ESD Protection Diode USON-14"

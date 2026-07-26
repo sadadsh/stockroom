@@ -73,7 +73,19 @@ def _tight(s: str) -> str:
 def _pkg(f: dict) -> str:
     """The package/case token: prefer the imperial case code (0603), strip the metric parenthetical,
     and collapse a physical size ("3.2 mm x 2.5 mm" -> "3.2x2.5mm")."""
-    p = _PAREN.sub("", str(f.get("Case Code - in") or f.get("Package") or "")).strip()
+    # The keys a real distributor record uses, most concise first. Only "Case Code - in" and a
+    # bare "Package" were read before, so four of the owner's five parts had no package in their
+    # name at all: a DigiKey record states it in "Supplier Device Package" ("SOT-23-5", "10-VSSOP")
+    # and, more verbosely, in "Package / Case" ("SC-74A, SOT-753"). The concise one is preferred
+    # because this is a NAME, and the verbose form carries a second alias or a millimetre width.
+    p = _PAREN.sub("", str(
+        f.get("Case Code - in")
+        or f.get("Package")
+        or f.get("Supplier Device Package")
+        or f.get("Package / Case")
+        or ""
+    )).strip()
+    p = p.split(",")[0].strip()  # "SC-74A, SOT-753" is two aliases for one package; name it once
     p = re.sub(r"\s*mm\s*x\s*", "x", p)
     return re.sub(r"\s*mm\b", "mm", p)
 
@@ -142,8 +154,22 @@ def _short_type(v: str) -> str:
     """A concise functional descriptor from a verbose distributor Product Type: keep the first
     segment before an "&"/","/" - " list, then singularize ("Encoders, Decoders, ..." -> "Encoder",
     "Buffers & Line Drivers" -> "Buffer", "ARM Microcontrollers - MCU" -> "ARM Microcontroller")."""
-    v = re.split(r"\s*[&,/]\s*| - ", str(v or ""))[0]
-    return _singular(v)
+    text = str(v or "").strip()
+    # A LIST of component types is written in the plural ("Buffers & Line Drivers", "Encoders,
+    # Decoders"), so its first entry stands alone and splitting is right. A SINGULAR first segment
+    # is a MODIFIER of the noun that follows ("Current & Power Monitors"), and splitting there
+    # threw the head noun away - which is how an INA226 came to be called "Current".
+    #
+    # Plurality is the whole test: no word list, nothing to keep up to date.
+    head = re.split(r"\s*[&,/]\s*| - ", text)[0].strip()
+    if head and head.split()[-1] != _singular(head.split()[-1]):
+        return _singular(head)          # a real list entry
+    # A modifier: keep the phrase, but drop any trailing "& ..." tail beyond the first head noun
+    # so "Current & Power Monitors & Regulators" reads "Current & Power Monitor".
+    parts = re.split(r"\s*&\s*", re.split(r"\s*[,/]\s*| - ", text)[0])
+    if len(parts) > 1:
+        return _singular(" & ".join(parts[:2]))
+    return _singular(text)
 
 
 def _join(*parts: str) -> str:
@@ -190,7 +216,11 @@ def propose_component_name(category: str, specs: dict, mpn: str = "", descriptio
     if category == "Transistors":
         return _join(g("Transistor Polarity", ""),
                      _singular(g("Product Category", "") or "Transistor"),
-                     _tight(g("Vds - Drain-Source Breakdown Voltage", "")), mpn, P) or mpn
+                     # No MPN here either. The owner's rule is that a name is HUMANISED because
+                     # the MPN is always shown under the title; Switches and Transistors were the
+                     # last two branches still trailing it, which is why two categories named
+                     # parts differently from every other.
+                     _tight(g("Vds - Drain-Source Breakdown Voltage", "")), P) or mpn
 
     if category == "Connectors":
         rows = int(re.sub(r"\D", "", str(g("Number of Rows", "") or "1")) or 1)
@@ -206,7 +236,12 @@ def propose_component_name(category: str, specs: dict, mpn: str = "", descriptio
         typ = _singular(g("Type", "") or "")
         if typ and not any(t in typ for t in ("Switch", "MUX", "Limit")):
             typ = f"{typ} Switch"
-        return _join(g("Contact Form", ""), typ or _short_type(g("Product Type", "")), mpn, P) or mpn
+        # ...or in Product Category ("Analog Switch ICs"), which is where a DigiKey switch record
+        # puts it. Without that fallback ADG714BRUZ produced NO name at all and fell back to its
+        # MPN. `mpn` stays in the join as the last resort it always was.
+        return _join(g("Contact Form", ""),
+                     typ or _short_type(g("Product Type", "")) or _descriptor(g),
+                     P) or mpn
 
     # ICs, Modules, Electromechanical, and anything else: the most human function the record can
     # support, plus a channel count where the part has one, plus the package.
