@@ -669,7 +669,15 @@ def main() -> int:
         ("eval", "evaluate an expression in the page"),
     ):
         p = sub.add_parser(name, help=help_text)
-        p.add_argument("arg")
+        # Optional for `eval`, which can take its expression from a FILE instead. Anything past a
+        # trivial expression cannot survive being typed as an argument from WSL: cmd.exe re-splits
+        # the argv, so `=>`, spaces and nested quotes arrive mangled and argparse rejects the
+        # remains as "unrecognized arguments". Measured three separate times in one session, each
+        # costing a cycle, on JS that was correct. A file crosses that boundary untouched.
+        p.add_argument("arg", nargs="?", default="")
+        p.add_argument("--js-file", default="",
+                       help="read the expression from this file (eval only), so quoting and "
+                            "argv-splitting across the WSL/cmd.exe boundary cannot corrupt it")
         p.add_argument("--shot", action="store_true", help="capture the window afterwards")
         p.set_defaults(single=name)
 
@@ -696,6 +704,11 @@ def main() -> int:
     try:
         if args.single == "do":
             return _run_steps(drive, args.steps, out_dir)
+        if args.single == "eval" and getattr(args, "js_file", ""):
+            args.arg = Path(args.js_file).read_text(encoding="utf-8")
+        if not args.arg and args.single in ("click", "text", "eval"):
+            print(f"{args.single}: nothing to run (pass an argument, or --js-file for eval)")
+            return 2
         if args.single == "console":
             drive.flush_events()
             for line in drive.console or ["(nothing logged)"]:
