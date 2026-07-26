@@ -1026,12 +1026,22 @@ export function mountModelScene(
       // reads GREY, which is what the first attempt did. Black mask needs the environment turned
       // DOWN, not just a darker base colour: the mask is matte resin, and only a thin clearcoat
       // sheen survives on a real board.
+      // MEASURED on the owner's window after the plane became effectively infinite: the mask ran
+      // rgb(55) near the camera to rgb(150) at the horizon, while the component body sat at rgb(77) -
+      // so the part was DARKER than its own background and read as a silhouette on a bright floor.
+      // That is Fresnel: a clearcoat mirrors the studio room at grazing incidence, and a 250mm plane
+      // is almost entirely grazing. A small dark slab hid it; an infinite one cannot.
+      //
+      // Matte black solder mask does not mirror a room at a glancing angle. Clearcoat cut to a trace,
+      // roughness up, and the environment contribution down - so the surface stays board-dark all the
+      // way out and the part is the lightest thing in frame, which is what makes it read as ON the
+      // board rather than cut out of it.
       color: 0x08090b,
-      roughness: 0.55,
+      roughness: 0.78,
       metalness: 0.0,
-      clearcoat: 0.3,
-      clearcoatRoughness: 0.45,
-      envMapIntensity: 0.28,
+      clearcoat: 0.06,
+      clearcoatRoughness: 0.8,
+      envMapIntensity: 0.1,
     });
     const substrateMat = new THREE.MeshPhysicalMaterial({
       color: 0x241f19,
