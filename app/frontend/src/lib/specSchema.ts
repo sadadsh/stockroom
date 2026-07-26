@@ -40,6 +40,7 @@ export const EMPTY_SPEC_VALUES = new Set([
 export type SpecGroupName =
   | "Electrical"
   | "Physical"
+  | "Device"
   | "Ratings & Compliance"
   | "Trade & Compliance"
   | "Other";
@@ -47,6 +48,10 @@ export type SpecGroupName =
 export const SPEC_GROUP_ORDER: readonly SpecGroupName[] = [
   "Electrical",
   "Physical",
+  // WHAT THE PART IS AND DOES: its type, topology, channel count, what it is for. These are
+  // real, first-class characteristics that are neither electrical quantities nor dimensions,
+  // and with no home of their own every one of them fell into "Other".
+  "Device",
   "Ratings & Compliance",
   "Trade & Compliance",
   "Other",
@@ -83,6 +88,108 @@ export interface SpecRegistryEntry {
   order: number;
   category?: string;
 }
+
+/**
+ * TOKEN PATTERNS - the second classification tier, and the one that stops "Other" being a dumping
+ * ground (owner, 2026-07-25: "the field classification needs to be modular and not just describe
+ * things as other").
+ *
+ * WHY a second tier rather than more exact rows. `SPEC_REGISTRY` matches a key VERBATIM, and real
+ * distributor parameter names are long and specific: "Voltage - Breakdown (Min)",
+ * "Current - Peak Pulse (10/1000us)", "Voltage - Clamping (Max) @ Ipp". Every one of those is
+ * plainly electrical and every one missed an exact `voltage` / `current` row, so on a real ESD
+ * diode 13 of 18 specs rendered under "Other". Enumerating the exact strings cannot work: each
+ * distributor spells them differently and new ones arrive with every part.
+ *
+ * A pattern matches on the key's TOKENS, so the family is recognised however the rest of the name
+ * is decorated. This stays DATA - a new family is a row here, never a code change - which is the
+ * modular half of the request.
+ *
+ * `leading: true` requires the token to START the key, which is how a parameter names its quantity
+ * ("Voltage - Breakdown"). Without it a token matches anywhere, for families that trail instead
+ * ("Operating Temperature"). Order matters: the first match wins, so put the specific first.
+ */
+export interface SpecPattern {
+  /** A normalized token, matched against the key's own tokens. */
+  token: string;
+  /** Require the token to be the key's FIRST token. */
+  leading?: boolean;
+  group: SpecGroupName;
+  order: number;
+}
+
+export const SPEC_PATTERNS: SpecPattern[] = [
+  // --- 1. STRONG DEVICE WORDS, first. These name a FEATURE and never a quantity, so they must be
+  // read before the quantity words below - "Power Line Protection" leads with "power" but is a
+  // capability, not a measurement, and classifying it as Electrical was measurably wrong.
+  { token: "protection", group: "Device", order: 21 },
+  { token: "applications", group: "Device", order: 12 },
+  { token: "application", group: "Device", order: 12 },
+  { token: "topology", group: "Device", order: 14 },
+  { token: "configuration", group: "Device", order: 15 },
+  { token: "channels", group: "Device", order: 16 },
+  { token: "circuits", group: "Device", order: 17 },
+  { token: "elements", group: "Device", order: 18 },
+  { token: "polarity", group: "Device", order: 19 },
+  { token: "technology", group: "Device", order: 20 },
+  { token: "interface", group: "Device", order: 22 },
+  { token: "protocol", group: "Device", order: 23 },
+  { token: "function", group: "Device", order: 13 },
+
+  // --- 2. Physical form, before electrical: "Supplier Device Package" and "Package / Case" are
+  // dimensions of the body whatever else their name carries.
+  { token: "package", group: "Physical", order: 12 },
+  { token: "case", group: "Physical", order: 13 },
+  { token: "size", group: "Physical", order: 14 },
+  { token: "dimension", group: "Physical", order: 14 },
+  { token: "height", group: "Physical", order: 15 },
+  { token: "width", group: "Physical", order: 15 },
+  { token: "length", group: "Physical", order: 15 },
+  { token: "thickness", group: "Physical", order: 15 },
+  { token: "weight", group: "Physical", order: 16 },
+  { token: "pitch", group: "Physical", order: 17 },
+  { token: "mounting", group: "Physical", order: 18 },
+  { token: "termination", group: "Physical", order: 19 },
+
+  // --- 3. Compliance families, which trail as often as they lead ("Operating Temperature").
+  { token: "temperature", group: "Ratings & Compliance", order: 15 },
+  { token: "humidity", group: "Ratings & Compliance", order: 16 },
+  { token: "moisture", group: "Ratings & Compliance", order: 17 },
+  { token: "rohs", group: "Ratings & Compliance", order: 18 },
+  { token: "reach", group: "Ratings & Compliance", order: 19 },
+  { token: "qualification", group: "Ratings & Compliance", order: 20 },
+  { token: "grade", group: "Ratings & Compliance", order: 21 },
+  { token: "esd", group: "Ratings & Compliance", order: 22 },
+  { token: "flammability", group: "Ratings & Compliance", order: 23 },
+  { token: "certification", group: "Ratings & Compliance", order: 24 },
+
+  // --- 4. Electrical quantities, matched ANYWHERE in the key rather than only in front. A
+  // distributor decorates the quantity from both sides ("Voltage - Clamping (Max) @ Ipp",
+  // "Output Voltage (Max)"), so requiring the leading position missed most real names.
+  { token: "voltage", group: "Electrical", order: 35 },
+  { token: "current", group: "Electrical", order: 45 },
+  { token: "power", group: "Electrical", order: 55 },
+  { token: "resistance", group: "Electrical", order: 75 },
+  { token: "capacitance", group: "Electrical", order: 15 },
+  { token: "inductance", group: "Electrical", order: 15 },
+  { token: "impedance", group: "Electrical", order: 76 },
+  { token: "frequency", group: "Electrical", order: 65 },
+  { token: "energy", group: "Electrical", order: 57 },
+  { token: "charge", group: "Electrical", order: 58 },
+  { token: "gain", group: "Electrical", order: 66 },
+  { token: "bandwidth", group: "Electrical", order: 67 },
+  { token: "noise", group: "Electrical", order: 68 },
+  { token: "propagation", group: "Electrical", order: 69 },
+  { token: "efficiency", group: "Electrical", order: 59 },
+  { token: "esr", group: "Electrical", order: 70 },
+
+  // --- 5. WEAK device words, last. "Type" and "Output" appear inside plenty of electrical and
+  // physical names, so they may only claim a key nothing above recognised.
+  { token: "type", group: "Device", order: 10 },
+  { token: "output", group: "Device", order: 24 },
+  { token: "input", group: "Device", order: 25 },
+];
+
 
 // The ordered, extensible registry. Grouped by concern for readability; `order` (not
 // array position) drives within-group sorting, so inserting a row anywhere is safe.
@@ -342,6 +449,21 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
       unit: entry.unit,
       order: entry.order,
     };
+  }
+  // No verbatim entry: fall to the TOKEN PATTERNS before giving up on the key. This is what keeps
+  // a specific distributor parameter name ("Voltage - Breakdown (Min)") with its family instead of
+  // in "Other". The label stays the raw key - the pattern decides WHERE it goes, never what it is
+  // called, because the distributor's own wording is the accurate one.
+  const tokens = norm.split(" ").filter(Boolean);
+  if (tokens.length) {
+    const first = tokens[0];
+    const present = new Set(tokens);
+    for (const p of SPEC_PATTERNS) {
+      const hit = p.leading ? first === p.token : present.has(p.token);
+      if (hit) {
+        return { key: rawKey, label: rawKey, group: p.group, order: p.order };
+      }
+    }
   }
   return { key: rawKey, label: rawKey, group: FALLBACK_GROUP, order: FALLBACK_ORDER };
 }

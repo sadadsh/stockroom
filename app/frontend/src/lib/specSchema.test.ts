@@ -8,6 +8,8 @@ import {
   applySign,
   EMPTY_SPEC_VALUES,
   SPEC_HIDDEN_KEYS,
+  resolveSpec,
+  type SpecGroupName,
 } from "./specSchema";
 
 describe("normalizeSpecKey", () => {
@@ -382,5 +384,60 @@ describe("groupSpecs zero-valued rates", () => {
 
   it("still drops a genuinely absent value rather than printing a zero", () => {
     expect(groupSpecs("ICs", { "US Tariff %": "" })).toEqual([]);
+  });
+});
+
+describe("token patterns keep real distributor parameters out of Other", () => {
+  // THE REGRESSION THIS EXISTS FOR (owner, 2026-07-25): on a real ESD diode, 13 of 18 specs
+  // rendered under "Other" because every exact registry row missed the distributor's own long
+  // parameter names. These are the actual keys off that part's record.
+  const REAL_KEYS: Array<[string, SpecGroupName]> = [
+    ["Voltage - Breakdown (Min)", "Electrical"],
+    ["Voltage - Clamping (Max) @ Ipp", "Electrical"],
+    ["Voltage - Reverse Standoff (Typ)", "Electrical"],
+    ["Current - Peak Pulse (10/1000µs)", "Electrical"],
+    ["Power - Peak Pulse", "Electrical"],
+    ["Package / Case", "Physical"],
+    ["Package Type", "Physical"],
+    ["Supplier Device Package", "Physical"],
+    ["Applications", "Device"],
+    ["Type", "Device"],
+    ["Unidirectional Channels", "Device"],
+    ["Power Line Protection", "Device"],
+    ["Operating Temperature", "Ratings & Compliance"],
+    ["Moisture Sensitivity Level", "Ratings & Compliance"],
+  ];
+
+  it.each(REAL_KEYS)("files %s under %s", (key, group) => {
+    expect(resolveSpec(key, "Diodes").group).toBe(group);
+  });
+
+  it("leaves NOTHING from that part in Other", () => {
+    const stragglers = REAL_KEYS.map(([k]) => k).filter(
+      (k) => resolveSpec(k, "Diodes").group === "Other",
+    );
+    expect(stragglers).toEqual([]);
+  });
+
+  it("keeps the distributor's own wording as the label", () => {
+    // The pattern decides WHERE a key goes, never what it is called: the vendor's phrasing carries
+    // the precision ("Max" vs "Typ" vs "Min"), and renaming it would quietly lose that.
+    expect(resolveSpec("Voltage - Clamping (Max) @ Ipp", "Diodes").label).toBe(
+      "Voltage - Clamping (Max) @ Ipp",
+    );
+  });
+
+  it("still lets an EXACT registry row win over a pattern", () => {
+    // Precedence has to hold, or curated labels and units are silently replaced by the fallback.
+    const exact = resolveSpec("Voltage Rating", "Capacitors");
+    expect(exact.label).toBe("Voltage Rating");
+    expect(exact.group).toBe("Electrical");
+  });
+
+  it("does not invent a group for a key with no recognisable family", () => {
+    // "Other" must remain a real destination - a pattern set that matches everything would be
+    // worse than one that matches nothing, because a wrong group is harder to notice than a
+    // missing one.
+    expect(resolveSpec("Brand Id", "Diodes").group).toBe("Other");
   });
 });

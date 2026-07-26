@@ -350,6 +350,9 @@ const _ATTR_INDEX: Map<string, AttributeRule> = (() => {
 const _ATTR_GROUP_SCORE: Record<SpecGroupName, number> = {
   Electrical: 400,
   Physical: 250,
+  // What the part IS and DOES (its type, topology, channel count). A glance-chip's whole job is
+  // to state that, so it ranks above compliance and just under the physical form.
+  Device: 200,
   "Ratings & Compliance": 120,
   // A glance-chip states what the part IS. An origin country or a tariff rate never does, and
   // `isReferenceOnlySpecKey` already keeps these keys off the chips - this only makes the ranking
