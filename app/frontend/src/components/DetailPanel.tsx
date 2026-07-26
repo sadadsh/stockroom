@@ -57,7 +57,6 @@ import {
   isPinned,
   keySpecRows,
   togglePinned,
-  withoutPromoted,
 } from "../lib/keySpecs";
 import { readPref, writePref } from "../lib/uiPrefs";
 import { PhotoTrigger, partPhotos } from "./ProductPhoto";
@@ -178,34 +177,50 @@ function KeySpecificationsBlock({
   // in the punch list were about.
   if (rows.length === 0) return null;
   return (
-    <DetailSection
+    // DISTINCT from the Specifications list below, and it has to be: since the owner reversed to
+    // "copy the specifications", the same row appears in both places, and two identically-styled
+    // lists showing one fact read as a bug rather than as a summary. So this is a CARD OF CELLS -
+    // label above value, two across, on a tinted surface - against a plain label-left/value-right
+    // list. It is deliberately the cell treatment the owner already accepted in this very slot when
+    // the EDA handoff band lived here, so it is new to the reader without being unfamiliar.
+    // (dev-id stays `detail.key-specs`: it is an internal handle, and renaming it churns the
+    // catalogue's count gate for no reader-visible gain.)
+    <section
       data-dev-id="detail.key-specs"
-      title={<Text id="detail.key-specifications">Key Specifications</Text>}
+      aria-label="Top Specifications"
+      className="@container mb-3 flex flex-none flex-col rounded-card border border-line bg-surface"
     >
-      <div className="flex flex-col">
+      <header className="flex items-center gap-3 border-b border-line px-3 py-1.5">
+        <span className={EYEBROW_DENSE}>
+          <Text id="detail.top-specifications">Top Specifications</Text>
+        </span>
+        <span className="ml-auto flex-none text-2xs text-t3">
+          {/* what the block is FOR, in three words, because "Top" invites "top by what?" */}
+          <Text id="detail.top-specifications-hint">What This Part Is</Text>
+        </span>
+      </header>
+      {/* gap-px on a line-coloured background draws the cell grid with no per-cell borders */}
+      <div className="grid grid-cols-1 gap-px bg-line @sm:grid-cols-2">
         {rows.map((row) => (
-          <div
-            key={row.key}
-            className="group flex items-baseline gap-3 py-[3px] text-xs leading-[16px]"
-          >
-            <span className="min-w-0 flex-1 truncate text-t2">{row.label}</span>
-            {/* The SAME renderer the Specifications list uses, on the same combined value+unit
-                string. The owner asked for this block "formatted like the specifications", and two
-                lists that split the unit differently do not match - it also meant a value read as
-                one string below and as two spans up here, which broke a text query that had every
-                right to expect them identical. */}
-            <span className="tnum min-w-0 flex-none break-words font-mono text-xs text-t1">
+          <div key={row.key} className="group relative flex flex-col gap-0.5 bg-surface px-3 py-2">
+            <span className={EYEBROW_DENSE + " truncate"} title={row.label}>
+              {row.label}
+            </span>
+            <span className="tnum break-words font-mono text-sm font-medium leading-tight text-t1">
               <SpecValue value={row.unit ? `${row.value} ${row.unit}` : row.value} />
             </span>
-            <PinStar
-              pinned={isPinned(pinned, category, row.key)}
-              onToggle={() => onTogglePin(category, row.key)}
-              label={row.label}
-            />
+            {/* corner-anchored so it never displaces the value it belongs to */}
+            <span className="absolute right-1.5 top-1.5">
+              <PinStar
+                pinned={isPinned(pinned, category, row.key)}
+                onToggle={() => onTogglePin(category, row.key)}
+                label={row.label}
+              />
+            </span>
           </div>
         ))}
       </div>
-    </DetailSection>
+    </section>
   );
 }
 
@@ -460,16 +475,6 @@ export function DetailPanel({
       rows: group.rows.filter((row) => !isReferenceOnlySpecKey(row.key)),
     }))
     .filter((group) => group.rows.length > 0);
-  // The keys Key Specifications is showing, derived from the SAME inputs that block uses, so the two
-  // can never disagree about what was promoted. One source, or a row could vanish from the list below
-  // without appearing above it - which would silently DELETE a spec from the sheet.
-  // NOT a useMemo. This sits below the panel's loading / error / no-selection early returns, so a
-  // hook here is called on some renders and not others - React caught it immediately as "Rendered
-  // more hooks than during the previous render", which corrupts the hook order for every hook after
-  // it. The work is a handful of scans over a few dozen rows; there was nothing to memoise anyway.
-  const promotedSpecKeys = new Set(
-    keySpecRows(allSpecGroups, detail.category, pinnedSpecs).map((r) => r.key),
-  );
   // The procurement facts (origin, the page's own tariff rate, export classification, order
   // quantities) go to SOURCING, not here. They are real vendor data the owner asked to stop
   // losing, but they are not physical parameters - and this is the one place the reference-only
@@ -753,11 +758,12 @@ export function DetailPanel({
               title={<Text id="detail.specifications">Specifications</Text>}
             >
               <SpecificationsSection
-                // PROMOTE, NOT COPY (owner 2026-07-26): a spec shown in Key Specifications above is
-                // removed from its group here, so no fact appears twice in one column. The group
-                // counts stay honest because they derive from `rows.length`, and a group emptied by
-                // promotion is dropped rather than left as an empty disclosure.
-                groups={withoutPromoted(specGroups, promotedSpecKeys)}
+                // COPY, not promote - the owner reversed this on 2026-07-26 ("It should copy the
+                // specifications i go back on what i said earlier"). So the full list stays complete
+                // and Top Specifications repeats the handful that matter. This is why that block now
+                // has to look DISTINCT from this one: two identically-styled lists showing the same
+                // row is what makes a repeat read as a bug rather than as a summary.
+                groups={specGroups}
                 alternates={detail.alternates ?? {}}
                 onUseSpecValue={onUseSpecValue}
                 category={detail.category}
@@ -1825,8 +1831,12 @@ function SpecificationsSection({
  * costs a header, a caret and a click to reveal a single value, which is more chrome than the value
  * it is hiding. `OTHER 1` was exactly that.
  */
-function defaultOpen(group: SpecGroup, index: number): boolean {
-  return index === 0 || group.rows.length <= 2;
+function defaultOpen(_group: SpecGroup, _index: number): boolean {
+  // ALL of them, per the owner 2026-07-26: "the specifications should all be expanded by default".
+  // This replaces "first group, plus any group small enough that collapsing it saves nothing" - the
+  // reasoning there was about not throwing 21 rows at someone, which the owner has now overruled.
+  // An explicit toggle still wins over this default.
+  return true;
 }
 
 /**
