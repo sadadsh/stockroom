@@ -1203,17 +1203,28 @@ class LibraryOps:
         from stockroom.text import fullest_name
 
         record = self.load_record(part_id)
-        changed = apply_procurement_refresh(record, per_vendor, now_iso)
-        # RE-FILE an unclassified record, after the refresh so it classifies from the freshest
-        # vendor answer. `9bcb033` taught the ADD path to do this; a record added BEFORE that
-        # kept "Other" forever, because nothing re-derived a category the way this method already
-        # re-derives the display name, and Move Category (by hand, per part) was the only route
-        # back. Runs before the rename on purpose: the name is spec-aware and a correctly filed
-        # part can name itself better.
+        # RE-FILE an unclassified record FIRST, and through `move_category`, which is the only
+        # thing that knows a category is not just a field: the part's symbol lives in that
+        # category's `.kicad_sym` and its footprint in that category's `.pretty`, and the record's
+        # lib nicknames name them. Setting `record.category` here directly - which this did in its
+        # first version - left the symbol in the OLD library while the record claimed the new one.
+        # Caught by checking the owner's REAL part before running anything against it: theirs is
+        # filed "Other" AND owns both files, so it was precisely the case that would have broken.
+        #
+        # `9bcb033` taught the ADD path to classify from the distributors' Product Category; a
+        # record added before that kept "Other" forever, because nothing re-derived it and Move
+        # Category by hand was the only route back.
+        #
+        # Its own atomic commit, deliberately: relocating two files is a different operation from
+        # refreshing a record's data, and pretending otherwise is what would make the rollback of
+        # one silently undo the other. It also runs BEFORE the rename, because the display name is
+        # spec-aware and a correctly filed part can name itself better.
         new_category = refile_category(record)
         if new_category:
-            record.category = new_category
-            changed = True
+            # A partially-detached part raises here rather than half-moving. Left to propagate on
+            # purpose: the message names what to do, and the bulk rescan reports per part.
+            record = self.move_category(part_id, new_category)
+        changed = apply_procurement_refresh(record, per_vendor, now_iso)
         # Prefer the SPELLED-OUT maker among the answers sources actually gave. Whichever source
         # answers first decides the form, so a part can sit under "TI" while another
         # distributor's "Texas Instruments" waits in `alternates` - and the Altium DbLib's
@@ -1281,6 +1292,20 @@ class LibraryOps:
         json_path = self.lib.parts_dir / f"{part_id}.json"
 
         with Transaction(self.repo) as txn:
+            # The destination category may have no symbol library yet - moving a part into a
+            # category nothing has been added to is the ordinary case, not an exotic one. Without
+            # this, `merge_symbol_into_lib` opened a file that does not exist and the move died on
+            # a bare FileNotFoundError naming a path, with nothing saying what to do about it.
+            # Created exactly as `add_part` creates one, including the same honest refusal when
+            # there is no kicad-cli to author it.
+            if not new_sym.exists():
+                if self.cli is None:
+                    raise ValueError(
+                        f"category symbol library {new_sym.name} is missing and no kicad-cli "
+                        "was provided to create it"
+                    )
+                new_sym.parent.mkdir(parents=True, exist_ok=True)
+                create_empty_symbol_lib(self.cli, new_sym)
             # symbol: append to new lib (byte-preserving), then remove from old
             merge_symbol_into_lib(new_sym, old_sym, name, name)
             txn.track(new_sym)

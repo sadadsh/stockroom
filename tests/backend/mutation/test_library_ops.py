@@ -17,6 +17,18 @@ from stockroom.vcs.repo import GitRepo
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
 
+def _seed_category_lib(profile, category: str) -> None:
+    """Pre-create a category's (empty, valid) symbol library, the way `_setup` seeds ICs and the
+    way a real profile has one per category. `move_category` MERGES into the destination and can
+    only author a fresh one when a kicad-cli was supplied, which this fixture does not do."""
+    path = profile.library.symbol_lib_path(category)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '(kicad_symbol_lib\r\n\t(version 20251024)\r\n\t(generator "x")\r\n)\r\n',
+        newline="",
+    )
+
+
 def _setup(tmp_path, fixtures_dir):
     repo = GitRepo(tmp_path / "repo")
     repo.init()
@@ -829,7 +841,7 @@ def test_add_part_persists_provenance_and_alternates(tmp_path, fixtures_dir):
     ]
 
 
-def test_rebuild_refiles_an_unclassified_part_its_vendors_can_name(tmp_path, fixtures_dir):
+def test_rebuild_refiles_a_FILE_LESS_part_its_vendors_can_name(tmp_path, fixtures_dir):
     """An ALREADY-ADDED record stuck on "Other" gets re-filed by a rebuild.
 
     `9bcb033` taught the ADD path to classify from the distributors' Product Category, but a
@@ -846,8 +858,14 @@ def test_rebuild_refiles_an_unclassified_part_its_vendors_can_name(tmp_path, fix
     repo, profile, staged = _setup(tmp_path, fixtures_dir)
     ops = LibraryOps(profile, repo)
     ops.add_part(staged)
+    _seed_category_lib(profile, "Diodes")
     rec = ops.load_record("tps62130rgtr")
     rec.category = "Other"
+    # The FILE-LESS case, which is the primary add flow: a part landed from a purchase link with
+    # its capture still pending owns no symbol or footprint, so re-filing it really is only a
+    # field change. The sibling test below covers the part that DOES own files, where the same
+    # re-file has to relocate them.
+    rec.passive = True
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
     (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage an unclassified record",
@@ -927,3 +945,50 @@ def test_rebuild_leaves_a_maker_alone_when_no_source_offered_a_fuller_name(tmp_p
 
     out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
     assert out.manufacturer == "TI"
+
+
+def test_refiling_during_a_rebuild_RELOCATES_the_assets_not_just_the_field(tmp_path, fixtures_dir):
+    """A re-file must move the part's KiCad files, exactly as Move Category does.
+
+    Category is not just a field: a part's symbol lives in that category's `.kicad_sym` and its
+    footprint in that category's `.pretty`, and the record's lib nicknames name them. Setting
+    `record.category` alone leaves the symbol in the OLD library while the record claims the new
+    one - a record that disagrees with the files it points at.
+
+    Caught by checking the owner's REAL part before running anything against it: their record is
+    filed "Other" AND owns a symbol and a footprint, so the first version of this re-file would
+    have desynced exactly the part it was written for.
+    """
+    from datetime import datetime, timezone
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    from stockroom.mutation.library_ops import _kicad
+
+    ops.add_part(staged)
+    name = _kicad(ops.load_record("tps62130rgtr")).symbol.name
+    # Both categories ship a (possibly empty) `SR-*.kicad_sym` in a real library, so both are
+    # seeded here rather than worked around: the test must exercise the shape the owner has.
+    _seed_category_lib(profile, "Other")
+    _seed_category_lib(profile, "Diodes")
+    # File it under "Other" the way a real mis-filed part is filed: through the real move, so its
+    # symbol and footprint genuinely LIVE under that category rather than only claiming to.
+    ops.move_category("tps62130rgtr", "Other")
+    rec = ops.load_record("tps62130rgtr")
+    rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
+    (profile.library.parts_dir / "tps62130rgtr.json").write_text(rec.dumps(), encoding="utf-8")
+    repo.commit("stage a filed-wrong part that OWNS files",
+                [profile.library.parts_dir / "tps62130rgtr.json"])
+    # its files must actually be under the old category for the move to be observable
+    old_sym = profile.library.symbol_lib_path("Other")
+    assert old_sym.exists() and name in old_sym.read_text(encoding="utf-8")
+
+    out = ops.rebuild_part("tps62130rgtr", [], datetime.now(timezone.utc).isoformat())
+
+    assert out.category == "Diodes"
+    new_sym = profile.library.symbol_lib_path("Diodes")
+    assert new_sym.exists(), "the symbol library for the new category was never created"
+    assert name in new_sym.read_text(encoding="utf-8"), "the symbol did not move with the part"
+    assert name not in old_sym.read_text(encoding="utf-8"), "the symbol was left in the old library"
+    new_fp = profile.library.footprint_lib_path("Diodes") / f"{name}.kicad_mod"
+    assert new_fp.exists(), "the footprint did not move with the part"
