@@ -10,7 +10,7 @@ pytestmark = pytest.mark.live_enrich
 
 def test_live_lcsc_product_page_yields_an_mpn():
     from stockroom.enrich.fetch import HttpRenderedDomFetcher
-    from stockroom.enrich.pipeline import ScrapeSource, _default_url_for
+    from stockroom.enrich.pipeline import ScrapeSource
 
     fetcher = HttpRenderedDomFetcher()
 

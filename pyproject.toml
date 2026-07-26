@@ -58,6 +58,12 @@ dev = [
     # critique a shot by measuring it, never by eye, and every visual slice was hand-rolling the
     # same throwaway Pillow snippet to do it.
     "pillow>=10.0",
+    # Wired into scripts/gates.sh 2026-07-26. It was configured in this file and enforced by
+    # NOTHING, run ad hoc at best, and the first repo-wide run found 48 issues including a
+    # duplicate dict key in the LCSC field map and two computed-then-dropped variables, one of
+    # which sat under a comment claiming a cross-sheet uniqueness nothing tested. A linter nobody
+    # runs is decoration.
+    "ruff>=0.6",
 ]
 
 [tool.hatch.build.targets.wheel]

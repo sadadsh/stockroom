@@ -1,4 +1,3 @@
-from pathlib import Path
 
 import pytest
 
@@ -41,8 +40,9 @@ def test_sym_export_svg_writes_file(tmp_path, fixtures_dir):
 
 @requires_kicad_cli
 def test_fp_upgrade_rewrites_footprint_to_current_format(tmp_path, fixtures_dir):
-    from stockroom.kicad.cli import KiCadCli
     import shutil
+
+    from stockroom.kicad.cli import KiCadCli
 
     cli = KiCadCli()
     pretty = tmp_path / "in.pretty"

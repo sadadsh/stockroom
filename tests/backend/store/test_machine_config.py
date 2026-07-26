@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from stockroom.store.machine_config import MachineConfig, config_dir
 
 

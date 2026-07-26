@@ -55,9 +55,8 @@ def _seed(
     it. The symbol name drives the on-disk assets; footprint_name (the LibRef name)
     drives the index's footprint grouping and is kept independent."""
     from stockroom.model.part import (
-        Datasheet,
         AssetRef,
-        EdaAssets,
+        Datasheet,
         PartRecord,
         Purchase,
     )

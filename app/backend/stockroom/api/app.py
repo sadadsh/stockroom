@@ -12,8 +12,8 @@ from fastapi.responses import JSONResponse
 
 from stockroom.api.context import AppContext
 from stockroom.api.errors import error_body, status_for
-from stockroom.api.security import make_require_token
 from stockroom.api.routers import system as system_router
+from stockroom.api.security import make_require_token
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend-dist"
 
@@ -57,8 +57,8 @@ def create_app(context: AppContext) -> FastAPI:
     from stockroom.api.routers import profiles as profiles_router_mod
     app.include_router(profiles_router_mod.profiles_router(require_token))
 
-    from stockroom.api.routers import sync as sync_router_mod
     from stockroom.api.routers import doctor as doctor_router_mod
+    from stockroom.api.routers import sync as sync_router_mod
     app.include_router(sync_router_mod.sync_router(require_token))
     app.include_router(doctor_router_mod.doctor_router(require_token))
 

@@ -7,6 +7,7 @@
 # of the 8-9 minutes it took serially).
 #
 #   scripts/gates.sh              # everything
+#   scripts/gates.sh lint         # ruff (fast; run it first, it fails in under a second)
 #   scripts/gates.sh backend      # backend suite only
 #   scripts/gates.sh frontend     # frontend tests + typecheck + build
 #   scripts/gates.sh quick        # typecheck + a serial-safe backend subset, for a tight loop
@@ -44,11 +45,17 @@ backend() {
   QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q -p no:randomly "${n[@]}"
 }
 fe() { npm --prefix app/frontend run "$1"; }
+# ruff was CONFIGURED in pyproject.toml and enforced by nothing until 2026-07-26. Its first
+# repo-wide run found 48 issues, including a duplicate dict key in the LCSC field map and two
+# computed-then-dropped variables. Scoped to hand-authored code: `skills/` alone produces over a
+# thousand third-party findings, and an ignored linter is decoration.
+lint() { .venv/bin/ruff check app/backend scripts tests; }
 
 ROOT="$PWD"
 BG_LOG="${GATES_BG_LOG:-build/gates-backend.log}"
 
 case "${1:-all}" in
+  lint)     run "ruff" lint ;;
   backend)  run "backend suite" backend ;;
   bg)       mkdir -p "$(dirname "$BG_LOG")"
             : > "$BG_LOG"
@@ -86,16 +93,18 @@ case "${1:-all}" in
   frontend) run "frontend tests" fe test:run
             run "typecheck" fe typecheck
             run "build" fe build ;;
-  quick)    run "typecheck" fe typecheck
+  quick)    run "ruff" lint
+            run "typecheck" fe typecheck
             run "backend (projects+store+model)" env QT_QPA_PLATFORM=offscreen \
                 .venv/bin/python -m pytest tests/backend/projects tests/backend/store \
                 tests/backend/model -q -p no:randomly ;;
   types)    run "ty (advisory)" .venv/bin/ty check app/backend/stockroom ;;
-  all)      run "typecheck" fe typecheck
+  all)      run "ruff" lint
+            run "typecheck" fe typecheck
             run "frontend tests" fe test:run
             run "backend suite" backend
             run "build" fe build ;;
-  *) echo "usage: $0 [all|backend|frontend|quick|types]" >&2; exit 2 ;;
+  *) echo "usage: $0 [all|lint|backend|frontend|quick|types|bg|await]" >&2; exit 2 ;;
 esac
 
 # The build must be the LAST thing that ran before a commit, because app/frontend-dist/ is what the

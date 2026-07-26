@@ -35,9 +35,9 @@ from typing import Iterable
 
 from stockroom.component_value import parse_component_value, same_component_value
 from stockroom.kicad.schematic import Schematic
-from stockroom.projects import binding
 from stockroom.library_core import symbol_name_ref
 from stockroom.model.category import category_nickname
+from stockroom.projects import binding
 from stockroom.sexp.document import SexpDocument, SexpNode
 
 # Field key -> the property name carried in the PROJECT schematic (KiCad's own field names). Value

@@ -1,5 +1,9 @@
 from stockroom.scrape.extract.html import (
-    extract_links, main_content, parse, strip_non_content, visible_text,
+    extract_links,
+    main_content,
+    parse,
+    strip_non_content,
+    visible_text,
 )
 
 

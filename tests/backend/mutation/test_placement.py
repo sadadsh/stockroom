@@ -4,7 +4,7 @@ import pytest
 
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord
+from stockroom.model.part import Datasheet, PartRecord
 from stockroom.mutation.placement import (
     PlacementError,
     assert_only_added,

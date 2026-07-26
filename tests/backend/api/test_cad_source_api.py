@@ -10,8 +10,8 @@ def test_cad_source_vendor_is_always_digikey_even_with_ul_login(client, app_ctx)
 
 
 def test_cad_source_exact_product_page_from_digikey_adapter(client, app_ctx, monkeypatch):
-    from stockroom.enrich.schema import EnrichmentResult, Sourced
     import stockroom.api.routers.library as lib_router
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
 
     class FakeDK:
         enabled = True

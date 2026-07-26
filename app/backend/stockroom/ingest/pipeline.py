@@ -22,7 +22,11 @@ from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.category import category_nickname
 from stockroom.model.part import AssetRef, PartRecord, Provenance
 from stockroom.mutation.library_ops import LibraryOps
-from stockroom.mutation.placement import merge_symbol_into_lib, mirror_fields_to_symbol, place_footprint
+from stockroom.mutation.placement import (
+    merge_symbol_into_lib,
+    mirror_fields_to_symbol,
+    place_footprint,
+)
 from stockroom.mutation.transaction import Transaction
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo

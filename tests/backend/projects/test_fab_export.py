@@ -20,7 +20,6 @@ import pytest
 from stockroom.kicad.errors import KiCadCliError
 from stockroom.projects import fab_export
 
-
 # ---- a faked kicad-cli ------------------------------------------------------
 
 

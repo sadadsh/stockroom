@@ -3,10 +3,10 @@ import shutil
 import pytest
 
 from stockroom.kicad.cli import KiCadCli
+from stockroom.kicad.common_json import read_env_var
 from stockroom.kicad.lib_table import LibTable
 from stockroom.kicad.wiring import KiCadWiring, auto_wire
 from stockroom.model.category import CATEGORIES, category_symbol_lib
-from stockroom.kicad.common_json import read_env_var
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
 from tests.backend.conftest import requires_kicad_cli

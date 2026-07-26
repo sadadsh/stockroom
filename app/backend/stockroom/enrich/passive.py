@@ -27,7 +27,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 # EIA imperial case -> KiCad metric suffix (the stock Resistor_SMD / Capacitor_SMD /

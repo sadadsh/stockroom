@@ -7,6 +7,7 @@ import shutil
 
 import pytest
 
+from stockroom.enrich.passive import passive_package_options
 from stockroom.ingest.passive_add import (
     PassiveAddError,
     PassiveNeedsInputError,
@@ -14,7 +15,6 @@ from stockroom.ingest.passive_add import (
     mouser_search_url,
     parse_mouser_product_url,
 )
-from stockroom.enrich.passive import passive_package_options
 from stockroom.mutation.library_ops import LibraryOps
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo

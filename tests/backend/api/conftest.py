@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -133,9 +132,8 @@ def _write_category_libs(lib) -> None:
 
 def _write_part(parts_dir: Path, part_id: str, complete: bool) -> None:
     from stockroom.model.part import (
-        Datasheet,
         AssetRef,
-        EdaAssets,
+        Datasheet,
         PartRecord,
         Purchase,
     )

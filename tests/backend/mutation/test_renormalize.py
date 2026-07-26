@@ -1,7 +1,6 @@
 """renormalize_descriptions(): rebuild machine names + placeholder descriptions from a
 record's specs, in one atomic commit, leaving custom data untouched."""
 
-import json
 import shutil
 
 import pytest

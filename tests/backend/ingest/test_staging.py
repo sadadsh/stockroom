@@ -1,13 +1,10 @@
 import shutil
 from pathlib import Path
 
-import pytest
-
-from tests.backend.conftest import requires_kicad_cli
-from stockroom.ingest.errors import IngestError
 from stockroom.ingest.fingerprint import DetectedSource
 from stockroom.ingest.staging import StagingCandidate, build_candidates, merge_candidates
 from stockroom.model.part import Provenance, Purchase
+from tests.backend.conftest import requires_kicad_cli
 
 
 def _candidate(**kw):

@@ -2,8 +2,8 @@ import shutil
 
 import pytest
 
-from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.kicad.footprint import Footprint
+from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.part import Datasheet, PartRecord, Purchase
 from stockroom.mutation.library_ops import (
     IncompleteError,

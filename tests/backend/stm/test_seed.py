@@ -7,7 +7,6 @@ stale seed decompresses but is then refused by StmIndex.load exactly like any st
 from __future__ import annotations
 
 import lzma
-import os
 from pathlib import Path
 
 from stockroom.stm import db as db_mod

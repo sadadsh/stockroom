@@ -191,7 +191,6 @@ def _resolve_digikey_url(mpn: str):
 
 def _drive_live(webview, base: str, captured: list, result: dict) -> None:
     import os
-
     import urllib.parse
 
     mpn = os.environ.get("STOCKROOM_LIVE_MPN", "2N7002")
@@ -703,10 +702,9 @@ def _drive_cdpcapture(webview, base: str, captured: list, result: dict) -> None:
     Writes C:\\srverify\\cdp_trace.log (readable at /mnt/c/srverify/cdp_trace.log). Never lets a
     probe error touch the capture it observes."""
     import os
+    import re
     import threading
     import time as _t
-
-    import re
 
     from stockroom.capture.requirements import Requirement
     from stockroom.capture.session import CaptureSession

@@ -1,4 +1,4 @@
-from stockroom.scrape.model import Page, FetchError, FetchOutcome
+from stockroom.scrape.model import FetchError, FetchOutcome, Page
 
 
 def test_page_ok_true_for_2xx():

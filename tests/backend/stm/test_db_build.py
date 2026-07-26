@@ -9,8 +9,6 @@ Fixtures (tests/backend/fixtures/stm/, real CubeMX XML, cited in the phase CONTE
 
 from pathlib import Path
 
-import pytest
-
 from stockroom.stm import db as db_mod
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "stm"

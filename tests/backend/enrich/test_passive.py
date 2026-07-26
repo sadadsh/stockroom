@@ -9,12 +9,9 @@ record proves ERJ-P03 == the 0603 case, 1.1 kOhm, 0.2 W, 1%).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from stockroom.enrich.passive import (
-    PassiveSpec,
     decode_resistance,
     detect_passive,
     parse_passive_mpn,
