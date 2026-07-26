@@ -188,6 +188,9 @@ describe("ComponentsPage", () => {
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
 
+    // Manufacturer is an EDA handoff field, and the handoff moved to its own tab (owner's choice,
+    // 2026-07-26). Open it first; the edit-and-toast behaviour under test is unchanged.
+    await user.click(await screen.findByRole("tab", { name: "Handoff" }));
     const field = await screen.findByRole("button", { name: "Edit Manufacturer" });
     await user.click(field);
     const input = screen.getByLabelText("Manufacturer");

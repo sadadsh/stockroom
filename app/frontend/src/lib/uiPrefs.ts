@@ -19,6 +19,9 @@ import { api } from "../api/client";
 export interface UiPrefs {
   theme?: "dark" | "light";
   rail_collapsed?: boolean;
+  /** Spec keys the user pinned into Key Specifications, per category display name. An OBJECT, unlike
+   *  the two scalars above - see the JSON handling in `writePref`. */
+  pinned_specs?: Record<string, readonly string[]>;
 }
 
 declare global {
@@ -71,7 +74,12 @@ export function writePref(key: keyof UiPrefs, value: unknown, mirrorKey: string)
   // "does not double-save" test see phantom calls.
   if (injectedPrefs()[key] === value) return;
   try {
-    localStorage.setItem(mirrorKey, String(value));
+    // JSON for anything that is not a primitive. `String(value)` on an object yields the literal
+    // "[object Object]", so an object-valued preference (pinned_specs) would mirror as garbage and
+    // read back as undefined on the next launch - silently losing every pin. The two scalar prefs
+    // keep their bare string form, so nothing already persisted has to be migrated.
+    const encoded = value !== null && typeof value === "object" ? JSON.stringify(value) : String(value);
+    localStorage.setItem(mirrorKey, encoded);
   } catch {
     /* the mirror is best-effort */
   }
