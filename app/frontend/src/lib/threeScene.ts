@@ -25,6 +25,7 @@ import {
   boardPlaneHalfExtents,
   boardStack,
   silkQuad,
+  SILK_MAX_FRACTION,
 } from "./boardPlane";
 import { orientUpright } from "./modelOrient";
 import {
@@ -1102,6 +1103,11 @@ export function mountModelScene(
       return silkMat;
     };
 
+    // The cap the owner chose: a fraction of the part's SHORT horizontal axis, so it scales with
+    // the part rather than being a magic millimetre value that is wrong at both extremes.
+    const silkCap = modelSize
+      ? Math.min(modelSize.x, modelSize.z) * SILK_MAX_FRACTION
+      : undefined;
     // SILKSCREEN + COURTYARD. Pads alone are not the land pattern: the silk outline and the pin-1
     // marker are how a person recognises the part, and the courtyard is the keep-out it gets
     // checked against. Drawn a hair above the mask so they are not z-fighting with it.
@@ -1123,7 +1129,7 @@ export function mountModelScene(
       // invisible on screen, which is exactly why the land pattern read as "just the pads". The
       // width the backend extracted from the footprint was being thrown away here. See
       // boardPlane.silkQuad for the geometry and for why LineSegments2 was rejected.
-      const q = silkQuad(g.start, g.end, g.width);
+      const q = silkQuad(g.start, g.end, g.width, silkCap);
       if (!q) continue;
       const mat = silkMaterial();
       const geo = new THREE.PlaneGeometry(q.length * MM_TO_SCENE, q.width * MM_TO_SCENE);

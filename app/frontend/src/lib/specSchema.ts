@@ -1,3 +1,4 @@
+import type { SourcedAlternate } from "../api/types";
 /**
  * The single, data-driven module that turns a part's free-form spec bag into a
  * presentation. It is the modular guarantee: a future part carrying a spec key we
@@ -754,4 +755,87 @@ export function cleanSpecLabel(raw: string): string {
     return text;
   }
   return [`${qualifier} ${quantity}`, suffix].filter(Boolean).join(" ");
+}
+
+/**
+ * Two spec keys name the SAME concept when their normalised word sets match.
+ *
+ * Distributors word one parameter differently and Stockroom keeps every wording, so the owner's
+ * real part carries BOTH `Breakdown Voltage` (LCSC, 6 V) and `Voltage - Breakdown` (DigiKey,
+ * 8.5 V). The label prettifier renders both as "Breakdown Voltage", so the sheet showed the same
+ * name twice with two different numbers and nothing saying which was in force - which is worse
+ * than showing one, because a reader cannot tell it is a disagreement rather than two parameters.
+ *
+ * A SET, not a sequence: the wordings differ by ORDER ("voltage breakdown" vs "breakdown
+ * voltage"), which is exactly what a plain normalised-string compare misses. Qualifiers still
+ * separate concepts, because they add a word - `Voltage - Breakdown (Min)` keeps `min` and stays
+ * its own row, and `Voltage - Clamping (Max) @ Ipp` keeps `max`/`ipp` and never folds into
+ * `Clamping Voltage`. Verified against the owner's real record, which contains all five.
+ */
+export function specConcept(key: string): string {
+  const words = key
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  return [...new Set(words)].sort().join(" ");
+}
+
+/**
+ * Fold rows that name one concept into a single row, routing the displaced values into
+ * `alternates` so the existing "N Sources" disclosure can show and swap them.
+ *
+ * The FIRST row wins the slot: groupSpecs already emits in registry/source priority order, so the
+ * winner here is the same value that won everywhere else. Pure and non-mutating - the caller's
+ * groups and alternates are re-rendered on every keystroke.
+ */
+export function mergeSameConcept(
+  groups: readonly SpecGroup[],
+  alternates: Record<string, SourcedAlternate[]>,
+): { groups: SpecGroup[]; alternates: Record<string, SourcedAlternate[]> } {
+  const winnerFor = new Map<string, SpecRow>();
+  const extra: Record<string, SourcedAlternate[]> = {};
+  const out: SpecGroup[] = [];
+
+  for (const group of groups) {
+    const rows: SpecRow[] = [];
+    for (const row of group.rows) {
+      // a family row carries its own members and is already a collapse; never fold one again
+      if (row.members) {
+        rows.push(row);
+        continue;
+      }
+      const concept = specConcept(row.key);
+      const winner = winnerFor.get(concept);
+      if (!winner) {
+        winnerFor.set(concept, row);
+        rows.push(row);
+        continue;
+      }
+      // `raw` and not `value`: the presented string is prettified ("1%" renders "±1%"), and
+      // comparing presented values is what made an alternates row offer the value already in force.
+      const already = [...(alternates[winner.key] ?? []), ...(extra[winner.key] ?? [])];
+      if (already.some((a) => a.value === (row.raw ?? row.value))) continue;
+      (extra[winner.key] ??= []).push({
+        value: row.raw ?? row.value,
+        source: row.key,
+        confidence: "",
+      });
+    }
+    if (rows.length) out.push({ ...group, rows });
+  }
+
+  if (!Object.keys(extra).length) return { groups: out, alternates };
+  const merged: Record<string, SourcedAlternate[]> = { ...alternates };
+  for (const [key, added] of Object.entries(extra)) {
+    const winner = [...winnerFor.values()].find((r) => r.key === key);
+    const head: SourcedAlternate[] = merged[key]?.length
+      ? merged[key]
+      : winner
+        ? [{ value: winner.raw ?? winner.value, source: "", confidence: "" }]
+        : [];
+    merged[key] = [...head, ...added];
+  }
+  return { groups: out, alternates: merged };
 }

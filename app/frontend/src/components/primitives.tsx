@@ -314,8 +314,15 @@ export function PanelTitle({
  * a filled sticky bar while its siblings were bare, which is exactly the "box behind the header"
  * the owner asked to remove. Separation comes from spacing.
  */
+// SMALL-CAPS, not `uppercase` (owner's decision, 2026-07-26, from previews). `text-transform:
+// uppercase` rewrites the characters, and UNITS ARE CASE-BEARING: a spec label reading
+// "Peak Pulse Current (10/1000ms)" was rendered "(10/1000Ms)", and the same transform turns mA
+// into MA and mV into MV. That is a label stating something false, not a styling preference.
+//
+// `font-variant: small-caps` gives the same dense capital register while leaving the actual
+// characters alone, so lowercase units survive with no per-label exception list to maintain.
 export const EYEBROW_DENSE =
-  "text-2xs font-semibold uppercase tracking-[0.07em] text-t3";
+  "text-2xs font-semibold [font-variant:small-caps] tracking-[0.07em] text-t3";
 
 export function Eyebrow({
   dense = false,

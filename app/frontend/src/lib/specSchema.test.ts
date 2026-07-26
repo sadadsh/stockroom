@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   deriveFacets,
   groupSpecs,
+  mergeSameConcept,
+  specConcept,
   normalizeSpecKey,
   splitValueUnit,
   prettifyValue,
@@ -496,5 +498,89 @@ describe("cleanSpecLabel", () => {
     expect(resolveSpec("Voltage - Clamping (Max) @ Ipp", "Diodes").label).toBe(
       "Clamping Voltage (Max) @ Ipp",
     );
+  });
+});
+
+// --- One concept, one row (owner, 2026-07-26). ---------------------------------------------------
+// Their real part carries BOTH `Breakdown Voltage` (LCSC, 6 V) and `Voltage - Breakdown` (DigiKey,
+// 8.5 V). Both render their label as "Breakdown Voltage", so the sheet showed one name twice with
+// two different numbers and nothing saying which was in force.
+
+describe("specConcept", () => {
+  it("matches the same words in a different ORDER", () => {
+    expect(specConcept("Voltage - Breakdown")).toBe(specConcept("Breakdown Voltage"));
+  });
+
+  it("keeps a qualifier as its own concept", () => {
+    // (Min) is a different parameter, not a different spelling
+    expect(specConcept("Voltage - Breakdown (Min)")).not.toBe(specConcept("Breakdown Voltage"));
+    expect(specConcept("Voltage - Clamping (Max) @ Ipp")).not.toBe(specConcept("Clamping Voltage"));
+  });
+
+  it("ignores punctuation and case", () => {
+    expect(specConcept("factory-pack QUANTITY")).toBe(specConcept("Factory Pack Quantity"));
+  });
+});
+
+describe("mergeSameConcept", () => {
+  // exactly the five keys on the owner's record
+  const groups = [
+    {
+      title: "ELECTRICAL",
+      rows: [
+        { key: "Breakdown Voltage", label: "Breakdown Voltage", value: "6 V", raw: "6 V" },
+        { key: "Clamping Voltage", label: "Clamping Voltage", value: "14 V", raw: "14V" },
+        { key: "Voltage - Breakdown", label: "Breakdown Voltage", value: "8.5 V", raw: "8.5V" },
+        { key: "Voltage - Breakdown (Min)", label: "Breakdown Voltage (Min)", value: "6.5 V", raw: "6.5V" },
+        { key: "Voltage - Clamping (Max) @ Ipp", label: "Clamping Voltage (Max) @ Ipp", value: "14 V", raw: "14V" },
+      ],
+    },
+  ] as unknown as Parameters<typeof mergeSameConcept>[0];
+
+  it("folds the duplicate wording into ONE row", () => {
+    const { groups: out } = mergeSameConcept(groups, {});
+    const keys = out[0].rows.map((r) => r.key);
+    expect(keys).toContain("Breakdown Voltage");
+    expect(keys).not.toContain("Voltage - Breakdown");
+  });
+
+  it("keeps the qualified parameters as their own rows", () => {
+    const { groups: out } = mergeSameConcept(groups, {});
+    const keys = out[0].rows.map((r) => r.key);
+    expect(keys).toContain("Voltage - Breakdown (Min)");
+    expect(keys).toContain("Voltage - Clamping (Max) @ Ipp");
+    expect(out[0].rows).toHaveLength(4); // 5 in, one folded
+  });
+
+  it("routes the displaced value into alternates, with the winner leading", () => {
+    const { alternates } = mergeSameConcept(groups, {});
+    expect(alternates["Breakdown Voltage"].map((a) => a.value)).toEqual(["6 V", "8.5V"]);
+  });
+
+  it("compares RAW values, so a prettified twin is not offered as an alternative", () => {
+    const same = [
+      {
+        title: "ELECTRICAL",
+        rows: [
+          { key: "Tolerance", label: "Tolerance", value: "±1%", raw: "1%" },
+          { key: "Tolerance - Value", label: "Tolerance", value: "±1%", raw: "1%" },
+        ],
+      },
+    ] as unknown as Parameters<typeof mergeSameConcept>[0];
+    const { alternates } = mergeSameConcept(same, {});
+    expect(alternates["Tolerance"]).toBeUndefined();
+  });
+
+  it("never folds a family row, which is already a collapse", () => {
+    const fam = [
+      {
+        title: "TRADE",
+        rows: [
+          { key: "HTS Code", label: "HTS Code", value: "2", members: [{ label: "US", value: "1" }] },
+          { key: "Code HTS", label: "HTS Code", value: "x" },
+        ],
+      },
+    ] as unknown as Parameters<typeof mergeSameConcept>[0];
+    expect(mergeSameConcept(fam, {}).groups[0].rows).toHaveLength(2);
   });
 });
