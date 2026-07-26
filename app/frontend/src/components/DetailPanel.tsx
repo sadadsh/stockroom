@@ -2133,7 +2133,9 @@ function Sourcing({
               value={qtyText}
               onChange={(e) => setQtyText(e.target.value)}
               aria-label="Amount needed"
-              placeholder="1"
+              // NO placeholder. A greyed "1" sitting in the box reads as a value at a glance, which
+              // is the opposite of the "default to blank" the owner asked for - the NEED label already
+              // says what the field is for.
               // SIZES TO ITS CONTENT, so a long quantity is never cut off and a blank field stays
               // small. `field-sizing: content` is supported on the owner's runtime - checked, not
               // assumed: their WebView2 reports Chromium 150 and CSS.supports("field-sizing",
