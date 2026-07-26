@@ -14,7 +14,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 234 as of Batch 3: +detail.spec-family (repeated spec keys collapsed into one row),
 // +detail.alternates (the other sources for a value), +detail.trade (the procurement facts that
 // used to be discarded). All three are new controls in this commit.
-const EXPECTED_ENTRIES = 251;
+const EXPECTED_ENTRIES = 252;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
