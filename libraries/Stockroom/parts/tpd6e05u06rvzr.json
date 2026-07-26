@@ -162,7 +162,7 @@
       }
     ]
   },
-  "category": "Other",
+  "category": "Diodes",
   "datasheet": {
     "fetched_at": "",
     "file": "",
@@ -191,7 +191,7 @@
     "kicad": {
       "footprint": {
         "file": "",
-        "lib": "SR-Other",
+        "lib": "SR-Diodes",
         "name": "TPD6E05U06RVZ"
       },
       "model": {
@@ -201,7 +201,7 @@
       },
       "symbol": {
         "file": "",
-        "lib": "SR-Other",
+        "lib": "SR-Diodes",
         "name": "TPD6E05U06RVZ"
       }
     }
