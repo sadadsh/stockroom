@@ -17,7 +17,13 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { PAD_THICKNESS_MM, boardStack, silkQuad } from "./boardPlane";
+import {
+  PAD_THICKNESS_MM,
+  boardExtent,
+  boardPlaneHalfExtents,
+  boardStack,
+  silkQuad,
+} from "./boardPlane";
 import { orientUpright } from "./modelOrient";
 import {
   type Box,
@@ -891,10 +897,13 @@ export function mountModelScene(
     // checked against. Drawn a hair above the mask so they are not z-fighting with it.
     const silkY = 0.012;
     for (const g of land.graphics ?? []) {
-      // F.Fab is a DOCUMENTATION layer - it never exists on a physical board, so drawing it here
-      // would show something the real part does not have.
-      if (g.layer.endsWith("Fab")) continue;
-      const isCourtyard = g.layer.endsWith("CrtYd");
+      // DOCUMENTATION layers never exist on a physical board, so they have no place in a physical
+      // render. F.Fab was already excluded on exactly that reasoning; the COURTYARD is the same kind
+      // of thing - a keep-out annotation, not ink - and it was breaking the rule its neighbour
+      // follows. Drawn at its real width it also became the loudest thing in the frame and, because
+      // the board was sized from pad centres, it hung off the board edge into mid-air. Owner
+      // 2026-07-26: "the 3d footprint looks horribly wrong now."
+      if (g.layer.endsWith("Fab") || g.layer.endsWith("CrtYd")) continue;
       // A FLAT QUAD at the footprint's own stroke width, not a THREE.Line. WebGL ignores
       // `LineBasicMaterial.linewidth`, so every graphic used to render as a 1-pixel hairline no
       // matter the zoom: the silkscreen outline and the pin-1 marker were in the scene graph and
@@ -904,9 +913,9 @@ export function mountModelScene(
       const q = silkQuad(g.start, g.end, g.width);
       if (!q) continue;
       const mat = new THREE.MeshBasicMaterial({
-        color: isCourtyard ? 0xff8fb1 : 0xf2f4f7,
+        color: 0xf2f4f7,
         transparent: true,
-        opacity: isCourtyard ? 0.5 : 0.95,
+        opacity: 0.95,
         // ink lies ON the mask; without this the underside vanishes when the board is seen from below
         side: THREE.DoubleSide,
       });
@@ -924,11 +933,11 @@ export function mountModelScene(
     // half of "the 3d footprint looks nothing like the model": a land pattern is a thing ON a
     // board, and the green solder mask is the visual anchor that says so. Sized from the pad
     // extents with a margin, so it frames the pattern instead of dwarfing it.
-    const xs = land.pads.map((q) => q.at[0]);
-    const ys = land.pads.map((q) => q.at[1]);
-    const spanX = (Math.max(...xs) - Math.min(...xs)) * MM_TO_SCENE;
-    const spanY = (Math.max(...ys) - Math.min(...ys)) * MM_TO_SCENE;
-    const margin = Math.max(spanX, spanY) * 0.28 + 0.5 * MM_TO_SCENE;
+    // A PLANE, not a tile. Sized from EVERYTHING that stands on it (pad centres PLUS pad sizes plus
+    // every graphic - see boardExtent, which fixed a board narrower than its own footprint), then
+    // grown well past it so the eye reads surface rather than object. Owner 2026-07-26: "the pcb
+    // render should legitimately add a plane to the 3d view not just another floating component."
+    const plane = boardPlaneHalfExtents(boardExtent(land.pads, land.graphics ?? []));
     const boardT = boardThickness;
     // A REAL BLACK PCB, not a tinted backdrop. Black solder mask is a very dark, slightly
     // blue-grey resin with a soft sheen rather than a flat black - the clearcoat is what stops it
@@ -954,7 +963,7 @@ export function mountModelScene(
       envMapIntensity: 0.35,
     });
     boardMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(spanX + margin, boardT, spanY + margin),
+      new THREE.BoxGeometry(plane.halfX * 2 * MM_TO_SCENE, boardT, plane.halfZ * 2 * MM_TO_SCENE),
       // BoxGeometry material order: +x, -x, +y(top), -y(bottom), +z, -z
       [substrateMat, substrateMat, maskMat, maskMat, substrateMat, substrateMat],
     );

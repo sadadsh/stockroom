@@ -97,6 +97,66 @@ export function silkQuad(
   };
 }
 
+/** Half-extents of everything the board must carry, in board-plane mm. */
+export interface BoardExtent {
+  halfX: number;
+  halfZ: number;
+}
+
+/**
+ * How far the board has to reach, from EVERYTHING that sits on it.
+ *
+ * The span used to come from pad CENTRES alone (`pads.map(p => p.at[0])`), which ignores both the
+ * pad's own width and every silkscreen graphic - so the board could be smaller than the footprint
+ * standing on it, and a graphic near the outline hung off the edge into mid-air. Owner 2026-07-26,
+ * on seeing that: "the 3d footprint looks horribly wrong now."
+ *
+ * Pads contribute centre +/- half their size (rotation ignored on purpose: a rotated pad's bounding
+ * half-extent is never LARGER than half its diagonal, and using the diagonal would over-reach on
+ * every ordinary axis-aligned pad, which is the common case). Graphics contribute their endpoints.
+ */
+export function boardExtent(
+  pads: readonly { at: readonly [number, number]; size: readonly [number, number] }[],
+  graphics: readonly { start: readonly [number, number]; end: readonly [number, number] }[] = [],
+): BoardExtent {
+  let halfX = 0;
+  let halfZ = 0;
+  for (const p of pads) {
+    halfX = Math.max(halfX, Math.abs(p.at[0]) + Math.abs(p.size[0]) / 2);
+    halfZ = Math.max(halfZ, Math.abs(p.at[1]) + Math.abs(p.size[1]) / 2);
+  }
+  for (const g of graphics) {
+    for (const pt of [g.start, g.end]) {
+      halfX = Math.max(halfX, Math.abs(pt[0]));
+      halfZ = Math.max(halfZ, Math.abs(pt[1]));
+    }
+  }
+  return { halfX, halfZ };
+}
+
+/**
+ * How far past the footprint the board plane extends, as a MULTIPLE of the footprint's own reach.
+ *
+ * Owner 2026-07-26: "the pcb render should legitimately add a plane to the 3d view not just another
+ * floating component." A board cropped to the footprint plus a hair reads as a coaster the part is
+ * balanced on. A real board continues past the part in every direction, so the eye takes it as
+ * surface rather than object. Bounded, because the camera re-fits to the whole visible set: an
+ * unbounded plane would simply shrink the part it exists to support.
+ */
+export const BOARD_PLANE_REACH = 1.8;
+
+/** The minimum half-extent in mm, so a tiny 0402 still gets a surface rather than a stamp. */
+export const BOARD_PLANE_MIN_HALF_MM = 1.2;
+
+/** The board plane's half-extents: the footprint's reach, grown so it reads as a surface. */
+export function boardPlaneHalfExtents(extent: BoardExtent): BoardExtent {
+  const reach = Math.max(extent.halfX, extent.halfZ) * BOARD_PLANE_REACH;
+  const half = Math.max(reach, BOARD_PLANE_MIN_HALF_MM);
+  // SQUARE on purpose. A board is not footprint-shaped, and matching the footprint's aspect is what
+  // made it read as a part-sized tile; a square surface under an oblong part reads as board.
+  return { halfX: half, halfZ: half };
+}
+
 /** Where each piece of the board / pad / part stack sits, in scene Y. */
 export interface BoardStack {
   /** board box height */
