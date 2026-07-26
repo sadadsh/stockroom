@@ -18,6 +18,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import {
+  DEFAULT_LAYERS,
   PAD_THICKNESS_MM,
   boardExtent,
   boardPlaneHalfExtents,
@@ -361,13 +362,15 @@ export function mountModelScene(
   const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   let realisticMaterial: THREE.MeshPhysicalMaterial | null = null;
   let xrayMaterial: THREE.MeshPhysicalMaterial | null = null;
-  // Pads and board default OFF, and the CONTROL's defaults must match these or the chips report a
-  // state the scene is not in. Both layers are BUILT as soon as a land pattern is available (see
-  // setLandPattern) and these flags only decide visibility, so either can be switched on
-  // independently. Before this, the board mesh was only ever CONSTRUCTED inside setLandPattern, and
-  // setLandPattern was only called by the Pads toggle - so at load the PCB chip read "on" while no
-  // board existed at all, and turning PCB on by itself did nothing.
-  const layers: LayerVisibility = { model: true, pads: false, board: false };
+  // ONE definition, shared with the toolbar chips (see DEFAULT_LAYERS in boardPlane, which is the
+  // three-free module Glb3DView can import without pulling this one - and three - into the main
+  // bundle). It used to be a literal here plus a matching literal in the control, held together by a
+  // comment; a chip that reports a state the scene is not in is a control that lies, so the two
+  // literals became one value. Both layers are BUILT as soon as a land pattern is available (see
+  // setLandPattern) and these flags only decide visibility. Before that, the board mesh was only
+  // ever CONSTRUCTED inside setLandPattern, and setLandPattern was only called by the Pads toggle -
+  // so at load the PCB chip read "on" while no board existed at all, and turning PCB on did nothing.
+  const layers: LayerVisibility = { ...DEFAULT_LAYERS };
 
   const loader = new GLTFLoader();
   const root = new THREE.Group();
@@ -1045,6 +1048,19 @@ export function mountModelScene(
       // value is almost entirely the environment, not the material - so the environment is the knob.
       // Target was far < 60, i.e. board-dark all the way out with the part the lightest thing present.
       envMapIntensity: 0.03,
+      // ...and the environment turned out NOT to be the whole knob, which is why that target was
+      // still missed. With envMapIntensity already at 0.03 the far field measured 96 while the
+      // component body measured 88 - the board was brighter than the part standing on it, the exact
+      // thing the paragraph above set out to stop. The remainder is DIRECT-light specular: a
+      // dielectric keeps 4% reflectance whatever its base colour, and across a near-infinite plane
+      // almost every pixel is at a grazing angle where Fresnel drives that toward 100%. A flat plane
+      // under a directional light has a constant DIFFUSE response, so the smooth near-to-far ramp
+      // that was being read as "environment" is specular from the key and rim.
+      //
+      // `specularIntensity` is the property that scales exactly that term for a non-metal, and it
+      // had never been touched. Matte black solder mask is not a 4%-reflective polish; cutting it is
+      // physically what the surface is, not a fudge to hit a number.
+      specularIntensity: 0.35,
     });
     const substrateMat = new THREE.MeshPhysicalMaterial({
       color: 0x241f19,

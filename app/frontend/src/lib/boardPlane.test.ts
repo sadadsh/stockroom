@@ -6,6 +6,7 @@ import {
   boardPlaneHalfExtents,
   boardPlaneThickness,
   boardStack,
+  DEFAULT_LAYERS,
   silkQuad,
 } from "./boardPlane";
 
@@ -204,5 +205,30 @@ describe("PAD_THICKNESS_MM", () => {
     // shared with the stacking maths, which is why it is exported rather than inlined in a loop.
     expect(PAD_THICKNESS_MM).toBeGreaterThan(0);
     expect(PAD_THICKNESS_MM).toBeLessThan(0.2);
+  });
+});
+
+describe("DEFAULT_LAYERS", () => {
+  // Owner 2026-07-26, chosen from previews over a stronger rim light and a lighter stage: the part
+  // should sit on the board at load rather than float. Measured symptom it answers: in dark theme the
+  // body's near side face read 53 against a 40 background (1.33:1) and the lower silhouette dissolved.
+  it("draws the board at load, so the part is never floating on nothing", () => {
+    expect(DEFAULT_LAYERS.board).toBe(true);
+    expect(DEFAULT_LAYERS.model).toBe(true);
+  });
+
+  // NOT a style rule - geometry. boardStack deliberately puts the board's top face one pad thickness
+  // BELOW the part's underside, because the part rests ON its pads. So a default that shows the board
+  // while hiding the pads leaves the part hovering over exactly that gap, which is the owner's
+  // "the 3d model clips into the pads and pcb" complaint inverted. Whoever changes one of these must
+  // change the other, and this is what says so.
+  it("never shows the board without the pads that hold the part up off it", () => {
+    if (!DEFAULT_LAYERS.board) return;
+    expect(DEFAULT_LAYERS.pads).toBe(true);
+
+    // and the gap that makes the coupling necessary is real, not assumed
+    const stack = boardStack(0, 0.55);
+    expect(stack.padTopY - stack.padGroupY).toBeCloseTo(PAD_THICKNESS_MM, 10);
+    expect(stack.padGroupY).toBeLessThan(stack.padTopY);
   });
 });

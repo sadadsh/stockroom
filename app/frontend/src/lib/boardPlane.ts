@@ -200,3 +200,25 @@ export function boardStack(componentBaseY: number, componentHeightMm: number): B
     boardCenterY: padGroupY - boardThickness / 2,
   };
 }
+
+/**
+ * Which layers the viewer draws at load.
+ *
+ * Lives HERE, in the three-free stack module, because the SCENE and the toolbar CHIPS both need it
+ * and must never disagree - a chip reading "off" while the scene draws the layer is a control that
+ * lies about the thing it controls. This used to be two separate literals in two files with a
+ * comment saying they had to match, which is a rule enforced by nothing; now there is one value and
+ * they cannot drift. `Glb3DView` deliberately cannot import it from `threeScene`: that module
+ * top-level-imports three and is loaded lazily so three lands in its own chunk, and a VALUE import
+ * would drag the whole library into the main bundle.
+ *
+ * Board and pads default ON (owner, 2026-07-26, chosen from previews). A part shown by itself floats
+ * on nothing - no contact shadow, and in dark theme its near side face measured 53 against a 40
+ * background, so the lower silhouette dissolved into the stage.
+ *
+ * They travel TOGETHER, and that is geometry rather than taste: `boardStack` puts the board's top
+ * face one PAD_THICKNESS_MM BELOW the part's underside, so drawing the board without the pads leaves
+ * the part hovering over exactly that gap - the owner's "the 3d model clips into the pads and pcb"
+ * complaint, inverted. `boardPlane.test.ts` pins the coupling.
+ */
+export const DEFAULT_LAYERS = { model: true, pads: true, board: true };
