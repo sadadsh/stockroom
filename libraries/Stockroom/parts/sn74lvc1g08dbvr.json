@@ -81,7 +81,25 @@
   },
   "description": "Logic Gates Single 2 Input A 595 -SN74LVC1G08DBVT A A 595-SN74LVC1G08DBVT",
   "display_name": "Logic Gate",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "SN74LVC1G08DBVR"
+      },
+      "model": {
+        "file": "models/SN74LVC1G08DBVR.stp",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "SN74LVC1G08DBVR"
+      }
+    }
+  },
   "enrichment": {},
   "hashes": null,
   "id": "sn74lvc1g08dbvr",
