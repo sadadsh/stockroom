@@ -93,7 +93,26 @@ def _glb_mesh_count(data: bytes) -> int:
 # grey ceramic body as steel. cascadio names its materials mat_0..mat_n, so there is no
 # material name to read either.
 _STEP_METALLIC = 0.0
-_STEP_ROUGHNESS = 0.45
+# MATTE, because that is the class this constant is defaulting FOR - the paragraph above
+# picks a dielectric on the grounds that "most of a package's visible surface is moulded
+# plastic or ceramic", and then stated a semi-gloss 0.45 that is neither plastic nor metal.
+# 0.45 was a number with no reasoning attached, and on a dark body it was the whole defect:
+#
+# MEASURED in the running viewer on the owner's TPD6E05U06RVZR (body albedo 0.0097, i.e.
+# near black), top face of the package, dark theme, same camera and same lighting:
+#     roughness 0.45 -> rgb(144,144,144)      roughness 0.85 -> rgb(90,90,90)
+# A near-black dielectric has essentially no diffuse response, so all that remains is the
+# ~4% specular lobe - and at 0.45 that lobe is tight enough to hand back a clean image of
+# the studio environment. The viewer was rendering the ROOM, not the part, which is what
+# the owner reported as the body being "a flat dark box". Widening the lobe lets the albedo
+# win again and the epoxy reads as epoxy.
+#
+# 0.8 rather than a tuned number: it is the practitioner-consensus value for black moulded
+# plastic in glTF/three.js PBR, and it sits inside the band the test pins (>=0.7, or the
+# environment starts washing the albedo out again; <0.95, or the surface is chalk and every
+# highlight dies). The leads keep this finish too - see the metal caveat above, which is
+# unchanged and still deliberate.
+_STEP_ROUGHNESS = 0.8
 
 # The GLB JSON chunk's type, as the little-endian u32 the container stores it as.
 _CHUNK_JSON = 0x4E4F534A

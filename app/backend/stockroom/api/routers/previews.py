@@ -130,7 +130,10 @@ _SYM_RENDER_VERSION = "c3"  # C3: the viewBox refit applies to every preview, sy
 # was merging away every material past the first and dropping NORMAL attributes -> "c1".)
 # (C2: a STEP-derived material states its metalness/roughness instead of inheriting glTF's
 # fully-metallic default, which rendered a black epoxy package as an unlit silhouette.)
-_MODEL_CONVERT_VERSION = "c2"
+# (C3: that stated finish becomes MATTE (0.45 -> 0.8). A semi-gloss lobe on a near-black
+# body handed back a clean reflection of the studio environment, so the package's top face
+# measured rgb(144,144,144) - the viewer was rendering the room rather than the part.)
+_MODEL_CONVERT_VERSION = "c3"
 
 
 def _clean_symbol_svg(cli, lib_path: Path, name: str, bw: bool, td: Path) -> list:

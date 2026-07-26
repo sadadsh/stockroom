@@ -135,6 +135,36 @@ def test_model_to_glb_states_a_surface_finish_instead_of_taking_gltfs_metal_defa
         )
 
 
+@requires_glb_tooling
+def test_model_to_glb_states_a_matte_finish_so_a_dark_body_is_not_a_mirror():
+    """The stated finish must be MATTE MOULDED PLASTIC, because that is the class it is
+    defaulting for - the constant's own reasoning is that "most of a package's visible
+    surface is moulded plastic or ceramic".
+
+    A semi-gloss default is not neutral, it is a third material that is neither. MEASURED
+    in the running viewer on the owner's TPD6E05U06RVZR, whose body albedo is 0.0097
+    (near black): at roughness 0.45 the package's top face rendered rgb(144,144,144), a
+    MID GREY, because a near-black dielectric has almost no diffuse response and the only
+    thing left to see is a broad 4% specular lobe reflecting the studio environment. The
+    render was a mirror of the room, not a picture of the part, which is what the owner
+    reported as "a flat dark box". Raising the finish to matte dropped the same face to
+    rgb(90,90,90) and the body read as epoxy for the first time.
+
+    The band, not a point value: below ~0.7 the environment starts to wash out the albedo
+    again; at ~0.95+ the surface is chalk, which kills every highlight and is just as
+    wrong for a moulded package."""
+    path, _ = _find_step_with_colours(minimum=1)
+    materials = _gltf_json(model_to_glb(path))["materials"]
+    assert materials, f"{path}: converted with no materials at all"
+    for mat in materials:
+        roughness = mat["pbrMetallicRoughness"]["roughnessFactor"]
+        assert 0.7 <= roughness < 0.95, (
+            f"{path}: {mat.get('name')} is stated at roughness {roughness}, outside the "
+            "matte-moulded-plastic band; a semi-gloss default makes a near-black body "
+            "render as a mid-grey mirror of the studio environment"
+        )
+
+
 def test_model_to_glb_gives_wrl_an_honest_message_not_install_cascadio(tmp_path):
     # WRL is a format the library legitimately stores, but trimesh has no VRML loader.
     # The failure must say STEP-only, NEVER tell the user to install cascadio (which is
