@@ -117,7 +117,25 @@
   },
   "description": "1.65V~5.5V 1 1 6.4ns@5V,50pF VSSOP-8 Flip Flops RoHS",
   "display_name": "Flip Flop VSSOP-8",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SN74LVC1G74DCUR"
+      },
+      "model": {
+        "file": "models/SN74LVC1G74DCUR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SN74LVC1G74DCUR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
