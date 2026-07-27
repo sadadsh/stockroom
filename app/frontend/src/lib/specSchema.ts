@@ -680,11 +680,23 @@ export function deriveFacets(
     for (const [key, value] of Object.entries(part.specs)) {
       if (isVendorBookkeeping(key)) continue;
       if (!isPresentableValue(value)) continue;
-      const bucket = acc.get(key);
+      // FOLD FAMILIES, exactly as `groupSpecs` does for the detail sheet. Without this the rail
+      // showed SIX separate HTS facets - one per jurisdiction - which is the same fact repeated,
+      // never six things to filter on. The docstring below has always claimed the rail "mirrors the
+      // detail spec sheet"; it did not, and `resolveFamily` is the same routing `groupSpecs` uses,
+      // so folding here keeps ONE definition of what a family is rather than a second copy.
+      const fam = resolveFamily(key);
+      const bucketKey = fam ? fam.family.family : key;
+      const bucket = acc.get(bucketKey);
       if (bucket) {
         bucket.values.push(coerceValue(value));
       } else {
-        acc.set(key, { key, category: part.category, values: [coerceValue(value)], seq: seq++ });
+        acc.set(bucketKey, {
+          key: bucketKey,
+          category: part.category,
+          values: [coerceValue(value)],
+          seq: seq++,
+        });
       }
     }
   }

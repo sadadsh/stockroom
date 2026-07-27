@@ -628,3 +628,46 @@ describe("vendor bookkeeping keys", () => {
     expect(labels).toEqual(expect.arrayContaining(["Grid", "Bridge Type", "Humidity"]));
   });
 });
+
+describe("deriveFacets folds spec families", () => {
+  // The rail showed SIX separate HTS facets - one per jurisdiction - which is one fact repeated,
+  // never six things to filter on. `groupSpecs` had always folded them for the detail sheet, and
+  // deriveFacets' own docstring claimed parity with it while not doing so.
+  const hts = {
+    category: "Other",
+    specs: {
+      "HTS Code": "8532.24.0020",
+      "HTS Code (US)": "8532.24.0020",
+      "HTS Code (EU)": "85322400",
+      "HTS Code (CN)": "8532240000",
+    },
+  };
+
+  it("routes every member of a family to ONE facet", () => {
+    const facets = deriveFacets([hts]);
+    const htsFacets = facets.filter((f) => f.label.toLowerCase().includes("hts"));
+    expect(htsFacets).toHaveLength(1);
+  });
+
+  it("keeps every member's VALUE, so the fold loses no filterable data", () => {
+    const facets = deriveFacets([hts]);
+    const one = facets.find((f) => f.label.toLowerCase().includes("hts"));
+    expect(one).toBeDefined();
+    if (one && one.kind === "checkbox" && one.values) {
+      const values = one.values.map((v) => v.value);
+      // all four jurisdictions' codes are still reachable as filter values
+      expect(values).toContain("8532.24.0020");
+      expect(values).toContain("85322400");
+      expect(values).toContain("8532240000");
+    }
+  });
+
+  it("leaves a non-family key exactly as it was", () => {
+    // the anti-vacuous half: if folding swallowed everything, the test above would pass for the
+    // wrong reason.
+    const facets = deriveFacets([
+      { category: "Resistors", specs: { Resistance: "10 kΩ", Tolerance: "1%" } },
+    ]);
+    expect(facets.map((f) => f.label).sort()).toEqual(["Resistance", "Tolerance"]);
+  });
+});
