@@ -153,7 +153,21 @@
   },
   "description": "1.65V~5.5V 1 1 10uA 3ns@5V,50pF SOT-23-5 Buffers, Drivers, Receivers, Transceivers RoHS",
   "display_name": "Buffer SOT-23-5",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "74LVC1G125W5-7"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "74LVC1G125W5-7"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
