@@ -469,3 +469,42 @@ assets** — those arrive from the capture pass (step 4) and are attached withou
 - Which derivation ruleset version (`derived_by`) gates a re-derive, and whether records carry it.
 - Whether `sourced/` is git-tracked, LFS'd, or ignored — it is re-fetchable, so all three are
   defensible; tracked is the default for device parity.
+
+### DECIDED: the part id scheme
+**`id = slug(mpn) + "-" + sha256(mpn)[:4]`** — e.g. `tps62130rgtr-8c1d`, `max6817eut-t-3f0a`.
+
+The id is a FILENAME and a git path, so it must be stable forever, unique, Windows-safe, and a
+PURE function of something immutable. `display_name` is derived and carries the human naming
+scheme; the id does not need to.
+
+- **Manufacturer is deliberately NOT in the id.** It comes from a source and varies between them
+  ("Texas Instruments" vs "TI"), so an id built on it would not be stable.
+- **A bare MPN slug is NOT enough, and the owner's own library proves it.** Slugging is lossy:
+  `MAX6817EUT+T` (owned) and `MAX6817EUT-T` both slug to `max6817eut_t`. A filename collision
+  silently MERGES two parts. The 4-hex suffix of the exact MPN makes that impossible while keeping
+  the readable stem.
+- Lowercase `[a-z0-9-]` only; Windows reserved stems (`CON`, `PRN`, `AUX`, `NUL`, `COM1`..`LPT9`)
+  guarded, since the library is a Windows-first git checkout.
+
+## 10. TWO STANDING INVARIANTS (owner, 2026-07-27)
+
+> *"i also want the app to always be updated even if its open so u dont have to close to see
+> updates"*
+
+**Stronger than auto-update: HOT RELOAD.** Item 5 of the owner's spec said updates must be
+automatic and error-free; this adds that the app must not require a relaunch to show them. That is
+a constraint on the HOST (`host/`, WebView2) and the updater route, not only on the update check —
+at minimum the frontend bundle must be reloadable in place, and a backend change must either be
+hot-swappable or restart without the user seeing a closed window.
+
+> *"library should always also be linked"*
+
+**Linking is an INVARIANT, not a step.** This supersedes "automatic linking" as build step 5 in the
+order above. The EDA linkage (the Altium DbLib + its data source, the KiCad tables) must be
+regenerated whenever the library changes — on add, on capture, on re-derive — rather than when
+someone remembers to run it. Same shape as the derived index: if it can be stale, it will be, and
+a stale link is a library that silently does not place.
+
+**Implication for the schema:** anything the linkage is generated FROM must be derivable without a
+network call and without user input, or the invariant cannot hold. That is already true of
+`derived` + `assets`, which is why this is recorded here rather than as a separate subsystem.
