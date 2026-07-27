@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5357/0402-%281005-Metric%29-Ceramic-Capacitor.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "294 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "42"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -304,6 +316,86 @@
       "stock": 261869,
       "url": "https://www.lcsc.com/category/1142.html?scene=FULL_MATCH&globalKeyword=C0402C105K4PACTU&s_z=n_q_C0402C105K4PACTU",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:30.439384+00:00",
+      "part_number": "80-C0402C105K4P",
+      "price_breaks": [
+        {
+          "price": 0.12,
+          "qty": 1
+        },
+        {
+          "price": 0.045,
+          "qty": 10
+        },
+        {
+          "price": 0.039,
+          "qty": 100
+        },
+        {
+          "price": 0.029,
+          "qty": 500
+        },
+        {
+          "price": 0.026,
+          "qty": 1000
+        },
+        {
+          "price": 0.022,
+          "qty": 2500
+        },
+        {
+          "price": 0.02,
+          "qty": 5000
+        },
+        {
+          "price": 0.017,
+          "qty": 10000
+        },
+        {
+          "price": 0.016,
+          "qty": 20000
+        }
+      ],
+      "stock": 261969,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:30.439384+00:00",
+      "part_number": "399-12289-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.01886,
+          "qty": 10000
+        },
+        {
+          "price": 0.0175,
+          "qty": 20000
+        },
+        {
+          "price": 0.01682,
+          "qty": 30000
+        },
+        {
+          "price": 0.01607,
+          "qty": 50000
+        },
+        {
+          "price": 0.01563,
+          "qty": 70000
+        },
+        {
+          "price": 0.01521,
+          "qty": 100000
+        }
+      ],
+      "stock": 649237,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
