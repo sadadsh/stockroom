@@ -117,7 +117,25 @@
   },
   "description": "62.5mW 2.2kΩ 50V Thick Film Resistor ±100ppm/℃ ±1% 0402 Chip Resistor - Surface Mount RoHS",
   "display_name": "2.2kΩ ±1% 0402",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-072K2L"
+      },
+      "model": {
+        "file": "models/AC0402FR-072K2L.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "AC0402FR-072K2L"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
