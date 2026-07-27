@@ -1,4 +1,107 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "50"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "C0G"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "C0G, NP0"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 20 pF, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GCM1555C1H200FA16D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 20PF 50V C0G/NP0 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +125,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "gcm1555c1h200fa16d",
   "manufacturer": "muRata",
@@ -37,8 +145,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:54.823117+00:00",
+      "part_number": "81-GCM1555C1H200FA6D",
       "price_breaks": [
         {
           "price": 0.016714286,
@@ -68,6 +176,40 @@
       "stock": 38463,
       "url": "https://www.mouser.com/c/?q=GCM1555C1H200FA16D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:54.823117+00:00",
+      "part_number": "490-GCM1555C1H200FA16DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00963,
+          "qty": 10000
+        },
+        {
+          "price": 0.00883,
+          "qty": 20000
+        },
+        {
+          "price": 0.00843,
+          "qty": 30000
+        },
+        {
+          "price": 0.00798,
+          "qty": 50000
+        },
+        {
+          "price": 0.00772,
+          "qty": 70000
+        },
+        {
+          "price": 0.00747,
+          "qty": 100000
+        }
+      ],
+      "stock": 54022,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +259,7 @@
     "LCSC Product Name": "CAP CER 20pF 50V C0G 0402",
     "LCSC Title": "muRata GCM1555C1H200FA16D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "98 Days",
+    "Lead Time": "21",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "50",
     "Moisture Sensitivity Level": "1 (Unlimited)",
