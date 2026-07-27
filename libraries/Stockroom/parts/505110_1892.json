@@ -1,5 +1,12 @@
 {
   "alternates": {
+    "Contact Material": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Phosphor bronze"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -51,6 +58,18 @@
         "confidence": "medium",
         "source": "digikey",
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1212/5051101892.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "91 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "5"
       }
     ],
     "Locking Feature": [
@@ -678,6 +697,78 @@
       "stock": 181,
       "url": "https://www.lcsc.com/product-detail/C3036269.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:52.810949+00:00",
+      "part_number": "538-505110-1892",
+      "price_breaks": [
+        {
+          "price": 1.17,
+          "qty": 1
+        },
+        {
+          "price": 0.997,
+          "qty": 10
+        },
+        {
+          "price": 0.89,
+          "qty": 25
+        },
+        {
+          "price": 0.847,
+          "qty": 100
+        },
+        {
+          "price": 0.794,
+          "qty": 250
+        },
+        {
+          "price": 0.756,
+          "qty": 500
+        },
+        {
+          "price": 0.72,
+          "qty": 1000
+        },
+        {
+          "price": 0.672,
+          "qty": 3000
+        },
+        {
+          "price": 0.632,
+          "qty": 6000
+        }
+      ],
+      "stock": 34540,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:52.810949+00:00",
+      "part_number": "WM12374TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.73457,
+          "qty": 3000
+        },
+        {
+          "price": 0.69953,
+          "qty": 6000
+        },
+        {
+          "price": 0.67982,
+          "qty": 9000
+        },
+        {
+          "price": 0.65579,
+          "qty": 15000
+        }
+      ],
+      "stock": 21199,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
