@@ -8,7 +8,9 @@ export const meta = {
     { title: 'Independent', detail: 'hot reload, 3D rotation, device sync - none depend on the schema' },
     { title: 'Model', detail: 'the part record: sourced/derived split, part classes, id scheme' },
     { title: 'OnModel', detail: 'derive engine, requirements by part class, index schema' },
+    { title: 'MergeA', detail: 'land the independent + on-model branches on main, gates green' },
     { title: 'OnDerive', detail: 'importer and guided capture UI' },
+    { title: 'MergeB', detail: 'land the on-derive branches on main, gates green' },
     { title: 'Verify', detail: 'acceptance test + adversarial review of every diff' },
   ],
 }
@@ -36,16 +38,55 @@ HARD CONSTRAINTS (from CLAUDE.md and the spec - violating any of these fails the
 - Report honestly: say what you exercised and name what you did NOT. Never claim "fully verified".
 `
 
+// Every concurrent builder runs in its own git worktree, because they touch overlapping backend
+// files and four agents committing into one .git also collide on index.lock. A worktree starts with
+// NO .venv and NO node_modules (both gitignored), so bootstrapping is part of the task, and the work
+// is only reachable afterwards if it is committed on a NAMED BRANCH - the worktree itself is
+// disposable. The merge phases below land those branches on main.
+const worktreeSetup = (branch) => `
+YOU ARE IN AN ISOLATED GIT WORKTREE. Read this before your first command.
+1. Confirm where you are: 'git rev-parse --show-toplevel' and 'git status'. Everything you do happens
+   HERE. Never cd into /home/sadad/git/stockroom (the main worktree) and never edit files there.
+2. FIRST COMMAND: 'git switch -c ${branch}'. Your work is only reachable later if it is committed on
+   that branch. An uncommitted worktree is thrown away.
+3. This worktree has NO .venv and NO node_modules - both are gitignored, so a fresh checkout lacks
+   them. Bootstrap what you need before running any gate:
+     backend:  'uv sync' from the worktree root, then use ./.venv/bin/python
+     frontend: 'npm ci' in app/frontend
+   Do NOT reach into the main worktree's .venv: pytest would then be running against a mix of two
+   checkouts, and a green result would mean nothing.
+4. COMMIT everything you finish, scoped, on ${branch}. Leave the tree CLEAN - 'git status' must show
+   no modified tracked files when you are done, or that work is lost.
+5. Your branch will be merged into main by a later agent. Keep your commits scoped and coherent so a
+   conflict is readable. Do NOT merge or rebase onto main yourself.
+6. REPORT the branch name and the output of 'git rev-parse HEAD'.
+`
+
+// Structured return so the merge phases get the branch names as data rather than as prose that has
+// to be re-parsed.
+const BRANCH_RESULT = {
+  type: 'object',
+  properties: {
+    branch: { type: 'string', description: 'the branch the work was committed on' },
+    head: { type: 'string', description: 'output of git rev-parse HEAD on that branch' },
+    committed: { type: 'boolean', description: 'true only if the worktree is clean and all work is committed' },
+    summary: { type: 'string', description: 'what was built: modules, dataclasses, fields, endpoints' },
+    notDone: { type: 'string', description: 'what was NOT achieved or NOT verified, named explicitly' },
+    gates: { type: 'string', description: 'the gate commands actually run and their actual results' },
+  },
+  required: ['branch', 'committed', 'summary', 'notDone', 'gates'],
+}
+
 // ---------------------------------------------------------------------------------------------
 // These three depend on NOTHING in the schema work, so they start immediately and run alongside it.
-// The owner asked for both hot reload and the 3D fix explicitly; device sync is their
-// "libraries linked between devices" invariant.
+// Deliberately NOT awaited here - they run concurrently with the Model agent and are collected at
+// MergeA. (The original script never awaited this at all, which made the final return crash.)
 phase('Independent')
 
 const independent = parallel([
   () =>
     agent(
-      `${RULES}
+      `${RULES}${worktreeSetup('wf/hot-reload')}
 TASK: HOT RELOAD. Owner: "i also want the app to always be updated even if its open so u dont have
 to close to see updates." Spec section 10.
 
@@ -59,12 +100,12 @@ an update requires relaunching. Make the running app pick up an update WITHOUT t
 - An update must NEVER leave the app in a broken state: if it cannot complete, it must roll back and
   say so. The owner's words are "automatic and never face errors".
 - State plainly which half you achieved (frontend reload / backend restart) and which you did not.`,
-      { label: 'hot-reload', phase: 'Independent' },
+      { label: 'hot-reload', phase: 'Independent', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 
   () =>
     agent(
-      `${RULES}
+      `${RULES}${worktreeSetup('wf/3d-rotation')}
 TASK: 3D MODEL ROTATION. MEASURED on the owner's real library: 21 of 57 parts carrying our own
 footprint have a non-identity model placement that the viewer IGNORES, so they render in the wrong
 orientation. Eleven are 180 degrees about Z, ten are 270.
@@ -81,12 +122,12 @@ footprint's (model ... (rotate (xyz ...)) (offset ...) (scale ...)).
 - Footprint.model_placement is a PROPERTY, not a method (this exact mistake was made three times in
   one session). Same for Footprint.pads and SymbolLib.symbol_names.
 - Do NOT re-seat or move any part: that regression was already fixed once in cae5a81.`,
-      { label: '3d-rotation', phase: 'Independent' },
+      { label: '3d-rotation', phase: 'Independent', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 
   () =>
     agent(
-      `${RULES}
+      `${RULES}${worktreeSetup('wf/device-sync')}
 TASK: DEVICE SYNC. Owner: "library should always also be linked" -> clarified as "i meant libraries
 linked between devices". Spec section 10. This is the DEVICE PARITY invariant: same parts, same
 files, same info on every machine, with nobody clicking Sync.
@@ -101,18 +142,22 @@ files, same info on every machine, with nobody clicking Sync.
 - The enrich cache is per-device today (libraries_root.parent/.stockroom-enrich-cache), so two
   machines can show DIFFERENT specs for the same part. Per-machine state that changes what the user
   SEES is a parity break; move it or justify it in writing.`,
-      { label: 'device-sync', phase: 'Independent' },
+      { label: 'device-sync', phase: 'Independent', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 ])
 
 // ---------------------------------------------------------------------------------------------
-// The schema track is strictly sequential at its root: everything downstream reads the model.
+// The schema track is strictly sequential at its root: everything downstream reads the model. It
+// runs in the MAIN worktree, which is free because every Independent agent is off in its own.
 phase('Model')
 
 const model = await agent(
   `${RULES}
 TASK: THE PART RECORD MODEL. Implement section 9 of ${SPEC} exactly - the shape is already decided
 and drawn out there. Do not redesign it.
+
+You are in the MAIN worktree (/home/sadad/git/stockroom) on branch main, which already has a .venv.
+Commit your work directly to main, scoped, and leave the tree CLEAN.
 
 - parts/<id>.json holds identity + part_class + a DERIVED block + asset refs + a sources index.
 - sourced/<id>/<vendor>.json holds the raw payload byte-for-byte as returned. It is APPEND-ONLY
@@ -128,7 +173,8 @@ and drawn out there. Do not redesign it.
   max(SCHEMA_VERSION, ...), which RELABELS a v1 record as current without migrating its data. The
   owner is deleting and re-importing so no migration is needed, but do not reproduce that bug.
 
-Return a summary of the dataclasses and fields you created.`,
+Return a summary of the dataclasses and fields you created, precise enough that another agent can
+write code against them WITHOUT reading your diff: module paths, class names, every field and type.`,
   { label: 'part-record', phase: 'Model' },
 )
 
@@ -136,14 +182,14 @@ Return a summary of the dataclasses and fields you created.`,
 // SPEED NOTE. These three touch overlapping backend files (model/, store/, capture/), so they run
 // in ISOLATED WORKTREES. Without isolation they serialise on each other's edits, which is what
 // makes a nominally parallel phase secretly sequential - the single biggest hidden cost in a
-// fan-out over one repo.
+// fan-out over one repo. They branch off main AFTER the model commit, so they all see it.
 phase('OnModel')
 
 const onModel = await parallel([
   () =>
     agent(
-      `${RULES}
-The part record model has landed: ${model}
+      `${RULES}${worktreeSetup('wf/derive-engine')}
+The part record model has landed on main: ${model}
 
 TASK: THE DERIVE ENGINE. One function that recomputes the entire 'derived' block from sourced/.
 
@@ -160,13 +206,13 @@ Write those three as real tests.
 - Identity (id, mpn, manufacturer, part_class) is NEVER touched by a derive.
 - Conflicts between sources: keep the existing per-key source+confidence and alternates behaviour,
   but derive it rather than storing a mutated winner.`,
-      { label: 'derive-engine', phase: 'OnModel', isolation: 'worktree' },
+      { label: 'derive-engine', phase: 'OnModel', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 
   () =>
     agent(
-      `${RULES}
-The part record model has landed: ${model}
+      `${RULES}${worktreeSetup('wf/requirements')}
+The part record model has landed on main: ${model}
 
 TASK: REQUIREMENTS BY PART CLASS. Rewrite capture/requirements.py so requirements are
 f(part_class, EDA tool), read off the EDA registry (spec D3).
@@ -181,13 +227,13 @@ f(part_class, EDA tool), read off the EDA registry (spec D3).
 - requires_override on the record wins over the class default when set.
 - The Requirement enum is a WIRE CONTRACT the TypeScript union mirrors; keep
   test_the_enum_covers_exactly_the_registry green.`,
-      { label: 'requirements', phase: 'OnModel', isolation: 'worktree' },
+      { label: 'requirements', phase: 'OnModel', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 
   () =>
     agent(
-      `${RULES}
-The part record model has landed: ${model}
+      `${RULES}${worktreeSetup('wf/index-schema')}
+The part record model has landed on main: ${model}
 
 TASK: THE DERIVED INDEX. Rewrite store/index.py, which is measurably wrong for this project's scope.
 
@@ -202,9 +248,49 @@ Defects to fix, all verified by reading the DDL:
 - is_complete + missing bake presence-as-completeness into SQL. The index must be able to express
   TRUST (derived from the assets' checks), not just presence.
 Keep every existing read path (search, facets, parametric filters) green.`,
-      { label: 'index-schema', phase: 'OnModel', isolation: 'worktree' },
+      { label: 'index-schema', phase: 'OnModel', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 ])
+
+// ---------------------------------------------------------------------------------------------
+// Land everything built so far on main. This phase exists because the previous version of this
+// script never merged the worktree branches at all: the OnDerive importer was told "the derive
+// engine landed" while running against a tree that did not contain it.
+phase('MergeA')
+
+const independentResults = (await independent).filter(Boolean)
+const onModelResults = onModel.filter(Boolean)
+const branchesA = [...independentResults, ...onModelResults]
+  .filter((r) => r && r.committed && r.branch)
+  .map((r) => r.branch)
+
+log(`MergeA: landing ${branchesA.length} branches on main - ${branchesA.join(', ')}`)
+
+const mergeA = await agent(
+  `${RULES}
+TASK: MERGE. Land these branches on main IN THIS ORDER, in the MAIN worktree
+(/home/sadad/git/stockroom): ${JSON.stringify(branchesA)}
+
+Context for resolving conflicts:
+- The part record model: ${model}
+- What each branch built: ${JSON.stringify([...independentResults, ...onModelResults].map((r) => ({ branch: r.branch, summary: r.summary, notDone: r.notDone })))}
+
+- 'git merge --no-ff <branch>' one at a time. After EACH merge, run the backend gate
+  (QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q -n auto) so you know which
+  merge broke what. Merging all of them and then testing tells you nothing about which one is at fault.
+- RESOLVE conflicts on the merits, using the spec and the summaries above. Never resolve by taking
+  one side wholesale without reading both - these branches were written against the same model and a
+  blind --ours/--theirs silently deletes real work.
+- If a branch cannot be landed without breaking the suite, do NOT force it: leave it unmerged, say
+  which one and exactly what broke, and continue with the rest.
+- These branches were built in parallel against the same base, so overlapping edits to
+  capture/requirements.py, store/index.py and model/ are EXPECTED. Reconcile them into one coherent
+  implementation rather than stacking two versions of the same idea.
+- Finish with: full backend suite, ruff, and (if any frontend changed) npm run test:run + typecheck +
+  build with app/frontend-dist committed. Leave main CLEAN and every gate result stated verbatim.
+- Do NOT push. Report which branches landed, which did not, and why.`,
+  { label: 'merge-a', phase: 'MergeA', effort: 'high' },
+)
 
 // ---------------------------------------------------------------------------------------------
 phase('OnDerive')
@@ -212,9 +298,9 @@ phase('OnDerive')
 const onDerive = await parallel([
   () =>
     agent(
-      `${RULES}
+      `${RULES}${worktreeSetup('wf/importer')}
 Model: ${model}
-Derive engine and requirements: ${JSON.stringify(onModel).slice(0, 1500)}
+Landed on main by the merge phase: ${mergeA}
 
 TASK: THE IMPORTER. The owner is DELETING the library and re-importing, so there is NO migration to
 write - build the importer the rebuild will use.
@@ -230,16 +316,20 @@ write - build the importer the rebuild will use.
   reuse it rather than writing a second one.
 - The run must be stoppable and resumable, and the worklist DERIVED from library state so a re-run
   is free on parts already done. capture/complete.py is the proven shape.`,
-      { label: 'importer', phase: 'OnDerive', isolation: 'worktree' },
+      { label: 'importer', phase: 'OnDerive', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 
   () =>
     agent(
-      `${RULES}
+      `${RULES}${worktreeSetup('wf/guided-capture')}
 Model: ${model}
+Landed on main by the merge phase: ${mergeA}
 
 TASK: GUIDED CAPTURE, REBUILT. Owner: "yes rebuild guided capture, digikey UL snapmagic and
 samacsys", and it must serve BOTH single part adds AND completing existing components.
+
+This is a FRONTEND task in a fresh worktree: run 'npm ci' in app/frontend before any frontend gate,
+and commit app/frontend-dist/ in the same commit as the source it was built from.
 
 WHY IT IS HUMAN-DRIVEN, so you do not try to automate it: every automated route was measured and
 closed. Nexar is $1,000/month. Ultra Librarian's terms state verbatim "You may not use any robot or
@@ -257,10 +347,39 @@ either side of that click.
   {vendor, url, captured_at} on the asset - the owner's complaint was literally "its not trusted
   where we've gotten them", so provenance is the point.
 - Both formats per part where the vendor offers them, and a fast path to the NEXT part: the owner is
-  doing ~90 parts in one sitting and every extra click is multiplied by 90.`,
-      { label: 'guided-capture', phase: 'OnDerive' },
+  doing ~90 parts in one sitting and every extra click is multiplied by 90.
+- This UI is the owner's main surface for a 90-part sitting: invoke the frontend-design skill, design
+  it deliberately, and critique your own screenshot element by element before calling it done.`,
+      { label: 'guided-capture', phase: 'OnDerive', isolation: 'worktree', schema: BRANCH_RESULT },
     ),
 ])
+
+// ---------------------------------------------------------------------------------------------
+phase('MergeB')
+
+const onDeriveResults = onDerive.filter(Boolean)
+const branchesB = onDeriveResults.filter((r) => r && r.committed && r.branch).map((r) => r.branch)
+
+log(`MergeB: landing ${branchesB.length} branches on main - ${branchesB.join(', ')}`)
+
+const mergeB = await agent(
+  `${RULES}
+TASK: MERGE. Land these branches on main, in order, in the MAIN worktree
+(/home/sadad/git/stockroom): ${JSON.stringify(branchesB)}
+
+What each built: ${JSON.stringify(onDeriveResults.map((r) => ({ branch: r.branch, summary: r.summary, notDone: r.notDone })))}
+
+Same rules as the earlier merge: '--no-ff' one at a time, run the backend gate after EACH so you
+know which merge broke what, resolve conflicts on the merits rather than by taking a side wholesale,
+and leave any branch that cannot land unmerged with a plain statement of what broke.
+
+The guided-capture branch carries frontend changes: after merging it, run npm ci if needed, then
+npm run test:run, npm run typecheck and npm run build, and make sure app/frontend-dist/ on main
+matches the merged source. A stale dist is what the backend would actually serve.
+
+Finish with every gate stated verbatim, main CLEAN, and no push.`,
+  { label: 'merge-b', phase: 'MergeB', effort: 'high' },
+)
 
 // ---------------------------------------------------------------------------------------------
 phase('Verify')
@@ -269,7 +388,8 @@ const verdicts = await parallel([
   () =>
     agent(
       `${RULES}
-TASK: PROVE THE ACCEPTANCE TEST on the real code, not in principle.
+TASK: PROVE THE ACCEPTANCE TEST on the real code, not in principle. Work in the MAIN worktree, which
+now carries every landed branch: ${mergeA}\n${mergeB}
 
 The owner's requirement is "we can edit it without reimporting". Demonstrate it end to end:
   1. Import a handful of real parts (Mouser creds are live).
@@ -277,6 +397,7 @@ The owner's requirement is "we can edit it without reimporting". Demonstrate it 
   3. Prove nothing under sourced/ was written by either derive (lossless).
   4. CHANGE the naming scheme, re-derive, and show display_name changed while sourced/ and identity
      did not.
+Do NOT touch the owner's real library - work against a scratch library directory.
 Report the actual commands and their actual output. If any step fails, say so plainly - a failed
 acceptance test reported honestly is worth far more than a green claim.`,
       { label: 'acceptance-test', phase: 'Verify', effort: 'high' },
@@ -286,6 +407,8 @@ acceptance test reported honestly is worth far more than a green claim.`,
     agent(
       `${RULES}
 TASK: ADVERSARIALLY REVIEW every diff this workflow produced. Try to REFUTE each piece of work.
+Review the diff of main against ${'a56b918'} (the commit this workflow started from). You are
+READ-ONLY: report findings, do not fix them and do not commit.
 
 Look specifically for the failure patterns this project has actually shipped:
 - A check that CANNOT FAIL. Feed every new detector a known-BAD input and confirm it says so. A
@@ -296,6 +419,8 @@ Look specifically for the failure patterns this project has actually shipped:
 - Any 'if tool == ...' branch in shared logic instead of iterating the registry.
 - A success message emitted by the code that STARTED the work rather than the code that OBSERVED it.
 - Anything that writes under sourced/ outside the importer.
+- Work LOST in the merges: a field, test or behaviour a branch summary claims that main does not
+  actually have. A parallel fan-out plus a conflict resolution is exactly where that happens.
 Report confirmed findings with file:line and a concrete failure scenario. Do not report style.`,
       { label: 'adversarial-review', phase: 'Verify', effort: 'high' },
     ),
@@ -304,9 +429,14 @@ Report confirmed findings with file:line and a concrete failure scenario. Do not
 log('rebuild-library complete - read the acceptance test and the adversarial review before shipping')
 
 return {
-  independent: independent.filter(Boolean),
+  independent: independentResults,
   model,
-  onModel: onModel.filter(Boolean),
-  onDerive: onDerive.filter(Boolean),
+  onModel: onModelResults,
+  mergeA,
+  onDerive: onDeriveResults,
+  mergeB,
   verdicts: verdicts.filter(Boolean),
+  unlanded: [...independentResults, ...onModelResults, ...onDeriveResults]
+    .filter((r) => r && !r.committed)
+    .map((r) => r.branch),
 }
