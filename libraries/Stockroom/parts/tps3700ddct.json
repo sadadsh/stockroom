@@ -46,6 +46,66 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0090"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-23-Thin-6_DDC_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8915/MFG_296%7E4214841%7EDDC%7E6.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "250"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C"
+      }
+    ],
+    "Output Type": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Open-drain"
       }
     ],
     "Packaging": [
@@ -60,6 +120,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Analog Comparators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +142,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -82,6 +159,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Analog Comparators Window Comp for Over & Under Vltg Det A A 595-TPS3700DDCR"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC COMPARATOR 2CH SOT-23-THIN"
       }
     ],
     "manufacturer": [
@@ -177,6 +259,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Current - Quiescent (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "medium",
       "source": "lcsc"
@@ -232,6 +318,10 @@
     "Has Third Party Stock": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Hysteresis": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Ib - Input Bias Current": {
       "confidence": "medium",
@@ -321,9 +411,21 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Number of Elements": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Operating Temperature": {
       "confidence": "medium",
@@ -345,6 +447,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -352,6 +458,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -385,6 +495,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Propagation Delay (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Propagation Delay(tpd)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -392,6 +506,10 @@
     "Quiescent Current(Iq)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Reel Setup Fee": {
       "confidence": "medium",
@@ -409,6 +527,10 @@
       "confidence": "high",
       "source": "mouser"
     },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
     "Stock": {
       "confidence": "medium",
       "source": "lcsc"
@@ -425,6 +547,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -432,6 +562,10 @@
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Supply, Single/Dual (±)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Vos - Input Offset Voltage": {
       "confidence": "medium",
@@ -494,6 +628,86 @@
       "stock": 853,
       "url": "https://www.lcsc.com/product-detail/C702147.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:35.090271+00:00",
+      "part_number": "595-TPS3700DDCT",
+      "price_breaks": [
+        {
+          "price": 2.86,
+          "qty": 1
+        },
+        {
+          "price": 2.13,
+          "qty": 10
+        },
+        {
+          "price": 1.95,
+          "qty": 25
+        },
+        {
+          "price": 1.75,
+          "qty": 100
+        },
+        {
+          "price": 1.65,
+          "qty": 250
+        },
+        {
+          "price": 1.61,
+          "qty": 500
+        },
+        {
+          "price": 1.53,
+          "qty": 1000
+        },
+        {
+          "price": 1.49,
+          "qty": 2500
+        },
+        {
+          "price": 1.46,
+          "qty": 5000
+        }
+      ],
+      "stock": 4618,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:35.090271+00:00",
+      "part_number": "296-30437-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.65092,
+          "qty": 250
+        },
+        {
+          "price": 1.5938,
+          "qty": 500
+        },
+        {
+          "price": 1.5652,
+          "qty": 750
+        },
+        {
+          "price": 1.5335,
+          "qty": 1250
+        },
+        {
+          "price": 1.51495,
+          "qty": 1750
+        },
+        {
+          "price": 1.49714,
+          "qty": 2500
+        }
+      ],
+      "stock": 341,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -508,6 +722,7 @@
     "Country of Origin": "Thailand",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Quiescent (Max)": "11µA",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/c5533f37e54f4bd0a361fb90c38aa932.svg?t=1703813406",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/5a375c8365e74e03808511cad3f38c64.svg?t=1703813406",
@@ -522,6 +737,7 @@
     "HTS Code (TARIC)": "8542339000",
     "HTS Code (US)": "8542330001",
     "Has Third Party Stock": "No",
+    "Hysteresis": "5.5mV",
     "Ib - Input Bias Current": "1nA",
     "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-23-Thin-6_DDC_t.jpg",
     "Input Hysteresis Voltage (Vhys)": "5.5mV",
@@ -544,14 +760,19 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Type": "Surface Mount",
     "Number of Channels": "2",
+    "Number of Elements": "2",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "1",
     "Output Mode": "-",
     "Output Type": "Open-drain",
     "Package": "TSOT-23-6",
+    "Package / Case": "SOT-23-6 Thin, TSOT-23-6",
     "Package Quantity": "250",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "515",
     "Popular Part": "No",
@@ -560,18 +781,24 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_blank.jpg",
+    "Propagation Delay (Max)": "29µs",
     "Propagation Delay(tpd)": "29us",
     "Quiescent Current(Iq)": "11uA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
     "Single Supply": "1.8V~18V",
     "Standard Pack Qty": "250",
+    "Standard Package": "250",
     "Stock": "1415",
     "Stock (Domestic)": "1415",
     "Stock (Overseas)": "1415",
     "Stock (Shenzhen)": "1415",
+    "Supplier Device Package": "SOT-23-THIN",
+    "Type": "Window",
     "Unit": "Piece",
     "Unit Weight (kg)": "3.6e-05",
+    "Voltage - Supply, Single/Dual (±)": "1.8V ~ 18V",
     "Vos - Input Offset Voltage": "-",
     "Weight": "0.44",
     "Weight (kg)": "0.00044",
