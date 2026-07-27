@@ -2044,3 +2044,65 @@ export interface BulkImportResult {
   counts: Record<string, number>;
   items: BulkImportItem[];
 }
+
+// GET /api/library/completion -- "is my library complete, and what is missing?"
+//
+// The owner's central question, which until now only a script outside the app could answer.
+// Two totals are deliberately separate: `needs_files` is work a run can actually do right now,
+// `unsourced` is a real gap that NOTHING registered can currently fill (every Altium asset,
+// today). Collapsing them would either hide the stuck parts or promise a run that cannot
+// deliver on them.
+export interface LibraryCoverage {
+  total: number;
+  complete: number;
+  needs_files: number;
+  unsourced: number;
+  // Requirement value ("kicad_symbol", "altium_footprint", ...) -> how many parts lack it.
+  by_requirement: Record<string, number>;
+  // The registered source keys, and every Requirement they can between them supply.
+  sources: string[];
+  can_provide: string[];
+}
+
+// One part's outcome from a completion run.
+export interface CompletionItem {
+  part_id: string;
+  mpn: string;
+  display_name: string;
+  category: string;
+  // already-complete | completed | improved | deferred | unchanged | error
+  //
+  // `deferred` is its own status on purpose: the catalogue was rate-limiting us, so the part
+  // was never really attempted. Folding it into `unchanged` would read as "nothing can be
+  // done for this part", which is the opposite of the truth.
+  status: string;
+  needed: string[];
+  satisfied: string[];
+  remaining: string[];
+  sources: string[];
+  error: string;
+}
+
+export interface CompletionResult {
+  items: CompletionItem[];
+  counts: Record<string, number>;
+  stopped: boolean;
+  // Why it stopped when the user did not ask it to -- empty otherwise. A stop with no reason
+  // is indistinguishable from a crash.
+  stop_reason: string;
+}
+
+// A progress frame from a completion run's SSE stream.
+export interface CompletionProgress {
+  stage: string;
+  done: number;
+  total: number | null;
+  pct: number | null;
+  part_id: string;
+  mpn: string;
+  display_name: string;
+  status: string;
+  satisfied: string[];
+  remaining: string[];
+  message: string;
+}

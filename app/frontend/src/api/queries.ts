@@ -1192,3 +1192,28 @@ export function useAltiumEmbedModels() {
   );
   return { ...job, start };
 }
+
+// "Is my library complete?" -- read from the records on disk, network-free. Invalidated by
+// anything that changes what a part holds (a completion run, an ingest, an attach), because a
+// coverage number that lags the library is a number that lies.
+export function useLibraryCoverage() {
+  return useQuery({
+    queryKey: ["library-coverage"],
+    queryFn: () => api.libraryCoverage(),
+  });
+}
+
+// Start a completion run. The mutation only STARTS the job; progress arrives over the job's
+// SSE stream and the caller owns that, exactly as the bulk import does. The coverage query is
+// invalidated when the run finishes, not when it starts.
+export function useRunCompletion() {
+  return useMutation({
+    mutationFn: (input: { partIds?: string[]; limit?: number }) => api.runCompletion(input),
+  });
+}
+
+// Ask a running job to stop. Deliberately NOT invalidating anything: stopping changes nothing
+// by itself, and the run's own terminal result is what refreshes the surface.
+export function useStopJob() {
+  return useMutation({ mutationFn: (jobId: string) => api.stopJob(jobId) });
+}
