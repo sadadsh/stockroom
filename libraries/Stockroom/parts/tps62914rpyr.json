@@ -12,6 +12,42 @@
         "value": "8542.39.0070"
       }
     ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-14_DSL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6385/MFG_296%7E4225171%7ERPY%7E14.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "16 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Lifecycle": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "New Product"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Active"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "",
@@ -22,6 +58,30 @@
         "confidence": "",
         "source": "digikey",
         "value": "3000"
+      }
+    ],
+    "Number of Outputs": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "1 Output"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Reel, Cut Tape, MouseReel"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
       }
     ],
     "Product Category": [
@@ -46,6 +106,30 @@
         "confidence": "",
         "source": "digikey",
         "value": "ROHS3 Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      }
+    ],
+    "Series": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "TPS6291x"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "TPS62914"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "38.06"
       }
     ],
     "description": [
@@ -58,6 +142,11 @@
         "confidence": "high",
         "source": "digikey",
         "value": "IC REG BUCK ADJ 4.5A 14VQFN"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "TPS62914RPYR Texas Instruments Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck datasheet, inventory, & pricing."
       }
     ],
     "lead_time": [
@@ -112,7 +201,96 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Input Voltage": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Input Voltage - Max": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Input Voltage - Min": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Maximum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Minimum Operating Temperature": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Moisture Sensitive": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Mounting Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Output Current": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Output Voltage": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Quiescent Current": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Shutdown": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Switching Frequency": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "tps62914rpyr",
   "manufacturer": "Texas Instruments",
@@ -126,47 +304,39 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:15.271189+00:00",
       "part_number": "595-TPS62914RPYR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 4.02,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 3.04,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 2.79,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 2.52,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 2.4,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 2.38,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 2.24,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 2.24,
           "qty": 3000
         }
@@ -176,12 +346,11 @@
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:15.271189+00:00",
       "part_number": "296-TPS62914RPYRTR-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.16965,
           "qty": 3000
         }
@@ -194,36 +363,58 @@
   "schema_version": 2,
   "specs": {
     "Assembly Country of Origin": "Not available",
+    "Brand": "Texas Instruments",
     "Country of Diffusion": "Not available",
     "Country of Origin": "China",
     "Current - Output": "4.5A",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "3000",
     "Frequency - Switching": "1MHz, 1.4MHz, 2.2MHz",
     "Function": "Step-Down",
     "HTS Code (CN)": "8542391090",
     "HTS Code (MX)": "8542399999",
     "HTS Code (US)": "8542390070",
     "Image": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-14_DSL.jpg",
+    "Input Voltage": "3 V to 17 V",
+    "Input Voltage - Max": "17 V",
+    "Input Voltage - Min": "3 V",
+    "Lead Time": "16 Weeks",
+    "Lifecycle": "New Product",
+    "Manufacturer": "Texas Instruments",
+    "Maximum Operating Temperature": "+ 150 C",
     "Maximum Order Quantity": "1001",
+    "Minimum Operating Temperature": "- 40 C",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitive": "Yes",
     "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Style": "SMD/SMT",
     "Mounting Type": "Surface Mount",
     "Number of Outputs": "1",
     "Operating Temperature": "-40°C ~ 150°C (TJ)",
     "Order Multiple": "1",
     "Output Configuration": "Positive",
+    "Output Current": "4.5 A",
     "Output Type": "Adjustable",
+    "Output Voltage": "800 mV to 5.5 V",
+    "Package": "VQFN-HR-14",
     "Package / Case": "14-PowerVFQFN",
     "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape, MouseReel",
     "Product Category": "Switching Voltage Regulators",
+    "Product Type": "Switching Voltage Regulators",
+    "Quiescent Current": "5 mA",
     "REACH": "REACH Unaffected",
     "RoHS": "RoHS Compliant",
     "Series": "TPS6291x",
+    "Shutdown": "Shutdown",
     "Standard Pack Qty": "3000",
+    "Subcategory": "PMIC - Power Management ICs",
     "Supplier Device Package": "14-VQFN-HR (2.5x3)",
+    "Switching Frequency": "2.2 MHz",
     "Synchronous Rectifier": "Yes",
     "Topology": "Buck",
+    "Type": "Low Noise, Low Ripple Buck Converter",
+    "US Tariff %": "38.06",
     "Voltage - Input (Max)": "17V",
     "Voltage - Input (Min)": "3V",
     "Voltage - Output (Max)": "5.5V",
