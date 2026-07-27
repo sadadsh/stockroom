@@ -129,7 +129,25 @@
   },
   "description": "Boost Switching Regulator IC Adjustable 2.2V~5.5V 1 Output 3A SOT-563",
   "display_name": "Switching Voltage Regulator SOT-563",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS61023DRLR"
+      },
+      "model": {
+        "file": "models/TPS61023DRLR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "TPS61023DRLR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
