@@ -59,7 +59,7 @@ export function CadClearSection() {
     setReport(result);
     toast(
       result.cleared
-        ? `Removed ${result.cleared} CAD ${result.cleared === 1 ? "file" : "files"}.`
+        ? `Removed ${result.cleared} CAD ${result.cleared === 1 ? "asset" : "assets"}.`
         : "There was no CAD to remove.",
       result.cleared ? "ok" : "neutral",
     );
@@ -83,8 +83,13 @@ export function CadClearSection() {
           "Your library holds no CAD files of its own."
         ) : (
           <>
+            {/* "assets", not "files": a KiCad symbol is an ENTRY inside a shared
+                `SR-<Category>.kicad_sym`, and an Altium 3D body lives INSIDE its `.PcbLib`, so
+                the 184 things being removed are not 184 files. Saying "files" over-counts by
+                roughly a third and is the count-does-not-agree-with-its-noun defect this repo
+                already gates on the backend. The trailing clause names what they are. */}
             Your library holds <span className="tnum font-medium text-t1">{cleared}</span> CAD{" "}
-            {cleared === 1 ? "file" : "files"} across{" "}
+            {cleared === 1 ? "asset" : "assets"} across{" "}
             <span className="tnum">{parts}</span> {parts === 1 ? "component" : "components"}:
             symbols, footprints and 3D models it downloaded or built.
           </>
@@ -131,7 +136,7 @@ export function CadClearSection() {
         <div className="flex flex-col gap-2 border-l-2 border-line pl-3 text-sm text-t2">
           <p>
             Removed <span className="tnum text-t1">{report.cleared}</span> CAD{" "}
-            {report.cleared === 1 ? "file" : "files"} from{" "}
+            {report.cleared === 1 ? "asset" : "assets"} from{" "}
             <span className="tnum">{report.items.length}</span>{" "}
             {report.items.length === 1 ? "component" : "components"}.
           </p>
@@ -185,7 +190,7 @@ export function CadClearSection() {
         confirmLabel="Remove Them"
         body={
           <>
-            This removes {cleared} CAD {cleared === 1 ? "file" : "files"} from {parts}{" "}
+            This removes {cleared} CAD {cleared === 1 ? "asset" : "assets"} from {parts}{" "}
             {parts === 1 ? "component" : "components"}: every symbol, footprint and 3D model your
             library holds. The components themselves, their specs, datasheets and imported
             distributor data are untouched, and{" "}

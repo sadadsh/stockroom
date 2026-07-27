@@ -75,7 +75,7 @@ it("states the real count of what it holds and what it would remove", async () =
   renderSection();
 
   expect(await screen.findByText(/Your library holds/)).toHaveTextContent(
-    "Your library holds 184 CAD files across 128 components",
+    "Your library holds 184 CAD assets across 128 components",
   );
 });
 
@@ -129,7 +129,7 @@ it("confirming asks for the WRITE explicitly and reports what came back", async 
   // `findAllByText`: the toast and the report both say "Removed ...", which is correct --
   // one is transient feedback, the other is the durable record.
   const said = await screen.findAllByText(/^Removed/);
-  expect(said.some((n) => n.textContent?.includes("Removed 184 CAD files from 1"))).toBe(true);
+  expect(said.some((n) => n.textContent?.includes("Removed 184 CAD assets from 1"))).toBe(true);
 });
 
 it("offers nothing when there is no CAD to remove", async () => {
@@ -205,4 +205,19 @@ it("reports a reference whose FILE was not there, instead of counting it as dele
 
   expect(await screen.findByText(/pointed at a file/)).toBeInTheDocument();
   expect(screen.getByText("altium/ina226aidgst-d958.SchLib")).toBeInTheDocument();
+});
+
+it("counts ASSETS, never files: a symbol is an entry inside a shared library, not a file", () => {
+  // MEASURED on the owner's library: 184 assets = 60 KiCad symbols + 60 footprints + 57 models +
+  // 7 Altium. The 60 symbols live INSIDE 13 shared `SR-*.kicad_sym` files and the Altium 3D body
+  // inside its `.PcbLib`, so the real file count is ~127. Calling them "files" over-counts by a
+  // third -- the count-does-not-agree-with-its-noun defect this repo gates on the backend.
+  mockApi.cadInventory.mockResolvedValue(inventory());
+  renderSection();
+
+  return waitFor(() => {
+    const line = screen.getByText(/Your library holds/);
+    expect(line).toHaveTextContent("184 CAD assets");
+    expect(line.textContent).not.toMatch(/CAD files/);
+  });
 });

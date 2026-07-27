@@ -201,7 +201,7 @@ _LIB_SYMBOLS = (
 )
 
 
-def _seed_workspace(base: Path) -> tuple[Path, Path]:
+def _seed_workspace(base: Path, source: Path | None = None) -> tuple[Path, Path]:
     """Build a throwaway library + KiCad project so the PROJECT surfaces can actually be shot.
 
     Without this, `--surface projects` only ever reaches "No projects are registered.", so the Health
@@ -210,13 +210,20 @@ def _seed_workspace(base: Path) -> tuple[Path, Path]:
     a tidy one: the schematic's passives are placed from KiCad's DEFAULT library, so they carry the
     generic `Device:R` symbol that identifies no part, which is exactly what the assign surface is for.
 
+    `source` is the library to COPY (default: the real one). It exists because `--library` used to
+    be accepted and then silently ignored whenever the seed ran -- and `--click` implies the seed,
+    so every clicked shot secretly photographed the real library no matter what was asked for.
+    That cost a wrong read on 2026-07-27: a shot aimed at a library holding 184 CAD assets showed
+    "holds no CAD files of its own", which looked like a backend bug and was the flag being dropped.
+    A flag that is accepted and ignored is worse than no flag.
+
     Returns (libraries_root, project_dir). Both live under `base`, never in the owner's real library.
     """
     import shutil
     import subprocess
 
     libs = base / "libraries"
-    shutil.copytree(DEFAULT_LIB, libs)
+    shutil.copytree(source or DEFAULT_LIB, libs)
     parts = libs / "Stockroom" / "parts"
     parts.mkdir(parents=True, exist_ok=True)
     # Two library resistors that are genuinely hard to tell apart: same value and package, different
@@ -817,7 +824,7 @@ def run(args) -> int:
     seed_project: Path | None = None
     if seed:
         scratch = tempfile.TemporaryDirectory(prefix="uishot-seed-")
-        library, seed_project = _seed_workspace(Path(scratch.name))
+        library, seed_project = _seed_workspace(Path(scratch.name), Path(args.library))
         print(f"  seeded library + project under {scratch.name}")
 
     def opener(base_url: str, token: str) -> None:
