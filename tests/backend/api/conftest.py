@@ -31,17 +31,20 @@ def _drain_job(client, job_id):
 
 
 @pytest.fixture(autouse=True)
-def _isolate_machine_config(tmp_path, monkeypatch):
-    """Keep every config.save() (a profile switch, a settings write) inside the
-    test's own tmp dir so the API suite never writes to the developer's real
-    ~/.config/stockroom (or %APPDATA%/Stockroom). config_dir() reads this env on
-    every call, so it governs load() and save() alike. XDG_CONFIG_HOME and APPDATA
-    are pinned too, so no code path (kicad_config_dir + the auto-wire that WRITES
-    there) can ever reach the developer's real ~/.config/kicad: the review caught
-    the suite doing exactly that through apply_kicad_settings."""
-    monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(tmp_path / "sr-config"))
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
-    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+def _isolate_stm_seed(tmp_path, monkeypatch):
+    """Config isolation MOVED to tests/backend/conftest.py; only the STM seed pin lives here.
+
+    This fixture used to also pin STOCKROOM_CONFIG_DIR / XDG_CONFIG_HOME / APPDATA. It was the
+    ONLY place that did, which meant the other twenty test directories had no isolation at all --
+    and on 2026-07-27 that hole was found the expensive way: the owner's real
+    `~/.config/stockroom/config.json` was overwritten with a pytest tmp path and every vendor
+    credential blanked, and a 235 MB STM index was left in the same real directory. The protection
+    had been added where the bug was first seen instead of at the root, which is a hand-listed
+    coverage set, and those grow silent holes by construction.
+
+    It now lives at the suite root and covers everything, so keeping a second copy here would only
+    be a copy to drift. `tests/backend/store/test_config_isolation.py` asserts the root fixture
+    reaches a directory this one never covered, so narrowing it back is loud."""
     # The committed STM baked seed (data/stm/index.sqlite.xz) must not leak into the
     # suite: build_context seed-restores when no index exists, which would turn every
     # index-absent 409 test into a false "built" state. Point the seed at a

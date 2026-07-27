@@ -341,6 +341,11 @@ _NON_F_LINES = {
 
 
 @requires_real_all_families_source
+# Same worker as test_all_families_build.py (see gates.sh --dist loadgroup). Both build the SAME
+# ~235 MB all-families index into the worker's stable STOCKROOM_STM_INDEX path, so sharing a worker
+# means it is built once instead of twice. Grouped per-test rather than per-module so the rest of
+# this file still spreads across workers.
+@pytest.mark.xdist_group("stm-real-index")
 def test_af_join_holds_with_zero_orphans_across_non_f_families_real_source():
     """Builds (or reuses the persisted, file-backed) all-families index and
     asserts zero orphans plus a clean, in-range AF join for at least one
