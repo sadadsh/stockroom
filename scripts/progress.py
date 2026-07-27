@@ -160,23 +160,29 @@ def render_html(plan: dict) -> str:
             st = derive_state(item)
             label = {"done": "Done", "doing": "In Progress",
                      "blocked": "Blocked", "todo": "Not Started"}[st]
+            # Collapsed by default, EXPANDED only while a thing is actually moving. The first
+            # version rendered every step of every item and came to 11,626px on a 844px phone:
+            # about 14 screens, most of it greyed-out "Not Started" text. The owner asked to SEE
+            # the bars, so the bars must fit on a screen and the detail must be one tap away.
+            openattr = " open" if st in ("doing", "blocked") else ""
             p += [
-                f'<article class="item s-{st}">',
-                f'<div class="ihead"><h3>{e(item["name"])}</h3>'
-                f'<span class="tag t-{st}">{label}</span></div>',
-                f'<div class="row">{bar(i_d, i_t, st)}</div>',
+                f'<details class="item s-{st}"{openattr}>',
+                f'<summary><div class="ihead"><h3>{e(item["name"])}</h3>'
+                f'<span class="tag t-{st}">{label}</span></div>'
+                f'<div class="row">{bar(i_d, i_t, st)}</div></summary>',
                 f'<p class="why">{e(item["why"])}</p>',
                 '<ul class="steps">',
             ]
             for s in item["steps"]:
                 done = bool(s.get("done"))
                 box = "&#10003;" if done else "&nbsp;"
-                ev = (f'<div class="ev">{e(s["evidence"])}</div>'
+                ev = (f'<details class="evwrap"><summary>evidence</summary>'
+                      f'<div class="ev">{e(s["evidence"])}</div></details>'
                       if done and s.get("evidence") else "")
                 p.append(f'<li class="step{" done" if done else ""}">'
                          f'<span class="box">{box}</span>'
                          f'<div class="stext"><div class="t">{e(s["t"])}</div>{ev}</div></li>')
-            p += ["</ul>", "</article>"]
+            p += ["</ul>", "</details>"]
         p.append("</section>")
 
     p += [
@@ -195,13 +201,13 @@ STYLE = """<style>
 }
 @media (prefers-color-scheme:light){:root{
   --bg:#f5f6f8; --card:#fff; --line:#e2e5ea; --ink:#11141a; --dim:#5b6472;
-  --done:#1a7f37; --doing:#9a6700; --blocked:#cf222e; --todo:#d2d7dd; --accent:#0969da;}}
+  --done:#1a7f37; --doing:#9a6700; --blocked:#cf222e; --todo:#b9c0c9; --accent:#0969da;}}
 :root[data-theme=dark]{
   --bg:#0d0f12; --card:#15181e; --line:#242932; --ink:#e9ebee; --dim:#98a1ad;
   --done:#3fb950; --doing:#d29922; --blocked:#f85149; --todo:#3a414b; --accent:#58a6ff;}
 :root[data-theme=light]{
   --bg:#f5f6f8; --card:#fff; --line:#e2e5ea; --ink:#11141a; --dim:#5b6472;
-  --done:#1a7f37; --doing:#9a6700; --blocked:#cf222e; --todo:#d2d7dd; --accent:#0969da;}
+  --done:#1a7f37; --doing:#9a6700; --blocked:#cf222e; --todo:#b9c0c9; --accent:#0969da;}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;
   font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -237,6 +243,12 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent)
   border-left:3px solid var(--todo);border-radius:var(--r-card)}
 .item.s-done{border-left-color:var(--done)}.item.s-doing{border-left-color:var(--doing)}
 .item.s-blocked{border-left-color:var(--blocked)}
+summary{cursor:pointer;list-style:none;outline-offset:3px}
+summary::-webkit-details-marker{display:none}
+.item>summary:hover .ihead h3{color:var(--accent)}
+.item:not([open])>summary{margin:0}
+.evwrap{margin-top:3px}
+.evwrap summary{font:10.5px ui-monospace,monospace;color:var(--dim);letter-spacing:.05em;text-transform:uppercase}
 .ihead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
 .ihead h3{flex:1;min-width:0}
 .tag{font-size:10.5px;letter-spacing:.04em;padding:2px 8px;border-radius:9px;
