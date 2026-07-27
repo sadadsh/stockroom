@@ -12,6 +12,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/460/MFG_QFPPHOTO.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "56 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "1"
+      }
+    ],
     "Product Category": [
       {
         "confidence": "high",
@@ -232,6 +244,46 @@
       "stock": 6,
       "url": "https://www.lcsc.com/search?q=IC201-1004-008",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:00.544922+00:00",
+      "part_number": "945-IC201-1004-008",
+      "price_breaks": [
+        {
+          "price": 98.94,
+          "qty": 1
+        },
+        {
+          "price": 86.37,
+          "qty": 25
+        },
+        {
+          "price": 85.09,
+          "qty": 50
+        },
+        {
+          "price": 83.07,
+          "qty": 100
+        }
+      ],
+      "stock": 6,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:00.544922+00:00",
+      "part_number": "2408-IC201-1004-008-ND",
+      "price_breaks": [
+        {
+          "price": 97.0,
+          "qty": 1
+        }
+      ],
+      "stock": 4,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
