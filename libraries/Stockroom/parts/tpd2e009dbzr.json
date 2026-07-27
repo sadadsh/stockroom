@@ -141,7 +141,25 @@
   },
   "description": "14VC Clamp 4A@8/20us Ipp ESD DIODE SOT-23",
   "display_name": "ESD Protection Diode SOT-23",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD2E009DBZR"
+      },
+      "model": {
+        "file": "models/TPD2E009DBZR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD2E009DBZR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
