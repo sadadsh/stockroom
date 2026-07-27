@@ -117,7 +117,25 @@
   },
   "description": "2 11uA TSOT-23-6 Comparators RoHS",
   "display_name": "2-Channel Analog Comparator TSOT-23-6",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TPS3700DDCT"
+      },
+      "model": {
+        "file": "models/TPS3700DDCT.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TPS3700DDCT"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
