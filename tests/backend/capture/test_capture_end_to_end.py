@@ -59,10 +59,16 @@ def _capture(tmp_path, base_url: str, formats: list[str]):
     return report, browser.captured
 
 
-def test_both_formats_are_selected_and_one_download_lands(tmp_path, vendor):
-    """The owner's requirement, verbatim: *"kicad and altium at once"*."""
-    report, captured = _capture(tmp_path, vendor, ["kicad", "altium"])
-    assert report.selected == ["kicad", "altium"], report
+def test_every_selectable_format_rides_one_download(tmp_path, vendor):
+    """Ultra Librarian gives symbol, footprint AND the STEP in ONE export.
+
+    CORRECTED 2026-07-27 against a real download. This used to ask for "kicad and altium" and
+    assert both were selected - and on the live site that produced a zip with a KiCad symbol and
+    footprint, NO 3D model, and an Altium *script* instead of libraries, while the run reported
+    success. The 3D lives behind its own "3D CAD Model" accordion and was never ticked.
+    """
+    report, captured = _capture(tmp_path, vendor, ["kicad", "model"])
+    assert report.selected == ["kicad", "model"], report
     assert report.missed == [], report
     assert report.submitted is True
     assert len(captured) == 1, f"expected ONE download carrying both formats, got {captured}"
@@ -70,17 +76,15 @@ def test_both_formats_are_selected_and_one_download_lands(tmp_path, vendor):
     assert captured[0].path.stat().st_size > 0
 
 
-def test_the_downloaded_file_really_carries_both_tools(tmp_path, vendor):
-    """Classification is the layer that decides what gets attached, so assert THERE - not on the
+def test_the_downloaded_file_really_carries_symbol_footprint_and_3d(tmp_path, vendor):
+    """Classification is the layer that decides what gets ATTACHED, so assert there - not on the
     fact that a file arrived. A zip that lands but classifies as nothing satisfies no requirement
-    and would leave the part exactly as incomplete as before."""
-    _, captured = _capture(tmp_path, vendor, ["kicad", "altium"])
+    and leaves the part exactly as incomplete as before, which is what a real run did."""
+    _, captured = _capture(tmp_path, vendor, ["kicad", "model"])
     classified = classify_asset(captured[0].path)
     assert Requirement.KICAD_SYMBOL in classified.requirements
     assert Requirement.KICAD_FOOTPRINT in classified.requirements
     assert Requirement.KICAD_MODEL in classified.requirements
-    assert Requirement.ALTIUM_SYMBOL in classified.requirements
-    assert Requirement.ALTIUM_FOOTPRINT in classified.requirements
 
 
 def test_a_kicad_only_capture_does_not_drag_in_altium(tmp_path, vendor):
@@ -112,7 +116,7 @@ def test_the_required_consent_is_accepted(tmp_path, vendor):
     browser = PlaywrightCaptureBrowser(download_dir=tmp_path / "dl", headless=True)
     with browser.session() as page:
         page.goto(vendor)
-        UltraLibrarianAdapter().drive(page, ["kicad", "altium"])
+        UltraLibrarianAdapter().drive(page, ["kicad", "model"])
         unticked = page.eval_on_selector_all(
             "input[type=checkbox][id^=consent-]", "els => els.filter(e => !e.checked).length"
         )
@@ -122,25 +126,35 @@ def test_the_required_consent_is_accepted(tmp_path, vendor):
 def test_nothing_is_reported_downloaded_before_a_file_exists(tmp_path, vendor):
     """`SUCCESS IS REPORTED BY WHAT OBSERVES IT`. `captured` is appended only after `save_as`
     returns, so a report of a download always has a readable file behind it."""
-    _, captured = _capture(tmp_path, vendor, ["kicad", "altium"])
+    _, captured = _capture(tmp_path, vendor, ["kicad", "model"])
     assert captured, "a submitted capture reported no file at all"
     for item in captured:
         assert isinstance(item, CapturedFile)
         assert item.path.is_file(), f"{item.path} was reported captured but is not on disk"
 
 
-def test_the_adapter_registry_declares_ultra_librarian_as_one_download(tmp_path):
-    """Capability is DATA the engine reads, so it must say the true thing: Ultra Librarian's own
-    site gives both formats in ONE export, so the engine must NOT sequence it."""
+def test_the_registry_does_not_claim_altium_files_ultra_librarian_cannot_supply(tmp_path):
+    """Capability is DATA the engine trusts, so it must say the TRUE thing.
+
+    Inspected on a real Ultra Librarian download 2026-07-27: the Altium export is "Altium Designer
+    (script based)" and ships `AltiumDesigner/UL_Import.pas` + a `.PrjScr` - a Delphi script that
+    builds the libraries inside Altium - and no `.SchLib`/`.PcbLib`. Claiming Altium here made the
+    engine request it and report success while attaching nothing.
+    """
     adapter = get_adapter("ultralibrarian")
     assert adapter is not None
     assert adapter.capability.formats_exclusive is False
     assert adapter.capability.version_pins["kicad"] == "KiCADv6"
-    assert set(adapter.capability.tools) == {"kicad", "altium"}
+    assert adapter.capability.version_pins["model"] == "MfrThreeDModel"
+    assert "altium" not in adapter.capability.tools
+    assert "altium" not in adapter.capability.version_pins
 
 
-def test_formats_are_derived_from_requirements_not_hardcoded():
+def test_the_3d_model_is_its_own_export_category():
+    """The defect this encodes: a 3D model is NOT part of the KiCad export. Asking only for
+    "kicad" returns a symbol and a footprint and silently no STEP."""
     assert formats_for([Requirement.KICAD_SYMBOL]) == ["kicad"]
+    assert formats_for([Requirement.KICAD_MODEL]) == ["model"]
+    assert formats_for([Requirement.KICAD_SYMBOL, Requirement.KICAD_MODEL]) == ["kicad", "model"]
     assert formats_for([Requirement.ALTIUM_FOOTPRINT]) == ["altium"]
-    assert formats_for([Requirement.KICAD_MODEL, Requirement.ALTIUM_SYMBOL]) == ["kicad", "altium"]
     assert formats_for([]) == []

@@ -52,14 +52,41 @@ _HARNESS_JS = """
 """
 
 
+# A MINIMAL BUT VALID KiCad 6 symbol library. The first version of this fixture wrote the string
+# "(kicad_symbol_lib)" and the real ingest pipeline rejected it with "no symbol found inside ...",
+# which is correct behaviour and meant the end-to-end test could never attach anything. A fixture
+# has to be valid enough for the REAL parser, or it tests the parser's error path by accident.
+_SYMBOL_LIB = """(kicad_symbol_lib (version 20211014) (generator stockroom_test)
+  (symbol "TPD6E05U06RVZR" (in_bom yes) (on_board yes)
+    (property "Reference" "U" (id 0) (at 0 0 0))
+    (property "Value" "TPD6E05U06RVZR" (id 1) (at 0 0 0))
+    (symbol "TPD6E05U06RVZR_0_1"
+      (rectangle (start -5.08 5.08) (end 5.08 -5.08)
+        (stroke (width 0.254) (type default)) (fill (type none)))
+    )
+  )
+)
+"""
+
+_FOOTPRINT = """(footprint "RVZ0014A" (version 20211014) (generator stockroom_test) (layer "F.Cu")
+  (attr smd)
+  (fp_text reference "REF**" (at 0 0) (layer "F.SilkS") (effects (font (size 1 1) (thickness 0.15))))
+  (pad "1" smd rect (at -1 0) (size 0.5 0.3) (layers "F.Cu" "F.Paste" "F.Mask"))
+)
+"""
+
+# A real STEP header, so a classifier or reader that sniffs content sees a plausible model.
+_STEP = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
+
+
 def _kicad_altium_zip() -> bytes:
     """A bundle shaped like a real two-format export: KiCad symbol + footprint + STEP, and the
     Altium pair. Classified by `capture.classify.classify_asset` exactly as a vendor's would be."""
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zf:
-        zf.writestr("TPD6E05U06RVZR.kicad_sym", "(kicad_symbol_lib)")
-        zf.writestr("TPD6E05U06RVZR.kicad_mod", "(footprint)")
-        zf.writestr("TPD6E05U06RVZR.step", "ISO-10303-21;")
+        zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
+        zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
+        zf.writestr("RVZ0014A.stp", _STEP)
         zf.writestr("TPD6E05U06RVZR.SchLib", "altium-symbol")
         zf.writestr("TPD6E05U06RVZR.PcbLib", "altium-footprint")
     return buffer.getvalue()
@@ -68,9 +95,9 @@ def _kicad_altium_zip() -> bytes:
 def _kicad_only_zip() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as zf:
-        zf.writestr("TPD6E05U06RVZR.kicad_sym", "(kicad_symbol_lib)")
-        zf.writestr("TPD6E05U06RVZR.kicad_mod", "(footprint)")
-        zf.writestr("TPD6E05U06RVZR.step", "ISO-10303-21;")
+        zf.writestr("TPD6E05U06RVZR.kicad_sym", _SYMBOL_LIB)
+        zf.writestr("footprints.pretty/RVZ0014A.kicad_mod", _FOOTPRINT)
+        zf.writestr("RVZ0014A.stp", _STEP)
     return buffer.getvalue()
 
 

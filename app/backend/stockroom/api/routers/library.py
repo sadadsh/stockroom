@@ -658,6 +658,69 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
 
+    @r.post("/capture/run")
+    def capture_run(request: Request, body: dict | None = None) -> dict:
+        """Guided capture from a trusted vendor: ONE component, or the whole library.
+
+        Owner, 2026-07-27: *"i also need guided capture per component"* and *"always make the
+        easiest workflow"*. So there is ONE route and one engine:
+
+            {"part_ids": ["<id>"]}   -> that component
+            {}                       -> every part still missing files
+
+        Both run the same `complete_library` path the offline sources use, so per-component and
+        whole-library cannot behave differently, and whichever is verified verifies the other.
+
+        A real browser window opens. The person signs in to the vendor ONCE - the profile is
+        persistent - and the run continues by itself from there. Cancellable, and every part is
+        its own atomic commit, so stopping is safe at any moment and resuming is just running it
+        again.
+        """
+        from stockroom.capture.runner import run_guided_capture
+
+        ctx = request.app.state.ctx
+        payload = body or {}
+        part_ids = payload.get("part_ids") or None
+        limit = payload.get("limit")
+        vendor = (payload.get("vendor") or "ultralibrarian").strip().lower()
+
+        def work(progress, should_stop):
+            return run_guided_capture(
+                ctx,
+                part_ids=part_ids,
+                vendor=vendor,
+                progress=progress,
+                should_stop=should_stop,
+                limit=(int(limit) if limit else None),
+            )
+
+        return {"job_id": ctx.jobs.submit_cancellable(work)}
+
+    @r.get("/capture/vendors")
+    def capture_vendors() -> dict:
+        """The vendors guided capture can actually drive, with what each can supply.
+
+        Driven off the adapter registry rather than a hand-kept list, so a surface can never offer
+        a vendor that has no implementation behind it - which is exactly how the old flow sent
+        people to a 404 for months.
+        """
+        from stockroom.capture.vendors import all_adapters
+
+        return {
+            "vendors": [
+                {
+                    "key": a.capability.key,
+                    "label": a.capability.label,
+                    "tools": list(a.capability.tools),
+                    "needs_login": a.capability.needs_login,
+                    "aggregator": a.capability.aggregator,
+                    "instruction": a.capability.instruction,
+                    "one_download_for_all_formats": not a.capability.formats_exclusive,
+                }
+                for a in all_adapters()
+            ]
+        }
+
     @r.get("/cad")
     def cad_inventory(request: Request) -> dict:
         """What CAD this library holds, and how much of it this app could remove.
