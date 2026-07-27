@@ -1,5 +1,12 @@
 {
   "alternates": {
+    "Contact Material": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Phosphor bronze"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -51,6 +58,18 @@
         "confidence": "medium",
         "source": "digikey",
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/406/FTSH-105-01-L-DV-K.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4"
       }
     ],
     "Mounting Type": [
@@ -674,6 +693,78 @@
       "stock": 482,
       "url": "https://www.lcsc.com/product-detail/C448647.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:59.310942+00:00",
+      "part_number": "200-FTSH10501LDVK",
+      "price_breaks": [
+        {
+          "price": 1.27,
+          "qty": 1
+        },
+        {
+          "price": 0.972,
+          "qty": 92
+        },
+        {
+          "price": 0.855,
+          "qty": 276
+        },
+        {
+          "price": 0.753,
+          "qty": 552
+        },
+        {
+          "price": 0.707,
+          "qty": 2024
+        }
+      ],
+      "stock": 53529,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:59.310942+00:00",
+      "part_number": "SAM8799-ND",
+      "price_breaks": [
+        {
+          "price": 1.37,
+          "qty": 1
+        },
+        {
+          "price": 1.075,
+          "qty": 100
+        },
+        {
+          "price": 0.972,
+          "qty": 250
+        },
+        {
+          "price": 0.855,
+          "qty": 500
+        },
+        {
+          "price": 0.753,
+          "qty": 1000
+        },
+        {
+          "price": 0.68,
+          "qty": 2500
+        },
+        {
+          "price": 0.607,
+          "qty": 5000
+        },
+        {
+          "price": 0.52375,
+          "qty": 10000
+        }
+      ],
+      "stock": 51772,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
