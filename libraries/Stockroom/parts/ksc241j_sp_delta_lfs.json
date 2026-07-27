@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6450/MFG_KSC241J%2520SP%2520DELTA%2520LFS.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "105 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "13"
+      }
+    ],
     "Product Category": [
       {
         "confidence": "high",
@@ -224,6 +236,94 @@
       "stock": 25596,
       "url": "https://www.lcsc.com/category/651.html?scene=FULL_MATCH&globalKeyword=KSC241J%2520SP%2520DELTA%2520LFS&s_z=n_q_KSC241J%2520SP%2520DELTA%2520LFS",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:22.258403+00:00",
+      "part_number": "611-SC241JSPDELTALFS",
+      "price_breaks": [
+        {
+          "price": 0.64,
+          "qty": 1
+        },
+        {
+          "price": 0.576,
+          "qty": 10
+        },
+        {
+          "price": 0.544,
+          "qty": 25
+        },
+        {
+          "price": 0.48,
+          "qty": 100
+        },
+        {
+          "price": 0.444,
+          "qty": 250
+        },
+        {
+          "price": 0.425,
+          "qty": 500
+        },
+        {
+          "price": 0.38,
+          "qty": 2000
+        },
+        {
+          "price": 0.349,
+          "qty": 4000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:22.258403+00:00",
+      "part_number": "108-KSC241JSPDELTALFS-ND",
+      "price_breaks": [
+        {
+          "price": 0.68,
+          "qty": 1
+        },
+        {
+          "price": 0.584,
+          "qty": 10
+        },
+        {
+          "price": 0.544,
+          "qty": 25
+        },
+        {
+          "price": 0.4857,
+          "qty": 100
+        },
+        {
+          "price": 0.44992,
+          "qty": 250
+        },
+        {
+          "price": 0.42482,
+          "qty": 500
+        },
+        {
+          "price": 0.38059,
+          "qty": 2000
+        },
+        {
+          "price": 0.36159,
+          "qty": 4000
+        },
+        {
+          "price": 0.35143,
+          "qty": 6000
+        }
+      ],
+      "stock": 25596,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
