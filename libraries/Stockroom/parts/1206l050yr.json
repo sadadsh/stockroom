@@ -1,5 +1,17 @@
 {
   "alternates": {
+    "Current - Max": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100A"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "100 A"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -46,6 +58,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8533408070"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.40.8070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/littelfuse/images/PTC_1206L_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/202/POLYFUSE-1206L.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "91 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "13"
       }
     ],
     "Minimum Order Quantity": [
@@ -58,6 +99,23 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+85℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 85°C"
       }
     ],
     "Order Multiple": [
@@ -84,6 +142,30 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resettable Fuses - PPTC"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Circuit Protection"
+      }
+    ],
+    "Resistance - Post Trip (R1) (Max)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "700mΩ"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "700 mOhms"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -94,6 +176,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -106,6 +193,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Resettable Fuses - PPTC 1206 PTC 6V 500MA"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "PTC RESET FUSE 6V 500MA 1206"
       }
     ],
     "product_url": [
@@ -189,9 +281,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Current - Hold (Ih) (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Current - Max": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Trip (It)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -341,6 +441,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Operating Temperature": {
       "confidence": "medium",
       "source": "lcsc"
@@ -353,6 +461,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -360,6 +472,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -401,9 +517,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Resistance - Initial (Ri) (Min)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Resistance - Post Trip (R1) (Max)": {
       "confidence": "medium",
@@ -416,6 +540,14 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -437,6 +569,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Thickness (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Time to Trip": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Time to Trip(Max)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -444,6 +584,10 @@
     "Trip Current": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Unit": {
       "confidence": "medium",
@@ -518,6 +662,70 @@
       "stock": 13563,
       "url": "https://www.lcsc.com/product-detail/C163512.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:41.693321+00:00",
+      "part_number": "576-1206L050YR",
+      "price_breaks": [
+        {
+          "price": 0.53,
+          "qty": 1
+        },
+        {
+          "price": 0.488,
+          "qty": 10
+        },
+        {
+          "price": 0.405,
+          "qty": 50
+        },
+        {
+          "price": 0.371,
+          "qty": 100
+        },
+        {
+          "price": 0.336,
+          "qty": 200
+        },
+        {
+          "price": 0.31,
+          "qty": 500
+        },
+        {
+          "price": 0.283,
+          "qty": 1000
+        },
+        {
+          "price": 0.271,
+          "qty": 2000
+        },
+        {
+          "price": 0.229,
+          "qty": 4000
+        }
+      ],
+      "stock": 23076,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:41.693321+00:00",
+      "part_number": "F2112TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.20782,
+          "qty": 4000
+        },
+        {
+          "price": 0.19963,
+          "qty": 8000
+        }
+      ],
+      "stock": 19888,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -532,7 +740,9 @@
     "Country of Origin": "Taiwan",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Hold (Ih) (Max)": "500 mA",
     "Current - Max": "100A",
+    "Current - Trip (It)": "1 A",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/c74a5ddd0add4500b745ecf0d59ab737.svg?t=1744297682",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/e9602846e22e45258f06f7cad8664abd.svg?t=1744297682",
@@ -570,11 +780,15 @@
     "Length": "-",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Operating Temperature": "-40℃~+85℃",
     "Order Multiple": "10",
     "Package": "1206",
+    "Package / Case": "1206 (3216 Metric), Concave",
     "Package Quantity": "4000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "395",
     "Pitch": "-",
@@ -585,17 +799,24 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20250804_Littelfuse-1206L050YR_C163512_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20250804_Littelfuse-1206L050YR_C163512_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20250804_Littelfuse-1206L050YR_C163512_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
+    "Resistance - Initial (Ri) (Min)": "150 mOhms",
     "Resistance - Post Trip (R1) (Max)": "700mΩ",
     "Resistance @ 25℃": "150mΩ",
     "RoHS": "Yes",
+    "Series": "POLY-FUSE®, 1206L",
+    "Size / Dimension": "0.126\" L x 0.065\" W (3.20mm x 1.65mm)",
     "Standard Pack Qty": "4000",
     "Stock": "18910",
     "Stock (Domestic)": "18910",
     "Stock (Overseas)": "18910",
     "Stock (Shenzhen)": "18910",
+    "Thickness (Max)": "0.030\" (0.75mm)",
+    "Time to Trip": "100 ms",
     "Time to Trip(Max)": "100ms",
     "Trip Current": "1A",
+    "Type": "Polymeric",
     "Unit": "Piece",
     "Unit Weight (kg)": "2.6e-05",
     "Voltage - Max": "6V",
