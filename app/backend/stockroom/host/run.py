@@ -14,6 +14,8 @@ headless ASGI app (spec section 2.1) and only the host imports the window layer.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -160,9 +162,36 @@ def run_windowed(
     return restart_requested["value"]
 
 
-def main() -> None:  # pragma: no cover - the real Windows-run entry (uv run target)
-    if run_windowed():
-        raise SystemExit(EXIT_RESTART)
+def _spawn_self() -> int:
+    """Run this host again, in a child process, and return its exit code.
+
+    The SAME interpreter and the SAME module, deliberately: resolving either from PATH would
+    relaunch whatever python happens to be first, which on a machine with several is not the
+    install's venv.
+    """
+    return subprocess.call([sys.executable, "-m", "stockroom.host.run"])
+
+
+def main() -> None:
+    """Run the window, and RELAUNCH after a self-update rather than assuming a supervisor exists.
+
+    The host used to just `raise SystemExit(EXIT_RESTART)` and trust something outside to bring it
+    back. Only the frozen `Stockroom.exe` does that -- and the owner runs
+    `python -m stockroom.host.run`, with no exe and no shortcut on the machine. So every update
+    pulled the files, closed the window, and ended. From the owner's side: *"my app still wont
+    update even with latest files pulled"* -- the pull had worked every time; nothing restarted.
+
+    Relaunching in-process makes the update path whole however the app was started, and the
+    EXIT_RESTART fallback keeps the launcher's contract intact for a frozen install. The child's
+    exit code becomes ours, so a second update inside the new process still works.
+    """
+    if not run_windowed():
+        return
+    try:
+        code = _spawn_self()
+    except Exception:  # noqa: BLE001 - a failed relaunch must fall back, never kill the update
+        raise SystemExit(EXIT_RESTART) from None
+    raise SystemExit(code)
 
 
 if __name__ == "__main__":  # pragma: no cover
