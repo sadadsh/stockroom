@@ -101,12 +101,29 @@ fe() { npm --prefix app/frontend run "$1"; }
 # thousand third-party findings, and an ignored linter is decoration.
 lint() { .venv/bin/ruff check app/backend scripts tests; }
 
+# Run pytest against ONE path, with the same parallelism and RAM temp dir the full suite uses, so
+# a targeted run and the gate cannot disagree about the environment they ran in.
+pytest_path() {
+  local target="$1"
+  local n=(-n "${PYTEST_WORKERS:-12}")
+  [[ "${SERIAL_TESTS:-0}" == "1" ]] && n=()
+  mkdir -p "$TMPBASE"
+  QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
+    .venv/bin/python -m pytest "$target" -q -p no:randomly "${n[@]}" --basetemp="$TMPBASE/bt"
+  local rc=$?
+  rm -rf "$TMPBASE/bt"
+  return $rc
+}
+
 ROOT="$PWD"
 BG_LOG="${GATES_BG_LOG:-build/gates-backend.log}"
 
 case "${1:-all}" in
   lint)     run "ruff" lint ;;
   backend)  run "backend suite" backend ;;
+  # A pytest PATH is a first-class scope, so `bg tests/backend/capture` works and `await` reports
+  # it exactly like any other. Without this, backgrounding one slow file meant hand-rolled polling.
+  tests|tests/*) run "pytest ${1}" pytest_path "$1" ;;
   since)    since "${2:-HEAD}" ;;
   bg)       # `bg [scope]` detaches ANY scope, not just the backend. It used to hardcode `backend`,
             # so a FULL gate run had no detached mode at all -- and the way round that was to
@@ -116,7 +133,15 @@ case "${1:-all}" in
             scope="${2:-backend}"
             case "$scope" in
               all|lint|backend|frontend|quick|types) ;;
-              *) echo "usage: $0 bg [all|lint|backend|frontend|quick|types]" >&2; exit 2 ;;
+              # A PYTEST PATH is a scope too. Without this, backgrounding one slow test file meant
+              # hand-rolling `pytest ... > log &` plus a `ps`/`pgrep` poll - which is how a dozen
+              # self-matching wait loops got created in one session, none of which could ever exit
+              # (their own argv contained the pattern they polled for). `await` already keys on a
+              # pid file and a .done marker, so routing a path through here inherits both.
+              tests/*|tests) [[ -e "$ROOT/${scope%%::*}" ]] || {
+                     echo "no such test path: $scope" >&2; exit 2; } ;;
+              *) echo "usage: $0 bg [all|lint|backend|frontend|quick|types|<tests/... path>]" >&2
+                 exit 2 ;;
             esac
             mkdir -p "$(dirname "$BG_LOG")"
             : > "$BG_LOG"
