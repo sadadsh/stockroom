@@ -65,6 +65,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4806/31%7ESOT23-3%7EF%2CN%2CSA%7E3.JPG"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "280 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "40"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -661,6 +673,54 @@
       "stock": 2540,
       "url": "https://www.lcsc.com/product-detail/C260927.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:27.781635+00:00",
+      "part_number": "621-DMG3414U-7",
+      "price_breaks": [
+        {
+          "price": 0.91,
+          "qty": 1
+        },
+        {
+          "price": 0.588,
+          "qty": 10
+        },
+        {
+          "price": 0.379,
+          "qty": 100
+        },
+        {
+          "price": 0.278,
+          "qty": 500
+        },
+        {
+          "price": 0.278,
+          "qty": 3000
+        }
+      ],
+      "stock": 5306,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:27.781635+00:00",
+      "part_number": "DMG3414U-7DITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.19872,
+          "qty": 3000
+        },
+        {
+          "price": 0.17349,
+          "qty": 9000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
