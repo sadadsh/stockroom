@@ -1,0 +1,161 @@
+{
+  "category": "Inductors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "blm15px601sh1d.pdf",
+    "source_url": ""
+  },
+  "description": "Ferrite Beads 0402 600ohm 25% 5A AEC-Q200 DC PWR Line",
+  "display_name": "Power Inductor",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "ECCN": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CA)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CN)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Packaging": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "RoHS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    }
+  },
+  "hashes": null,
+  "id": "blm15px601sh1d",
+  "manufacturer": "Murata Electronics",
+  "mpn": "BLM15PX601SH1D",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.27,
+          "qty": 1
+        },
+        {
+          "price": 0.184,
+          "qty": 10
+        },
+        {
+          "price": 0.16,
+          "qty": 25
+        },
+        {
+          "price": 0.143,
+          "qty": 50
+        },
+        {
+          "price": 0.128,
+          "qty": 100
+        },
+        {
+          "price": 0.11,
+          "qty": 250
+        },
+        {
+          "price": 0.094,
+          "qty": 500
+        },
+        {
+          "price": 0.083,
+          "qty": 1000
+        },
+        {
+          "price": 0.082,
+          "qty": 5000
+        },
+        {
+          "price": 0.082,
+          "qty": 10000
+        }
+      ],
+      "stock": 108674,
+      "url": "https://www.lcsc.com/search?q=BLM15PX601SH1D",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Japan",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Japan",
+    "ECCN": "EAR99",
+    "HTS Code (CA)": "8548000000",
+    "HTS Code (CN)": "8548000001",
+    "HTS Code (EU TARIC)": "8504509590",
+    "HTS Code (JP)": "854800000",
+    "HTS Code (US)": "8548000000",
+    "Image": "https://www.mouser.com/images/murata/images/BLM15PX-series_SPL.jpg",
+    "Lead Time": "112 Days",
+    "Minimum Order Quantity": "1",
+    "Order Multiple": "1",
+    "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product Category": "Ferrite Beads",
+    "RoHS": "RoHS Compliant",
+    "Standard Pack Qty": "10000"
+  },
+  "tags": [],
+  "value": ""
+}
