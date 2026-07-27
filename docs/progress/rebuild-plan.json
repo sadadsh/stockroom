@@ -10,9 +10,9 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 15:42 UTC",
-  "now": "Your laptop's update abort is FIXED and pushed (c8a595d). It needs one manual unblock first, because the fix ships inside the update that is blocked.",
-  "now_updated": "2026-07-27 13:10 UTC",
+  "updated": "2026-07-27 16:12 UTC",
+  "now": "Back on the plan: guided capture. The library divergence is resolved and the desktop is converged; three steps remain on One Library, One Repo.",
+  "now_updated": "2026-07-27 14:05 UTC",
   "projects": [
     {
       "id": "stockroom",
@@ -809,6 +809,45 @@
                 },
                 {
                   "t": "Verified on the owner's laptop",
+                  "done": false,
+                  "evidence": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dp1",
+          "name": "One Library, One Repo",
+          "why": "The owner has ONE repo and wants one library. Divergence came from THREE working copies of it, and nothing in the app said so.",
+          "items": [
+            {
+              "id": "one-library",
+              "name": "Three Working Copies Of One Repo",
+              "why": "The desktop was 116 ahead / 54 behind a second clone; the laptop silently adopted a third via IN_REPO_DEFAULT. No surface ever said the copies had drifted.",
+              "steps": [
+                {
+                  "t": "Desktop procurement data carried across the v3 id rename",
+                  "done": true,
+                  "evidence": "116 parts / 180 rows added / 47 upgraded, keyed by MPN because MPN is IDENTITY and survives an id rename (keying by filename is exactly what conflicted). Dry-run first: 116 parts changed, matching the 116 commits exactly, 0 unmatched MPNs. 15076f1."
+                },
+                {
+                  "t": "Desktop clone converged to origin",
+                  "done": true,
+                  "evidence": "C:\\stockroom-fresh-device now 0 ahead / 0 behind origin, 158 parts all on rules@2, 145 DigiKey rows intact. The 116 original commits are preserved on origin branch desktop-procurement-2026-07-27, so nothing was destroyed to get there."
+                },
+                {
+                  "t": "IN_REPO_DEFAULT stops silently adopting a rival library",
+                  "done": false,
+                  "evidence": ""
+                },
+                {
+                  "t": "The app SAYS when its library has drifted from the remote",
+                  "done": false,
+                  "evidence": ""
+                },
+                {
+                  "t": "One working copy per machine, enforced or detected",
                   "done": false,
                   "evidence": ""
                 }
