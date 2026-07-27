@@ -247,3 +247,50 @@ the manual work the owner wants removed).
 
 **STILL TO DECIDE:** the concrete asset record shape; which fields are derived and how a re-derive
 is proven lossless; the migration path for the 158 live records.
+
+---
+
+## 7. FILE SOURCES - the full landscape, researched 2026-07-27
+
+Owner: *"look up how we can get these files accurately and without limiters"*, and
+*"i will rebuild my whole library once everything is perfect"* (so NO migration constraint - design
+for correctness, the owner re-imports).
+
+**CONCLUSION: a free, unlimited, automated, both-format source DOES NOT EXIST.** Every source that
+emits both Altium and KiCad gates automation behind a partner API or a desktop app.
+
+| source | Altium | KiCad | automatable | limits | trusted |
+|---|---|---|---|---|---|
+| **SamacSys / Component Search Engine** | yes | yes | plugin + Library Loader desktop app; **no documented API** | **none stated; downloads FREE** | yes, IPC-verified |
+| Ultra Librarian | yes | yes | **no public REST API found** | - | yes |
+| SnapMagic / SnapEDA | yes | yes | API exists, **behind a request form** | free + premium tiers | yes |
+| Mouser API | **no CAD fields at all** | no | yes, key works today | 30/min, 1000/day | yes (owner trusts most) |
+| LCSC / EasyEDA | **never** (KiCad only) | yes | keyless | CloudFront blocks past ~20 calls/min | **NO - owner: "never again"** |
+| KiCad official libraries | no | yes | **already installed locally** | **NONE** | yes, community-reviewed |
+
+### Evidence behind each row
+- **Mouser has no CAD.** Dumped every key the Search API returns for `595-TPS62130RGTR`:
+  `DataSheetUrl, PriceBreaks, ProductAttributes, LifecycleStatus, ProductCompliance, ...` and
+  nothing for symbol/footprint/3D/CAD/model. Mouser's own "Download Design Files" button is
+  SamacSys, a separate service outside the Search API.
+- **SamacSys is what Mouser uses**, so trusting Mouser already means trusting SamacSys indirectly.
+  Free, no stated download limits, 24+ CAD systems including Altium and KiCad. Account required.
+  No API documented; access is the web UI or the **Library Loader** desktop app.
+- **KiCad official libs are ON DISK**: `C:\Program Files\KiCad\10.0\share\kicad\` - 223 symbol,
+  155 footprint, 105 3D-model libraries. Zero network, zero limit. Coverage measured against the
+  owner's failing parts: Samtec **998** footprints, Harwin **104**, QFN-16 **83**, TSSOP-28 **24**,
+  SOIC-8 **23**, SOT-23-5/-6 four each, SOT-363 and SOT-563 one each. KiCad-only, so it cannot
+  satisfy Altium on its own.
+
+### The recommendation, and the one test that decides it
+**SamacSys is the strongest candidate** and was under-weighted earlier: free, unlimited, both
+formats, IPC-verified, and already implicitly trusted via Mouser. "No API" is a weaker blocker than
+it looks - this repo ALREADY drives a desktop application headlessly (`altium/driver.py`, proven
+for 3D embedding), so Library Loader is drivable by the same pattern.
+
+**NEXT TEST (short, decisive):** does a logged-in SamacSys session expose a predictable per-part
+download URL, or is Library Loader the only path? That answer picks between a clean in-app fetcher
+and a driven desktop app. Everything else about acquisition waits on it.
+
+**Do NOT propose LCSC/EasyEDA again.** Owner ruled it out explicitly; it is also KiCad-only, so it
+could never satisfy the Altium half regardless.
