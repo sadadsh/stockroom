@@ -129,7 +129,25 @@
   },
   "description": "14VC Clamp 6A@8/20us Ipp ESD DIODE X1-SON-2(0.6x1)",
   "display_name": "ESD Protection Diode X1-SON-2",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD1E10B06DPYR"
+      },
+      "model": {
+        "file": "models/TPD1E10B06DPYR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TPD1E10B06DPYR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
