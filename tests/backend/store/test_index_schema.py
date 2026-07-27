@@ -277,3 +277,43 @@ def test_the_schema_creates_no_DROP_and_survives_being_applied_twice(tmp_path):
     idx._conn.executescript(_SCHEMA)  # idempotent: must not raise or wipe
     assert idx.count() == 1
     idx.close()
+
+
+# --------------------------------------------------- which derivation ruleset a part carries
+#
+# `derived_by` is the stamp `model/derived.py` exists to make useful: *"a library can be swept
+# for parts still carrying an older derivation instead of everything being re-derived blindly."*
+# Sweeping by reading 10,000 record files defeats the point, so the stamp is INDEXED and the
+# question is a query.
+
+
+def test_the_index_knows_which_derivation_ruleset_each_part_carries(tmp_path):
+    # `record.derived` is a computed VIEW over the flat fields, so the stamp is set where it
+    # actually lives. Mutating the returned block would be a no-op, which is exactly the trap
+    # this spelling avoids.
+    old = _rec("a-0001", "AAA", derived_by="rules@1")
+    new = _rec("b-0002", "BBB", derived_by="rules@2")
+    index = LibraryIndex.build(_lib(tmp_path, [old, new]))
+
+    assert index.derivation_counts() == {"rules@1": 1, "rules@2": 1}
+
+
+def test_the_stale_parts_are_named_not_just_counted(tmp_path):
+    """A count alone cannot drive a re-derive; the ids are what the engine walks."""
+    old_a = _rec("a-0001", "AAA", derived_by="rules@1")
+    old_b = _rec("b-0002", "BBB", derived_by="rules@1")
+    current = _rec("c-0003", "CCC", derived_by="rules@9")
+    index = LibraryIndex.build(_lib(tmp_path, [old_a, old_b, current]))
+
+    assert index.parts_not_derived_by("rules@9") == ["a-0001", "b-0002"]
+    assert index.parts_not_derived_by("rules@1") == ["c-0003"]
+
+
+def test_a_record_that_has_never_been_derived_counts_as_stale_not_as_current(tmp_path):
+    """An empty stamp is not the current ruleset. NEGATIVE CONTROL for the query above: if
+    `parts_not_derived_by` compared with anything but equality, this part would go missing."""
+    never = _rec("a-0001", "AAA", derived_by="")
+    index = LibraryIndex.build(_lib(tmp_path, [never]))
+
+    assert index.derivation_counts() == {"": 1}
+    assert index.parts_not_derived_by("rules@2") == ["a-0001"]

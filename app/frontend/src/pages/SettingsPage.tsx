@@ -13,6 +13,7 @@ import { useJob } from "../lib/useJob";
 import { AltiumDbLibSection } from "../components/AltiumDbLibSection";
 import { SettingsDisclosure } from "../components/SettingsDisclosure";
 import { LibraryCompletionSection } from "../components/LibraryCompletionSection";
+import { DerivationSection } from "../components/DerivationSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
 import { RescanSection } from "../components/RescanSection";
@@ -337,6 +338,15 @@ export function SettingsPage() {
                     data-dev-id="settings.completion"
                   >
                     <LibraryCompletionSection />
+                  </SettingsDisclosure>
+                  <SettingsDisclosure
+                    title="Presentation Data" titleId="settings.derivation.title"
+                    hint="Which rules built the names, descriptions, categories and specs you see. They are computed from the raw distributor data stored beside each component, so improving the rules means recomputing rather than re-importing. Needs no network and no API keys."
+                    hintId="settings.derivation.hint"
+                    open={open("derivation")} onToggle={() => toggle("derivation")}
+                    data-dev-id="settings.derivation"
+                  >
+                    <DerivationSection />
                   </SettingsDisclosure>
                   <SettingsDisclosure
                     title="Library Health" titleId="settings.health.title"

@@ -51,13 +51,18 @@ CREATE TABLE IF NOT EXISTS parts (
     is_complete    INTEGER NOT NULL,
     missing        TEXT NOT NULL DEFAULT '',
     search_blob    TEXT NOT NULL,
-    source_hash    TEXT NOT NULL DEFAULT ''
+    source_hash    TEXT NOT NULL DEFAULT '',
+    derived_by     TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_parts_category ON parts(category);
 CREATE INDEX IF NOT EXISTS idx_parts_mpn      ON parts(mpn);
 CREATE INDEX IF NOT EXISTS idx_parts_complete ON parts(is_complete);
 CREATE INDEX IF NOT EXISTS idx_parts_fp       ON parts(footprint_name);
 CREATE INDEX IF NOT EXISTS idx_parts_class    ON parts(part_class);
+-- Which derivation ruleset produced each part's `derived` block. Indexed because the stamp only
+-- pays for itself if "which parts are behind the current rules" is a QUERY: sweeping a 10,000-part
+-- library by opening every record file is the O(n) read this index exists to remove.
+CREATE INDEX IF NOT EXISTS idx_parts_derived  ON parts(derived_by);
 
 -- One row per (part, tool, asset kind). `present` mirrors model.part.asset_present, so
 -- "is this part ready for Altium" is a query rather than a per-tool column.
@@ -251,8 +256,8 @@ class LibraryIndex:
         self._conn.execute(
             "INSERT OR REPLACE INTO parts (id, display_name, category, description, mpn, "
             "manufacturer, part_class, footprint_name, model_file, datasheet_file, purchase_url, "
-            "is_complete, missing, search_blob, source_hash) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "is_complete, missing, search_blob, source_hash, derived_by) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             _row_values(rec, source_hash),
         )
         self._conn.execute("DELETE FROM part_assets WHERE part_id = ?", (rec.id,))
@@ -274,6 +279,36 @@ class LibraryIndex:
     def count(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM parts").fetchone()[0]
+
+    def derivation_counts(self) -> dict[str, int]:
+        """How many parts each derivation ruleset produced, stamp -> count.
+
+        A record that has never been derived carries an EMPTY stamp and appears under `""`. It is
+        reported rather than folded into the current ruleset, because "never derived" and "derived
+        by the rules running now" are different states and only one of them needs work.
+        """
+        with self._lock:
+            return {
+                r[0]: r[1]
+                for r in self._conn.execute(
+                    "SELECT derived_by, COUNT(*) FROM parts GROUP BY derived_by ORDER BY derived_by"
+                )
+            }
+
+    def parts_not_derived_by(self, ruleset: str) -> list[str]:
+        """The ids of every part whose derived block came from some OTHER ruleset, in id order.
+
+        Equality, never a version comparison: a stamp is an opaque label, and a library can hold a
+        block produced by a ruleset NEWER than the one running (a peer device on a later build).
+        Ordered so a resumed sweep walks the same parts in the same order.
+        """
+        with self._lock:
+            return [
+                r[0]
+                for r in self._conn.execute(
+                    "SELECT id FROM parts WHERE derived_by IS NOT ? ORDER BY id", (ruleset,)
+                )
+            ]
 
     def search(
         self, query: str = "", category: str | None = None, complete_only: bool = False
@@ -552,6 +587,7 @@ def _row_values(rec: PartRecord, source_hash: str = "") -> tuple:
         ",".join(missing),
         search_blob,
         source_hash,
+        rec.derived.derived_by,
     )
 
 

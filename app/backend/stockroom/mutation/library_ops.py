@@ -6,6 +6,7 @@ sections 3, 5, 9).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import shutil
@@ -139,6 +140,28 @@ def staged_missing_fields(staged: "StagedPart") -> list[str]:
         "purchase": any(bool(p.url) for p in staged.purchase),
     }
     return missing_from_presence(present)
+
+
+def derivation_status(index) -> dict:
+    """Which derivation ruleset the library's parts currently carry, and how many are behind.
+
+    Answered from the INDEX with one grouped query, never by opening every record file - that is
+    the whole reason the `derived_by` stamp is an indexed column. Takes the index rather than
+    living on `LibraryOps` because it reads only derived state and writes nothing.
+
+    `stale` counts everything whose stamp is not the running ruleset, INCLUDING the empty stamp
+    (never derived) and any stamp from a NEWER build a peer device wrote. Both need a look; only
+    one of them needs the same fix, and the per-stamp `counts` is what tells them apart.
+    """
+    from stockroom.model.derived import DERIVED_BY
+
+    counts = index.derivation_counts() if index is not None else {}
+    return {
+        "ruleset": DERIVED_BY,
+        "counts": counts,
+        "current": counts.get(DERIVED_BY, 0),
+        "stale": sum(n for stamp, n in counts.items() if stamp != DERIVED_BY),
+    }
 
 
 def _reference_commit_message(record: PartRecord) -> str:
@@ -1116,6 +1139,89 @@ class LibraryOps:
                     path.write_text(record.dumps(), encoding="utf-8")
                     txn.track(path)
                 txn.commit(f"Rebuild {len(planned)} names + descriptions from part specs")
+        return report
+
+    def rederive_library(
+        self, *, now_iso: str, scheme: str = "", dry_run: bool = False, progress=None
+    ) -> dict:
+        """Recompute every record's DERIVED block from its stored evidence, in one atomic commit.
+
+        This is the sweep the `derived_by` stamp exists for: a derivation-rules change (a new
+        naming scheme, a cleaned-up description, a different spec normalization) makes every
+        record's derived block stale, and the owner must be able to close that from inside the
+        app rather than by someone running a script at their machine.
+
+        THREE PROPERTIES, each load-bearing:
+
+        * **Credential-free.** It reads `sourced/` and nothing else - no network, no API key.
+          A fresh clone that has never been given credentials can still rebuild the library it
+          just pulled, which is what device parity requires.
+        * **Non-destructive.** A record with NO stored evidence is SKIPPED and counted, never
+          rewritten. `derive.engine.rederive` on its own recomputes an empty block from no
+          payloads - correct for one part mid-import, and a silent wipe of every hand-added
+          part's description if applied blindly across a library.
+        * **Atomic.** "The library is on ruleset N" is one fact, so it is one commit and one
+          rollback. A part that cannot be read is reported by id and does not abandon the rest.
+
+        Streams: one record is held in memory at a time, so a 10,000-part library costs the same
+        as a 10-part one. `derived_at` is only re-stamped when the block actually changed, so a
+        second pass over an already-current library is a true no-op rather than a full rewrite.
+        """
+        from stockroom.derive.engine import rederive
+        from stockroom.derive.naming import DEFAULT_SCHEME
+        from stockroom.model.derived import DERIVED_BY
+        from stockroom.model.sourced import list_sources
+
+        library_root = self.lib.parts_dir.parent
+        report = {
+            "ruleset": DERIVED_BY,
+            "checked": 0,
+            "rewritten": 0,
+            "unchanged": 0,
+            "no_evidence": 0,
+            "failed": [],
+        }
+        paths = sorted(self.lib.parts_dir.glob("*.json"))
+        # The transaction is opened BEFORE the walk, so a rewritten record is written and tracked
+        # immediately and nothing accumulates. Holding the new text of every changed record until
+        # the end would be ~300 MB at the 10,000-part scale this is built for, which is exactly
+        # the shape the streaming worklist elsewhere in this repo exists to avoid.
+        # `dry_run` opens no transaction at all: a run that writes nothing must not be able to
+        # commit, rather than merely choosing not to.
+        with (Transaction(self.repo) if not dry_run else contextlib.nullcontext()) as txn:
+            for i, path in enumerate(paths):
+                report["checked"] += 1
+                if progress is not None:
+                    progress(i + 1, len(paths), path.stem)
+                try:
+                    record = PartRecord.loads(path.read_text(encoding="utf-8"))
+                    # Evidence is checked on DISK, not from the record's `sources` index: an
+                    # index entry pointing at a payload that is not there would blank the part.
+                    if not list_sources(library_root, record.id):
+                        report["no_evidence"] += 1
+                        continue
+                    before = record.derived.to_dict()
+                    # Derive with the record's EXISTING timestamp so an unchanged block compares
+                    # equal. Stamping `now` up front would make every part differ every run,
+                    # churning the library and making the `unchanged` count meaningless.
+                    rederive(
+                        record,
+                        library_root,
+                        derived_at=record.derived_at or now_iso,
+                        scheme=scheme or DEFAULT_SCHEME,
+                    )
+                    if record.derived.to_dict() == before:
+                        report["unchanged"] += 1
+                        continue
+                    record.derived_at = now_iso
+                    report["rewritten"] += 1
+                    if txn is not None:
+                        path.write_text(record.dumps(), encoding="utf-8")
+                        txn.track(path)
+                except Exception as exc:  # noqa: BLE001 - one bad record cannot abandon the sweep
+                    report["failed"].append({"id": path.stem, "error": str(exc)})
+            if txn is not None and report["rewritten"]:
+                txn.commit(f"Re-derive {report['rewritten']} parts onto {DERIVED_BY}")
         return report
 
     def set_specs(self, part_id: str, specs: dict, *, overwrite: bool = False) -> PartRecord:

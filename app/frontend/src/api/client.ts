@@ -12,6 +12,7 @@ import type {
   AltiumEmbedResult,
   AltiumModelsPending,
   LibraryCoverage,
+  LibraryDerivation,
   AltiumRegenerateResult,
   DevSaveBody,
   DevSaveResult,
@@ -1191,6 +1192,21 @@ export const api = {
   runCompletion(input: { partIds?: string[]; limit?: number } = {}): Promise<{ job_id: string }> {
     return request<{ job_id: string }>("POST", "/api/library/completion/run", {
       body: { part_ids: input.partIds, limit: input.limit },
+    });
+  },
+
+  // Which derivation ruleset produced what the library is currently showing. Read-only and
+  // network-free: one grouped query over the index's `derived_by` column.
+  libraryDerivation(): Promise<LibraryDerivation> {
+    return apiGet<LibraryDerivation>("/api/library/derivation");
+  },
+
+  // Recompute every part's presentation data from its stored raw payloads. A JOB, and a WRITE:
+  // it lands as one atomic commit. Credential-free by construction, so it works on a machine
+  // that has never been given distributor keys.
+  rebuildDerivation(input: { dryRun?: boolean } = {}): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/library/derivation/rebuild", {
+      body: { dry_run: input.dryRun ?? false },
     });
   },
 

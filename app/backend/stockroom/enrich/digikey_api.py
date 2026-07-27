@@ -138,7 +138,11 @@ def _parse_digikey_part(product: dict) -> EnrichmentResult:
     man = _obj_str(product.get("Manufacturer"), "Name")
     if man:
         r.manufacturer = Sourced(man, "digikey", "high")
-    desc = _obj_str(product.get("Description"), "ProductDescription", "DetailedDescription")
+    # DetailedDescription FIRST: DigiKey's `ProductDescription` is the abbreviated string it
+    # prints in a search listing ("CAP CER 0.47UF 10V X7R 0402"), while `DetailedDescription`
+    # is the readable one ("0.47 uF +/-10% 10V Ceramic Capacitor X7R 0402 (1005 Metric)").
+    # Measured on the owner's library, 2026-07-27: both present on all 158 parts.
+    desc = _obj_str(product.get("Description"), "DetailedDescription", "ProductDescription")
     if desc:
         r.description = Sourced(desc, "digikey", "high")
     ds = _obj_str(product.get("DatasheetUrl"))

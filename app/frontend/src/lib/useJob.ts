@@ -39,72 +39,81 @@ export function useJob<T = unknown>() {
 
   const reset = useCallback(() => setState(IDLE as JobState<T>), []);
 
-  const run = useCallback(async (jobId: string) => {
-    setState({ status: "running", progress: null, result: null, error: null });
+  // Returns the TERMINAL state as well as setting it. A caller that needs to act on the result
+  // (toast what was written, refetch a query) cannot read it off the hook afterwards: the `job`
+  // object captured in its callback is the render-time snapshot, so `job.result` there is still
+  // null. Handing the final state back is what lets the caller report what ACTUALLY happened
+  // rather than the fact that a job was started.
+  const run = useCallback(async (jobId: string): Promise<JobState<T>> => {
+    let final: JobState<T> = { status: "running", progress: null, result: null, error: null };
+    const settle = (next: JobState<T>): JobState<T> => (final = next);
+    setState(settle({ status: "running", progress: null, result: null, error: null }));
     let body: ReadableStream<Uint8Array>;
     try {
       body = await api.openJobStream(jobId);
     } catch (err) {
-      setState({
+      setState(settle({
         status: "error",
         progress: null,
         result: null,
         error: err instanceof Error ? err.message : "could not open the job stream",
-      });
-      return;
+      }));
+      return final;
     }
     try {
       for await (const ev of streamEvents(body)) {
         if (ev.event === "progress") {
           const progress = ev.data as JobProgress;
-          setState((s) => ({ ...s, progress }));
+          setState((s) => settle({ ...s, progress }));
         } else if (ev.event === "result") {
           const result = (ev.data as { result: T }).result;
-          setState((s) => ({ ...s, status: "done", result }));
+          setState((s) => settle({ ...s, status: "done", result }));
         } else if (ev.event === "error") {
           const detail = (ev.data as { detail?: string }).detail;
-          setState((s) => ({ ...s, status: "error", error: detail ?? "the job failed" }));
+          setState((s) => settle({ ...s, status: "error", error: detail ?? "the job failed" }));
         } else if (ev.event === "done") {
           break;
         }
       }
     } catch (err) {
-      setState((s) => ({
+      setState((s) => settle({
         ...s,
         status: "error",
         error: err instanceof Error ? err.message : "the job stream broke",
       }));
-      return;
+      return final;
     }
     // The stream ended cleanly but without a terminal result/error event (an
     // abnormal EOF: the sidecar died or the host dropped the SSE body). Do not sit
     // in "running" forever; surface an honest error instead.
     setState((s) =>
       s.status === "running"
-        ? { ...s, status: "error", error: "the job stream ended without a result" }
+        ? settle({ ...s, status: "error", error: "the job stream ended without a result" })
         : s,
     );
+    return final;
   }, []);
 
   // Submit a job and stream it as one call, so a POST failure (the submit itself) lands in
   // the same job state as a stream failure. The submitter returns the job ref; we flip to
   // running immediately (the spinner shows during the submit too), then hand off to run().
   const start = useCallback(
-    async (submit: () => Promise<{ job_id: string }>) => {
+    async (submit: () => Promise<{ job_id: string }>): Promise<JobState<T>> => {
       setState({ status: "running", progress: null, result: null, error: null });
       let ref: { job_id: string };
       try {
         ref = await submit();
       } catch (err) {
-        setState({
+        const failed: JobState<T> = {
           status: "error",
           progress: null,
           result: null,
           error: err instanceof Error ? err.message : "could not start the job",
-        });
-        return;
+        };
+        setState(failed);
+        return failed;
       }
-      await run(ref.job_id);
+      return run(ref.job_id);
     },
     [run],
   );

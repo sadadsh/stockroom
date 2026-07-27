@@ -13,12 +13,76 @@ sliding-window limiter (ratelimit.py) instead."""
 
 from __future__ import annotations
 
+import html
 import json
+import re
 import urllib.error
 import urllib.request
 
 from stockroom.enrich.errors import EnrichError, status_from_error
 from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced, normalize_mpn
+
+
+def _catalogue_code(mouser_part_number: str) -> str:
+    """The manufacturer code from a Mouser stock number ("595-TPS2121RUXR" -> "595").
+
+    Returns "" when the stock number is absent or is not in that shape, and the caller then
+    strips NOTHING -- an unknown code must never be guessed at, because the whole point of
+    keying on it is that a token starting with it IS a Mouser catalogue number.
+    """
+    code, sep, rest = (mouser_part_number or "").strip().partition("-")
+    return code if sep and rest and code.isdigit() else ""
+
+
+def _is_catalogue_tail(joined: str, code: str) -> bool:
+    """True when `joined` (the candidate tail, its whitespace already removed) is nothing but
+    Mouser's own alternate-packaging annotation: bare "A" markers, each optionally followed by
+    this part's Mouser stock number or a truncated prefix of it.
+
+    Whitespace is removed by the caller rather than tolerated here because Mouser inserts spaces
+    INSIDE the numbers it appends ("59 5-TPD1E10B06DPYT", "595- DRV2605LDGST", "595 -SN74..."),
+    so the only reliable form of the token is the one with the spacing taken back out.
+    """
+    partials = [re.escape(code) + r"-[A-Z0-9]*"] + [
+        re.escape(code[:k]) for k in range(len(code), 0, -1)
+    ]
+    group = "A(?:" + "|".join(partials) + ")?"
+    if not re.fullmatch(f"(?:{group})+", joined):
+        return False
+    # A run of bare markers is NOT a catalogue tail. Requiring at least one real, non-empty
+    # stock number is what stops a description that legitimately ends in "A" (an amp rating)
+    # from being cut, which would be a worse defect than the noise this removes.
+    return re.search(re.escape(code) + r"-[A-Z0-9]", joined) is not None
+
+
+def clean_mouser_description(description: str, mouser_part_number: str) -> str:
+    """Mouser's `Description`, as a person should read it.
+
+    Two defects, both measured on the owner's real library (2026-07-27, 158 parts):
+
+    1. **The catalogue tail.** Mouser appends its alternate-packaging stock numbers to the
+       description behind a bare "A" marker, so 13 of 158 parts derived a description ending
+       "... Vltg Det A A 595-TPS3700DDCR". It is cut at the FIRST marker whose remainder is
+       entirely catalogue numbers, and the cut is driven by the payload's OWN stock number
+       rather than by a guess at what a part number looks like.
+    2. **HTML entities.** `2.7-V&nbsp;to 22-V` is served raw. Unescaping alone is not enough:
+       `&nbsp;` decodes to U+00A0, which is not a space to anything that measures or wraps
+       text, so every whitespace run is normalized to a single space.
+
+    The raw payload is untouched by all of this -- it stays byte-for-byte under `sourced/`,
+    which is what makes cleaning at DERIVE time safe rather than lossy.
+    """
+    text = re.sub(r"\s+", " ", html.unescape(description or "")).strip()
+    code = _catalogue_code(mouser_part_number)
+    if not code:
+        return text
+    words = text.split(" ")
+    for i in range(1, len(words)):
+        if words[i] != "A":
+            continue
+        if _is_catalogue_tail("".join(words[i:]), code):
+            return " ".join(words[:i])
+    return text
 
 
 def _coerce_price(raw) -> float | None:
@@ -108,7 +172,7 @@ def _parse_mouser_part(p: dict) -> EnrichmentResult:
     man = (p.get("Manufacturer") or "").strip()
     if man:
         r.manufacturer = Sourced(man, "mouser", "high")
-    desc = (p.get("Description") or "").strip()
+    desc = clean_mouser_description(p.get("Description") or "", p.get("MouserPartNumber") or "")
     if desc:
         r.description = Sourced(desc, "mouser", "high")
     ds = (p.get("DataSheetUrl") or "").strip()

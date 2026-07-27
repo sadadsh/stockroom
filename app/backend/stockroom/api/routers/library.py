@@ -608,4 +608,54 @@ def library_router(require_token) -> APIRouter:
 
         return {"job_id": ctx.jobs.submit_cancellable(work)}
 
+    @r.get("/derivation")
+    def derivation(request: Request) -> dict:
+        """Which derivation ruleset this library's parts carry, and how many are behind.
+
+        Read-only, network-free, and answered from the index in one grouped query. The point of
+        surfacing it at all: a rules change (a new naming scheme, a cleaned-up description) makes
+        every stored derived block stale, and the owner needs to SEE that rather than discover it
+        as parts that read differently on two machines.
+        """
+        from stockroom.mutation.library_ops import derivation_status
+
+        return derivation_status(request.app.state.ctx.index)
+
+    @r.post("/derivation/rebuild")
+    def derivation_rebuild(request: Request, body: dict | None = None) -> dict:
+        """Recompute every part's derived block from its stored evidence. One atomic commit.
+
+        Credential-free by construction (it reads `sourced/`, never a distributor), so it works
+        on a fresh clone that has never been given API keys. `dry_run` reports the same numbers
+        and writes nothing -- anything that acts across a whole library gets a dry run first.
+        """
+        ctx = request.app.state.ctx
+        payload = body or {}
+        dry_run = bool(payload.get("dry_run"))
+        scheme = str(payload.get("scheme") or "")
+
+        def work(progress):
+            from datetime import datetime, timezone
+
+            def on_part(done: int, total: int, part_id: str) -> None:
+                progress({
+                    "pct": int(done * 100 / total) if total else 100,
+                    "message": f"re-deriving {part_id}",
+                })
+
+            report = ctx.ops.rederive_library(
+                now_iso=datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+                    "+00:00", "Z"
+                ),
+                scheme=scheme,
+                dry_run=dry_run,
+                progress=on_part,
+            )
+            if not dry_run and report["rewritten"]:
+                ctx.rebuild_index()
+                ctx.auto_push()
+            return report
+
+        return {"job_id": ctx.jobs.submit(work, write=not dry_run)}
+
     return r
