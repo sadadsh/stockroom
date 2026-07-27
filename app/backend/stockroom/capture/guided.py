@@ -80,10 +80,16 @@ def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float =
     return len(browser.captured) > before
 
 
-# What `altium/extract.py::normalize_altium_source` can actually take. `.lia` is deliberately NOT
-# here: Ultra Librarian's PCAD row ships one and Altium imports it directly, but nothing in this app
-# can convert it, so listing it would hand normalize_altium_source a file it raises on. See
-# UltraLibrarianAdapter for the whole story.
+# What `altium/extract.py::normalize_altium_source` can actually take TODAY. `.lia` is not here
+# because normalize_altium_source raises on it, NOT because a P-CAD library is unconvertible -
+# that was a wrong conclusion reached without research (owner corrected it, 2026-07-27).
+#
+# Altium's Import Wizard converts a P-CAD `.lia` natively: a library carrying both pattern and
+# symbol information translates into BOTH a `.PcbLib` and a `.SchLib`, which is exactly the shape
+# Ultra Librarian's PCAD row ships. Altium's scripting language is DelphiScript, this repo already
+# drives installed Altium (`altium/driver.py`), and `pyaltiumrun` exists to run scripts in it - so
+# the conversion is an unbuilt FEATURE with a documented path, not an impossibility.
+# Sources and the open sub-question are in the ledger's 2026-07-27 P-CAD finding.
 _ALTIUM_LIBRARY_SUFFIXES = (".schlib", ".pcblib", ".intlib")
 
 
