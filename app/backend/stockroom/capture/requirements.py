@@ -58,11 +58,26 @@ def capture_needs(record) -> list[Requirement]:
     and no Altium set reports exactly the Altium gaps. The asymmetry that made every part
     read "CAD Incomplete" forever is gone by construction, not by a branch.
     """
+    # A PASSIVE NEEDS NOTHING, FROM ANY TOOL. Owner, 2026-07-27: *"passive components dont need
+    # files, models or symbols not for kicad or for altium, theyre built in. we use kicad for those
+    # passives only for our app's uis. the only 'linking to the eda' is for building boms."*
+    #
+    # So a requirement is a function of the PART CLASS, not only of the tool. Both KiCad and Altium
+    # ship generic passives, so there is nothing to acquire for a resistor in either. The `SR-*`
+    # symbol a passive does carry is a BOM-property vehicle (see
+    # `docs/superpowers/specs/2026-07-20-bom-ready-library-rebuild-design.md`, which promotes each
+    # passive to an owned symbol precisely so it can carry the mirrored BOM field set) - it is
+    # produced by `rebuild_part`, never captured, and its absence is not a gap.
+    #
+    # MEASURED before this exemption existed: the completion surface demanded `altium_symbol` and
+    # `altium_footprint` from all 68 of the owner's passives - 136 requirements nothing could ever
+    # satisfy, which was most of what the UI reported as permanently stuck. This used to exempt
+    # only `model`, which was the same rule applied one asset kind too narrowly.
+    if getattr(record, "passive", False):
+        return []
+
     needs: list[Requirement] = []
     for tool_key, kind in _capturable():
-        if kind == "model" and getattr(record, "passive", False):
-            # A passive references the stock footprint, which carries its own 3D body.
-            continue
         ref = record.assets_for(tool_key).get(kind)
         if ref is None or not (ref.name or ref.file):
             needs.append(requirement(tool_key, kind))
