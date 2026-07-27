@@ -1,0 +1,491 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.39.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399999"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "1 Circuit IC SWITCH 2:1 1.8Ω SOT-23-6"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Analog Switch ICs 3-pA on-state leakag e current 5-V 2:1"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C2877615.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/947.html?scene=FULL_MATCH&globalKeyword=TMUX1119DBVR&s_z=n_q_TMUX1119DBVR"
+      }
+    ]
+  },
+  "category": "Switches",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "tmux1119dbvr.pdf",
+    "source_url": ""
+  },
+  "description": "1 Circuit IC SWITCH 2:1 1.8Ω SOT-23-6",
+  "display_name": "Analog Switch IC SOT-23-6",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Con": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Ron": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "tmux1119dbvr",
+  "manufacturer": "TI",
+  "mpn": "TMUX1119DBVR",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.477142857,
+          "qty": 1
+        },
+        {
+          "price": 2.045714286,
+          "qty": 10
+        },
+        {
+          "price": 1.79,
+          "qty": 30
+        },
+        {
+          "price": 1.531428571,
+          "qty": 100
+        },
+        {
+          "price": 1.411428571,
+          "qty": 500
+        },
+        {
+          "price": 1.357142857,
+          "qty": 1000
+        }
+      ],
+      "stock": 56,
+      "url": "https://www.lcsc.com/product-detail/C2877615.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "Brand Id": "100",
+    "Catalog Id": "947",
+    "Con": "6pF",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "China",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/f3d2a2ecf658447dac746eb15158a989.svg?t=1721702518",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/162eadd4c6284125986b4d851f44c225.svg?t=1721702518",
+    "Features": "Fault protection;Bidirectional analog channel;Glitch-free switching",
+    "HTS Code (BR)": "85423999",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (IN)": "85423900",
+    "HTS Code (MX)": "8542.39.99",
+    "HTS Code (TARIC)": "8542399000",
+    "HTS Code (US)": "8542390001",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-23-6_DBV_t.jpg",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "Key Attributes": "5V, low-leakage current, 2:1 precision switch",
+    "LCSC Category": "Analog Switches, Multiplexers, Demultiplexers",
+    "LCSC Category Path": "Integrated Circuits (ICs) > Interface",
+    "LCSC Parent Category": "Interface",
+    "LCSC Product ID": "3086227",
+    "LCSC Product Name": "5V, low-leakage current, 2:1 precision switch",
+    "LCSC Title": "TI TMUX1119DBVR",
+    "LCSC Warehouse Category": "Analog Switches, Multiplexers, Demultiplexers",
+    "Lead Time": "63 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Number of Channels": "1",
+    "Operating Temperature": "-40℃~+125℃",
+    "Order Multiple": "1",
+    "Package": "SOT-23-6",
+    "Package Quantity": "3000",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "575",
+    "Popular Part": "No",
+    "Pre-Sale": "No",
+    "Product Category": "Analog Switch ICs",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20250729_TI-TMUX1119DBVR_C2877615_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20250729_TI-TMUX1119DBVR_C2877615_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20250729_TI-TMUX1119DBVR_C2877615_blank.jpg",
+    "Reel Setup Fee": "3",
+    "RoHS": "Yes",
+    "Ron": "1.8Ω",
+    "Standard Pack Qty": "3000",
+    "Stock": "145",
+    "Stock (Domestic)": "145",
+    "Stock (Overseas)": "145",
+    "Stock (Shenzhen)": "145",
+    "Unit": "Piece",
+    "Voltage - Supply": "1.08V~5.5V",
+    "Weight": "0.057",
+    "Weight (kg)": "5.7e-05",
+    "Wm Catalog Id": "947"
+  },
+  "tags": [],
+  "value": ""
+}
