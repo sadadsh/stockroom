@@ -646,6 +646,52 @@
       "stock": 896,
       "url": "https://www.lcsc.com/product-detail/C221872.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:25.420171+00:00",
+      "part_number": "611-PTS645SK50SMTR92",
+      "price_breaks": [
+        {
+          "price": 0.36,
+          "qty": 1
+        },
+        {
+          "price": 0.313,
+          "qty": 10
+        },
+        {
+          "price": 0.293,
+          "qty": 25
+        },
+        {
+          "price": 0.262,
+          "qty": 100
+        },
+        {
+          "price": 0.243,
+          "qty": 250
+        },
+        {
+          "price": 0.229,
+          "qty": 500
+        },
+        {
+          "price": 0.183,
+          "qty": 1000
+        },
+        {
+          "price": 0.172,
+          "qty": 2000
+        },
+        {
+          "price": 0.17,
+          "qty": 5000
+        }
+      ],
+      "stock": 21908,
+      "url": "",
+      "vendor": "Mouser"
     }
   ],
   "schema_version": 2,
