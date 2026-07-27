@@ -322,3 +322,33 @@ def test_a_failed_token_is_not_cached_so_the_next_call_retries(monkeypatch):
     body = req("X")                           # second call: retries token, succeeds
     assert body["Products"][0]["ManufacturerProductNumber"] == "X"
     assert state["token_calls"] == 2          # the failed token was NOT memoized
+
+
+def test_a_digikey_description_reads_as_prose_not_as_a_catalogue_abbreviation():
+    """DigiKey serves TWO descriptions and they are not interchangeable.
+
+    `ProductDescription` is the abbreviated string DigiKey prints in a search listing;
+    `DetailedDescription` is the readable one. MEASURED on the owner's real library, 2026-07-27:
+    both are present on all 158 parts, and the difference is
+    "CAP CER 0.47UF 10V X7R 0402" against "0.47 uF +/-10% 10V Ceramic Capacitor X7R 0402".
+    Both strings below are verbatim from `sourced/grm155r71a474ke01d-*/digikey.json`.
+    """
+    product = {
+        "ManufacturerProductNumber": "GRM155R71A474KE01D",
+        "Description": {
+            "ProductDescription": "CAP CER 0.47UF 10V X7R 0402",
+            "DetailedDescription": "0.47 µF ±10% 10V Ceramic Capacitor X7R 0402 (1005 Metric)",
+        },
+    }
+    got = _parse_digikey_part(product).description.value
+    assert got == "0.47 µF ±10% 10V Ceramic Capacitor X7R 0402 (1005 Metric)"
+
+
+def test_the_listing_description_is_still_used_when_it_is_the_only_one_there():
+    """The fallback is not dropped: a payload carrying only the abbreviated string must still
+    produce a description rather than none."""
+    product = {
+        "ManufacturerProductNumber": "X",
+        "Description": {"ProductDescription": "CAP CER 0.47UF 10V X7R 0402"},
+    }
+    assert _parse_digikey_part(product).description.value == "CAP CER 0.47UF 10V X7R 0402"

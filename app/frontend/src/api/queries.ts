@@ -1203,6 +1203,14 @@ export function useLibraryCoverage() {
   });
 }
 
+// Which derivation ruleset produced the presentation data currently on screen.
+export function useLibraryDerivation() {
+  return useQuery({
+    queryKey: ["library-derivation"],
+    queryFn: () => api.libraryDerivation(),
+  });
+}
+
 // Start a completion run. The mutation only STARTS the job; progress arrives over the job's
 // SSE stream and the caller owns that, exactly as the bulk import does. The coverage query is
 // invalidated when the run finishes, not when it starts.

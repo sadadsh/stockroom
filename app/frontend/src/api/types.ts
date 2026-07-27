@@ -2149,6 +2149,32 @@ export interface LibraryCoverage {
   can_provide: string[];
 }
 
+// Which derivation ruleset produced the presentation data the library is currently showing.
+//
+// A part's `derived` block (display name, description, category, normalized specs) is computed
+// FROM its stored raw distributor payloads. Change the rules and every stored block is stale, so
+// the library can be showing two different answers for the same evidence.
+export interface LibraryDerivation {
+  // The ruleset this build runs, e.g. "rules@2".
+  ruleset: string;
+  // Every stamp found in the library -> how many parts carry it. The empty string means a part
+  // that has never been derived at all, which is a real state and not the same as being behind.
+  counts: Record<string, number>;
+  current: number;
+  stale: number;
+}
+
+// What a whole-library re-derive did. `no_evidence` is not a failure: a part with no stored raw
+// payloads is SKIPPED rather than recomputed from nothing, which would blank it.
+export interface DerivationReport {
+  ruleset: string;
+  checked: number;
+  rewritten: number;
+  unchanged: number;
+  no_evidence: number;
+  failed: { id: string; error: string }[];
+}
+
 // One part's outcome from a completion run.
 export interface CompletionItem {
   part_id: string;

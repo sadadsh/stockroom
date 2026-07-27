@@ -254,3 +254,108 @@ def test_a_genuine_non_match_is_still_downgraded():
     a = MouserAdapter(api_key="k", requester=lambda mpn: body)
     r = a.lookup("SOMETHING-ELSE")
     assert r.mpn.confidence == "low"
+
+
+# --------------------------------------------------------------------- description hygiene
+#
+# Mouser's Search API appends its own alternate-packaging catalogue numbers to the
+# `Description` field, behind a bare "A" marker, and mangles them with inserted spaces
+# ("59 5-TPD1E10B06DPYT", "595- DRV2605LDGST"). MEASURED on the owner's real library,
+# 2026-07-27: 13 of 158 parts derived a description ending in that noise, e.g.
+#
+#     Analog Comparators Window Comp for Over & Under Vltg Det A A 595-TPS3700DDCR
+#
+# Every string below is a VERBATIM `Description` value from a stored `sourced/<id>/mouser.json`
+# payload in `libraries/Stockroom`, so these are not invented shapes.
+_REAL_POLLUTED = [
+    # (MouserPartNumber, raw Description, what a person should read)
+    (
+        "595-TPS3700DDCT",
+        "Analog Comparators Window Comp for Over & Under Vltg Det A A 595-TPS3700DDCR",
+        "Analog Comparators Window Comp for Over & Under Vltg Det",
+    ),
+    (
+        "595-TPD1E10B06DPYR",
+        "ESD Protection Diodes / TVS Diodes Sgl Channel ESD A 59 5-TPD1E10B06DPYT A A "
+        "595-TPD1E10B06DPYT",
+        "ESD Protection Diodes / TVS Diodes Sgl Channel ESD",
+    ),
+    (
+        "595-SN74LVC1G04DBVR",
+        "Inverters Single A 595-SN74LVC 1G04DBVT A 595-SN74 A 595-SN74LVC1G04DBVT",
+        "Inverters Single",
+    ),
+    (
+        "595-SN74LVC1G08DBVR",
+        "Logic Gates Single 2 Input A 595 -SN74LVC1G08DBVT A A 595-SN74LVC1G08DBVT",
+        "Logic Gates Single 2 Input",
+    ),
+    (
+        "595-BQ24074RGTR",
+        "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC A 5 A 595-BQ24074RGTT",
+        "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC",
+    ),
+    (
+        "595-DRV2605LDGSR",
+        "Motor / Motion / Ignition Controllers & Drivers Haptic Driver A 595- DRV2605LDGST "
+        "A 595- A 595-DRV2605LDGST",
+        "Motor / Motion / Ignition Controllers & Drivers Haptic Driver",
+    ),
+    (
+        "595-TS3A5018DR",
+        "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch A 595-TS A 595-TS3A5018D",
+        "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch",
+    ),
+    (
+        "581-12063D226KAT2A",
+        "Multilayer Ceramic Capacitors MLCC - SMD/SMT KGM31HR51E226KU NEW GLOBAL PN 25V "
+        "22uF X A 581-KGM31HR51E226KU",
+        "Multilayer Ceramic Capacitors MLCC - SMD/SMT KGM31HR51E226KU NEW GLOBAL PN 25V 22uF X",
+    ),
+]
+
+
+@pytest.mark.parametrize("mouser_pn,raw,expected", _REAL_POLLUTED)
+def test_the_catalogue_tail_is_cut_off_a_real_mouser_description(mouser_pn, raw, expected):
+    part = {"ManufacturerPartNumber": "X", "Description": raw, "MouserPartNumber": mouser_pn}
+    assert _parse_mouser_part(part).description.value == expected
+
+
+# NEGATIVE CONTROLS. A stripper that cuts a description short is worse than the noise it
+# removes, so each of these must survive UNTOUCHED. They are real descriptions from the same
+# library except where noted.
+_REAL_CLEAN = [
+    ("595-BSS138", "MOSFETs SOT-23 N-CH LOGIC"),
+    ("581-GRM155R71A474KE01D", "Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.47 uF 10 VDC 10% 0402 X7R"),
+    ("652-RC0402FR-0712K4L", "Thick Film Resistors - SMD General Purpose Chip Resistor 0402, 12.4kOhms, 1%, 1/16W"),
+    ("200-TSW-120-07-G-D", "Headers & Wire Housings Classic PCB Header Strips"),
+    # A description that legitimately ENDS in a bare "A" (an amp rating): the marker alone is
+    # not a catalogue tail, because no Mouser part number follows it.
+    ("595-TPS2121RUXR", "Power Switch ICs 4.5-A"),
+    # A description whose last word merely STARTS with A. The marker is a standalone "A".
+    ("595-INA226AIDGST", "Current & Power Monitors Bi-Dir Current/Pwr Mon Amplifier"),
+    # No Mouser part number at all -> nothing is known to strip, so nothing is stripped.
+    ("", "Analog Comparators Window Comp A A 595-TPS3700DDCR"),
+]
+
+
+@pytest.mark.parametrize("mouser_pn,desc", _REAL_CLEAN)
+def test_a_clean_mouser_description_is_left_exactly_as_it_came(mouser_pn, desc):
+    part = {"ManufacturerPartNumber": "X", "Description": desc, "MouserPartNumber": mouser_pn}
+    assert _parse_mouser_part(part).description.value == desc
+
+
+def test_an_html_entity_in_a_mouser_description_reads_as_the_character_it_encodes():
+    # VERBATIM from libraries/Stockroom/sourced/tps2121ruxr-8f51/mouser.json.
+    part = {
+        "ManufacturerPartNumber": "TPS2121RUXR",
+        "MouserPartNumber": "595-TPS2121RUXR",
+        "Description": (
+            "Power Switch ICs - Power Distribution 2.7-V&nbsp;to 22-V 5 6-m? 4.5-A power "
+            "A A 595-TPS2121RUXT"
+        ),
+    }
+    got = _parse_mouser_part(part).description.value
+    assert "&nbsp;" not in got
+    assert " " not in got  # the entity decodes to a NBSP; a NBSP is not a space to a reader
+    assert got == "Power Switch ICs - Power Distribution 2.7-V to 22-V 5 6-m? 4.5-A power"

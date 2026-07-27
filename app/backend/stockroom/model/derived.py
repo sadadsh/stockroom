@@ -42,7 +42,11 @@ from dataclasses import dataclass, field
 # and not the schema, and adding a field bumps the schema and not this. The spec's illustrative
 # JSON showed "rules@3" as an example value in a section that lists the ruleset version under
 # "still to decide"; this is that decision.
-RULESET_VERSION = 1
+# 1 -> 2 (2026-07-27): descriptions are cleaned at derive time. Mouser's catalogue tail is cut
+# and its HTML entities decoded (enrich/mouser.py::clean_mouser_description), and DigiKey's
+# readable `DetailedDescription` outranks its abbreviated listing string. Same evidence, different
+# output, so the stamp moves.
+RULESET_VERSION = 2
 DERIVED_BY = f"rules@{RULESET_VERSION}"
 
 # Every field of the derived block, in one place, so the record model, the serializer and the
