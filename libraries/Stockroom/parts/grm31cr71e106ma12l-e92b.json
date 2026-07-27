@@ -1,0 +1,317 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "5"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "20%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±20%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 10 µF, 20%, 1206"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM31CR71E106MA12L Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 10UF 25V X7R 1206"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Capacitor_SMD",
+          "name": "C_1206_3216Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "C"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/487017f6b54a225cb531ae9163fbe3cd.pdf?productCode=C440205"
+  },
+  "derived": {
+    "category": "Capacitors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Capacitor, 10 µF, 20%, 1206",
+    "display_name": "10 µF 20% 1206 Capacitor",
+    "specs": {
+      "3D Model": "Capacitor_SMD.3dshapes/C_1206_3216Metric.wrl",
+      "Applications": "General Purpose",
+      "Assembly Country of Origin": "Not available",
+      "Available On Reel": "Yes",
+      "BRHTS": "85322410",
+      "Brand Id": "79",
+      "Capacitance": "10 µF",
+      "Catalog Id": "1142",
+      "Contains Battery": "No",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Philippines",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/7bdec8012728462a85919a4d0d033579.svg?t=1744291892",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/f4af4522470148e4b73390818d0503c5.svg?t=1744291892",
+      "Footprint": "Capacitor_SMD:C_1206_3216Metric",
+      "HTS Code (BR)": "85322410",
+      "HTS Code (CA)": "8532240090",
+      "HTS Code (CN)": "8532241000",
+      "HTS Code (EU TARIC)": "8532240000",
+      "HTS Code (IN)": "85322400",
+      "HTS Code (JP)": "853224000",
+      "HTS Code (MX)": "8532.24.01",
+      "HTS Code (TARIC)": "8532240000",
+      "HTS Code (US)": "8532240020",
+      "Has Third Party Stock": "No",
+      "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "KRHTS": "8532240000",
+      "Key Attributes": "CAP CER 10uF 25V X7R 1206",
+      "LCSC Category": "Ceramic Capacitors",
+      "LCSC Category Path": "Passives > Capacitors",
+      "LCSC Parent Category": "Capacitors",
+      "LCSC Product ID": "439574",
+      "LCSC Product Name": "CAP CER 10uF 25V X7R 1206",
+      "LCSC Title": "muRata GRM31CR71E106MA12L",
+      "LCSC Warehouse Category": "Ceramic Capacitors",
+      "Lead Time": "10 Weeks",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "5",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount, MLCC",
+      "Operating Temperature": "-55°C ~ 125°C",
+      "Order Multiple": "5",
+      "Package": "1206",
+      "Package / Case": "1206 (3216 Metric)",
+      "Package Quantity": "2000",
+      "Package Quantity Unit": "Reel",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "312",
+      "Popular Part": "No",
+      "Pre-Sale": "No",
+      "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20260627_muRata-GRM31CR71E106MA12L_C440205_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20260627_muRata-GRM31CR71E106MA12L_C440205_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20260627_muRata-GRM31CR71E106MA12L_C440205_blank.jpg",
+      "REACH": "REACH Unaffected",
+      "Reel Setup Fee": "3",
+      "RoHS": "Yes",
+      "Series": "GRM",
+      "Size / Dimension": "0.126\" L x 0.063\" W (3.20mm x 1.60mm)",
+      "Standard Pack Qty": "2000",
+      "Stock": "0",
+      "Stock (Domestic)": "0",
+      "Stock (Overseas)": "0",
+      "Stock (Shenzhen)": "0",
+      "Symbol": "Device:C",
+      "Temperature Coefficient": "X7R",
+      "Thickness (Max)": "0.071\" (1.80mm)",
+      "Tolerance": "20%",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "2.7e-05",
+      "Voltage - Rated": "25V",
+      "Voltage Rating": "25V",
+      "Weight": "0.071",
+      "Weight (kg)": "7.105e-05",
+      "Weight Foreign (kg)": "0",
+      "Wm Catalog Id": "1142"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
+  "hashes": null,
+  "id": "grm31cr71e106ma12l-e92b",
+  "manufacturer": "muRata",
+  "mpn": "GRM31CR71E106MA12L",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GRM31CR71E106MA12L"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "2026-07-27T03:59:50.820269+00:00",
+      "part_number": "81-GRM31CR71E106MA2L",
+      "price_breaks": [
+        {
+          "price": 0.084857143,
+          "qty": 5
+        },
+        {
+          "price": 0.068142857,
+          "qty": 250
+        },
+        {
+          "price": 0.059857143,
+          "qty": 750
+        },
+        {
+          "price": 0.053571429,
+          "qty": 2500
+        },
+        {
+          "price": 0.048714286,
+          "qty": 10000
+        },
+        {
+          "price": 0.046142857,
+          "qty": 20000
+        }
+      ],
+      "stock": 157,
+      "url": "https://www.mouser.com/c/?q=GRM31CR71E106MA12L",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T03:59:50.820269+00:00",
+      "part_number": "490-6519-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.07629,
+          "qty": 2000
+        },
+        {
+          "price": 0.07105,
+          "qty": 4000
+        },
+        {
+          "price": 0.06843,
+          "qty": 6000
+        },
+        {
+          "price": 0.06552,
+          "qty": 10000
+        },
+        {
+          "price": 0.06382,
+          "qty": 14000
+        },
+        {
+          "price": 0.06218,
+          "qty": 20000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

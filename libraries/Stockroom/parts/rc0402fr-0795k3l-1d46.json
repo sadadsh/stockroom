@@ -1,0 +1,181 @@
+{
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Resistor_SMD",
+          "name": "R_0402_1005Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "R"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/b426be3ce22c6de3e0c3a2248e49159e.pdf?productCode=C276280"
+  },
+  "derived": {
+    "category": "Resistors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Resistor, 95.3 kOhm, 1%, 0402",
+    "display_name": "95.3 kOhm 1% 0402 Resistor",
+    "specs": {
+      "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+      "Assembly Country of Origin": "Not available",
+      "Available On Reel": "Yes",
+      "BRHTS": "85332120",
+      "Brand Id": "396",
+      "Catalog Id": "1199",
+      "Composition": "Thick Film",
+      "Contains Battery": "No",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Taiwan",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/fafd024f554e426eb74cf4a204aa88b0.svg?t=1732212698",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/86af1c27915e4f1bb34fc83975b571ae.svg?t=1732212698",
+      "Features": "Moisture Resistant",
+      "Footprint": "Resistor_SMD:R_0402_1005Metric",
+      "HTS Code (BR)": "85332110",
+      "HTS Code (CA)": "8533210000",
+      "HTS Code (CN)": "8533211000",
+      "HTS Code (EU TARIC)": "8533210000",
+      "HTS Code (IN)": "85332111",
+      "HTS Code (JP)": "853321000",
+      "HTS Code (MX)": "8533.21.01",
+      "HTS Code (TARIC)": "8533210000",
+      "HTS Code (US)": "8533210020",
+      "Has Third Party Stock": "No",
+      "Height - Seated (Max)": "0.016\" (0.40mm)",
+      "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
+      "Is Asian Brand": "Yes",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "KRHTS": "8533219000",
+      "Key Attributes": "RES 95.3kΩ ±1% 62.5mW 0402",
+      "LCSC Category": "Chip Resistor - Surface Mount",
+      "LCSC Category Path": "Passives > Resistors",
+      "LCSC Parent Category": "Resistors",
+      "LCSC Product ID": "263984",
+      "LCSC Product Name": "RES 95.3kΩ ±1% 62.5mW 0402",
+      "LCSC Title": "YAGEO RC0402FR-0795K3L",
+      "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
+      "Lead Time": "56 Days",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "100",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Number of Terminations": "2",
+      "Operating Temperature": "-55°C ~ 155°C",
+      "Order Multiple": "100",
+      "Package": "0402",
+      "Package / Case": "0402 (1005 Metric)",
+      "Package Quantity": "10000",
+      "Package Quantity Unit": "Reel",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "308",
+      "Popular Part": "No",
+      "Power": "0.063 W",
+      "Power (Watts)": "0.063W, 1/16W",
+      "Power(Watts)": "62.5mW",
+      "Pre-Sale": "No",
+      "Product Category": "Thick Film Resistors - SMD",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230109_YAGEO-RC0402FR-0795K3L_C276280_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230109_YAGEO-RC0402FR-0795K3L_C276280_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230109_YAGEO-RC0402FR-0795K3L_C276280_blank.jpg",
+      "REACH": "REACH Unaffected",
+      "Reel Setup Fee": "3",
+      "Resistance": "95.3 kOhm",
+      "RoHS": "Yes",
+      "Series": "RC_L",
+      "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
+      "Standard Pack Qty": "10000",
+      "Stock": "0",
+      "Stock (Domestic)": "0",
+      "Stock (Overseas)": "0",
+      "Stock (Shenzhen)": "0",
+      "Supplier Device Package": "0402",
+      "Symbol": "Device:R",
+      "Temperature Coefficient": "±100ppm/℃",
+      "Tolerance": "1%",
+      "Type": "Thick Film Resistor",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "6.5e-07",
+      "Voltage Rating": "50V",
+      "Weight": "0.009",
+      "Weight (kg)": "9e-06",
+      "Weight Foreign (kg)": "0",
+      "Wm Catalog Id": "1199"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "rc0402fr-0795k3l-1d46",
+  "manufacturer": "Yageo",
+  "mpn": "RC0402FR-0795K3L",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=RC0402FR-0795K3L"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.000285714,
+          "qty": 20
+        },
+        {
+          "price": 0.000285714,
+          "qty": 20000
+        },
+        {
+          "price": 0.000285714,
+          "qty": 60000
+        },
+        {
+          "price": 0.000271429,
+          "qty": 200000
+        },
+        {
+          "price": 0.000271429,
+          "qty": 204000
+        },
+        {
+          "price": 0.000271429,
+          "qty": 208000
+        }
+      ],
+      "stock": 36395,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-0795K3L",
+      "vendor": "Mouser"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

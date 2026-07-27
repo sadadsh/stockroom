@@ -1,0 +1,556 @@
+{
+  "alternates": {
+    "HTS Code (CN)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8536300000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399000"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8536308000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Surge Protection IC 2.7V~23V VQFN-10-HR(2x2)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Hot Swap Voltage Controllers 2.7-V to 23-V 28-m? 5.5-A eFuse with i"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C3662793.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/1006.html?scene=FULL_MATCH&globalKeyword=TPS259470LRPWR&s_z=n_q_TPS259470LRPWR"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS259470LRPWR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS259470LRPWR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS259470LRPWR"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "tps259470lrpwr-1dec.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "ICs",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Surge Protection IC 2.7V~23V VQFN-10-HR(2x2)",
+    "display_name": "Hot Swap Voltage Controller VQFN-10-HR",
+    "specs": {
+      "Assembly Country of Origin": "China",
+      "Available On Reel": "Yes",
+      "Brand Id": "100",
+      "Catalog Id": "1006",
+      "Contains Battery": "No",
+      "Country of Diffusion": "United States",
+      "Country of Origin": "China",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/1273b37c83e54da6bc4d38e1ccef637f.svg?t=1764920931",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/7e8917788f7841bc847b027b670a70d1.svg?t=1764920931",
+      "FET Type": "Integrated FET",
+      "Features": "Overcurrent Protection;Short-Circuit Protection;Overvoltage clamping protection;Under-voltage lockout;Thermal Protection",
+      "HTS Code (BR)": "85363090",
+      "HTS Code (CA)": "8536302000",
+      "HTS Code (CN)": "8536300000",
+      "HTS Code (IN)": "85363000",
+      "HTS Code (MX)": "8536.30.01",
+      "HTS Code (TARIC)": "8536301010",
+      "HTS Code (US)": "8536308000",
+      "Has Third Party Stock": "No",
+      "Height": "1mm",
+      "Image": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-10_DSL.jpg",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "Key Attributes": "IC SURGE STOPPER 2.7V~23V VQFN-10-HR(2x2)",
+      "LCSC Category": "Current Regulation/Management",
+      "LCSC Category Path": "Integrated Circuits (ICs) > Power Management (PMIC)",
+      "LCSC Parent Category": "Power Management (PMIC)",
+      "LCSC Product ID": "4230592",
+      "LCSC Product Name": "IC SURGE STOPPER 2.7V~23V VQFN-10-HR(2x2)",
+      "LCSC Title": "TI TPS259470LRPWR",
+      "LCSC Warehouse Category": "Current Regulation/Management",
+      "Lead Time": "63 Days",
+      "Length": "2mm",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "1",
+      "Number of Channels": "1",
+      "Operating Temperature": "-40℃~+125℃",
+      "Order Multiple": "1",
+      "Package": "VQFN-10-HR(2x2)",
+      "Package Quantity": "3000",
+      "Package Quantity Unit": "Reel",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "380",
+      "Peak Output Current(Sink)": "-",
+      "Peak Output Current(Source)": "-",
+      "Popular Part": "No",
+      "Pre-Sale": "No",
+      "Product Category": "Hot Swap Voltage Controllers",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20240823_Texas-Instruments-TPS259470LRPWR_C3662793_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20240823_Texas-Instruments-TPS259470LRPWR_C3662793_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20240823_Texas-Instruments-TPS259470LRPWR_C3662793_blank.jpg",
+      "RDS(on)": "28.3mΩ",
+      "Reel Setup Fee": "3",
+      "RoHS": "Yes",
+      "Standard Pack Qty": "3000",
+      "Stock": "2969",
+      "Stock (Domestic)": "2969",
+      "Stock (Overseas)": "2969",
+      "Stock (Shenzhen)": "2969",
+      "Threshold Voltage": "-",
+      "Trigger Current": "500mA~6A",
+      "Unit": "Piece",
+      "Voltage - Supply": "2.7V~23V",
+      "Weight": "0.021",
+      "Weight (kg)": "2.1e-05",
+      "Width": "2mm",
+      "Wm Catalog Id": "1006"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "FET Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Height": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Length": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Peak Output Current(Sink)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Peak Output Current(Source)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RDS(on)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Threshold Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Trigger Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Width": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "tps259470lrpwr-1dec",
+  "manufacturer": "TI",
+  "mpn": "TPS259470LRPWR",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 1.211428571,
+          "qty": 1
+        },
+        {
+          "price": 1.067142857,
+          "qty": 10
+        },
+        {
+          "price": 0.964285714,
+          "qty": 30
+        },
+        {
+          "price": 0.871428571,
+          "qty": 100
+        },
+        {
+          "price": 0.828571429,
+          "qty": 500
+        },
+        {
+          "price": 0.811428571,
+          "qty": 1000
+        }
+      ],
+      "stock": 70,
+      "url": "https://www.lcsc.com/product-detail/C3662793.html",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

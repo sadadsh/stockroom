@@ -1,0 +1,132 @@
+{
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Capacitor_SMD",
+          "name": "C_0805_2012Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "C"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8942/490_Chip_Multilayer_CAT2021_MLCC.pdf"
+  },
+  "derived": {
+    "category": "Capacitors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Capacitor, 22 µF, 20%, 0805",
+    "display_name": "22 µF 20% 0805 Capacitor",
+    "specs": {
+      "3D Model": "Capacitor_SMD.3dshapes/C_0805_2012Metric.wrl",
+      "Applications": "General Purpose",
+      "Assembly Country of Origin": "Not available",
+      "BRHTS": "85322410",
+      "Capacitance": "22 µF",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Japan",
+      "ECCN": "EAR99",
+      "Footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "HTS Code (CA)": "8532240010",
+      "HTS Code (CN)": "8532241000",
+      "HTS Code (EU TARIC)": "8532240000",
+      "HTS Code (JP)": "853224000",
+      "HTS Code (MX)": "8532240400",
+      "HTS Code (US)": "8532240020",
+      "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+      "KRHTS": "8532240000",
+      "Lead Time": "70 Days",
+      "Lifecycle": "Not Recommended for New Designs",
+      "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount, MLCC",
+      "Operating Temperature": "-55°C ~ 85°C",
+      "Order Multiple": "1",
+      "Package": "0805",
+      "Package / Case": "0805 (2012 Metric)",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Reel, Cut Tape, MouseReel",
+      "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+      "REACH": "REACH Unaffected",
+      "RoHS": "RoHS Compliant",
+      "Series": "GRM",
+      "Size / Dimension": "0.079\" L x 0.049\" W (2.00mm x 1.25mm)",
+      "Standard Pack Qty": "4000",
+      "Symbol": "Device:C",
+      "Temperature Coefficient": "X5R",
+      "Thickness (Max)": "0.037\" (0.95mm)",
+      "Tolerance": "20%",
+      "Unit Weight (kg)": "6.4e-06",
+      "Voltage - Rated": "10V"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "grm219r61a226mea0d-f0c2",
+  "manufacturer": "Murata Electronics",
+  "mpn": "GRM219R61A226MEA0D",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GRM219R61A226MEA0D"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.49,
+          "qty": 1
+        },
+        {
+          "price": 0.222,
+          "qty": 10
+        },
+        {
+          "price": 0.199,
+          "qty": 100
+        },
+        {
+          "price": 0.16,
+          "qty": 500
+        },
+        {
+          "price": 0.147,
+          "qty": 1000
+        },
+        {
+          "price": 0.144,
+          "qty": 2000
+        },
+        {
+          "price": 0.118,
+          "qty": 4000
+        }
+      ],
+      "stock": 88588,
+      "url": "https://www.mouser.com/c/?q=GRM219R61A226MEA0D",
+      "vendor": "Mouser"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}
