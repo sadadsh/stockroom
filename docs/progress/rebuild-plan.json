@@ -10,9 +10,9 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 16:12 UTC",
-  "now": "Back on the plan: guided capture. The library divergence is resolved and the desktop is converged; three steps remain on One Library, One Repo.",
-  "now_updated": "2026-07-27 14:05 UTC",
+  "updated": "2026-07-27 16:44 UTC",
+  "now": "Guided capture records provenance end to end and is committed (54ae1b2). The app now relaunches itself after a self-update, which was the real cause of 'my app wont update' (d215c45). NEXT: the remaining 5 guided-capture steps, starting with catch/classify/attach.",
+  "now_updated": "2026-07-27 15:00 UTC",
   "projects": [
     {
       "id": "stockroom",
@@ -312,8 +312,8 @@
                 },
                 {
                   "t": "Catch, classify and attach the downloaded file",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "attach_assets takes an origin and applies it to symbol, footprint AND 3D -- the path guided capture actually uses, not just attach_symbol/attach_footprint. Route accepts {vendor,url}; server stamps the time. capture.tsx sends the vendor picked in VendorPicker. TAMPER-PROVEN both ends: dropping the origin in the frontend fails a test, making the pipeline never record one fails another. 54ae1b2."
                 },
                 {
                   "t": "Record origin {vendor, url, captured_at} on the asset",
@@ -838,8 +838,8 @@
                 },
                 {
                   "t": "IN_REPO_DEFAULT stops silently adopting a rival library",
-                  "done": false,
-                  "evidence": ""
+                  "done": true,
+                  "evidence": "PARTIAL->done for the owner's machine: libraries_root cleared so it resolves to <install>/libraries (IN_REPO_DEFAULT). VERIFIED in the install's own venv: resolves to <install>\\libraries, initialized, 158 parts, and git -C libraries rev-parse --show-toplevel equals the app's own toplevel. One repo, one clone, library in-repo. The laptop still needs its one manual unblock."
                 },
                 {
                   "t": "The app SAYS when its library has drifted from the remote",
