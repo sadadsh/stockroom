@@ -133,6 +133,10 @@ Return a summary of the dataclasses and fields you created.`,
 )
 
 // ---------------------------------------------------------------------------------------------
+// SPEED NOTE. These three touch overlapping backend files (model/, store/, capture/), so they run
+// in ISOLATED WORKTREES. Without isolation they serialise on each other's edits, which is what
+// makes a nominally parallel phase secretly sequential - the single biggest hidden cost in a
+// fan-out over one repo.
 phase('OnModel')
 
 const onModel = await parallel([
@@ -156,7 +160,7 @@ Write those three as real tests.
 - Identity (id, mpn, manufacturer, part_class) is NEVER touched by a derive.
 - Conflicts between sources: keep the existing per-key source+confidence and alternates behaviour,
   but derive it rather than storing a mutated winner.`,
-      { label: 'derive-engine', phase: 'OnModel' },
+      { label: 'derive-engine', phase: 'OnModel', isolation: 'worktree' },
     ),
 
   () =>
@@ -177,7 +181,7 @@ f(part_class, EDA tool), read off the EDA registry (spec D3).
 - requires_override on the record wins over the class default when set.
 - The Requirement enum is a WIRE CONTRACT the TypeScript union mirrors; keep
   test_the_enum_covers_exactly_the_registry green.`,
-      { label: 'requirements', phase: 'OnModel' },
+      { label: 'requirements', phase: 'OnModel', isolation: 'worktree' },
     ),
 
   () =>
@@ -198,7 +202,7 @@ Defects to fix, all verified by reading the DDL:
 - is_complete + missing bake presence-as-completeness into SQL. The index must be able to express
   TRUST (derived from the assets' checks), not just presence.
 Keep every existing read path (search, facets, parametric filters) green.`,
-      { label: 'index-schema', phase: 'OnModel' },
+      { label: 'index-schema', phase: 'OnModel', isolation: 'worktree' },
     ),
 ])
 
@@ -226,7 +230,7 @@ write - build the importer the rebuild will use.
   reuse it rather than writing a second one.
 - The run must be stoppable and resumable, and the worklist DERIVED from library state so a re-run
   is free on parts already done. capture/complete.py is the proven shape.`,
-      { label: 'importer', phase: 'OnDerive' },
+      { label: 'importer', phase: 'OnDerive', isolation: 'worktree' },
     ),
 
   () =>
@@ -275,7 +279,7 @@ The owner's requirement is "we can edit it without reimporting". Demonstrate it 
      did not.
 Report the actual commands and their actual output. If any step fails, say so plainly - a failed
 acceptance test reported honestly is worth far more than a green claim.`,
-      { label: 'acceptance-test', phase: 'Verify' },
+      { label: 'acceptance-test', phase: 'Verify', effort: 'high' },
     ),
 
   () =>
@@ -293,7 +297,7 @@ Look specifically for the failure patterns this project has actually shipped:
 - A success message emitted by the code that STARTED the work rather than the code that OBSERVED it.
 - Anything that writes under sourced/ outside the importer.
 Report confirmed findings with file:line and a concrete failure scenario. Do not report style.`,
-      { label: 'adversarial-review', phase: 'Verify' },
+      { label: 'adversarial-review', phase: 'Verify', effort: 'high' },
     ),
 ])
 
