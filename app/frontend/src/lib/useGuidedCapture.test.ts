@@ -174,7 +174,13 @@ describe("useGuidedCapture", () => {
 
     await waitFor(() => expect(result.current.status).toBe("done"));
     expect(api.assetsInspect).toHaveBeenCalledWith("part1", ["C:\\Downloads\\BQ24074.zip"]);
-    expect(api.assetsCommit).toHaveBeenCalledWith("part1", CANDIDATE);
+    // The attach carries WHERE the files came from: the vendor key and the exact page this
+    // capture opened. Without it every guided capture lands unattributed, which is the state the
+    // owner's "its not trusted where we've gotten them" complaint is about.
+    expect(api.assetsCommit).toHaveBeenCalledWith("part1", CANDIDATE, {
+      vendor: "ultralibrarian",
+      url: UL_URL,
+    });
     expect(result.current.received.kicad_symbol).toBe(true);
     expect(result.current.received.kicad_model).toBe(true);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["cad-source", "part1"] });

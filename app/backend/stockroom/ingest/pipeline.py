@@ -19,6 +19,7 @@ from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footpri
 from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
+from stockroom.model.asset import AssetOrigin
 from stockroom.model.category import category_nickname
 from stockroom.model.part import AssetRef, PartRecord, Provenance
 from stockroom.mutation.library_ops import LibraryOps
@@ -30,6 +31,26 @@ from stockroom.mutation.placement import (
 from stockroom.mutation.transaction import Transaction
 from stockroom.store.profile import Profile
 from stockroom.vcs.repo import GitRepo
+
+
+def _with_origin(ref: AssetRef, origin: AssetOrigin | None, now_iso: str):
+    """An asset carrying `ref`, tagged with where it came from when that is known.
+
+    Returns the BARE ref when there is no origin, so an unattributed attach stays unattributed
+    rather than acquiring an origin whose vendor is the empty string -- `Asset.of` wraps a bare
+    ref with `origin=None`, which is the honest shape for "attached, nobody recorded a source".
+    """
+    if origin is None:
+        return ref
+    from stockroom.model.asset import Asset
+
+    return Asset(
+        ref=ref,
+        origin=AssetOrigin(
+            vendor=origin.vendor, url=origin.url,
+            captured_at=now_iso or origin.captured_at, extra=dict(origin.extra),
+        ),
+    )
 
 
 class IngestPipeline:
@@ -126,7 +147,10 @@ class IngestPipeline:
             txn.commit(f"Attach 3D model to {part_id}")
         return record
 
-    def attach_assets(self, part_id: str, candidate: StagingCandidate) -> PartRecord:
+    def attach_assets(
+        self, part_id: str, candidate: StagingCandidate,
+        *, origin: AssetOrigin | None = None, now_iso: str = "",
+    ) -> PartRecord:
         """Attach a downloaded CAD ZIP's symbol/footprint/3D onto an EXISTING part (the
         owner's DigiKey-CAD-download flow for a part that already landed identity-only,
         via add_reference_part; spec section 5). Mirrors add_part's file-owning attach
@@ -136,7 +160,15 @@ class IngestPipeline:
         above); one that also carries a symbol + footprint merges the symbol into the
         category lib and places the footprint into the category `.pretty` too. One
         atomic Transaction: a failure restores every touched path, so an existing part
-        can never end up half-attached."""
+        can never end up half-attached.
+
+        `origin` records WHERE these files came from, and is applied to every asset this call
+        files. It is the guided flow's answer to the owner's complaint -- *"its not trusted where
+        we've gotten them"* -- and it has to live HERE rather than only on `attach_symbol` /
+        `attach_footprint`, because this is the path guided capture actually uses: a downloaded
+        archive whose symbol, footprint and 3D all came from the same page in one click.
+        `captured_at` is stamped by the caller's clock (the API passes the server's), never by the
+        client. Omitted means the assets stay honestly UNATTRIBUTED."""
         fp = candidate.chosen_footprint  # None if no variants; IngestError if index invalid
         if candidate.symbol_lib_path is None and fp is None and candidate.model_path is None:
             raise IngestError("candidate carries no symbol, footprint, or 3D model to attach")
@@ -175,7 +207,7 @@ class IngestPipeline:
                     sym_lib_path, candidate.symbol_lib_path, candidate.symbol_name, entry_name
                 )
                 txn.track(sym_lib_path)
-                kicad.symbol = AssetRef(lib=nickname, name=entry_name)
+                kicad.symbol = _with_origin(AssetRef(lib=nickname, name=entry_name), origin, now_iso)
 
             if fp is not None:
                 if not entry_name:
@@ -183,7 +215,9 @@ class IngestPipeline:
                 ensure_footprint_lib(pretty_dir)
                 fp_path = place_footprint(pretty_dir, fp, entry_name)
                 txn.track(fp_path)
-                kicad.footprint = AssetRef(lib=nickname, name=entry_name)
+                kicad.footprint = _with_origin(
+                    AssetRef(lib=nickname, name=entry_name), origin, now_iso
+                )
 
             if candidate.model_path is not None:
                 if kicad.footprint is None:
@@ -200,7 +234,9 @@ class IngestPipeline:
                 fp_obj.set_model_path(f"${{SR_LIB}}/models/{model_name}")
                 fp_file.write_text(fp_obj.serialize(), encoding="utf-8", newline="")
                 txn.track(fp_file)
-                kicad.model = AssetRef(file=f"models/{model_name}")
+                kicad.model = _with_origin(
+                    AssetRef(file=f"models/{model_name}"), origin, now_iso
+                )
 
             # the symbol's Footprint property + mirror the record's identity fields onto
             # it, whenever a symbol exists (freshly placed above, or already on the
