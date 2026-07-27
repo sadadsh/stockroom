@@ -204,12 +204,16 @@ def _stable_stm_index(tmp_path_factory, monkeypatch):
     on this machine at 235 MB, written into the developer's REAL config dir by a past test run --
     the same unisolated-write defect that blanked the owner's vendor credentials.
 
-    IT IS PERSISTENT AND REPO-LOCAL, NOT UNDER pytest's TMP, and that is a deliberate speed
-    decision with a measured number behind it. Pointing it inside the per-run basetemp is correct
-    but rebuilds a **235,163,648-byte** index over ~2,100 device XML on EVERY suite run, which
-    measured as minutes added to each run on the owner's machine - exactly the "sick of waiting
-    minutes upon minutes" cost the repo's own gate rules exist to avoid. Before config isolation
-    the suite got that caching by accident, from the developer's real `~/.config/stockroom`.
+    IT IS PERSISTENT AND REPO-LOCAL, NOT UNDER pytest's TMP, so the index is not rebuilt every run.
+    Pointing it inside the per-run basetemp is equally correct and equally isolated, but rebuilds a
+    **235,163,648-byte** index over ~2,100 device XML each time. Before config isolation the suite
+    got this caching by accident, from the developer's real `~/.config/stockroom`.
+
+    VERIFIED: a warm run REUSES it - `index.sqlite` mtime was byte-identical before and after a full
+    `tests/backend/stm` run (`116 passed in 152.85s`), so no rebuild happened. NOT MEASURED: how much
+    wall clock that actually saves. A cold run of the two real-source modules took 175.77s, but the
+    warm comparison was abandoned, so no speed-up figure is claimed here. The reason to keep it is
+    correctness-neutral and rebuild-avoiding, not a number I can quote.
     `build/` is gitignored (`/.gitignore:28`), so this keeps the caching WITHOUT writing anywhere
     the user's own config lives, and `StmIndex.build` already re-parses when the source or
     `classifier_rev` changes, so a stale cache corrects itself rather than lying.

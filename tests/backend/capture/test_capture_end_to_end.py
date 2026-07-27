@@ -57,11 +57,11 @@ def _capture(tmp_path, base_url: str, formats: list[str]):
         page.goto(base_url)
         report = adapter.drive(page, formats)
         if report.submitted:
-            _wait_for_file(browser, before=0)
+            _wait_for_file(browser, page, before=0)
     return report, browser.captured
 
 
-def _wait_for_file(browser, before: int, timeout_s: float = 60.0) -> bool:
+def _wait_for_file(browser, page, before: int, timeout_s: float = 60.0) -> bool:
     """True once a NEW file has actually been SAVED.
 
     NEVER `page.wait_for_event("download")` here either. The session registers an `on("download")`
@@ -71,12 +71,20 @@ def _wait_for_file(browser, before: int, timeout_s: float = 60.0) -> bool:
     tests in this file each sat out that timeout and then failed, for files that were on disk the
     whole time. That is the same defect `capture/guided.py` had in production, and it is locked
     there by tests/backend/capture/test_guided_download_wait.py.
+
+    AND IT SLEEPS THROUGH THE PAGE, for the same reason the production wait does. This helper used
+    `time.sleep`, which passed only by accident: against a localhost fixture the download is already
+    dispatched during `drive()`, so the loop never actually had to observe anything. A bare
+    `time.sleep` blocks the thread that Playwright's sync api needs in order to deliver
+    `on("download")` at all, so the moment the fixture or the machine got slower these tests would
+    have failed with a phantom "no file downloaded" - the exact confusion that cost an hour today.
+    Found by asking where ELSE the production defect existed, rather than assuming it was unique.
     """
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if len(browser.captured) > before:
             return True
-        time.sleep(0.2)
+        page.wait_for_timeout(200)
     return len(browser.captured) > before
 
 
