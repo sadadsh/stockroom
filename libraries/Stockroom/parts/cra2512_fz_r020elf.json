@@ -117,7 +117,25 @@
   },
   "description": "20mΩ 3W ±50ppm/℃ ±1% 2512 Chip Resistor - Surface Mount RoHS",
   "display_name": "20mΩ ±1% 2512",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "CRA2512-FZ-R020ELF"
+      },
+      "model": {
+        "file": "models/CRA2512-FZ-R020ELF.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "CRA2512-FZ-R020ELF"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
