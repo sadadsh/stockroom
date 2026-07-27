@@ -473,6 +473,11 @@ class EnrichmentPipeline:
         # returns the same result, and only a SUBSTANTIVE result is stored, so a one-off thin or
         # Akamai-blocked fetch never becomes the cached answer.
         self.url_cache = TtlCache(Path(cache_dir), prefix="url")
+        # A THIRD cache, keyed by the distributor stock number, holding only what that number
+        # resolved to. Mouser's Search API is capped at 1000 calls/day and a register import
+        # spends up to two per part, so without this a preview followed by the real import pays
+        # the resolve half twice - ~660 calls for one 166-part list.
+        self.resolve_cache = TtlCache(Path(cache_dir), prefix="resolve")
         self.fetcher = fetcher or HttpRenderedDomFetcher()
         self.limiter = limiter or SlidingWindowLimiter(limit=10, window=60.0)
         # The Mouser API has its OWN documented cap (~30/60), separate from the gentler
@@ -699,6 +704,14 @@ class EnrichmentPipeline:
         q = (query or "").strip()
         if not q:
             return ResolvedQuery(mpn="", query=q)
+        cached = self.resolve_cache.get(q)
+        if cached is not None:
+            return ResolvedQuery(
+                mpn=str(cached.get("mpn", "")), query=q,
+                vendor=str(cached.get("vendor", "")),
+                product_url=str(cached.get("product_url", "")),
+                resolved=True,
+            )
         for vendor, adapter in (("mouser", self.mouser), ("digikey", self.digikey)):
             if not _looks_like_stock_number(q, vendor):
                 continue
@@ -708,13 +721,21 @@ class EnrichmentPipeline:
             result = adapter.lookup(q)
             if result.mpn is None or not str(result.mpn.value).strip():
                 continue
-            return ResolvedQuery(
+            resolved = ResolvedQuery(
                 mpn=str(result.mpn.value).strip(),
                 query=q,
                 vendor=vendor,
                 product_url=str(result.product_url.value) if result.product_url else "",
                 resolved=True,
             )
+            # Cache the ANSWER only, never a miss: a miss is usually a transient network or
+            # rate-limit failure, and remembering it would make one bad minute stick for the
+            # whole TTL. Disk-backed, not in-memory, because the pipeline is rebuilt per request
+            # so a memo would cache nothing across the preview-then-import pair this is for.
+            self.resolve_cache.put(q, {
+                "mpn": resolved.mpn, "vendor": vendor, "product_url": resolved.product_url,
+            })
+            return resolved
         # Not resolvable (or not a stock number at all): the query stands as the MPN, and
         # `resolved` says which of those two it was, so a caller can report the difference
         # instead of guessing why a part came back thin.
