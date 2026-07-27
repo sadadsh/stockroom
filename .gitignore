@@ -103,3 +103,6 @@ tests/backend/api/test_gitshim.py
 
 # headless UI shot output
 build/shots/
+
+# Generated progress page (rendered from rebuild-plan.json by scripts/progress.py on service start)
+docs/progress/index.html
