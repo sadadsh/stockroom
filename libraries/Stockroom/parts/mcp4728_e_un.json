@@ -22,6 +22,47 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0040"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/microchiptechnology/images/msop10.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8924/MFG_150%7EC04-021%7EUN%7E10.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "133 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "18"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C"
       }
     ],
     "Packaging": [
@@ -36,6 +77,18 @@
         "value": "Tube"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Digital to Analog Converters - DAC"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +99,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Settling Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "6us"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "6µs (Typ)"
       }
     ],
     "datasheet_url": [
@@ -70,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Digital to Analog Converters - DAC Quad 12-bit NV DAC with I2C interface"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC DAC 12BIT 10-MSOP"
       }
     ],
     "manufacturer": [
@@ -119,6 +194,10 @@
   "display_name": "4-Channel Digital to Analog Converter MSOP-10",
   "eda": {},
   "enrichment": {
+    "Architecture": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -154,6 +233,14 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Data Interface": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Differential Output": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -214,6 +301,10 @@
     "Has Third Party Stock": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "INL/DNL (LSB)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Image": {
       "confidence": "medium",
@@ -303,9 +394,25 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Bits": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Number of D/A Converters": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Operating Temperature": {
       "confidence": "medium",
@@ -315,9 +422,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Output Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Package Quantity": {
       "confidence": "medium",
@@ -326,6 +441,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -363,9 +482,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Reference Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Resolution (Bits)": {
       "confidence": "medium",
@@ -399,6 +526,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -410,6 +541,14 @@
     "Voltage - Supply": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Supply, Analog": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Supply, Digital": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -464,10 +603,71 @@
       "stock": 4745,
       "url": "https://www.lcsc.com/product-detail/C478093.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:18.452643+00:00",
+      "part_number": "579-MCP4728-E/UN",
+      "price_breaks": [
+        {
+          "price": 2.5,
+          "qty": 1
+        },
+        {
+          "price": 2.47,
+          "qty": 10
+        },
+        {
+          "price": 2.09,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        },
+        {
+          "price": 1.89,
+          "qty": 300
+        },
+        {
+          "price": 1.88,
+          "qty": 500
+        },
+        {
+          "price": 1.86,
+          "qty": 1000
+        }
+      ],
+      "stock": 61861,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:18.452643+00:00",
+      "part_number": "MCP4728-E/UN-ND",
+      "price_breaks": [
+        {
+          "price": 2.5,
+          "qty": 1
+        },
+        {
+          "price": 2.09,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        }
+      ],
+      "stock": 6242,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Architecture": "String DAC",
     "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
     "Brand Id": "169",
@@ -477,6 +677,8 @@
     "Country of Origin": "Thailand",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Data Interface": "I2C",
+    "Differential Output": "No",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/39d8599faaba488da9210c131131e81b.svg?t=1683510650",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/874ff736f43741bcaba4c5eb98785ff3.svg?t=1683510650",
@@ -492,6 +694,7 @@
     "HTS Code (TARIC)": "8542399000",
     "HTS Code (US)": "8542390001",
     "Has Third Party Stock": "No",
+    "INL/DNL (LSB)": "±2, ±0.2",
     "Image": "https://www.mouser.com/images/microchiptechnology/images/msop10.jpg",
     "Integral non - linearity": "2LSB",
     "Interface Type": "I2C",
@@ -514,12 +717,19 @@
     "Lead Time": "133 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
+    "Number of Bits": "12",
     "Number of Channels": "4",
+    "Number of D/A Converters": "4",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "1",
+    "Output Type": "Voltage - Buffered",
     "Package": "MSOP-10",
+    "Package / Case": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tube",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "601",
     "Popular Part": "No",
@@ -529,7 +739,9 @@
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_blank.jpg",
     "Quiescent Current (Iq)": "40nA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
+    "Reference Type": "Internal, Supply",
     "Resolution (Bits)": "12",
     "RoHS": "Yes",
     "Settling Time": "6us",
@@ -538,9 +750,12 @@
     "Stock (Domestic)": "10641",
     "Stock (Overseas)": "10641",
     "Stock (Shenzhen)": "10641",
+    "Supplier Device Package": "10-MSOP",
     "Unit": "Piece",
     "Unit Weight (kg)": "0.00022",
     "Voltage - Supply": "2.7V~5.5V",
+    "Voltage - Supply, Analog": "2.7V ~ 5.5V",
+    "Voltage - Supply, Digital": "2.7V ~ 5.5V",
     "Weight": "0.02",
     "Weight (kg)": "2e-05",
     "Wm Catalog Id": "934"
