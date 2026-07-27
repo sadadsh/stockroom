@@ -1,0 +1,782 @@
+{
+  "alternates": {
+    "HTS Code (CA)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541290000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541210000"
+      }
+    ],
+    "HTS Code (CN)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541290000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541210000"
+      }
+    ],
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541.29.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541210100"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8541290095"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8541210095"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8541.21.0095"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4806/31%7ESOT23-3%7EF%2CN%2CSA%7E3.JPG"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "3000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "-55℃~+150℃"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "-55°C ~ 150°C (TJ)"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "MOSFETs"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Discrete Semiconductor Products"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/b1f7d36895b500d9b8e7ac1290b185e8.pdf?productCode=C260927"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://www.diodes.com/datasheet/download/DMG3414U.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "N-Channel 20V 4.2A 0.78W Surface Mount SOT-23"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "MOSFETs N-Ch 20V VDSS 8 Vgss 30A IDM"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "MOSFET N-CH 20V 4.2A SOT23-3"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "280 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "40"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "DIODES"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Diodes Incorporated"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C260927.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=DMG3414U-7"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Transistors",
+          "name": "DMG3414U-7"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/DMG3414U-7.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Transistors",
+          "name": "DMG3414U-7"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "dmg3414u-7-ffe1.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "Transistors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "N-Channel 20V 4.2A 0.78W Surface Mount SOT-23",
+    "display_name": "MOSFET SOT-23",
+    "specs": {
+      "Assembly Country of Origin": "China",
+      "Available On Reel": "Yes",
+      "Brand Id": "296",
+      "Catalog Id": "1436",
+      "Contains Battery": "No",
+      "Country of Diffusion": "Taiwan",
+      "Country of Origin": "Taiwan",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "Current - Continuous Drain (Id) @ 25°C": "4.2A (Ta)",
+      "Current - Continuous Drain(Id)": "4.2A",
+      "Drain to Source Voltage": "20V",
+      "Drain to Source Voltage (Vdss)": "20 V",
+      "Drive Voltage (Max Rds On, Min Rds On)": "1.8V, 4.5V",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/1fb6146406a34819a86e33d73e7677db.svg?t=1731400560",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/8655f23bb4d84d06a432871c7e76da51.svg?t=1731400560",
+      "FET Type": "N-Channel",
+      "Gate Charge (Qg) (Max) @ Vgs": "9.6 nC @ 4.5 V",
+      "Gate Charge(Qg)": "9.6nC@4.5V",
+      "Gate Threshold Voltage (Vgs(th))": "900mV",
+      "HTS Code (BR)": "85412910",
+      "HTS Code (CA)": "8541290000",
+      "HTS Code (CN)": "8541290000",
+      "HTS Code (EU TARIC)": "8541210000",
+      "HTS Code (IN)": "85412900",
+      "HTS Code (JP)": "854121000",
+      "HTS Code (MX)": "8541.29.99",
+      "HTS Code (TARIC)": "8541290000",
+      "HTS Code (US)": "8541290095",
+      "Has Third Party Stock": "No",
+      "Image": "https://www.mouser.com/images/mouserelectronics/images/SOT_23_3_t.jpg",
+      "Input Capacitance (Ciss) (Max) @ Vds": "829.9 pF @ 10 V",
+      "Input Capacitance(Ciss)": "829.9pF",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "KRHTS": "8541219000",
+      "Key Attributes": "MOSFET N-CH 20V 4.2A SOT-23",
+      "LCSC Category": "Single FETs, MOSFETs",
+      "LCSC Category Path": "Discrete Semiconductors > Transistors > FETs, MOSFETs",
+      "LCSC Parent Category": "Transistors/Thyristors",
+      "LCSC Product ID": "252791",
+      "LCSC Product Name": "MOSFET N-CH 20V 4.2A SOT-23",
+      "LCSC Title": "DIODES DMG3414U-7",
+      "LCSC Warehouse Category": "Single FETs, MOSFETs",
+      "Lead Time": "280 Days",
+      "Lifecycle": "Active",
+      "Maximum Order Quantity": "530",
+      "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount",
+      "Number": "1 N-channel",
+      "Operating Temperature": "-55℃~+150℃",
+      "Order Multiple": "1",
+      "Output Capacitance(Coss)": "85.3pF",
+      "Package": "SOT-23",
+      "Package / Case": "TO-236-3, SC-59, SOT-23-3",
+      "Package Quantity": "3000",
+      "Package Quantity Unit": "Reel",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "320",
+      "Pd - Power Dissipation": "780mW",
+      "Popular Part": "No",
+      "Power Dissipation (Max)": "780mW (Ta)",
+      "Pre-Sale": "No",
+      "Product Category": "MOSFETs",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20181128_Diodes-Incorporated-DMG3414U-7_C260927_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20181128_Diodes-Incorporated-DMG3414U-7_C260927_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20181128_Diodes-Incorporated-DMG3414U-7_C260927_blank.jpg",
+      "RDS(on)": "37mΩ@1.8V",
+      "REACH": "REACH Unaffected",
+      "Rds On (Max) @ Id, Vgs": "25mOhm @ 8.2A, 4.5V",
+      "Reel Setup Fee": "3",
+      "Reverse Transfer Capacitance (Crss@Vds)": "81.2pF",
+      "RoHS": "Yes",
+      "Standard Pack Qty": "3000",
+      "Standard Package": "3000",
+      "Stock": "135",
+      "Stock (Domestic)": "135",
+      "Stock (Overseas)": "135",
+      "Stock (Shenzhen)": "135",
+      "Supplier Device Package": "SOT-23-3",
+      "Technology": "MOSFET (Metal Oxide)",
+      "Type": "N-Channel",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "8e-06",
+      "Vgs (Max)": "±8V",
+      "Vgs(th) (Max) @ Id": "900mV @ 250µA",
+      "Weight": "0.034",
+      "Weight (kg)": "3.4e-05",
+      "Weight Foreign (kg)": "0",
+      "Wm Catalog Id": "1436"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Current - Continuous Drain (Id) @ 25°C": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Current - Continuous Drain(Id)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Drain to Source Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Drain to Source Voltage (Vdss)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Drive Voltage (Max Rds On, Min Rds On)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "FET Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Gate Charge (Qg) (Max) @ Vgs": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Gate Charge(Qg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Gate Threshold Voltage (Vgs(th))": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Input Capacitance (Ciss) (Max) @ Vds": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Input Capacitance(Ciss)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Maximum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Capacitance(Coss)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pd - Power Dissipation": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Power Dissipation (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RDS(on)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Rds On (Max) @ Id, Vgs": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reverse Transfer Capacitance (Crss@Vds)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Technology": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Vgs (Max)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Vgs(th) (Max) @ Id": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "dmg3414u-7-ffe1",
+  "manufacturer": "DIODES",
+  "mpn": "DMG3414U-7",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.082142857,
+          "qty": 5
+        },
+        {
+          "price": 0.065857143,
+          "qty": 250
+        },
+        {
+          "price": 0.057571429,
+          "qty": 750
+        },
+        {
+          "price": 0.051571429,
+          "qty": 2500
+        },
+        {
+          "price": 0.046571429,
+          "qty": 15000
+        },
+        {
+          "price": 0.044142857,
+          "qty": 30000
+        }
+      ],
+      "stock": 2540,
+      "url": "https://www.lcsc.com/product-detail/C260927.html",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

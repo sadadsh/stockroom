@@ -1,0 +1,524 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "56mΩ VQFN-HR-12(2x2.5) OR Controllers, Ideal Diodes RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Power Switch ICs - Power Distribution 2.7-V&nbsp;to 22-V 5 6-m? 4.5-A power A A 595-TPS2121RUXT"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C485916.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/1017.html?scene=FULL_MATCH&globalKeyword=TPS2121RUXR&s_z=n_q_TPS2121RUXR"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TPS2121RUXR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS2121RUXR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TPS2121RUXR"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "tps2121ruxr-8f51.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "Switches",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "56mΩ VQFN-HR-12(2x2.5) OR Controllers, Ideal Diodes RoHS",
+    "display_name": "Power Switch IC VQFN-HR-12",
+    "specs": {
+      "Assembly Country of Origin": "Philippines",
+      "Available On Reel": "No",
+      "Brand Id": "100",
+      "Catalog Id": "1017",
+      "Contains Battery": "No",
+      "Country of Diffusion": "United States",
+      "Country of Origin": "Philippines",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/054ba70a973c4409acd913e8a5372d9d.svg?t=1695779739",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/f283b2f7091f423fbea2d05db5dfc6a0.svg?t=1695779739",
+      "Function": "Reverse current blocking;Overvoltage lockout;Under-voltage lockout;Over temperature protection;Short-Circuit Protection",
+      "HTS Code (BR)": "85423999",
+      "HTS Code (CA)": "8542390000",
+      "HTS Code (CN)": "8542399000",
+      "HTS Code (EU TARIC)": "8542399000",
+      "HTS Code (IN)": "85423900",
+      "HTS Code (MX)": "8542.39.99",
+      "HTS Code (TARIC)": "8542399000",
+      "HTS Code (US)": "8542390001",
+      "Has Third Party Stock": "No",
+      "Image": "https://www.mouser.com/images/texasinstruments/images/TPS2121RUXR_t.jpg",
+      "Input Voltage (Vin)": "2.8V~22V",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "Key Attributes": "2.8-V to 22-V Priority Power MUX with Seamless Switchover",
+      "LCSC Category": "OR Controllers, Ideal Diodes",
+      "LCSC Category Path": "Integrated Circuits (ICs) > Power Management (PMIC)",
+      "LCSC Parent Category": "Power Management (PMIC)",
+      "LCSC Product ID": "494503",
+      "LCSC Product Name": "2.8-V to 22-V Priority Power MUX with Seamless Switchover",
+      "LCSC Title": "TI TPS2121RUXR",
+      "LCSC Warehouse Category": "OR Controllers, Ideal Diodes",
+      "Lead Time": "112 Days",
+      "Lifecycle": "Active",
+      "Maximum Order Quantity": "1001",
+      "Minimum Order Quantity": "1",
+      "Operating temperature": "-40℃~+125℃",
+      "Order Multiple": "1",
+      "Package": "VQFN-HR-12(2x2.5)",
+      "Package Quantity": "3000",
+      "Package Quantity Unit": "Reel",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "380",
+      "Popular Part": "Yes",
+      "Pre-Sale": "No",
+      "Product Category": "Power Switch ICs - Power Distribution",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230119_Texas-Instruments-TPS2121RUXR_C485916_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230119_Texas-Instruments-TPS2121RUXR_C485916_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230119_Texas-Instruments-TPS2121RUXR_C485916_blank.jpg",
+      "Quiescent Current": "200uA",
+      "RDS(on)": "56mΩ",
+      "Reel Setup Fee": "0",
+      "RoHS": "Yes",
+      "Standard Pack Qty": "3000",
+      "Stock": "4260",
+      "Stock (Domestic)": "4260",
+      "Stock (Overseas)": "4260",
+      "Stock (Shenzhen)": "4260",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "2.8e-05",
+      "Weight": "0.023",
+      "Weight (kg)": "2.3e-05",
+      "Weight Foreign (kg)": "0",
+      "Wm Catalog Id": "1017"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Function": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Input Voltage (Vin)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Maximum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Quiescent Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RDS(on)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "tps2121ruxr-8f51",
+  "manufacturer": "TI",
+  "mpn": "TPS2121RUXR",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.867142857,
+          "qty": 1
+        },
+        {
+          "price": 0.692857143,
+          "qty": 10
+        },
+        {
+          "price": 0.605714286,
+          "qty": 30
+        },
+        {
+          "price": 0.52,
+          "qty": 100
+        },
+        {
+          "price": 0.458571429,
+          "qty": 500
+        },
+        {
+          "price": 0.431428571,
+          "qty": 1000
+        }
+      ],
+      "stock": 4833,
+      "url": "https://www.lcsc.com/product-detail/C485916.html",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

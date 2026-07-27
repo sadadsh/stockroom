@@ -1,0 +1,246 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "8542390070"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "Switching Voltage Regulators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "IC REG BUCK ADJ 4.5A 14VQFN"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "lifecycle": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "New Product"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Active"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS62914RPYR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS62914RPYR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-ICs",
+          "name": "TPS62914RPYR"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.ti.com/lit/ds/symlink/tps62918.pdf"
+  },
+  "derived": {
+    "category": "ICs",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Switching Voltage Regulators 17V VIN 4.5A low-no ise low-ripple buck",
+    "display_name": "Switching Voltage Regulator 14-VQFN-HR",
+    "specs": {
+      "Assembly Country of Origin": "Not available",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "China",
+      "Current - Output": "4.5A",
+      "ECCN": "EAR99",
+      "Frequency - Switching": "1MHz, 1.4MHz, 2.2MHz",
+      "Function": "Step-Down",
+      "HTS Code (CN)": "8542391090",
+      "HTS Code (MX)": "8542399999",
+      "HTS Code (US)": "8542390070",
+      "Image": "https://www.mouser.com/images/texasinstruments/images/VQFN-HR-14_DSL.jpg",
+      "Maximum Order Quantity": "1001",
+      "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "2 (1 Year)",
+      "Mounting Type": "Surface Mount",
+      "Number of Outputs": "1",
+      "Operating Temperature": "-40°C ~ 150°C (TJ)",
+      "Order Multiple": "1",
+      "Output Configuration": "Positive",
+      "Output Type": "Adjustable",
+      "Package / Case": "14-PowerVFQFN",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Reel, Cut Tape, MouseReel",
+      "Product Category": "Switching Voltage Regulators",
+      "REACH": "REACH Unaffected",
+      "RoHS": "RoHS Compliant",
+      "Series": "TPS6291x",
+      "Standard Pack Qty": "3000",
+      "Supplier Device Package": "14-VQFN-HR (2.5x3)",
+      "Synchronous Rectifier": "Yes",
+      "Topology": "Buck",
+      "Voltage - Input (Max)": "17V",
+      "Voltage - Input (Min)": "3V",
+      "Voltage - Output (Max)": "5.5V",
+      "Voltage - Output (Min/Fixed)": "0.8V"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "tps62914rpyr-2e2f",
+  "manufacturer": "Texas Instruments",
+  "mpn": "TPS62914RPYR",
+  "part_class": "component",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "manual",
+    "source_url": "https://www.ti.com/lit/ds/symlink/tps62918.pdf"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "595-TPS62914RPYR",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 4.02,
+          "qty": 1
+        },
+        {
+          "currency": "USD",
+          "price": 3.04,
+          "qty": 10
+        },
+        {
+          "currency": "USD",
+          "price": 2.79,
+          "qty": 25
+        },
+        {
+          "currency": "USD",
+          "price": 2.52,
+          "qty": 100
+        },
+        {
+          "currency": "USD",
+          "price": 2.4,
+          "qty": 250
+        },
+        {
+          "currency": "USD",
+          "price": 2.38,
+          "qty": 500
+        },
+        {
+          "currency": "USD",
+          "price": 2.24,
+          "qty": 1000
+        },
+        {
+          "currency": "USD",
+          "price": 2.24,
+          "qty": 3000
+        }
+      ],
+      "stock": 2228,
+      "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/TPS62914RPYR?qs=IKkN%2F947nfBsu5PgBfXn4w%3D%3D",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "296-TPS62914RPYRTR-ND",
+      "price_breaks": [
+        {
+          "currency": "USD",
+          "price": 2.16965,
+          "qty": 3000
+        }
+      ],
+      "stock": 3164,
+      "url": "https://www.digikey.com/en/products/detail/texas-instruments/TPS62914RPYR/24708432",
+      "vendor": "DigiKey"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

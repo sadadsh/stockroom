@@ -1,0 +1,556 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.39.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542310399"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Tube"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/00b95c11d5694188a4537fc45e334135.pdf?productCode=C478093"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/282/1/22187E.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "6us 2.7V~5.5V 2LSB 12 I2C MSOP-10 Digital to Analog Converters (DAC) RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Digital to Analog Converters - DAC Quad 12-bit NV DAC with I2C interface"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "MICROCHIP"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Microchip Technology"
+      }
+    ],
+    "mpn": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "MCP4728T-E/UN"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "MCP4728-E/UN"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C478093.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/934.html?scene=FULL_MATCH&globalKeyword=MCP4728-E%252FUN&s_z=n_q_MCP4728-E%252FUN"
+      }
+    ]
+  },
+  "assets": {},
+  "datasheet": {
+    "fetched_at": "",
+    "file": "mcp4728-e-un-434f.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "Other",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "6us 2.7V~5.5V 2LSB 12 I2C MSOP-10 Digital to Analog Converters (DAC) RoHS",
+    "display_name": "4-Channel Digital to Analog Converter MSOP-10",
+    "specs": {
+      "Assembly Country of Origin": "Not available",
+      "Available On Reel": "Yes",
+      "Brand Id": "169",
+      "Catalog Id": "934",
+      "Contains Battery": "No",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Thailand",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/39d8599faaba488da9210c131131e81b.svg?t=1683510650",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/874ff736f43741bcaba4c5eb98785ff3.svg?t=1683510650",
+      "Flash Sale Product Po": "{\"recommendId\": 252730, \"recommendCode\": \"TL2607160411\", \"productId\": 485402, \"productCode\": \"C478093\", \"productModel\": \"MCP4728T-E/UN\", \"brandId\": 169, \"brandNameEn\": \"MICROCHIP\", \"recommendLevel\": \"A\", \"sellPrice\": 1.4032, \"usdPrice\": 1.4032, \"sellCurrencyType\": \"USD\", \"currencySymbol\": \"$\", \"arriveDays\": 45, \"recommendNumber\": 30000, \"minOrderNum\": 3000, \"validNumber\": 30000, \"warehouseCode\": \"zh\", \"expiredTime\": \"2026-08-05 23:59:59\", \"expiredSeconds\": 831087529, \"isOnsale\": true, \"deliveryTimeWayDays\": [46, 48], \"isShowForeignPrice\": true, \"productBatchCode\": \"25+\", \"productBatchCodeEn\": \"25+\", \"isRealPrice\": true, \"productImageUrl\": \"https://assets.lcsc.com/images/lcsc/96x96/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_front.jpg\", \"productImageUrlBig\": \"https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_front.jpg\", \"split\": 1, \"encapStandard\": \"MSOP-10\", \"isReel\": true, \"reelPrice\": 3, \"productIntroEn\": \"6us 2.7V~5.5V 2LSB 12 I2C MSOP-10 Digital to Analog Converters (DAC) RoHS\", \"isEnvironment\": true, \"catalogId\": 615, \"catalogName\": \"Digital to Analog Converters (DAC)\", \"parentCatalogId\": 601, \"parentCatalogName\": \"Data Acquisition\", \"productArrange\": \"Tape & Reel (TR)\", \"weight\": 0.02, \"minPacketNumber\": 2500, \"minPacketUnit\": \"Reel\", \"isHot\": false, \"productCodeHighlight\": null, \"productModelHighlight\": null, \"isAsianBrand\": null, \"firstWmCatalogId\": 17, \"firstWmCatalogNameEn\": \"Integrated Circuits (ICs)\", \"secondWmCatalogId\": 257, \"secondWmCatalogNameEn\": \"Data Acquisition\", \"thirdWmCatalogId\": 934, \"thirdWmCatalogNameEn\": \"Digital to Analog Converters (DAC)\", \"fourthWmCatalogId\": null, \"fourthWmCatalogNameEn\": null, \"fifthWmCatalogId\": null, \"fifthWmCatalogNameEn\": null, \"sixthWmCatalogId\": null, \"sixthWmCatalogNameEn\": null, \"wmCatalogId\": 934, \"wmCatalogNameEn\": \"Digital to Analog Converters (DAC)\"}",
+      "Function": "Integrated buffer;Programmable gain;Power-down mode;Power-on reset",
+      "HTS Code (BR)": "85423999",
+      "HTS Code (CA)": "8542390000",
+      "HTS Code (CN)": "8542399000",
+      "HTS Code (EU TARIC)": "8542319000",
+      "HTS Code (IN)": "85423900",
+      "HTS Code (JP)": "8542390990",
+      "HTS Code (MX)": "8542.39.99",
+      "HTS Code (TARIC)": "8542399000",
+      "HTS Code (US)": "8542390001",
+      "Has Third Party Stock": "No",
+      "Image": "https://www.mouser.com/images/microchiptechnology/images/msop10.jpg",
+      "Integral non - linearity": "2LSB",
+      "Interface Type": "I2C",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "Key Attributes": "12-Bit, Quad Digital-to-Analog Converter with EEPROM Memory",
+      "LCSC Category": "Digital to Analog Converters (DAC)",
+      "LCSC Category Path": "Integrated Circuits (ICs) > Data Acquisition",
+      "LCSC Parent Category": "Data Acquisition",
+      "LCSC Product ID": "485402",
+      "LCSC Product Name": "12-Bit, Quad Digital-to-Analog Converter with EEPROM Memory",
+      "LCSC Title": "MICROCHIP MCP4728T-E/UN",
+      "LCSC Warehouse Category": "Digital to Analog Converters (DAC)",
+      "Lead Time": "133 Days",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "1",
+      "Number of Channels": "4",
+      "Operating Temperature": "-40℃~+125℃",
+      "Order Multiple": "1",
+      "Package": "MSOP-10",
+      "Package Quantity": "2500",
+      "Package Quantity Unit": "Reel",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "601",
+      "Popular Part": "No",
+      "Pre-Sale": "No",
+      "Product Category": "Digital to Analog Converters - DAC",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230121_Microchip-Tech-MCP4728T-E-UN_C478093_blank.jpg",
+      "Quiescent Current (Iq)": "40nA",
+      "Reel Setup Fee": "3",
+      "Resolution (Bits)": "12",
+      "RoHS": "Yes",
+      "Settling Time": "6us",
+      "Standard Pack Qty": "100",
+      "Stock": "10641",
+      "Stock (Domestic)": "10641",
+      "Stock (Overseas)": "10641",
+      "Stock (Shenzhen)": "10641",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "0.00022",
+      "Voltage - Supply": "2.7V~5.5V",
+      "Weight": "0.02",
+      "Weight (kg)": "2e-05",
+      "Wm Catalog Id": "934"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Flash Sale Product Po": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Function": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Integral non - linearity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Interface Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Quiescent Current (Iq)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Resolution (Bits)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Settling Time": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "mcp4728-e-un-434f",
+  "manufacturer": "MICROCHIP",
+  "mpn": "MCP4728-E/UN",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 2.0,
+          "qty": 1
+        },
+        {
+          "price": 1.7,
+          "qty": 10
+        },
+        {
+          "price": 1.511428571,
+          "qty": 30
+        },
+        {
+          "price": 1.205714286,
+          "qty": 100
+        },
+        {
+          "price": 1.118571429,
+          "qty": 500
+        },
+        {
+          "price": 1.081428571,
+          "qty": 1000
+        }
+      ],
+      "stock": 4745,
+      "url": "https://www.lcsc.com/product-detail/C478093.html",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

@@ -1,0 +1,173 @@
+{
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Capacitor_SMD",
+          "name": "C_0805_2012Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "C"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://datasheet.lcsc.com/datasheet/pdf/a322db3e54171c50651c4881ac6f60fb.pdf?productCode=C5119301"
+  },
+  "derived": {
+    "category": "Capacitors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Capacitor, 22 µF, 20%, 0805",
+    "display_name": "22 µF 20% 0805 Capacitor",
+    "specs": {
+      "3D Model": "Capacitor_SMD.3dshapes/C_0805_2012Metric.wrl",
+      "Applications": "Automotive",
+      "Assembly Country of Origin": "Not available",
+      "Available On Reel": "Yes",
+      "BRHTS": "85322410",
+      "Brand Id": "79",
+      "Capacitance": "22 µF",
+      "Catalog Id": "1142",
+      "Contains Battery": "No",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Japan",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/2ee8eb13a0124a108e622ce40c0c25a8.svg?t=1737015412",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/7c9807a5ae1c4031946dbb58948f59f6.svg?t=1737015412",
+      "Footprint": "Capacitor_SMD:C_0805_2012Metric",
+      "HTS Code (BR)": "85322410",
+      "HTS Code (CA)": "8532240090",
+      "HTS Code (CN)": "8532241000",
+      "HTS Code (EU TARIC)": "8532240000",
+      "HTS Code (IN)": "85322400",
+      "HTS Code (JP)": "853224000",
+      "HTS Code (MX)": "8532.24.01",
+      "HTS Code (TARIC)": "8532240000",
+      "HTS Code (US)": "8532240020",
+      "Has Third Party Stock": "No",
+      "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "KRHTS": "8532240000",
+      "Key Attributes": "CAP CER 22uF 16V X6S 0805",
+      "LCSC Category": "Ceramic Capacitors",
+      "LCSC Category Path": "Passives > Capacitors",
+      "LCSC Parent Category": "Capacitors",
+      "LCSC Product ID": "5700214",
+      "LCSC Product Name": "CAP CER 22uF 16V X6S 0805",
+      "LCSC Title": "muRata GRT21BC81C226ME13L",
+      "LCSC Warehouse Category": "Ceramic Capacitors",
+      "Lead Time": "126 Days",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "5",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount, MLCC",
+      "Operating Temperature": "-55°C ~ 105°C",
+      "Order Multiple": "5",
+      "Package": "0805",
+      "Package / Case": "0805 (2012 Metric)",
+      "Package Quantity": "3000",
+      "Package Quantity Unit": "Reel",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "312",
+      "Popular Part": "No",
+      "Pre-Sale": "No",
+      "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Murata-Electronics-GRT21BC81C226ME13L_C5119301_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Murata-Electronics-GRT21BC81C226ME13L_C5119301_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230123_Murata-Electronics-GRT21BC81C226ME13L_C5119301_blank.jpg",
+      "REACH": "REACH Unaffected",
+      "Reel Setup Fee": "3",
+      "RoHS": "Yes",
+      "Series": "GRT",
+      "Size / Dimension": "0.079\" L x 0.049\" W (2.00mm x 1.25mm)",
+      "Standard Pack Qty": "3000",
+      "Stock": "715",
+      "Stock (Domestic)": "715",
+      "Stock (Overseas)": "715",
+      "Stock (Shenzhen)": "715",
+      "Symbol": "Device:C",
+      "Temperature Coefficient": "X6S",
+      "Thickness (Max)": "0.057\" (1.45mm)",
+      "Tolerance": "20%",
+      "Unit": "Piece",
+      "Voltage - Rated": "16V",
+      "Voltage Rating": "16V",
+      "Weight": "0.042",
+      "Weight (kg)": "4.2e-05",
+      "Wm Catalog Id": "1142"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "grt21bc81c226me13l-54e3",
+  "manufacturer": "muRata",
+  "mpn": "GRT21BC81C226ME13L",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GRT21BC81C226ME13L"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.199857143,
+          "qty": 5
+        },
+        {
+          "price": 0.161571429,
+          "qty": 250
+        },
+        {
+          "price": 0.145214286,
+          "qty": 750
+        },
+        {
+          "price": 0.124714286,
+          "qty": 2500
+        },
+        {
+          "price": 0.115714286,
+          "qty": 15000
+        },
+        {
+          "price": 0.110142857,
+          "qty": 30000
+        }
+      ],
+      "stock": 1003,
+      "url": "https://www.mouser.com/c/?q=GRT21BC81C226ME13L",
+      "vendor": "Mouser"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

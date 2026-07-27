@@ -1,0 +1,116 @@
+{
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Resistor_SMD",
+          "name": "R_0402_1005Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "R"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/508/1/PYu-RC_Group_51_RoHS_L_12.pdf"
+  },
+  "derived": {
+    "category": "Resistors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Resistor, 5.1 kOhm, 1%, 0402",
+    "display_name": "5.1 kOhm 1% 0402 Resistor",
+    "specs": {
+      "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+      "Assembly Country of Origin": "Not available",
+      "BRHTS": "85332120",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Taiwan",
+      "ECCN": "EAR99",
+      "Footprint": "Resistor_SMD:R_0402_1005Metric",
+      "HTS Code (CA)": "8533210000",
+      "HTS Code (CN)": "8533211000",
+      "HTS Code (EU TARIC)": "8533210000",
+      "HTS Code (JP)": "853321000",
+      "HTS Code (MX)": "8533210100",
+      "HTS Code (US)": "8533210030",
+      "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
+      "KRHTS": "8533219000",
+      "Lead Time": "63 Days",
+      "Minimum Order Quantity": "1",
+      "Order Multiple": "1",
+      "Package": "0402",
+      "Packaging": "Reel, Cut Tape, MouseReel",
+      "Power": "0.063 W",
+      "Product Category": "Thick Film Resistors - SMD",
+      "Resistance": "5.1 kOhm",
+      "RoHS": "RoHS Compliant By Exemption",
+      "Standard Pack Qty": "50000",
+      "Symbol": "Device:R",
+      "Tolerance": "1%",
+      "Unit Weight (kg)": "6.5e-07"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "rc0402fr-135k1l-8a01",
+  "manufacturer": "Yageo",
+  "mpn": "RC0402FR-135K1L",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=RC0402FR-135K1L"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.009,
+          "qty": 10
+        },
+        {
+          "price": 0.006,
+          "qty": 100
+        },
+        {
+          "price": 0.004,
+          "qty": 2500
+        },
+        {
+          "price": 0.003,
+          "qty": 10000
+        },
+        {
+          "price": 0.002,
+          "qty": 50000
+        }
+      ],
+      "stock": 83743,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-135K1L",
+      "vendor": "Mouser"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

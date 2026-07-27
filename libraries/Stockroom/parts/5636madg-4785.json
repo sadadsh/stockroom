@@ -1,0 +1,349 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8536509065"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8536.50.9065"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "25"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Toggle Switches"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Switches"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/348/1/toggle_switches_serie_5000M.pdf"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://www.apem.com/storage/datasheets/files/5000M/media/toggle-switches-serie-5000M.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Toggle Switches TOGGLE SWITCH 5000 MINIATURE"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "TOGGLE SWITCH 5000 MINIATURE"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "70 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "14"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Apem"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "APEM Inc."
+      }
+    ]
+  },
+  "assets": {},
+  "datasheet": {
+    "fetched_at": "",
+    "file": "5636madg-4785.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "Switches",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Toggle Switches TOGGLE SWITCH 5000 MINIATURE",
+    "display_name": "Toggle Switch",
+    "specs": {
+      "Actuator Length": "17.50mm",
+      "Actuator Type": "Standard Round",
+      "Assembly Country of Origin": "Not available",
+      "BRHTS": "85365090",
+      "Bushing Thread": "15/32-32",
+      "Circuit": "SPDT",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "France",
+      "Current Rating (Amps)": "6A (AC), 4A (DC)",
+      "ECCN": "EAR99",
+      "HTS Code (CA)": "8536509090",
+      "HTS Code (CN)": "8536500090",
+      "HTS Code (EU TARIC)": "8536508099",
+      "HTS Code (JP)": "853650090",
+      "HTS Code (US)": "8536509065",
+      "Illumination": "Non-Illuminated",
+      "Image": "https://www.mouser.com/images/apem/images/5636MADG_DSL.jpg",
+      "Lead Time": "70 Days",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Panel Mount",
+      "Operating Temperature": "-40°C ~ 85°C",
+      "Order Multiple": "1",
+      "Package Type": "Bulk",
+      "Panel Cutout Dimensions": "Circular - 12.50mm Dia",
+      "Product Category": "Toggle Switches",
+      "REACH": "REACH Affected",
+      "RoHS": "RoHS Compliant",
+      "Series": "5000M",
+      "Standard Pack Qty": "25",
+      "Standard Package": "25",
+      "Switch Function": "On-On",
+      "Termination Style": "Solder Lug",
+      "Unit Weight (kg)": "0.025676",
+      "Voltage Rating - AC": "125 V",
+      "Voltage Rating - DC": "30 V"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Actuator Length": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Actuator Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Bushing Thread": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Circuit": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Current Rating (Amps)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "ECCN": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CA)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CN)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Illumination": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Panel Cutout Dimensions": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "RoHS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Switch Function": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Termination Style": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage Rating - AC": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage Rating - DC": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
+  "hashes": null,
+  "id": "5636madg-4785",
+  "manufacturer": "Apem",
+  "mpn": "5636MADG",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 52.03,
+          "qty": 1
+        },
+        {
+          "price": 47.03,
+          "qty": 10
+        },
+        {
+          "price": 44.84,
+          "qty": 25
+        },
+        {
+          "price": 41.84,
+          "qty": 50
+        },
+        {
+          "price": 40.2,
+          "qty": 100
+        },
+        {
+          "price": 37.46,
+          "qty": 250
+        }
+      ],
+      "stock": 24,
+      "url": "https://www.lcsc.com/category/653.html?scene=FULL_MATCH&globalKeyword=5636MADG&s_z=n_q_5636MADG",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

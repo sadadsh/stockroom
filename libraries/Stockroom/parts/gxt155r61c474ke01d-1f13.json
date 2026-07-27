@@ -1,0 +1,140 @@
+{
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "Capacitor_SMD",
+          "name": "C_0402_1005Metric"
+        }
+      },
+      "model": null,
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "Device",
+          "name": "C"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "//mm.digikey.com/Volume0/opasdata/d220001/medias/docus/8944/GXT155R61C474KE01D.pdf"
+  },
+  "derived": {
+    "category": "Capacitors",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "Capacitor, 470 nF, 10%, 0402",
+    "display_name": "470 nF 10% 0402 Capacitor",
+    "specs": {
+      "3D Model": "Capacitor_SMD.3dshapes/C_0402_1005Metric.wrl",
+      "Applications": "Automotive",
+      "Assembly Country of Origin": "Not available",
+      "BRHTS": "85322410",
+      "Capacitance": "470 nF",
+      "Country of Diffusion": "Not available",
+      "Country of Origin": "Japan",
+      "ECCN": "EAR99",
+      "Footprint": "Capacitor_SMD:C_0402_1005Metric",
+      "HTS Code (CA)": "8532240010",
+      "HTS Code (CN)": "8532241000",
+      "HTS Code (EU TARIC)": "8532240000",
+      "HTS Code (JP)": "853224000",
+      "HTS Code (MX)": "8532240400",
+      "HTS Code (US)": "8532240020",
+      "Image": "https://www.mouser.com/images/murata/images/GCJ21AR72E102KXJ1J_SPL.jpg",
+      "KRHTS": "8532240000",
+      "Lead Time": "126 Days",
+      "Lifecycle": "New Product",
+      "Minimum Order Quantity": "1",
+      "Moisture Sensitivity Level": "1 (Unlimited)",
+      "Mounting Type": "Surface Mount, MLCC",
+      "Operating Temperature": "-55°C ~ 85°C",
+      "Order Multiple": "1",
+      "Package": "0402",
+      "Package / Case": "0402 (1005 Metric)",
+      "Package Type": "Tape & Reel (TR)",
+      "Packaging": "Reel, Cut Tape",
+      "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+      "REACH": "REACH Unaffected",
+      "Ratings": "AEC-Q200",
+      "RoHS": "RoHS Compliant",
+      "Series": "GXT",
+      "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
+      "Standard Pack Qty": "10000",
+      "Symbol": "Device:C",
+      "Temperature Coefficient": "X5R",
+      "Thickness (Max)": "0.022\" (0.55mm)",
+      "Tolerance": "10%",
+      "Voltage - Rated": "16V"
+    },
+    "value": ""
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "gxt155r61c474ke01d-1f13",
+  "manufacturer": "Murata Electronics",
+  "mpn": "GXT155R61C474KE01D",
+  "part_class": "passive",
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GXT155R61C474KE01D"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.15,
+          "qty": 1
+        },
+        {
+          "price": 0.063,
+          "qty": 10
+        },
+        {
+          "price": 0.036,
+          "qty": 100
+        },
+        {
+          "price": 0.028,
+          "qty": 500
+        },
+        {
+          "price": 0.023,
+          "qty": 1000
+        },
+        {
+          "price": 0.021,
+          "qty": 2500
+        },
+        {
+          "price": 0.019,
+          "qty": 5000
+        },
+        {
+          "price": 0.018,
+          "qty": 10000
+        },
+        {
+          "price": 0.015,
+          "qty": 20000
+        }
+      ],
+      "stock": 12658,
+      "url": "https://www.mouser.com/c/?q=GXT155R61C474KE01D",
+      "vendor": "Mouser"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}

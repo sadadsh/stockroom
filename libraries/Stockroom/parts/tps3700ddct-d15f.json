@@ -1,0 +1,595 @@
+{
+  "alternates": {
+    "HTS Code (CA)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542330000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390000"
+      }
+    ],
+    "HTS Code (CN)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542339000"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399000"
+      }
+    ],
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.33.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399999"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542330001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390090"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Reel, Cut Tape, MouseReel"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "2 11uA TSOT-23-6 Comparators RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Analog Comparators Window Comp for Over & Under Vltg Det A A 595-TPS3700DDCR"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "TI"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Texas Instruments"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C702147.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/category/1604.html?scene=FULL_MATCH&globalKeyword=TPS3700DDCT&s_z=n_q_TPS3700DDCT"
+      }
+    ]
+  },
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "TPS3700DDCT"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS3700DDCT.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "TPS3700DDCT"
+        }
+      }
+    }
+  },
+  "datasheet": {
+    "fetched_at": "",
+    "file": "tps3700ddct-d15f.pdf",
+    "source_url": ""
+  },
+  "derived": {
+    "category": "Other",
+    "derived_at": "",
+    "derived_by": "",
+    "description": "2 11uA TSOT-23-6 Comparators RoHS",
+    "display_name": "2-Channel Analog Comparator TSOT-23-6",
+    "specs": {
+      "Assembly Country of Origin": "Thailand",
+      "Available On Reel": "Yes",
+      "Brand Id": "100",
+      "Catalog Id": "1604",
+      "Common Mode Rejection Ratio(CMRR)": "-",
+      "Contains Battery": "No",
+      "Country of Diffusion": "United States",
+      "Country of Origin": "Thailand",
+      "Currency Symbol": "$",
+      "Currency Type": "USD",
+      "ECCN": "EAR99",
+      "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/c5533f37e54f4bd0a361fb90c38aa932.svg?t=1703813406",
+      "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/5a375c8365e74e03808511cad3f38c64.svg?t=1703813406",
+      "Features": "-",
+      "HTS Code (BR)": "85423390",
+      "HTS Code (CA)": "8542330000",
+      "HTS Code (CN)": "8542339000",
+      "HTS Code (EU TARIC)": "8542399000",
+      "HTS Code (IN)": "85423300",
+      "HTS Code (JP)": "854239099",
+      "HTS Code (MX)": "8542.33.99",
+      "HTS Code (TARIC)": "8542339000",
+      "HTS Code (US)": "8542330001",
+      "Has Third Party Stock": "No",
+      "Ib - Input Bias Current": "1nA",
+      "Image": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_SOT-23-Thin-6_DDC_t.jpg",
+      "Input Hysteresis Voltage (Vhys)": "5.5mV",
+      "Is Cable Category": "No",
+      "Is Foreign Display": "Yes",
+      "Is Foreign Onsale": "Yes",
+      "Is Infringement": "No",
+      "Is Mro": "No",
+      "Is Not Overstock": "No",
+      "Is Real Price": "Yes",
+      "Is Show Foreign Price": "Yes",
+      "Key Attributes": "High-voltage (18V) window voltage detector with internal reference for overvoltage and undervoltage monitoring",
+      "LCSC Category": "Comparators",
+      "LCSC Category Path": "Integrated Circuits (ICs) > Linear",
+      "LCSC Parent Category": "Amplifiers/Comparators",
+      "LCSC Product ID": "737223",
+      "LCSC Product Name": "High-voltage (18V) window voltage detector with internal reference for overvoltage and undervoltage monitoring",
+      "LCSC Title": "TI TPS3700DDCT",
+      "LCSC Warehouse Category": "Comparators",
+      "Lead Time": "112 Days",
+      "Lifecycle": "Active",
+      "Minimum Order Quantity": "1",
+      "Number of Channels": "2",
+      "Operating Temperature": "-40℃~+125℃",
+      "Order Multiple": "1",
+      "Output Mode": "-",
+      "Output Type": "Open-drain",
+      "Package": "TSOT-23-6",
+      "Package Quantity": "250",
+      "Package Quantity Unit": "Reel",
+      "Packaging": "Tape & Reel (TR)",
+      "Parent Catalog Id": "515",
+      "Popular Part": "No",
+      "Pre-Sale": "No",
+      "Product Category": "Analog Comparators",
+      "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_front.jpg",
+      "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_back.jpg",
+      "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20231229_Texas-Instruments-TPS3700DDCT_C702147_blank.jpg",
+      "Propagation Delay(tpd)": "29us",
+      "Quiescent Current(Iq)": "11uA",
+      "Reel Setup Fee": "3",
+      "RoHS": "Yes",
+      "Single Supply": "1.8V~18V",
+      "Standard Pack Qty": "250",
+      "Stock": "1415",
+      "Stock (Domestic)": "1415",
+      "Stock (Overseas)": "1415",
+      "Stock (Shenzhen)": "1415",
+      "Unit": "Piece",
+      "Unit Weight (kg)": "3.6e-05",
+      "Vos - Input Offset Voltage": "-",
+      "Weight": "0.44",
+      "Weight (kg)": "0.00044",
+      "Weight Foreign (kg)": "0",
+      "Wm Catalog Id": "1604"
+    },
+    "value": ""
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Common Mode Rejection Ratio(CMRR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Ib - Input Bias Current": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Input Hysteresis Voltage (Vhys)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Channels": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Mode": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Propagation Delay(tpd)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Quiescent Current(Iq)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Single Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Vos - Input Offset Voltage": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "tps3700ddct-d15f",
+  "manufacturer": "TI",
+  "mpn": "TPS3700DDCT",
+  "part_class": "component",
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.491428571,
+          "qty": 1
+        },
+        {
+          "price": 0.392857143,
+          "qty": 10
+        },
+        {
+          "price": 0.344285714,
+          "qty": 30
+        },
+        {
+          "price": 0.295714286,
+          "qty": 250
+        },
+        {
+          "price": 0.265714286,
+          "qty": 500
+        },
+        {
+          "price": 0.251428571,
+          "qty": 1000
+        }
+      ],
+      "stock": 853,
+      "url": "https://www.lcsc.com/product-detail/C702147.html",
+      "vendor": "scrape"
+    }
+  ],
+  "requires_override": null,
+  "schema_version": 3,
+  "sources": {},
+  "tags": []
+}
