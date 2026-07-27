@@ -457,3 +457,35 @@ def test_the_index_is_re_read_per_part_not_captured_for_the_whole_run(tmp_path):
     report = bulk_import(["A", "B"], pipe, _Ops(),
                          index=lambda: live.__setitem__("index", _Rebuilding()) or live["index"])
     assert [i.status for i in report.items] == ["added", "added"]
+
+
+def test_the_pulled_datasheet_url_is_not_dropped(tmp_path):
+    """MEASURED on the owner's real library: 76 of 166 parts landed "Needs More / Missing
+    datasheet" while their symbol, footprint and 3D were already resolved. `enrich_candidate`
+    records the pulled datasheet URL only `if candidate.provenance is not None`, and the bulk
+    candidate had no Provenance - so the URL was dropped for every bulk-imported part. The
+    datasheet is a required passport field, so that one missing object blocked half the import.
+    """
+    from stockroom.model.part import Purchase
+
+    class _P:
+        def resolve_to_mpn(self, query):
+            from stockroom.enrich.pipeline import ResolvedQuery
+
+            return ResolvedQuery(mpn=query, query=query)
+
+        def enrich_candidate(self, candidate, overwrite=None):
+            candidate.manufacturer = "Murata"
+            candidate.description = "100 nF X7R 0402"
+            candidate.category = "Capacitors"
+            candidate.purchase = [Purchase(vendor="mouser", url="https://mouser/x")]
+            # exactly what the real one does, and it is a NO-OP without a provenance
+            if candidate.provenance is not None:
+                candidate.provenance.source_url = "https://ds/x.pdf"
+            return candidate
+
+    ops = _PassiveOps()
+    report = bulk_import(["GRM155R71C104KA88D"], _P(), ops, index=_index({}))
+    assert report.items[0].status == "added", report.items[0].missing
+    assert report.items[0].assets == "kicad-stock"
+    assert ops.passives[0].datasheet.source_url == "https://ds/x.pdf"
