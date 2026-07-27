@@ -243,7 +243,15 @@ case "${1:-all}" in
               # belongs in the tool. Reports the newest progress marker the scope actually emits.
               if (( waited % 30 == 0 )); then
                 stage="$(grep -aoE '^== .* ==|\[ *[0-9]+%\]' "$BG_LOG" | tail -1)"
-                printf '\r  ...still running (%ds) %s' "$waited" "${stage:-starting}" >&2
+                # `\r` only when stderr is a TERMINAL. Redirected or piped - which is how this is
+                # normally run - a carriage return produces one unreadable smeared line, and any
+                # pipe buffers it until EOF so nothing appears at all. That is the failure this
+                # heartbeat exists to prevent, so it must not reintroduce it one layer down.
+                if [[ -t 2 ]]; then
+                  printf '\r  ...still running (%ds) %s' "$waited" "${stage:-starting}" >&2
+                else
+                  printf '  ...still running (%ds) %s\n' "$waited" "${stage:-starting}" >&2
+                fi
               fi
               sleep 5
               waited=$(( waited + 5 ))

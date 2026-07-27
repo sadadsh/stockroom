@@ -512,3 +512,61 @@ def test_saved_credentials_refuses_a_half_filled_pair(monkeypatch):
     monkeypatch.setattr("stockroom.store.machine_config.MachineConfig.load", classmethod(lambda cls: _Cfg()))
     assert runner._saved_credentials("ultralibrarian") is None
     assert runner._saved_credentials("no-such-vendor") is None
+
+
+# --------------------------------------------------------------------------------------------
+# `signed_in` MUST DISCRIMINATE. The first version checked only that `#loginLink` was absent, and
+# returned True on the identity server's own login page - so a WRONG PASSWORD reported success in
+# the same 3.5s as the right one. It was caught solely by feeding it a deliberately bad password.
+# The three states below are the real ones, measured live 2026-07-27.
+# --------------------------------------------------------------------------------------------
+
+
+class _StatePage:
+    """A page pinned to one of the three measured post-login states."""
+
+    def __init__(self, url, login_link=0, username=0):
+        self.url = url
+        self._counts = {"#loginLink": login_link, "#Username": username}
+
+    def locator(self, selector):
+        count = self._counts.get(selector, 0)
+        return type("L", (), {"count": staticmethod(lambda c=count: c)})()
+
+
+def _ul():
+    from stockroom.capture.vendors import UltraLibrarianAdapter
+
+    return UltraLibrarianAdapter()
+
+
+def test_signed_in_is_true_only_for_the_real_signed_in_state():
+    """correct password -> www.ultralibrarian.com, no #loginLink, no #Username."""
+    assert _ul().signed_in(_StatePage("https://www.ultralibrarian.com/")) is True
+
+
+def test_signed_in_is_false_on_the_identity_servers_login_page():
+    """THE BUG. Wrong password leaves you on sso.../Account/Login, which has NO #loginLink either -
+    so an absence-only check called this signed in and reported a bad password as success."""
+    page = _StatePage(
+        "https://sso.ultralibrarian.com/Account/Login?ReturnUrl=%2Fconnect%2F",
+        login_link=0, username=1,
+    )
+    assert _ul().signed_in(page) is False
+
+
+def test_signed_in_is_false_when_the_header_still_offers_a_login():
+    """signed out on the app host -> #loginLink present."""
+    assert _ul().signed_in(
+        _StatePage("https://app.ultralibrarian.com/search?queryText=X", login_link=1)
+    ) is False
+
+
+def test_signed_in_needs_all_three_signals_not_any_one():
+    """Mutation guard. Each single signal alone is satisfied by a state that is NOT signed in, which
+    is exactly why the original one-signal version could not tell a hit from a miss."""
+    ul = _ul()
+    # no #loginLink alone is NOT enough - the login page also has none
+    assert ul.signed_in(_StatePage("https://sso.ultralibrarian.com/Account/Login")) is False
+    # off the identity host alone is NOT enough - a login form can still be on screen
+    assert ul.signed_in(_StatePage("https://app.ultralibrarian.com/x", username=1)) is False

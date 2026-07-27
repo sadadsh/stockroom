@@ -186,8 +186,29 @@ class UltraLibrarianAdapter:
     _ACCORDION = {"kicad": "KiCAD", "altium": "Altium", "model": "3D CAD Model"}
 
     def signed_in(self, page) -> bool:
-        """Whether this page is a signed-in session. Measured: the header shows #loginLink when not."""
+        """Whether this page is a signed-in session.
+
+        THE ABSENCE OF `#loginLink` IS NOT ENOUGH, and assuming it was made this function report
+        SUCCESS FOR A WRONG PASSWORD. Measured 2026-07-27 across all three real states:
+
+            correct password -> www.ultralibrarian.com   #loginLink 0   #Username 0
+            WRONG password   -> sso.../Account/Login     #loginLink 0   #Username 1
+            signed out       -> app.ultralibrarian.com   #loginLink 1   #Username 0
+
+        `#loginLink` is absent in BOTH the success and the failure case, because the identity
+        server's login page simply has no such header. So a check built on it alone cannot tell a
+        hit from a miss - caught only by feeding it a deliberately wrong password, which returned
+        the same `''` in the same 3.5s as the correct one.
+
+        All three signals are therefore required: not on the identity host, no login form on screen,
+        and no sign-in link in the header.
+        """
         try:
+            url = page.url or ""
+            if "sso." in url or "/Account/Login" in url:
+                return False
+            if page.locator("#Username").count() > 0:
+                return False
             return page.locator("#loginLink").count() == 0
         except Exception:  # noqa: BLE001 - an unreadable page is not a signed-in one
             return False
@@ -220,17 +241,70 @@ class UltraLibrarianAdapter:
             page.locator("#Password").first.fill(password)
             # Remembered session = the whole point of the persistent profile.
             _check_box(page, "#RememberLogin")
-            page.locator('button[name="button"][value="login"]').first.click()
-            page.wait_for_load_state("domcontentloaded", timeout=30_000)
-            page.wait_for_timeout(2_000)  # the OIDC form_post bounce back to app.
+            # The click's OWN navigation wait must not decide anything. Playwright's `click()`
+            # waits for the navigation it triggers to settle, and on this OIDC form_post bounce
+            # that wait timed out after 30s on a login that was otherwise fine - reporting a hard
+            # failure for a sign-in that had very likely succeeded. The outcome is decided
+            # exclusively by `_await_sign_in`, which polls signals that mean something, so a click
+            # that raises mid-navigation is swallowed on purpose rather than trusted.
+            try:
+                page.locator('button[name="button"][value="login"]').first.click(timeout=15_000)
+            except Exception:  # noqa: BLE001 - navigating away IS the expected outcome of this click
+                pass
+            return self._await_sign_in(page)
         except Exception as exc:  # noqa: BLE001 - a failed sign-in is a reportable row, not a crash
             return f"could not sign in to Ultra Librarian: {exc}"
-        if not self.signed_in(page):
-            return (
-                "Ultra Librarian did not accept the saved credentials. Check the username and "
-                "password in Settings."
-            )
-        return ""
+
+    def _await_sign_in(self, page, timeout_s: float = 30.0) -> str:
+        """Poll the two REAL signals after submitting the login form. "" once signed in.
+
+        NEVER a fixed sleep followed by one look. Sign-in completes through an OIDC `form_post`
+        bounce from `sso.ultralibrarian.com` back to `app.ultralibrarian.com`, whose duration
+        depends on the network - so "sleep 2s, then check" reports "did not accept the saved
+        credentials" for a login that simply took 2.1 seconds, which is a false failure on CORRECT
+        credentials and would look exactly like a wrong password.
+
+        Both signals are MEASURED on the real pages rather than invented:
+          * SUCCESS - the header's `#loginLink` is gone (`signed_in`). Ends the wait the instant it
+            is true, so a fast login costs no wait at all.
+          * FAILURE - `#Username` is present AGAIN. The identity server re-renders the login form on
+            a rejected credential, so the field coming back IS the rejection, available immediately
+            instead of at the end of a clock.
+        The timeout is only a backstop for a vendor that never answers either way.
+        """
+        import time as _time
+
+        deadline = _time.monotonic() + timeout_s
+        while _time.monotonic() < deadline:
+            # FAILURE IS CHECKED FIRST, on purpose. It is the unambiguous one - the identity server
+            # re-renders the login form and says why - whereas "looks signed in" is inferred from
+            # several absences. Checking success first is what let a wrong password return "".
+            try:
+                if page.locator("#Username").count() > 0 and "sso." in (page.url or ""):
+                    body = ""
+                    try:
+                        body = page.inner_text("body") or ""
+                    except Exception:  # noqa: BLE001 - the URL alone already settles it
+                        pass
+                    # measured wording on a rejected login: "Error Invalid username or password"
+                    if "invalid username or password" in body.lower():
+                        return (
+                            "Ultra Librarian rejected the saved credentials: invalid username or "
+                            "password. Update them in Settings."
+                        )
+                    return (
+                        "Ultra Librarian did not accept the saved credentials. Check the username "
+                        "and password in Settings."
+                    )
+            except Exception:  # noqa: BLE001 - mid-navigation reads are expected; keep polling
+                pass
+            if self.signed_in(page):
+                return ""
+            page.wait_for_timeout(250)
+        return (
+            f"Ultra Librarian did not finish signing in within {int(timeout_s)}s, and never showed "
+            "either a signed-in header or a rejected login form."
+        )
 
     def resolve_url(self, mpn: str) -> str:
         from stockroom.enrich.cad_sources import resolve_cad_sources
