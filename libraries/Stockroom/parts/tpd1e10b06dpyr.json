@@ -34,6 +34,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8541100080"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8541.10.0080"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/LLP1006-2L.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6222/296%7E4211012%7EDPY%7E2.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
       }
     ],
     "Minimum Order Quantity": [
@@ -46,6 +75,23 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C (TA)"
       }
     ],
     "Order Multiple": [
@@ -72,6 +118,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "ESD Protection Diodes / TVS Diodes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Circuit Protection"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -82,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -94,6 +157,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "ESD Protection Diodes / TVS Diodes Sgl Channel ESD A 59 5-TPD1E10B06DPYT A A 595-TPD1E10B06DPYT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "TVS DIODE 5.5VWM 14VC 2X1SON"
       }
     ],
     "manufacturer": [
@@ -149,6 +217,10 @@
     }
   },
   "enrichment": {
+    "Applications": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -160,6 +232,10 @@
     "BRHTS": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Bidirectional Channels": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Brand Id": {
       "confidence": "medium",
@@ -192,6 +268,10 @@
     "Currency Type": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Current - Peak Pulse (10/1000µs)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "ECCN": {
       "confidence": "medium",
@@ -321,6 +401,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Channels": {
       "confidence": "medium",
       "source": "lcsc"
@@ -337,6 +425,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -344,6 +436,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -369,6 +465,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Power - Peak Pulse": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Power Line Protection": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Pre-Sale": {
       "confidence": "medium",
       "source": "lcsc"
@@ -388,6 +492,10 @@
     "Product Image 3": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Reel Setup Fee": {
       "confidence": "medium",
@@ -425,6 +533,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -436,6 +552,18 @@
     "Voltage - Breakdown": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Breakdown (Min)": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Clamping (Max) @ Ipp": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Voltage - Reverse Standoff (Typ)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -498,13 +626,95 @@
       "stock": 70712,
       "url": "https://www.lcsc.com/product-detail/C48260.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:54.564170+00:00",
+      "part_number": "595-TPD1E10B06DPYR",
+      "price_breaks": [
+        {
+          "price": 0.35,
+          "qty": 1
+        },
+        {
+          "price": 0.214,
+          "qty": 10
+        },
+        {
+          "price": 0.134,
+          "qty": 100
+        },
+        {
+          "price": 0.1,
+          "qty": 500
+        },
+        {
+          "price": 0.079,
+          "qty": 1000
+        },
+        {
+          "price": 0.074,
+          "qty": 2500
+        },
+        {
+          "price": 0.067,
+          "qty": 5000
+        },
+        {
+          "price": 0.056,
+          "qty": 10000
+        },
+        {
+          "price": 0.051,
+          "qty": 20000
+        }
+      ],
+      "stock": 286695,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:54.564170+00:00",
+      "part_number": "296-30406-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.06152,
+          "qty": 10000
+        },
+        {
+          "price": 0.05613,
+          "qty": 20000
+        },
+        {
+          "price": 0.05338,
+          "qty": 30000
+        },
+        {
+          "price": 0.0503,
+          "qty": 50000
+        },
+        {
+          "price": 0.04847,
+          "qty": 70000
+        },
+        {
+          "price": 0.0467,
+          "qty": 100000
+        }
+      ],
+      "stock": 910269,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Applications": "General Purpose",
     "Assembly Country of Origin": "China",
     "Available On Reel": "Yes",
     "BRHTS": "85411029",
+    "Bidirectional Channels": "1",
     "Brand Id": "100",
     "Catalog Id": "702",
     "Clamping Voltage": "14V",
@@ -513,6 +723,7 @@
     "Country of Origin": "China",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Peak Pulse (10/1000µs)": "5A (8/20µs)",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/477bad06357942dba2b071e61d0edae9.svg?t=1779071285",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/b5672421927f4eaea439d4c9b39b0219.svg?t=1779071285",
@@ -545,23 +756,30 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Channels": "1",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "10",
     "Package": "X1-SON-2(0.6x1)",
+    "Package / Case": "0402 (1006 Metric)",
     "Package Quantity": "10000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "320",
     "Peak Pulse Current (Ipp)": "6A@8/20us",
     "Peak Pulse Power Dissipation (Ppp)": "90W@8/20us",
     "Polarity": "Bidirectional",
     "Popular Part": "Yes",
+    "Power - Peak Pulse": "90W",
+    "Power Line Protection": "No",
     "Pre-Sale": "No",
     "Product Category": "ESD Protection Diodes / TVS Diodes",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-TPD1E10B06DPYR_C48260_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-TPD1E10B06DPYR_C48260_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-TPD1E10B06DPYR_C48260_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Reverse Leakage Current (Ir)": "100nA",
     "Reverse Stand-Off Voltage (Vrwm)": "5.5V",
@@ -571,9 +789,14 @@
     "Stock (Domestic)": "100000",
     "Stock (Overseas)": "100000",
     "Stock (Shenzhen)": "100000",
+    "Supplier Device Package": "2-X1SON (1x.60)",
+    "Type": "Zener",
     "Unit": "Piece",
     "Unit Weight (kg)": "9e-07",
     "Voltage - Breakdown": "6V",
+    "Voltage - Breakdown (Min)": "6V",
+    "Voltage - Clamping (Max) @ Ipp": "14V",
+    "Voltage - Reverse Standoff (Typ)": "5.5V (Max)",
     "Weight": "0.004",
     "Weight (kg)": "3.518e-06",
     "Weight Foreign (kg)": "0",
