@@ -117,7 +117,25 @@
   },
   "description": "1 600mA Active High 1.7V~5.5V SOT-23-6 Current Regulation/Management RoHS",
   "display_name": "Load Switch SOT-23-6",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "MAX4995BAUT+T"
+      },
+      "model": {
+        "file": "models/MAX4995BAUT+T.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "MAX4995BAUT+T"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
