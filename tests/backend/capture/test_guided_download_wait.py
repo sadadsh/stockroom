@@ -407,3 +407,108 @@ def test_a_failing_altium_attach_is_a_row_not_a_crash(monkeypatch, tmp_path):
 
     assert outcome.error and "Altium" in outcome.error, outcome
     assert "normalize refused the file" in outcome.error
+
+
+# --------------------------------------------------------------------------------------------
+# SIGN-IN. Measured against the LIVE site 2026-07-27: signed out, everything works - search
+# resolves, the details page opens, the export panel renders 39 controls, KiCad and 3D both tick -
+# and the ONLY missing piece is the Download button, which the vendor renders solely for a signed-in
+# user. So one sign-in per run is the difference between a 90-part sitting completing by itself and
+# failing on every single part.
+# --------------------------------------------------------------------------------------------
+
+
+class _LoginAdapter:
+    """A vendor that needs a login, recording how it was asked."""
+
+    def __init__(self, already_signed_in=False, refuse=""):
+        self.capability = VendorCapability(
+            key="faketron", label="Faketron", tools=("kicad",), formats_exclusive=False,
+            aggregator=False, needs_login=True, instruction="",
+            version_pins={"kicad": "KiCADv6"},
+        )
+        self.calls: list[tuple] = []
+        self._already = already_signed_in
+        self._refuse = refuse
+
+    def signed_in(self, page):
+        return self._already
+
+    def sign_in(self, page, username, password):
+        self.calls.append((username, password))
+        return self._refuse
+
+    def resolve_url(self, mpn):
+        return "https://example.invalid/part"
+
+    def drive(self, page, formats):
+        return DriveReport(missed=list(formats), submitted=False,
+                           message="the Download button is not on this page.")
+
+
+def _source_with_adapter(monkeypatch, tmp_path, browser, adapter, credentials):
+    monkeypatch.setattr(guided, "get_adapter", lambda key: adapter)
+    src = guided.GuidedCaptureSource(
+        (lambda: None), vendor="faketron", download_root=tmp_path / "dl",
+        headless=True, credentials=credentials,
+    )
+    src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    return src
+
+
+def test_the_run_signs_in_once_using_the_saved_credentials(monkeypatch, tmp_path):
+    adapter = _LoginAdapter()
+    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
+                               lambda key: ("user@example.com", "secret"))
+    src._sign_in_once(_FakePage())
+    assert adapter.calls == [("user@example.com", "secret")]
+    assert src._sign_in_error == ""
+
+
+def test_an_already_signed_in_profile_is_not_signed_in_again(monkeypatch, tmp_path):
+    """The persistent profile carrying the session is the whole point - re-logging in every run
+    would throw away that benefit and hammer the vendor's login for nothing."""
+    adapter = _LoginAdapter(already_signed_in=True)
+    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
+                               lambda key: ("user@example.com", "secret"))
+    src._sign_in_once(_FakePage())
+    assert adapter.calls == []
+
+
+def test_no_saved_credentials_is_a_silent_no_op(monkeypatch, tmp_path):
+    adapter = _LoginAdapter()
+    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter, lambda key: None)
+    src._sign_in_once(_FakePage())
+    assert adapter.calls == []
+    assert src._sign_in_error == ""
+
+
+def test_a_refused_sign_in_is_explained_in_the_part_row(monkeypatch, tmp_path):
+    """A refused login must SAY SO on the part, not leave a bare vendor message.
+
+    Everything up to the Download button works signed out, so without this the owner sees
+    "the Download button is not on this page" on all 90 parts and no hint that the cause is a
+    rejected password.
+    """
+    adapter = _LoginAdapter(refuse="Ultra Librarian did not accept the saved credentials.")
+    src = _source_with_adapter(monkeypatch, tmp_path, _FakeBrowser(), adapter,
+                               lambda key: ("user@example.com", "wrong"))
+    src._sign_in_once(_FakePage())
+    assert src._sign_in_error
+
+    outcome = src.supply(_Record())
+    assert "did not accept the saved credentials" in (outcome.skipped or ""), outcome
+
+
+def test_saved_credentials_refuses_a_half_filled_pair(monkeypatch):
+    """A username with no password is not a credential; returning it would fail an empty login
+    and report a vendor problem for what is really an unset setting."""
+    from stockroom.capture import runner
+
+    class _Cfg:
+        ul_username = "user@example.com"
+        ul_password = ""
+
+    monkeypatch.setattr("stockroom.store.machine_config.MachineConfig.load", classmethod(lambda cls: _Cfg()))
+    assert runner._saved_credentials("ultralibrarian") is None
+    assert runner._saved_credentials("no-such-vendor") is None

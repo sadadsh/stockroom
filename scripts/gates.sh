@@ -224,6 +224,7 @@ case "${1:-all}" in
               exit 2
             fi
             deadline=$(( $(date +%s) + ${GATES_AWAIT_TIMEOUT:-900} ))
+            waited=0
             while (( $(date +%s) < deadline )); do
               # THE TERMINAL SIGNAL IS THE MARKER THE RUN WRITES WHEN IT EXITS, carrying its
               # exit code. Not a line in the log: a scope that runs several gates prints an
@@ -235,8 +236,19 @@ case "${1:-all}" in
                   "$BG_LOG" | tail -20
                 exit "$(cat "$BG_LOG.done")"
               fi
+              # SAY THAT IT IS ALIVE. This printed nothing at all while waiting, which is
+              # indistinguishable from a hang - and on 2026-07-27 that is exactly how it read, so
+              # `await` was abandoned mid-session and the same until-grep loop was hand-written
+              # THREE times instead. A silent correct tool loses to a noisy wrong one, so the fix
+              # belongs in the tool. Reports the newest progress marker the scope actually emits.
+              if (( waited % 30 == 0 )); then
+                stage="$(grep -aoE '^== .* ==|\[ *[0-9]+%\]' "$BG_LOG" | tail -1)"
+                printf '\r  ...still running (%ds) %s' "$waited" "${stage:-starting}" >&2
+              fi
               sleep 5
+              waited=$(( waited + 5 ))
             done
+            echo >&2
             echo "TIMEOUT: no pytest summary in $BG_LOG. The run died without reporting, which is" >&2
             echo "a gap in the observation, not a normal outcome. Read the log." >&2
             exit 5 ;;
