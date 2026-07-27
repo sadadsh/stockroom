@@ -21,7 +21,25 @@
   },
   "description": "10.7A 1uH ±20% 8.89mΩ 9A SMD,4x4mm Fixed Inductors RoHS",
   "display_name": "1µH ±20% Power Inductor SMD",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Inductors",
+        "name": "XEL4030-102MEC"
+      },
+      "model": {
+        "file": "models/XEL4030-102MEC.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Inductors",
+        "name": "XEL4030-102MEC"
+      }
+    }
+  },
   "enrichment": {
     "Available On Reel": {
       "confidence": "medium",
