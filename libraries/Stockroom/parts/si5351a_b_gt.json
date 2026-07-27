@@ -1,0 +1,555 @@
+{
+  "alternates": {
+    "HTS Code (MX)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542.39.99"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542399901"
+      }
+    ],
+    "HTS Code (US)": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "8542390001"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8542390070"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Tape & Reel (TR)"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Tube"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "Yes"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://datasheet.lcsc.com/datasheet/pdf/5d7f5c86cdf6c68ced42b3c5f622c0a9.pdf?productCode=C504891"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/datasheet/3/564/1/Si5351_B.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "1.71V~3.6V 200MHz CMOS 3 MSOP-10 Clock Generators, PLLs, Frequency Synthesizers RoHS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Clock Generators & Support Products I2C program, any-frequency, any-output, Xtal reference, 3-output LVCMOS clock generator"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "SILICON LABS"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Skyworks Solutions, Inc."
+      }
+    ],
+    "mpn": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "SI5351A-B-GTR"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "SI5351A-B-GT"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C504891.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=SI5351A-B-GT"
+      }
+    ]
+  },
+  "category": "Other",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "si5351a_b_gt.pdf",
+    "source_url": ""
+  },
+  "description": "1.71V~3.6V 200MHz CMOS 3 MSOP-10 Clock Generators, PLLs, Frequency Synthesizers RoHS",
+  "display_name": "Clock Generator MSOP-10",
+  "eda": {},
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Available On Reel": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Brand Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Clock/Oscillator": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Contains Battery": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Currency Symbol": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Currency Type": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "ECCN": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Footprint SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "EDA Symbol SVG": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Flash Sale Product Po": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (BR)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CA)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (CN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (IN)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (TARIC)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "HTS Code (US)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Has Third Party Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Is Cable Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Display": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Foreign Onsale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Infringement": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Mro": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Not Overstock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Real Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Is Show Foreign Price": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Key Attributes": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Category Path": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Parent Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product ID": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Product Name": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Title": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "LCSC Warehouse Category": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Number of Outputs": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Operating Temperature": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Frequency(Max)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Output Level": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Quantity Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Packaging": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Parent Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Period Jitter, Peak-to-Peak": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Phase Offset": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Popular Part": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Pre-Sale": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Product Image": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 2": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Product Image 3": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Reel Setup Fee": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "RoHS": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Stock": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Domestic)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Overseas)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Stock (Shenzhen)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Voltage - Supply": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Weight Foreign (kg)": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Wm Catalog Id": {
+      "confidence": "medium",
+      "source": "lcsc"
+    }
+  },
+  "hashes": null,
+  "id": "si5351a_b_gt",
+  "manufacturer": "SILICON LABS",
+  "mpn": "SI5351A-B-GT",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.88,
+          "qty": 1
+        },
+        {
+          "price": 0.77,
+          "qty": 10
+        },
+        {
+          "price": 0.665714286,
+          "qty": 30
+        },
+        {
+          "price": 0.588571429,
+          "qty": 100
+        },
+        {
+          "price": 0.555714286,
+          "qty": 500
+        },
+        {
+          "price": 0.54,
+          "qty": 1000
+        }
+      ],
+      "stock": 2623,
+      "url": "https://www.lcsc.com/product-detail/C504891.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "Available On Reel": "Yes",
+    "Brand Id": "197",
+    "Catalog Id": "925",
+    "Clock/Oscillator": "External",
+    "Contains Battery": "No",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Malaysia",
+    "Currency Symbol": "$",
+    "Currency Type": "USD",
+    "ECCN": "EAR99",
+    "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/118a205096a1444195e08feff716c648.svg?t=1706802142",
+    "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/f335a5e2195241f8ba0312cf5bf73c51.svg?t=1706802142",
+    "Features": "On-chip VCO/DCO;Built-in phase-locked loop;Spread spectrum;Protocol-specific clock generation",
+    "Flash Sale Product Po": "{\"recommendId\": 255022, \"recommendCode\": \"TL2607220356\", \"productId\": 519851, \"productCode\": \"C504891\", \"productModel\": \"SI5351A-B-GTR\", \"brandId\": 197, \"brandNameEn\": \"SILICON LABS\", \"recommendLevel\": \"A\", \"sellPrice\": 0.7548, \"usdPrice\": 0.7548, \"sellCurrencyType\": \"USD\", \"currencySymbol\": \"$\", \"arriveDays\": 10, \"recommendNumber\": 10000, \"minOrderNum\": 5000, \"validNumber\": 10000, \"warehouseCode\": \"zh\", \"expiredTime\": \"2026-08-01 23:59:59\", \"expiredSeconds\": 485449188, \"isOnsale\": true, \"deliveryTimeWayDays\": [11, 13], \"isShowForeignPrice\": true, \"productBatchCode\": null, \"productBatchCodeEn\": null, \"isRealPrice\": true, \"productImageUrl\": \"https://assets.lcsc.com/images/lcsc/96x96/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg\", \"productImageUrlBig\": \"https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg\", \"split\": 2500, \"encapStandard\": \"MSOP-10\", \"isReel\": true, \"reelPrice\": 3, \"productIntroEn\": \"1.71V~3.6V 200MHz CMOS 3 MSOP-10 Clock Generators, PLLs, Frequency Synthesizers RoHS\", \"isEnvironment\": true, \"catalogId\": 11109, \"catalogName\": \"Clock Generators, PLLs, Frequency Synthesizers\", \"parentCatalogId\": 493, \"parentCatalogName\": \"Clock/Timing\", \"productArrange\": \"Tape & Reel (TR)\", \"weight\": 0.287, \"minPacketNumber\": 2500, \"minPacketUnit\": \"Reel\", \"isHot\": false, \"productCodeHighlight\": null, \"productModelHighlight\": null, \"isAsianBrand\": null, \"firstWmCatalogId\": 17, \"firstWmCatalogNameEn\": \"Integrated Circuits (ICs)\", \"secondWmCatalogId\": 256, \"secondWmCatalogNameEn\": \"Clock/Timing\", \"thirdWmCatalogId\": 925, \"thirdWmCatalogNameEn\": \"Clock Generators, PLLs, Frequency Synthesizers\", \"fourthWmCatalogId\": null, \"fourthWmCatalogNameEn\": null, \"fifthWmCatalogId\": null, \"fifthWmCatalogNameEn\": null, \"sixthWmCatalogId\": null, \"sixthWmCatalogNameEn\": null, \"wmCatalogId\": 925, \"wmCatalogNameEn\": \"Clock Generators, PLLs, Frequency Synthesizers\"}",
+    "HTS Code (BR)": "85423999",
+    "HTS Code (CA)": "8542390000",
+    "HTS Code (CN)": "8542399000",
+    "HTS Code (EU TARIC)": "8542399000",
+    "HTS Code (IN)": "85423900",
+    "HTS Code (JP)": "854239099",
+    "HTS Code (MX)": "8542.39.99",
+    "HTS Code (TARIC)": "8542399000",
+    "HTS Code (US)": "8542390001",
+    "Has Third Party Stock": "No",
+    "Image": "https://www.mouser.com/images/skyworks/images/skyworks_msop10_spl.jpg",
+    "Is Cable Category": "No",
+    "Is Foreign Display": "Yes",
+    "Is Foreign Onsale": "Yes",
+    "Is Infringement": "No",
+    "Is Mro": "No",
+    "Is Not Overstock": "No",
+    "Is Real Price": "Yes",
+    "Is Show Foreign Price": "Yes",
+    "Key Attributes": "I2C configurable clock generator + VCXO",
+    "LCSC Category": "Clock Generators, PLLs, Frequency Synthesizers",
+    "LCSC Category Path": "Integrated Circuits (ICs) > Clock/Timing",
+    "LCSC Parent Category": "Clock/Timing",
+    "LCSC Product ID": "519851",
+    "LCSC Product Name": "I2C configurable clock generator + VCXO",
+    "LCSC Title": "SILICON LABS SI5351A-B-GTR",
+    "LCSC Warehouse Category": "Clock Generators, PLLs, Frequency Synthesizers",
+    "Lead Time": "84 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Number of Outputs": "3",
+    "Operating Temperature": "-40℃~+85℃",
+    "Order Multiple": "1",
+    "Output Frequency(Max)": "200MHz",
+    "Output Level": "CMOS",
+    "Package": "MSOP-10",
+    "Package Quantity": "2500",
+    "Package Quantity Unit": "Reel",
+    "Packaging": "Tape & Reel (TR)",
+    "Parent Catalog Id": "493",
+    "Period Jitter, Peak-to-Peak": "70ps;70ps",
+    "Phase Offset": "Support",
+    "Popular Part": "No",
+    "Pre-Sale": "No",
+    "Product Category": "Clock Generators & Support Products",
+    "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg",
+    "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_back.jpg",
+    "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_blank.jpg",
+    "Reel Setup Fee": "3",
+    "RoHS": "Yes",
+    "Standard Pack Qty": "95",
+    "Stock": "8896",
+    "Stock (Domestic)": "8896",
+    "Stock (Overseas)": "8896",
+    "Stock (Shenzhen)": "8896",
+    "Unit": "Piece",
+    "Unit Weight (kg)": "0.0001432",
+    "Voltage - Supply": "1.71V~3.6V",
+    "Weight": "0.287",
+    "Weight (kg)": "0.00028736",
+    "Weight Foreign (kg)": "0",
+    "Wm Catalog Id": "925"
+  },
+  "tags": [],
+  "value": ""
+}
