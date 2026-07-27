@@ -1,0 +1,106 @@
+{
+  "category": "Resistors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/catalog/specsheets/YAGEO_PYu_RC_Group_51_RoHS_L_12.pdf"
+  },
+  "description": "Resistor, 10 Ohm, 1%, 0402",
+  "display_name": "10 Ohm 1% 0402 Resistor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Resistor_SMD",
+        "name": "R_0402_1005Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "R"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "rc0402fr_1310rl",
+  "manufacturer": "Yageo",
+  "mpn": "RC0402FR-1310RL",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=RC0402FR-1310RL"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.014,
+          "qty": 10
+        },
+        {
+          "price": 0.008,
+          "qty": 100
+        },
+        {
+          "price": 0.007,
+          "qty": 1000
+        },
+        {
+          "price": 0.005,
+          "qty": 2500
+        },
+        {
+          "price": 0.004,
+          "qty": 50000
+        }
+      ],
+      "stock": 100992,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-1310RL",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Resistor_SMD.3dshapes/R_0402_1005Metric.wrl",
+    "Assembly Country of Origin": "Not available",
+    "BRHTS": "85332120",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Taiwan",
+    "ECCN": "EAR99",
+    "Footprint": "Resistor_SMD:R_0402_1005Metric",
+    "HTS Code (CA)": "8533210000",
+    "HTS Code (CN)": "8533211000",
+    "HTS Code (EU TARIC)": "8533210000",
+    "HTS Code (JP)": "853321000",
+    "HTS Code (MX)": "8533210100",
+    "HTS Code (US)": "8533210030",
+    "Image": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg",
+    "KRHTS": "8533219000",
+    "Lead Time": "56 Days",
+    "Minimum Order Quantity": "1",
+    "Order Multiple": "1",
+    "Package": "0402",
+    "Packaging": "Reel, Cut Tape, MouseReel",
+    "Power": "0.063 W",
+    "Product Category": "Thick Film Resistors - SMD",
+    "Resistance": "10 Ohm",
+    "RoHS": "RoHS Compliant By Exemption",
+    "Standard Pack Qty": "50000",
+    "Symbol": "Device:R",
+    "Tolerance": "1%",
+    "Unit Weight (kg)": "6.5e-07"
+  },
+  "tags": [],
+  "value": ""
+}
