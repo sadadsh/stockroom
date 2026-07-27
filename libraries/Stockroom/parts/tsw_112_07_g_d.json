@@ -1,5 +1,12 @@
 {
   "alternates": {
+    "Contact Material": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Phosphor bronze"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -63,6 +70,18 @@
         "confidence": "high",
         "source": "digikey",
         "value": "0.100\" (2.54mm)"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2"
       }
     ],
     "Operating Temperature": [
@@ -694,6 +713,66 @@
       "stock": 100,
       "url": "https://www.lcsc.com/product-detail/C7128390.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:14.130725+00:00",
+      "part_number": "200-TSW11207GD",
+      "price_breaks": [
+        {
+          "price": 2.49,
+          "qty": 1
+        },
+        {
+          "price": 2.36,
+          "qty": 50
+        },
+        {
+          "price": 1.93,
+          "qty": 100
+        },
+        {
+          "price": 1.6,
+          "qty": 500
+        },
+        {
+          "price": 1.57,
+          "qty": 2000
+        },
+        {
+          "price": 1.36,
+          "qty": 5000
+        }
+      ],
+      "stock": 1261,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:14.130725+00:00",
+      "part_number": "612-TSW-112-07-G-D-ND",
+      "price_breaks": [
+        {
+          "price": 3.78,
+          "qty": 1
+        },
+        {
+          "price": 3.209,
+          "qty": 10
+        },
+        {
+          "price": 2.7273,
+          "qty": 100
+        },
+        {
+          "price": 2.49008,
+          "qty": 500
+        }
+      ],
+      "stock": 174,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
