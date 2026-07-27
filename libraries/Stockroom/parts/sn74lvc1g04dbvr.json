@@ -117,7 +117,25 @@
   },
   "description": "1.65V~5.5V 3.7ns@5V,50pF 1 10uA SOT-23-5 Gates and Inverters RoHS",
   "display_name": "Inverter SOT-23-5",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SN74LVC1G04DBVR"
+      },
+      "model": {
+        "file": "models/SN74LVC1G04DBVR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "SN74LVC1G04DBVR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
