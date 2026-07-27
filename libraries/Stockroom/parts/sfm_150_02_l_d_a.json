@@ -65,6 +65,18 @@
         "value": "0.185\" (4.70mm)"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "15 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4"
+      }
+    ],
     "Mounting Type": [
       {
         "confidence": "medium",
@@ -692,6 +704,70 @@
       "stock": 10,
       "url": "https://www.lcsc.com/product-detail/C7076477.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:19.975929+00:00",
+      "part_number": "200-SFM15002LDA",
+      "price_breaks": [
+        {
+          "price": 18.58,
+          "qty": 1
+        },
+        {
+          "price": 14.4,
+          "qty": 104
+        },
+        {
+          "price": 13.32,
+          "qty": 256
+        },
+        {
+          "price": 10.66,
+          "qty": 504
+        },
+        {
+          "price": 8.95,
+          "qty": 1000
+        }
+      ],
+      "stock": 45,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:19.975929+00:00",
+      "part_number": "612-SFM-150-02-L-D-A-ND",
+      "price_breaks": [
+        {
+          "price": 18.51,
+          "qty": 1
+        },
+        {
+          "price": 17.519,
+          "qty": 10
+        },
+        {
+          "price": 16.8612,
+          "qty": 25
+        },
+        {
+          "price": 16.449,
+          "qty": 50
+        },
+        {
+          "price": 12.679,
+          "qty": 100
+        },
+        {
+          "price": 11.65376,
+          "qty": 250
+        }
+      ],
+      "stock": 293,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
