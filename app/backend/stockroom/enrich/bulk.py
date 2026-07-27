@@ -138,6 +138,11 @@ class ImportItem:
     missing: list[str] = field(default_factory=list)
     error: str = ""
     resolved_by: str = ""     # which distributor recognised the stock number, if any
+    # What CAD the part landed with. "kicad-stock" means a real, placeable symbol +
+    # footprint + 3D model (KiCad's own, referenced by lib_id); "none" means the record
+    # landed on identity alone and still needs a capture. The owner's question is "did I
+    # get the FILES", and a report that cannot tell those apart cannot answer it.
+    assets: str = ""
 
 
 @dataclass
@@ -165,6 +170,52 @@ def _candidate_for(mpn: str, category: str) -> StagingCandidate:
         display_name=mpn,
         entry_name=mpn,
     )
+
+
+def _passive_record(candidate: StagingCandidate):
+    """A passive PartRecord carrying KiCad STOCK symbol/footprint/3D references, or None when
+    this part is not an addable passive.
+
+    This is what turns an import into PLACEABLE parts instead of bare records. A resistor,
+    capacitor or inductor MPN deterministically encodes its case, and KiCad already ships the
+    generic symbol, footprint and 3D model for that case - so the files need no vendor, no
+    login and no network. Roughly half the owner's Component Register is jellybean passives.
+
+    Returns None rather than guessing whenever the MPN cannot be decoded and no package can be
+    resolved (`PassiveNeedsInputError`): the part then takes the ordinary file-less add and is
+    reported as still needing a capture. A wrong footprint is worse than no footprint.
+    """
+    from stockroom.ingest.passive_add import (
+        PassiveAddError,
+        PassiveNeedsInputError,
+        build_passive_record,
+    )
+
+    if not candidate.mpn:
+        return None
+    purchase = candidate.purchase[0] if candidate.purchase else None
+    datasheet_url = ""
+    if candidate.provenance is not None and candidate.provenance.source_url:
+        datasheet_url = candidate.provenance.source_url
+    try:
+        build = build_passive_record(
+            candidate.mpn,
+            category=candidate.category or None,
+            manufacturer=candidate.manufacturer or None,
+            datasheet_url=datasheet_url or None,
+            purchase_part_number=(purchase.part_number if purchase else None),
+            specs=dict(candidate.specs) or None,
+            price_breaks=(list(purchase.price_breaks) if purchase else None),
+            stock=(purchase.stock if purchase else None),
+        )
+    except (PassiveNeedsInputError, PassiveAddError):
+        return None
+    record = build.record
+    # Carry the purchase link across verbatim: the passport's sourcing field needs a real URL,
+    # and build_passive_record only reconstructs one when the input WAS a Mouser link.
+    if purchase is not None and purchase.url and not any(p.url for p in record.purchase):
+        record.purchase = [purchase]
+    return record
 
 
 def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
@@ -216,6 +267,31 @@ def bulk_import(queries, pipeline, ops, *, index, category: str = "Other",
             pipeline.enrich_candidate(candidate)
             item.category = candidate.category
             item.display_name = candidate.display_name
+            # A passive resolves KiCad's own stock symbol/footprint/3D from its MPN alone, so it
+            # lands PLACEABLE with no download. Decided before the gate, because the two paths
+            # have different (both legitimate) completeness rules: a passive's stock lib_ids
+            # satisfy symbol/footprint, which a StagedPart has no way to express.
+            passive = _passive_record(candidate)
+            if passive is not None:
+                item.assets = "kicad-stock"
+                item.category = passive.category or item.category
+                missing = passive.missing_fields()
+                if missing:
+                    item.status = "incomplete"
+                    item.missing = missing
+                    continue
+                if dry_run:
+                    item.status = "would-add"
+                    added_mpns.add(item.mpn)
+                    continue
+                record = ops.add_passive_part(passive)
+                item.status = "added"
+                item.part_id = getattr(record, "id", "")
+                item.display_name = getattr(record, "display_name", "") or item.display_name
+                added_mpns.add(item.mpn)
+                continue
+
+            item.assets = "none"
             missing = _missing_for(candidate)
             if missing:
                 item.status = "incomplete"

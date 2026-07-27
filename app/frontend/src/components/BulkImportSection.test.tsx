@@ -53,7 +53,7 @@ function mockRun(counts: Record<string, number>, items: BulkImportItem[] = []) {
 function item(over: Partial<BulkImportItem>): BulkImportItem {
   return {
     query: "", mpn: "", part_id: "", status: "added", display_name: "",
-    category: "", missing: [], error: "", resolved_by: "", ...over,
+    category: "", missing: [], error: "", resolved_by: "", assets: "none", ...over,
   };
 }
 
@@ -154,6 +154,24 @@ describe("BulkImportSection", () => {
     expect((box() as HTMLTextAreaElement).value).toBe("595-A");
     await user.click(screen.getByRole("button", { name: "Show All 1 Rows" }));
     expect(screen.getByText("Part A")).toBeTruthy();
+  });
+
+  it("says whether the FILES landed, not just that the part did", async () => {
+    // The owner's actual question. "Added" alone cannot answer it: a part can land complete on
+    // its identity and still carry no symbol, footprint or 3D model.
+    const user = userEvent.setup();
+    mockRun({ added: 2 }, [
+      item({ query: "81-GRM155R71C104KA88D", mpn: "GRM155R71C104KA88D", display_name: "100 nF 0402", assets: "kicad-stock" }),
+      item({ query: "595-TPD6E05U06RVZR", mpn: "TPD6E05U06RVZR", display_name: "ESD array", assets: "none" }),
+    ]);
+    wrap(<BulkImportSection />);
+    await user.click(box());
+    await user.paste("81-GRM155R71C104KA88D\n595-TPD6E05U06RVZR");
+    await user.click(screen.getByRole("button", { name: "Import 2 Parts" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Show All/ })).toBeTruthy());
+    await user.click(screen.getByRole("button", { name: "Show All 2 Rows" }));
+    expect(screen.getByText("Symbol, Footprint, 3D")).toBeTruthy();
+    expect(screen.getByText("Needs Capture")).toBeTruthy();
   });
 
   it("shows what a stock number resolved to, never silently substituting it", async () => {

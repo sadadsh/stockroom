@@ -2035,6 +2035,9 @@ export interface BulkImportItem {
   missing: string[];
   error: string;
   resolved_by: string;
+  // "kicad-stock" = a placeable symbol + footprint + 3D model landed with the part;
+  // "none" = the record landed on identity alone and still needs a CAD capture.
+  assets: string;
 }
 
 export interface BulkImportResult {

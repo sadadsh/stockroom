@@ -206,3 +206,109 @@ def test_blank_queries_are_dropped_not_looked_up(blank):
     report = bulk_import([blank], pipe, _Ops(), index=_index({}))
     assert report.items == []
     assert pipe.enriched == []
+
+
+# --------------------------------------------------------------------------- #
+# The passive lane. This is what makes an import produce PLACEABLE parts rather than
+# records: a resistor/capacitor/inductor MPN resolves the KiCad STOCK symbol, footprint
+# and 3D model offline, with no vendor download at all. Without this routing the decoder
+# could be perfect and every capacitor would still land with no files.
+# --------------------------------------------------------------------------- #
+
+
+class _PassivePipeline:
+    """Fills a candidate the way the real one does for a Murata MLCC."""
+
+    def __init__(self, resolve):
+        self._resolve = resolve
+
+    def resolve_to_mpn(self, query):
+        from stockroom.enrich.pipeline import ResolvedQuery
+
+        mpn = self._resolve.get(query)
+        if mpn is None:
+            return ResolvedQuery(mpn=query, query=query)
+        return ResolvedQuery(mpn=mpn, query=query, vendor="mouser", resolved=True)
+
+    def enrich_candidate(self, candidate, overwrite=None):
+        from stockroom.model.part import Provenance, Purchase
+
+        candidate.manufacturer = "Murata"
+        candidate.description = "100 nF X7R 0402"
+        candidate.category = "Capacitors"
+        candidate.specs = {"Capacitance": "100 nF", "Tolerance": "10%"}
+        candidate.purchase = [Purchase(vendor="mouser", url="https://mouser/x")]
+        candidate.provenance = Provenance(source="mouser", source_url="https://ds/x.pdf")
+        return candidate
+
+
+class _PassiveOps:
+    def __init__(self):
+        self.passives: list = []
+        self.plain: list = []
+
+    def add_passive_part(self, record, require_complete: bool = True):
+        self.passives.append(record)
+        record.id = record.mpn.lower()
+        return record
+
+    def add_part(self, staged, require_complete: bool = True):
+        self.plain.append(staged)
+
+        class _R:
+            id = "plain"
+            display_name = staged.display_name
+
+        return _R
+
+
+def test_a_capacitor_lands_with_stock_kicad_symbol_footprint_and_3d():
+    pipe = _PassivePipeline({"81-GRM155R71C104KA88D": "GRM155R71C104KA88D"})
+    ops = _PassiveOps()
+    report = bulk_import(["81-GRM155R71C104KA88D"], pipe, ops, index=_index({}))
+
+    assert report.items[0].status == "added"
+    assert ops.plain == [], "a passive must not take the file-less path"
+    assert len(ops.passives) == 1
+    record = ops.passives[0]
+    kicad = record.assets_for("kicad")
+    assert kicad.symbol.lib == "Device" and kicad.symbol.name == "C"
+    assert kicad.footprint.lib == "Capacitor_SMD"
+    assert kicad.footprint.name == "C_0402_1005Metric"
+    # `record.passive` is what makes the 3D model RENDER. The model endpoint branches on it and
+    # resolves the model from the stock footprint lib_id at serve time
+    # (`previews.model_glb`: `if rec.passive: stock_model_file(...)`), so a passive deliberately
+    # carries NO owned model file. Asserting `kicad.model is not None` here was asserting the
+    # opposite of the design - it would have failed a correct part and passed a broken one.
+    assert record.passive is True
+    assert kicad.model is None
+
+
+def test_the_report_says_a_passive_landed_with_its_assets():
+    """The owner's whole complaint is 'I want the FILES'. A report that cannot distinguish a
+    record from a placeable part cannot answer that question."""
+    pipe = _PassivePipeline({"81-GRM155R71C104KA88D": "GRM155R71C104KA88D"})
+    report = bulk_import(["81-GRM155R71C104KA88D"], pipe, _PassiveOps(), index=_index({}))
+    item = report.items[0]
+    assert item.assets == "kicad-stock"
+
+
+def test_a_non_passive_still_takes_the_file_less_path_and_says_so(tmp_path):
+    ds = tmp_path / "d.pdf"
+    ds.write_bytes(b"%PDF-")
+    pipe = _Pipeline(fill={"TPD6E05U06RVZR": _complete(ds)})
+    ops = _PassiveOps()
+    report = bulk_import(["TPD6E05U06RVZR"], pipe, ops, index=_index({}))
+    assert report.items[0].status == "added"
+    assert report.items[0].assets == "none"
+    assert ops.passives == [] and len(ops.plain) == 1
+
+
+def test_a_passive_whose_package_cannot_be_resolved_is_not_forced():
+    """An undecodable passive must fall through to the honest file-less add, never guess a
+    package. A wrong footprint is worse than no footprint."""
+    pipe = _PassivePipeline({"81-MYSTERYCAP": "MYSTERYCAP99"})
+    ops = _PassiveOps()
+    report = bulk_import(["81-MYSTERYCAP"], pipe, ops, index=_index({}))
+    assert ops.passives == []
+    assert report.items[0].assets in ("none", "")
