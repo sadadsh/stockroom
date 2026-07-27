@@ -150,6 +150,40 @@
       "stock": 53467,
       "url": "https://www.lcsc.com/search?q=10-ERA-2AEB1182X",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:37.476452+00:00",
+      "part_number": "10-ERA-2AEB1182XTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0549,
+          "qty": 10000
+        },
+        {
+          "price": 0.05272,
+          "qty": 20000
+        },
+        {
+          "price": 0.05156,
+          "qty": 30000
+        },
+        {
+          "price": 0.05023,
+          "qty": 50000
+        },
+        {
+          "price": 0.04942,
+          "qty": 70000
+        },
+        {
+          "price": 0.04862,
+          "qty": 100000
+        }
+      ],
+      "stock": 53467,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
