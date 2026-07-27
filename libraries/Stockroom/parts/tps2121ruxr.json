@@ -81,7 +81,25 @@
   },
   "description": "56mΩ VQFN-HR-12(2x2.5) OR Controllers, Ideal Diodes RoHS",
   "display_name": "Power Switch IC VQFN-HR-12",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "TPS2121RUXR"
+      },
+      "model": {
+        "file": "models/TPS2121RUXR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Switches",
+        "name": "TPS2121RUXR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
