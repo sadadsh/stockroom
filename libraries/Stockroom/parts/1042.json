@@ -1,0 +1,377 @@
+{
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "8536908585"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "8536.90.4000"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "https://www.mouser.com/images/keystoneelectronics/images/1042_tn.jpg"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/1067/SEH-001T-P0.6.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "medium",
+        "source": "mouser",
+        "value": "1"
+      },
+      {
+        "confidence": "medium",
+        "source": "digikey",
+        "value": "9000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Cylindrical Battery Contacts, Clips, Holders & Springs"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "Connectors, Interconnects"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "datasheet_url": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "https://www.mouser.com/catalog/specsheets/Keystone_01142020_1042.pdf"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "https://www.jst-mfg.com/product/pdf/eng/eEH.pdf"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Cylindrical Battery Contacts, Clips, Holders & Springs 18650 S/M PC BATTERY HOLDER"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "CONN SOCKET 22-30AWG CRIMP TIN"
+      }
+    ],
+    "lead_time": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "104 Days"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "manufacturer": [
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "Keystone Electronics"
+      },
+      {
+        "confidence": "high",
+        "source": "digikey",
+        "value": "JST Sales America Inc."
+      }
+    ],
+    "mpn": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "SDFL2012Q1R0KTF"
+      },
+      {
+        "confidence": "high",
+        "source": "mouser",
+        "value": "1042"
+      },
+      {
+        "confidence": "low",
+        "source": "digikey",
+        "value": "SEH-001T-P0.6"
+      }
+    ],
+    "product_url": [
+      {
+        "confidence": "medium",
+        "source": "lcsc",
+        "value": "https://www.lcsc.com/product-detail/C1042.html"
+      },
+      {
+        "confidence": "medium",
+        "source": "scrape",
+        "value": "https://www.lcsc.com/search?q=1042"
+      }
+    ]
+  },
+  "category": "Connectors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "1042.pdf",
+    "source_url": ""
+  },
+  "description": "Cylindrical Battery Contacts, Clips, Holders & Springs 18650 S/M PC BATTERY HOLDER",
+  "display_name": "Stamped 0805",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Connectors",
+        "name": "1042"
+      },
+      "model": {
+        "file": "models/1042.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Connectors",
+        "name": "1042"
+      }
+    }
+  },
+  "enrichment": {
+    "Assembly Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "BRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Contact Finish": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Contact Termination": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Country of Diffusion": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Country of Origin": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "ECCN": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CA)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (CN)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (EU TARIC)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (JP)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (MX)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "HTS Code (US)": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Image": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "KRHTS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lead Time": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Lifecycle": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Minimum Order Quantity": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Order Multiple": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Package": {
+      "confidence": "medium",
+      "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
+    },
+    "Packaging": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Pin or Socket": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Product Category": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "RoHS": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Standard Pack Qty": {
+      "confidence": "high",
+      "source": "mouser"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Unit Weight (kg)": {
+      "confidence": "medium",
+      "source": "mouser"
+    },
+    "Wire Gauge": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
+  "hashes": null,
+  "id": "1042",
+  "manufacturer": "Keystone Electronics",
+  "mpn": "1042",
+  "passive": false,
+  "provenance": null,
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.016285714,
+          "qty": 20
+        },
+        {
+          "price": 0.013657143,
+          "qty": 4000
+        },
+        {
+          "price": 0.012228571,
+          "qty": 12000
+        },
+        {
+          "price": 0.011371429,
+          "qty": 80000
+        },
+        {
+          "price": 0.010628571,
+          "qty": 160000
+        },
+        {
+          "price": 0.010214286,
+          "qty": 400000
+        }
+      ],
+      "stock": 74509,
+      "url": "https://www.lcsc.com/product-detail/C1042.html",
+      "vendor": "scrape"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "Assembly Country of Origin": "Not available",
+    "BRHTS": "85369090",
+    "Contact Finish": "Tin",
+    "Contact Termination": "Crimp",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "United States",
+    "ECCN": "EAR99",
+    "HTS Code (CA)": "8536900090",
+    "HTS Code (CN)": "8536909000",
+    "HTS Code (EU TARIC)": "8536909599",
+    "HTS Code (JP)": "853690000",
+    "HTS Code (MX)": "85369099",
+    "HTS Code (US)": "8536908585",
+    "Image": "https://www.mouser.com/images/keystoneelectronics/images/1042_tn.jpg",
+    "KRHTS": "8536909090",
+    "Lead Time": "104 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Order Multiple": "1",
+    "Package": "0805",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Tray",
+    "Pin or Socket": "Socket",
+    "Product Category": "Cylindrical Battery Contacts, Clips, Holders & Springs",
+    "REACH": "REACH Unaffected",
+    "RoHS": "RoHS Compliant",
+    "Series": "EH",
+    "Standard Pack Qty": "200",
+    "Type": "Stamped",
+    "Unit Weight (kg)": "0.0250125",
+    "Wire Gauge": "22-26 AWG"
+  },
+  "tags": [],
+  "value": ""
+}
