@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/387/PEL12T-4225S-S1024.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "25"
+      }
+    ],
     "Product Category": [
       {
         "confidence": "high",
@@ -300,6 +312,98 @@
       "stock": 835,
       "url": "https://www.lcsc.com/search?q=PEL12T-4225S-S1024",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:39.603895+00:00",
+      "part_number": "652-PEL12T4225SS1024",
+      "price_breaks": [
+        {
+          "price": 6.57,
+          "qty": 1
+        },
+        {
+          "price": 5.7,
+          "qty": 5
+        },
+        {
+          "price": 5.45,
+          "qty": 10
+        },
+        {
+          "price": 5.18,
+          "qty": 25
+        },
+        {
+          "price": 4.66,
+          "qty": 50
+        },
+        {
+          "price": 4.32,
+          "qty": 100
+        },
+        {
+          "price": 3.92,
+          "qty": 200
+        },
+        {
+          "price": 3.73,
+          "qty": 500
+        },
+        {
+          "price": 3.55,
+          "qty": 1000
+        }
+      ],
+      "stock": 835,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:39.603895+00:00",
+      "part_number": "PEL12T-4225S-S1024-ND",
+      "price_breaks": [
+        {
+          "price": 7.05,
+          "qty": 1
+        },
+        {
+          "price": 6.058,
+          "qty": 5
+        },
+        {
+          "price": 5.673,
+          "qty": 10
+        },
+        {
+          "price": 5.2008,
+          "qty": 25
+        },
+        {
+          "price": 4.8692,
+          "qty": 50
+        },
+        {
+          "price": 4.5577,
+          "qty": 100
+        },
+        {
+          "price": 4.10203,
+          "qty": 300
+        },
+        {
+          "price": 3.9048,
+          "qty": 500
+        },
+        {
+          "price": 3.65088,
+          "qty": 1000
+        }
+      ],
+      "stock": 3588,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
