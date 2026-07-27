@@ -593,11 +593,26 @@
        "t": "Derived description is polluted with distributor part numbers - real Mouser evidence for TPS62130RGTR derives to \"Switching Voltage Regulators 3-17V 3A SD Cnvrtr A 595-TPS62130RGTT A A 595-T...\". Visible only because a REAL payload was used; a tidy fixture hides it.",
        "done": false,
        "evidence": ""
+      },
+      {
+       "t": "CONFIRMED ON REAL WINDOWS: the duplicate-concept spec row is not theme-specific - a 0R resistor shows BOTH \"Power 0.063 W\" and \"Power Rating 62.5 mW (1/16 W)\", which are the same value twice. Second instance of the same fold defect, on a different part and a different platform.",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "CHECK: in the Windows tour shot the highlighted list row (1 uF 0402 Capacitor) and the detail panel (0R Resistor) disagree. May be the CDP driver's own click state rather than a desync bug - reproduce by hand before treating it as real.",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "windrive tour reports NO EFFECT for rail.collapse and settings.nav-application (6 findings across 3 surfaces). Either real dead controls or a limitation of the tour's change detection; needs one manual press each to tell which.",
+       "done": false,
+       "evidence": ""
       }
      ]
     }
    ]
   }
  ],
- "updated": "2026-07-27 05:25 UTC"
+ "updated": "2026-07-27 05:45 UTC"
 }
