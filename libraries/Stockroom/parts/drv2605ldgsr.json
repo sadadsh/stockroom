@@ -69,7 +69,25 @@
   },
   "description": "2V~5.2V VSSOP-10-0.5mm Motor Drivers, Controllers RoHS",
   "display_name": "Motor / Motion / Ignition Controller & Driver VSSOP-10-0.5mm",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "DRV2605LDGSR"
+      },
+      "model": {
+        "file": "models/DRV2605LDGSR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "DRV2605LDGSR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
