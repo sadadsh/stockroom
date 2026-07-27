@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 20:47 UTC",
-  "now": "UNIFICATION DONE: guided capture enters through ONE route that behaves identically on Windows and Linux - the Windows-only pywebview bridge is deleted, not kept as a fallback. Per-component and whole-library are the same engine. Gates all green (backend 3666, frontend 1277). Four process rules written and registered after the owner pointed out I was logging problems instead of fixing them. NEXT: your UL PCAD recording to settle the .LIA/Altium route.",
+  "updated": "2026-07-27 21:41 UTC",
+  "now": "Guided capture reaches the live vendor through ONE cross-platform route and delivers all five requirements in one download - PROVEN, but the capability change was reverted with an entangled harness fix and is item 5 on the punch list to redo as small commits. Landed: .lia recognised as both Altium assets; gates.sh can background a single test path; seven process rules written and registered after the owner pointed out I keep logging problems instead of fixing them.",
   "now_updated": "",
   "projects": [
     {
