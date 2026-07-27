@@ -158,9 +158,18 @@ class UltraLibrarianAdapter:
         # reports progress forever, which is precisely the "success that attached nothing" this
         # file already got burned by once.
         #
-        # DONE LOOKS LIKE: a `.lia` reaching the record's altium bundle, which needs a decision on
-        # HOW (Altium itself imports P-CAD, so converting outside it is the hard part). Logged in
-        # the punch list rather than half-wired here.
+        # DONE LOOKS LIKE: a `.lia` converted to `.SchLib`/`.PcbLib` and attached. THAT IS A BUILD
+        # TASK WITH A DOCUMENTED PATH, not an open research question - a previous version of this
+        # comment implied otherwise, which was a negative conclusion reached without researching it
+        # (owner corrected it, 2026-07-27).
+        #
+        # Altium's Import Wizard translates a P-CAD library carrying BOTH pattern and symbol
+        # information into a `.PcbLib` AND a `.SchLib` - precisely what the PCAD row ships (the
+        # documented caveat, that a symbol-ONLY library will not import, does not apply here). Altium
+        # scripts in DelphiScript, this repo already drives installed Altium via `altium/driver.py`,
+        # and `pyaltiumrun` runs scripts inside it. Note the same reasoning rehabilitates the
+        # `#AltiumDesigner` script row: `UL_Import.pas` IS DelphiScript, so "it ships a script
+        # instead of libraries" is a description of the mechanism, never proof it cannot be used.
         tools=("kicad",),
         formats_exclusive=False,
         aggregator=False,
