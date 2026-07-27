@@ -1,0 +1,124 @@
+{
+  "category": "Capacitors",
+  "datasheet": {
+    "fetched_at": "",
+    "file": "",
+    "source_url": "https://www.mouser.com/datasheet/3/76/2/GRM3195C1H104JA05_01A.pdf"
+  },
+  "description": "Capacitor, 100 nF, 5%, 1206",
+  "display_name": "100 nF 5% 1206 Capacitor",
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "Capacitor_SMD",
+        "name": "C_1206_3216Metric"
+      },
+      "model": null,
+      "symbol": {
+        "file": "",
+        "lib": "Device",
+        "name": "C"
+      }
+    }
+  },
+  "enrichment": {},
+  "hashes": null,
+  "id": "grm3195c1h104ja05j",
+  "manufacturer": "Murata Electronics",
+  "mpn": "GRM3195C1H104JA05J",
+  "passive": true,
+  "provenance": {
+    "ingested_at": "",
+    "original_zip_sha256": "",
+    "source": "passive-decode",
+    "source_url": "https://www.mouser.com/c/?q=GRM3195C1H104JA05J"
+  },
+  "purchase": [
+    {
+      "currency": "",
+      "fetched_at": "",
+      "part_number": "",
+      "price_breaks": [
+        {
+          "price": 0.44,
+          "qty": 1
+        },
+        {
+          "price": 0.19,
+          "qty": 10
+        },
+        {
+          "price": 0.159,
+          "qty": 100
+        },
+        {
+          "price": 0.127,
+          "qty": 500
+        },
+        {
+          "price": 0.108,
+          "qty": 1000
+        },
+        {
+          "price": 0.106,
+          "qty": 2500
+        },
+        {
+          "price": 0.093,
+          "qty": 5000
+        },
+        {
+          "price": 0.088,
+          "qty": 10000
+        }
+      ],
+      "stock": 15400,
+      "url": "https://www.mouser.com/c/?q=GRM3195C1H104JA05J",
+      "vendor": "Mouser"
+    }
+  ],
+  "schema_version": 2,
+  "specs": {
+    "3D Model": "Capacitor_SMD.3dshapes/C_1206_3216Metric.wrl",
+    "Applications": "General Purpose",
+    "Assembly Country of Origin": "Not available",
+    "BRHTS": "85322410",
+    "Capacitance": "100 nF",
+    "Country of Diffusion": "Not available",
+    "Country of Origin": "Japan",
+    "ECCN": "EAR99",
+    "Footprint": "Capacitor_SMD:C_1206_3216Metric",
+    "HTS Code (CN)": "8532241000",
+    "HTS Code (EU TARIC)": "8532240000",
+    "HTS Code (JP)": "853224000",
+    "HTS Code (US)": "8532240020",
+    "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
+    "Lead Time": "70 Days",
+    "Lifecycle": "Active",
+    "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount, MLCC",
+    "Operating Temperature": "-55°C ~ 125°C",
+    "Order Multiple": "1",
+    "Package": "1206",
+    "Package / Case": "1206 (3216 Metric)",
+    "Package Type": "Tape & Reel (TR)",
+    "Packaging": "Reel, Cut Tape, MouseReel",
+    "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "REACH": "REACH Unaffected",
+    "RoHS": "ROHS3 Compliant",
+    "Series": "GRM",
+    "Size / Dimension": "0.126\" L x 0.063\" W (3.20mm x 1.60mm)",
+    "Standard Pack Qty": "10000",
+    "Standard Package": "10000",
+    "Symbol": "Device:C",
+    "Temperature Coefficient": "C0G, NP0",
+    "Thickness (Max)": "0.037\" (0.95mm)",
+    "Tolerance": "5%",
+    "Unit Weight (kg)": "1.9e-05",
+    "Voltage - Rated": "50V"
+  },
+  "tags": [],
+  "value": ""
+}
