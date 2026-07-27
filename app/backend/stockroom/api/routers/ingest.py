@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
 
 from stockroom.api.jobs import to_sse
+from stockroom.enrich.distributor_url import vendor_from_url
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.part import Provenance, Purchase
@@ -31,19 +32,10 @@ def _make_enrich_pipeline(ctx):
     return make(ctx)
 
 
-_KNOWN_VENDOR_HOSTS = {"lcsc": "LCSC", "mouser": "Mouser", "digikey": "DigiKey"}
-
-
-def vendor_from_url(url: str) -> str:
-    """A display vendor for a pasted purchase link: the known distributors by
-    name, any other shop by its host, and a non-URL as a manual entry."""
-    host = (urlsplit(url).hostname or "").lower()
-    if not host:
-        return "manual"
-    for token, name in _KNOWN_VENDOR_HOSTS.items():
-        if token in host:
-            return name
-    return host.removeprefix("www.")
+# `vendor_from_url` is imported above rather than defined here. It used to live in this router,
+# where the Qt-free enrich pipeline could not reach it -- so the pipeline hardcoded
+# `vendor="scrape"` and 85 of the owner's records were filed under a mechanism name instead of a
+# distributor. Two host maps would drift; one, in the enrich layer both callers can reach, cannot.
 
 
 def candidate_to_dto(c: StagingCandidate) -> dict:
