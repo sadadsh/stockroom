@@ -208,38 +208,38 @@
           "steps": [
             {
               "t": "Per-tool columns by iterating the EDA registry",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "part_assets CHILD TABLE, one row per (part, tool, kind), populated by iterating all_tools() x ASSET_KINDS. REJECTED wide per-tool columns: they fix today's case and keep the real problem, since a THIRD tool would need a schema migration. New queries the old shape could not answer AT ALL: assets_for_tool(tool), parts_missing_asset(tool, kind) - the latter a LEFT JOIN so a part with no row for that tool counts as missing it rather than being silently excluded (mutation-proven: an INNER JOIN fails 2 tests)."
             },
             {
               "t": "Multiple purchase rows, not one purchase_url",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "part_purchase child table, one row per link with vendor/url/part_number/stock/currency, seq preserving the record's priority order. The old single purchase_url column kept only purchase[0], so every other distributor's link and order number was invisible to every query. New: purchase_rows(part_id), vendors(). Mutation-proven: indexing only purchase[0] again fails a test."
             },
             {
               "t": "Incremental sync, no DROP TABLE",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "No DROP TABLE anywhere in _SCHEMA (asserted by a test), every object IF NOT EXISTS, and sync() upserts by comparing a sha256 of each record file's BYTES against a stored source_hash. CONTENT, not mtime: a 'touch' must not count as a change, and this repo has already shipped a bug from treating an mtime as one. Both directions tested - a touched but unchanged file parses 0 records, and an edit that keeps the same length still parses 1 (which a size-or-mtime check would miss). Removal is explicit: a record file that disappears has its parts row AND its child rows deleted, which the old full-rebuild got for free by dropping everything and an incremental path has to do on purpose. ctx.rebuild_index() now calls sync() instead of close+rebuild. 4 mutations run, all caught."
             },
             {
               "t": "Measured before/after on a synthetic 10k library",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "MEASURED on a synthetic 10,000-record library. Cold build (parse all 10k) 0.50s. sync with nothing changed: 0.14s, 10000 unchanged / 0 PARSED. sync after ONE edit: 0.14s, 9999 unchanged / 1 parsed. So a library write went from re-parsing 10k records to parsing 1 - a 3.7x wall-clock win, NOT the 100x the parse saving alone suggests, because the residual 0.14s is reading and hashing all 10k files and I am not claiming otherwise. Also measured: search 29ms, facets 1.9ms, parts_missing_asset(altium,footprint) 5.4ms over 10k - the last being a query that was impossible before."
             },
             {
               "t": "Expresses TRUST, not just presence",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "part_assets stores origin_vendor/origin_url/origin_captured_at and checks_json - the raw CHECK FACTS. NO VERDICT COLUMN EXISTS (asserted by a test reading PRAGMA table_info). asset_trust() derives PASS/FAIL/UNKNOWN through model.trust.verdict_for on every read, so tightening a check re-judges the library with no re-audit. UNKNOWN for an unmeasured asset, never a pass. assets_by_origin() counts unattributed assets under '(unrecorded)' rather than dropping them, because 'we do not know where this came from' is the answer the owner's complaint ('its not trusted where we've gotten them') most needs. Mutation-proven: returning a fixed verdict fails 2 tests."
             },
             {
               "t": "Search, facets and parametric filters still green",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "693 store + api tests pass unchanged (search, facets, duplicates, parametric filters, completion rollup), plus an explicit test that the public read API - count/search/facets/find_by_mpn/get - behaves identically. The schema changed underneath; the contract did not."
             },
             {
               "t": "Merged to main, gate green",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "Committed 05b3ac9. Full backend suite 3550 passed / 5 skipped / exit 0; ruff clean. 16 new index tests, 6 mutations all caught. Also DROVE THE REAL APP after the change (uishot, real 158-part library): the components surface renders and now shows the recovered Lifecycle: Active and Lead Time: 70 Days rows."
             }
           ]
         }
@@ -763,7 +763,7 @@
       ]
     }
   ],
-  "updated": "2026-07-27 11:55 UTC",
-  "now": "Wave 1 complete except the index schema. 158 records imported + re-derived from stored evidence. Next: the derived SQLite index (per-tool assets, multiple purchase rows, incremental sync, trust), then guided capture for the 72 components still missing CAD files.",
-  "now_updated": "2026-07-27 08:40 UTC"
+  "updated": "2026-07-27 12:09 UTC",
+  "now": "Wave 1 COMPLETE. Index schema landed (per-tool assets, all purchase rows, incremental sync measured on 10k, trust as facts). Next: guided capture - 72 components still need CAD files, which is what the UL/SnapMagic logins are for.",
+  "now_updated": "2026-07-27 09:20 UTC"
 }
