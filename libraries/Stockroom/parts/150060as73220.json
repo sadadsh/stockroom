@@ -24,6 +24,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6162/MFG_150060AS73220.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "119 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "19"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -308,6 +320,50 @@
       "stock": 3848,
       "url": "https://www.lcsc.com/search?q=150060AS73220",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:56.865711+00:00",
+      "part_number": "710-150060AS73220",
+      "price_breaks": [
+        {
+          "price": 0.22,
+          "qty": 1
+        },
+        {
+          "price": 0.208,
+          "qty": 10
+        },
+        {
+          "price": 0.196,
+          "qty": 100
+        },
+        {
+          "price": 0.185,
+          "qty": 1000
+        },
+        {
+          "price": 0.159,
+          "qty": 3000
+        }
+      ],
+      "stock": 3848,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:56.865711+00:00",
+      "part_number": "732-150060AS73220TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.1595,
+          "qty": 3000
+        }
+      ],
+      "stock": 2344,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
