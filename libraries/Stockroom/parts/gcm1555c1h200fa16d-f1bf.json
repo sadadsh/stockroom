@@ -85,8 +85,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:54.823117+00:00",
+      "part_number": "81-GCM1555C1H200FA6D",
       "price_breaks": [
         {
           "price": 0.016714286,
@@ -116,6 +116,40 @@
       "stock": 38463,
       "url": "https://www.mouser.com/c/?q=GCM1555C1H200FA16D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:54.823117+00:00",
+      "part_number": "490-GCM1555C1H200FA16DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00963,
+          "qty": 10000
+        },
+        {
+          "price": 0.00883,
+          "qty": 20000
+        },
+        {
+          "price": 0.00843,
+          "qty": 30000
+        },
+        {
+          "price": 0.00798,
+          "qty": 50000
+        },
+        {
+          "price": 0.00772,
+          "qty": 70000
+        },
+        {
+          "price": 0.00747,
+          "qty": 100000
+        }
+      ],
+      "stock": 54022,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

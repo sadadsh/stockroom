@@ -501,6 +501,70 @@
       "stock": 736,
       "url": "https://www.lcsc.com/product-detail/C54313.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:32.372197+00:00",
+      "part_number": "595-BQ24074RGTR",
+      "price_breaks": [
+        {
+          "price": 2.43,
+          "qty": 1
+        },
+        {
+          "price": 1.81,
+          "qty": 10
+        },
+        {
+          "price": 1.65,
+          "qty": 25
+        },
+        {
+          "price": 1.48,
+          "qty": 100
+        },
+        {
+          "price": 1.39,
+          "qty": 250
+        },
+        {
+          "price": 1.35,
+          "qty": 500
+        },
+        {
+          "price": 1.32,
+          "qty": 1000
+        },
+        {
+          "price": 1.25,
+          "qty": 3000
+        },
+        {
+          "price": 1.22,
+          "qty": 6000
+        }
+      ],
+      "stock": 2854,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:32.372197+00:00",
+      "part_number": "296-38873-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.25356,
+          "qty": 3000
+        },
+        {
+          "price": 1.22886,
+          "qty": 6000
+        }
+      ],
+      "stock": 12325,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

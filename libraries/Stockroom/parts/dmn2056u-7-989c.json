@@ -714,6 +714,58 @@
       "stock": 18969,
       "url": "https://www.lcsc.com/product-detail/C332302.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:29.121974+00:00",
+      "part_number": "621-DMN2056U-7",
+      "price_breaks": [
+        {
+          "price": 0.41,
+          "qty": 1
+        },
+        {
+          "price": 0.245,
+          "qty": 10
+        },
+        {
+          "price": 0.153,
+          "qty": 100
+        },
+        {
+          "price": 0.113,
+          "qty": 500
+        },
+        {
+          "price": 0.1,
+          "qty": 1000
+        },
+        {
+          "price": 0.081,
+          "qty": 3000
+        }
+      ],
+      "stock": 132578,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:29.121974+00:00",
+      "part_number": "DMN2056U-7DITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.08187,
+          "qty": 3000
+        },
+        {
+          "price": 0.06972,
+          "qty": 9000
+        }
+      ],
+      "stock": 120197,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

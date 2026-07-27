@@ -382,6 +382,54 @@
       "stock": 7055,
       "url": "https://www.lcsc.com/product-detail/C6848499.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:02.209653+00:00",
+      "part_number": "710-150060VS75000",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.151,
+          "qty": 10
+        },
+        {
+          "price": 0.142,
+          "qty": 50
+        },
+        {
+          "price": 0.122,
+          "qty": 100
+        },
+        {
+          "price": 0.116,
+          "qty": 500
+        },
+        {
+          "price": 0.116,
+          "qty": 4000
+        }
+      ],
+      "stock": 323430,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:02.209653+00:00",
+      "part_number": "732-4980-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.11745,
+          "qty": 4000
+        }
+      ],
+      "stock": 214897,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

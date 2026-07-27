@@ -652,6 +652,74 @@
       "stock": 8360,
       "url": "https://www.lcsc.com/product-detail/C227195.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:58.276994+00:00",
+      "part_number": "603-AC0402FR-0769K8L",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.011,
+          "qty": 10
+        },
+        {
+          "price": 0.007,
+          "qty": 100
+        },
+        {
+          "price": 0.006,
+          "qty": 1000
+        },
+        {
+          "price": 0.005,
+          "qty": 2500
+        },
+        {
+          "price": 0.004,
+          "qty": 10000
+        }
+      ],
+      "stock": 189263,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:58.276994+00:00",
+      "part_number": "YAG5308TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00358,
+          "qty": 10000
+        },
+        {
+          "price": 0.00319,
+          "qty": 20000
+        },
+        {
+          "price": 0.003,
+          "qty": 30000
+        },
+        {
+          "price": 0.0028,
+          "qty": 50000
+        },
+        {
+          "price": 0.00268,
+          "qty": 70000
+        },
+        {
+          "price": 0.00257,
+          "qty": 100000
+        }
+      ],
+      "stock": 831,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

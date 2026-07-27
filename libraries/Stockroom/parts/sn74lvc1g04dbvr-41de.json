@@ -533,6 +533,86 @@
       "stock": 59772,
       "url": "https://www.lcsc.com/product-detail/C7827.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:03.648419+00:00",
+      "part_number": "595-SN74LVC1G04DBVR",
+      "price_breaks": [
+        {
+          "price": 0.16,
+          "qty": 1
+        },
+        {
+          "price": 0.1,
+          "qty": 10
+        },
+        {
+          "price": 0.088,
+          "qty": 25
+        },
+        {
+          "price": 0.074,
+          "qty": 100
+        },
+        {
+          "price": 0.067,
+          "qty": 250
+        },
+        {
+          "price": 0.063,
+          "qty": 500
+        },
+        {
+          "price": 0.06,
+          "qty": 1000
+        },
+        {
+          "price": 0.055,
+          "qty": 3000
+        },
+        {
+          "price": 0.053,
+          "qty": 6000
+        }
+      ],
+      "stock": 40540,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:03.648419+00:00",
+      "part_number": "296-11599-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.05296,
+          "qty": 3000
+        },
+        {
+          "price": 0.05115,
+          "qty": 6000
+        },
+        {
+          "price": 0.05024,
+          "qty": 9000
+        },
+        {
+          "price": 0.04923,
+          "qty": 15000
+        },
+        {
+          "price": 0.04864,
+          "qty": 21000
+        },
+        {
+          "price": 0.04807,
+          "qty": 30000
+        }
+      ],
+      "stock": 69410,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

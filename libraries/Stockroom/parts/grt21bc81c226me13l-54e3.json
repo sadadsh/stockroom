@@ -83,38 +83,84 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:21.327913+00:00",
+      "part_number": "81-GRT21BC81C226ME3L",
       "price_breaks": [
         {
-          "price": 0.199857143,
-          "qty": 5
+          "price": 0.41,
+          "qty": 1
         },
         {
-          "price": 0.161571429,
-          "qty": 250
+          "price": 0.18,
+          "qty": 10
         },
         {
-          "price": 0.145214286,
-          "qty": 750
+          "price": 0.161,
+          "qty": 100
         },
         {
-          "price": 0.124714286,
-          "qty": 2500
+          "price": 0.128,
+          "qty": 500
         },
         {
-          "price": 0.115714286,
+          "price": 0.118,
+          "qty": 1000
+        },
+        {
+          "price": 0.101,
+          "qty": 3000
+        },
+        {
+          "price": 0.095,
+          "qty": 6000
+        },
+        {
+          "price": 0.087,
+          "qty": 9000
+        },
+        {
+          "price": 0.085,
+          "qty": 24000
+        }
+      ],
+      "stock": 7760,
+      "url": "https://www.mouser.com/c/?q=GRT21BC81C226ME13L",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:21.327913+00:00",
+      "part_number": "490-GRT21BC81C226ME13LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.10161,
+          "qty": 3000
+        },
+        {
+          "price": 0.09566,
+          "qty": 6000
+        },
+        {
+          "price": 0.09267,
+          "qty": 9000
+        },
+        {
+          "price": 0.08937,
           "qty": 15000
         },
         {
-          "price": 0.110142857,
+          "price": 0.08743,
+          "qty": 21000
+        },
+        {
+          "price": 0.08557,
           "qty": 30000
         }
       ],
-      "stock": 1003,
-      "url": "https://www.mouser.com/c/?q=GRT21BC81C226ME13L",
-      "vendor": "Mouser"
+      "stock": 2513,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

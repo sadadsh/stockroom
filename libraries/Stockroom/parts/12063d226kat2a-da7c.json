@@ -590,6 +590,78 @@
       "stock": 2830,
       "url": "https://www.lcsc.com/product-detail/C2167862.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:36.582335+00:00",
+      "part_number": "581-12063D226KAT2A",
+      "price_breaks": [
+        {
+          "price": 1.14,
+          "qty": 1
+        },
+        {
+          "price": 0.574,
+          "qty": 10
+        },
+        {
+          "price": 0.525,
+          "qty": 100
+        },
+        {
+          "price": 0.442,
+          "qty": 500
+        },
+        {
+          "price": 0.417,
+          "qty": 1000
+        },
+        {
+          "price": 0.395,
+          "qty": 2000
+        },
+        {
+          "price": 0.368,
+          "qty": 4000
+        }
+      ],
+      "stock": 187162,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:36.582335+00:00",
+      "part_number": "478-KGM31HR51E226KUTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.39495,
+          "qty": 2000
+        },
+        {
+          "price": 0.37756,
+          "qty": 4000
+        },
+        {
+          "price": 0.36884,
+          "qty": 6000
+        },
+        {
+          "price": 0.35919,
+          "qty": 10000
+        },
+        {
+          "price": 0.35354,
+          "qty": 14000
+        },
+        {
+          "price": 0.34811,
+          "qty": 20000
+        }
+      ],
+      "stock": 191778,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

@@ -515,6 +515,98 @@
       "stock": 2623,
       "url": "https://www.lcsc.com/product-detail/C504891.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:40.971201+00:00",
+      "part_number": "634-SI5351A-B-GT",
+      "price_breaks": [
+        {
+          "price": 2.19,
+          "qty": 1
+        },
+        {
+          "price": 1.62,
+          "qty": 10
+        },
+        {
+          "price": 1.33,
+          "qty": 25
+        },
+        {
+          "price": 1.26,
+          "qty": 95
+        },
+        {
+          "price": 1.23,
+          "qty": 285
+        },
+        {
+          "price": 1.19,
+          "qty": 570
+        },
+        {
+          "price": 1.15,
+          "qty": 1045
+        },
+        {
+          "price": 1.12,
+          "qty": 2565
+        },
+        {
+          "price": 1.09,
+          "qty": 5035
+        }
+      ],
+      "stock": 3232,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:40.971201+00:00",
+      "part_number": "336-2399-5-ND",
+      "price_breaks": [
+        {
+          "price": 2.19,
+          "qty": 1
+        },
+        {
+          "price": 1.621,
+          "qty": 10
+        },
+        {
+          "price": 1.32526,
+          "qty": 95
+        },
+        {
+          "price": 1.26584,
+          "qty": 190
+        },
+        {
+          "price": 1.23611,
+          "qty": 285
+        },
+        {
+          "price": 1.19246,
+          "qty": 570
+        },
+        {
+          "price": 1.16069,
+          "qty": 1045
+        },
+        {
+          "price": 1.12252,
+          "qty": 2565
+        },
+        {
+          "price": 1.09957,
+          "qty": 5035
+        }
+      ],
+      "stock": 11521,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

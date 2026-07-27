@@ -155,47 +155,39 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:15.232996+00:00",
       "part_number": "584-ADG714BRUZ",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 6.18,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 4.74,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 4.22,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 3.98,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 3.79,
           "qty": 248
         },
         {
-          "currency": "USD",
           "price": 3.68,
           "qty": 558
         },
         {
-          "currency": "USD",
           "price": 3.64,
           "qty": 1054
         },
         {
-          "currency": "USD",
           "price": 3.58,
           "qty": 2542
         }
@@ -205,47 +197,39 @@
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:15.232996+00:00",
       "part_number": "505-ADG714BRUZ-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 6.34,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 4.867,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 4.21565,
           "qty": 62
         },
         {
-          "currency": "USD",
           "price": 4.04323,
           "qty": 124
         },
         {
-          "currency": "USD",
           "price": 3.86129,
           "qty": 310
         },
         {
-          "currency": "USD",
           "price": 3.76695,
           "qty": 558
         },
         {
-          "currency": "USD",
           "price": 3.68099,
           "qty": 1054
         },
         {
-          "currency": "USD",
           "price": 3.58473,
           "qty": 2542
         }

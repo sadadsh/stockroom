@@ -474,6 +474,38 @@
       "stock": 491,
       "url": "https://www.lcsc.com/product-detail/C623960.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:37.859362+00:00",
+      "part_number": "579-PAC1934JQ",
+      "price_breaks": [
+        {
+          "price": 1.94,
+          "qty": 1
+        },
+        {
+          "price": 1.94,
+          "qty": 3300
+        }
+      ],
+      "stock": 4590,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:37.859362+00:00",
+      "part_number": "PAC1934T-I/JQTR-ND",
+      "price_breaks": [
+        {
+          "price": 1.5625,
+          "qty": 3300
+        }
+      ],
+      "stock": 15036,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

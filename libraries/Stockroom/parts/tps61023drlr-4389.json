@@ -525,6 +525,74 @@
       "stock": 3329,
       "url": "https://www.lcsc.com/product-detail/C919459.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:20.544685+00:00",
+      "part_number": "595-TPS61023DRLR",
+      "price_breaks": [
+        {
+          "price": 1.21,
+          "qty": 1
+        },
+        {
+          "price": 0.879,
+          "qty": 10
+        },
+        {
+          "price": 0.796,
+          "qty": 25
+        },
+        {
+          "price": 0.703,
+          "qty": 100
+        },
+        {
+          "price": 0.659,
+          "qty": 250
+        },
+        {
+          "price": 0.632,
+          "qty": 500
+        },
+        {
+          "price": 0.604,
+          "qty": 1000
+        },
+        {
+          "price": 0.587,
+          "qty": 2000
+        },
+        {
+          "price": 0.573,
+          "qty": 4000
+        }
+      ],
+      "stock": 12248,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:20.544685+00:00",
+      "part_number": "296-TPS61023DRLRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.57775,
+          "qty": 4000
+        },
+        {
+          "price": 0.56556,
+          "qty": 8000
+        },
+        {
+          "price": 0.55946,
+          "qty": 12000
+        }
+      ],
+      "stock": 23863,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

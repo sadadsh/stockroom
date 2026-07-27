@@ -741,6 +741,70 @@
       "stock": 795,
       "url": "https://www.lcsc.com/product-detail/C5276598.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:02.503499+00:00",
+      "part_number": "200-FTS10701LD",
+      "price_breaks": [
+        {
+          "price": 2.04,
+          "qty": 1
+        },
+        {
+          "price": 1.62,
+          "qty": 100
+        },
+        {
+          "price": 1.45,
+          "qty": 1040
+        },
+        {
+          "price": 1.31,
+          "qty": 2015
+        },
+        {
+          "price": 1.28,
+          "qty": 5005
+        }
+      ],
+      "stock": 148,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:02.503499+00:00",
+      "part_number": "612-FTS-107-01-L-D-ND",
+      "price_breaks": [
+        {
+          "price": 2.74,
+          "qty": 1
+        },
+        {
+          "price": 2.326,
+          "qty": 10
+        },
+        {
+          "price": 1.9766,
+          "qty": 100
+        },
+        {
+          "price": 1.76436,
+          "qty": 500
+        },
+        {
+          "price": 1.68017,
+          "qty": 1000
+        },
+        {
+          "price": 1.59488,
+          "qty": 5000
+        }
+      ],
+      "stock": 161,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

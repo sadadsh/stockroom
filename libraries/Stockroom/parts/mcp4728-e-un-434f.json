@@ -510,6 +510,66 @@
       "stock": 4745,
       "url": "https://www.lcsc.com/product-detail/C478093.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:18.452643+00:00",
+      "part_number": "579-MCP4728-E/UN",
+      "price_breaks": [
+        {
+          "price": 2.5,
+          "qty": 1
+        },
+        {
+          "price": 2.47,
+          "qty": 10
+        },
+        {
+          "price": 2.09,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        },
+        {
+          "price": 1.89,
+          "qty": 300
+        },
+        {
+          "price": 1.88,
+          "qty": 500
+        },
+        {
+          "price": 1.86,
+          "qty": 1000
+        }
+      ],
+      "stock": 61861,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:18.452643+00:00",
+      "part_number": "MCP4728-E/UN-ND",
+      "price_breaks": [
+        {
+          "price": 2.5,
+          "qty": 1
+        },
+        {
+          "price": 2.09,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        }
+      ],
+      "stock": 6242,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

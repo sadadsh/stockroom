@@ -85,8 +85,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:41.740806+00:00",
+      "part_number": "81-GRM21BZ71E475KE5K",
       "price_breaks": [
         {
           "price": 0.28,
@@ -124,6 +124,40 @@
       "stock": 232244,
       "url": "https://www.mouser.com/c/?q=GRM21BZ71E475KE15K",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:41.740806+00:00",
+      "part_number": "490-GRM21BZ71E475KE15KTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05658,
+          "qty": 10000
+        },
+        {
+          "price": 0.05358,
+          "qty": 20000
+        },
+        {
+          "price": 0.05208,
+          "qty": 30000
+        },
+        {
+          "price": 0.05041,
+          "qty": 50000
+        },
+        {
+          "price": 0.04944,
+          "qty": 70000
+        },
+        {
+          "price": 0.0485,
+          "qty": 100000
+        }
+      ],
+      "stock": 10849,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

@@ -716,6 +716,86 @@
       "stock": 788,
       "url": "https://www.lcsc.com/product-detail/C3025063.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:28.501965+00:00",
+      "part_number": "640-USB4105-GF-A",
+      "price_breaks": [
+        {
+          "price": 0.93,
+          "qty": 1
+        },
+        {
+          "price": 0.81,
+          "qty": 10
+        },
+        {
+          "price": 0.741,
+          "qty": 25
+        },
+        {
+          "price": 0.668,
+          "qty": 100
+        },
+        {
+          "price": 0.61,
+          "qty": 250
+        },
+        {
+          "price": 0.505,
+          "qty": 800
+        },
+        {
+          "price": 0.474,
+          "qty": 2400
+        },
+        {
+          "price": 0.451,
+          "qty": 4800
+        },
+        {
+          "price": 0.43,
+          "qty": 9600
+        }
+      ],
+      "stock": 478707,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:28.501965+00:00",
+      "part_number": "2073-USB4105-GF-ATR-ND",
+      "price_breaks": [
+        {
+          "price": 0.49603,
+          "qty": 800
+        },
+        {
+          "price": 0.47234,
+          "qty": 1600
+        },
+        {
+          "price": 0.45903,
+          "qty": 2400
+        },
+        {
+          "price": 0.44278,
+          "qty": 4000
+        },
+        {
+          "price": 0.43239,
+          "qty": 5600
+        },
+        {
+          "price": 0.42165,
+          "qty": 8000
+        }
+      ],
+      "stock": 102960,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:02:32.147913+00:00",
+      "part_number": "81-GCM1555C1H221J16D",
       "price_breaks": [
         {
           "price": 0.007228571,
@@ -114,9 +114,43 @@
           "qty": 2000000
         }
       ],
-      "stock": 5678,
+      "stock": 86457,
       "url": "https://www.mouser.com/c/?q=GCM1555C1H221JA16D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:32.147913+00:00",
+      "part_number": "490-4927-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00867,
+          "qty": 10000
+        },
+        {
+          "price": 0.00793,
+          "qty": 20000
+        },
+        {
+          "price": 0.00756,
+          "qty": 30000
+        },
+        {
+          "price": 0.00715,
+          "qty": 50000
+        },
+        {
+          "price": 0.00691,
+          "qty": 70000
+        },
+        {
+          "price": 0.00668,
+          "qty": 100000
+        }
+      ],
+      "stock": 331142,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

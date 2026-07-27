@@ -528,6 +528,86 @@
       "stock": 107192,
       "url": "https://www.lcsc.com/product-detail/C138714.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:51.432783+00:00",
+      "part_number": "595-TPD4E05U06DQAR",
+      "price_breaks": [
+        {
+          "price": 0.69,
+          "qty": 1
+        },
+        {
+          "price": 0.433,
+          "qty": 10
+        },
+        {
+          "price": 0.279,
+          "qty": 100
+        },
+        {
+          "price": 0.213,
+          "qty": 500
+        },
+        {
+          "price": 0.191,
+          "qty": 1000
+        },
+        {
+          "price": 0.164,
+          "qty": 3000
+        },
+        {
+          "price": 0.15,
+          "qty": 6000
+        },
+        {
+          "price": 0.143,
+          "qty": 9000
+        },
+        {
+          "price": 0.131,
+          "qty": 24000
+        }
+      ],
+      "stock": 199135,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:51.432783+00:00",
+      "part_number": "296-35765-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.18076,
+          "qty": 3000
+        },
+        {
+          "price": 0.16547,
+          "qty": 6000
+        },
+        {
+          "price": 0.15767,
+          "qty": 9000
+        },
+        {
+          "price": 0.14892,
+          "qty": 15000
+        },
+        {
+          "price": 0.14373,
+          "qty": 21000
+        },
+        {
+          "price": 0.13869,
+          "qty": 30000
+        }
+      ],
+      "stock": 440351,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

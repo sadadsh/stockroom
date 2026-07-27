@@ -716,6 +716,74 @@
       "stock": 300658,
       "url": "https://www.lcsc.com/product-detail/C7420321.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:21.003697+00:00",
+      "part_number": "621-2N7002-F",
+      "price_breaks": [
+        {
+          "price": 0.23,
+          "qty": 1
+        },
+        {
+          "price": 0.124,
+          "qty": 10
+        },
+        {
+          "price": 0.086,
+          "qty": 100
+        },
+        {
+          "price": 0.062,
+          "qty": 500
+        },
+        {
+          "price": 0.054,
+          "qty": 1000
+        },
+        {
+          "price": 0.032,
+          "qty": 3000
+        }
+      ],
+      "stock": 6757,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:21.003697+00:00",
+      "part_number": "2N7002-FDITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.03633,
+          "qty": 3000
+        },
+        {
+          "price": 0.03239,
+          "qty": 6000
+        },
+        {
+          "price": 0.03038,
+          "qty": 9000
+        },
+        {
+          "price": 0.02812,
+          "qty": 15000
+        },
+        {
+          "price": 0.02678,
+          "qty": 21000
+        },
+        {
+          "price": 0.02548,
+          "qty": 30000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

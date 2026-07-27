@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:31.196992+00:00",
+      "part_number": "81-GRM155R71H472KA1J",
       "price_breaks": [
         {
           "price": 0.003285714,
@@ -114,9 +114,43 @@
           "qty": 1004000
         }
       ],
-      "stock": 44265,
+      "stock": 7711,
       "url": "https://www.mouser.com/c/?q=GRM155R71H472KA01J",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:31.196992+00:00",
+      "part_number": "490-8259-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00316,
+          "qty": 50000
+        },
+        {
+          "price": 0.0029,
+          "qty": 100000
+        },
+        {
+          "price": 0.00277,
+          "qty": 150000
+        },
+        {
+          "price": 0.00263,
+          "qty": 250000
+        },
+        {
+          "price": 0.00255,
+          "qty": 350000
+        },
+        {
+          "price": 0.00247,
+          "qty": 500000
+        }
+      ],
+      "stock": 65774,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

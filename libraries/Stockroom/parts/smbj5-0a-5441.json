@@ -667,6 +667,82 @@
       "stock": 63964,
       "url": "https://www.lcsc.com/product-detail/C19077558.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:42.482606+00:00",
+      "part_number": "581-SMBJ5.0A",
+      "price_breaks": [
+        {
+          "price": 0.65,
+          "qty": 1
+        },
+        {
+          "price": 0.4,
+          "qty": 10
+        },
+        {
+          "price": 0.256,
+          "qty": 100
+        },
+        {
+          "price": 0.198,
+          "qty": 500
+        },
+        {
+          "price": 0.174,
+          "qty": 1000
+        },
+        {
+          "price": 0.147,
+          "qty": 3000
+        },
+        {
+          "price": 0.135,
+          "qty": 6000
+        },
+        {
+          "price": 0.119,
+          "qty": 9000
+        }
+      ],
+      "stock": 13558,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:42.482606+00:00",
+      "part_number": "SMBJ5.0ALFTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.09205,
+          "qty": 3000
+        },
+        {
+          "price": 0.08353,
+          "qty": 6000
+        },
+        {
+          "price": 0.07919,
+          "qty": 9000
+        },
+        {
+          "price": 0.07431,
+          "qty": 15000
+        },
+        {
+          "price": 0.07142,
+          "qty": 21000
+        },
+        {
+          "price": 0.06888,
+          "qty": 30000
+        }
+      ],
+      "stock": 136340,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

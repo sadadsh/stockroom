@@ -500,6 +500,86 @@
       "stock": 2690,
       "url": "https://www.lcsc.com/product-detail/C2860939.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:13.671581+00:00",
+      "part_number": "595-TLV7021DBVR",
+      "price_breaks": [
+        {
+          "price": 0.55,
+          "qty": 1
+        },
+        {
+          "price": 0.389,
+          "qty": 10
+        },
+        {
+          "price": 0.347,
+          "qty": 25
+        },
+        {
+          "price": 0.302,
+          "qty": 100
+        },
+        {
+          "price": 0.28,
+          "qty": 250
+        },
+        {
+          "price": 0.267,
+          "qty": 500
+        },
+        {
+          "price": 0.256,
+          "qty": 1000
+        },
+        {
+          "price": 0.243,
+          "qty": 3000
+        },
+        {
+          "price": 0.236,
+          "qty": 6000
+        }
+      ],
+      "stock": 13213,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:13.671581+00:00",
+      "part_number": "296-TLV7021DBVRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.24235,
+          "qty": 3000
+        },
+        {
+          "price": 0.23593,
+          "qty": 6000
+        },
+        {
+          "price": 0.23271,
+          "qty": 9000
+        },
+        {
+          "price": 0.22915,
+          "qty": 15000
+        },
+        {
+          "price": 0.22707,
+          "qty": 21000
+        },
+        {
+          "price": 0.22506,
+          "qty": 30000
+        }
+      ],
+      "stock": 9511,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

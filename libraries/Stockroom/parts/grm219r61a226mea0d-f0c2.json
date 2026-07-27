@@ -84,9 +84,9 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:14.812134+00:00",
+      "part_number": "81-GRM219R61A226ME0D",
       "price_breaks": [
         {
           "price": 0.49,
@@ -120,6 +120,40 @@
       "stock": 88588,
       "url": "https://www.mouser.com/c/?q=GRM219R61A226MEA0D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:14.812134+00:00",
+      "part_number": "490-9951-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.1253,
+          "qty": 4000
+        },
+        {
+          "price": 0.11879,
+          "qty": 8000
+        },
+        {
+          "price": 0.11553,
+          "qty": 12000
+        },
+        {
+          "price": 0.11191,
+          "qty": 20000
+        },
+        {
+          "price": 0.1098,
+          "qty": 28000
+        },
+        {
+          "price": 0.10776,
+          "qty": 40000
+        }
+      ],
+      "stock": 181158,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

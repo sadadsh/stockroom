@@ -176,6 +176,70 @@
       "stock": 108674,
       "url": "https://www.lcsc.com/search?q=BLM15PX601SH1D",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:38.546883+00:00",
+      "part_number": "81-BLM15PX601SH1D",
+      "price_breaks": [
+        {
+          "price": 0.27,
+          "qty": 1
+        },
+        {
+          "price": 0.184,
+          "qty": 10
+        },
+        {
+          "price": 0.16,
+          "qty": 25
+        },
+        {
+          "price": 0.143,
+          "qty": 50
+        },
+        {
+          "price": 0.128,
+          "qty": 100
+        },
+        {
+          "price": 0.11,
+          "qty": 250
+        },
+        {
+          "price": 0.094,
+          "qty": 500
+        },
+        {
+          "price": 0.083,
+          "qty": 1000
+        },
+        {
+          "price": 0.082,
+          "qty": 5000
+        },
+        {
+          "price": 0.082,
+          "qty": 10000
+        }
+      ],
+      "stock": 108683,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:38.546883+00:00",
+      "part_number": "490-BLM15PX601SH1DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.06375,
+          "qty": 10000
+        }
+      ],
+      "stock": 4671,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

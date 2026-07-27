@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:02:51.060121+00:00",
+      "part_number": "81-GCM155R71H332KA7J",
       "price_breaks": [
         {
           "price": 0.1,
@@ -122,9 +122,43 @@
           "qty": 50000
         }
       ],
-      "stock": 276952,
+      "stock": 6630,
       "url": "https://www.mouser.com/c/?q=GCM155R71H332KA37J",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:51.060121+00:00",
+      "part_number": "490-GCM155R71H332KA37JTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00435,
+          "qty": 50000
+        },
+        {
+          "price": 0.00402,
+          "qty": 100000
+        },
+        {
+          "price": 0.00386,
+          "qty": 150000
+        },
+        {
+          "price": 0.00368,
+          "qty": 250000
+        },
+        {
+          "price": 0.00357,
+          "qty": 350000
+        },
+        {
+          "price": 0.00347,
+          "qty": 500000
+        }
+      ],
+      "stock": 126972,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

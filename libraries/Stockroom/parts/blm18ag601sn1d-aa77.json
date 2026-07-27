@@ -464,6 +464,52 @@
       "stock": 986511,
       "url": "https://www.lcsc.com/product-detail/C19330.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:33.395794+00:00",
+      "part_number": "81-BLM11A601S",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.059,
+          "qty": 10
+        },
+        {
+          "price": 0.046,
+          "qty": 25
+        },
+        {
+          "price": 0.042,
+          "qty": 100
+        },
+        {
+          "price": 0.036,
+          "qty": 250
+        },
+        {
+          "price": 0.032,
+          "qty": 500
+        },
+        {
+          "price": 0.028,
+          "qty": 1000
+        },
+        {
+          "price": 0.021,
+          "qty": 4000
+        },
+        {
+          "price": 0.019,
+          "qty": 8000
+        }
+      ],
+      "stock": 559744,
+      "url": "",
+      "vendor": "Mouser"
     }
   ],
   "requires_override": null,

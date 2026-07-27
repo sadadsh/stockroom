@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:46.472091+00:00",
+      "part_number": "81-GRM188R61A475MAJJ",
       "price_breaks": [
         {
           "price": 0.37,
@@ -125,6 +125,20 @@
       "stock": 2792,
       "url": "https://www.mouser.com/c/?q=GRM188R61A475MAAJJ",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:46.472091+00:00",
+      "part_number": "490-GRM188R61A475MAAJJTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0834,
+          "qty": 10000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

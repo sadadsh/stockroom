@@ -677,6 +677,82 @@
       "stock": 199361,
       "url": "https://www.lcsc.com/product-detail/C19077497.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:46.192773+00:00",
+      "part_number": "576-SMF5.0A",
+      "price_breaks": [
+        {
+          "price": 0.46,
+          "qty": 1
+        },
+        {
+          "price": 0.305,
+          "qty": 10
+        },
+        {
+          "price": 0.178,
+          "qty": 100
+        },
+        {
+          "price": 0.147,
+          "qty": 500
+        },
+        {
+          "price": 0.125,
+          "qty": 1000
+        },
+        {
+          "price": 0.096,
+          "qty": 3000
+        },
+        {
+          "price": 0.088,
+          "qty": 6000
+        },
+        {
+          "price": 0.079,
+          "qty": 9000
+        }
+      ],
+      "stock": 163382,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:46.192773+00:00",
+      "part_number": "1801-SMF5.0ATR-ND",
+      "price_breaks": [
+        {
+          "price": 0.07956,
+          "qty": 10000
+        },
+        {
+          "price": 0.07292,
+          "qty": 20000
+        },
+        {
+          "price": 0.06954,
+          "qty": 30000
+        },
+        {
+          "price": 0.06574,
+          "qty": 50000
+        },
+        {
+          "price": 0.06349,
+          "qty": 70000
+        },
+        {
+          "price": 0.06131,
+          "qty": 100000
+        }
+      ],
+      "stock": 23503,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

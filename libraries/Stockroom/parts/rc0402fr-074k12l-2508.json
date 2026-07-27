@@ -87,38 +87,68 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:20.069805+00:00",
+      "part_number": "603-RC0402FR-074K12L",
       "price_breaks": [
         {
-          "price": 0.000285714,
-          "qty": 20
+          "price": 0.1,
+          "qty": 1
         },
         {
-          "price": 0.000285714,
+          "price": 0.009,
+          "qty": 10
+        },
+        {
+          "price": 0.006,
+          "qty": 100
+        },
+        {
+          "price": 0.004,
+          "qty": 2500
+        },
+        {
+          "price": 0.002,
+          "qty": 10000
+        }
+      ],
+      "stock": 1560790,
+      "url": "https://www.mouser.com/c/?q=RC0402FR-074K12L",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:20.069805+00:00",
+      "part_number": "YAG3171TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
           "qty": 20000
         },
         {
-          "price": 0.000285714,
-          "qty": 60000
+          "price": 0.00257,
+          "qty": 30000
         },
         {
-          "price": 0.000271429,
-          "qty": 200000
+          "price": 0.00239,
+          "qty": 50000
         },
         {
-          "price": 0.000271429,
-          "qty": 204000
+          "price": 0.00228,
+          "qty": 70000
         },
         {
-          "price": 0.000271429,
-          "qty": 208000
+          "price": 0.00218,
+          "qty": 100000
         }
       ],
-      "stock": 22875,
-      "url": "https://www.mouser.com/c/?q=RC0402FR-074K12L",
-      "vendor": "Mouser"
+      "stock": 14841,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

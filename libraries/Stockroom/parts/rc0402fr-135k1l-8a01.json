@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:04:35.988086+00:00",
+      "part_number": "603-RC0402FR-135K1L",
       "price_breaks": [
         {
           "price": 0.1,
@@ -117,6 +117,40 @@
       "stock": 83743,
       "url": "https://www.mouser.com/c/?q=RC0402FR-135K1L",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:35.988086+00:00",
+      "part_number": "13-RC0402FR-135K1LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        },
+        {
+          "price": 0.00208,
+          "qty": 150000
+        },
+        {
+          "price": 0.00197,
+          "qty": 250000
+        },
+        {
+          "price": 0.00191,
+          "qty": 350000
+        },
+        {
+          "price": 0.00185,
+          "qty": 500000
+        }
+      ],
+      "stock": 19177,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,
