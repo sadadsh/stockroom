@@ -41,6 +41,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4848/13_0603-%281608-metric%29.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "56 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "20"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -623,6 +635,78 @@
       "stock": 5118,
       "url": "https://www.lcsc.com/product-detail/C1882595.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:52.146051+00:00",
+      "part_number": "603-AF0603FR-072R2L",
+      "price_breaks": [
+        {
+          "price": 0.1,
+          "qty": 1
+        },
+        {
+          "price": 0.031,
+          "qty": 10
+        },
+        {
+          "price": 0.02,
+          "qty": 100
+        },
+        {
+          "price": 0.017,
+          "qty": 1000
+        },
+        {
+          "price": 0.012,
+          "qty": 5000
+        },
+        {
+          "price": 0.01,
+          "qty": 10000
+        },
+        {
+          "price": 0.009,
+          "qty": 25000
+        }
+      ],
+      "stock": 4511,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:52.146051+00:00",
+      "part_number": "13-AF0603FR-072R2LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.01214,
+          "qty": 5000
+        },
+        {
+          "price": 0.01108,
+          "qty": 10000
+        },
+        {
+          "price": 0.01057,
+          "qty": 15000
+        },
+        {
+          "price": 0.01002,
+          "qty": 25000
+        },
+        {
+          "price": 0.0097,
+          "qty": 35000
+        },
+        {
+          "price": 0.0094,
+          "qty": 50000
+        }
+      ],
+      "stock": 29427,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -672,7 +756,7 @@
     "LCSC Product Name": "RES 2.2Ω ±1% 100mW 0603",
     "LCSC Title": "YAGEO AF0603FR-072R2L",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "84 Days",
+    "Lead Time": "56 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
