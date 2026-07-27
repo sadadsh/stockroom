@@ -329,3 +329,48 @@ Both chosen sources are manufacturer-verified. That is what "trusted" means for 
 per-part URL on a logged-in session) or whether the Library Loader desktop app is the only path.
 This repo already drives a desktop app headlessly (`altium/driver.py`), so either answer is
 workable; the answer decides which.
+
+---
+
+## 8. NEXAR / OCTOPART - the angle every earlier pass missed (researched 2026-07-27)
+
+Found only after the owner pushed for deeper research. **Nexar is a business unit of ALTIUM**, and
+Octopart's CAD Model Marketplace **aggregates Ultra Librarian AND SnapEDA in one place**. Three
+earlier research passes never surfaced it, because each stopped at the first usable answer.
+
+### What is CONFIRMED
+- **A documented API with first-class CAD awareness.** The supply search accepts the filters
+  `cad_models:["symbol_footprint_3d"]` and `cad_models:["symbol_footprint"]`, and a `cad_agg`
+  aggregation returns a `CadBucket` counting parts that have symbol + footprint + 3D.
+  Source: support.nexar.com "Supply: Sorting and Filtering your Queries" (fetched, quoted).
+- **It answers the exact question that defeated scraping:** does THIS part have a CAD model.
+- **Free tier is capped: "the FREE Evaluation plan that allows up to 100 matched parts"**, rising
+  to a custom Enterprise plan. Source: nexar.com/api, quoted verbatim.
+- Octopart's own API reference (`octopart.com/api/v4/reference`) returns **403 to automated
+  fetching** - noted as a fact about access, not a conclusion about the API.
+
+### What this changes
+- **The coverage question is now answerable, for free, exactly.** The owner has **90 non-passives**
+  and the free tier covers **100 matched parts**. One pass measures precisely how many have a CAD
+  model, with no scraping and no fabricated instrument. This is the next concrete step.
+- **It does NOT solve bulk acquisition at 10,000 parts.** 100 matched parts is a hard limiter; the
+  paid tiers are a cost decision for the owner, not a technical one.
+
+### STILL OPEN - the questions this raised and did not answer
+1. **Does Nexar return model DOWNLOAD URLs, or only availability?** Decides whether it is an
+   acquisition path or only a coverage oracle. Unknown; the v4 reference 403s.
+2. **Which formats does it expose** - Altium `.SchLib`/`.PcbLib`, KiCad, or a neutral form?
+3. **What do the paid tiers cost, and what are their per-month part caps?**
+4. **Terms of service on automated download** - unread for Nexar, SamacSys, UL and SnapMagic alike.
+   No source has been checked on whether bulk automated retrieval is permitted. **This is a real
+   gap and must be closed before building any fetcher.**
+5. Does the `cad_agg` count distinguish PROVENANCE (manufacturer-verified vs AI-generated), which is
+   the owner's actual trust criterion?
+
+### Negative results, recorded so they are not retried
+- **Plain HTTP + regex against componentsearchengine.com yields nothing.** It is a Next.js **App
+  Router** site: no `__NEXT_DATA__`, and RSC flight-chunk extraction returned 0 bytes. Three
+  attempts, three wrong layers. Use a real browser (`scripts/uishot.py` already drives Playwright).
+- **A coverage probe built on that scraping could not distinguish a hit from a miss** - a fabricated
+  MPN returned a byte-identical response shape to a real part. Any future coverage number must ship
+  with its negative control stated.
