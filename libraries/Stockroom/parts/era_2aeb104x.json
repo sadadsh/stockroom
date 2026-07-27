@@ -41,6 +41,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2494/ERAW%20Series%200402%20Pkg.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "231 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "33"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -634,6 +646,86 @@
       "stock": 8777,
       "url": "https://www.lcsc.com/product-detail/C445619.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:22.337622+00:00",
+      "part_number": "667-ERA-2AEB104X",
+      "price_breaks": [
+        {
+          "price": 0.11,
+          "qty": 1
+        },
+        {
+          "price": 0.082,
+          "qty": 10
+        },
+        {
+          "price": 0.078,
+          "qty": 100
+        },
+        {
+          "price": 0.072,
+          "qty": 250
+        },
+        {
+          "price": 0.068,
+          "qty": 500
+        },
+        {
+          "price": 0.065,
+          "qty": 1000
+        },
+        {
+          "price": 0.058,
+          "qty": 5000
+        },
+        {
+          "price": 0.057,
+          "qty": 10000
+        },
+        {
+          "price": 0.055,
+          "qty": 20000
+        }
+      ],
+      "stock": 228586,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:22.337622+00:00",
+      "part_number": "P100KDCTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0549,
+          "qty": 10000
+        },
+        {
+          "price": 0.05272,
+          "qty": 20000
+        },
+        {
+          "price": 0.05156,
+          "qty": 30000
+        },
+        {
+          "price": 0.05023,
+          "qty": 50000
+        },
+        {
+          "price": 0.04942,
+          "qty": 70000
+        },
+        {
+          "price": 0.04862,
+          "qty": 100000
+        }
+      ],
+      "stock": 50689,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
