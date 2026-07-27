@@ -22,6 +22,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8533210030"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/PE_L_DSL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/2399/CRSM%20PT0805.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "56 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "20"
       }
     ],
     "Minimum Order Quantity": [
@@ -34,6 +63,11 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "5000"
       }
     ],
     "Order Multiple": [
@@ -60,6 +94,30 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Current Sense Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100mΩ"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "100 mOhms"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +128,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
       }
     ],
     "datasheet_url": [
@@ -94,6 +169,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Current Sense Resistors - SMD 100 mOhms 125mW 1 % 100 ppm/C AEC-Q200"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 0.1 OHM 1% 1/8W 0805"
       }
     ],
     "product_url": [
@@ -139,6 +219,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Composition": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Contains Battery": {
       "confidence": "medium",
       "source": "lcsc"
@@ -162,6 +246,10 @@
     "ECCN": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -202,6 +290,10 @@
     "Has Third Party Stock": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Image": {
       "confidence": "medium",
@@ -291,6 +383,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Terminations": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
@@ -299,6 +403,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -306,6 +414,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -318,6 +430,10 @@
     "Popular Part": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Power (Watts)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Power(Watts)": {
       "confidence": "medium",
@@ -343,6 +459,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -354,6 +474,14 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -374,6 +502,10 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Temperature Coefficient": {
       "confidence": "medium",
@@ -456,6 +588,82 @@
       "stock": 1570,
       "url": "https://www.lcsc.com/product-detail/C1882648.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:24.252533+00:00",
+      "part_number": "603-PE0805FRF070R1L",
+      "price_breaks": [
+        {
+          "price": 0.44,
+          "qty": 1
+        },
+        {
+          "price": 0.285,
+          "qty": 10
+        },
+        {
+          "price": 0.214,
+          "qty": 25
+        },
+        {
+          "price": 0.191,
+          "qty": 100
+        },
+        {
+          "price": 0.166,
+          "qty": 250
+        },
+        {
+          "price": 0.15,
+          "qty": 500
+        },
+        {
+          "price": 0.129,
+          "qty": 1000
+        },
+        {
+          "price": 0.121,
+          "qty": 5000
+        }
+      ],
+      "stock": 18432,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:24.252533+00:00",
+      "part_number": "13-PE0805FRF070R1LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.11185,
+          "qty": 5000
+        },
+        {
+          "price": 0.10397,
+          "qty": 10000
+        },
+        {
+          "price": 0.09992,
+          "qty": 15000
+        },
+        {
+          "price": 0.09534,
+          "qty": 25000
+        },
+        {
+          "price": 0.09262,
+          "qty": 35000
+        },
+        {
+          "price": 0.09022,
+          "qty": 50000
+        }
+      ],
+      "stock": 2708,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -465,12 +673,14 @@
     "BRHTS": "85332120",
     "Brand Id": "396",
     "Catalog Id": "1199",
+    "Composition": "Metal Film",
     "Contains Battery": "No",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
     "Currency Symbol": "$",
     "Currency Type": "USD",
     "ECCN": "EAR99",
+    "Features": "Automotive AEC-Q200, Current Sense",
     "HTS Code (BR)": "85332110",
     "HTS Code (CA)": "8533210000",
     "HTS Code (CN)": "8533211000",
@@ -481,6 +691,7 @@
     "HTS Code (TARIC)": "8533210000",
     "HTS Code (US)": "8533210020",
     "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.026\" (0.65mm)",
     "Image": "https://www.mouser.com/images/yageo/images/PE_L_DSL.jpg",
     "Is Asian Brand": "Yes",
     "Is Cable Category": "No",
@@ -503,27 +714,37 @@
     "Lead Time": "56 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Number of Terminations": "2",
+    "Operating Temperature": "-55°C ~ 170°C",
     "Order Multiple": "10",
     "Package": "0805",
+    "Package / Case": "0805 (2012 Metric)",
     "Package Quantity": "5000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "308",
     "Popular Part": "No",
+    "Power (Watts)": "0.125W, 1/8W",
     "Power(Watts)": "125mW",
     "Pre-Sale": "No",
     "Product Category": "Current Sense Resistors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230104_YAGEO-PE0805FRF070R1L_C1882648_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230104_YAGEO-PE0805FRF070R1L_C1882648_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230104_YAGEO-PE0805FRF070R1L_C1882648_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Resistance": "100mΩ",
     "RoHS": "Yes",
+    "Series": "PE_L",
+    "Size / Dimension": "0.080\" L x 0.050\" W (2.03mm x 1.27mm)",
     "Standard Pack Qty": "5000",
     "Stock": "0",
     "Stock (Domestic)": "0",
     "Stock (Overseas)": "0",
     "Stock (Shenzhen)": "0",
+    "Supplier Device Package": "0805",
     "Temperature Coefficient": "±100ppm/℃",
     "Tolerance": "±1%",
     "Type": "Metal Film Resistor",
