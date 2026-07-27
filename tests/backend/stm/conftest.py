@@ -20,6 +20,7 @@ alternatively carry the SAME signal (USART3_TX), the double-claim case.
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -203,12 +204,20 @@ def _stable_stm_index(tmp_path_factory, monkeypatch):
     on this machine at 235 MB, written into the developer's REAL config dir by a past test run --
     the same unisolated-write defect that blanked the owner's vendor credentials.
 
-    Per WORKER, not per session-across-workers: `getbasetemp()` is already worker-scoped under
-    xdist. The real-source test modules carry `xdist_group("stm-real-index")` so they land on ONE
-    worker and pay that build once rather than once per worker.
+    IT IS PERSISTENT AND REPO-LOCAL, NOT UNDER pytest's TMP, and that is a deliberate speed
+    decision with a measured number behind it. Pointing it inside the per-run basetemp is correct
+    but rebuilds a **235,163,648-byte** index over ~2,100 device XML on EVERY suite run, which
+    measured as minutes added to each run on the owner's machine - exactly the "sick of waiting
+    minutes upon minutes" cost the repo's own gate rules exist to avoid. Before config isolation
+    the suite got that caching by accident, from the developer's real `~/.config/stockroom`.
+    `build/` is gitignored (`/.gitignore:28`), so this keeps the caching WITHOUT writing anywhere
+    the user's own config lives, and `StmIndex.build` already re-parses when the source or
+    `classifier_rev` changes, so a stale cache corrects itself rather than lying.
+
+    Only `test_all_families_build.py` and `test_af_join.py` resolve through `default_index_path()`;
+    every other STM test passes an explicit `db_path`. Both of those modules carry
+    `xdist_group("stm-real-index")`, so exactly ONE worker ever writes this file during a run.
     """
-    # getbasetemp()+mkdir, not mktemp(numbered=False): mktemp RAISES the second time it is asked
-    # for the same name, so the first test created it and every later test errored.
-    shared = tmp_path_factory.getbasetemp() / "stm-shared"
+    shared = Path(__file__).resolve().parents[3] / "build" / "stm-test-index"
     shared.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("STOCKROOM_STM_INDEX", str(shared / "index.sqlite"))

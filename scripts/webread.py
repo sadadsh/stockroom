@@ -137,6 +137,13 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--profile", default="", help="persistent profile dir (keeps a sign-in)")
     ap.add_argument("--headed", action="store_true", help="show the browser (to sign in by hand)")
+    ap.add_argument(
+        "--engine",
+        default="chromium",
+        choices=("chromium", "camoufox"),
+        help="camoufox is the stealth engine: slower to launch, but the only one measured to get "
+        "past a Cloudflare Turnstile (SnapEDA serves one to plain Chromium)",
+    )
     args = ap.parse_args()
 
     url = args.url or (_resolve_vendor_url(args.vendor, args.mpn) if args.vendor else "")
@@ -145,10 +152,13 @@ def main() -> int:
 
     from stockroom.capture.browser import PlaywrightCaptureBrowser, chromium_unavailable_reason
 
-    blocked = chromium_unavailable_reason()
-    if blocked:
-        print(blocked, file=sys.stderr)
-        return 2
+    # The chromium availability probe answers a question about CHROMIUM, so it must not gate a
+    # camoufox run - camoufox ships its own browser build and is present when chromium is not.
+    if args.engine == "chromium":
+        blocked = chromium_unavailable_reason()
+        if blocked:
+            print(blocked, file=sys.stderr)
+            return 2
 
     browser = PlaywrightCaptureBrowser(
         download_dir=Path(args.profile or ".") / "_webread-downloads"
@@ -156,6 +166,7 @@ def main() -> int:
         else Path("/tmp/webread-downloads"),
         profile_dir=Path(args.profile) if args.profile else None,
         headless=not args.headed,
+        engine=args.engine,
     )
     with browser.session() as page:
         page.goto(url, wait_until="domcontentloaded", timeout=60000)

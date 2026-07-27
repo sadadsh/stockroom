@@ -55,9 +55,42 @@ run() {  # run <label> <cmd...>
 # 2026-07-27, the moment `bg` made concurrent runs easy: a second suite started while one was
 # running produced **1655 errors** that had nothing to do with the code. $$ is this shell's pid.
 TMPBASE="${GATES_TMPDIR:-/dev/shm/pytest-stockroom-$$}"
+
+# REAP STALE BASETEMPS BEFORE RUNNING, because a full tmpfs does NOT fail as "disk full".
+#
+# Measured 2026-07-27, and it cost most of an hour plus one wrong diagnosis: /dev/shm was 4.5 GB
+# full of basetemps left by killed runs and by a SECOND Claude session. Playwright's `save_as` then
+# cannot write the download, and the capture tests fail as "a submitted capture reported no file at
+# all" - which reads exactly like a capture bug. I blamed a code change and reverted it; the revert
+# changed nothing, because the cause was the disk.
+#
+# Only directories whose owning PID is GONE are removed, so a concurrent run is never touched (that
+# is the 1655-error footgun noted above, from the other direction).
+reap_stale_tmp() {
+  local parent; parent="$(dirname "$TMPBASE")"
+  [[ -d "$parent" ]] || return 0
+  local d pid
+  for d in "$parent"/pytest-stockroom-*; do
+    [[ -d "$d" ]] || continue
+    pid="${d##*-}"
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null && continue   # a LIVE run owns it
+    rm -rf "$d" 2>/dev/null && echo "reaped stale basetemp $d (pid $pid is gone)"
+  done
+  # Report what is left if it is still tight. A warning, not a block: the threshold is a guess, but
+  # a NUMBER the reader can act on is not.
+  local avail_kb; avail_kb="$(df -Pk "$parent" 2>/dev/null | awk 'NR==2{print $4}')"
+  if [[ -n "$avail_kb" && "$avail_kb" -lt 2097152 ]]; then
+    printf '\033[31mWARNING\033[0m  only %s MiB free on %s - downloads may fail SILENTLY.\n' \
+      "$((avail_kb / 1024))" "$parent" >&2
+    du -sh "$parent"/* 2>/dev/null | sort -rh | head -5 >&2
+  fi
+}
+
 backend() {
   local n=(-n "${PYTEST_WORKERS:-12}")
   [[ "${SERIAL_TESTS:-0}" == "1" ]] && n=()
+  reap_stale_tmp
   mkdir -p "$TMPBASE"
   # A RAM-backed temp dir is safe to wipe: pytest owns everything under it. If /dev/shm is too
   # small on some other machine, GATES_TMPDIR points this back at a disk path.
@@ -113,6 +146,7 @@ pytest_path() {
   local target="$1"
   local n=(-n "${PYTEST_WORKERS:-12}")
   [[ "${SERIAL_TESTS:-0}" == "1" ]] && n=()
+  reap_stale_tmp
   mkdir -p "$TMPBASE"
   QT_QPA_PLATFORM=offscreen TMPDIR="$TMPBASE" \
     .venv/bin/python -m pytest "$target" -q -p no:randomly "${n[@]}" --basetemp="$TMPBASE/bt"

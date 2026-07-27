@@ -180,6 +180,7 @@ def run_guided_capture(
     should_stop=None,
     limit=None,
     headless: bool = False,
+    engine: str = "camoufox",
 ) -> dict:
     """Capture from a trusted vendor through a real browser: ONE component, or the whole library.
 
@@ -203,6 +204,11 @@ def run_guided_capture(
         download_root=_capture_downloads(ctx),
         profile_dir=_capture_profile(ctx),
         headless=headless,
+        # THE engine for real vendors, named HERE at the production call site rather than as a
+        # constructor default. Stated where it ships means a test that forgets to choose gets the
+        # fast engine instead of silently launching a full Firefox and hanging the suite - which is
+        # exactly what a camoufox constructor default did on 2026-07-27.
+        engine=engine,
         run_write=ctx.jobs.run_write,
         now_iso=_utc_now_iso,
     )
