@@ -2020,3 +2020,24 @@ export interface AfCheckBody {
 export interface AfCheckResponse {
   conflicts: { kind: string; positions: string[]; peripheral: string; message: string }[];
 }
+
+// POST /api/enrich/bulk-import -> one row per part number the run was given. `query` is what the
+// user pasted and `mpn` what it resolved to, kept apart so a report can say
+// "595-TPS62130RGTR -> TPS62130RGTR" rather than silently substituting one for the other.
+export interface BulkImportItem {
+  query: string;
+  mpn: string;
+  part_id: string;
+  // added | would-add | exists | duplicate | incomplete | error
+  status: string;
+  display_name: string;
+  category: string;
+  missing: string[];
+  error: string;
+  resolved_by: string;
+}
+
+export interface BulkImportResult {
+  counts: Record<string, number>;
+  items: BulkImportItem[];
+}

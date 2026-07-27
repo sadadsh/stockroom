@@ -1158,6 +1158,27 @@ export const api = {
     });
   },
 
+  // Import a pasted list of part numbers (or a BOM CSV) into the library. A JOB: 169 parts is
+  // minutes of network work, and the stream names the part it is on. `dryRun` reports what WOULD
+  // land and writes nothing, so an import into a git-backed library is previewable first.
+  bulkImport(input: {
+    text?: string;
+    partNumbers?: string[];
+    format?: "list" | "csv";
+    dryRun?: boolean;
+    category?: string;
+  }): Promise<{ job_id: string }> {
+    return request<{ job_id: string }>("POST", "/api/enrich/bulk-import", {
+      body: {
+        text: input.text,
+        part_numbers: input.partNumbers,
+        format: input.format,
+        dry_run: input.dryRun,
+        category: input.category,
+      },
+    });
+  },
+
   // How many parts a bulk embed would actually work on, so the action can state a number it will
   // honour rather than one it might not.
   altiumModelsPending(): Promise<AltiumModelsPending> {

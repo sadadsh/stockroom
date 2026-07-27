@@ -667,7 +667,11 @@ export function Panel({
   actions?: ReactNode;
   inset?: boolean;
   bodyClassName?: string;
-} & HTMLAttributes<HTMLElement>) {
+  // `title` is intersected away by HTMLAttributes' own string `title` (the tooltip attribute),
+  // which made the documented ReactNode heading unusable: the first caller to pass an element
+  // got "Element is not assignable to ReactPortal & string". Omitted so the panel's heading prop
+  // is the one that wins; a real tooltip belongs on the element inside, not on the section.
+} & Omit<HTMLAttributes<HTMLElement>, "title">) {
   const hasHeader = title != null || actions != null;
   return (
     <section
