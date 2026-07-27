@@ -93,7 +93,25 @@
   },
   "description": "1 5uA 8mV Rail-to-rail input SOT-23-5 Comparators RoHS",
   "display_name": "Analog Comparator SOT-23-5",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TLV7021DBVR"
+      },
+      "model": {
+        "file": "models/TLV7021DBVR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Other",
+        "name": "TLV7021DBVR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
