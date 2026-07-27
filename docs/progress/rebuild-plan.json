@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 20:13 UTC",
-  "now": "Guided capture now WORKS against the live Ultra Librarian from Linux: symbol + footprint + a real 345KB STEP (the 3D was silently never requested before). Reports state intent, not achievement, so it can no longer claim a format that did not land. NEW: scripts/capturerec.py lets the owner drive a real browser - clearing Cloudflare walls a bot cannot - while recording every click, so adapters are authored from a real journey instead of guessed selectors. NEXT: record UL's PCAD export to confirm the .LIA is the Altium route, then wire the frontend to the cross-platform capture route.",
+  "updated": "2026-07-27 20:47 UTC",
+  "now": "UNIFICATION DONE: guided capture enters through ONE route that behaves identically on Windows and Linux - the Windows-only pywebview bridge is deleted, not kept as a fallback. Per-component and whole-library are the same engine. Gates all green (backend 3666, frontend 1277). Four process rules written and registered after the owner pointed out I was logging problems instead of fixing them. NEXT: your UL PCAD recording to settle the .LIA/Altium route.",
   "now_updated": "",
   "projects": [
     {
