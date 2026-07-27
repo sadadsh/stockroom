@@ -1,4 +1,95 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "50000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "0.25%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±0.25pF"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 1.5 pF, 0.25%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM1555C1H1R5CA01J Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 1.5PF 50V C0G/NP0 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +113,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "grm1555c1h1r5ca01j",
   "manufacturer": "Murata Electronics",
@@ -37,8 +133,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T03:59:21.228008+00:00",
+      "part_number": "81-GRM1555C1H1R5CA1J",
       "price_breaks": [
         {
           "price": 0.1,
@@ -84,6 +180,40 @@
       "stock": 143335,
       "url": "https://www.mouser.com/c/?q=GRM1555C1H1R5CA01J",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T03:59:21.228008+00:00",
+      "part_number": "490-11978-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00386,
+          "qty": 50000
+        },
+        {
+          "price": 0.00356,
+          "qty": 100000
+        },
+        {
+          "price": 0.00341,
+          "qty": 150000
+        },
+        {
+          "price": 0.00325,
+          "qty": 250000
+        },
+        {
+          "price": 0.00315,
+          "qty": 350000
+        },
+        {
+          "price": 0.00306,
+          "qty": 500000
+        }
+      ],
+      "stock": 32705,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -104,7 +234,7 @@
     "HTS Code (US)": "8532240020",
     "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
     "KRHTS": "8532240000",
-    "Lead Time": "70 Days",
+    "Lead Time": "17",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
