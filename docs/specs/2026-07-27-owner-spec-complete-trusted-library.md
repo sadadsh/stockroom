@@ -374,3 +374,98 @@ earlier research passes never surfaced it, because each stopped at the first usa
 - **A coverage probe built on that scraping could not distinguish a hit from a miss** - a fabricated
   MPN returned a byte-identical response shape to a real part. Any future coverage number must ship
   with its negative control stated.
+
+---
+
+## 9. THE PART RECORD SHAPE (owner-confirmed order, 2026-07-27)
+
+### The governing principle, owner's words
+> *"the new schema would allow us to manipulate the data after without losing what we imported"*
+> *"all of these need to happen after the data exists in a way where we can edit it without
+> reimporting you know?"*
+
+**ACCEPTANCE TEST for this whole schema:** change the naming scheme, re-derive the entire library,
+and lose nothing that was imported. If a re-derive can destroy imported data, the schema is wrong.
+Concretely: a re-derive must be **idempotent** (run it twice, get identical records) and **lossless**
+(the `sourced/` tree is never written by it).
+
+### Build order, owner-set
+1. **SCHEMA** — the gate; everything below waits on it
+2. **DELETE the current library and re-import onto it** (data is cheap and automated; no migration)
+3. **GUIDED CAPTURE** — for single part adds AND for completing existing components
+4. **The owner's capture pass** (the one expensive, human, irreversible step)
+5. **AUTOMATIC LINKING** to the EDA tools
+6. **3D rotation fix** — last; cosmetic, independent, already measured (21 of 57 parts)
+
+### Layout on disk
+    parts/<id>.json          small, reviewable, mergeable. Identity + class + DERIVED + asset refs.
+    sourced/<id>/mouser.json raw payload exactly as returned. NEVER written by a re-derive.
+    sourced/<id>/digikey.json
+    sourced/<id>/lcsc.json
+
+### `parts/<id>.json`
+    {
+      "schema_version": 3,
+      "id": "tps62130rgtr",
+      "mpn": "TPS62130RGTR",            // identity: never derived, never overwritten
+      "manufacturer": "Texas Instruments",
+      "part_class": "component",        // passive | component | mechanical | virtual
+      "requires_override": null,        // per-part escape hatch; null = use the class default
+
+      "derived": {                      // EVERY field here is recomputable from sourced/
+        "display_name": "Buck Converter 3A 17V QFN-16",
+        "value": "",
+        "category": "ICs",
+        "description": "...",
+        "specs": { "Package / Case": "16-VQFN", ... },
+        "derived_at": "2026-07-27T21:04:00Z",
+        "derived_by": "rules@3"         // which derivation ruleset produced this
+      },
+
+      "sources": {                      // provenance INDEX, not the payloads themselves
+        "mouser":  { "fetched_at": "...", "file": "sourced/tps62130rgtr/mouser.json" },
+        "digikey": { "fetched_at": "...", "file": "sourced/tps62130rgtr/digikey.json" }
+      },
+
+      "assets": {                       // per EDA tool, per kind
+        "kicad": {
+          "symbol": {
+            "ref":    { "lib": "SR-ICs", "name": "TPS62130RGTR" },
+            "origin": { "vendor": "ultralibrarian", "url": "...", "captured_at": "..." },
+            "checks": [                 // EVIDENCE. The verdict is DERIVED from these on read.
+              { "check": "pins_vs_datasheet", "measured": 16, "expected": 16, "against": "rev C" }
+            ]
+          },
+          "footprint": { ... }, "model": { ... }
+        },
+        "altium": { "symbol": { ... }, "footprint": { ... } }
+      }
+    }
+
+### The rules that make it work
+1. **`sourced/` is append-only evidence.** A re-derive READS it and never writes it. A re-pull
+   rewrites exactly one file and touches no record. This is what "edit without reimporting" means.
+2. **`derived` is disposable by construction.** Deleting the whole block and recomputing must
+   reproduce it byte-for-byte. Normalization happens at DERIVE time, never at import time — the
+   current schema normalizes on the way in and the raw winning value is lost forever.
+3. **Identity is not derived.** `id`, `mpn`, `manufacturer`, `part_class` are never rewritten by a
+   re-derive; only a human or an explicit re-classify changes them.
+4. **`origin` on every asset**, because capture is now human-driven across four vendors and
+   "SnapMagic, 2026-07-27" and "Ultra Librarian, 2026-07-27" carry DIFFERENT trust weight. Without
+   this, the library cannot answer "where did this file come from", which is the owner's original
+   complaint verbatim: *"its not trusted where we've gotten them"*.
+5. **`checks` are facts, the verdict is derived** (D2). Tightening a check re-judges the whole
+   library with no re-audit, and a verdict can never disagree with its own evidence.
+6. **Requirements = f(part_class, tool)** off the EDA registry (D3), with `requires_override` for
+   the genuine exception. A passive resolves to `[]` for every tool.
+
+### What the importer emits on day one
+Identity + `part_class` + `sources` + the raw `sourced/` files + a first `derived` block. **No
+assets** — those arrive from the capture pass (step 4) and are attached without ever rewriting
+`sourced` or `derived`.
+
+### Still to decide before implementation
+- The `id` scheme (today it is a slugged MPN; a human naming scheme is an explicit owner goal).
+- Which derivation ruleset version (`derived_by`) gates a re-derive, and whether records carry it.
+- Whether `sourced/` is git-tracked, LFS'd, or ignored — it is re-fetchable, so all three are
+  defensible; tracked is the default for device parity.
