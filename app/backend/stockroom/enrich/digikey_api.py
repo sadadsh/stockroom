@@ -218,6 +218,31 @@ def _parse_digikey_part(product: dict) -> EnrichmentResult:
     return r
 
 
+def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
+    """The WHOLE DigiKey response -> one EnrichmentResult, with no network and no credentials.
+
+    The sibling of `parse_mouser_payload`; see that docstring for why the full body is the unit
+    stored and re-parsed rather than the already-selected product.
+    """
+    products = (body or {}).get("Products") or []
+    if not products:
+        return EnrichmentResult()
+    target = normalize_mpn(mpn)
+    exact = next(
+        (p for p in products
+         if isinstance(p, dict)
+         and normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
+        None,
+    )
+    chosen = exact if exact is not None else products[0]
+    if not isinstance(chosen, dict):
+        return EnrichmentResult()
+    result = _parse_digikey_part(chosen)
+    if exact is None and result.mpn is not None:
+        result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
+    return result
+
+
 class DigiKeyAdapter:
     def __init__(self, client_id: str = "", client_secret: str = "", requester=None):
         self.client_id = client_id or ""
@@ -241,20 +266,6 @@ class DigiKeyAdapter:
         except EnrichError as exc:
             self.last_status = status_from_error(exc)
             return EnrichmentResult()  # a failed API call must not break enrichment
-        products = (body or {}).get("Products") or []
-        if not products:
-            self.last_status = "not_found"
-            return EnrichmentResult()
-        target = normalize_mpn(mpn)
-        exact = next(
-            (p for p in products
-             if isinstance(p, dict)
-             and normalize_mpn(_obj_str(p.get("ManufacturerProductNumber")) or "") == target),
-            None,
-        )
-        chosen = exact if exact is not None else products[0]
-        result = _parse_digikey_part(chosen)
-        if exact is None and result.mpn is not None:
-            result.mpn = Sourced(result.mpn.value, "digikey", "low")  # flag for manual review
-        self.last_status = "ok"
+        result = parse_digikey_payload(body, mpn)
+        self.last_status = "ok" if result.filled_fields() else "not_found"
         return result

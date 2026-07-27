@@ -72,6 +72,53 @@
               "evidence": "Committed 32652fb on main."
             }
           ]
+        },
+        {
+          "id": "wire-contract",
+          "name": "Frontend Reads The New Record",
+          "why": "The schema commit renamed six fields and touched ZERO frontend files, so the app was BROKEN while the backend suite, `tsc` and the frontend suite were all green. A schema gate that stops at the backend is not a gate.",
+          "steps": [
+            {
+              "t": "PartDetail declares the real wire shape (derived/assets/part_class/sources)",
+              "done": true,
+              "evidence": "app/frontend/src/api/types.ts: PartDetail now mirrors PartRecord.to_dict() exactly - 16 top-level keys plus Derived/Asset/AssetOrigin/AssetCheck/SourceEntry/RequirementOverride."
+            },
+            {
+              "t": "Wire-contract gate: emitted keys == declared fields, BOTH directions",
+              "done": true,
+              "evidence": "tests/backend/test_part_wire_contract.py, 7 passed. TAMPERED 4 ways, each caught by a DIFFERENT test: renamed field -> stale-declaration test; ghost field -> same; alternates? -> alternates -> the optionality test; all-fields-optional -> the anti-vacuous harness guard. Restored green after each."
+            },
+            {
+              "t": "A key the backend can OMIT must be declared optional in TS",
+              "done": true,
+              "evidence": "Third direction a key-set diff cannot see: to_dict omits `alternates` while empty, so a required TS field would promise a consumer something absent. Measured against a minimal AND a maximal record; the test refuses to pass if the minimal record omits nothing (non-vacuous)."
+            },
+            {
+              "t": "Readiness is f(part_class, tool) from generated data, not a branch",
+              "done": true,
+              "evidence": "CLASS_NEEDS generated into edaRegistry.generated.ts (PART_CLASSES) by scripts/gen_eda_registry_ts.py, gated by the existing registry-parity pytest. edaTarget.assetReadiness intersects tool-reportable kinds with class-needed kinds; NO `part_class === \"passive\"` branch survives."
+            },
+            {
+              "t": "MUTATION-PROVEN: the naive one-class port fails the new tests",
+              "done": true,
+              "evidence": "Replaced the class lookup with `part_class === \"passive\" ? [] : [symbol,footprint,model]` (the naive port): 5 failed / 24 passed - mechanical-needs-footprint, mechanical-not-ready, virtual-ready, override-replaces, empty-override. Restored: 29 passed."
+            },
+            {
+              "t": "Every frontend fixture rebuilt on ONE wire-shaped factory",
+              "done": true,
+              "evidence": "src/test/partFixture.ts adopts `fishery` (thoughtbot, MIT) rather than a hand-rolled deep-merge; merge semantics MEASURED (deep, arrays replace, null wins, `{}` does NOT clear). Removed 4 `as unknown as PartDetail` casts - two fixtures were stale back to schema 1 - which is how those files dodged tsc entirely."
+            },
+            {
+              "t": "REAL APP DRIVEN: the detail panel renders, CAD reads Complete",
+              "done": true,
+              "evidence": "scripts/uishot.py, both themes, against the owner's real 158-part library. Panel renders title/specs/sourcing and the CAD row reads 'Complete' - NOT the 'CAD Incomplete forever' defect. Verified at the RENDERED panel, which is the layer that lied last time; build/shots/components-{dark,light}-1600w.png."
+            },
+            {
+              "t": "Full gates green and committed",
+              "done": true,
+              "evidence": "Backend: 3429 passed, 5 skipped, exit 0 (2m34s, -n 12). Frontend: 1256 passed / 100 files, tsc clean, build clean, frontend-dist committed in the same commit (42ea6d5)."
+            }
+          ]
         }
       ]
     },
@@ -129,28 +176,28 @@
             },
             {
               "t": "passive resolves to [] for EVERY tool",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "model/part_class.py CLASS_NEEDS + needed_kinds()/capturable_kinds() intersect the class's asset kinds with the EDA registry's closable_assets()/capturable_assets(). No 'if tool ==' and no 'if passive' anywhere in the path. tests/backend/model/test_part_class.py, 16 tests."
             },
             {
               "t": "mechanical = footprint only, virtual = nothing and no BOM line",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "DRIVEN for real over all four classes x both registered tools: passive -> [], virtual -> []. NEGATIVE CONTROL: component -> ['kicad_symbol','kicad_footprint','kicad_model','altium_symbol','altium_footprint'], so the empty results are not an instrument that always returns empty. Before this rule the surface demanded altium_symbol+altium_footprint from all 68 of the owner's passives: 136 unsatisfiable requirements."
             },
             {
               "t": "requires_override wins over the class default",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "DRIVEN: mechanical -> ['kicad_footprint','altium_footprint'] (footprint only, never a symbol); virtual -> [] with has_bom_line=False, while every other class is True. tests test_a_mechanical_part_needs_a_footprint_and_no_symbol / test_a_virtual_part_needs_nothing_and_has_no_bom_line."
             },
             {
               "t": "Requirement enum still matches the TypeScript union",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "test_an_override_replaces_the_class_default, test_an_override_that_needs_NOTHING_is_different_from_no_override_at_all (null vs needs=[] are distinct claims), test_an_override_can_be_scoped_to_one_tool, plus round-trip and forward-compat-key tests. Mirrored in the frontend: 2 new edaTarget tests, mutation-proven."
             },
             {
               "t": "Merged to main, gate green",
-              "done": false,
-              "evidence": ""
+              "done": true,
+              "evidence": "GAP FOUND AND CLOSED. The match was asserted in a COMMENT in capture/requirements.py and enforced by NOTHING. Added test_the_requirement_enum_matches_the_typescript_union_exactly + the same for PartClass, parsing the TS string unions out of types.ts. TAMPERED 3 ways, all caught: dropped a TS member; added a TS-only PartClass ('panel'); added a Python-only member (EAGLE_SYMBOL). Restored green."
             }
           ]
         },
@@ -494,9 +541,31 @@
               "evidence": ""
             }
           ]
+        },
+        {
+          "id": "ui-defects",
+          "name": "UI Defects Seen In The Shots",
+          "why": "Found by the mandated ruthless critique of the 2026-07-27 both-theme shots, against the real library. Logged rather than fixed inline so none goes quiet.",
+          "steps": [
+            {
+              "t": "Duplicate 'Voltage Rating 50 V' row: the one-concept-one-row fold misses it",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "3D viewport keeps a dark background in LIGHT theme (scene ignores the theme token)",
+              "done": false,
+              "evidence": ""
+            },
+            {
+              "t": "Dead space in the assets column while the specs column overflows past the fold",
+              "done": false,
+              "evidence": ""
+            }
+          ]
         }
       ]
     }
   ],
-  "updated": "2026-07-27 06:55 UTC"
+  "updated": "2026-07-27 07:42 UTC"
 }
