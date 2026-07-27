@@ -7,8 +7,8 @@
  * refactor nobody asked for; and MSW, which the repo does not use anywhere and would add a
  * dependency to intercept two functions a partial mock already covers.
  *
- * The REAL `useBulkImport` hook and `useJob` run here; only the two network seams are stubbed, so
- * these exercise the wiring rather than a mock of it.
+ * The REAL `bulkImportStore` runs here; only the two network seams are stubbed, so these exercise
+ * the wiring rather than a mock of it.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -17,6 +17,7 @@ import type { ReactNode } from "react";
 import { api } from "../api/client";
 import type { BulkImportItem } from "../api/types";
 import { BulkImportSection } from "./BulkImportSection";
+import { resetBulkImport, setBulkImportText } from "../lib/bulkImportStore";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -67,6 +68,10 @@ function box() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The store is a module singleton ON PURPOSE (it must outlive the dialog), so each test has to
+  // clear it or the previous run's report leaks into the next assertion.
+  resetBulkImport();
+  setBulkImportText("");
 });
 
 describe("BulkImportSection", () => {
@@ -127,6 +132,27 @@ describe("BulkImportSection", () => {
     // 160 "Added" rows would bury the one that needs a decision, so it is hidden until asked for
     expect(screen.queryByText("Part A")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Show All 2 Rows" }));
+    expect(screen.getByText("Part A")).toBeTruthy();
+  });
+
+  it("keeps the report and the paste when the dialog is closed and reopened", async () => {
+    // THE reason the store exists. A 166-part register import runs ~25 minutes inside the
+    // Add-A-Part dialog; with the state in useState, dismissing that dialog unmounted the reader
+    // and threw the finished report away while the job kept running server-side.
+    const user = userEvent.setup();
+    mockRun({ added: 1 }, [item({ query: "595-A", mpn: "A", part_id: "a", display_name: "Part A" })]);
+    const view = wrap(<BulkImportSection />);
+    await user.click(box());
+    await user.paste("595-A");
+    await user.click(screen.getByRole("button", { name: "Import 1 Part" }));
+    await waitFor(() => expect(screen.getByText("Added")).toBeTruthy());
+
+    view.unmount(); // the dialog is dismissed
+    wrap(<BulkImportSection />); // and reopened
+
+    expect(screen.getByText("Added")).toBeTruthy();
+    expect((box() as HTMLTextAreaElement).value).toBe("595-A");
+    await user.click(screen.getByRole("button", { name: "Show All 1 Rows" }));
     expect(screen.getByText("Part A")).toBeTruthy();
   });
 
