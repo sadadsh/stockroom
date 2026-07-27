@@ -257,38 +257,38 @@
      "steps": [
       {
        "t": "Takes the MPN register, pulls Mouser + DigiKey",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "scripts/import_library.py + importer/engine.py. DRIVEN LIVE against the owner's real Mouser + DigiKey keys (read from the Windows install's config.json via --config): both APIs answered for TPS62130RGTR and both payloads were stored. Worklist is the library's own records, deterministic id order."
       },
       {
        "t": "Writes sourced/<id>/<vendor>.json verbatim",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "VERBATIM, measured: the test compares the stored payload for equality AND for KEY ORDER, which a sorted re-serialization would silently break (json.dumps(json.loads(x)) loses order, and that is how the old schema already lost a value). Live proof: sourced/tps62130rgtr-d77f/{mouser,digikey}.json, 2 files / 24470 bytes."
       },
       {
        "t": "Calls the existing derive engine, does not write a second one",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "importer/engine.py imports rederive from stockroom.derive.engine and contains NO derivation logic. test_the_import_re_derives_by_CALLING_the_derive_engine. Live result: 38 specs, display_name 'Switching Voltage Regulator 16-VQFN', category ICs, value TPS62130RGTR - all produced by the derive engine from the stored evidence."
       },
       {
        "t": "Classifies each part into one of the four classes",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "importer/classify.py: four classes as a keyword TABLE behind an electrical veto, defaulting to COMPONENT. MEASURED over the owner's real 158 records: 85 passive / 72 component / 1 mechanical (the M3 screw 29311 - exactly the part the spec says was excluded by hand). NEGATIVE CONTROL run on 8 cases including 3 adversarial ones (a heatsink-mounted regulator, a SCREW terminal connector, a RESISTOR network driver) - all correctly stay COMPONENT. Found 17 genuinely-passive parts currently stored as component because the v2->v3 migration defaulted them; each verified by eye as R/C/L."
       },
       {
        "t": "Rate-limited part is DEFERRED, not FAILED",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Outcome enum separates DEFERRED (a provider refused for quota/rate reasons - retryable, part left UNCHANGED, no evidence written) from NO_DATA (every source answered and none knows the MPN) and FAILED. Decided by the provider's own last_status against DEFERRABLE_STATUSES, never guessed from a missing body. Both directions tested, including the negative control that a not_found is NOT deferred."
       },
       {
        "t": "Stoppable and resumable, worklist derived from library state",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "No checkpoint file by design: needs_sources() asks the tree whether sourced/<id>/<source>.json exists, so Ctrl-C and re-run continues where it stopped. Proven by API-CALL COUNT, not by file state: a second pass returns SKIPPED and the fake fetcher records zero calls, i.e. it does not re-spend quota. --refetch is the deliberate opposite."
       },
       {
        "t": "Merged to main, gate green",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Committed 0e4ae8c. Full backend suite 3499 passed / 5 skipped / exit 0 (2m09s, -n 12); ruff clean. 35 importer tests + a guard that makes urlopen explode, added after MEASURING that my own first pacing test made a real outbound request to api.mouser.com with a bogus key."
       }
      ]
     },
@@ -342,29 +342,56 @@
    "why": "Nothing ships to the real library until these pass. A failed acceptance test reported honestly beats a green claim.",
    "items": [
     {
+     "id": "id-migration",
+     "name": "Migrate The Library To v3 Part Ids",
+     "why": "BLOCKS THE IMPORT OF THE REAL LIBRARY, found 2026-07-27 by pointing the importer at it. 84 of 158 records still carry pre-v3 ids with underscores (`103at_2`), and `sourced/` correctly refuses those as path components - so evidence cannot be filed for any of them. The other 74 are path-safe but still lack the `-hash` suffix. The importer now reports this as one FAILED part with the reason instead of crashing the pass.",
+     "steps": [
+      {
+       "t": "Rename every record to slug(mpn)+'-'+sha256(mpn)[:4], in one atomic commit",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "Rewrite every reference to a renamed id (index, projects, assign bindings)",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "Prove no two records collide onto one id, and no id is left path-unsafe",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "Dry run first, and a verified backup before it is applied",
+       "done": false,
+       "evidence": ""
+      }
+     ]
+    },
+    {
      "id": "acceptance",
      "name": "Acceptance Test",
      "why": "The owner's own bar, verbatim: 'we can edit it without reimporting'.",
      "steps": [
       {
        "t": "Import real parts into a scratch library",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Real parts into a scratch library with real API calls: scripts/import_library.py --library <scratch> --config <windows config> --apply pulled Mouser AND DigiKey for TPS62130RGTR and wrote both payloads. Dry run verified FIRST by listing files afterwards (exactly the one seeded record, nothing else)."
       },
       {
        "t": "Derive twice, prove byte-identical",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "ON REAL VENDOR EVIDENCE (2 payloads, 38 derived specs), not a fixture: derive twice -> byte-identical dumps() = PASS; the second derive also matches exactly what the import wrote = PASS; clear_derived() + re-derive reproduces it = PASS."
       },
       {
        "t": "Prove sourced/ untouched by either derive",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "sha256 of every file under sourced/ taken before and after FIVE derives (2 plain, 1 after clear_derived, 2 with different naming schemes): unchanged = PASS, over 2 files / 24470 bytes of real vendor payload."
       },
       {
        "t": "Change the naming scheme, re-derive, identity survives",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Naming scheme swapped on the real record: 'Switching Voltage Regulator 16-VQFN' (spec-aware) vs 'Texas Instruments TPS62130RGTR' (manufacturer-mpn), with EVERY other derived field byte-identical between them and id/mpn/manufacturer/part_class untouched. sourced/ hashes unchanged by both."
       }
      ]
     },
@@ -567,5 +594,5 @@
    ]
   }
  ],
- "updated": "2026-07-27 04:05 UTC"
+ "updated": "2026-07-27 05:10 UTC"
 }
