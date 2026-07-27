@@ -22,6 +22,35 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8533210030"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/bourns/images/chpreztr.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/649/CRA2512.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "98 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "18"
       }
     ],
     "Minimum Order Quantity": [
@@ -34,6 +63,11 @@
         "confidence": "medium",
         "source": "mouser",
         "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4000"
       }
     ],
     "Order Multiple": [
@@ -60,6 +94,30 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Current Sense Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "20mΩ"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "20 mOhms"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -70,6 +128,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±50ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±50ppm/°C"
       }
     ],
     "datasheet_url": [
@@ -94,6 +169,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Current Sense Resistors - SMD 0.020ohms 1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 0.02 OHM 1% 3W 2512"
       }
     ],
     "product_url": [
@@ -157,6 +237,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Composition": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Contains Battery": {
       "confidence": "medium",
       "source": "lcsc"
@@ -188,6 +272,10 @@
     "EDA Symbol SVG": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Features": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -228,6 +316,10 @@
     "Has Third Party Stock": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Height - Seated (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Image": {
       "confidence": "medium",
@@ -317,6 +409,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Terminations": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Operating Temperature": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Order Multiple": {
       "confidence": "medium",
       "source": "lcsc"
@@ -325,6 +429,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -332,6 +440,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -344,6 +456,10 @@
     "Popular Part": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Power (Watts)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Power(Watts)": {
       "confidence": "medium",
@@ -369,6 +485,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -380,6 +500,14 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Size / Dimension": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -400,6 +528,10 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Temperature Coefficient": {
       "confidence": "medium",
@@ -478,6 +610,86 @@
       "stock": 5118,
       "url": "https://www.lcsc.com/product-detail/C840620.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:01.258822+00:00",
+      "part_number": "652-CRA2512FZ-R20ELF",
+      "price_breaks": [
+        {
+          "price": 0.55,
+          "qty": 1
+        },
+        {
+          "price": 0.353,
+          "qty": 10
+        },
+        {
+          "price": 0.267,
+          "qty": 25
+        },
+        {
+          "price": 0.238,
+          "qty": 100
+        },
+        {
+          "price": 0.207,
+          "qty": 250
+        },
+        {
+          "price": 0.187,
+          "qty": 500
+        },
+        {
+          "price": 0.171,
+          "qty": 1000
+        },
+        {
+          "price": 0.144,
+          "qty": 4000
+        },
+        {
+          "price": 0.135,
+          "qty": 8000
+        }
+      ],
+      "stock": 105558,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:01.258822+00:00",
+      "part_number": "CRA2512-FZ-R020ELFTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.14471,
+          "qty": 4000
+        },
+        {
+          "price": 0.13455,
+          "qty": 8000
+        },
+        {
+          "price": 0.12933,
+          "qty": 12000
+        },
+        {
+          "price": 0.12342,
+          "qty": 20000
+        },
+        {
+          "price": 0.1199,
+          "qty": 28000
+        },
+        {
+          "price": 0.11646,
+          "qty": 40000
+        }
+      ],
+      "stock": 157443,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -487,6 +699,7 @@
     "BRHTS": "85332120",
     "Brand Id": "377",
     "Catalog Id": "1199",
+    "Composition": "Metal Element",
     "Contains Battery": "No",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Taiwan",
@@ -495,6 +708,7 @@
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/86c0ec3cc52642569103c31bd5918052.svg?t=1694747136",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/c738b9276e7d4541983c3cbc8110adac.svg?t=1694747136",
+    "Features": "Automotive AEC-Q200, Current Sense, Moisture Resistant",
     "HTS Code (BR)": "85332110",
     "HTS Code (CA)": "8533210000",
     "HTS Code (CN)": "8533211000",
@@ -505,6 +719,7 @@
     "HTS Code (TARIC)": "8533210000",
     "HTS Code (US)": "8533210020",
     "Has Third Party Stock": "No",
+    "Height - Seated (Max)": "0.035\" (0.90mm)",
     "Image": "https://www.mouser.com/images/bourns/images/chpreztr.jpg",
     "Is Cable Category": "No",
     "Is Foreign Display": "Yes",
@@ -527,27 +742,37 @@
     "Lead Time": "98 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "5",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Number of Terminations": "2",
+    "Operating Temperature": "-55°C ~ 170°C",
     "Order Multiple": "5",
     "Package": "2512",
+    "Package / Case": "2512 (6332 Metric)",
     "Package Quantity": "4000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "308",
     "Popular Part": "No",
+    "Power (Watts)": "3W",
     "Power(Watts)": "3W",
     "Pre-Sale": "No",
     "Product Category": "Current Sense Resistors - SMD",
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20230131_BOURNS-CRA2512-FZ-R020ELF_C840620_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230131_BOURNS-CRA2512-FZ-R020ELF_C840620_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230131_BOURNS-CRA2512-FZ-R020ELF_C840620_blank.jpg",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Resistance": "20mΩ",
     "RoHS": "Yes",
+    "Series": "CRA2512",
+    "Size / Dimension": "0.254\" L x 0.132\" W (6.45mm x 3.35mm)",
     "Standard Pack Qty": "4000",
     "Stock": "13930",
     "Stock (Domestic)": "13930",
     "Stock (Overseas)": "13930",
     "Stock (Shenzhen)": "13930",
+    "Supplier Device Package": "2512",
     "Temperature Coefficient": "±50ppm/℃",
     "Tolerance": "±1%",
     "Type": "-",
