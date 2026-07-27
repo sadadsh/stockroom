@@ -60,6 +60,30 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/331/Taiyo-Yuden-0805-%282012-Metric%29.jpg"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "0 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "13"
+      }
+    ],
+    "Lifecycle": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "End of Life"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Not For New Designs"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -406,8 +430,8 @@
       "source": "mouser"
     },
     "Lifecycle": {
-      "confidence": "medium",
-      "source": "lcsc"
+      "confidence": "high",
+      "source": "mouser"
     },
     "Minimum Order Quantity": {
       "confidence": "medium",
@@ -606,6 +630,78 @@
       "stock": 20841,
       "url": "https://www.lcsc.com/product-detail/C2182156.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:26.937325+00:00",
+      "part_number": "963-EMK212BB7106KG-T",
+      "price_breaks": [
+        {
+          "price": 0.5,
+          "qty": 1
+        },
+        {
+          "price": 0.271,
+          "qty": 10
+        },
+        {
+          "price": 0.238,
+          "qty": 100
+        },
+        {
+          "price": 0.198,
+          "qty": 500
+        },
+        {
+          "price": 0.184,
+          "qty": 1000
+        },
+        {
+          "price": 0.165,
+          "qty": 3000
+        },
+        {
+          "price": 0.158,
+          "qty": 6000
+        }
+      ],
+      "stock": 185620,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:00:26.937325+00:00",
+      "part_number": "587-6139-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.17048,
+          "qty": 3000
+        },
+        {
+          "price": 0.16168,
+          "qty": 6000
+        },
+        {
+          "price": 0.15727,
+          "qty": 9000
+        },
+        {
+          "price": 0.15238,
+          "qty": 15000
+        },
+        {
+          "price": 0.14952,
+          "qty": 21000
+        },
+        {
+          "price": 0.14677,
+          "qty": 30000
+        }
+      ],
+      "stock": 28,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -654,7 +750,7 @@
     "LCSC Title": "Taiyo Yuden EMK212BB7106KG-T",
     "LCSC Warehouse Category": "Ceramic Capacitors",
     "Lead Time": "0 Days",
-    "Lifecycle": "Active",
+    "Lifecycle": "End of Life",
     "Minimum Order Quantity": "5",
     "Moisture Sensitivity Level": "1 (Unlimited)",
     "Mounting Type": "Surface Mount, MLCC",
