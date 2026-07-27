@@ -988,6 +988,91 @@ class LibraryOps:
             txn.commit(f"Remove {kind.replace('_', ' ')} from {part_id}")
         return record
 
+    def _is_stockroom_authored(self, record: PartRecord, tool: str, asset_kind: str, ref) -> bool:
+        """Does this reference point at a file THIS LIBRARY holds?
+
+        The distinction that makes a library-wide clear safe. Two kinds of reference live in the
+        same slot and only one of them is a file:
+
+          STOCKROOM-AUTHORED  an entry in `SR-<Category>.kicad_sym`, a `.kicad_mod` under
+                              `SR-<Category>.pretty`, a `.step` under `models/`, or an Altium
+                              `.SchLib`/`.PcbLib` in the profile's `altium/`. Captured files.
+          KICAD-STOCK         `Device:R`, `Resistor_SMD:R_0402_1005Metric` - KiCad's OWN installed
+                              libraries. No file here to delete, and clearing the reference would
+                              blank the part for good, because `capture_needs` returns `[]` for a
+                              passive so nothing would ever refill it.
+
+        Decided by WHERE THE FILE WOULD BE, never by the part's class: measured on the owner's
+        library, 10 passives carry `SR-` symbols and footprints from the now-distrusted LCSC lane,
+        and those are captured files like any other.
+        """
+        if ref is None or not ref.is_present():
+            return False
+        if ref.file:
+            return True  # a file-shaped ref is always a path inside this profile
+        if tool != "kicad":
+            return True  # an Altium ref names a .SchLib/.PcbLib this profile stores verbatim
+        # A KiCad lib_id resolves against a NICKNAME. Ours is `SR-<Category>`; anything else is a
+        # library KiCad installed, which this app neither wrote nor may delete.
+        return ref.lib == category_nickname(record.category)
+
+    def clear_cad_assets(self, *, dry_run: bool = False) -> dict:
+        """Remove every CAD asset this library HOLDS - the files and their references - in ONE
+        atomic commit.
+
+        Owner, 2026-07-27: *"remove all the current cad files before guided capture"*. The point is
+        to start the trusted-capture pass from nothing, because the existing files came from
+        sources the owner has since ruled out (*"a lot of our symbols, footprints, and 3d models
+        are broken so its not trusted where we've gotten them"*).
+
+        SCOPE, and it is the whole safety story: only STOCKROOM-AUTHORED references are cleared
+        (see `_is_stockroom_authored`). A KiCad-stock reference is counted and LEFT, because it
+        names no file this app owns and removing it would empty a part permanently.
+
+        Touches CAD only. Identity, the derived block, `sourced/` evidence and the datasheet all
+        stand - this removes assets, not parts.
+        """
+        report: dict = {"cleared": 0, "kept_stock": 0, "items": [], "failed": []}
+        paths = sorted(self.lib.parts_dir.glob("*.json"))
+        # One transaction around the whole sweep, opened before the walk so nothing accumulates
+        # and a failure anywhere restores every touched path. `dry_run` opens none at all: a run
+        # that writes nothing must be UNABLE to commit, not merely choose not to.
+        with (Transaction(self.repo) if not dry_run else contextlib.nullcontext()) as txn:
+            for path in paths:
+                try:
+                    record = PartRecord.loads(path.read_text(encoding="utf-8"))
+                except Exception as exc:  # noqa: BLE001 - one bad record cannot abandon the sweep
+                    report["failed"].append({"id": path.stem, "error": str(exc)})
+                    continue
+                removed: list[str] = []
+                for tool in all_tools():
+                    assets = record.assets_for(tool.key)
+                    for asset_kind in tool.asset_kinds:
+                        ref = assets.get(asset_kind)
+                        if ref is None or not ref.is_present():
+                            continue
+                        if not self._is_stockroom_authored(record, tool.key, asset_kind, ref):
+                            report["kept_stock"] += 1
+                            continue
+                        removed.append(f"{tool.key}_{asset_kind}")
+                if not removed:
+                    continue
+                report["cleared"] += len(removed)
+                report["items"].append({"part_id": record.id, "assets": removed})
+                if txn is None:
+                    continue
+                try:
+                    for kind in removed:
+                        self._detach_eda_asset(record, kind, txn)
+                    path.write_text(record.dumps(), encoding="utf-8")
+                    txn.track(path)
+                except Exception as exc:  # noqa: BLE001 - reported, and the transaction still holds
+                    report["failed"].append({"id": record.id, "error": str(exc)})
+            if txn is not None and report["items"]:
+                report_n = report["cleared"]
+                txn.commit(f"Remove {report_n} CAD assets from {len(report['items'])} parts")
+        return report
+
     def _detach_eda_asset(self, record: PartRecord, kind: str, txn) -> None:
         """Remove one tool's asset: its on-disk file(s) and its record reference.
 

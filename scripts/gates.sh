@@ -116,6 +116,23 @@ case "${1:-all}" in
             exit 0 ;;
   await)    [[ -f "$BG_LOG" ]] || { echo "no detached run: $BG_LOG is absent" >&2; exit 2; }
             pid="$(cat "$BG_LOG.pid" 2>/dev/null || echo 0)"
+            # REFUSE A STALE LOG. Without this, `await` happily reports the summary of a run that
+            # finished HOURS ago as though it were the run you are waiting on -- measured
+            # 2026-07-27, when it printed "3037 passed" from a log dated the previous afternoon
+            # while a completely different suite was still running. That is a green signal not
+            # wired to the fact it claims, which is the exact failure mode this repo bans.
+            #
+            # The check is a FACT, not a heuristic: a live pid means a real run; no live pid plus
+            # an already-complete log means the log describes a PREVIOUS run and there is nothing
+            # to await. Say so and exit non-zero rather than answering the wrong question.
+            if [[ "$pid" == 0 ]] || ! kill -0 "$pid" 2>/dev/null; then
+              if grep -qE '[0-9]+ (passed|failed|error)' "$BG_LOG"; then
+                echo "no detached run is in flight; $BG_LOG is a COMPLETED earlier run" >&2
+                echo "  (last written: $(date -r "$BG_LOG" '+%Y-%m-%d %H:%M:%S'))" >&2
+                echo "  start one with: $0 bg" >&2
+                exit 2
+              fi
+            fi
             deadline=$(( $(date +%s) + ${GATES_AWAIT_TIMEOUT:-900} ))
             while (( $(date +%s) < deadline )); do
               # SUCCESS signal: pytest's own summary line.
