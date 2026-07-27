@@ -84,12 +84,15 @@ def _wait_for_capture(browser, page, before: int, timeout_s: float, gap: float =
 # because normalize_altium_source raises on it, NOT because a P-CAD library is unconvertible -
 # that was a wrong conclusion reached without research (owner corrected it, 2026-07-27).
 #
-# Altium's Import Wizard converts a P-CAD `.lia` natively: a library carrying both pattern and
-# symbol information translates into BOTH a `.PcbLib` and a `.SchLib`, which is exactly the shape
-# Ultra Librarian's PCAD row ships. Altium's scripting language is DelphiScript, this repo already
-# drives installed Altium (`altium/driver.py`), and `pyaltiumrun` exists to run scripts in it - so
-# the conversion is an unbuilt FEATURE with a documented path, not an impossibility.
-# Sources and the open sub-question are in the ledger's 2026-07-27 P-CAD finding.
+# A `.lia` is convertible by SEVERAL routes, and Altium is only one of them (owner pushed back on an
+# Altium-only framing, correctly, 2026-07-27):
+#   * ACCEL_ASCII is an OPEN, parsed format - `xtoolbox/pcad2kicad` implements a parser for it and
+#     KiCad itself natively loads P-CAD ASCII. Nothing about reading a `.lia` is proprietary.
+#   * `AltiumSharp` (C#/.NET, open source) reads AND WRITES `.SchLib`/`.PcbLib` explicitly WITHOUT
+#     Altium installed - so a conversion needs no license and no Windows.
+#   * Altium's own Import Wizard does it natively, and this repo already drives installed Altium.
+# Cheapest of all is not converting: a vendor that ships NATIVE Altium libraries needs none of this,
+# and the attach path above already handles those. See the ledger's 2026-07-27 P-CAD findings.
 _ALTIUM_LIBRARY_SUFFIXES = (".schlib", ".pcblib", ".intlib")
 
 

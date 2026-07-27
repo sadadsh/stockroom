@@ -163,13 +163,20 @@ class UltraLibrarianAdapter:
         # comment implied otherwise, which was a negative conclusion reached without researching it
         # (owner corrected it, 2026-07-27).
         #
-        # Altium's Import Wizard translates a P-CAD library carrying BOTH pattern and symbol
-        # information into a `.PcbLib` AND a `.SchLib` - precisely what the PCAD row ships (the
-        # documented caveat, that a symbol-ONLY library will not import, does not apply here). Altium
-        # scripts in DelphiScript, this repo already drives installed Altium via `altium/driver.py`,
-        # and `pyaltiumrun` runs scripts inside it. Note the same reasoning rehabilitates the
-        # `#AltiumDesigner` script row: `UL_Import.pas` IS DelphiScript, so "it ships a script
-        # instead of libraries" is a description of the mechanism, never proof it cannot be used.
+        # THREE independent routes exist, and Altium is only one of them - an earlier version of
+        # this comment implied Altium was required, which the owner pushed back on and was right:
+        #   1. NO CONVERSION AT ALL. A vendor shipping native `.SchLib`/`.PcbLib` (SnapMagic's
+        #      `altium_native`) needs none of this, and `guided.py::_attach` already stores those.
+        #      This is the cheapest path and should be measured before either of the others.
+        #   2. OPEN TOOLING, no Altium and no Windows. ACCEL_ASCII is an open format with existing
+        #      parsers (`xtoolbox/pcad2kicad`; KiCad loads P-CAD ASCII natively), and `AltiumSharp`
+        #      reads AND WRITES `.SchLib`/`.PcbLib` without Altium installed. Cost is a .NET
+        #      dependency beside a Python backend, which is a real tradeoff, not a blocker.
+        #   3. ALTIUM ITSELF. Its Import Wizard translates a P-CAD library carrying BOTH pattern and
+        #      symbol info into a `.PcbLib` AND a `.SchLib` (the documented caveat about symbol-ONLY
+        #      libraries does not apply here); `altium/driver.py` already drives it. Windows + a
+        #      license only. The same reasoning rehabilitates the `#AltiumDesigner` script row:
+        #      `UL_Import.pas` IS DelphiScript, which is exactly what Altium's scripting system runs.
         tools=("kicad",),
         formats_exclusive=False,
         aggregator=False,
