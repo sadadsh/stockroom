@@ -22,6 +22,59 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390090"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/microchiptechnology/images/UQFN-16microchip.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6345/150%7EC04-257%7EJQ%7E16.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "77 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "7"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3300"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+85℃@(TA)"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 85°C"
       }
     ],
     "Packaging": [
@@ -36,6 +89,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Current & Power Monitors & Regulators"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +111,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "datasheet_url": [
@@ -70,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Current & Power Monitors & Regulators PAC1934 Four Channel DC Power Monitor"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC CURRENT MONITOR 1% 16UQFN"
       }
     ],
     "manufacturer": [
@@ -107,6 +182,10 @@
   "display_name": "Current & Power Monitor UQFN-16-EP",
   "eda": {},
   "enrichment": {
+    "Accuracy": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Assembly Country of Origin": {
       "confidence": "high",
       "source": "mouser"
@@ -158,6 +237,10 @@
     "EDA Symbol SVG": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Function": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -271,6 +354,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Voltages Monitored": {
       "confidence": "medium",
       "source": "lcsc"
@@ -291,6 +382,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -298,6 +393,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -335,6 +434,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -347,9 +450,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Sensing Method": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -367,6 +478,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Unit": {
       "confidence": "medium",
       "source": "lcsc"
@@ -374,6 +489,10 @@
     "Unit Weight (kg)": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Voltage - Input": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Voltage - Supply": {
       "confidence": "medium",
@@ -436,10 +555,43 @@
       "stock": 491,
       "url": "https://www.lcsc.com/product-detail/C623960.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:37.859362+00:00",
+      "part_number": "579-PAC1934JQ",
+      "price_breaks": [
+        {
+          "price": 1.94,
+          "qty": 1
+        },
+        {
+          "price": 1.94,
+          "qty": 3300
+        }
+      ],
+      "stock": 4590,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:37.859362+00:00",
+      "part_number": "PAC1934T-I/JQTR-ND",
+      "price_breaks": [
+        {
+          "price": 1.5625,
+          "qty": 3300
+        }
+      ],
+      "stock": 15036,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
   "specs": {
+    "Accuracy": "±1%",
     "Assembly Country of Origin": "Not available",
     "Available On Reel": "Yes",
     "Brand Id": "169",
@@ -453,6 +605,7 @@
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/02aaa8b0909c4fdc85f9dd452938cabc.svg?t=1729859148",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/1fba17f3db3d4505b99f1f17450cadbb.svg?t=1729859148",
+    "Function": "Current Monitor",
     "HTS Code (BR)": "85423999",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
@@ -481,13 +634,17 @@
     "Lead Time": "77 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "1 (Unlimited)",
+    "Mounting Type": "Surface Mount",
     "Number of Voltages Monitored": "4",
     "Operating Temperature": "-40℃~+85℃@(TA)",
     "Order Multiple": "1",
     "Output Type": "Open-drain",
     "Package": "UQFN-16-EP(4x4)",
+    "Package / Case": "16-UQFN Exposed Pad",
     "Package Quantity": "3300",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "380",
     "Popular Part": "No",
@@ -497,16 +654,21 @@
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20230201_Microchip-Tech-PAC1934T-I-JQ_C623960_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20230201_Microchip-Tech-PAC1934T-I-JQ_C623960_blank.jpg",
     "Quiescent Current": "585uA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "3",
     "Reset Active Level": "Active Low",
     "RoHS": "Yes",
+    "Sensing Method": "High-Side",
     "Standard Pack Qty": "3300",
+    "Standard Package": "3300",
     "Stock": "459",
     "Stock (Domestic)": "459",
     "Stock (Overseas)": "459",
     "Stock (Shenzhen)": "459",
+    "Supplier Device Package": "16-UQFN (4x4)",
     "Unit": "Piece",
     "Unit Weight (kg)": "0.00018",
+    "Voltage - Input": "2.7V ~ 5.5V",
     "Voltage - Supply": "2.7V~5.5V",
     "Weight": "0.267",
     "Weight (kg)": "0.000267134",
