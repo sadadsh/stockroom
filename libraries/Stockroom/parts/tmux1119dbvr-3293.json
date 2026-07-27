@@ -93,8 +93,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Analog Switch ICs 3-pA on-state leakag e current 5-V 2:1",
     "display_name": "Analog Switch IC SOT-23-6",
     "specs": {

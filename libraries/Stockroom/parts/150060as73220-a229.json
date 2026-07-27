@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Single Color LEDs WL-SMCC 80mcd 2V 120 degress 0603 Amber",
     "display_name": "Single Color LED 0603",
     "specs": {

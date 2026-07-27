@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Crystals & Oscillators",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Crystals 3.2x2.5mm 25MHz 12pF +-20ppm 40Ohms AEC-Q200 SMT",
     "display_name": "25MHz Crystal 12pF 4-SMD",
     "specs": {

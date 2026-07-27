@@ -141,9 +141,9 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Flip Flops Sgl Pos-Edge-Trggrd A 595-SN74LVC1G74DCU A 595-SN74LVC1G74DCUT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Flip Flops Sgl Pos-Edge-Trggrd",
     "display_name": "Flip Flop 8-VSSOP",
     "specs": {
       "Assembly Country of Origin": "China",

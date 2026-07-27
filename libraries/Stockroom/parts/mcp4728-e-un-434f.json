@@ -117,8 +117,8 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Digital to Analog Converters - DAC Quad 12-bit NV DAC with I2C interface",
     "display_name": "Digital to Analog Converter 10-MSOP",
     "specs": {

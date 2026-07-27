@@ -129,8 +129,8 @@
   },
   "derived": {
     "category": "Inductors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Ferrite Beads 600 OHM 25% Alternate Sizing Guide Below",
     "display_name": "Power Inductor 0603",
     "specs": {

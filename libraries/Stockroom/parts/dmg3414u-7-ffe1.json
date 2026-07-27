@@ -228,8 +228,8 @@
   },
   "derived": {
     "category": "Transistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "MOSFETs N-Ch 20V VDSS 8 Vgss 30A IDM",
     "display_name": "MOSFET SOT-23-3",
     "specs": {

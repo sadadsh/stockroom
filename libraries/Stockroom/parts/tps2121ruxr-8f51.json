@@ -105,9 +105,9 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Power Switch ICs - Power Distribution 2.7-V&nbsp;to 22-V 5 6-m? 4.5-A power A A 595-TPS2121RUXT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Power Switch ICs - Power Distribution 2.7-V to 22-V 5 6-m? 4.5-A power",
     "display_name": "Source Selector Switch 12-VQFN-HR",
     "specs": {
       "Applications": "General Purpose",

@@ -117,8 +117,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Hot Swap Voltage Controllers 2.7-V to 23-V 28-m? 5.5-A eFuse with i",
     "display_name": "Hot Swap Voltage Controller 10-VQFN-HR",
     "specs": {

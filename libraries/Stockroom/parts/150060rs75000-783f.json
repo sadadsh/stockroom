@@ -141,8 +141,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Single Color LEDs WL-SMCW SMDMono TpVw Waterclr 0603 Red",
     "display_name": "Single Color LED 0603",
     "specs": {

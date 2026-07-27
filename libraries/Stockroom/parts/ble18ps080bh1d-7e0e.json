@@ -105,9 +105,9 @@
   },
   "derived": {
     "category": "Inductors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Ferrite Beads 8.5  OHMS",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Ferrite Beads 8.5 OHMS",
     "display_name": "Power Inductor 0603",
     "specs": {
       "Assembly Country of Origin": "Not available",

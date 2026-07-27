@@ -251,8 +251,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "FFC & FPC Connectors 0.5 FPC ZIF BTM CONT EMBT PKG 18Ckt",
     "display_name": "Connector 1x18 0.020\"",
     "specs": {

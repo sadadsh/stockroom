@@ -141,8 +141,8 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Current Sense Resistors - SMD 0.020ohms 1%",
     "display_name": "20mΩ ±1% 2512",
     "specs": {

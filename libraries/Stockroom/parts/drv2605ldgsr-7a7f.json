@@ -93,9 +93,9 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Motor / Motion / Ignition Controllers & Drivers Haptic Driver A 595- DRV2605LDGST A 595- A 595-DRV2605LDGST",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Motor / Motion / Ignition Controllers & Drivers Haptic Driver",
     "display_name": "Motor / Motion / Ignition Controller & Driver 10-VSSOP",
     "specs": {
       "Applications": "Haptic Feedback",

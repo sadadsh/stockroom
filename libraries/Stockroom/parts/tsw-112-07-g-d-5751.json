@@ -233,8 +233,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Headers & Wire Housings 2.54MM CLASSIC PCB HDR STRIP",
     "display_name": "Connector 2x12",
     "specs": {

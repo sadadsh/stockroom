@@ -175,9 +175,9 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT KGM31HR51E226KU NEW GLOBAL PN 25V 22uF X A 581-KGM31HR51E226KU",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT KGM31HR51E226KU NEW GLOBAL PN 25V 22uF X",
     "display_name": "22µF ±10% 1206",
     "specs": {
       "Applications": "General Purpose",

@@ -7,9 +7,9 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "RES SMD 11.8KOHM 0.1% 1/16W 0402",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "11.8 kOhms ±0.1% 0.063W, 1/16W Chip Resistor 0402 (1005 Metric) Automotive AEC-Q200 Thin Film",
     "display_name": "11.8kΩ ±0.1% 0402",
     "specs": {
       "Composition": "Thin Film",

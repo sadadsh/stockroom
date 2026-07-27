@@ -293,8 +293,8 @@
   },
   "derived": {
     "category": "Connectors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "USB Connectors USB Type C,2.0, Rec,SMT, 0.95mmTH Shell Stakes,G/F,RA,Top Mnt,T&R",
     "display_name": "Connector",
     "specs": {

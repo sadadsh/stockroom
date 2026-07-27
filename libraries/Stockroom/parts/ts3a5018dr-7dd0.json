@@ -165,9 +165,9 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch A 595-TS A 595-TS3A5018D",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Analog Switch ICs 10-Ohm Quad SPDT Ana log Switch",
     "display_name": "Analog Switch IC 16-SOIC",
     "specs": {
       "-3db Bandwidth": "300MHz",

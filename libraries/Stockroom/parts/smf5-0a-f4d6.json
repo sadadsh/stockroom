@@ -226,8 +226,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "ESD Protection Diodes / TVS Diodes 200W 5V 5% Uni-directional",
     "display_name": "ESD Protection Diode SOD-123W",
     "specs": {

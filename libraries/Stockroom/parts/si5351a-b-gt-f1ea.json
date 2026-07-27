@@ -141,8 +141,8 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Clock Generators & Support Products I2C program, any-frequency, any-output, Xtal reference, 3-output LVCMOS clock generator",
     "display_name": "Clock Generator 10-MSOP",
     "specs": {

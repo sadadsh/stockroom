@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Sensors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Encoders Red Blue/Green LED Push Switch Knurled",
     "display_name": "Encoder",
     "specs": {

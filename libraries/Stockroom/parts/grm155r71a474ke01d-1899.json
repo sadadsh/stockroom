@@ -25,8 +25,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 0.47 uF 10 VDC 10% 0402 X7R",
     "display_name": "0.47µF ±10% 0402",
     "specs": {

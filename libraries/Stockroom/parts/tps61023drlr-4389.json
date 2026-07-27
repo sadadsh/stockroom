@@ -153,9 +153,9 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Switching Voltage Regulators 3.7-A boost converte r with 0.5-V ultra- A 595-TPS61023DRLT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Switching Voltage Regulators 3.7-A boost converte r with 0.5-V ultra-",
     "display_name": "Switching Voltage Regulator SOT-563",
     "specs": {
       "Assembly Country of Origin": "Philippines",
