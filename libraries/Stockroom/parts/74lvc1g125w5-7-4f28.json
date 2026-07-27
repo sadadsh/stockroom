@@ -145,25 +145,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "74LVC1G125W5-7"
-        }
-      },
-      "model": null,
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "74LVC1G125W5-7"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "74lvc1g125w5-7-4f28.pdf",

@@ -194,31 +194,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "SMF5.0A"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/SMF5.0A.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Diodes",
-          "name": "SMF5.0A"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "smf5-0a-f4d6.pdf",

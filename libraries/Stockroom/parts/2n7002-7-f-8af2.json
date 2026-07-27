@@ -225,31 +225,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "2N7002-7-F"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/2N7002-7-F.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "2N7002-7-F"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "2n7002-7-f-8af2.pdf",

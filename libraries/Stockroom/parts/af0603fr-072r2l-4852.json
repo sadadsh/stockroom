@@ -194,31 +194,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Resistors",
-          "name": "AF0603FR-072R2L"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/AF0603FR-072R2L.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Resistors",
-          "name": "AF0603FR-072R2L"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "af0603fr-072r2l-4852.pdf",

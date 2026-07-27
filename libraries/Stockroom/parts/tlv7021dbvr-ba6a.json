@@ -85,31 +85,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "TLV7021DBVR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TLV7021DBVR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "TLV7021DBVR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tlv7021dbvr-ba6a.pdf",

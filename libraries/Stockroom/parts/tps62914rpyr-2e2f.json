@@ -85,31 +85,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "TPS62914RPYR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TPS62914RPYR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "TPS62914RPYR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "",

@@ -201,31 +201,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "FTSH-105-01-L-DV-K"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/FTSH-105-01-L-DV-K.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "FTSH-105-01-L-DV-K"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "ftsh-105-01-l-dv-k-0957.pdf",

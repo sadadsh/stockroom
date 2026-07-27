@@ -109,31 +109,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "SN74LVC1G74DCUR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/SN74LVC1G74DCUR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "SN74LVC1G74DCUR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "sn74lvc1g74dcur-5184.pdf",
