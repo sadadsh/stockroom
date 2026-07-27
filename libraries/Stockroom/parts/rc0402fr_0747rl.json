@@ -1,4 +1,131 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8533210020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8533.21.0030"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/yageo/images/RC_series_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4849/13_0402-%281005-metric%29.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "9 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "17"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "100"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Thick Film Resistors - SMD"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Resistors"
+      }
+    ],
+    "Resistance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "47 Ohm"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "47 Ohms"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Temperature Coefficient": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "±100ppm/℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±100ppm/°C"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±1%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Resistor, 47 Ohm, 1%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: RC0402FR-0747RL Thick Film Resistors - SMD – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "RES 47 OHM 1% 1/16W 0402"
+      }
+    ]
+  },
   "category": "Resistors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +149,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "rc0402fr_0747rl",
   "manufacturer": "Yageo",
@@ -37,8 +169,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:04:06.320681+00:00",
+      "part_number": "603-RC0402FR-0747RL",
       "price_breaks": [
         {
           "price": 0.000557143,
@@ -65,9 +197,43 @@
           "qty": 1004000
         }
       ],
-      "stock": 152693,
+      "stock": 307298,
       "url": "https://www.mouser.com/c/?q=RC0402FR-0747RL",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:06.320681+00:00",
+      "part_number": "311-47.0LRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00228,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 4100,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -119,7 +285,7 @@
     "LCSC Product Name": "RES 47Ω ±1% 62.5mW 0402",
     "LCSC Title": "YAGEO RC0402FR-0747RL",
     "LCSC Warehouse Category": "Chip Resistor - Surface Mount",
-    "Lead Time": "56 Days",
+    "Lead Time": "9 Weeks",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "100",
     "Moisture Sensitivity Level": "1 (Unlimited)",
