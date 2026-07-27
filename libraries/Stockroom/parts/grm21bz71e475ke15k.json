@@ -1,4 +1,95 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6344/MFG_GGM155xxxxxxxKE38D.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 4.7 µF, 10%, 0805"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM21BZ71E475KE15K Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 4.7UF 25V X7R 0805"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +113,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "grm21bz71e475ke15k",
   "manufacturer": "Murata Electronics",
@@ -37,8 +133,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:41.740806+00:00",
+      "part_number": "81-GRM21BZ71E475KE5K",
       "price_breaks": [
         {
           "price": 0.28,
@@ -76,6 +172,40 @@
       "stock": 232244,
       "url": "https://www.mouser.com/c/?q=GRM21BZ71E475KE15K",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:41.740806+00:00",
+      "part_number": "490-GRM21BZ71E475KE15KTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05658,
+          "qty": 10000
+        },
+        {
+          "price": 0.05358,
+          "qty": 20000
+        },
+        {
+          "price": 0.05208,
+          "qty": 30000
+        },
+        {
+          "price": 0.05041,
+          "qty": 50000
+        },
+        {
+          "price": 0.04944,
+          "qty": 70000
+        },
+        {
+          "price": 0.0485,
+          "qty": 100000
+        }
+      ],
+      "stock": 10849,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -96,7 +226,7 @@
     "HTS Code (US)": "8532240020",
     "Image": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG",
     "KRHTS": "8532240000",
-    "Lead Time": "84 Days",
+    "Lead Time": "19",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
