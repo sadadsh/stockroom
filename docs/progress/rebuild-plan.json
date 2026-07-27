@@ -588,11 +588,16 @@
        "t": "Dead space in the assets column while the specs column overflows past the fold",
        "done": false,
        "evidence": ""
+      },
+      {
+       "t": "Derived description is polluted with distributor part numbers - real Mouser evidence for TPS62130RGTR derives to \"Switching Voltage Regulators 3-17V 3A SD Cnvrtr A 595-TPS62130RGTT A A 595-T...\". Visible only because a REAL payload was used; a tidy fixture hides it.",
+       "done": false,
+       "evidence": ""
       }
      ]
     }
    ]
   }
  ],
- "updated": "2026-07-27 05:10 UTC"
+ "updated": "2026-07-27 05:25 UTC"
 }
