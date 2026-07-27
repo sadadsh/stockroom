@@ -249,4 +249,19 @@ def ingest_router(require_token) -> APIRouter:
 
         return EventSourceResponse(gen())
 
+    @r.post("/jobs/{job_id}/stop")
+    def job_stop(request: Request, job_id: str) -> dict:
+        """Ask a long job to stop at its next safe point.
+
+        Cooperative, so the WORKER picks the boundary -- for a library-wide completion run
+        that is between two parts, never inside one, and each part is its own atomic commit.
+        A stopped run therefore leaves the library exactly as a finished one would, with
+        fewer parts done. Resolving the job first makes an unknown id an honest 404 rather
+        than a silent success.
+        """
+        ctx = request.app.state.ctx
+        ctx.jobs.get(job_id)
+        ctx.jobs.request_stop(job_id)
+        return {"job_id": job_id, "stopping": True}
+
     return r
