@@ -22,6 +22,47 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390070"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/skyworks/images/skyworks_msop10_spl.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/7228/MFG_863%7E10MSOP-3%7EGT%7E10.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "84 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+85℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 85°C"
       }
     ],
     "Packaging": [
@@ -36,6 +77,18 @@
         "value": "Tube"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Clock Generators & Support Products"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +99,23 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Voltage - Supply": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1.71V~3.6V"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "1.71V ~ 3.6V"
       }
     ],
     "datasheet_url": [
@@ -70,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Clock Generators & Support Products I2C program, any-frequency, any-output, Xtal reference, 3-output LVCMOS clock generator"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC CLOCK GENERATOR 10MSOP"
       }
     ],
     "manufacturer": [
@@ -177,6 +252,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Differential - Input:Output": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "DigiKey Programmable": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Divider/Multiplier": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "medium",
       "source": "lcsc"
@@ -196,6 +283,10 @@
     "Flash Sale Product Po": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Frequency - Max": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -240,6 +331,10 @@
     "Image": {
       "confidence": "medium",
       "source": "mouser"
+    },
+    "Input": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Is Cable Category": {
       "confidence": "medium",
@@ -317,6 +412,18 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Number of Circuits": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Outputs": {
       "confidence": "medium",
       "source": "lcsc"
@@ -329,6 +436,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Output": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Output Frequency(Max)": {
       "confidence": "medium",
       "source": "lcsc"
@@ -337,9 +448,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "PLL": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Package Quantity": {
       "confidence": "medium",
@@ -348,6 +467,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -389,6 +512,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Ratio - Input:Output": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Reel Setup Fee": {
       "confidence": "medium",
       "source": "lcsc"
@@ -396,6 +527,10 @@
     "RoHS": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Series": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Standard Pack Qty": {
       "confidence": "high",
@@ -416,6 +551,14 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Type": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Unit": {
       "confidence": "medium",
@@ -486,6 +629,98 @@
       "stock": 2623,
       "url": "https://www.lcsc.com/product-detail/C504891.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:40.971201+00:00",
+      "part_number": "634-SI5351A-B-GT",
+      "price_breaks": [
+        {
+          "price": 2.19,
+          "qty": 1
+        },
+        {
+          "price": 1.62,
+          "qty": 10
+        },
+        {
+          "price": 1.33,
+          "qty": 25
+        },
+        {
+          "price": 1.26,
+          "qty": 95
+        },
+        {
+          "price": 1.23,
+          "qty": 285
+        },
+        {
+          "price": 1.19,
+          "qty": 570
+        },
+        {
+          "price": 1.15,
+          "qty": 1045
+        },
+        {
+          "price": 1.12,
+          "qty": 2565
+        },
+        {
+          "price": 1.09,
+          "qty": 5035
+        }
+      ],
+      "stock": 3232,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:40.971201+00:00",
+      "part_number": "336-2399-5-ND",
+      "price_breaks": [
+        {
+          "price": 2.19,
+          "qty": 1
+        },
+        {
+          "price": 1.621,
+          "qty": 10
+        },
+        {
+          "price": 1.32526,
+          "qty": 95
+        },
+        {
+          "price": 1.26584,
+          "qty": 190
+        },
+        {
+          "price": 1.23611,
+          "qty": 285
+        },
+        {
+          "price": 1.19246,
+          "qty": 570
+        },
+        {
+          "price": 1.16069,
+          "qty": 1045
+        },
+        {
+          "price": 1.12252,
+          "qty": 2565
+        },
+        {
+          "price": 1.09957,
+          "qty": 5035
+        }
+      ],
+      "stock": 11521,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -500,11 +735,15 @@
     "Country of Origin": "Malaysia",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Differential - Input:Output": "No/No",
+    "DigiKey Programmable": "Not Verified",
+    "Divider/Multiplier": "Yes/No",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/118a205096a1444195e08feff716c648.svg?t=1706802142",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/f335a5e2195241f8ba0312cf5bf73c51.svg?t=1706802142",
     "Features": "On-chip VCO/DCO;Built-in phase-locked loop;Spread spectrum;Protocol-specific clock generation",
     "Flash Sale Product Po": "{\"recommendId\": 255022, \"recommendCode\": \"TL2607220356\", \"productId\": 519851, \"productCode\": \"C504891\", \"productModel\": \"SI5351A-B-GTR\", \"brandId\": 197, \"brandNameEn\": \"SILICON LABS\", \"recommendLevel\": \"A\", \"sellPrice\": 0.7548, \"usdPrice\": 0.7548, \"sellCurrencyType\": \"USD\", \"currencySymbol\": \"$\", \"arriveDays\": 10, \"recommendNumber\": 10000, \"minOrderNum\": 5000, \"validNumber\": 10000, \"warehouseCode\": \"zh\", \"expiredTime\": \"2026-08-01 23:59:59\", \"expiredSeconds\": 485449188, \"isOnsale\": true, \"deliveryTimeWayDays\": [11, 13], \"isShowForeignPrice\": true, \"productBatchCode\": null, \"productBatchCodeEn\": null, \"isRealPrice\": true, \"productImageUrl\": \"https://assets.lcsc.com/images/lcsc/96x96/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg\", \"productImageUrlBig\": \"https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg\", \"split\": 2500, \"encapStandard\": \"MSOP-10\", \"isReel\": true, \"reelPrice\": 3, \"productIntroEn\": \"1.71V~3.6V 200MHz CMOS 3 MSOP-10 Clock Generators, PLLs, Frequency Synthesizers RoHS\", \"isEnvironment\": true, \"catalogId\": 11109, \"catalogName\": \"Clock Generators, PLLs, Frequency Synthesizers\", \"parentCatalogId\": 493, \"parentCatalogName\": \"Clock/Timing\", \"productArrange\": \"Tape & Reel (TR)\", \"weight\": 0.287, \"minPacketNumber\": 2500, \"minPacketUnit\": \"Reel\", \"isHot\": false, \"productCodeHighlight\": null, \"productModelHighlight\": null, \"isAsianBrand\": null, \"firstWmCatalogId\": 17, \"firstWmCatalogNameEn\": \"Integrated Circuits (ICs)\", \"secondWmCatalogId\": 256, \"secondWmCatalogNameEn\": \"Clock/Timing\", \"thirdWmCatalogId\": 925, \"thirdWmCatalogNameEn\": \"Clock Generators, PLLs, Frequency Synthesizers\", \"fourthWmCatalogId\": null, \"fourthWmCatalogNameEn\": null, \"fifthWmCatalogId\": null, \"fifthWmCatalogNameEn\": null, \"sixthWmCatalogId\": null, \"sixthWmCatalogNameEn\": null, \"wmCatalogId\": 925, \"wmCatalogNameEn\": \"Clock Generators, PLLs, Frequency Synthesizers\"}",
+    "Frequency - Max": "200MHz",
     "HTS Code (BR)": "85423999",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
@@ -516,6 +755,7 @@
     "HTS Code (US)": "8542390001",
     "Has Third Party Stock": "No",
     "Image": "https://www.mouser.com/images/skyworks/images/skyworks_msop10_spl.jpg",
+    "Input": "Crystal",
     "Is Cable Category": "No",
     "Is Foreign Display": "Yes",
     "Is Foreign Onsale": "Yes",
@@ -535,14 +775,21 @@
     "Lead Time": "84 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Type": "Surface Mount",
+    "Number of Circuits": "2",
     "Number of Outputs": "3",
     "Operating Temperature": "-40℃~+85℃",
     "Order Multiple": "1",
+    "Output": "LVCMOS",
     "Output Frequency(Max)": "200MHz",
     "Output Level": "CMOS",
+    "PLL": "Yes",
     "Package": "MSOP-10",
+    "Package / Case": "10-TFSOP, 10-MSOP (0.118\", 3.00mm Width)",
     "Package Quantity": "2500",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tube",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "493",
     "Period Jitter, Peak-to-Peak": "70ps;70ps",
@@ -553,13 +800,18 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20251016_SILICON-LABS-SI5351A-B-GTR_C504891_blank.jpg",
+    "REACH": "REACH Unaffected",
+    "Ratio - Input:Output": "1:3",
     "Reel Setup Fee": "3",
     "RoHS": "Yes",
+    "Series": "MultiSynth™",
     "Standard Pack Qty": "95",
     "Stock": "8896",
     "Stock (Domestic)": "8896",
     "Stock (Overseas)": "8896",
     "Stock (Shenzhen)": "8896",
+    "Supplier Device Package": "10-MSOP",
+    "Type": "Clock Generator",
     "Unit": "Piece",
     "Unit Weight (kg)": "0.0001432",
     "Voltage - Supply": "1.71V~3.6V",
