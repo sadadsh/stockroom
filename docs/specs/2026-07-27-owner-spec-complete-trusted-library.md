@@ -294,3 +294,38 @@ and a driven desktop app. Everything else about acquisition waits on it.
 
 **Do NOT propose LCSC/EasyEDA again.** Owner ruled it out explicitly; it is also KiCad-only, so it
 could never satisfy the Altium half regardless.
+
+### DECIDED 2026-07-27: SamacSys primary, Ultra Librarian fallback, SnapMagic NOT USED
+
+Owner's own research, which settles it:
+
+> *"Ultra Librarian: Offers the widest raw collection of manufacturer-verified models. They partner
+> directly with large semiconductor companies (like Texas Instruments and Analog Devices) to build
+> models straight from the source. SnapMagic (formerly SnapEDA): Hosts a massive database of
+> millions of parts but heavily blends manufacturer data with community-built and AI-generated
+> models. SamacSys: Possesses a smaller independent footprint but is deeply integrated into Mouser
+> Electronics and RS Components. If a part is on Mouser, its SamacSys-powered model is usually
+> available instantly."*
+
+**SnapMagic is DISQUALIFIED as a primary source** despite being the only one with a usable API.
+Its models blend community-built and AI-GENERATED content, which is precisely the defect the owner
+reported ("a lot of our symbols, footprints, and 3d models are broken so its not trusted where
+we've gotten them"). Automating against it would have bought speed at the cost of the one property
+that matters. Recorded so no future session re-proposes it for its API.
+
+**SamacSys is PRIMARY, and its "smaller database" is not a limitation HERE.** The owner buys from
+Mouser and trusts Mouser most; SamacSys IS Mouser's model provider. So for this library, SamacSys
+coverage and the purchasable set are the same set by construction - the register is a Mouser
+register. "Smaller in absolute terms" is irrelevant when the subset it covers is exactly the subset
+being bought.
+
+**Ultra Librarian is the FALLBACK**, for anything Mouser does not carry. Highest verification of
+the three (built from source with the manufacturer), widest raw coverage, but no public API - so it
+is the second call, not the first.
+
+Both chosen sources are manufacturer-verified. That is what "trusted" means for this project.
+
+**Open, and it gates the build:** whether SamacSys downloads can be automated (a predictable
+per-part URL on a logged-in session) or whether the Library Loader desktop app is the only path.
+This repo already drives a desktop app headlessly (`altium/driver.py`), so either answer is
+workable; the answer decides which.
