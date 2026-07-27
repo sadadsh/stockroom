@@ -38,7 +38,7 @@ export function useGuidedCapture(partId: string, needs: Requirement[] = [], part
     backgrounded,
     kicadComplete: subsetComplete(activeNeeds, received, KICAD_REQS),
     altiumComplete: subsetComplete(activeNeeds, received, ALTIUM_REQS),
-    start: () => cap.start(partId, partName, needs),
+    start: (sourceKey?: string) => cap.start(partId, partName, needs, sourceKey),
     submitPaths: (paths: string[]) => cap.submitPaths(partId, partName, needs, paths),
     reset: () => cap.reset(),
     keepWorking: () => cap.keepWorking(),

@@ -368,16 +368,38 @@ def library_router(require_token) -> APIRouter:
 
         record = ctx.ops.load_record(part_id)
         needs = [req.value for req in capture_needs(record)]
-        # DigiKey is the single CAD source: a part's DigiKey page gathers the SnapEDA / Ultra
-        # Librarian / SamacSys CAD downloads in ONE place. When the API resolves an exact product
-        # page we open that; otherwise the resolver falls back to a DigiKey keyword search, so a
-        # part with an mpn ALWAYS opens a real DigiKey page even with no DigiKey creds.
-        from stockroom.enrich.cad_source import resolve_digikey_cad_source
+        # EVERY vendor the owner named, in their trust order, not just the one that aggregates.
+        # Owner, 2026-07-27: *"yes rebuild guided capture, digikey UL snapmagic and samacsys"*.
+        # DigiKey leads only because its product page gathers the other three in one place, which
+        # is fewer clicks when the part is stocked there; it is flagged `aggregator` so a surface
+        # can say so rather than imply a fourth model library. `resolve_cad_sources` percent-encodes
+        # the MPN for each vendor, and a part with no MPN resolves to NOTHING rather than to four
+        # searches for the empty string.
+        from stockroom.enrich.cad_sources import resolve_cad_sources
 
         digikey = next((a for a in build_refresh_adapters(ctx)
                         if getattr(a, "vendor", "") == "DigiKey"), None)
-        url = resolve_digikey_cad_source(record.mpn, digikey)
-        return {"url": url, "mpn": record.mpn, "vendor": "DigiKey", "needs": needs}
+        sources = resolve_cad_sources(record.mpn, digikey)
+        first = sources[0] if sources else None
+        return {
+            "mpn": record.mpn,
+            "needs": needs,
+            "sources": [
+                {
+                    "key": s.key,
+                    "label": s.label,
+                    "url": s.url,
+                    "tools": list(s.tools),
+                    "aggregator": s.aggregator,
+                    "instruction": s.instruction,
+                }
+                for s in sources
+            ],
+            # The first source, flattened. Kept because the capture store opens ONE page and this
+            # is the default it opens; it is the same object as `sources[0]`, never a second answer.
+            "url": first.url if first else None,
+            "vendor": first.label if first else "",
+        }
 
     @r.get("/lfs")
     def get_library_lfs(request: Request) -> dict:

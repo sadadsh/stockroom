@@ -85,12 +85,41 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
+// The real DTO: every vendor in the owner's trust order, plus the flattened head.
+const CAD_SOURCES = [
+  {
+    key: "digikey", label: "DigiKey",
+    url: "https://www.digikey.com/en/products/result?keywords=BQ24074",
+    tools: ["kicad", "altium"], aggregator: true,
+    instruction: "Open the CAD Models section, then download for KiCad and for Altium.",
+  },
+  {
+    key: "ultralibrarian", label: "Ultra Librarian",
+    url: "https://www.ultralibrarian.com/search?queryText=BQ24074",
+    tools: ["kicad", "altium"], aggregator: false,
+    instruction: "Pick the part, choose KiCad and Altium as the export formats, then Download.",
+  },
+  {
+    key: "samacsys", label: "SamacSys",
+    url: "https://componentsearchengine.com/search/BQ24074",
+    tools: ["kicad", "altium"], aggregator: false,
+    instruction: "Open the part, then download the KiCad and Altium models.",
+  },
+  {
+    key: "snapmagic", label: "SnapMagic",
+    url: "https://www.snapeda.com/search/?q=BQ24074",
+    tools: ["kicad", "altium"], aggregator: false,
+    instruction: "Check the model is manufacturer-verified, then download for KiCad and Altium.",
+  },
+];
+
 function mockCadSource(needs: string[]) {
   vi.spyOn(api, "partCadSource").mockResolvedValue({
-    url: "https://www.digikey.com/en/products/result?keywords=BQ24074",
+    url: CAD_SOURCES[0].url,
     mpn: "BQ24074",
     vendor: "DigiKey",
     needs,
+    sources: CAD_SOURCES,
   } as never);
 }
 
@@ -283,5 +312,102 @@ describe("CompletePartModal - copy + icon adoption", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     toggleDevMode();
     expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
+  });
+});
+
+// ------------------------------------------------------- choosing WHERE the files come from
+//
+// The control the four-vendor module existed for and nothing rendered. Before this the route
+// resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
+// model had no way to say so.
+
+const RENDER = () =>
+  render(<CompletePartModal detail={DETAIL} hasModel={true} onClose={() => {}} />, { wrapper });
+
+// The picker's own buttons, found through the group's heading rather than a testid: this repo
+// carries `data-dev-id`, not `data-testid`, and querying the wrong attribute is a test that fails
+// for a reason unrelated to the thing it is about.
+const vendorGroup = () =>
+  screen.getByText("Download From").parentElement!.querySelector("div")!.parentElement!;
+const vendorButton = (name: RegExp) =>
+  within(vendorGroup()).getByRole("button", { name });
+
+describe("CompletePartModal - vendor choice", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("offers every vendor, in the owner's trust order", async () => {
+    mockCadSource(["kicad_symbol", "altium_symbol"]);
+    RENDER();
+    await screen.findByText("Download From");
+
+    const names = within(vendorGroup())
+      .getAllByRole("button")
+      .map((b) => b.textContent!.replace("hosts all three", "").trim());
+    expect(names).toEqual(["DigiKey", "Ultra Librarian", "SamacSys", "SnapMagic"]);
+  });
+
+  it("says DigiKey HOSTS the others rather than implying a fourth library", async () => {
+    mockCadSource(["kicad_symbol"]);
+    RENDER();
+    await screen.findByText("Download From");
+
+    expect(vendorButton(/DigiKey/)).toHaveTextContent("hosts all three");
+    expect(vendorButton(/SamacSys/)).not.toHaveTextContent("hosts all three");
+  });
+
+  it("opens the vendor that was CHOSEN, not the default", async () => {
+    mockCadSource(["kicad_symbol"]);
+    const opened: string[] = [];
+    const open = vi.fn((url: string) => {
+      opened.push(url);
+      return Promise.resolve("tok");
+    });
+    (window as unknown as { pywebview: { api: { open_cad_download: typeof open } } }).pywebview = {
+      api: { open_cad_download: open },
+    };
+    RENDER();
+    await screen.findByText("Download From");
+
+    await userEvent.click(vendorButton(/Ultra Librarian/));
+    await userEvent.click(screen.getByRole("button", { name: "Get Files" }));
+
+    await waitFor(() => expect(opened).toHaveLength(1));
+    expect(opened[0]).toContain("ultralibrarian.com");
+  });
+
+  it("remembers the choice, because over 90 parts one decision beats ninety", async () => {
+    mockCadSource(["kicad_symbol"]);
+    const { unmount } = RENDER();
+    await screen.findByText("Download From");
+    await userEvent.click(vendorButton(/SamacSys/));
+    unmount();
+
+    mockCadSource(["kicad_symbol"]);
+    RENDER();
+    await screen.findByText("Download From");
+
+    expect(vendorButton(/SamacSys/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("falls back to the trust order's head when the remembered vendor is not offered", async () => {
+    // A stored key from a build that knew a vendor this one does not must not open nowhere.
+    window.localStorage.setItem("stockroom.capture.vendor", "a-vendor-that-retired");
+    mockCadSource(["kicad_symbol"]);
+    RENDER();
+    await screen.findByText("Download From");
+
+    expect(vendorButton(/DigiKey/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("names the CHOSEN vendor in the subline, so the sentence matches the button", async () => {
+    mockCadSource(["kicad_symbol"]);
+    RENDER();
+    await screen.findByText("Download From");
+
+    await userEvent.click(vendorButton(/SnapMagic/));
+
+    expect(await screen.findByText(/from SnapMagic\.?$/)).toBeInTheDocument();
   });
 });

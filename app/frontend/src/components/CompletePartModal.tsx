@@ -7,10 +7,10 @@
  * moving while the files land. Applying a row routes to the same seams the detail uses (attach /
  * edit-field / guided capture), so the record stays the single source of truth.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
-import type { PartDetail, Requirement } from "../api/types";
+import type { CadSource, PartDetail, Requirement } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
 import { useToast } from "../lib/toast";
@@ -30,6 +30,28 @@ interface Props {
 }
 
 // The registry check glyph (dev-mode editable), sized for the small badge slots here.
+// The chosen vendor, remembered. Deliberately localStorage and not a machine-config field: it is a
+// per-person habit that changes nothing another device would render differently, which is the one
+// case the device-parity rule allows per-machine state. Reads are guarded because the WebView2
+// host has denied storage before, and a capture flow must not die for a preference.
+const VENDOR_PREF_KEY = "stockroom.capture.vendor";
+
+function readVendorPref(): string | null {
+  try {
+    return window.localStorage.getItem(VENDOR_PREF_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeVendorPref(key: string): void {
+  try {
+    window.localStorage.setItem(VENDOR_PREF_KEY, key);
+  } catch {
+    /* a denied storage must not break the capture */
+  }
+}
+
 const CheckMark = () => <Icon id="modal.check" className="h-2.5 w-2.5" />;
 
 // A segmented meter: one cell per needed file, filling as each lands. The discrete cells read
@@ -160,6 +182,68 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
 }
 
 // A needs-accurate one-liner: never promise KiCad when only Altium is missing (or vice versa).
+/**
+ * WHERE the files come from. One row per vendor, in the owner's trust order.
+ *
+ * This is the control the whole four-vendor module existed for and nothing rendered: the route
+ * resolved a single DigiKey link, so a person who wanted Ultra Librarian's manufacturer-verified
+ * model had no way to say so. The owner's trust ranking is not decoration -- SnapMagic blends
+ * community and automatically generated models, which is exactly the defect that started the trust
+ * workstream, so it must be VISIBLY last and never the silent default.
+ *
+ * The choice STICKS (localStorage). Over a 90-part sitting, re-picking a vendor per part is 90
+ * extra decisions, and the whole point of this surface is that every click is multiplied by 90.
+ */
+function VendorPicker({
+  sources,
+  value,
+  onChange,
+  disabled,
+}: {
+  sources: CadSource[];
+  value: string;
+  onChange: (key: string) => void;
+  disabled: boolean;
+}) {
+  if (sources.length < 2) return null;
+  return (
+    <div className="mt-3" data-dev-id="complete.cad-vendor">
+      <div className="mb-1.5 text-2xs font-medium uppercase tracking-wide text-t3">
+        <Text id="modal.completePart.vendor">Download From</Text>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {sources.map((v) => {
+          const active = v.key === value;
+          return (
+            <button
+              key={v.key}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(v.key)}
+              aria-pressed={active}
+              title={v.instruction}
+              className={
+                "rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
+                "disabled:opacity-50 disabled:cursor-not-allowed " +
+                (active
+                  ? "border-acc bg-acc/[0.14] text-t1"
+                  : "border-line2 bg-raise2 text-t2 hover:text-t1")
+              }
+            >
+              {v.label}
+              {v.aggregator ? (
+                <span className="ml-1.5 text-2xs font-normal text-t3">
+                  <Text id="modal.completePart.vendor-hosts">hosts all three</Text>
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function needsSubline(hasKicad: boolean, hasAltium: boolean, vendor: string): string {
   if (hasKicad && hasAltium) return `Get its KiCad and Altium libraries from ${vendor}.`;
   if (hasAltium) return `Get its Altium symbol and footprint from ${vendor}.`;
@@ -250,6 +334,20 @@ export function CompletePartModal({
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);
+  const cadSources = useMemo<CadSource[]>(() => cadSource.data?.sources ?? [], [cadSource.data]);
+  // The chosen vendor persists across parts and across launches: over a 90-part sitting, one
+  // decision beats ninety. Falls back to the head of the backend's trust order whenever the
+  // stored key is absent from what this part actually offers.
+  const [vendorPref, setVendorPref] = useState<string>(
+    () => readVendorPref() ?? "",
+  );
+  const vendorKey =
+    cadSources.find((v) => v.key === vendorPref)?.key ?? cadSources[0]?.key ?? "";
+  const chosen = cadSources.find((v) => v.key === vendorKey) ?? null;
+  const pickVendor = useCallback((key: string) => {
+    setVendorPref(key);
+    writeVendorPref(key);
+  }, []);
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
   const { toast } = useToast();
@@ -420,13 +518,22 @@ export function CompletePartModal({
                           : needsSubline(
                               kicadRows.length > 0 || sharedRows.length > 0,
                               altiumRows.length > 0,
-                              cadSource.data?.vendor ?? "DigiKey",
+                              chosen?.label ?? "a model library",
                             )}
                       </div>
                     </div>
                   </div>
                   <SegmentMeter needs={needs} received={download.received} done={isDone} />
                 </div>
+
+                {!isDone ? (
+                  <VendorPicker
+                    sources={cadSources}
+                    value={vendorKey}
+                    onChange={pickVendor}
+                    disabled={cadBusy}
+                  />
+                ) : null}
 
                 <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
                   {kicadRows.length > 0 ? (
@@ -461,13 +568,13 @@ export function CompletePartModal({
                 ) : null}
 
                 <div data-dev-id="complete.cad-actions" className="mt-3 flex flex-wrap items-center gap-2">
-                  {cadSource.data?.url && !isDone ? (
+                  {chosen && !isDone ? (
                     <Button
                       variant="accent"
                       small
                       icon={<DownloadIcon className="h-3.5 w-3.5" />}
                       disabled={cadBusy}
-                      onClick={() => void download.start()}
+                      onClick={() => void download.start(vendorKey)}
                     >
                       <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
                     </Button>
@@ -477,7 +584,7 @@ export function CompletePartModal({
                     // so it becomes the primary; otherwise it stays the quiet manual fallback.
                     <Button
                       small
-                      variant={cadSource.data?.url ? undefined : "accent"}
+                      variant={chosen ? undefined : "accent"}
                       disabled={cadBusy}
                       onClick={() => void browse()}
                     >

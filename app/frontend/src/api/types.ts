@@ -503,12 +503,36 @@ export type Requirement =
   | "altium_symbol"
   | "altium_footprint";
 
+// ONE vendor's page for one part, and what the person has to do when they get there.
+export interface CadSource {
+  // "digikey" | "ultralibrarian" | "samacsys" | "snapmagic"
+  key: string;
+  label: string;
+  url: string;
+  // Which EDA tools this vendor can actually export for. The owner needs BOTH, and a vendor that
+  // cannot emit Altium must say so rather than send someone to a page that can never satisfy the
+  // requirement they are working on.
+  tools: string[];
+  // True when the vendor merely HOSTS models other libraries built (DigiKey shows SnapEDA / Ultra
+  // Librarian / SamacSys downloads on its product pages) rather than authoring them. Data, so a
+  // surface can label it honestly instead of implying a fourth library.
+  aggregator: boolean;
+  // Per-vendor, because "click Download" is not the same journey on a distributor product page as
+  // on a model library's part page.
+  instruction: string;
+}
+
 export interface CadSourceResponse {
-  url: string | null;
   mpn: string;
-  vendor: string;
   // The requirements this part is missing, so the guided checklist knows what to fill.
   needs: Requirement[];
+  // Every vendor this part can be fetched from, in the owner's trust order. EMPTY when the part
+  // has no MPN: sending someone to a search for "" is worse than telling them there is nowhere.
+  sources: CadSource[];
+  // The first source, flattened -- the page a capture opens by default. The SAME object as
+  // `sources[0]`, never a second answer.
+  url: string | null;
+  vendor: string;
 }
 
 // Bulk MPN / BOM-CSV enrichment triage (POST /api/enrich/bulk, spec section 8.1). Each item
