@@ -141,7 +141,25 @@
   },
   "description": "16V 20A@8/20us 350W@8/20us 6V Unidirectional 3.3V SOD-323 TVS Diodes RoHS",
   "display_name": "ESD Protection Diode SOD-323",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TSD03DYFR"
+      },
+      "model": {
+        "file": "models/TSD03DYFR.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "TSD03DYFR"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
