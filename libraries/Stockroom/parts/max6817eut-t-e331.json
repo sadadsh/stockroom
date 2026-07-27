@@ -97,31 +97,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "MAX6817EUT+T"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/MAX6817EUT+T.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "MAX6817EUT+T"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "max6817eut-t-e331.pdf",

@@ -213,31 +213,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "BSS138"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/BSS138.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Transistors",
-          "name": "BSS138"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "bss138-8921.pdf",

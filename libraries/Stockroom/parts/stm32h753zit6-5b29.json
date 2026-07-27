@@ -97,31 +97,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "STM32H753ZIT6"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/STM32H753ZIT6.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "STM32H753ZIT6"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "stm32h753zit6-5b29.pdf",

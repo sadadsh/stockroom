@@ -97,31 +97,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "PCA9955BTWJ"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/PCA9955BTWJ.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "PCA9955BTWJ"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "pca9955btwj-bc92.pdf",
