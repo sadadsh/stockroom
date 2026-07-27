@@ -312,3 +312,148 @@ def test_a_passive_whose_package_cannot_be_resolved_is_not_forced():
     report = bulk_import(["81-MYSTERYCAP"], pipe, ops, index=_index({}))
     assert ops.passives == []
     assert report.items[0].assets in ("none", "")
+
+
+# --------------------------------------------------------------------------- #
+# The LCSC lane: real symbol + footprint + 3D for a NON-passive, with no login.
+# `ingest/lcsc.py` already converts an LCSC part number through easyeda2kicad; enrichment
+# already resolves that id (69 of the owner's first 96 cached parts carry one). This is the
+# wiring between them, and it is what gets files onto the ICs, connectors and diodes.
+# --------------------------------------------------------------------------- #
+
+
+def _lcsc_candidate(tmp_path):
+    """What ingest's LCSC fetch produces: a candidate carrying real asset FILES."""
+    from stockroom.ingest.staging import StagingCandidate
+
+    sym = tmp_path / "lcsc.kicad_sym"
+    sym.write_text("(kicad_symbol_lib)", encoding="utf-8")
+    fp = tmp_path / "lcsc.kicad_mod"
+    fp.write_text("(footprint)", encoding="utf-8")
+    model = tmp_path / "lcsc.step"
+    model.write_bytes(b"ISO-10303-21;")
+    return StagingCandidate(
+        vendor="lcsc", symbol_lib_path=sym, symbol_name="C7666",
+        footprint_variants=[fp], model_path=model,
+        display_name="C7666", entry_name="C7666", category="Other",
+    )
+
+
+def _lcsc_pipeline(tmp_path):
+    from stockroom.model.part import Provenance, Purchase
+
+    class _P:
+        def resolve_to_mpn(self, query):
+            from stockroom.enrich.pipeline import ResolvedQuery
+
+            return ResolvedQuery(mpn="SN74LVC1G08DBVR", query=query,
+                                 vendor="mouser", resolved=True)
+
+        def enrich_candidate(self, candidate, overwrite=None):
+            candidate.manufacturer = "TI"
+            candidate.description = "2-input AND, SOT-23-5"
+            candidate.category = "ICs"
+            candidate.datasheet_path = tmp_path / "d.pdf"
+            candidate.provenance = Provenance(source="lcsc", source_url="https://ds/x.pdf")
+            # the LCSC product page IS the purchase link enrichment lands (measured)
+            candidate.purchase = [
+                Purchase(vendor="scrape", url="https://www.lcsc.com/product-detail/C7666.html")
+            ]
+            return candidate
+
+    return _P()
+
+
+def test_a_non_passive_gets_real_files_from_its_lcsc_id(tmp_path):
+    (tmp_path / "d.pdf").write_bytes(b"%PDF-")
+    seen = []
+
+    def cad_source(lcsc_id):
+        seen.append(lcsc_id)
+        return _lcsc_candidate(tmp_path)
+
+    ops = _PassiveOps()
+    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops,
+                         index=_index({}), cad_source=cad_source)
+
+    assert seen == ["C7666"], "the LCSC id must be read out of the enriched purchase link"
+    item = report.items[0]
+    assert item.status == "added"
+    assert item.assets == "lcsc"
+    staged = ops.plain[0]
+    assert staged.symbol_source is not None
+    assert staged.footprint_source is not None
+    assert staged.model_source is not None, "the 3D model is the part the owner asked about"
+    # the ENRICHED identity wins over the converter's placeholder
+    assert staged.mpn == "SN74LVC1G08DBVR"
+    assert staged.manufacturer == "TI"
+    assert staged.entry_name, "a staged symbol needs an entry name or add_part refuses it"
+
+
+def test_a_failing_cad_fetch_never_loses_the_part(tmp_path):
+    """easyeda2kicad can fail (no LCSC entry, a bad convert, no network). The part must still
+    land on its identity and be REPORTED as needing a capture, never dropped."""
+    (tmp_path / "d.pdf").write_bytes(b"%PDF-")
+
+    def cad_source(lcsc_id):
+        raise RuntimeError("easyeda2kicad failed: no such component")
+
+    ops = _PassiveOps()
+    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops,
+                         index=_index({}), cad_source=cad_source)
+    assert report.items[0].status == "added"
+    assert report.items[0].assets == "none"
+    assert len(ops.plain) == 1
+
+
+def test_no_cad_source_configured_is_not_an_error(tmp_path):
+    """The lane is optional: with no fetcher the import still works, parts just land file-less."""
+    (tmp_path / "d.pdf").write_bytes(b"%PDF-")
+    ops = _PassiveOps()
+    report = bulk_import(["595-SN74LVC1G08DBVR"], _lcsc_pipeline(tmp_path), ops, index=_index({}))
+    assert report.items[0].status == "added"
+    assert report.items[0].assets == "none"
+
+
+def test_a_passive_never_takes_the_lcsc_lane(tmp_path):
+    """KiCad's own stock footprint is authoritative for a jellybean; a converted one is not.
+    The passive lane must win, and must not spend a conversion."""
+    calls = []
+    report = bulk_import(["81-GRM155R71C104KA88D"],
+                         _PassivePipeline({"81-GRM155R71C104KA88D": "GRM155R71C104KA88D"}),
+                         _PassiveOps(), index=_index({}),
+                         cad_source=lambda i: calls.append(i))
+    assert calls == []
+    assert report.items[0].assets == "kicad-stock"
+
+
+def test_the_index_is_re_read_per_part_not_captured_for_the_whole_run(tmp_path):
+    """MEASURED ON THE OWNER'S REAL APP: 37 of 166 parts failed with "Cannot operate on a closed
+    database". A 166-part run takes ~28 minutes, and the background sync loop rebuilds the
+    library index while it runs - which CLOSES the sqlite connection the run captured at the
+    start. Holding a live handle across a long job is the bug; the lookup must be re-read each
+    time so a rebuild mid-run is invisible.
+    """
+    ds = tmp_path / "d.pdf"
+    ds.write_bytes(b"%PDF-")
+
+    class _Rebuilding:
+        """Stands in for ctx.index being swapped out underneath the run."""
+
+        def __init__(self):
+            self.closed = False
+            self.calls = 0
+
+        def find_by_mpn(self, mpn):
+            self.calls += 1
+            if self.closed:
+                raise RuntimeError("Cannot operate on a closed database.")
+            if self.calls >= 1:
+                self.closed = True  # a rebuild happens right after the first lookup
+            return []
+
+    live = {"index": _Rebuilding()}
+    pipe = _Pipeline(fill={"A": _complete(ds), "B": _complete(ds)})
+    report = bulk_import(["A", "B"], pipe, _Ops(),
+                         index=lambda: live.__setitem__("index", _Rebuilding()) or live["index"])
+    assert [i.status for i in report.items] == ["added", "added"]
