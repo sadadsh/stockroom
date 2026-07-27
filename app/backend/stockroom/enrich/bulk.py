@@ -161,6 +161,8 @@ class ImportReport:
 
 
 def _candidate_for(mpn: str, category: str) -> StagingCandidate:
+    from stockroom.model.part import Provenance
+
     return StagingCandidate(
         vendor="bulk",
         symbol_lib_path=None,
@@ -170,6 +172,12 @@ def _candidate_for(mpn: str, category: str) -> StagingCandidate:
         mpn=mpn,
         display_name=mpn,
         entry_name=mpn,
+        # A Provenance MUST exist before enrichment runs. `enrich_candidate` records the pulled
+        # datasheet URL only `if candidate.provenance is not None`, so a candidate without one
+        # silently loses it - and the datasheet is a required passport field. MEASURED on the
+        # owner's real library: 76 of 166 parts landed "Needs More / Missing datasheet" with
+        # their symbol, footprint and 3D already resolved, blocked on this one dropped string.
+        provenance=Provenance(source="bulk"),
     )
 
 
