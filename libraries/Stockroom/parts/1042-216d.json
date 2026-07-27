@@ -138,31 +138,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "1042"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/1042.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "1042"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "1042-216d.pdf",

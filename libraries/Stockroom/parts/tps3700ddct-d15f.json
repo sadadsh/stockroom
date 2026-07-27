@@ -109,31 +109,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "TPS3700DDCT"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/TPS3700DDCT.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Other",
-          "name": "TPS3700DDCT"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tps3700ddct-d15f.pdf",

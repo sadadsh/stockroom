@@ -61,31 +61,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "DRV2605LDGSR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/DRV2605LDGSR.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "DRV2605LDGSR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "drv2605ldgsr-7a7f.pdf",

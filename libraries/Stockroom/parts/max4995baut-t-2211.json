@@ -109,31 +109,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Switches",
-          "name": "MAX4995BAUT+T"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/MAX4995BAUT+T.step",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Switches",
-          "name": "MAX4995BAUT+T"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "max4995baut-t-2211.pdf",

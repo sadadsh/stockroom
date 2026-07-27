@@ -73,48 +73,7 @@
       }
     ]
   },
-  "assets": {
-    "altium": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "sn74lvc1g08dbvr.PcbLib",
-          "name": "DBV0005A_N"
-        }
-      },
-      "model": null,
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "sn74lvc1g08dbvr.SchLib",
-          "name": "SN74LVC1G08DBVR"
-        }
-      }
-    },
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "SN74LVC1G08DBVR"
-        }
-      },
-      "model": {
-        "ref": {
-          "file": "models/SN74LVC1G08DBVR.stp",
-          "lib": "",
-          "name": ""
-        }
-      },
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-ICs",
-          "name": "SN74LVC1G08DBVR"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "",

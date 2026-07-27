@@ -196,25 +196,7 @@
       }
     ]
   },
-  "assets": {
-    "kicad": {
-      "footprint": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "TSW-120-07-G-D"
-        }
-      },
-      "model": null,
-      "symbol": {
-        "ref": {
-          "file": "",
-          "lib": "SR-Connectors",
-          "name": "TSW-120-07-G-D"
-        }
-      }
-    }
-  },
+  "assets": {},
   "datasheet": {
     "fetched_at": "",
     "file": "tsw-120-07-g-d-4560.pdf",
