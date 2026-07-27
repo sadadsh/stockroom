@@ -100,22 +100,28 @@ export function CadClearSection() {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          // The page-level TRIGGER is quiet; the loud solid `danger` is reserved for the
-          // in-modal confirm, which is the committed action.
-          variant="ghost-danger"
-          onClick={() => setConfirming(true)}
-          disabled={job.status === "running" || cleared === 0}
-          data-dev-id="settings.cad-clear.run"
-        >
-          {job.status === "running" ? "Removing" : "Remove All CAD Files"}
-        </Button>
-        <p className="text-sm text-t2">
-          Lands as one change you can revert. Components, specs, datasheets and the imported
-          distributor data all stay; only the CAD goes.
-        </p>
-      </div>
+      {/* With nothing to remove, the action is not merely disabled -- it is ABSENT. A
+          destructive-looking control at 50% opacity still reads as available, and the sentence
+          beside it would be describing something that cannot happen. The "holds no CAD files"
+          line above is the whole answer in that state. */}
+      {cleared > 0 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            // The page-level TRIGGER is quiet; the loud solid `danger` is reserved for the
+            // in-modal confirm, which is the committed action.
+            variant="ghost-danger"
+            onClick={() => setConfirming(true)}
+            disabled={job.status === "running"}
+            data-dev-id="settings.cad-clear.run"
+          >
+            {job.status === "running" ? "Removing" : "Remove All CAD Files"}
+          </Button>
+          {/* Says what the disclosure's hint does NOT: that it is atomic and revertible. Repeating
+              the hint's "components and specs all stay" here is the same duplication caught in
+              DerivationSection, 230px apart on the same screen. */}
+          <p className="text-sm text-t2">Lands as one change you can revert.</p>
+        </div>
+      ) : null}
 
       {job.status === "error" && job.error ? (
         <p className="text-sm text-err">{job.error}</p>
