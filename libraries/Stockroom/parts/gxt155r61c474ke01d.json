@@ -1,4 +1,160 @@
 {
+  "alternates": {
+    "Capacitance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "470 nF"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "0.47 uF"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "0.47 µF"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCJ21AR72E102KXJ1J_SPL.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/6682/MFG_GCM033D70E105ME36D.jpg"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "18 Weeks"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "25"
+      }
+    ],
+    "Lifecycle": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "New Product"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Active"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "10000"
+      }
+    ],
+    "Package": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "0402"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "0402 (1005 metric)"
+      }
+    ],
+    "Packaging": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Reel, Cut Tape"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Reel"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "mouser_web",
+        "value": "Details"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "US Tariff %": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8.33"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 470 nF, 10%, 0402"
+      },
+      {
+        "confidence": "",
+        "source": "jsonld",
+        "value": "GXT155R61C474KE01D Murata Electronics Multilayer Ceramic Capacitors MLCC - SMD/SMT 0402 16VDC 0.47uF 10% X5R AEC-Q200 datasheet, inventory, & pricing."
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER .47UF 16V X5R 0402"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +178,80 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Brand": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - in": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Case Code - mm": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Dielectric": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Factory Pack Quantity": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Height": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Lead Time": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Length": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Manufacturer": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Product Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Subcategory": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Termination": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Termination Style": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Type": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "US Tariff %": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Voltage Rating DC": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    },
+    "Width": {
+      "confidence": "medium",
+      "source": "mouser_web"
+    }
+  },
   "hashes": null,
   "id": "gxt155r61c474ke01d",
   "manufacturer": "Murata Electronics",
@@ -36,16 +265,16 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:20.340774+00:00",
+      "part_number": "81-GXT155R61C474KE1D",
       "price_breaks": [
         {
-          "price": 0.15,
+          "price": 0.12,
           "qty": 1
         },
         {
-          "price": 0.063,
+          "price": 0.048,
           "qty": 10
         },
         {
@@ -57,29 +286,63 @@
           "qty": 500
         },
         {
-          "price": 0.023,
+          "price": 0.025,
           "qty": 1000
         },
         {
-          "price": 0.021,
+          "price": 0.022,
           "qty": 2500
         },
         {
-          "price": 0.019,
+          "price": 0.02,
           "qty": 5000
         },
         {
-          "price": 0.018,
+          "price": 0.017,
           "qty": 10000
         },
         {
-          "price": 0.015,
+          "price": 0.013,
           "qty": 20000
         }
       ],
       "stock": 12658,
       "url": "https://www.mouser.com/c/?q=GXT155R61C474KE01D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:20.340774+00:00",
+      "part_number": "490-GXT155R61C474KE01DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.01551,
+          "qty": 10000
+        },
+        {
+          "price": 0.01436,
+          "qty": 20000
+        },
+        {
+          "price": 0.01378,
+          "qty": 30000
+        },
+        {
+          "price": 0.01314,
+          "qty": 50000
+        },
+        {
+          "price": 0.01277,
+          "qty": 70000
+        },
+        {
+          "price": 0.01241,
+          "qty": 100000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -88,10 +351,15 @@
     "Applications": "Automotive",
     "Assembly Country of Origin": "Not available",
     "BRHTS": "85322410",
+    "Brand": "Murata Electronics",
     "Capacitance": "470 nF",
+    "Case Code - in": "0402",
+    "Case Code - mm": "1005",
     "Country of Diffusion": "Not available",
     "Country of Origin": "Japan",
+    "Dielectric": "X5R",
     "ECCN": "EAR99",
+    "Factory Pack Quantity": "10000",
     "Footprint": "Capacitor_SMD:C_0402_1005Metric",
     "HTS Code (CA)": "8532240010",
     "HTS Code (CN)": "8532241000",
@@ -99,10 +367,13 @@
     "HTS Code (JP)": "853224000",
     "HTS Code (MX)": "8532240400",
     "HTS Code (US)": "8532240020",
+    "Height": "0.5 mm (0.02 in)",
     "Image": "https://www.mouser.com/images/murata/images/GCJ21AR72E102KXJ1J_SPL.jpg",
     "KRHTS": "8532240000",
-    "Lead Time": "126 Days",
+    "Lead Time": "18 Weeks",
+    "Length": "1 mm (0.039 in)",
     "Lifecycle": "New Product",
+    "Manufacturer": "Murata",
     "Minimum Order Quantity": "1",
     "Moisture Sensitivity Level": "1 (Unlimited)",
     "Mounting Type": "Surface Mount, MLCC",
@@ -112,18 +383,27 @@
     "Package / Case": "0402 (1005 Metric)",
     "Package Type": "Tape & Reel (TR)",
     "Packaging": "Reel, Cut Tape",
+    "Product": "Multilayer Ceramic Capacitors",
     "Product Category": "Multilayer Ceramic Capacitors MLCC - SMD/SMT",
+    "Product Type": "Miltilayer Ceramic Capacitors",
     "REACH": "REACH Unaffected",
     "Ratings": "AEC-Q200",
     "RoHS": "RoHS Compliant",
     "Series": "GXT",
     "Size / Dimension": "0.039\" L x 0.020\" W (1.00mm x 0.50mm)",
     "Standard Pack Qty": "10000",
+    "Subcategory": "Capacitors",
     "Symbol": "Device:C",
     "Temperature Coefficient": "X5R",
+    "Termination": "Standard",
+    "Termination Style": "SMD/SMT",
     "Thickness (Max)": "0.022\" (0.55mm)",
     "Tolerance": "10%",
-    "Voltage - Rated": "16V"
+    "Type": "Automotive MLCC",
+    "US Tariff %": "8.33",
+    "Voltage - Rated": "16V",
+    "Voltage Rating DC": "16 VDC",
+    "Width": "0.5 mm (0.02 in)"
   },
   "tags": [],
   "value": ""
