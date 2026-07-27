@@ -415,23 +415,23 @@
      "steps": [
       {
        "t": "Rename every record to slug(mpn)+'-'+sha256(mpn)[:4], in one atomic commit",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "app/backend/stockroom/migrate/v3_ids.py + scripts/migrate_library_v3.py, APPLIED to the real 158-part library (commit 2966668). git detected 198 RENAMES rather than 158 deletes+adds, so file history is preserved. Verified independently of the tool's own report: 158 records in / 158 out, 158 distinct MPNs (no merges), schema_version 3 on all 158, 0 v2 keys left, all 158 carry derived + part_class."
       },
       {
        "t": "Rewrite every reference to a renamed id (index, projects, assign bindings)",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Every persisted reference enumerated by READING the library, not assuming. MOVED: parts/<id>.json (158) and datasheets/<id>.pdf (85 of 158 - measured: all 85 named exactly <id>.pdf, zero other conventions) with record.datasheet.file updated in the same pass -> 0 dangling datasheet refs after. NOT TOUCHED, each checked: models/ (named by MPN, zero refs embed an id), symbols/ + footprints/ (per-CATEGORY libs), the SQLite index (derived, rebuilt), altium/*.DbLib (regenerated + gitignored). REPORTED not migrated: project _sr_bound_part_id bindings live in the PROJECT's repo - measured zero registered projects on either of the owner's libraries, and the tool REFUSES unless --allow-orphan-bindings when any exist."
       },
       {
        "t": "Prove no two records collide onto one id, and no id is left path-unsafe",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "Collision detection refuses rather than merging: two records mapping to one id would DESTROY one, so it is a blocking error naming both. Also refuses a filename that disagrees with the record's id (picking a winner is not a migration's call) and a record with no MPN (the id is slug(mpn)+sha256(mpn)[:4], so there is nothing to compute). Verified on the real library: 0 collisions, 0 path-UNSAFE ids afterwards (was 84 of 158), 0 filename/id disagreements. 17 tests; 5 mutations run, all caught - dropping collision detection, unlinking before writing, forgetting the datasheet ref, forgetting the id update, accepting a filename mismatch."
       },
       {
        "t": "Dry run first, and a verified backup before it is applied",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "DRY RUN IS THE DEFAULT; --apply is required. Backup is git itself: the library is a git repo, so a clean tree + recorded HEAD is a complete verified undo (git checkout . && git clean -fd, printed on success). REFUSES to apply against a DIRTY library tree because git is then no longer a full undo - and that check is SCOPED to the library path, after finding that a bare git status reported the whole repo's churn and would have made --allow-dirty the normal way to run it. Ran dry first against the real library (158 planned, 0 errors), then --apply from HEAD d852ecb2 clean."
       }
      ]
     },
@@ -530,8 +530,8 @@
    "items": [
     {
      "id": "device-sync",
-     "name": "Device Parity",
-     "why": "Owner: 'i meant libraries linked between devices'. Same parts, same files, same info, nobody clicking Sync.",
+     "name": "Device Parity (Library AND App Version)",
+     "why": "Owner: 'i meant libraries linked between devices'. Same parts, same files, same info, nobody clicking Sync. EXTENDED by the owner 2026-07-27: 'for device parity i also meant the app itself too, it shouldnt ever stray what version its on other than the latest' - so parity covers the APP VERSION, not only the library. MEASURED THE SAME NIGHT, and it is the proof this is missing: their install was 61 commits behind at 02945c51 and only became current because I ran git fetch/merge BY HAND over the WSL bridge. A version that only converges when someone drives it is not converging.",
      "steps": [
       {
        "t": "Two devices adding different parts converges",
@@ -555,6 +555,26 @@
       },
       {
        "t": "Verified on two real machines",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "The app CHECKS for a newer commit by itself, on a schedule, with no human trigger",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "It APPLIES the update by itself - the install never sits behind origin/main",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "Version parity is OBSERVABLE: the app states its commit and whether it is behind, so 'am I on the latest' is answerable without a shell",
+       "done": false,
+       "evidence": ""
+      },
+      {
+       "t": "PROVEN on the owner's real install by letting it converge ON ITS OWN from a deliberately old commit - no hand-run git, no deploy script (the exact thing done by hand on 2026-07-27, which is why this step exists)",
        "done": false,
        "evidence": ""
       }
@@ -743,5 +763,7 @@
    ]
   }
  ],
- "updated": "2026-07-27 05:05 UTC"
+ "updated": "2026-07-27 07:35 UTC",
+ "now": "Waves 1-2 landing. Just applied the v3 schema + part-id migration to all 158 records, which unblocked the importer against the real library. Next: run the real 158-part import (Mouser + DigiKey), then the derived index schema.",
+ "now_updated": "2026-07-27 07:30 UTC"
 }
