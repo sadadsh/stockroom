@@ -185,6 +185,53 @@ class UltraLibrarianAdapter:
     # The accordion each format hides behind, by its visible text.
     _ACCORDION = {"kicad": "KiCAD", "altium": "Altium", "model": "3D CAD Model"}
 
+    def signed_in(self, page) -> bool:
+        """Whether this page is a signed-in session. Measured: the header shows #loginLink when not."""
+        try:
+            return page.locator("#loginLink").count() == 0
+        except Exception:  # noqa: BLE001 - an unreadable page is not a signed-in one
+            return False
+
+    def sign_in(self, page, username: str, password: str) -> str:
+        """Sign in so a whole-library run is unattended. "" on success, else a readable reason.
+
+        WHY THIS EXISTS. Measured against the live site 2026-07-27: signed OUT, everything works -
+        search resolves, the details page opens, the export panel renders 39 controls, and KiCad and
+        3D both tick. The ONLY thing missing is the Download button, which the site renders solely
+        for a signed-in user. So one sign-in is the difference between a 90-part sitting completing
+        by itself and failing on every single part.
+
+        MEASURED FORM (the real one, enumerated 2026-07-27): login is OIDC on a DIFFERENT host,
+        `sso.ultralibrarian.com/Account/Login`, carrying `#Username`, `#Password`, `#RememberLogin`
+        and `button[name=button][value=login]`, plus an ASP.NET `__RequestVerificationToken`. The
+        token is why this fills and submits the REAL form rather than posting credentials directly -
+        a hand-built POST would be rejected, and would also be a second implementation of signing in.
+
+        `#RememberLogin` is TICKED deliberately: it is what makes the persistent browser profile keep
+        the session between runs, so the owner signs in once rather than once per run.
+        """
+        if not username or not password:
+            return "no Ultra Librarian credentials are saved in Settings"
+        try:
+            page.goto("https://app.ultralibrarian.com/Account/Login", wait_until="domcontentloaded")
+            user_box = page.locator("#Username").first
+            user_box.wait_for(state="visible", timeout=30_000)
+            user_box.fill(username)
+            page.locator("#Password").first.fill(password)
+            # Remembered session = the whole point of the persistent profile.
+            _check_box(page, "#RememberLogin")
+            page.locator('button[name="button"][value="login"]').first.click()
+            page.wait_for_load_state("domcontentloaded", timeout=30_000)
+            page.wait_for_timeout(2_000)  # the OIDC form_post bounce back to app.
+        except Exception as exc:  # noqa: BLE001 - a failed sign-in is a reportable row, not a crash
+            return f"could not sign in to Ultra Librarian: {exc}"
+        if not self.signed_in(page):
+            return (
+                "Ultra Librarian did not accept the saved credentials. Check the username and "
+                "password in Settings."
+            )
+        return ""
+
     def resolve_url(self, mpn: str) -> str:
         from stockroom.enrich.cad_sources import resolve_cad_sources
 

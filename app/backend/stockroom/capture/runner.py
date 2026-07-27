@@ -213,6 +213,9 @@ def run_guided_capture(
         # never called - so a vendor shipping real .SchLib/.PcbLib had them downloaded and dropped.
         # Passed in rather than imported so capture/ stays clear of the mutation layer.
         attach_altium=ctx.ops.attach_altium_assets,
+        # Saved vendor sign-ins, so a 90-part sitting runs unattended instead of stopping on every
+        # part at the Download button (which the vendor renders only for a signed-in user).
+        credentials=_saved_credentials,
         run_write=ctx.jobs.run_write,
         now_iso=_utc_now_iso,
     )
@@ -283,3 +286,36 @@ def _take(iterable, n: int):
         if i >= n:
             return
         yield item
+
+
+# Where each vendor's saved sign-in lives in the machine config. DATA, not a branch: adding a
+# vendor is adding a row here, never an `if vendor == ...` inside the capture engine.
+_CREDENTIAL_FIELDS = {
+    "ultralibrarian": ("ul_username", "ul_password"),
+    "snapmagic": ("snapeda_username", "snapeda_password"),
+    "samacsys": ("samacsys_username", "samacsys_password"),
+}
+
+
+def _saved_credentials(vendor_key: str):
+    """`(username, password)` for a vendor, or None when nothing is saved.
+
+    Read at CALL time rather than captured at construction, so a sign-in saved in Settings takes
+    effect on the next run without restarting the app. Returns None rather than a blank pair when
+    either half is missing, because a half-filled credential is not a credential and the adapter
+    should report "nothing saved" rather than fail an empty login.
+    """
+    from stockroom.store.machine_config import MachineConfig
+
+    fields = _CREDENTIAL_FIELDS.get(vendor_key)
+    if not fields:
+        return None
+    try:
+        cfg = MachineConfig.load()
+    except Exception:  # noqa: BLE001 - an unreadable config is "no credentials", never a crash
+        return None
+    user = (getattr(cfg, fields[0], "") or "").strip()
+    secret = getattr(cfg, fields[1], "") or ""
+    if not user or not secret:
+        return None
+    return user, secret

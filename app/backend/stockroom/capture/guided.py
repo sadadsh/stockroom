@@ -171,6 +171,7 @@ class GuidedCaptureSource:
         headless: bool = False,
         engine: str = "chromium",
         attach_altium=None,
+        credentials=None,
         run_write=None,
         now_iso=None,
     ) -> None:
@@ -183,6 +184,10 @@ class GuidedCaptureSource:
         # `library_ops.attach_altium_assets`, injected rather than imported, so this module stays
         # free of the mutation layer and a test can drive the Altium path without a real library.
         self._attach_altium = attach_altium
+        # `(vendor_key) -> (username, password) | None`. Injected, so capture/ never reads the
+        # machine config itself and a test can drive sign-in without one.
+        self._credentials = credentials
+        self._sign_in_error = ""
         self._run_write = run_write or (lambda fn: fn())
         self._now_iso = now_iso
         self._session: _Session | None = None
@@ -206,7 +211,35 @@ class GuidedCaptureSource:
         manager = browser.session()
         page = manager.__enter__()
         self._session = _Session(browser=browser, ctx_manager=manager, page=page)
+        self._sign_in_once(page)
         return self._session
+
+    def _sign_in_once(self, page) -> None:
+        """Sign in for the WHOLE run, on the one session, before the first part.
+
+        Here rather than per part because that is the shape of the real workflow: a 90-part sitting
+        must cost one sign-in, and the persistent profile then carries it to later runs entirely.
+
+        Deliberately NOT fatal. A vendor that needs no login, an adapter with no `sign_in`, or
+        absent credentials all leave this a silent no-op, and a REFUSED sign-in is recorded and
+        allowed to continue - because everything up to the Download button works signed out
+        (measured), so the per-part outcome is a far more useful error than a dead run. The reason
+        is kept on `_sign_in_error` so those per-part rows can say WHY rather than just "no button".
+        """
+        adapter = get_adapter(self._vendor_key)
+        self._sign_in_error = ""
+        if adapter is None or not getattr(adapter.capability, "needs_login", False):
+            return
+        sign_in = getattr(adapter, "sign_in", None)
+        if sign_in is None or self._credentials is None:
+            return
+        if getattr(adapter, "signed_in", None) and adapter.signed_in(page):
+            return  # the persistent profile already carries the session
+        creds = self._credentials(self._vendor_key)
+        if not creds:
+            return
+        username, password = creds
+        self._sign_in_error = sign_in(page, username, password) or ""
 
     def close(self) -> None:
         """Close the browser. Called by the runner in a finally, so a stopped or failed run never
@@ -254,7 +287,13 @@ class GuidedCaptureSource:
             session.page.goto(url, wait_until="domcontentloaded")
             report = adapter.drive(session.page, formats)
             if not report.submitted:
-                return SourceOutcome(skipped=report.message or "the vendor offered no download")
+                why = report.message or "the vendor offered no download"
+                if self._sign_in_error:
+                    # Everything up to the Download button works signed out, so a refused sign-in is
+                    # the real cause of "no Download button" and must be said here rather than left
+                    # for the owner to infer from a vendor-shaped message.
+                    why = f"{why} ({self._sign_in_error})"
+                return SourceOutcome(skipped=why)
             # Wait for the FILE TO BE SAVED, not for the download EVENT.
             #
             # `wait_for_event("download")` RACES the `on("download")` handler the browser session
