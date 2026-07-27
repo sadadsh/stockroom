@@ -141,6 +141,22 @@ def render_html(plan: dict) -> str:
         "</header>",
     ]
 
+    # WHAT IS BEING WORKED ON RIGHT NOW (owner, 2026-07-27: "also add what youre currently working
+    # on" / "in the html"). Placed above everything else because it answers the question a person
+    # opens this page to ask, and a percentage cannot: 52% does not say whether anything is moving.
+    # Absent rather than an empty box when nothing is set - a blank "Now:" reads as stalled.
+    now = (plan.get("now") or "").strip()
+    now_at = (plan.get("now_updated") or "").strip()
+    if now:
+        p += [
+            '<section class="now">',
+            '<div class="nowhead"><span class="dot"></span><h2>Working on now</h2>'
+            + (f'<span class="nowat">{e(now_at)}</span>' if now_at else "")
+            + "</div>",
+            f'<p class="nowtext">{e(now)}</p>',
+            "</section>",
+        ]
+
     p.append('<details class="reqs"><summary>The owner\'s five requirements, verbatim</summary><ol>')
     for r in plan["owner_requirements"]:
         p.append(f"<li>{e(r)}</li>")
@@ -194,6 +210,15 @@ def render_html(plan: dict) -> str:
 
 
 STYLE = """<style>
+.now{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--doing);
+  border-radius:var(--r-card);padding:10px 12px;margin:14px 0}
+.nowhead{display:flex;align-items:center;gap:8px}
+.nowhead h2{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--dim);margin:0}
+.nowhead .nowat{margin-left:auto;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.now .dot{width:7px;height:7px;border-radius:50%;background:var(--doing);flex:none;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--doing) 25%,transparent)}
+.nowtext{margin:6px 0 0;font-size:14px;line-height:1.45;color:var(--ink)}
 :root{
   --bg:#0d0f12; --card:#15181e; --line:#242932; --ink:#e9ebee; --dim:#98a1ad;
   --done:#3fb950; --doing:#d29922; --blocked:#f85149; --todo:#3a414b; --accent:#58a6ff;
@@ -325,6 +350,12 @@ def main() -> int:
     ps = sub.add_parser("state")
     ps.add_argument("item")
     ps.add_argument("state", choices=STATES)
+    # `now` is its own subcommand rather than a field to hand-edit, because a stale "working on
+    # now" is worse than none: it asserts activity that has stopped. One short command means it
+    # actually gets kept current.
+    pn = sub.add_parser("now", help="set the WORKING ON NOW banner (empty string clears it)")
+    pn.add_argument("text", help="one sentence. Pass '' to clear the banner entirely.")
+    pn.add_argument("--at", default="", help="timestamp shown beside it (free-form)")
     a = ap.parse_args()
 
     plan = load()
@@ -333,6 +364,14 @@ def main() -> int:
         return 0
     if a.cmd == "check":
         return cmd_check(plan)
+    if a.cmd == "now":
+        text = a.text.strip()
+        plan["now"] = text
+        plan["now_updated"] = a.at.strip()
+        save(plan)
+        cmd_render(plan)
+        print(f"now: {text or '(cleared)'}")
+        return 0
 
     _, item = find(plan, a.item)
     if a.cmd in ("tick", "untick"):
