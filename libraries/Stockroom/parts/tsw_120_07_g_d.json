@@ -1,5 +1,12 @@
 {
   "alternates": {
+    "Contact Material": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Phosphor bronze"
+      }
+    ],
     "HTS Code (CA)": [
       {
         "confidence": "medium",
@@ -63,6 +70,18 @@
         "confidence": "high",
         "source": "digikey",
         "value": "0.100\" (2.54mm)"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "16 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "2"
       }
     ],
     "Operating Temperature": [
@@ -689,6 +708,74 @@
       "stock": 10,
       "url": "https://www.lcsc.com/product-detail/C5968215.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:17.117272+00:00",
+      "part_number": "200-TSW12007GD",
+      "price_breaks": [
+        {
+          "price": 4.06,
+          "qty": 1
+        },
+        {
+          "price": 4.04,
+          "qty": 25
+        },
+        {
+          "price": 3.72,
+          "qty": 50
+        },
+        {
+          "price": 3.31,
+          "qty": 100
+        },
+        {
+          "price": 2.78,
+          "qty": 500
+        },
+        {
+          "price": 2.67,
+          "qty": 1000
+        },
+        {
+          "price": 2.48,
+          "qty": 2500
+        }
+      ],
+      "stock": 3457,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:17.117272+00:00",
+      "part_number": "612-TSW-120-07-G-D-ND",
+      "price_breaks": [
+        {
+          "price": 4.81,
+          "qty": 1
+        },
+        {
+          "price": 4.09,
+          "qty": 10
+        },
+        {
+          "price": 3.4763,
+          "qty": 100
+        },
+        {
+          "price": 3.10322,
+          "qty": 500
+        },
+        {
+          "price": 2.9575,
+          "qty": 1000
+        }
+      ],
+      "stock": 112,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
