@@ -205,3 +205,56 @@ def test_a_recorded_origin_reaches_the_wire():
     assert slot.get("origin", {}).get("vendor") == "ultralibrarian", (
         f"a recorded origin must survive to the wire: {slot}"
     )
+
+
+# --------------------------------------------------------------- string-union parity
+#
+# A Python enum whose values cross the wire has a TypeScript twin, and until 2026-07-27 the
+# match was asserted in a COMMENT: `capture/requirements.py` says "``Requirement`` values are
+# the wire contract the TypeScript ``Requirement`` union mirrors", and NOTHING checked it. That
+# is a rule stated in prose and enforced by nothing, which is how the record rename got through
+# in the first place. Registering a third EDA tool, or adding a fifth part class, now fails here
+# with the exact members to add.
+#
+# FACT, not judgement: it compares two literal string sets. So it may BLOCK.
+
+
+def _declared_union(name: str) -> set[str]:
+    """The string literals of `export type <name> = "a" | "b" | ...;` in types.ts."""
+    src = TYPES_TS.read_text(encoding="utf-8")
+    m = re.search(rf"export\s+type\s+{re.escape(name)}\s*=(.*?);", src, re.S)
+    assert m, f"could not find `export type {name} = ...` in types.ts"
+    body = re.sub(r"//[^\n]*", "", m.group(1))
+    return set(re.findall(r'"([^"]+)"', body))
+
+
+def test_the_requirement_enum_matches_the_typescript_union_exactly():
+    from stockroom.capture.requirements import Requirement
+
+    python = {r.value for r in Requirement}
+    declared = _declared_union("Requirement")
+    assert python, "the Requirement enum is empty - the import is wrong, not the contract"
+    assert python == declared, (
+        f"the `Requirement` union in {TYPES_TS.relative_to(ROOT).as_posix()} does not match "
+        f"stockroom.capture.requirements.Requirement.\n"
+        f"  only in Python: {sorted(python - declared)}\n"
+        f"  only in TS:     {sorted(declared - python)}\n"
+        f"These strings are spoken by the capture HUD, the host bridge and detach_asset, so a "
+        f"mismatch is a request the other side cannot understand."
+    )
+
+
+def test_the_part_class_enum_matches_the_typescript_union_exactly():
+    from stockroom.model.part_class import PartClass
+
+    python = {c.value for c in PartClass}
+    declared = _declared_union("PartClass")
+    assert python, "the PartClass enum is empty - the import is wrong, not the contract"
+    assert python == declared, (
+        f"the `PartClass` union in {TYPES_TS.relative_to(ROOT).as_posix()} does not match "
+        f"stockroom.model.part_class.PartClass.\n"
+        f"  only in Python: {sorted(python - declared)}\n"
+        f"  only in TS:     {sorted(declared - python)}\n"
+        f"part_class decides which assets a part needs, so a class the frontend cannot name is a "
+        f"class whose parts it will silently judge against the wrong requirements."
+    )

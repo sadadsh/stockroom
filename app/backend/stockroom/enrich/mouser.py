@@ -175,6 +175,45 @@ def _default_requester(api_key: str, timeout: int = 8):
     return request
 
 
+def parse_mouser_payload(body: dict | None, mpn: str) -> EnrichmentResult:
+    """The WHOLE Mouser response -> one EnrichmentResult, with no network and no credentials.
+
+    Extracted from `MouserAdapter.lookup` (not copied from it: `lookup` calls this) so a RE-DERIVE
+    can rebuild a part from `sourced/<id>/mouser.json` on a fresh clone with no API key. That is
+    the point of storing the raw payload at all - "import everything so we can change the way the
+    data's manipulated later" only works if the manipulation can run again without the vendor.
+
+    It takes the FULL response body rather than the already-chosen part, so the SELECTION is
+    re-derivable too: which of several returned parts matched is a derivation decision, and
+    freezing it at import time would mean a later fix to the matcher could never reach the parts
+    already imported.
+    """
+    parts = ((body or {}).get("SearchResults") or {}).get("Parts") or []
+    if not parts:
+        return EnrichmentResult()
+    target = normalize_mpn(mpn)
+    # The query may be a MANUFACTURER part number or a MOUSER STOCK NUMBER - the endpoint
+    # accepts both (`mouserPartNumber`, options "Exact"), and a sourcing document written
+    # against Mouser names parts the second way. Checking only the manufacturer field made
+    # every stock-number query a non-match, so the adapter silently fell through to
+    # parts[0]: a DIFFERENT part, returned as the answer with a `low` label nobody reads.
+    exact = next(
+        (p for p in parts
+         if isinstance(p, dict)
+         and target in {normalize_mpn(p.get("ManufacturerPartNumber") or ""),
+                        normalize_mpn(p.get("MouserPartNumber") or "")}),
+        None,
+    )
+    chosen = exact if exact is not None else parts[0]
+    if not isinstance(chosen, dict):
+        return EnrichmentResult()
+    result = _parse_mouser_part(chosen)
+    if exact is None and result.mpn is not None:
+        # no exact match: downgrade confidence so a manual review flags it
+        result.mpn = Sourced(result.mpn.value, "mouser", "low")
+    return result
+
+
 class MouserAdapter:
     def __init__(self, api_key: str = "", requester=None):
         self.api_key = api_key or ""
@@ -197,26 +236,6 @@ class MouserAdapter:
         except EnrichError as exc:
             self.last_status = status_from_error(exc)
             return EnrichmentResult()  # a failed API call must not break enrichment
-        parts = ((body or {}).get("SearchResults") or {}).get("Parts") or []
-        if not parts:
-            self.last_status = "not_found"
-            return EnrichmentResult()
-        target = normalize_mpn(mpn)
-        # The query may be a MANUFACTURER part number or a MOUSER STOCK NUMBER - the endpoint
-        # accepts both (`mouserPartNumber`, options "Exact"), and a sourcing document written
-        # against Mouser names parts the second way. Checking only the manufacturer field made
-        # every stock-number query a non-match, so the adapter silently fell through to
-        # parts[0]: a DIFFERENT part, returned as the answer with a `low` label nobody reads.
-        exact = next(
-            (p for p in parts
-             if target in {normalize_mpn(p.get("ManufacturerPartNumber") or ""),
-                           normalize_mpn(p.get("MouserPartNumber") or "")}),
-            None,
-        )
-        chosen = exact if exact is not None else parts[0]
-        result = _parse_mouser_part(chosen)
-        if exact is None and result.mpn is not None:
-            # no exact match: downgrade confidence so a manual review flags it
-            result.mpn = Sourced(result.mpn.value, "mouser", "low")
-        self.last_status = "ok"
+        result = parse_mouser_payload(body, mpn)
+        self.last_status = "ok" if result.filled_fields() else "not_found"
         return result
