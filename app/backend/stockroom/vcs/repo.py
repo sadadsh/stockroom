@@ -443,6 +443,64 @@ class GitRepo:
             return PullResult(ok=False, updated=False, reason=reason)
         return PullResult(ok=True, updated=self.head() != before, reason="")
 
+    # Where a local file is moved when an incoming commit wants to add the same path. Inside the
+    # repo but git-ignored, so it travels nowhere and is trivially findable by the person whose
+    # file it was -- as opposed to a system temp dir, which is where data goes to be forgotten.
+    _RESCUE_DIR = ".stockroom-kept"
+
+    def _clear_untracked_blockers(self, target: str) -> list[str]:
+        """Move aside untracked files that `target` would add, so a pull cannot be blocked by one.
+
+        THE OWNER'S REAL FAILURE, 2026-07-27: their laptop could not update at all, because the app
+        had created ten `SR-<Category>.kicad_sym` files locally (untracked) and the incoming commits
+        add those exact paths. Git refuses to clobber an untracked file and aborts the whole
+        operation -- so one machine simply could not receive another's updates, which is the
+        *"same update, same files, same info"* rule broken outright.
+
+        NEVER destructive. A file whose bytes already match the incoming one is just removed (there
+        is nothing to keep, and a backup would be clutter in the user's library). Anything that
+        DIFFERS is moved under `_RESCUE_DIR`, keeping its path, so the person still has it.
+
+        Returns the repo-relative paths that were moved or removed, so the caller can report them.
+        """
+        merge_base = self._run("merge-base", "HEAD", target, check=False).stdout.strip()
+        if not merge_base:
+            return []
+        # Exactly the paths the incoming commits ADD. Narrow on purpose: this must never touch an
+        # untracked file the update has no opinion about.
+        added = self._run(
+            "diff", "--name-only", "--diff-filter=A", merge_base, target, check=False
+        ).stdout.split("\n")
+        cleared: list[str] = []
+        for rel in (p.strip() for p in added):
+            if not rel:
+                continue
+            local = self.root / rel
+            if not local.is_file():
+                continue
+            # Tracked already? Then git handles it normally and this has no business here.
+            if self._run("ls-files", "--error-unmatch", rel, check=False).returncode == 0:
+                continue
+            # Compare by git's OWN object hash rather than by reading bytes: `_run` is text-mode,
+            # and a `.step` or `.PcbLib` is binary, so a byte comparison through it would corrupt
+            # the very comparison it is making. `hash-object` also costs one small process instead
+            # of loading a 3 MB model into memory.
+            theirs = self._run("rev-parse", f"{target}:{rel}", check=False)
+            mine = self._run("hash-object", str(local), check=False)
+            same = (
+                theirs.returncode == 0
+                and mine.returncode == 0
+                and theirs.stdout.strip() == mine.stdout.strip()
+            )
+            if not same:
+                kept = self.root / self._RESCUE_DIR / rel
+                kept.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(local), str(kept))
+            else:
+                local.unlink()
+            cleared.append(rel)
+        return cleared
+
     @_serialized
     def pull_rebase(self) -> PullResult:
         """Pull, REBASING local commits onto the upstream. For the in-repo library (which shares
@@ -450,6 +508,19 @@ class GitRepo:
         paths, so a rebase replays the part commit on top of the update cleanly, reconciling what a
         fast-forward could not. A real conflict aborts the half-applied rebase and reports honestly."""
         before = self.head()
+        # Fetch FIRST so the blocker check can see what is actually incoming. Without a fetch the
+        # upstream ref is whatever was last seen, so a brand-new file would not be found and the
+        # pull would abort exactly as before.
+        fetched = self._run("fetch", check=False)
+        if fetched.returncode != 0:
+            # Let the pull below produce the authoritative error. A failed fetch is usually
+            # offline, and duplicating that judgement here would be a second place to keep right.
+            return PullResult(ok=False, updated=False, reason=fetched.stderr.strip())
+        upstream = self._run(
+            "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", check=False
+        ).stdout.strip()
+        if upstream:
+            self._clear_untracked_blockers(upstream)
         proc = self._run("pull", "--rebase", check=False)
         if proc.returncode != 0:
             self._run("rebase", "--abort", check=False)  # leave the tree clean on a conflict
