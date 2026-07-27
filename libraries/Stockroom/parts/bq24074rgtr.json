@@ -22,6 +22,71 @@
         "confidence": "high",
         "source": "mouser",
         "value": "8542390070"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8542.39.0070"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/texasinstruments/images/ITP_TI_VQFN-16_RGT_t.jpg"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/4117/296%7E4222419%7ERGT%7E16.JPG"
+      }
+    ],
+    "Interface": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "USB"
+      }
+    ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "112 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "16"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "1"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "3000"
+      }
+    ],
+    "Operating Temperature": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "-40℃~+125℃"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "-40°C ~ 125°C (TJ)"
       }
     ],
     "Packaging": [
@@ -36,6 +101,18 @@
         "value": "Reel, Cut Tape, MouseReel"
       }
     ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Battery Management"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Integrated Circuits (ICs)"
+      }
+    ],
     "RoHS": [
       {
         "confidence": "medium",
@@ -46,6 +123,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "RoHS Compliant"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
       }
     ],
     "description": [
@@ -58,6 +140,11 @@
         "confidence": "high",
         "source": "mouser",
         "value": "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC A 5 A 595-BQ24074RGTT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "IC BATT CHG LI-ION 1CELL 16QFN"
       }
     ],
     "manufacturer": [
@@ -129,6 +216,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Battery Chemistry": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Battery Pack Voltage": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Battery Temperature Detection": {
       "confidence": "medium",
       "source": "lcsc"
@@ -169,6 +264,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Current - Charging": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "ECCN": {
       "confidence": "medium",
       "source": "lcsc"
@@ -184,6 +283,10 @@
     "End-Off Voltage": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Fault Protection": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "HTS Code (BR)": {
       "confidence": "medium",
@@ -309,6 +412,14 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Moisture Sensitivity Level": {
+      "confidence": "high",
+      "source": "digikey"
+    },
+    "Mounting Type": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Number of Cells": {
       "confidence": "medium",
       "source": "lcsc"
@@ -325,6 +436,10 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Package / Case": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Package Quantity": {
       "confidence": "medium",
       "source": "lcsc"
@@ -332,6 +447,10 @@
     "Package Quantity Unit": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Package Type": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Packaging": {
       "confidence": "medium",
@@ -365,9 +484,17 @@
       "confidence": "medium",
       "source": "lcsc"
     },
+    "Programmable Features": {
+      "confidence": "high",
+      "source": "digikey"
+    },
     "Quiescent Current": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "REACH": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Reel Setup Fee": {
       "confidence": "medium",
@@ -380,6 +507,10 @@
     "Standard Pack Qty": {
       "confidence": "high",
       "source": "mouser"
+    },
+    "Standard Package": {
+      "confidence": "medium",
+      "source": "digikey"
     },
     "Stock": {
       "confidence": "medium",
@@ -396,6 +527,10 @@
     "Stock (Shenzhen)": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Supplier Device Package": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "The Chip Type": {
       "confidence": "medium",
@@ -416,6 +551,10 @@
     "Voltage - Supply": {
       "confidence": "medium",
       "source": "lcsc"
+    },
+    "Voltage - Supply (Max)": {
+      "confidence": "high",
+      "source": "digikey"
     },
     "Weight": {
       "confidence": "medium",
@@ -474,6 +613,70 @@
       "stock": 736,
       "url": "https://www.lcsc.com/product-detail/C54313.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:32.372197+00:00",
+      "part_number": "595-BQ24074RGTR",
+      "price_breaks": [
+        {
+          "price": 2.43,
+          "qty": 1
+        },
+        {
+          "price": 1.81,
+          "qty": 10
+        },
+        {
+          "price": 1.65,
+          "qty": 25
+        },
+        {
+          "price": 1.48,
+          "qty": 100
+        },
+        {
+          "price": 1.39,
+          "qty": 250
+        },
+        {
+          "price": 1.35,
+          "qty": 500
+        },
+        {
+          "price": 1.32,
+          "qty": 1000
+        },
+        {
+          "price": 1.25,
+          "qty": 3000
+        },
+        {
+          "price": 1.22,
+          "qty": 6000
+        }
+      ],
+      "stock": 2854,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:32.372197+00:00",
+      "part_number": "296-38873-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.25356,
+          "qty": 3000
+        },
+        {
+          "price": 1.22886,
+          "qty": 6000
+        }
+      ],
+      "stock": 12325,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -482,6 +685,8 @@
     "Assembly Country of Origin": "Philippines",
     "Available On Reel": "No",
     "Balance Current": "-",
+    "Battery Chemistry": "Lithium Ion",
+    "Battery Pack Voltage": "4.2V",
     "Battery Temperature Detection": "Support",
     "Brand Id": "100",
     "Catalog Id": "1616",
@@ -492,10 +697,12 @@
     "Country of Origin": "Philippines",
     "Currency Symbol": "$",
     "Currency Type": "USD",
+    "Current - Charging": "Constant - Programmable",
     "ECCN": "EAR99",
     "EDA Footprint SVG": "https://image.easyeda.com/component_svgs/prod/17c514692c5549c7b235395c89b1446f.svg?t=1732276285",
     "EDA Symbol SVG": "https://image.easyeda.com/component_svgs/prod/46a447ef12c94516fb8f06cc747e0133.svg?t=1732276285",
     "End-Off Voltage": "-",
+    "Fault Protection": "Over Temperature, Over Voltage, Reverse Current, Short Circuit",
     "HTS Code (BR)": "85423999",
     "HTS Code (CA)": "8542390000",
     "HTS Code (CN)": "8542399000",
@@ -527,12 +734,16 @@
     "Lead Time": "112 Days",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "1",
+    "Moisture Sensitivity Level": "2 (1 Year)",
+    "Mounting Type": "Surface Mount",
     "Number of Cells": "1",
     "Operating Temperature": "-40℃~+125℃",
     "Order Multiple": "1",
     "Package": "QFN-16-EP(3x3)",
+    "Package / Case": "16-VFQFN Exposed Pad",
     "Package Quantity": "3000",
     "Package Quantity Unit": "Reel",
+    "Package Type": "Tape & Reel (TR)",
     "Packaging": "Tape & Reel (TR)",
     "Parent Catalog Id": "380",
     "Popular Part": "No",
@@ -541,19 +752,24 @@
     "Product Image": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_front.jpg",
     "Product Image 2": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_back.jpg",
     "Product Image 3": "https://assets.lcsc.com/images/lcsc/900x900/20221230_Texas-Instruments-BQ24074RGTR_C54313_blank.jpg",
+    "Programmable Features": "Current, Timer",
     "Quiescent Current": "6.5uA",
+    "REACH": "REACH Unaffected",
     "Reel Setup Fee": "0",
     "RoHS": "Yes",
     "Standard Pack Qty": "3000",
+    "Standard Package": "3000",
     "Stock": "5641",
     "Stock (Domestic)": "5641",
     "Stock (Overseas)": "5641",
     "Stock (Shenzhen)": "5641",
+    "Supplier Device Package": "16-VQFN (3x3)",
     "The Chip Type": "Charging IC",
     "Type of Battery": "Lithium Battery",
     "Unit": "Piece",
     "Unit Weight (kg)": "2.29e-05",
     "Voltage - Supply": "4.35V~10.2V",
+    "Voltage - Supply (Max)": "10.2V",
     "Weight": "0.203",
     "Weight (kg)": "0.000202957",
     "Weight Foreign (kg)": "0",
