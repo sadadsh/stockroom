@@ -207,7 +207,25 @@
   },
   "description": "9.2VC Clamp 65.22A@10/1000us Ipp TVS DIODE DO-214AA(SMB)",
   "display_name": "ESD Protection Diode DO-214AA",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "SMBJ5.0A"
+      },
+      "model": {
+        "file": "models/SMBJ5.0A.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "SMBJ5.0A"
+      }
+    }
+  },
   "enrichment": {
     "Applications": {
       "confidence": "high",
