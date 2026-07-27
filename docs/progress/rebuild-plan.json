@@ -10,8 +10,8 @@
     "Everything done within the app, not some third party manipulation u do.",
     "App updates should be automatic and never face errors, app shouldnt have to fully relaunch to update either."
   ],
-  "updated": "2026-07-27 19:03 UTC",
-  "now": "Measured the REAL vendor pages on the owner's PC with a new committed tool (scripts/vendorprobe.py). Two of four CAD vendor URLs were broken: Ultra Librarian 404'd (site moved to app.ultralibrarian.com) and SamacSys never searched (it reported every part 'unavailable'). Both fixed, RED proven first. Ultra Librarian's formats turned out to be CHECKBOXES, so KiCad+Altium arrive in ONE download - its driver is rebuilt against a captured fixture of the real page and tested by RUNNING it, not by string-matching selectors.",
+  "updated": "2026-07-27 19:09 UTC",
+  "now": "Guided capture now opens vendor pages that exist: Ultra Librarian's URL was a 404 and SamacSys's never searched (it called every part 'unavailable'). Both fixed and pushed (7c49f6a), suite 3636 green. Ultra Librarian's driver is rebuilt against a captured fixture of its REAL page - KiCad + Altium in one download. NEXT: SnapEDA's driver, whose format buttons are measured but whose post-click behaviour still needs a signed-in look.",
   "now_updated": "",
   "projects": [
     {
