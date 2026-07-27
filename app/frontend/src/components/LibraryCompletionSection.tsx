@@ -138,7 +138,7 @@ function CoverageBody({
         <Button variant="accent" onClick={onRun} disabled={running || needsFiles === 0}>
           {running ? "Filling Gaps" : "Complete My Library"}
         </Button>
-        <p className="text-sm text-t3">
+        <p className="text-sm text-t2">
           {needsFiles > 0 ? (
             <>
               {needsFiles} {needsFiles === 1 ? "component has a gap" : "components have gaps"} a
@@ -154,7 +154,7 @@ function CoverageBody({
       </div>
 
       {unsourced > 0 ? (
-        <p className="border-l-2 border-line pl-3 text-sm text-t3">
+        <p className="border-l-2 border-line pl-3 text-sm text-t2">
           <span className="tnum text-t2">{unsourced}</span>{" "}
           {unsourced === 1 ? "component needs a file" : "components need files"} that no
           automatic source can supply yet. Open one and use Complete Part to fetch those by hand.
