@@ -342,6 +342,73 @@
    "why": "Nothing ships to the real library until these pass. A failed acceptance test reported honestly beats a green claim.",
    "items": [
     {
+     "id": "cold-eyes-fixes",
+     "name": "Cold-Eyes Review, Verified And Fixed",
+     "why": "One fresh worker reviewed the diff (07db6a8..6d27dba) with no plan or reasoning context, per the owner's standing rule. It found 11 real defects, most with a mutation proving they were real and a negative control proving the check wasn't vacuous. All 11 fixed same session, each re-verified with the SAME mutation.",
+     "steps": [
+      {
+       "t": "Finding 1 (CRITICAL): fetch_payload used HTTP-truthiness ('ok' if body else 'not_found') to decide a hit, but a genuine not-found is HTTP 200 with an EMPTY results list - a truthy dict. A fabricated MPN was indistinguishable from a real hit: written to sourced/, indexed, counted imported, and never retried.",
+       "done": true,
+       "evidence": "mouser.py + digikey_api.py fetch_payload now parse the body the same way lookup() already did correctly. Re-ran the reviewer's exact negative control: real hit -> ok/not-None, ZZZNOTAREALPART123 -> not_found/None, on BOTH adapters. 4 new regression tests in tests/backend/enrich/{test_mouser,test_digikey_api}.py."
+      },
+      {
+       "t": "Finding 2: the writer-check's own 'can it fail' test built a synthetic AST from a string and asserted ast.walk() finds a call in it - testing the ast module, not the gate. MEASURED to be vacuous: disabling the real gate left it green.",
+       "done": true,
+       "evidence": "Split engine.assert_no_writer_imported into _scan_modules_for_writes(modules, writer), callable directly. Rewrote the self-test to drive it against an injected temp module with a real write_payload() call PLUS a negative control (a clean module must not raise). Reproduced the reviewer's exact mutation (disable the gate) -> now correctly FAILS; restored -> green."
+      },
+      {
+       "t": "Finding 3 (CRITICAL): the DetailPanel's own 'Add X to make this part usable' line hardcoded symbol/footprint/3D-model regardless of part_class, recreating the exact class-blindness bug edaTarget.ts fixed - one layer up, in the same session.",
+       "done": true,
+       "evidence": "missingAssets now derives from kicad.missing (already class-aware); hasModel's stock-3D inheritance narrowed from 'any class needing no owned model' to 'passive specifically' (a mechanical footprint is not guaranteed to carry a baked-in 3D body the way a KiCad stock passive footprint is). Drove the reviewer's exact 4-row reproduction table against the REAL RENDERED DOM: all 4 passed after the fix, 3 of 4 FAILED against the pre-fix code (mutation-proven). 4 permanent tests added to DetailPanel.test.tsx; first version of those tests was itself vacuous (canComplete gate never enabled) and caught before being trusted."
+      },
+      {
+       "t": "Finding 4: an exception anywhere in one part's import could kill the WHOLE pass. UnknownNamingScheme subclasses Exception not ValueError so it escaped the catch tuple; a per-source fetch was not wrapped in any try at all.",
+       "done": true,
+       "evidence": "Fetch loop now catches Exception per-source (result.errors); the write/derive/reclassify catch widened from a hand-picked tuple to Exception (BaseException still uncaught). 2 regression tests: a raising fetcher across 3 parts still produces a report covering all 3; a bad --scheme fails only that part, never the batch."
+      },
+      {
+       "t": "Finding 5: a payload written then a failure BEFORE the record was persisted left orphaned evidence that resumability (file-existence-based, by design) would never retry - permanently, silently, in the skipped bucket forever.",
+       "done": true,
+       "evidence": "import_part now detects files present but absent from record.sources ('orphaned'), indexes them WITHOUT re-fetching, and re-derives. 2 regression tests: recovery happens with a fetcher that raises if called at all (proves no re-fetch); a second pass after recovery is a clean SKIPPED."
+      },
+      {
+       "t": "Finding 6: sources.py's docstring claimed a drift gate (tests/backend/importer/test_source_registry.py) that did not exist.",
+       "done": true,
+       "evidence": "Wrote the real file: fetch/parse registries must name the same sources, in the same relative priority order, plus a self-test that the drift logic can fail (feeds it a deliberately broken pair)."
+      },
+      {
+       "t": "Finding 7: load_payloads swallowed an invalid-v3-id ValueError as 'no evidence', so rederive() (a public entry point) could silently BLANK a record's derived block instead of refusing loudly.",
+       "done": true,
+       "evidence": "load_payloads now raises loudly for an invalid id; import_part's own id check moved to the top of the function, UNCONDITIONAL on --refetch (previously only checked in the non-refetch branch, so --refetch on a bad id would have spent real API quota before failing)."
+      },
+      {
+       "t": "Finding 8: pace() iterated a set (nondeterministic order) and ran for every record regardless of whether it needed a fetch - throttling a resumed pass for work it was never going to do.",
+       "done": true,
+       "evidence": "usable is now sorted(); pacing gated on _needs_a_fetch() per record. Regression test: a fully-imported part triggers zero pace() calls; a fresh part still triggers one (negative control)."
+      },
+      {
+       "t": "Finding 9: the electrical veto's whole-word matching had NO trailing \\b on all but the last alternative, so 'led' matched inside 'ledge' and 'gate' inside 'Gateway' - the exact substring-matching failure the module's own thesis warns against.",
+       "done": true,
+       "evidence": "Every alternative now closes with its own \\b. Verified: 'Aluminium ledge bracket' and 'Gateway enclosure' now correctly match their sibling controls ('Steel bracket', 'Enclosure') instead of being wrongly excused to component."
+      },
+      {
+       "t": "Finding 10: the writer-check's FORBIDDEN_CALLS included bare 'replace'/'rename' attribute names, which collide with str.replace/Path.replace - a latent false-positive machine waiting for the first text.replace() in the derive path.",
+       "done": true,
+       "evidence": "Narrowed to {unlink, rmtree} only, neither a name any object in this path's real vocabulary (str, dict, dataclass) exposes."
+      },
+      {
+       "t": "Finding 11: dead `import sys` in derive/engine.py (invisible to ruff, F401 is globally ignored by design), and a comment pointing at lib/partFields.ts, which was never created.",
+       "done": true,
+       "evidence": "import removed; comment corrected to state reality (detail.derived.<field>, no dedicated helper module exists)."
+      },
+      {
+       "t": "Categories the review checked and found CLEAN: no existing test was weakened (assertion/case counts equal or higher in every rewritten file, exactly 3 expect() lines strengthened not deleted); no blanket find/replace damage to dev-ids/comments/string literals; no consumer reads a field that no longer exists at runtime.",
+       "done": true,
+       "evidence": "Reported by the reviewer with counts per file; independently re-verified via full suites (backend 3513 passed/5 skipped, frontend 1260 passed, tsc clean, build clean, ruff clean) after all 11 fixes landed."
+      }
+     ]
+    },
+    {
      "id": "id-migration",
      "name": "Migrate The Library To v3 Part Ids",
      "why": "BLOCKS THE IMPORT OF THE REAL LIBRARY, found 2026-07-27 by pointing the importer at it. 84 of 158 records still carry pre-v3 ids with underscores (`103at_2`), and `sourced/` correctly refuses those as path components - so evidence cannot be filed for any of them. The other 74 are path-safe but still lack the `-hash` suffix. The importer now reports this as one FAILED part with the reason instead of crashing the pass.",
@@ -676,5 +743,5 @@
    ]
   }
  ],
- "updated": "2026-07-27 06:10 UTC"
+ "updated": "2026-07-27 05:05 UTC"
 }
