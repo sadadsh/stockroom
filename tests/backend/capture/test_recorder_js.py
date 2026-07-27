@@ -119,3 +119,46 @@ def test_every_entry_carries_where_it_happened(page_with_recorder):
     for entry in log:
         assert entry.get("url"), entry
         assert entry.get("t"), entry
+
+
+def test_actions_survive_a_navigation():
+    """THE BUG THIS EXISTS FOR. `window.__SR_REC__` is per-DOCUMENT and resets on every navigation.
+    The first version of the recorder polled that array's LENGTH against a counter that only ever
+    grew, so after the first page change the comparison was permanently false and every later
+    action was silently dropped - and the journey being recorded (search -> part page -> export
+    panel) is mostly navigations, so it would have lost nearly all of it.
+
+    Actions are now PUSHED to Python through a binding, which survives navigation. This drives two
+    documents and asserts the second one's clicks arrive.
+    """
+    from playwright.sync_api import sync_playwright
+
+    base, shutdown = serve_fixture_vendor()
+    received: list[dict] = []
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            context = browser.new_context()
+            context.expose_binding("__srRecord", lambda _s, e: received.append(e))
+            context.add_init_script(_recorder_js())
+            page = context.new_page()
+
+            page.goto(base)
+            page.evaluate("document.querySelector('#KiCADv6').click()")
+            first = len(received)
+            assert first, "nothing recorded on the FIRST page"
+
+            page.goto(base + "?second")  # a fresh document: __SR_REC__ starts empty again
+            page.evaluate("document.querySelector('#AltiumDesigner').click()")
+
+            context.close()
+            browser.close()
+    finally:
+        shutdown()
+
+    after = [e for e in received if "second" in (e.get("url") or "")]
+    assert after, (
+        "no actions recorded after navigating - the recorder lost the rest of the journey; "
+        f"got {[e.get('url') for e in received]}"
+    )
+    assert any(e.get("selector") == "#AltiumDesigner" for e in after), after

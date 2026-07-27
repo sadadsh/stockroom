@@ -106,7 +106,7 @@ def _url_for(key: str, mpn: str, digikey_product_url: str) -> str:
             f"https://www.digikey.com/en/products/result?keywords={quote_plus(mpn)}"
         )
     if key == "ultralibrarian":
-        # `app.`, NOT `www.` - MEASURED 2026-07-27 on the owner's machine (scripts/vendorprobe.py):
+        # `app.`, NOT `www.` - MEASURED 2026-07-27 on the owner's machine (scripts/webread.py --controls):
         # www.ultralibrarian.com/search?queryText=... returns a 404 "PAGE NOT FOUND" page since the
         # site became part of Cadence. The query PARAMETER was right; only the host was wrong, and
         # it was read off Ultra Librarian's own search form (action="https://app.ultralibrarian.com

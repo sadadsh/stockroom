@@ -72,8 +72,13 @@ _RECORDER_JS = r"""
     catch (e) { return ''; }
   };
   const push = (rec) => {
-    try { window.__SR_REC__.push(Object.assign({t: Date.now(), url: location.href}, rec)); }
-    catch (e) {}
+    const entry = Object.assign({t: Date.now(), url: location.href}, rec);
+    // Kept for the tests, which inject this script directly with no binding present.
+    try { window.__SR_REC__.push(entry); } catch (e) {}
+    // PUSHED to Python the moment it happens. This array is per-DOCUMENT and resets on every
+    // navigation, so polling its length lost every action after the first page change - and the
+    // journey being recorded (search -> part -> export panel) is mostly navigations.
+    try { if (window.__srRecord) window.__srRecord(entry); } catch (e) {}
   };
   document.addEventListener('click', (e) => {
     const el = e.target && e.target.closest ? (e.target.closest('a,button,input,label,[role=button]') || e.target) : e.target;
@@ -156,6 +161,18 @@ def main() -> int:
     actions: list[dict] = []
     downloads: list[dict] = []
 
+    def _on_action(entry: dict) -> None:
+        if not isinstance(entry, dict):
+            return
+        actions.append(entry)
+        kind = entry.get("kind")
+        if kind in ("click", "check"):
+            state = "" if kind == "click" else f"  -> {entry.get('checked')}"
+            print(f"  {kind:<6} {entry.get('selector', '')}  {entry.get('text', '')[:40]}{state}")
+        elif kind == "fill":
+            shown = "<redacted>" if entry.get("secret") else entry.get("value", "")
+            print(f"  fill   {entry.get('selector', '')}  {shown}")
+
     print(f"vendor url : {url}")
     print(f"profile    : {profile}   (your sign-in is remembered here)")
     print(f"recording  : {out}")
@@ -184,6 +201,9 @@ def main() -> int:
         if not args.no_trace:
             context.tracing.start(screenshots=True, snapshots=True, sources=False)
 
+        # Actions arrive as EVENTS, not by polling: the in-page recorder calls this the instant
+        # something happens, and a binding survives navigation where a per-document array does not.
+        context.expose_binding("__srRecord", lambda _source, entry: _on_action(entry))
         # Re-inject on every document so a navigation never loses the recorder.
         context.add_init_script(_RECORDER_JS)
 
@@ -209,25 +229,14 @@ def main() -> int:
         wire(page)
         page.goto(url)
 
-        # Drain the in-page recorder until the person closes the window. Polling the page is the
-        # only way to see events from a browser we are deliberately NOT driving.
-        seen = 0
+        # Wait for the person to finish. Actions already stream in through the binding above, so
+        # nothing is being detected here - this only watches for the window closing, which the
+        # sync client exposes no push API for. The half-second is a poll INTERVAL on a real signal
+        # (`context.pages` going empty), never a duration anything is concluded from, and there is
+        # deliberately no timeout: the person takes as long as they take.
         try:
-            while True:
-                if not context.pages:
-                    break
-                try:
-                    log = context.pages[0].evaluate("window.__SR_REC__ || []")
-                except Exception:  # noqa: BLE001 - mid-navigation the context blinks; keep going
-                    log = None
-                if isinstance(log, list) and len(log) > seen:
-                    for entry in log[seen:]:
-                        actions.append(entry)
-                        kind = entry.get("kind")
-                        if kind in ("click", "check"):
-                            print(f"  {kind:<6} {entry.get('selector','')}  {entry.get('text','')[:40]}")
-                    seen = len(log)
-                time.sleep(0.4)
+            while context.pages:
+                time.sleep(0.5)
         except KeyboardInterrupt:
             print("\nstopping on Ctrl-C")
         finally:

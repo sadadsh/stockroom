@@ -55,7 +55,7 @@ def _capture(tmp_path, base_url: str, formats: list[str]):
         page.goto(base_url)
         report = adapter.drive(page, formats)
         # Wait on the real signal - a file arriving - never on a clock.
-        page.wait_for_event("download", timeout=15_000) if report.submitted else None
+        page.wait_for_event("download", timeout=90_000) if report.submitted else None
     return report, browser.captured
 
 

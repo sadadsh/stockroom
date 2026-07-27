@@ -152,7 +152,7 @@ def test_the_part_number_actually_appears_in_every_url():
 
 
 def test_ultra_librarian_search_lives_on_the_app_subdomain_not_www():
-    """MEASURED on the owner's machine 2026-07-27, driving the real page with scripts/vendorprobe.py.
+    """MEASURED on the owner's machine 2026-07-27, driving the real page with `scripts/webread.py` (then named vendorprobe.py, since merged).
 
     `https://www.ultralibrarian.com/search?queryText=<MPN>` returns a 404 "PAGE NOT FOUND" - the
     site is now part of Cadence and the search app moved to the `app.` subdomain. Every guided
