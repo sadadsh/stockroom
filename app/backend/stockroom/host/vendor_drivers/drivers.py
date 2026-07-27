@@ -24,16 +24,15 @@ _VENDORS: dict[str, dict] = {
     # a captured fixture of the real page. The stale entry was deleted rather than left behind,
     # because a wrong selector that LOOKS validated is worse than an absent one.
     #
-    # SnapEDA's entry below is still OWNER-VALIDATE - unmeasured first guesses, same as Ultra
-    # Librarian's were. `scripts/webread.py --controls` is the tool that settles it; nobody has run it
-    # against SnapEDA yet, and this comment is the honest record of that gap rather than silence.
-    "snapeda": {
-        "label": "SnapEDA",
-        "consent": [".cookie-accept", "[aria-label='accept cookies']"],
-        "kicad": ["a[href*='kicad']", "[data-format='kicad']", "button[title*='KiCad']"],
-        "altium": ["a[href*='altium']", "[data-format='altium']", "button[title*='Altium']"],
-        "download": ["a.download-button", "[data-testid='download']", "a[download]"],
-    },
+    # SnapEDA is NOT here any more either, and for the same reason: its entry was unmeasured first
+    # guesses, and it now has a measured Python adapter (`capture/vendors.py::SnapMagicAdapter`)
+    # driven by Playwright on every platform. Deleted rather than left behind a flag, because two
+    # implementations of one vendor mean the tests and the owner's machine can disagree silently -
+    # which is exactly what `tests/backend/capture/test_one_implementation_per_vendor.py` enforces.
+    #
+    # The table is EMPTY on purpose and is kept rather than deleted: DigiKey below still builds its
+    # driver through this module's helpers, and an empty table states plainly that no vendor is
+    # implemented as injected JS any more.
 }
 
 _HELPERS = (

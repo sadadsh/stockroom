@@ -16,11 +16,18 @@ def test_ultralibrarian_is_no_longer_driven_from_here():
     assert ".click()" not in js  # but drives nothing: no second implementation lives here
 
 
-def test_snapeda_driver_is_built_for_snapeda():
+def test_snapeda_is_no_longer_driven_from_here():
+    """SnapEDA moved to `stockroom.capture.vendors.SnapMagicAdapter`, exactly as Ultra Librarian
+    did, and for the same reason - its entry here was unmeasured first-guess selectors.
+
+    The old test asserted only that the string "snapeda" appeared in a generated script, which is
+    true of a driver that matches nothing on the real page; it would have passed forever while the
+    vendor was broken. The adapter is measured against the live site and its formats are sequenced
+    (SnapMagic serves one download per format), which no injected-JS driver here ever did.
+    """
     js = build_driver_js("SnapEDA", ["kicad", "altium"])
-    assert "snapeda" in js.lower()
-    assert "try" in js and "catch" in js
-    assert "__STOCKROOM_OVERLAY__" in js
+    assert "__STOCKROOM_OVERLAY__" in js  # still tells the overlay something useful
+    assert ".click()" not in js  # but drives nothing: no second implementation lives here
 
 
 def test_digikey_driver_navigates_to_the_models_page_and_drives_a_provider_download():

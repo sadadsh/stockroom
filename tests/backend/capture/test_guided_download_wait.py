@@ -570,3 +570,90 @@ def test_signed_in_needs_all_three_signals_not_any_one():
     assert ul.signed_in(_StatePage("https://sso.ultralibrarian.com/Account/Login")) is False
     # off the identity host alone is NOT enough - a login form can still be on screen
     assert ul.signed_in(_StatePage("https://app.ultralibrarian.com/x", username=1)) is False
+
+
+# --------------------------------------------------------------------------------------------
+# BOTH VENDORS. Owner, 2026-07-27: *"i wanted both"* / *"check both to see which one has it, and if
+# one download fails use the other."*
+# --------------------------------------------------------------------------------------------
+
+
+def test_the_default_vendor_chain_is_ultra_librarian_then_snapmagic():
+    """Order is the policy: UL first (manufacturer-authored, ONE download for every format),
+    SnapMagic second (blends community/AI content, one download per format)."""
+    from stockroom.capture import runner
+
+    assert runner._vendor_chain(None) == ["ultralibrarian", "snapmagic"]
+
+
+def test_a_single_vendor_or_an_explicit_order_still_works():
+    """The API and existing callers pass one key; a list lets the order be chosen deliberately."""
+    from stockroom.capture import runner
+
+    assert runner._vendor_chain("snapmagic") == ["snapmagic"]
+    assert runner._vendor_chain(["snapmagic", "ultralibrarian"]) == ["snapmagic", "ultralibrarian"]
+
+
+def test_an_unknown_vendor_degrades_instead_of_emptying_the_chain():
+    """A stale vendor name must not produce a run that opens no browser and reports 'nothing to
+    do' - that would look like a complete library rather than a typo."""
+    from stockroom.capture import runner
+
+    assert runner._vendor_chain("no-such-vendor") == ["ultralibrarian"]
+    assert runner._vendor_chain([]) == ["ultralibrarian"]
+
+
+def test_snapmagic_serves_native_altium_which_needs_no_conversion():
+    """The reason SnapMagic matters for the owner's Altium half.
+
+    Ultra Librarian's Altium row ships a P-CAD `.lia`, which nothing here converts yet. SnapMagic's
+    `altium_native` is real `.SchLib`/`.PcbLib`, which `_attach` already stores - so the Altium gap
+    closes through the vendor rather than through a converter.
+    """
+    from stockroom.capture.vendors import get_adapter
+
+    sm = get_adapter("snapmagic")
+    assert sm is not None
+    assert set(sm.capability.tools) == {"kicad", "altium"}
+    assert sm.capability.version_pins["altium"] == "altium_native"
+    # KiCad V6+, never the V3/V4 rows: KiCad 5 emits `(module ...)` that Footprint.load REFUSES.
+    assert sm.capability.version_pins["kicad"] == "kicad_modv6"
+    # one button per format, so the engine MUST sequence it
+    assert sm.capability.formats_exclusive is True
+
+
+def test_exclusive_formats_are_downloaded_one_at_a_time(monkeypatch, tmp_path):
+    """THE SEQUENCING. `formats_exclusive` was DATA nothing read: a single drive with both formats
+    would fetch only the first and silently lose the other."""
+    browser = _FakeBrowser()
+    drives: list[list[str]] = []
+
+    class _Exclusive:
+        capability = VendorCapability(
+            key="faketron", label="Faketron", tools=("kicad", "altium"),
+            formats_exclusive=True, aggregator=False, needs_login=False, instruction="",
+            version_pins={"kicad": "k", "altium": "a"},
+        )
+
+        def resolve_url(self, mpn):
+            return "https://example.invalid/part"
+
+        def drive(self, page, formats):
+            drives.append(list(formats))
+            browser.captured.append(_CapturedFile(tmp_path / f"{formats[0]}.zip"))
+            return DriveReport(selected=list(formats), submitted=True, message="ok")
+
+    monkeypatch.setattr(guided, "get_adapter", lambda key: _Exclusive())
+    src = guided.GuidedCaptureSource(
+        (lambda: None), vendor="faketron", download_root=tmp_path / "dl", headless=True,
+    )
+    src._session = guided._Session(browser=browser, ctx_manager=None, page=_FakePage())
+    report, failure = src._drive_each_format(
+        src._session, _Exclusive(), ["kicad", "altium"], "https://example.invalid/part"
+    )
+
+    assert failure is None
+    assert drives == [["kicad"], ["altium"]], f"formats were not sequenced: {drives}"
+    assert report.selected == ["kicad", "altium"]
+    assert report.submitted is True
+    assert len(browser.captured) == 2, "each exclusive format must produce its OWN download"

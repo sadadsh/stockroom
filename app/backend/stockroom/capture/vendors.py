@@ -504,3 +504,139 @@ def _absolute(page, href: str) -> str:
     from urllib.parse import urljoin
 
     return urljoin(page.url, href)
+
+
+class SnapMagicAdapter:
+    """SnapMagic (SnapEDA). Runs ALONGSIDE Ultra Librarian, never instead of it.
+
+    Owner, 2026-07-27: *"i wanted both"* and *"check both to see which one has it, and if one
+    download fails use the other."* The completion engine already gives that for free - it walks its
+    sources in order and skips any whose `provides()` no longer overlaps what a part still needs -
+    so registering this second is the whole fallback chain.
+
+    ITS MECHANICS ARE THE OPPOSITE OF ULTRA LIBRARIAN'S, which is why it is a separate adapter
+    rather than a config difference (measured 2026-07-27 against the live signed-in site):
+
+      * ONE BUTTON PER FORMAT, so each format is its own download -> `formats_exclusive=True`, and
+        `GuidedCaptureSource` sequences them. Ultra Librarian ticks checkboxes and exports once.
+      * KiCad is a TWO-STEP chooser: `[data-format=kicad_options]` opens a version list whose
+        members are `kicad` (V3 & prior), `kicad_mod` (V4+) and `kicad_modv6` (V6+). Taking the
+        wrong one downloads a library `Footprint.load` REFUSES - the same version trap Ultra
+        Librarian has, at a second vendor, which is why the pin is mandatory data rather than a
+        default.
+      * Altium is ONE step, `[data-format=altium_native]`, and NATIVE - `.SchLib`/`.PcbLib` rather
+        than Ultra Librarian's P-CAD `.lia`. That matters: `guided.py::_attach` can store those
+        directly, with no conversion anywhere.
+      * the 3D model is a SEPARATE download (`#download_step_model`), not part of either.
+
+    THE WALL, stated because it decides the workflow: SnapEDA serves a Cloudflare Turnstile
+    interstitial to a plain browser. That is why the capture engine defaults to camoufox, which was
+    measured walking straight through it. Auto-clicking a Turnstile only trips detection harder
+    (learned 2026-07-24), so a person clears it once into the persistent profile if it ever appears.
+    """
+
+    capability = VendorCapability(
+        key="snapmagic",
+        label="SnapMagic",
+        # Altium is NATIVE here, unlike Ultra Librarian's PCAD `.lia`, so both tools are real.
+        tools=("kicad", "altium"),
+        formats_exclusive=True,
+        # It hosts community and AI-generated models as well as authored ones, so it is ordered
+        # AFTER Ultra Librarian in the source chain rather than being an equal first choice.
+        aggregator=False,
+        needs_login=True,
+        instruction="Clear the human check once if it appears, then the downloads run themselves.",
+        version_pins={"kicad": "kicad_modv6", "altium": "altium_native", "model": "step_model"},
+    )
+
+    def resolve_url(self, mpn: str) -> str:
+        from stockroom.enrich.cad_sources import resolve_cad_sources
+
+        for source in resolve_cad_sources(mpn):
+            if source.key == "snapmagic":
+                return source.url
+        return ""
+
+    def signed_in(self, page) -> bool:
+        """A signed-in SnapEDA session shows an account menu instead of a Login link."""
+        try:
+            if page.locator("a[href*='/account/login']").count() > 0:
+                return False
+            return page.locator("a[href*='/account/logout'], a[href*='logout']").count() > 0
+        except Exception:  # noqa: BLE001 - an unreadable page is not a signed-in one
+            return False
+
+    def open_panel(self, page) -> str:
+        """Search -> part page -> the "Choose Download Format" modal. "" when the formats are up."""
+        if page.locator("[data-format]").count() > 0:
+            return ""
+        body = ""
+        try:
+            body = (page.inner_text("body") or "").lower()
+        except Exception:  # noqa: BLE001 - a page mid-navigation is not a verdict
+            pass
+        if "just a moment" in body or "security verification" in body:
+            return (
+                "SnapMagic is asking you to confirm you are human. Clear it once in this window; "
+                "it is remembered afterwards."
+            )
+        if "/search" in (page.url or ""):
+            results = page.locator('a[href*="view-part"]')
+            try:
+                results.first.wait_for(state="visible", timeout=20_000)
+            except Exception:  # noqa: BLE001 - no result IS an answer, and a normal one
+                return "SnapMagic has no model for this part."
+            href = results.first.get_attribute("href") or ""
+            if not href:
+                return "the SnapMagic result row carried no link"
+            page.goto(_absolute(page, href), wait_until="domcontentloaded")
+        opener = page.locator('a[name="download-modal"]').first
+        if opener.count() == 0:
+            return "SnapMagic showed no download control for this part."
+        opener.click()
+        try:
+            page.locator("[data-format]").first.wait_for(state="attached", timeout=15_000)
+        except Exception:  # noqa: BLE001
+            return "the SnapMagic format list did not open"
+        return ""
+
+    def drive(self, page, formats: list[str]) -> DriveReport:
+        """Select ONE format and trigger its download.
+
+        The engine calls this once per format because on SnapMagic each is a separate file; taking
+        `formats[:1]` here means a caller that forgets cannot silently lose the rest - it gets one
+        file and an honest report naming the one it took.
+        """
+        report = DriveReport()
+        blocked = self.open_panel(page)
+        if blocked:
+            report.missed = list(formats)
+            report.message = blocked
+            return report
+        for fmt in formats[:1]:
+            target = self.capability.version_pins.get(fmt)
+            if not target:
+                report.missed.append(fmt)
+                continue
+            if fmt == "kicad":
+                # the version chooser has to be opened before its members exist in the DOM
+                opener = page.locator('[data-format="kicad_options"]').first
+                if opener.count():
+                    opener.click()
+                    page.wait_for_timeout(300)
+            button = page.locator(f'[data-format="{target}"]').first
+            if button.count() == 0:
+                report.missed.append(fmt)
+                continue
+            button.click()
+            report.selected.append(fmt)
+            report.submitted = True
+        report.message = (
+            f"Requested {' and '.join(report.selected)} from SnapMagic."
+            if report.selected
+            else f"SnapMagic does not offer {' or '.join(report.missed)} for this part."
+        )
+        return report
+
+
+_ADAPTERS[SnapMagicAdapter.capability.key] = SnapMagicAdapter()
