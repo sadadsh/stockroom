@@ -1,4 +1,95 @@
 {
+  "alternates": {
+    "HTS Code (US)": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "8532240020"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "8532.24.0020"
+      }
+    ],
+    "Image": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "https://www.mouser.com/images/murata/images/GCM033D70E105ME36D_SPL.JPG"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/5447/490-Ceramic-Capacitor-Tan-Field.jpg"
+      }
+    ],
+    "Minimum Order Quantity": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "4000"
+      }
+    ],
+    "Product Category": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "Capacitors"
+      }
+    ],
+    "RoHS": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Yes"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "ROHS3 Compliant"
+      }
+    ],
+    "Tolerance": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "10%"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "±10%"
+      }
+    ],
+    "description": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "Capacitor, 4.7 µF, 10%, 0603"
+      },
+      {
+        "confidence": "",
+        "source": "heuristic",
+        "value": "Search results for: GRM188C71C475KE21D Multilayer Ceramic Capacitors MLCC - SMD/SMT – Mouser"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "CAP CER 4.7UF 16V X7S 0603"
+      }
+    ]
+  },
   "category": "Capacitors",
   "datasheet": {
     "fetched_at": "",
@@ -22,7 +113,12 @@
       }
     }
   },
-  "enrichment": {},
+  "enrichment": {
+    "Lead Time": {
+      "confidence": "high",
+      "source": "digikey"
+    }
+  },
   "hashes": null,
   "id": "grm188c71c475ke21d",
   "manufacturer": "muRata",
@@ -37,8 +133,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:36.606898+00:00",
+      "part_number": "81-GRM188C71C475KE1D",
       "price_breaks": [
         {
           "price": 0.077714286,
@@ -68,6 +164,40 @@
       "stock": 18162,
       "url": "https://www.mouser.com/c/?q=GRM188C71C475KE21D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:36.606898+00:00",
+      "part_number": "490-16337-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.05609,
+          "qty": 4000
+        },
+        {
+          "price": 0.05247,
+          "qty": 8000
+        },
+        {
+          "price": 0.05065,
+          "qty": 12000
+        },
+        {
+          "price": 0.04864,
+          "qty": 20000
+        },
+        {
+          "price": 0.04747,
+          "qty": 28000
+        },
+        {
+          "price": 0.04634,
+          "qty": 40000
+        }
+      ],
+      "stock": 104667,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
@@ -117,7 +247,7 @@
     "LCSC Product Name": "CAP CER 4.7uF 16V X7S 0603",
     "LCSC Title": "muRata GRM188C71C475KE21D",
     "LCSC Warehouse Category": "Ceramic Capacitors",
-    "Lead Time": "70 Days",
+    "Lead Time": "17",
     "Lifecycle": "Active",
     "Minimum Order Quantity": "10",
     "Moisture Sensitivity Level": "1 (Unlimited)",
