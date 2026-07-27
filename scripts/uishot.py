@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -833,6 +834,22 @@ def run(args) -> int:
             or any(s.startswith("project-") or s == "part-vendor-data" for s in surfaces))
     if clicking and not args.seed:
         print("  --click implies --seed: clicks can mutate, and the default library is the real one")
+    # NO SHOT MAY CHANGE A SETTING. `--seed` isolates the LIBRARY but never isolated the MACHINE
+    # CONFIG, which is deliberately origin-independent - so a `--click rail.collapse` run wrote
+    # `rail_collapsed: true` into the owner's real ~/.config/stockroom/config.json, and the NEXT
+    # shot measured a 1179px pane instead of 1041px. It had to be restored by hand, and the wrong
+    # measurement was believed in the meantime.
+    #
+    # Applied to EVERY run, not just clicking ones: the app persists UI state (theme, rail, pinned
+    # specs) on ordinary navigation too, so "only clicks can mutate" was already untrue. XDG and
+    # APPDATA are pinned alongside it because `config_dir()` falls back to them when the explicit
+    # override is absent - pinning one and not the others leaves the fallback pointing at the real
+    # directory, which is exactly how the test suite blanked the owner's credentials.
+    config_scratch = tempfile.TemporaryDirectory(prefix="uishot-config-")
+    os.environ["STOCKROOM_CONFIG_DIR"] = str(Path(config_scratch.name) / "config")
+    os.environ["XDG_CONFIG_HOME"] = str(Path(config_scratch.name) / "xdg")
+    os.environ["APPDATA"] = str(Path(config_scratch.name) / "appdata")
+
     scratch: tempfile.TemporaryDirectory | None = None
     library = Path(args.library)
     seed_project: Path | None = None
