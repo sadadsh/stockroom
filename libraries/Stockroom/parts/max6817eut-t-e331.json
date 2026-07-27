@@ -129,8 +129,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Supervisory Circuits 15kV ESD-Protected, Single/Dual/Octal, CMOS Switch Debouncers",
     "display_name": "Supervisory Circuit SOT-23-6",
     "specs": {

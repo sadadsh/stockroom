@@ -128,8 +128,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 10 pF 50 VDC 5% 0402 C0G (NP0)",
     "display_name": "10pF ±5% 0402",
     "specs": {

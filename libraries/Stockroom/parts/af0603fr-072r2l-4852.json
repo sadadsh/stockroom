@@ -226,9 +226,9 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Thick Film Resistors - SMD 2.2Ohms 100 mW 0603  1% AEC-Q200",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Thick Film Resistors - SMD 2.2Ohms 100 mW 0603 1% AEC-Q200",
     "display_name": "2.2Ω ±1% 0603",
     "specs": {
       "Assembly Country of Origin": "Not available",

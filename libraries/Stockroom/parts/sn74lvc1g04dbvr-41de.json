@@ -141,9 +141,9 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Inverters Single A 595-SN74LVC 1G04DBVT A 595-SN74 A 595-SN74LVC1G04DBVT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Inverters Single",
     "display_name": "Inverter SOT-23-5",
     "specs": {
       "Assembly Country of Origin": "Malaysia",

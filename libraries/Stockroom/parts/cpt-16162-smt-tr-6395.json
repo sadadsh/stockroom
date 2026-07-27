@@ -7,8 +7,8 @@
   },
   "derived": {
     "category": "Electromechanical",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Buzzers & Audio Indicators - Board Mount buzzer, 16mmx16mmx2.5 mm deep, P, 3 V, 75 dB, Surface Mount, Audio Transducer",
     "display_name": "Buzzer",
     "specs": {

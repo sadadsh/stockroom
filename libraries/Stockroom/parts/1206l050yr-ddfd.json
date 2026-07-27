@@ -153,8 +153,8 @@
   },
   "derived": {
     "category": "Other",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Resettable Fuses - PPTC 1206 PTC 6V 500MA",
     "display_name": "Resettable Fuse 1206",
     "specs": {

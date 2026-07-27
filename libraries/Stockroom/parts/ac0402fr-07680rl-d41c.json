@@ -141,9 +141,9 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Thick Film Resistors - SMD 680 Ohms 1/16 W 50 V 1 % 0402 100 PPM / C - 55 C /  + 155 C AEC-Q200",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Thick Film Resistors - SMD 680 Ohms 1/16 W 50 V 1 % 0402 100 PPM / C - 55 C / + 155 C AEC-Q200",
     "display_name": "680Ω ±1% 0402",
     "specs": {
       "Assembly Country of Origin": "Not available",

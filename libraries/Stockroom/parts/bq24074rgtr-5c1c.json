@@ -117,9 +117,9 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC A 5 A 595-BQ24074RGTT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Battery Management Li-Ion Batt Chrgr & Pwr-Path Mgmt IC",
     "display_name": "Battery Management 16-VQFN",
     "specs": {
       "Assembly Country of Origin": "Philippines",

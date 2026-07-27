@@ -257,8 +257,8 @@
   },
   "derived": {
     "category": "Resistors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Thin Film Resistors - SMD 0402 1/16W 100Kohms",
     "display_name": "100kΩ ±0.1% 0402",
     "specs": {

@@ -153,9 +153,9 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "ESD Protection Diodes / TVS Diodes Sgl Channel ESD A 59 5-TPD1E10B06DPYT A A 595-TPD1E10B06DPYT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "ESD Protection Diodes / TVS Diodes Sgl Channel ESD",
     "display_name": "ESD Protection Diode 2-X1SON",
     "specs": {
       "Applications": "General Purpose",

@@ -7,8 +7,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "LED Lighting Driver ICs 36-Channel LED Driver, QFN-44 (5.0mm x 5.0mm), T&R, selectable clock",
     "display_name": "LED Lighting Driver IC 44-QFN",
     "specs": {

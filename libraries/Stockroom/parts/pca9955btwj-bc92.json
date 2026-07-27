@@ -129,8 +129,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "LED Lighting Driver ICs 16-bit 57 mA Constant current LED Driver with 1 MHz I2C interface in HTSSOP28 package",
     "display_name": "LED Lighting Driver IC 28-HTSSOP",
     "specs": {

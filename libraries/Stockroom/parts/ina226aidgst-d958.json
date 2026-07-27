@@ -122,9 +122,9 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon A 59 A 595-INA226AIDGSR",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "Current & Power Monitors & Regulators Hi-Side Msmt Bi-Dir Current/Pwr Mon",
     "display_name": "Current & Power Monitor 10-VSSOP",
     "specs": {
       "Accuracy": "±0.02%",

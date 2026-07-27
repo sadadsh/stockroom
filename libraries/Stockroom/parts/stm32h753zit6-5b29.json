@@ -129,8 +129,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "ARM Microcontrollers - MCU High-performance & DSP DP-FPU, Arm Cortex-M7 MCU 2MBytes of Flash 1MB RAM, 480 M",
     "display_name": "ARM Microcontroller 144-LQFP",
     "specs": {

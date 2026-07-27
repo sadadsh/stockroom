@@ -233,9 +233,9 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
-    "description": "ESD Protection Diodes / TVS Diodes 1 CH Ultra Lo capaci tance IEC A 595-TPD A 595-TPD1E05U06DPYT",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
+    "description": "ESD Protection Diodes / TVS Diodes 1 CH Ultra Lo capaci tance IEC",
     "display_name": "ESD Protection Diode 2-X1SON",
     "specs": {
       "Applications": "HDMI",

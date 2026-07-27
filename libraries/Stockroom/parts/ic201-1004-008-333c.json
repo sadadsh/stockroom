@@ -81,8 +81,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "IC & Component Sockets 100Pin QFP Burn-in Skt 0.50 pitch",
     "display_name": "IC & Component Socket",
     "specs": {

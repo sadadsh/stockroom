@@ -25,8 +25,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 22 uF 16 VDC 10% 1206 X6S AEC-Q200",
     "display_name": "22µF ±10% 1206",
     "specs": {

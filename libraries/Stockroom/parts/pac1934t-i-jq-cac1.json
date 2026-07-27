@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "ICs",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Current & Power Monitors & Regulators PAC1934 Four Channel DC Power Monitor",
     "display_name": "Current & Power Monitor 16-UQFN",
     "specs": {

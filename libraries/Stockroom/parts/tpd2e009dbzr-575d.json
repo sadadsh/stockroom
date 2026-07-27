@@ -165,8 +165,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "ESD Protection Diodes / TVS Diodes 2Ch ESD Prot Array H i-Spd Data Inter",
     "display_name": "ESD Protection Diode SOT-23-3",
     "specs": {

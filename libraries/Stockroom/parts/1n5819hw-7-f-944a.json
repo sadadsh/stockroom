@@ -221,8 +221,8 @@
   },
   "derived": {
     "category": "Diodes",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Schottky Diodes & Rectifiers Vr/40V Io/1A T/R",
     "display_name": "Schottky Diode SOD-123",
     "specs": {

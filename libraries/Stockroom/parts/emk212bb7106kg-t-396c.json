@@ -257,8 +257,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 16V 10uF X7R 0805 10 %",
     "display_name": "10µF ±10% 0805",
     "specs": {

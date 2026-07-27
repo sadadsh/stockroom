@@ -45,8 +45,8 @@
   },
   "derived": {
     "category": "Inductors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Power Inductors - SMD 1uH Shld 20% 10.7A 9.78mOhms AECQ2",
     "display_name": "1µH ±20% Power Inductor 1616",
     "specs": {

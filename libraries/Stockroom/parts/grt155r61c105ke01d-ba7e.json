@@ -116,8 +116,8 @@
   },
   "derived": {
     "category": "Capacitors",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 1 uF 16 VDC 10% 0402 X5R AEC-Q200",
     "display_name": "1µF ±10% 0402",
     "specs": {

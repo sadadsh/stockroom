@@ -105,8 +105,8 @@
   },
   "derived": {
     "category": "Switches",
-    "derived_at": "2026-07-27T11:39:39Z",
-    "derived_by": "rules@1",
+    "derived_at": "2026-07-27T12:46:08Z",
+    "derived_by": "rules@2",
     "description": "Toggle Switches TOGGLE SWITCH 5000 MINIATURE",
     "display_name": "Toggle Switch",
     "specs": {
