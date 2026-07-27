@@ -210,11 +210,19 @@ describe("api client", () => {
     fetchMock.mockResolvedValueOnce(
       okJson({
         id: "r1",
-        eda: { kicad: { symbol: { lib: "Device", name: "R", file: "" }, footprint: null, model: null } },
+        assets: {
+          kicad: {
+            symbol: { ref: { lib: "Device", name: "R", file: "" } },
+            footprint: null,
+            model: null,
+          },
+        },
       }),
     );
     const res = await api.attachSymbol("r1", "Device", "R");
-    expect(res.eda.kicad.symbol?.name).toBe("R");
+    // Reads through the `ref` wrapper on purpose: a slot is `{ref, origin?, checks?}`, and
+    // asserting `symbol?.name` would pass against a mock while yielding undefined off the wire.
+    expect(res.assets.kicad.symbol?.ref.name).toBe("R");
     const [url, init] = fetchMock.mock.calls[0];
     expect(new URL(String(url)).pathname).toBe("/api/library/parts/r1/symbol");
     expect((init as RequestInit).method).toBe("POST");

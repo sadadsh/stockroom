@@ -12,23 +12,14 @@ import {
 } from "./queries";
 import { api } from "./client";
 import type { PartDetail } from "./types";
+import { makePartDetail } from "../test/partFixture";
 
-const PART_DETAIL: PartDetail = {
+const PART_DETAIL: PartDetail = makePartDetail({
   id: "lm358",
-  display_name: "LM358",
-  category: "ICs",
-  description: "",
-  tags: [],
   mpn: "LM358DR",
   manufacturer: "TI",
-  datasheet: null,
-  purchase: [],
-  eda: {},
-  provenance: null,
-  hashes: null,
-  enrichment: {},
-  specs: {},
-};
+  derived: { display_name: "LM358", description: "" },
+});
 
 function wrapperWith(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) =>

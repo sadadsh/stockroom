@@ -1,61 +1,66 @@
 import { describe, expect, it } from "vitest";
 import { deriveTitle, deriveAttributes, isReferenceOnlySpecKey } from "./derive";
+import type { DeepPartial } from "fishery";
 import type { PartDetail } from "../api/types";
+import { makePartDetail } from "../test/partFixture";
 
-// A minimal PartDetail factory: only the fields the derivers read carry meaning; the rest
-// are honest empty defaults so the record shape still type-checks.
-function makePart(over: Partial<PartDetail>): PartDetail {
-  return {
+// Only the fields the derivers read carry meaning here, so the shared wire-shaped factory is
+// blanked down to empty defaults and each case fills in exactly what it is about. Blanking
+// rather than re-declaring keeps this file on the one factory the API contract is pinned to.
+function makePart(over: DeepPartial<PartDetail>): PartDetail {
+  // `derived` is destructured and merged rather than spread wholesale: a plain `...over` would
+  // REPLACE the blanked block, so the factory's own defaults ("LM358", "Dual op-amp") would leak
+  // back in - and the fallback cases below assert precisely what happens when those are EMPTY.
+  const { derived, ...rest } = over;
+  return makePartDetail({
     id: "x",
-    display_name: "",
-    category: "",
-    description: "",
-    tags: [],
     mpn: "",
     manufacturer: "",
-    datasheet: null,
-    purchase: [],
-    eda: {},
-    provenance: null,
-    hashes: null,
-    enrichment: {},
-    specs: {},
-    ...over,
-  };
+    derived: { display_name: "", value: "", category: "", description: "", specs: {}, ...derived },
+    ...rest,
+  });
 }
 
 describe("deriveTitle", () => {
   it("builds a resistor masthead from resistance + tolerance + the noun", () => {
     const part = makePart({
-      category: "Resistors",
-      display_name: "1.10k 1% 0603 Panasonic ERJ-P03F1101V",
-      specs: { Resistance: "1.1 kΩ", Tolerance: "±1%", Package: "0603" },
+      derived: {
+        category: "Resistors",
+        display_name: "1.10k 1% 0603 Panasonic ERJ-P03F1101V",
+        specs: { Resistance: "1.1 kΩ", Tolerance: "±1%", Package: "0603" },
+      },
     });
     expect(deriveTitle(part)).toBe("1.1 kΩ ±1% Resistor");
   });
 
   it("builds a capacitor masthead from capacitance + voltage + dielectric", () => {
     const part = makePart({
-      category: "Capacitors",
-      specs: { Capacitance: "0.1 µF", Voltage: "16V", Dielectric: "X7R" },
+      derived: {
+        category: "Capacitors",
+        specs: { Capacitance: "0.1 µF", Voltage: "16V", Dielectric: "X7R" },
+      },
     });
     expect(deriveTitle(part)).toBe("0.1 µF 16V X7R Capacitor");
   });
 
   it("falls back gracefully for an unknown category: first spec + a singularized noun", () => {
     const part = makePart({
-      category: "Thermistors",
-      display_name: "NTC 10K 3950",
-      specs: { Resistance: "10 kΩ" },
+      derived: {
+        category: "Thermistors",
+        display_name: "NTC 10K 3950",
+        specs: { Resistance: "10 kΩ" },
+      },
     });
     expect(deriveTitle(part)).toBe("10 kΩ Thermistor");
   });
 
   it("titles a spec-less IC by its MPN, not a junk spec fragment", () => {
     const part = makePart({
-      category: "ICs",
       mpn: "SN74LVC138AQPWREP",
-      specs: { "Base Product Number": "LVC138", Function: "Decoder" },
+      derived: {
+        category: "ICs",
+        specs: { "Base Product Number": "LVC138", Function: "Decoder" },
+      },
     });
     // was "LVC IC" (first spec + noun); the MPN is the recognizable identifier instead
     expect(deriveTitle(part)).toBe("SN74LVC138AQPWREP");
@@ -63,26 +68,32 @@ describe("deriveTitle", () => {
 
   it("titles a diode lacking rating specs by its MPN, not 'Single Diode'", () => {
     const part = makePart({
-      category: "Diodes",
       mpn: "599-0160-137F",
-      specs: { Configuration: "Single" },
+      derived: {
+        category: "Diodes",
+        specs: { Configuration: "Single" },
+      },
     });
     expect(deriveTitle(part)).toBe("599-0160-137F");
   });
 
   it("keeps the category noun when a known category is missing its title specs", () => {
     const part = makePart({
-      category: "Resistors",
-      display_name: "raw dense name",
-      specs: { Package: "0805" },
+      derived: {
+        category: "Resistors",
+        display_name: "raw dense name",
+        specs: { Package: "0805" },
+      },
     });
     expect(deriveTitle(part)).toBe("0805 Resistor");
   });
 
   it("skips an empty-in-disguise registry spec when composing the title", () => {
     const part = makePart({
-      category: "Capacitors",
-      specs: { Capacitance: "0.1 µF", Voltage: "Not available", Dielectric: "X7R" },
+      derived: {
+        category: "Capacitors",
+        specs: { Capacitance: "0.1 µF", Voltage: "Not available", Dielectric: "X7R" },
+      },
     });
     expect(deriveTitle(part)).toBe("0.1 µF X7R Capacitor");
   });
@@ -91,9 +102,10 @@ describe("deriveTitle", () => {
     // Specs arrive alphabetically, so a country-of-origin lands first; the fallback must
     // never turn that into the headline. A connector earns its title from real specs.
     const part = makePart({
-      category: "Connectors",
-      display_name: "USB4105-GF-A Top-Mount GCT",
-      specs: {
+      derived: {
+        category: "Connectors",
+        display_name: "USB4105-GF-A Top-Mount GCT",
+        specs: {
         "Assembly Country of Origin": "China",
         Brand: "GCT",
         Color: "Black",
@@ -101,6 +113,7 @@ describe("deriveTitle", () => {
         "Number of Contacts": "16 Contact",
         Gender: "Receptacle (Female)",
         "Mounting Style": "Top-Mount",
+      },
       },
     });
     const title = deriveTitle(part);
@@ -110,12 +123,14 @@ describe("deriveTitle", () => {
 
   it("skips country / brand junk in the first-spec fallback for an unregistered category", () => {
     const part = makePart({
-      category: "Sensors",
-      display_name: "BME280",
-      specs: {
+      derived: {
+        category: "Sensors",
+        display_name: "BME280",
+        specs: {
         "Country of Origin": "China",
         Brand: "Bosch",
         "Supply Voltage": "3.3 V",
+      },
       },
     });
     expect(deriveTitle(part)).toBe("3.3 V Sensor");
@@ -123,15 +138,17 @@ describe("deriveTitle", () => {
 
   it("falls back to the raw display_name when there is no usable spec", () => {
     const part = makePart({
-      category: "Widgets",
-      display_name: "ACME 1234 Whatsit",
-      specs: {},
+      derived: {
+        category: "Widgets",
+        display_name: "ACME 1234 Whatsit",
+        specs: {},
+      },
     });
     expect(deriveTitle(part)).toBe("ACME 1234 Whatsit");
   });
 
   it("never returns empty: an empty name falls through to the category", () => {
-    const part = makePart({ category: "Sensors", display_name: "", specs: {} });
+    const part = makePart({ derived: { category: "Sensors", display_name: "", specs: {} } });
     expect(deriveTitle(part)).toBe("Sensors");
   });
 });
@@ -139,9 +156,10 @@ describe("deriveTitle", () => {
 describe("deriveAttributes", () => {
   it("derives the key parameters from specs, ranked electrical-first, and IGNORES tags", () => {
     const part = makePart({
-      category: "Resistors",
-      tags: ["Thin Film", "General Purpose"], // manual tags are NOT folded into derived attributes
-      specs: {
+      tags: ["Thin Film", "General Purpose"],
+      derived: {
+        category: "Resistors",
+        specs: {
         Resistance: "1.1 kΩ", // the headline value is in the title, so never a chip
         Tolerance: "1%",
         "Power Rating": "0.2 W",
@@ -149,6 +167,7 @@ describe("deriveAttributes", () => {
         Composition: "Thick Film",
         "Mounting Type": "SMD",
         RoHS: "Yes",
+      },
       },
     });
     const attrs = deriveAttributes(part);
@@ -164,8 +183,9 @@ describe("deriveAttributes", () => {
 
   it("caps the ranked set and leads with the electrical parameters", () => {
     const part = makePart({
-      category: "Resistors",
-      specs: {
+      derived: {
+        category: "Resistors",
+        specs: {
         Tolerance: "1%",
         "Power Rating": "0.2 W",
         "Voltage Rating": "75 V",
@@ -176,6 +196,7 @@ describe("deriveAttributes", () => {
         RoHS: "Yes",
         Qualification: "AEC-Q200",
       },
+      },
     });
     const attrs = deriveAttributes(part);
     expect(attrs.length).toBeLessThanOrEqual(14); // the ceiling; the detail band shows a capped highlight glance
@@ -184,19 +205,21 @@ describe("deriveAttributes", () => {
 
   it("maps a through-hole code and keeps a value that is already a label", () => {
     expect(
-      deriveAttributes(makePart({ category: "Resistors", specs: { "Mounting Type": "THT" } })),
+      deriveAttributes(makePart({ derived: { category: "Resistors", specs: { "Mounting Type": "THT" } } })),
     ).toEqual(["Through Hole"]);
     expect(
       deriveAttributes(
-        makePart({ category: "Resistors", specs: { "Mounting Type": "Through Hole" } }),
+        makePart({ derived: { category: "Resistors", specs: { "Mounting Type": "Through Hole" } } }),
       ),
     ).toEqual(["Through Hole"]);
   });
 
   it("skips an empty-in-disguise spec value instead of chipping it", () => {
     const part = makePart({
-      category: "Resistors",
-      specs: { Package: "N/A", RoHS: "Yes" },
+      derived: {
+        category: "Resistors",
+        specs: { Package: "N/A", RoHS: "Yes" },
+      },
     });
     const attrs = deriveAttributes(part);
     expect(attrs).not.toContain("N/A");
@@ -204,20 +227,22 @@ describe("deriveAttributes", () => {
   });
 
   it("emits no compliance chip for a non-compliant value", () => {
-    const part = makePart({ category: "Resistors", specs: { RoHS: "No" } });
+    const part = makePart({ derived: { category: "Resistors", specs: { RoHS: "No" } } });
     expect(deriveAttributes(part)).toEqual([]);
   });
 
   it("sinks bare dimensions below real attributes (no 0.8 mm noise)", () => {
     const part = makePart({
-      category: "Diodes",
-      specs: {
+      derived: {
+        category: "Diodes",
+        specs: {
         Height: "0.8 mm",
         Length: "2 mm",
         Width: "1.25 mm",
         Package: "0805",
         "Mounting Type": "SMD",
         RoHS: "Yes",
+      },
       },
     });
     const attrs = deriveAttributes(part);
@@ -228,12 +253,14 @@ describe("deriveAttributes", () => {
 
   it("skips commercial / provenance specs (tariff, country, packaging)", () => {
     const part = makePart({
-      category: "Resistors",
-      specs: {
+      derived: {
+        category: "Resistors",
+        specs: {
         "US Tariff %": "8",
         "Assembly Country of Origin": "China",
         Packaging: "Tape & Reel",
         Package: "0603",
+      },
       },
     });
     expect(deriveAttributes(part)).toEqual(["0603"]);

@@ -20,7 +20,7 @@
 import type { ReactNode } from "react";
 import type { PartDetail } from "../api/types";
 import { EDA_DATA_FIELDS, edaTool } from "../lib/edaRegistry.generated";
-import { assetsFor } from "../lib/edaTarget";
+import { assetRef, assetsFor } from "../lib/edaTarget";
 import { compactUrl } from "../lib/compactUrl";
 import { Text } from "../lib/copy";
 import { EditableText } from "./EditableText";
@@ -73,14 +73,14 @@ function resolve(field: string, detail: PartDetail): Resolved {
     case "manufacturer":
       return { text: detail.manufacturer ?? "" };
     case "category":
-      return { text: detail.category ?? "" };
+      return { text: detail.derived.category ?? "" };
     case "description":
-      return { text: detail.description ?? "" };
+      return { text: detail.derived.description ?? "" };
     case "symbol":
     case "footprint": {
       // The reference as the TOOL resolves it (`<lib>:<name>`), not the on-disk file name: that
       // is the string the schematic actually carries, so it is the one worth checking.
-      const ref = field === "symbol" ? kicad.symbol : kicad.footprint;
+      const ref = assetRef(field === "symbol" ? kicad.symbol : kicad.footprint);
       const lib = (ref?.lib ?? "").trim();
       const name = (ref?.name ?? "").trim();
       if (!name) return { text: "" };

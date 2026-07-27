@@ -3,22 +3,34 @@
  * that are not ready for THAT tool. Pure functions, no React: the panel and the Settings
  * rollup read readiness through this one module instead of each re-deriving it.
  *
- * Readiness is now GENERIC. A part carries one symmetric asset bundle per tool
- * (`detail.eda[tool]`, matching `stockroom.model.part.EdaAssets`), and the tool's facts come
- * from `edaRegistry.generated.ts`, which is generated from the Python registry and gated by a
- * pytest. So "is this part ready for tool X" is the same check for every tool, and adding a
- * third tool changes nothing here.
+ * Readiness is GENERIC IN BOTH ARGUMENTS: it is `f(part_class, tool)`, and neither half is a
+ * branch. A part carries one symmetric asset bundle per tool (`detail.assets[tool]`, matching
+ * `stockroom.model.asset.EdaAssets`); the tool's facts and the class's needs BOTH come from
+ * `edaRegistry.generated.ts`, which is generated from the Python registry and gated by a
+ * pytest. So adding a third EDA tool, or a fifth part class, changes nothing in this file.
  *
- * That symmetry is the fix, not a refactor. This module used to branch:
- * `if (tool === "altium")` read `part.altium_symbol`, while the KiCad path read `part.symbol`
- * -- and because Altium had no 3D-model slot at all, the branch simply asserted
- * `model = true`. Any part whose Altium assets were attached still read "CAD Incomplete"
- * forever (live 2026-07-24, reported ~10 times). A branch per tool is how that happens; a
- * uniform lookup is how it cannot.
+ * That symmetry is the fix, not a refactor, and it has been paid for twice:
+ *
+ *  - PER TOOL: this module used to branch `if (tool === "altium")` to read `part.altium_symbol`
+ *    while the KiCad path read `part.symbol` -- and because Altium had no 3D-model slot at all,
+ *    the branch simply asserted `model = true`. Any part whose Altium assets were attached
+ *    still read "CAD Incomplete" forever (live 2026-07-24, reported ~10 times).
+ *  - PER CLASS: it then branched `if (part.passive)` to excuse the 3D model. `passive` became a
+ *    four-valued `part_class` on 2026-07-27, and the naive port of that branch
+ *    (`part_class === "passive"`) would have reported every `mechanical` part as missing a
+ *    symbol forever -- a class that has no symbol BY DEFINITION. Same defect, same shape.
+ *
+ * A branch per tool, or per class, is how that happens; a table lookup is how it cannot.
  */
-import { ASSET_LABELS, DEFAULT_EDA_TOOL, EDA_TOOLS, edaTool } from "./edaRegistry.generated";
-import type { EdaToolSpec, EmbeddedAssetSpec } from "./edaRegistry.generated";
-import type { AssetRef, EdaAssets, PartDetail, PartSummary } from "../api/types";
+import {
+  ASSET_LABELS,
+  DEFAULT_EDA_TOOL,
+  EDA_TOOLS,
+  edaTool,
+  partClass,
+} from "./edaRegistry.generated";
+import type { EdaToolSpec, EmbeddedAssetSpec, PartClassSpec } from "./edaRegistry.generated";
+import type { Asset, AssetRef, EdaAssets, PartDetail, PartSummary } from "../api/types";
 
 export type EdaTool = string;
 
@@ -48,14 +60,28 @@ const EMPTY_ASSETS: EdaAssets = { symbol: null, footprint: null, model: null };
 
 /** A part's asset bundle for one tool. Absent tools read as an empty bundle, never as
  * another tool's assets. */
-export function assetsFor(part: Pick<PartDetail, "eda">, tool: EdaTool): EdaAssets {
-  return part.eda?.[tool] ?? EMPTY_ASSETS;
+export function assetsFor(part: Pick<PartDetail, "assets">, tool: EdaTool): EdaAssets {
+  return part.assets?.[tool] ?? EMPTY_ASSETS;
 }
 
-/** True when a reference actually resolves: an entry-shaped asset by `name`, a file-shaped
- * one (a 3D model) by `file`. A container with no entry is NOT present. Mirrors
+/**
+ * Just the REFERENCE out of an asset slot, for callers that only need where the asset is.
+ *
+ * An asset is `{ref, origin?, checks?}`, not a bare `{lib,name,file}` -- that wrapper is what
+ * makes "where did this file come from" answerable at all. Reading `slot.name` instead of
+ * `slot.ref.name` yields `undefined` and reports the asset ABSENT, silently, which is the
+ * 2026-07-27 break this whole module was rewritten for. Going through here means no call site
+ * has to remember the wrapper.
+ */
+export function assetRef(asset: Asset | null | undefined): AssetRef | null {
+  return asset?.ref ?? null;
+}
+
+/** True when an asset actually resolves: an entry-shaped one by `name`, a file-shaped one
+ * (a 3D model) by `file`. A container with no entry is NOT present. Mirrors
  * `stockroom.model.part.asset_present`. */
-export function assetPresent(ref: AssetRef | null | undefined): boolean {
+export function assetPresent(asset: Asset | null | undefined): boolean {
+  const ref = assetRef(asset);
   return !!ref && !!(ref.name || ref.file);
 }
 
@@ -78,8 +104,9 @@ export interface AssetReadiness {
    * tool, so it needs that tool installed on this machine).
    */
   embedded: Record<string, EmbeddedAssetSpec>;
-  /** Ready when the symbol AND footprint are present; a 3D model is reported when absent but
-   * never blocks readiness (a footprint places fine without one). */
+  /** Ready when every BLOCKING asset the part's class needs from this tool is present. A 3D
+   * model is reported when absent but never blocks (a footprint places fine without one), and
+   * a class that needs nothing -- a passive, a fiducial -- is ready by definition. */
   ready: boolean;
 }
 
@@ -101,39 +128,70 @@ export function reportableKinds(
   );
 }
 
+/**
+ * Asset kinds a part of this class NEEDS, before the tool is considered. The per-part
+ * `requires_override` REPLACES the class list when it applies, so one odd part never forces a
+ * new class. Mirrors `stockroom.model.part_class._wanted`.
+ *
+ * A null override means "use the class default"; an override with an empty `needs` is somebody
+ * stating that this one part needs nothing, and collapsing the two is how an escape hatch
+ * silently stops working -- hence the explicit null check rather than a truthiness test.
+ */
+export function neededKinds(
+  part: Pick<PartDetail, "part_class" | "requires_override">,
+  tool: EdaTool,
+  spec: Pick<PartClassSpec, "assets"> | undefined,
+): string[] {
+  const override = part.requires_override;
+  if (override && (override.tools.length === 0 || override.tools.includes(tool))) {
+    return [...override.needs];
+  }
+  return [...(spec?.assets ?? [])];
+}
+
+/**
+ * An asset kind that is reported when absent but does NOT hold readiness open: a footprint
+ * places fine without a 3D body. Mirrors `stockroom.model.part.tool_assets_ready`, which asks
+ * for the symbol and the footprint only.
+ *
+ * Named rather than inlined because it IS the rule, and because expressing it as "everything
+ * the class needs except this" is what lets a `mechanical` part (footprint, no symbol) be
+ * ready at all. Hardcoding `symbol && footprint` the way the backend still does cannot.
+ */
+const NON_BLOCKING_KINDS: ReadonlySet<string> = new Set(["model"]);
+
 // The per-tool asset readiness of one part detail.
 export function assetReadiness(part: PartDetail, tool: EdaTool): AssetReadiness {
   const spec = edaTool(tool);
   const assets = assetsFor(part, tool);
   const unsupported = spec?.unsupportedAssets ?? {};
   const embedded = spec?.embeddedAssets ?? {};
-  const kinds = reportableKinds({
+  // What the TOOL can hold, intersected with what the CLASS needs. Both are table lookups.
+  const reportable = reportableKinds({
     assetKinds: spec?.assetKinds ?? ["symbol", "footprint", "model"],
     unsupportedAssets: unsupported,
     embeddedAssets: embedded,
   });
+  const needed = neededKinds(part, tool, partClass(part.part_class));
 
+  // `present` covers every kind the TOOL can hold, because it answers "is this attached" and a
+  // passive that happens to carry a stock symbol reference should say so. `missing` and `ready`
+  // cover only what the CLASS needs, because they answer "is there work left to do" -- and a
+  // gap a part can never have is not work. Reporting one is precisely "CAD Incomplete forever".
   const present: Record<string, boolean> = {};
-  const missing: string[] = [];
-  for (const kind of kinds) {
-    // A passive references the stock footprint, which carries its own 3D body, so it needs
-    // no owned model. Mirrors PartRecord.missing_assets.
-    if (kind === "model" && part.passive) {
-      present[kind] = true;
-      continue;
-    }
-    const ok = assetPresent(assets[kind as keyof EdaAssets]);
-    present[kind] = ok;
-    if (!ok) missing.push(assetTitleLabel(kind));
+  for (const kind of reportable) {
+    present[kind] = assetPresent(assets[kind as keyof EdaAssets]);
   }
 
-  return {
-    present,
-    missing,
-    unsupported,
-    embedded,
-    ready: !!present.symbol && !!present.footprint,
-  };
+  const missing: string[] = [];
+  let ready = true;
+  for (const kind of reportable) {
+    if (!needed.includes(kind) || present[kind]) continue;
+    missing.push(assetTitleLabel(kind));
+    if (!NON_BLOCKING_KINDS.has(kind)) ready = false;
+  }
+
+  return { present, missing, unsupported, embedded, ready };
 }
 
 export interface SummaryReadiness {

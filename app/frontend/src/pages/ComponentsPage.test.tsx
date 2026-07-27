@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { api } from "../api/client";
 import type { EnrichmentResult, PartDetail, PartSummary } from "../api/types";
+import { makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
 import { RouterProvider } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
@@ -73,22 +74,13 @@ const SUMMARY: PartSummary = {
   missing: [],
 };
 
-const DETAIL: PartDetail = {
+const DETAIL: PartDetail = makePartDetail({
   id: "lm358",
-  display_name: "LM358",
-  category: "ICs",
-  description: "Dual Operational Amplifier",
-  tags: ["op-amp"],
   mpn: "LM358DR",
   manufacturer: "Texas Instruments",
-  datasheet: null,
-  purchase: [],
-  eda: {},
-  provenance: null,
-  hashes: null,
-  enrichment: {},
-  specs: {},
-};
+  tags: ["op-amp"],
+  derived: { display_name: "LM358", description: "Dual Operational Amplifier" },
+});
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -214,7 +206,9 @@ describe("ComponentsPage", () => {
       incomplete: 0,
     });
     mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.moveCategory.mockResolvedValue({ ...DETAIL, category: "Passives" });
+    mockApi.moveCategory.mockResolvedValue(
+      makePartDetail({ ...DETAIL, derived: { ...DETAIL.derived, category: "Passives" } }),
+    );
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();
@@ -406,7 +400,9 @@ describe("ComponentsPage", () => {
       specs: { pinout: { value: pins, source: "datasheet", confidence: "high" } },
       schema_version: 1,
     });
-    mockApi.setSpecs.mockResolvedValue({ ...DETAIL, specs: { pinout: pins } });
+    mockApi.setSpecs.mockResolvedValue(
+      makePartDetail({ ...DETAIL, derived: { ...DETAIL.derived, specs: { pinout: pins } } }),
+    );
 
     wrap(<ComponentsPage />);
     const user = userEvent.setup();

@@ -44,12 +44,15 @@ import {
 } from "../lib/sourcingOrder";
 import { distributorLabel } from "../lib/sourced";
 import {
+  assetPresent,
   assetReadiness,
+  assetRef,
   assetsFor,
   assetTitleLabel,
+  neededKinds,
   type AssetReadiness,
 } from "../lib/edaTarget";
-import { EDA_TOOLS } from "../lib/edaRegistry.generated";
+import { EDA_TOOLS, partClass } from "../lib/edaRegistry.generated";
 import { useInlineEdit } from "../lib/useInlineEdit";
 import { Text } from "../lib/copy";
 import { Icon } from "./Icon";
@@ -514,19 +517,26 @@ export function DetailPanel({
       return next;
     });
   }, []);
-  // A passive owns no 3D-model file: it inherits the KiCad stock footprint's built-in model
-  // (the model.glb endpoint resolves it from the footprint). So "has a 3D model" for a passive
-  // is "has a footprint", not "has an owned model.file" (which the passive add correctly leaves
-  // null). Without this a passive read "Not Linked" though its 3D rendered during add (A8).
+  // A class that needs no 3D model of its OWN inherits the one built into the stock footprint
+  // it references (the model.glb endpoint resolves it from the footprint). So "has a 3D model"
+  // for such a part is "has a footprint", not "has an owned model.file" - which the passive add
+  // correctly leaves null. Without this a passive read "Not Linked" though its 3D rendered
+  // during add (A8).
+  //
+  // Asked of the CLASS TABLE rather than of `part_class === "passive"`: `virtual` owns no files
+  // either, and hardcoding the one class that happens to exist today is how the sibling defect
+  // (every `mechanical` part missing a symbol forever) gets written a second time.
   const kicadAssets = detail ? assetsFor(detail, "kicad") : null;
-  const hasModel = detail?.passive
-    ? !!kicadAssets?.footprint?.name
-    : !!kicadAssets?.model?.file;
+  const kicadNeeds = detail ? neededKinds(detail, "kicad", partClass(detail.part_class)) : [];
+  const ownsModelFile = kicadNeeds.includes("model");
+  const hasModel = ownsModelFile
+    ? !!assetRef(kicadAssets?.model)?.file
+    : assetPresent(kicadAssets?.footprint);
   // EVERY product photo on record, not just the one that won the specs slot (owner 2026-07-25).
   // Both distributor adapters write specs["Image"] with setdefault, so a second vendor's genuinely
   // different photograph was preserved in `alternates["Image"]` and shown to nobody. Still hidden
   // until clicked - it is the trigger that got bigger, not the default state.
-  const partPhotoSet = partPhotos(detail?.specs, detail?.alternates);
+  const partPhotoSet = partPhotos(detail?.derived.specs, detail?.alternates);
   // Inline 3D render (C1/C2): fetch + render the GLB right in the hero, auto-rotating and
   // pointer-events-none so it never fights the tile's own click. Enabled only for a part that
   // actually has a model, so a model-less part pays nothing.
@@ -595,9 +605,14 @@ export function DetailPanel({
   // message: a 3D body is written INTO the footprint's .PcbLib, so there must be a footprint to
   // write into and a model file to write. Offered only when the registry says the kind is
   // embeddable at all, so a tool that gains an embed route needs no edit here.
-  const altiumFootprint = assetsFor(detail, "altium").footprint;
+  const altiumFootprint = assetRef(assetsFor(detail, "altium").footprint);
+  // Embedding is offered only when the registry says the kind is embeddable AND the part's own
+  // class actually needs a 3D model. Offering it to a fiducial would name a gap it cannot have.
+  const altiumNeedsModel = neededKinds(detail, "altium", partClass(detail.part_class)).includes(
+    "model",
+  );
   const embed3d: Embed3dState | null =
-    "model" in altium.embedded && !detail.passive
+    "model" in altium.embedded && altiumNeedsModel
       ? {
           done: !!altium.present.model,
           // The blocker to state, in the order the user would fix them. Null means ready to run.
@@ -619,8 +634,8 @@ export function DetailPanel({
 
   // What the part still needs, files + data, for the one Complete-Part window and its trigger.
   const missingAssets = [
-    !kicadAssets?.symbol?.name ? "symbol" : null,
-    !kicadAssets?.footprint?.name ? "footprint" : null,
+    !assetPresent(kicadAssets?.symbol) ? "symbol" : null,
+    !assetPresent(kicadAssets?.footprint) ? "footprint" : null,
     !hasModel ? "3D model" : null,
   ].filter((x): x is string => x !== null);
   // Altium gaps read straight off the part RECORD (altium.missing from assetReadiness), so an
@@ -634,7 +649,7 @@ export function DetailPanel({
   const canComplete = !!(onEditField || onAttachSymbol || onAttachFootprint);
 
   const derived = deriveTitle(detail);
-  const name = detail.display_name.trim();
+  const name = detail.derived.display_name.trim();
   // The headline is the best HUMAN name: a passive gets its derived spec title
   // ("0.1 µF X7R Capacitor"); an opaque part whose title fell back to the MPN shows its
   // display name instead when that carries something the MPN does not, so the MPN never
@@ -650,7 +665,7 @@ export function DetailPanel({
   // saying which was in force. The fold routes the displaced value into `alternates`, so the
   // existing "N Sources" disclosure shows and swaps it like any other vendor disagreement.
   const mergedSpecs = mergeSameConcept(
-    groupSpecs(detail.category, detail.specs),
+    groupSpecs(detail.derived.category, detail.derived.specs),
     detail.alternates ?? {},
   );
   const allSpecGroups = mergedSpecs.groups;
@@ -669,7 +684,7 @@ export function DetailPanel({
   const tradeGroup = allSpecGroups.find((group) => group.title === TRADE_GROUP) ?? null;
   // The persisted pinout (M6i) reads from the record's specs, its provenance from
   // the enrichment map. Shown when present, in both read-only and editable modes.
-  const pinout = parsePinout(detail.specs);
+  const pinout = parsePinout(detail.derived.specs);
   const pinoutProvenance = detail.enrichment?.pinout;
 
   // The workbench tabs: Specs and Sourcing always; Pinout only when the record carries one;
@@ -706,7 +721,7 @@ export function DetailPanel({
       >
         <TitleBlock
           headline={headline}
-          name={detail.display_name}
+          name={detail.derived.display_name}
           onRename={onEditField ? (v) => onEditField("display_name", v) : undefined}
           busy={busy}
         />
@@ -874,28 +889,30 @@ export function DetailPanel({
               <AssetTile
                 devId="detail.asset-symbol"
                 name="Symbol"
-                present={!!kicadAssets?.symbol?.name}
+                present={assetPresent(kicadAssets?.symbol)}
                 className="h-[142px]"
                 art={<SymbolArt />}
                 thumb={
-                  kicadAssets?.symbol?.name ? (
+                  assetPresent(kicadAssets?.symbol) ? (
                     <PreviewImage kind="symbol" partId={detail.id} fallback={<SymbolArt />} />
                   ) : undefined
                 }
-                onOpen={kicadAssets?.symbol?.name ? () => setPreview("symbol") : undefined}
+                onOpen={assetPresent(kicadAssets?.symbol) ? () => setPreview("symbol") : undefined}
               />
               <AssetTile
                 devId="detail.asset-footprint"
                 name="Footprint"
-                present={!!kicadAssets?.footprint?.name}
+                present={assetPresent(kicadAssets?.footprint)}
                 className="h-[142px]"
                 art={<FootprintArt />}
                 thumb={
-                  kicadAssets?.footprint?.name ? (
+                  assetPresent(kicadAssets?.footprint) ? (
                     <PreviewImage kind="footprint" partId={detail.id} fallback={<FootprintArt />} />
                   ) : undefined
                 }
-                onOpen={kicadAssets?.footprint?.name ? () => setPreview("footprint") : undefined}
+                onOpen={
+                  assetPresent(kicadAssets?.footprint) ? () => setPreview("footprint") : undefined
+                }
               />
             </div>
           </div>
@@ -915,7 +932,7 @@ export function DetailPanel({
                 devId="detail.photo"
                 variant="panel"
                 photos={partPhotoSet}
-                partName={detail.display_name}
+                partName={detail.derived.display_name}
               />
             </div>
           ) : null}
@@ -931,9 +948,10 @@ export function DetailPanel({
               needsList={needsList}
               onComplete={() => setCompleteOpen(true)}
               removable={
-                // a passive references KiCad STOCK assets by id (no owned files);
-                // element removal applies to owned files only
-                onEditField && !detail.passive
+                // a class that needs no assets of its own (a passive, a fiducial) references
+                // STOCK assets by id and owns no files; element removal applies to owned files
+                // only. Read off the class table, never off one hardcoded class name.
+                onEditField && (partClass(detail.part_class)?.assets.length ?? 0) > 0
                   ? ([
                       // Every tool's attached assets, from the registry: a third EDA tool
                       // becomes removable by being registered, with no edit here. `kind` is
@@ -942,8 +960,8 @@ export function DetailPanel({
                         tool.assetKinds
                           .filter((k) => !(k in tool.unsupportedAssets))
                           .map((k) => {
-                            const ref = assetsFor(detail, tool.key)[k as "symbol"];
-                            if (!ref || !(ref.name || ref.file)) return null;
+                            const slot = assetsFor(detail, tool.key)[k as "symbol"];
+                            if (!assetPresent(slot)) return null;
                             return {
                               kind: `${tool.key}_${k}`,
                               label: `${tool.label} ${assetTitleLabel(k)}`,
@@ -990,13 +1008,13 @@ export function DetailPanel({
                 differently, and moving the text without its disclosure would silently drop the
                 ability to choose between them. */}
             <DescriptionLede
-              text={detail.description}
+              text={detail.derived.description}
               alternates={detail.alternates?.description ?? []}
               onUse={onEditField ? (value) => onEditField("description", value) : undefined}
             />
             <KeySpecificationsBlock
               groups={allSpecGroups}
-              category={detail.category}
+              category={detail.derived.category}
               pinned={pinnedSpecs}
               onTogglePin={togglePin}
             />
@@ -1020,7 +1038,7 @@ export function DetailPanel({
                 groups={specGroups}
                 alternates={specAlternates}
                 onUseSpecValue={onUseSpecValue}
-                category={detail.category}
+                category={detail.derived.category}
                 pinned={pinnedSpecs}
                 onTogglePin={togglePin}
               />
@@ -1118,10 +1136,10 @@ export function DetailPanel({
             <EnrichPanel
               key={detail.mpn}
               mpn={detail.mpn}
-              category={detail.category}
+              category={detail.derived.category}
               current={{
                 manufacturer: detail.manufacturer,
-                description: detail.description,
+                description: detail.derived.description,
               }}
               onApply={onEditField!}
               onApplyPinout={onApplyPinout}
@@ -1152,7 +1170,7 @@ export function DetailPanel({
                 description: (
                   <AlternatesDisclosure
                     entries={detail.alternates?.description ?? []}
-                    current={detail.description}
+                    current={detail.derived.description}
                     onUse={onEditField ? (value) => onEditField("description", value) : undefined}
                   />
                 ),
@@ -1211,11 +1229,11 @@ export function DetailPanel({
       <PreviewModal
         open={preview !== null}
         partId={detail.id}
-        partName={detail.display_name}
+        partName={detail.derived.display_name}
         available={{
           model: hasModel,
-          symbol: !!kicadAssets?.symbol?.name,
-          footprint: !!kicadAssets?.footprint?.name,
+          symbol: assetPresent(kicadAssets?.symbol),
+          footprint: assetPresent(kicadAssets?.footprint),
         }}
         initialKind={preview ?? "symbol"}
         onClose={() => setPreview(null)}
@@ -1259,7 +1277,7 @@ export function DetailPanel({
           title="Delete This Part?"
           body={
             <>
-              This removes {detail.display_name}'s symbol, footprint, and record in
+              This removes {detail.derived.display_name}'s symbol, footprint, and record in
               one commit. You can restore it from git history.
             </>
           }

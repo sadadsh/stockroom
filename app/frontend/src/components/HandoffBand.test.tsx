@@ -10,32 +10,38 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BAND_ORDER, HandoffBand, handoffFields } from "./HandoffBand";
 import { EDA_DATA_FIELDS } from "../lib/edaRegistry.generated";
+import type { DeepPartial } from "fishery";
 import type { PartDetail } from "../api/types";
+import { makeAsset, makePartDetail } from "../test/partFixture";
 
-const part = (over: Partial<PartDetail> = {}): PartDetail =>
-  ({
+// NO CAST. This fixture used to end `as unknown as PartDetail`, which is precisely how it kept
+// type-checking through the 2026-07-27 rename while describing a record the server had stopped
+// sending: a double cast tells the compiler to stop looking. It builds through the shared
+// wire-shaped factory now, so the API contract really does hold it.
+const part = (over: DeepPartial<PartDetail> = {}): PartDetail =>
+  makePartDetail({
     id: "p1",
-    display_name: "TPD6E05U06RVZR",
-    category: "Diodes",
-    description: "ESD protection diodes",
-    tags: [],
     mpn: "TPD6E05U06RVZR",
     manufacturer: "Texas Instruments",
-    datasheet: { file: "", source_url: "https://www.ti.com/lit/ds/symlink/tpd6e05u06.pdf", fetched_at: "" },
-    purchase: [],
-    eda: {
+    derived: {
+      display_name: "TPD6E05U06RVZR",
+      category: "Diodes",
+      description: "ESD protection diodes",
+    },
+    datasheet: {
+      file: "",
+      source_url: "https://www.ti.com/lit/ds/symlink/tpd6e05u06.pdf",
+      fetched_at: "",
+    },
+    assets: {
       kicad: {
-        symbol: { lib: "SR-Diodes", name: "TPD6E05U06RVZR", file: "" },
-        footprint: { lib: "SR-Diodes", name: "TPD6E05U06RVZR", file: "" },
+        symbol: makeAsset({ lib: "SR-Diodes", name: "TPD6E05U06RVZR" }),
+        footprint: makeAsset({ lib: "SR-Diodes", name: "TPD6E05U06RVZR" }),
         model: null,
       },
     },
-    provenance: null,
-    hashes: null,
-    enrichment: {},
-    specs: {},
     ...over,
-  }) as unknown as PartDetail;
+  });
 
 describe("HandoffBand", () => {
   it("covers EVERY curated field the registry declares, with none left out of the order", () => {

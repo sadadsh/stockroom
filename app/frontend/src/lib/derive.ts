@@ -215,9 +215,13 @@ function singularize(category: string): string {
  * A brand-new category needs only a TITLE_REGISTRY line, never a code change.
  */
 export function deriveTitle(part: PartDetail): string {
-  const rule = _TITLE_INDEX.get(normalizeSpecKey(part.category));
-  const noun = rule ? rule.noun : singularize(part.category);
-  const specMap = normalizedSpecMap(part.specs);
+  // `category`, `specs` and `display_name` are DERIVED values (stockroom.model.derived), which
+  // is exactly why a title may be recomputed from them: dropping the block and re-deriving must
+  // reproduce the record, so nothing read here is authored truth.
+  const { category, specs, display_name: displayName } = part.derived;
+  const rule = _TITLE_INDEX.get(normalizeSpecKey(category));
+  const noun = rule ? rule.noun : singularize(category);
+  const specMap = normalizedSpecMap(specs);
 
   const values: string[] = [];
   if (rule) {
@@ -239,14 +243,14 @@ export function deriveTitle(part: PartDetail): string {
 
   // A registered category with none of its title specs, or any unregistered one, still earns a
   // sane headline from the first meaningful (non-commerce) spec + the noun.
-  const first = firstDefiningValue(part.specs);
+  const first = firstDefiningValue(specs);
   if (first) {
     const lead = prettifyValue(first);
     return noun ? `${lead} ${noun}` : lead;
   }
   // Nothing usable in the specs: the raw name is the honest last resort, then the category,
   // so the masthead is never empty.
-  return part.display_name.trim() || part.category.trim();
+  return displayName.trim() || category.trim();
 }
 
 // --- attributes --------------------------------------------------------------
@@ -395,9 +399,10 @@ const _DIMENSION_KEYS = new Set(
  * folded in - a user's manual attributes live in `tags` and are shown/edited separately.
  */
 export function deriveAttributes(part: PartDetail): string[] {
+  const { category, specs } = part.derived;
   const scored: { label: string; score: number; order: number }[] = [];
   let seq = 0;
-  for (const [key, value] of Object.entries(part.specs)) {
+  for (const [key, value] of Object.entries(specs)) {
     seq += 1;
     if (SPEC_HIDDEN_KEYS.has(key)) continue;
     if (!isPresentable(value)) continue;
@@ -409,7 +414,7 @@ export function deriveAttributes(part: PartDetail): string[] {
     const label = rule ? rule.format(text) : prettifyValue(applySign(key, text));
     if (!label) continue;
     if (label.length > 22 || EMPTY_SPEC_VALUES.has(label.toLowerCase())) continue;
-    const r = resolveSpec(key, part.category);
+    const r = resolveSpec(key, category);
     let score = _ATTR_GROUP_SCORE[r.group] - (r.order ?? 100) / 100;
     // a spec curated as attribute-worthy (a registry rule) is at least mid-tier, so a key
     // characteristic the spec schema doesn't rank (composition, dielectric) still surfaces;

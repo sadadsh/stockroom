@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO_ROOT / "app" / "backend"))
 
 from stockroom.eda.registry import all_tools, data_field_union, default_tool  # noqa: E402
 from stockroom.model.part import ASSET_LABELS  # noqa: E402
+from stockroom.model.part_class import CLASS_NEEDS  # noqa: E402
 
 OUT_PATH = REPO_ROOT / "app" / "frontend" / "src" / "lib" / "edaRegistry.generated.ts"
 
@@ -126,6 +127,42 @@ def render() -> str:
         "  /** Whether embedding needs the EDA tool installed on this machine. */",
         "  requiresToolInstalled: boolean;",
         "  reason: string;",
+        "}",
+        "",
+        "// What one part CLASS needs, as data (mirrors stockroom.model.part_class.ClassNeeds).",
+        "//",
+        "// Generated for the same reason the tool facts are: readiness is `f(part_class, tool)`,",
+        "// and the frontend has to answer it synchronously. Hand-porting it produced exactly the",
+        "// defect this file exists to prevent -- `if (part.passive)` special-cased ONE class, so a",
+        "// `mechanical` part (footprint only, no symbol by definition) would have reported a",
+        "// missing symbol forever, which is the \"CAD Incomplete forever\" shape in class form.",
+        "export interface PartClassSpec {",
+        "  key: string;",
+        "  label: string;",
+        "  /** Asset kinds a part of this class needs, in acquisition order. Intersect with the",
+        "   * tool's reportable kinds; the answer is what that tool must end up holding. */",
+        "  assets: string[];",
+        "  /** Whether a part of this class appears on a bill of materials. A fiducial does not. */",
+        "  bomLine: boolean;",
+        "  description: string;",
+        "}",
+        "",
+        "export const PART_CLASSES: PartClassSpec[] = [",
+    ]
+    for part_class, needs in CLASS_NEEDS.items():
+        assets = ", ".join(_ts_string(a) for a in needs.assets)
+        lines.append("  {")
+        lines.append(f"    key: {_ts_string(part_class.value)},")
+        lines.append(f"    label: {_ts_string(needs.label)},")
+        lines.append(f"    assets: [{assets}],")
+        lines.append(f"    bomLine: {'true' if needs.bom_line else 'false'},")
+        lines.append(f"    description: {_ts_string(needs.description)},")
+        lines.append("  },")
+    lines += [
+        "];",
+        "",
+        "export function partClass(key: string): PartClassSpec | undefined {",
+        "  return PART_CLASSES.find((c) => c.key === key);",
         "}",
         "",
         "// Human labels for the asset kinds, keyed as the registry keys them.",
