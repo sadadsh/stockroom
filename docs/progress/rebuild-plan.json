@@ -299,8 +299,8 @@
      "steps": [
       {
        "t": "All four vendors on enrich/cad_sources.py",
-       "done": false,
-       "evidence": ""
+       "done": true,
+       "evidence": "WIRED. `GET /parts/{id}/cad-source` returned ONE DigiKey link while `enrich/cad_sources.py` held all four vendors, tested, consumed by nothing. Route now returns `sources[]` in the owner's trust order with per-vendor url/tools/aggregator/instruction, plus the flattened head for the store's default. 7 API tests: trust order, a real encoded URL per vendor, both tools declared, DigiKey flagged aggregator and the model libraries not, and a part with NO MPN resolving to NOTHING rather than four searches for the empty string."
       },
       {
        "t": "Catch, classify and attach the downloaded file",
@@ -320,7 +320,7 @@
       {
        "t": "Fast path to the next part",
        "done": false,
-       "evidence": ""
+       "evidence": "PARTIAL - the vendor choice PERSISTS (localStorage, falls back to the trust order's head when the stored key is not offered), so a 90-part sitting costs one decision instead of ninety. Tamper-proven: dropping the write fails the test. The next-part JUMP itself is not built."
       },
       {
        "t": "Designed deliberately, screenshot critiqued both themes",
@@ -764,6 +764,6 @@
   }
  ],
  "updated": "2026-07-27 12:09 UTC",
- "now": "The library now holds NO CAD at all - the owner asked for it cleared before guided capture, and Settings > Clear CAD Files removed 184 assets from 60 components plus 2 orphans (32892bc). The 136 KiCad-stock references on the 68 passives correctly survive. Next and now the only blocker: guided capture for the 90 non-passives, starting with the four-vendor cad_sources module that is written, tested and wired to nothing.",
- "now_updated": "2026-07-27 11:10 UTC"
+ "now": "Guided capture is no longer single-vendor: the route offers DigiKey / Ultra Librarian / SamacSys / SnapMagic in the owner's trust order and the modal has a picker that remembers the choice. NOT visually verified - uishot cannot currently reach the Complete Part modal (see the Punch List).",
+ "now_updated": "2026-07-27 11:20 UTC"
 }

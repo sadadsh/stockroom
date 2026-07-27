@@ -912,7 +912,15 @@ def run(args) -> int:
                     # scrim - so on a modal surface the toggle is unclickable and the run died
                     # with a 30 s timeout on the second theme. Close the modal, switch, reopen.
                     # `_goto_surface` is idempotent and already re-drives the real button.
-                    modal = page.locator('[data-dev-id="addpart.root"]')
+                    # ANY modal, not just Add A Part. Every modal in this app lays a fixed
+                    # full-bleed scrim over the shell, and the theme toggle lives on the RAIL
+                    # underneath it -- so with a modal open the toggle is unclickable and the run
+                    # dies retrying. This used to name `addpart.root` alone, which fixed exactly
+                    # one modal and left the Complete Part window unshootable: measured
+                    # 2026-07-27, `--click detail.complete-part` opened the modal correctly and
+                    # then timed out with "scrim intercepts pointer events", producing no shot at
+                    # all. Keyed on the scrim itself, so a modal added later needs no edit here.
+                    modal = page.locator('div.fixed.inset-0[role="presentation"]')
                     reopen = bool(modal.count())
                     if reopen:
                         page.keyboard.press("Escape")
