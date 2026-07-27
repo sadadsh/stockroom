@@ -105,7 +105,25 @@
   },
   "description": "ARM Cortex-M7 32 Bit 480MHz 114 LQFP-144(20x20) Microcontrollers RoHS",
   "display_name": "ARM Microcontroller LQFP-144",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "STM32H753ZIT6"
+      },
+      "model": {
+        "file": "models/STM32H753ZIT6.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "STM32H753ZIT6"
+      }
+    }
+  },
   "enrichment": {
     "ADC (Bit)": {
       "confidence": "medium",
