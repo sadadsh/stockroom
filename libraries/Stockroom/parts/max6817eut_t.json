@@ -105,7 +105,25 @@
   },
   "description": "SOT-23-6 Specialized ICs RoHS",
   "display_name": "Supervisory Circuit SOT-23-6",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "MAX6817EUT+T"
+      },
+      "model": {
+        "file": "models/MAX6817EUT+T.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "MAX6817EUT+T"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
