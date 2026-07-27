@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "SI5351A-B-GT"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/SI5351A-B-GT.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "SI5351A-B-GT"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "si5351a-b-gt-f1ea.pdf",

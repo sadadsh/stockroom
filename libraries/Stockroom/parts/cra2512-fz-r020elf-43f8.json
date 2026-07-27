@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "CRA2512-FZ-R020ELF"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/CRA2512-FZ-R020ELF.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "CRA2512-FZ-R020ELF"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "cra2512-fz-r020elf-43f8.pdf",

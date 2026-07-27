@@ -73,7 +73,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TPS2121RUXR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPS2121RUXR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "TPS2121RUXR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tps2121ruxr-8f51.pdf",

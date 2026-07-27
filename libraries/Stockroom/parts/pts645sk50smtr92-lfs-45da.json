@@ -201,7 +201,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "PTS645SK50SMTR92-LFS"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/PTS645SK50SMTR92-LFS.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Switches",
+          "name": "PTS645SK50SMTR92-LFS"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "pts645sk50smtr92-lfs-45da.pdf",

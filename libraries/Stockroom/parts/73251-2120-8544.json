@@ -177,7 +177,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "73251-2120"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/73251-2120.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Connectors",
+          "name": "73251-2120"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "73251-2120-8544.pdf",

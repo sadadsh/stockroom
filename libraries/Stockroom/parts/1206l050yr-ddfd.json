@@ -121,7 +121,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "1206L050YR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/1206L050YR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "1206L050YR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "1206l050yr-ddfd.pdf",

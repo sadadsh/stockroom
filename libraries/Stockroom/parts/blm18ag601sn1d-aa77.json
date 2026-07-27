@@ -97,7 +97,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Inductors",
+          "name": "BLM18AG601SN1D"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/BLM18AG601SN1D.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Inductors",
+          "name": "BLM18AG601SN1D"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "blm18ag601sn1d-aa77.pdf",

@@ -218,7 +218,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Transistors",
+          "name": "DMN2056U-7"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/DMN2056U-7.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Transistors",
+          "name": "DMN2056U-7"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "dmn2056u-7-989c.pdf",

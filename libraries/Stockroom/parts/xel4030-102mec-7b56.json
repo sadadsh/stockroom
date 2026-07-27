@@ -13,7 +13,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Inductors",
+          "name": "XEL4030-102MEC"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/XEL4030-102MEC.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Inductors",
+          "name": "XEL4030-102MEC"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "xel4030-102mec-7b56.pdf",

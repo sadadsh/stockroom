@@ -194,7 +194,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-0722RL"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/AC0402FR-0722RL.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "AC0402FR-0722RL"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "ac0402fr-0722rl-bd22.pdf",

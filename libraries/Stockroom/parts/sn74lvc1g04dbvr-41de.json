@@ -109,7 +109,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "SN74LVC1G04DBVR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/SN74LVC1G04DBVR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Other",
+          "name": "SN74LVC1G04DBVR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "sn74lvc1g04dbvr-41de.pdf",

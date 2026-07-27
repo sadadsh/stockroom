@@ -121,7 +121,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD1E10B06DPYR"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/TPD1E10B06DPYR.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Diodes",
+          "name": "TPD1E10B06DPYR"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "tpd1e10b06dpyr-ac04.pdf",

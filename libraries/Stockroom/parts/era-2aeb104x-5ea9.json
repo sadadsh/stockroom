@@ -225,7 +225,31 @@
       }
     ]
   },
-  "assets": {},
+  "assets": {
+    "kicad": {
+      "footprint": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "ERA-2AEB104X"
+        }
+      },
+      "model": {
+        "ref": {
+          "file": "models/ERA-2AEB104X.step",
+          "lib": "",
+          "name": ""
+        }
+      },
+      "symbol": {
+        "ref": {
+          "file": "",
+          "lib": "SR-Resistors",
+          "name": "ERA-2AEB104X"
+        }
+      }
+    }
+  },
   "datasheet": {
     "fetched_at": "",
     "file": "era-2aeb104x-5ea9.pdf",
