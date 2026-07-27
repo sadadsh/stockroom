@@ -115,7 +115,7 @@ export interface PurchaseRef {
   fetched_at: string;
 }
 
-// One EDA asset reference (stockroom.model.part.AssetRef). `lib` names the container (a
+// One EDA asset reference (stockroom.model.asset.AssetRef). `lib` names the container (a
 // KiCad library nickname, an Altium .SchLib/.PcbLib filename), `name` the entry inside it,
 // and `file` the repo-relative path for a file-shaped asset such as a 3D model. A kind fills
 // the fields it needs and leaves the rest blank -- nothing here is tool-specific.
@@ -125,13 +125,48 @@ export interface AssetRef {
   file: string;
 }
 
-// Everything ONE EDA tool holds for a part (stockroom.model.part.EdaAssets). Every tool gets
+// WHERE an asset came from (stockroom.model.asset.AssetOrigin). Absent -- not blank -- when
+// the asset was attached before anyone recorded its source: an unattributed asset must read
+// as unattributed, never as one whose vendor happens to be the empty string.
+export interface AssetOrigin {
+  vendor: string;
+  url: string;
+  captured_at: string;
+  [key: string]: unknown;
+}
+
+// ONE measurement taken against an asset (stockroom.model.trust.AssetCheck). Facts only; the
+// pass/fail/unknown verdict is DERIVED from these on read and is never stored, so a verdict
+// can never silently disagree with its own evidence. `measured === null` means the check could
+// not measure and `expected === null` means there was no authority -- either is UNKNOWN, and
+// neither is a failure. `0` is a real measurement, never "missing".
+export interface AssetCheck {
+  check: string;
+  measured: unknown;
+  expected: unknown;
+  against: string;
+  checked_at: string;
+  tolerance: number | null;
+  note: string;
+}
+
+// One asset a part holds for one tool (stockroom.model.asset.Asset): its reference, its
+// provenance, its evidence. `origin` and `checks` are OMITTED while empty rather than nulled,
+// so adopting the schema did not have to rewrite every record; absence means "nobody recorded
+// this", never a trusted blank.
+export interface Asset {
+  ref: AssetRef;
+  origin?: AssetOrigin;
+  checks?: AssetCheck[];
+}
+
+// Everything ONE EDA tool holds for a part (stockroom.model.asset.EdaAssets). Every tool gets
 // the same symmetric bundle, which is what makes readiness a single generic check instead of
-// a per-tool branch. Slots are absent when the tool has no such asset.
+// a per-tool branch. Slots are null when the tool has no such asset.
 export interface EdaAssets {
-  symbol: AssetRef | null;
-  footprint: AssetRef | null;
-  model: AssetRef | null;
+  symbol: Asset | null;
+  footprint: Asset | null;
+  model: Asset | null;
 }
 
 export interface Provenance {
@@ -148,31 +183,78 @@ export interface PinoutPin {
   name: string;
 }
 
-// GET /api/library/parts/{id} -> full PartRecord.to_dict()
-export interface PartDetail {
-  id: string;
+// What a part IS, which decides which assets it needs (stockroom.model.part_class.PartClass).
+// It replaced the two-valued `passive` boolean, which could not express an M3 mounting hole or
+// a fiducial -- both of which the owner's register holds and both of which had to be kept out
+// of the library by hand.
+export type PartClass = "passive" | "component" | "mechanical" | "virtual";
+
+// The per-part escape hatch (stockroom.model.part_class.RequirementOverride): `needs` REPLACES
+// the class's asset list. A null override means "use the class default"; an override with an
+// empty `needs` is somebody stating this one part needs nothing, which is a different claim.
+export interface RequirementOverride {
+  needs: string[];
+  // EDA tool keys the override applies to. Empty means every tool.
+  tools: string[];
+  reason: string;
+}
+
+// The DERIVED block (stockroom.model.derived.Derived): everything recomputable from the raw
+// payloads in `sourced/`. Disposable by construction -- drop it, recompute, get the record
+// back -- which is what makes a naming-scheme or normalization change a re-derive rather than
+// a re-import. Identity (`id`, `mpn`, `manufacturer`, `part_class`) is deliberately NOT in here.
+export interface Derived {
   display_name: string;
+  // The schematic/BOM Value: a passive's parametric value, an active's MPN.
+  value: string;
   category: string;
   description: string;
-  tags: string[];
+  // Normalized spec keys and values; specs.pinout is a list of {pin, name}. Per-key
+  // provenance lives in the record's `enrichment`.
+  specs: Record<string, unknown>;
+  derived_at: string;
+  // Which ruleset produced this block ("rules@1"), so a library can be swept for parts still
+  // carrying an older derivation instead of everything being re-derived blindly.
+  derived_by: string;
+}
+
+// One line of the record's `sources` INDEX (stockroom.model.sourced.SourceEntry): when a
+// source was pulled and where its raw payload sits. Never the payload itself.
+export interface SourceEntry {
+  fetched_at: string;
+  // Repo-relative POSIX path, normally `sourced/<id>/<source>.json`.
+  file: string;
+}
+
+// GET /api/library/parts/{id} -> full PartRecord.to_dict(), verbatim.
+//
+// This is the WIRE SHAPE, not a convenience view: the endpoint returns the record dataclass's
+// own dict. `tests/backend/test_part_wire_contract.py` compares the key set the backend really
+// emits against the fields declared here and fails in BOTH directions, because on 2026-07-27
+// the record was renamed wholesale, no frontend file was touched, and all three gates stayed
+// green while the detail panel crashed and every part read "CAD Incomplete".
+export interface PartDetail {
+  schema_version: number;
+  id: string;
   mpn: string;
   manufacturer: string;
-  // True for a passive (R/C/L) that references KiCad stock symbol/footprint/3D
-  // rather than owning copied asset files. Optional so older fixtures/records
-  // without the flag still type-check; the backend always emits it.
-  passive?: boolean;
-  datasheet: DatasheetRef | null;
-  purchase: PurchaseRef[];
+  part_class: PartClass;
+  requires_override: RequirementOverride | null;
+  // The recomputable half. `display_name`, `category`, `description` and `specs` live HERE,
+  // not at the top level -- reach them through the helpers in lib/partFields.ts.
+  derived: Derived;
+  // Which sources this record was derived from, keyed by source name ("mouser", "digikey").
+  sources: Record<string, SourceEntry>;
   // The CAD assets, one symmetric bundle per EDA tool key ("kicad", "altium", ...). Tools
   // with nothing attached are omitted by the backend, so read it through
   // `assetsFor(detail, tool)` in lib/edaTarget.ts rather than indexing it directly.
-  eda: Record<string, EdaAssets>;
+  assets: Record<string, EdaAssets>;
+  tags: string[];
+  datasheet: DatasheetRef | null;
+  purchase: PurchaseRef[];
   provenance: Provenance | null;
   hashes: Record<string, string> | null;
   enrichment: Record<string, { source: string; confidence: string }>;
-  // Persisted canonical spec data (M6i). A free-form value bag keyed by spec name;
-  // specs.pinout is a list of {pin, name}. Per-key provenance lives in `enrichment`.
-  specs: Record<string, unknown>;
   // Every value a source offered for a field and did NOT win with, keyed exactly like
   // `enrichment` (a canonical field name in lower_snake, or a spec label). The value in force is
   // repeated as the first entry, so a reader sees which answer is stored beside the ones set

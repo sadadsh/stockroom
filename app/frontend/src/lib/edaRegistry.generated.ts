@@ -84,6 +84,59 @@ export interface EmbeddedAssetSpec {
   reason: string;
 }
 
+// What one part CLASS needs, as data (mirrors stockroom.model.part_class.ClassNeeds).
+//
+// Generated for the same reason the tool facts are: readiness is `f(part_class, tool)`,
+// and the frontend has to answer it synchronously. Hand-porting it produced exactly the
+// defect this file exists to prevent -- `if (part.passive)` special-cased ONE class, so a
+// `mechanical` part (footprint only, no symbol by definition) would have reported a
+// missing symbol forever, which is the "CAD Incomplete forever" shape in class form.
+export interface PartClassSpec {
+  key: string;
+  label: string;
+  /** Asset kinds a part of this class needs, in acquisition order. Intersect with the
+   * tool's reportable kinds; the answer is what that tool must end up holding. */
+  assets: string[];
+  /** Whether a part of this class appears on a bill of materials. A fiducial does not. */
+  bomLine: boolean;
+  description: string;
+}
+
+export const PART_CLASSES: PartClassSpec[] = [
+  {
+    key: "passive",
+    label: "Passive",
+    assets: [],
+    bomLine: true,
+    description: "A resistor, capacitor or inductor. Both KiCad and Altium ship generic passives, so there is nothing to acquire. Its SR-* symbol is a BOM-property vehicle produced by rebuild_part, never a captured asset.",
+  },
+  {
+    key: "component",
+    label: "Component",
+    assets: ["symbol", "footprint", "model"],
+    bomLine: true,
+    description: "An active or otherwise non-generic part. The acquisition case.",
+  },
+  {
+    key: "mechanical",
+    label: "Mechanical",
+    assets: ["footprint"],
+    bomLine: true,
+    description: "A screw, standoff or mounting hole. It occupies board area and may be ordered, but it has no schematic symbol.",
+  },
+  {
+    key: "virtual",
+    label: "Virtual",
+    assets: [],
+    bomLine: false,
+    description: "A test point, fiducial or logo. Nothing to acquire and nothing to buy.",
+  },
+];
+
+export function partClass(key: string): PartClassSpec | undefined {
+  return PART_CLASSES.find((c) => c.key === key);
+}
+
 // Human labels for the asset kinds, keyed as the registry keys them.
 export const ASSET_LABELS: Record<string, string> = {
   symbol: "symbol",

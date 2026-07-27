@@ -8,6 +8,8 @@ import { DEV_ID_BY_ID } from "../lib/devIds";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 import { CaptureProvider } from "../lib/capture";
+import type { DeepPartial } from "fishery";
+import { makeAsset, makePartDetail } from "../test/partFixture";
 import { DetailPanel } from "./DetailPanel";
 
 // The Files cards fetch live SVG thumbnails; mock the previews so nothing hits network.
@@ -67,30 +69,20 @@ beforeEach(() => {
   } as never);
 });
 
-function detail(over: Partial<PartDetail> = {}): PartDetail {
-  return {
+// Delegates to the ONE shared wire-shaped factory (src/test/partFixture.ts); only the default
+// asset set is local to this file, because most cases here are about a complete KiCad part.
+function detail(over: DeepPartial<PartDetail> = {}): PartDetail {
+  return makePartDetail({
     id: "lm358",
-    display_name: "LM358",
-    category: "ICs",
-    description: "Dual op-amp",
-    tags: [],
-    mpn: "LM358DR",
-    manufacturer: "TI",
-    datasheet: null,
-    purchase: [],
-    eda: { kicad: { symbol: SYM, footprint: FP, model: MODEL } },
-    provenance: null,
-    hashes: null,
-    enrichment: {},
-    specs: {},
+    assets: { kicad: { symbol: SYM, footprint: FP, model: MODEL } },
     ...over,
-  };
+  });
 }
 
 // The default KiCad asset set the fixture carries; cases override one slot at a time.
-const SYM = { lib: "SR-ICs", name: "LM358", file: "" };
-const FP = { lib: "SR-ICs", name: "SOIC-8", file: "" };
-const MODEL = { lib: "", name: "", file: "models/lm358.step" };
+const SYM = makeAsset({ lib: "SR-ICs", name: "LM358", file: "" });
+const FP = makeAsset({ lib: "SR-ICs", name: "SOIC-8", file: "" });
+const MODEL = makeAsset({ lib: "", name: "", file: "models/lm358.step" });
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -144,7 +136,7 @@ describe("DetailPanel files previews (M6d)", () => {
   });
 
   it("does not make a missing file's card clickable", () => {
-    wrap(<DetailPanel detail={detail({ eda: { kicad: { symbol: SYM, footprint: FP, model: null } } })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ assets: { kicad: { symbol: SYM, footprint: FP, model: null } } })} {...BASE} />);
     expect(
       screen.queryByRole("button", { name: "Open 3D Model Preview" }),
     ).not.toBeInTheDocument();
@@ -154,13 +146,15 @@ describe("DetailPanel files previews (M6d)", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          specs: {
+          derived: {
+            specs: {
             Resistance: "1.1 kOhms",
             Tolerance: "1%",
             Symbol: "Device:R",
             Footprint: "Resistor_SMD:R_0603_1608Metric",
             "3D Model": "Resistor_SMD.3dshapes/R_0603.wrl",
             pinout: [{ pin: "1", name: "A" }],
+          },
           },
         })}
         {...BASE}
@@ -177,7 +171,7 @@ describe("DetailPanel files previews (M6d)", () => {
   it("never truncates or caps the rows inside a spec group (B2)", () => {
     const many: Record<string, string> = {};
     for (let i = 0; i < 15; i++) many[`Spec ${i}`] = `value ${i}`;
-    wrap(<DetailPanel detail={detail({ specs: many })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { specs: many } })} {...BASE} />);
     // B2 originally read "renders every spec at once (no collapse)". NARROWED 2026-07-25 when the
     // owner asked for the opposite of "no collapse" - *"doesnt have things hidden behind buttons.
     // its so much thrown in your face"* - so groups past the first closed by default.
@@ -202,9 +196,9 @@ describe("DetailPanel files previews (M6d)", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          passive: true,
-          eda: {
-            kicad: { symbol: null, footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric", file: "" }, model: null },
+          part_class: "passive",
+          assets: {
+            kicad: { symbol: null, footprint: makeAsset({ lib: "Resistor_SMD", name: "R_0603_1608Metric", file: "" }), model: null },
           },
         })}
         {...BASE}
@@ -237,13 +231,15 @@ describe("DetailPanel pinout (M6i)", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          specs: {
+          enrichment: { pinout: { source: "datasheet", confidence: "high" } },
+          derived: {
+            specs: {
             pinout: [
               { pin: "1", name: "OUT1" },
               { pin: "2", name: "IN1-" },
             ],
           },
-          enrichment: { pinout: { source: "datasheet", confidence: "high" } },
+          },
         })}
         {...BASE}
       />,
@@ -255,7 +251,7 @@ describe("DetailPanel pinout (M6i)", () => {
   });
 
   it("shows no Pinout section when the record has no pinout", () => {
-    wrap(<DetailPanel detail={detail({ specs: {} })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { specs: {} } })} {...BASE} />);
     expect(screen.queryByText("Pinout")).not.toBeInTheDocument();
   });
 
@@ -274,10 +270,12 @@ describe("DetailPanel pinout (M6i)", () => {
         </ThemeProvider>
       </QueryClientProvider>
     );
-    const A = detail({ id: "a", specs: { pinout: [{ pin: "1", name: "VCC" }] } });
+    const A = detail({ id: "a", derived: { specs: { pinout: [{ pin: "1", name: "VCC" }] } } });
     const B = detail({
       id: "b",
-      specs: { pinout: [{ pin: "1", name: "GND" }, { pin: "2", name: "OUT" }] },
+      derived: {
+        specs: { pinout: [{ pin: "1", name: "GND" }, { pin: "2", name: "OUT" }] },
+      },
     });
     const { rerender } = render(view(A));
     // Pinout now lives in the workbench's Pinout tab; open it before filtering.
@@ -297,7 +295,7 @@ describe("DetailPanel attach-after affordance", () => {
     const onAttachSymbol = vi.fn();
     wrap(
       <DetailPanel
-        detail={detail({ eda: { kicad: { symbol: null, footprint: FP, model: MODEL } } })}
+        detail={detail({ assets: { kicad: { symbol: null, footprint: FP, model: MODEL } } })}
         {...BASE}
         onAttachSymbol={onAttachSymbol}
         onAttachFootprint={vi.fn()}
@@ -318,7 +316,7 @@ describe("DetailPanel attach-after affordance", () => {
   it("disables the attach action until a footprint lib + name are entered", async () => {
     wrap(
       <DetailPanel
-        detail={detail({ eda: { kicad: { symbol: SYM, footprint: null, model: MODEL } } })}
+        detail={detail({ assets: { kicad: { symbol: SYM, footprint: null, model: MODEL } } })}
         {...BASE}
         onAttachSymbol={vi.fn()}
         onAttachFootprint={vi.fn()}
@@ -336,7 +334,7 @@ describe("DetailPanel attach-after affordance", () => {
   });
 
   it("offers no Complete Part affordance in a read-only panel (no handlers)", () => {
-    wrap(<DetailPanel detail={detail({ eda: { kicad: { symbol: null, footprint: FP, model: MODEL } } })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ assets: { kicad: { symbol: null, footprint: FP, model: MODEL } } })} {...BASE} />);
     expect(
       screen.queryByRole("button", { name: /Complete Part/ }),
     ).not.toBeInTheDocument();
@@ -359,11 +357,11 @@ describe("DetailPanel attach-after affordance", () => {
     // the regression the owner hit: a part with its Altium libraries attached stayed on
     // "CAD Incomplete" forever because readiness read the KiCad fields for Altium.
     const complete = detail({
-      eda: {
+      assets: {
         kicad: { symbol: SYM, footprint: FP, model: MODEL },
         altium: {
-          symbol: { lib: "p.SchLib", name: "P", file: "" },
-          footprint: { lib: "p.PcbLib", name: "P", file: "" },
+          symbol: makeAsset({ lib: "p.SchLib", name: "P", file: "" }),
+          footprint: makeAsset({ lib: "p.PcbLib", name: "P", file: "" }),
           model: null,
         },
       },
@@ -484,13 +482,15 @@ describe("DetailPanel spec sheet + identity", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          category: "Resistors",
-          specs: {
+          derived: {
+            category: "Resistors",
+            specs: {
             Resistance: "1.1 kOhms",
             Manufacturer: "Acme Corp",
             "Country of Origin": "Malaysia",
             Packaging: "Reel",
             "US Tariff %": "8",
+          },
           },
         })}
         {...BASE}
@@ -526,10 +526,12 @@ describe("DetailPanel spec sheet + identity", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          category: "ICs",
-          display_name: "Dual Op-Amp LM358",
           mpn: "LM358DR",
-          specs: {},
+          derived: {
+            category: "ICs",
+            display_name: "Dual Op-Amp LM358",
+            specs: {},
+          },
         })}
         {...BASE}
       />,
@@ -550,10 +552,12 @@ describe("DetailPanel spec sheet + identity", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          category: "Resistors",
-          display_name: "10k 1% 0603",
           mpn: "RC0603",
-          specs: { Resistance: "10 kOhms", Tolerance: "1%" },
+          derived: {
+            category: "Resistors",
+            display_name: "10k 1% 0603",
+            specs: { Resistance: "10 kOhms", Tolerance: "1%" },
+          },
         })}
         {...BASE}
       />,
@@ -598,13 +602,13 @@ describe("Altium 3D embed (punch 16)", () => {
   const ALTIUM_READY = {
     kicad: { symbol: SYM, footprint: FP, model: MODEL },
     altium: {
-      symbol: { lib: "lm358.SchLib", name: "LM358", file: "" },
-      footprint: { lib: "lm358.PcbLib", name: "SOIC-8", file: "" },
+      symbol: makeAsset({ lib: "lm358.SchLib", name: "LM358", file: "" }),
+      footprint: makeAsset({ lib: "lm358.PcbLib", name: "SOIC-8", file: "" }),
       model: null,
     },
   };
 
-  async function openReadiness(over: Partial<PartDetail> = {}) {
+  async function openReadiness(over: DeepPartial<PartDetail> = {}) {
     wrap(<DetailPanel detail={detail(over)} {...BASE} />);
     await userEvent.click(screen.getByRole("button", { name: /CAD/ }));
   }
@@ -614,7 +618,7 @@ describe("Altium 3D embed (punch 16)", () => {
   }
 
   it("offers the embed action when there is a footprint to write into and a model to write", async () => {
-    await openReadiness({ eda: ALTIUM_READY });
+    await openReadiness({ assets: ALTIUM_READY });
     const action = await waitFor(() => {
       const el = byDevId("detail.embed3d");
       expect(el).not.toBeNull();
@@ -628,7 +632,7 @@ describe("Altium 3D embed (punch 16)", () => {
   it("runs the embed for this part when the action is clicked", async () => {
     // Drive the actual control, not the handler: a wired-looking button that calls nothing is the
     // failure mode this catches.
-    await openReadiness({ eda: ALTIUM_READY });
+    await openReadiness({ assets: ALTIUM_READY });
     const action = await waitFor(() => {
       const el = byDevId("detail.embed3d") as HTMLButtonElement;
       expect(el).not.toBeDisabled();
@@ -639,14 +643,14 @@ describe("Altium 3D embed (punch 16)", () => {
   });
 
   it("explains that the Altium library must be attached first, rather than sitting inert", async () => {
-    await openReadiness({ eda: { kicad: { symbol: SYM, footprint: FP, model: MODEL } } });
+    await openReadiness({ assets: { kicad: { symbol: SYM, footprint: FP, model: MODEL } } });
     expect(byDevId("detail.embed3d")).toBeDisabled();
     expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Attach the Altium library first/);
   });
 
   it("explains that a 3D model file is needed first", async () => {
     await openReadiness({
-      eda: { ...ALTIUM_READY, kicad: { symbol: SYM, footprint: FP, model: null } },
+      assets: { ...ALTIUM_READY, kicad: { symbol: SYM, footprint: FP, model: null } },
     });
     expect(byDevId("detail.embed3d")).toBeDisabled();
     expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Add a 3D model file first/);
@@ -661,7 +665,7 @@ describe("Altium 3D embed (punch 16)", () => {
       busy: "",
       available: false,
     } as never);
-    await openReadiness({ eda: ALTIUM_READY });
+    await openReadiness({ assets: ALTIUM_READY });
     await waitFor(() =>
       expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/needs Altium installed/),
     );
@@ -677,7 +681,7 @@ describe("Altium 3D embed (punch 16)", () => {
       busy: "Altium Designer",
       available: false,
     } as never);
-    await openReadiness({ eda: ALTIUM_READY });
+    await openReadiness({ assets: ALTIUM_READY });
     await waitFor(() =>
       expect(byDevId("detail.embed3d-blocked")).toHaveTextContent(/Close Altium first/),
     );
@@ -685,11 +689,11 @@ describe("Altium 3D embed (punch 16)", () => {
 
   it("shows the embedded confirmation, and no action, once the container really carries it", async () => {
     await openReadiness({
-      eda: {
+      assets: {
         ...ALTIUM_READY,
         altium: {
           ...ALTIUM_READY.altium,
-          model: { lib: "lm358.PcbLib", name: "SOIC-8", file: "models/lm358.step" },
+          model: makeAsset({ lib: "lm358.PcbLib", name: "SOIC-8", file: "models/lm358.step" }),
         },
       },
     });
@@ -706,7 +710,7 @@ describe("Altium 3D embed (punch 16)", () => {
     //    session and an Altium 3D body cannot be fetched from a vendor. It is embedded from the
     //    file the part already holds, which is a different action entirely.
     // So the gap is communicated by the presence of the embed action next to a READY Altium row.
-    await openReadiness({ eda: ALTIUM_READY });
+    await openReadiness({ assets: ALTIUM_READY });
     await waitFor(() => expect(byDevId("detail.embed3d")).not.toBeNull());
     const readiness = byDevId("detail.readiness") as HTMLElement;
     // BOTH tool rows read Ready: the 3D gap is real and actionable without making Altium unready.
@@ -715,7 +719,7 @@ describe("Altium 3D embed (punch 16)", () => {
   });
 
   it("offers nothing for a passive, which inherits the stock footprint's own 3D body", async () => {
-    await openReadiness({ passive: true, eda: ALTIUM_READY });
+    await openReadiness({ part_class: "passive", assets: ALTIUM_READY });
     expect(byDevId("detail.embed3d")).toBeNull();
     expect(byDevId("detail.embed3d-done")).toBeNull();
   });
@@ -727,12 +731,14 @@ describe("Altium 3D embed (punch 16)", () => {
 describe("DetailPanel alternates", () => {
   const withTwoDescriptions = () =>
     detail({
-      description: "3A buck",
       alternates: {
         description: [
           { value: "3A buck", source: "mouser", confidence: "high" },
           { value: "Step-Down Regulator, 3 A", source: "digikey", confidence: "high" },
         ],
+      },
+      derived: {
+        description: "3A buck",
       },
     });
 
@@ -788,7 +794,7 @@ describe("DetailPanel alternates", () => {
   });
 
   it("shows nothing at all for a part whose sources agreed", () => {
-    wrap(<DetailPanel detail={detail({ description: "3A buck" })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { description: "3A buck" } })} {...BASE} />);
     expect(screen.queryByRole("button", { name: /Sources/i })).toBeNull();
   });
 
@@ -798,12 +804,14 @@ describe("DetailPanel alternates", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          specs: { Tolerance: "1%" },
           alternates: {
             Tolerance: [
               { value: "1%", source: "mouser", confidence: "high" },
               { value: "5%", source: "digikey", confidence: "high" },
             ],
+          },
+          derived: {
+            specs: { Tolerance: "1%" },
           },
         })}
         {...BASE}
@@ -826,12 +834,14 @@ describe("DetailPanel alternates comparison", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          specs: { Tolerance: "1%" },
           alternates: {
             Tolerance: [
               { value: "1%", source: "mouser", confidence: "high" },
               { value: "2%", source: "digikey", confidence: "high" },
             ],
+          },
+          derived: {
+            specs: { Tolerance: "1%" },
           },
         })}
         {...BASE}
@@ -895,7 +905,7 @@ describe("DetailPanel spec row pairing", () => {
       <DetailPanel
         // Slew Rate deliberately: it is NOT in the curated ICs key set, so "promote not copy" leaves
         // it in the Specifications list, which is the list whose row anatomy this test is about.
-        detail={detail({ category: "ICs", specs: { "Slew Rate": "13 V/us" } })}
+        detail={detail({ derived: { category: "ICs", specs: { "Slew Rate": "13 V/us" } } })}
         {...BASE}
       />,
     );
@@ -920,12 +930,14 @@ describe("DetailPanel alternates alignment", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          specs: { Tolerance: "1%" },
           alternates: {
             Tolerance: [
               { value: "1%", source: "mouser", confidence: "high" },
               { value: "2%", source: "digikey", confidence: "high" },
             ],
+          },
+          derived: {
+            specs: { Tolerance: "1%" },
           },
         })}
         {...BASE}
@@ -1014,8 +1026,10 @@ describe("the description lede", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          description: "Dual op-amp, 3 MHz",
-          specs: { "Supply Voltage": "3 V", "Package / Case": "SOIC-8" },
+          derived: {
+            description: "Dual op-amp, 3 MHz",
+            specs: { "Supply Voltage": "3 V", "Package / Case": "SOIC-8" },
+          },
         })}
         {...BASE}
       />,
@@ -1034,7 +1048,7 @@ describe("the description lede", () => {
 
   it("renders NOTHING when the part has no description", () => {
     // An emphasized empty lede would be the loudest element on the sheet saying nothing.
-    wrap(<DetailPanel detail={detail({ description: "" })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { description: "" } })} {...BASE} />);
     expect(document.querySelector('[data-dev-id="detail.description-lede"]')).toBeNull();
   });
 
@@ -1042,14 +1056,16 @@ describe("the description lede", () => {
     wrap(
       <DetailPanel
         detail={detail({
-          description: "Dual op-amp",
           alternates: {
             description: [
               { value: "Dual op-amp", source: "mouser", confidence: "high" },
               { value: "Op Amp, 2 channel", source: "digikey", confidence: "high" },
             ],
           },
-        } as Partial<PartDetail>)}
+          derived: {
+            description: "Dual op-amp",
+          },
+        })}
         {...BASE}
       />,
     );
@@ -1105,7 +1121,7 @@ describe("a spec value never breaks INSIDE one of its tokens", () => {
   // rests on, which is the part jsdom can actually see.
   it("holds a token containing a slash together", () => {
     wrap(
-      <DetailPanel detail={detail({ specs: { "Peak Pulse": "2.5A (8/20us)" } })} {...BASE} />,
+      <DetailPanel detail={detail({ derived: { specs: { "Peak Pulse": "2.5A (8/20us)" } } })} {...BASE} />,
     );
     // Asserted through the CLASS rather than the exact string: the spec pipeline prettifies a
     // value on its way to the row, so pinning the rendered text here would be testing the
@@ -1125,7 +1141,7 @@ describe("a spec value never breaks INSIDE one of its tokens", () => {
     // text node, and `getByText` matches an element by its DIRECT text children, so a blanket
     // split silently broke every existing query for a spec value. A value with no break-risk must
     // stay exactly as it was.
-    wrap(<DetailPanel detail={detail({ specs: { Resistance: "1.1 kΩ" } })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { specs: { Resistance: "1.1 kΩ" } } })} {...BASE} />);
     const el = screen.getByText("1.1 kΩ");
     expect(el.tagName).toBe("DD");
     expect(el.querySelector("span.whitespace-nowrap")).toBeNull();
@@ -1133,7 +1149,7 @@ describe("a spec value never breaks INSIDE one of its tokens", () => {
 
   it("still lets a token too long for any track break rather than overflowing", () => {
     const long = `${"A".repeat(30)}/${"B".repeat(30)}`;
-    wrap(<DetailPanel detail={detail({ specs: { Weird: long } })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { specs: { Weird: long } } })} {...BASE} />);
     expect(screen.getByText(long).querySelector("span.whitespace-nowrap")).toBeNull();
   });
 });
@@ -1145,7 +1161,7 @@ describe("a spec group's count", () => {
     // with nothing tying each number to its noun. jsdom has no layout, so this asserts the
     // STRUCTURE that produces the adjacency: the count is the title's immediate next sibling,
     // and nothing in the header pushes it away with an auto margin.
-    wrap(<DetailPanel detail={detail({ specs: { "Breakdown Voltage": "6.5 V" } })} {...BASE} />);
+    wrap(<DetailPanel detail={detail({ derived: { specs: { "Breakdown Voltage": "6.5 V" } } })} {...BASE} />);
     const header = await screen.findByText("Electrical");
     const button = header.closest("button");
     expect(button).not.toBeNull();

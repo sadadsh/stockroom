@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
+import { makePartDetail } from "./test/partFixture";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { CaptureProvider } from "./lib/capture";
@@ -38,22 +39,12 @@ const SUMMARY: PartSummary = {
   missing: [],
 };
 
-const DETAIL: PartDetail = {
+const DETAIL: PartDetail = makePartDetail({
   id: "lm358",
-  display_name: "LM358",
-  category: "ICs",
-  description: "Dual Operational Amplifier",
-  tags: [],
   mpn: "LM358DR",
   manufacturer: "Texas Instruments",
-  datasheet: null,
-  purchase: [],
-  eda: {},
-  provenance: null,
-  hashes: null,
-  enrichment: {},
-  specs: {},
-};
+  derived: { display_name: "LM358", description: "Dual Operational Amplifier" },
+});
 
 describe("App shell", () => {
   it("renders the rail and the Components page for the default route", async () => {

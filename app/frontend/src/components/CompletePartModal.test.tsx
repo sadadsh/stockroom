@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { PartDetail, StagingCandidate } from "../api/types";
+import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
@@ -42,19 +43,18 @@ function toggleDevMode() {
   fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
 }
 
-const DETAIL = {
+// Built through the shared wire-shaped factory rather than cast. The literal this replaces was
+// stale all the way back to schema 1 - flat `symbol`/`footprint`/`model` and a `passive` boolean,
+// none of which the record has carried for two schema versions - and `as unknown as PartDetail`
+// is what let it keep compiling and keep asserting against a shape the server never sends.
+const DETAIL: PartDetail = makePartDetail({
   id: "part1",
-  display_name: "BQ24074",
-  category: "ICs",
   mpn: "BQ24074",
   manufacturer: "Texas Instruments",
-  description: "Li-Ion charger",
-  symbol: null,
-  footprint: null,
-  model: null,
-  datasheet: null,
-  passive: false,
-} as unknown as PartDetail;
+  part_class: "component",
+  derived: { display_name: "BQ24074", category: "ICs", description: "Li-Ion charger" },
+  assets: { kicad: makeEdaAssets() },
+});
 
 const CANDIDATE: StagingCandidate = {
   vendor: "ultralibrarian",
@@ -176,7 +176,10 @@ describe("CompletePartModal - guided capture", () => {
   it("never shows an asset word as both Added and Needed: DETAILS is metadata-only when FILES owns the assets", async () => {
     // A part that already HAS a KiCad symbol but needs the Altium symbol + footprint. Before the
     // fix, Symbol read "Added" in DETAILS and "Needed" in FILES at once.
-    const withSymbol = { ...DETAIL, symbol: { name: "BQ24074" } } as unknown as PartDetail;
+    const withSymbol = makePartDetail({
+      ...DETAIL,
+      assets: { kicad: makeEdaAssets({ symbol: makeAsset({ name: "BQ24074" }) }) },
+    });
     mockCadSource(["altium_symbol", "altium_footprint"]);
     render(<CompletePartModal detail={withSymbol} hasModel={true} onClose={() => {}} />, { wrapper });
     await screen.findByText("Files");

@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useFacetsQuery, usePassiveAdd } from "../api/queries";
-import { assetsFor } from "../lib/edaTarget";
+import { assetRef, assetsFor } from "../lib/edaTarget";
 import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
@@ -122,7 +122,7 @@ export function PassiveAddSection({
         if (p.suggested_kind && !kind) setKind(p.suggested_kind);
       } else {
         setPreview(p);
-        setCategory((c) => c || p.record.category);
+        setCategory((c) => c || p.record.derived.category);
         setManufacturer(
           (m) => m || sourced(result.manufacturer) || p.record.manufacturer,
         );
@@ -156,7 +156,7 @@ export function PassiveAddSection({
         purchase_part_number: distributorPn.trim() || undefined,
       },
       {
-        onSuccess: (rec) => onAdded(rec.display_name),
+        onSuccess: (rec) => onAdded(rec.derived.display_name),
         onError: (err) =>
           toast(err instanceof ApiError ? err.message : toastAddFailed, "err"),
       },
@@ -165,10 +165,10 @@ export function PassiveAddSection({
 
   const rec = preview?.record;
   // A passive preview's KiCad footprint is a STOCK lib_id (Resistor_SMD:R_0603_1608Metric).
-  const previewFp = rec ? assetsFor(rec, "kicad").footprint : null;
+  const previewFp = rec ? assetRef(assetsFor(rec, "kicad").footprint) : null;
   const fpLibId = previewFp ? `${previewFp.lib}:${previewFp.name}` : "";
   const specEntries = rec
-    ? Object.entries(rec.specs).filter(([k]) => !ASSET_KEYS.has(k))
+    ? Object.entries(rec.derived.specs).filter(([k]) => !ASSET_KEYS.has(k))
     : [];
   // Recompute the datasheet/manufacturer gaps live against what is typed.
   const remaining = (preview?.gaps ?? []).filter((g) => {
@@ -235,7 +235,7 @@ export function PassiveAddSection({
         <div className="flex flex-col gap-4 rounded-card border border-line2 bg-raise2 p-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-base font-medium text-t1">{rec.mpn}</span>
-            <span className="text-sm text-t2">{rec.description}</span>
+            <span className="text-sm text-t2">{rec.derived.description}</span>
           </div>
 
           <StockAssetPreview footprintLibId={fpLibId} />

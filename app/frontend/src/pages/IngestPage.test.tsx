@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
+import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { queuePaths } from "../lib/ingestQueue";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
@@ -52,26 +53,44 @@ const EMPTY_RESULT: EnrichmentResult = {
   schema_version: 1,
 };
 
-const PASSIVE_RECORD = {
+// A file-less passive as the server really sends it: `part_class`, a `derived` block, and the
+// stock KiCad references inside `assets`. The literal this replaces was schema-1 flat fields
+// behind `as unknown as PartDetail`, so it compiled and asserted nothing real.
+const PASSIVE_RECORD: PartDetail = makePartDetail({
   id: "",
-  display_name: "118 Ohm 1% 0603 Resistor",
-  category: "Resistors",
-  description: "Resistor, 118 Ohm, 1%, 0603",
   mpn: "560112116151",
   manufacturer: "",
-  passive: true,
-  symbol: { lib: "Device", name: "R" },
-  footprint: { lib: "Resistor_SMD", name: "R_0603_1608Metric" },
-  model: null,
-  datasheet: { source_url: "" },
-  purchase: [{ vendor: "Mouser", url: "https://www.mouser.com/x", part_number: "" }],
-  specs: {
-    Resistance: "118 Ohms",
-    Tolerance: "1%",
-    Package: "0603",
-    "3D Model": "Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+  part_class: "passive",
+  derived: {
+    display_name: "118 Ohm 1% 0603 Resistor",
+    category: "Resistors",
+    description: "Resistor, 118 Ohm, 1%, 0603",
+    specs: {
+      Resistance: "118 Ohms",
+      Tolerance: "1%",
+      Package: "0603",
+      "3D Model": "Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+    },
   },
-} as unknown as PartDetail;
+  assets: {
+    kicad: makeEdaAssets({
+      symbol: makeAsset({ lib: "Device", name: "R" }),
+      footprint: makeAsset({ lib: "Resistor_SMD", name: "R_0603_1608Metric" }),
+    }),
+  },
+  datasheet: { file: "", source_url: "", fetched_at: "" },
+  purchase: [
+    {
+      vendor: "Mouser",
+      url: "https://www.mouser.com/x",
+      part_number: "",
+      price_breaks: [],
+      stock: null,
+      currency: "",
+      fetched_at: "",
+    },
+  ],
+});
 
 const ZIP_CANDIDATE: StagingCandidate = {
   vendor: "snapeda",
@@ -297,7 +316,7 @@ describe("IngestPage — unified Add A Part", () => {
     const cand = { ...ZIP_CANDIDATE, mpn: "NE555P", display_name: "NE555P", datasheet_path: "/tmp/x.pdf" };
     mockApi.ingestInspect.mockResolvedValue({ job_id: "j1" });
     mockApi.openJobStream.mockResolvedValue(resultStream([cand]));
-    mockApi.ingestCommit.mockResolvedValue({ id: "ne555", display_name: "NE555P" } as PartDetail);
+    mockApi.ingestCommit.mockResolvedValue(makePartDetail({ id: "ne555", derived: { display_name: "NE555P" } }));
     const pick = vi.fn().mockResolvedValue(["C:/dl/NE555.zip"]);
     (window as unknown as { pywebview?: unknown }).pywebview = {
       api: { pick_ingest_files: pick },
@@ -447,7 +466,7 @@ describe("IngestPage — unified Add A Part", () => {
       if (jobId === "zipX") return Promise.resolve(resultStream([ZIP_CANDIDATE]));
       return Promise.resolve(resultStream([{ ...ZIP_CANDIDATE, entry_name: "UNREL555" }]));
     });
-    mockApi.ingestCommit.mockResolvedValue({ id: "stm32", display_name: "STM32F103" } as PartDetail);
+    mockApi.ingestCommit.mockResolvedValue(makePartDetail({ id: "stm32", derived: { display_name: "STM32F103" } }));
     const pick = vi
       .fn()
       .mockResolvedValueOnce(["C:/dl/STM32.zip"])
@@ -512,10 +531,10 @@ describe("IngestPage — unified Add A Part", () => {
     await user.click(addButtons[0]);
     await user.click(addButtons[1]);
     await act(async () => {
-      resolveA({ id: "a", display_name: "AAA111" } as PartDetail);
+      resolveA(makePartDetail({ id: "a", derived: { display_name: "AAA111" } }));
     });
     await act(async () => {
-      resolveB({ id: "b", display_name: "BBB222" } as PartDetail);
+      resolveB(makePartDetail({ id: "b", derived: { display_name: "BBB222" } }));
     });
 
     await waitFor(() => expect(mockApi.ingestCommit).toHaveBeenCalledTimes(2));
@@ -533,7 +552,7 @@ describe("IngestPage — unified Add A Part", () => {
     // reopen intent + the Add window's open state.
     mockApi.ingestInspect.mockResolvedValue({ job_id: "zip1" });
     mockApi.openJobStream.mockResolvedValue(resultStream([ZIP_CANDIDATE]));
-    mockApi.ingestCommit.mockResolvedValue({ id: "new-part", display_name: "New Part" } as PartDetail);
+    mockApi.ingestCommit.mockResolvedValue(makePartDetail({ id: "new-part", derived: { display_name: "New Part" } }));
     const pick = vi.fn().mockResolvedValue(["C:/dl/part.zip"]);
     (window as unknown as { pywebview?: unknown }).pywebview = {
       api: { pick_ingest_files: pick },
@@ -568,7 +587,7 @@ describe("IngestPage — unified Add A Part", () => {
         datasheet_url: { value: "https://ti.com/tpd.pdf", source: "mouser", confidence: "high" },
       } as unknown as EnrichmentResult),
     );
-    mockApi.ingestCommit.mockResolvedValue({ id: "tpd6e05u06rvzr", display_name: "TPD6E05U06RVZR" } as PartDetail);
+    mockApi.ingestCommit.mockResolvedValue(makePartDetail({ id: "tpd6e05u06rvzr", derived: { display_name: "TPD6E05U06RVZR" } }));
     wrap(<IngestPage />);
     const user = userEvent.setup();
     const probe = screen.getByTestId("continuation-probe");

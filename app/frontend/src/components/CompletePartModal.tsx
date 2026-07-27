@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { assetsFor } from "../lib/edaTarget";
+import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type { PartDetail, Requirement } from "../api/types";
 import { useCadSourceQuery } from "../api/queries";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
@@ -245,13 +245,13 @@ export function CompletePartModal({
   busy,
 }: Props) {
   const kicadAssets = assetsFor(detail, "kicad");
-  const hasSymbol = !!kicadAssets.symbol?.name;
-  const hasFootprint = !!kicadAssets.footprint?.name;
+  const hasSymbol = assetPresent(kicadAssets.symbol);
+  const hasFootprint = assetPresent(kicadAssets.footprint);
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
-  const download = useGuidedCapture(detail.id, cadNeeds, detail.display_name);
+  const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
   const { toast } = useToast();
   // Resolve the five per-requirement toast strings through the copy layer at the top (hooks run
   // unconditionally, fixed order), keeping REQ_TOAST's prose as the fallbacks. A ref carries the
@@ -316,7 +316,7 @@ export function CompletePartModal({
         { key: "datasheet", label: "Datasheet", copyId: "modal.completePart.row-datasheet", kind: "url" as const, present: hasDatasheet },
         { key: "mpn", label: "Part Number", copyId: "modal.completePart.row-mpn", kind: "text" as const, present: !!detail.mpn },
         { key: "manufacturer", label: "Manufacturer", copyId: "modal.completePart.row-manufacturer", kind: "text" as const, present: !!detail.manufacturer },
-        { key: "description", label: "Value / Description", copyId: "modal.completePart.row-description", kind: "text" as const, present: !!detail.description },
+        { key: "description", label: "Value / Description", copyId: "modal.completePart.row-description", kind: "text" as const, present: !!detail.derived.description },
         // When the FILES section is shown it owns the whole asset story (symbol, footprint,
         // and 3D model), so drop those from DETAILS to avoid the same asset word reading
         // "Added" here and "Needed" in FILES at once. DETAILS then stays metadata-only.
@@ -359,7 +359,7 @@ export function CompletePartModal({
         >
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold leading-tight text-t1">
-              {detail.display_name}
+              {detail.derived.display_name}
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.completePart.subtitle">

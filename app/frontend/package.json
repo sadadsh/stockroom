@@ -40,6 +40,7 @@
     "@vitejs/plugin-react": "^4.3.2",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.20",
+    "fishery": "^2.4.0",
     "jsdom": "^25.0.1",
     "lucide-static": "^1.26.0",
     "postcss": "^8.4.47",
