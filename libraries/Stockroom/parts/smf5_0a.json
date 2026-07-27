@@ -202,7 +202,25 @@
   },
   "description": "9.2VC Clamp 21.7A@10/1000us Ipp TVS DIODE SOD-123FL",
   "display_name": "ESD Protection Diode SOD-123FL",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "SMF5.0A"
+      },
+      "model": {
+        "file": "models/SMF5.0A.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Diodes",
+        "name": "SMF5.0A"
+      }
+    }
+  },
   "enrichment": {
     "Applications": {
       "confidence": "high",
