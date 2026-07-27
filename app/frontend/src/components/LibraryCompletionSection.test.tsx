@@ -91,7 +91,10 @@ describe("coverage", () => {
     // one nobody can consent to.
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
-    expect(await screen.findByText(/47 components can be filled automatically/i)).toBeInTheDocument();
+    // "can be filled" would be a promise the run cannot keep: 19 of those have no catalogue
+    // entry and will find nothing. The copy says what is TRIED, not what is guaranteed.
+    expect(await screen.findByText(/47 components have gaps a source can try/i)).toBeInTheDocument();
+    expect(screen.getByText(/Not every one will find files/i)).toBeInTheDocument();
     expect(screen.getByText(/about 6 minutes/i)).toBeInTheDocument();
   });
 
