@@ -84,8 +84,14 @@ class AppContext:
     kicad_dir_pinned: Path | None = None
 
     def rebuild_index(self) -> None:
-        self.index.close()
-        self.index = LibraryIndex.build(self.profile.library.parts_dir)
+        """Bring the index in line with the records. INCREMENTAL since 2026-07-27.
+
+        This used to close the connection and rebuild from scratch, which re-read AND re-PARSED
+        every record in the library. It runs after EVERY library write (eight call sites), so a
+        one-field edit on a 10k-part library paid for 10k parses. `sync()` hashes each file's bytes
+        and parses only what actually moved; on a single-part edit that is one parse, not n.
+        """
+        self.index.sync(self.profile.library.parts_dir)
 
     def rebuild_stm_index(self, source: Path | None = None, progress=None) -> None:
         """Build the STM index from `source` (falling back to the configured
