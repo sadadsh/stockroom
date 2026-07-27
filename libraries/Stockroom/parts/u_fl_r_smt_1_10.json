@@ -65,6 +65,18 @@
         "value": "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/386/U.FL-R-SMT-1%2810%29.JPG"
       }
     ],
+    "Lead Time": [
+      {
+        "confidence": "",
+        "source": "",
+        "value": "46 Days"
+      },
+      {
+        "confidence": "",
+        "source": "digikey",
+        "value": "12"
+      }
+    ],
     "Minimum Order Quantity": [
       {
         "confidence": "medium",
@@ -647,6 +659,78 @@
       "stock": 39546,
       "url": "https://www.lcsc.com/product-detail/C88374.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:25.781425+00:00",
+      "part_number": "798-U.FL-R-SMT-110",
+      "price_breaks": [
+        {
+          "price": 1.29,
+          "qty": 1
+        },
+        {
+          "price": 1.1,
+          "qty": 10
+        },
+        {
+          "price": 0.98,
+          "qty": 25
+        },
+        {
+          "price": 0.933,
+          "qty": 100
+        },
+        {
+          "price": 0.875,
+          "qty": 250
+        },
+        {
+          "price": 0.849,
+          "qty": 500
+        },
+        {
+          "price": 0.833,
+          "qty": 1000
+        },
+        {
+          "price": 0.806,
+          "qty": 2500
+        },
+        {
+          "price": 0.8,
+          "qty": 5000
+        }
+      ],
+      "stock": 163186,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:25.781425+00:00",
+      "part_number": "H11891TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.84895,
+          "qty": 2500
+        },
+        {
+          "price": 0.80846,
+          "qty": 5000
+        },
+        {
+          "price": 0.78567,
+          "qty": 7500
+        },
+        {
+          "price": 0.75789,
+          "qty": 12500
+        }
+      ],
+      "stock": 274163,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "schema_version": 2,
