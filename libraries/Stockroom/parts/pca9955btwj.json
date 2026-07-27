@@ -105,7 +105,25 @@
   },
   "description": "31.25kHz~1MHz 16 DC-DC 57mA 3V~5.5V HTSSOP-28-EP LED Drivers RoHS",
   "display_name": "16-Channel LED Lighting Driver IC HTSSOP-28-EP",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "PCA9955BTWJ"
+      },
+      "model": {
+        "file": "models/PCA9955BTWJ.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-ICs",
+        "name": "PCA9955BTWJ"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
