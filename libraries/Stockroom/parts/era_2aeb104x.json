@@ -221,7 +221,25 @@
   },
   "description": "100kΩ ±0.1% 63mW 0402 Thin Film Resistor AEC-Q200",
   "display_name": "100kΩ ±0.1% 0402",
-  "eda": {},
+  "eda": {
+    "kicad": {
+      "footprint": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "ERA-2AEB104X"
+      },
+      "model": {
+        "file": "models/ERA-2AEB104X.step",
+        "lib": "",
+        "name": ""
+      },
+      "symbol": {
+        "file": "",
+        "lib": "SR-Resistors",
+        "name": "ERA-2AEB104X"
+      }
+    }
+  },
   "enrichment": {
     "Assembly Country of Origin": {
       "confidence": "high",
