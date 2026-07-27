@@ -162,6 +162,78 @@
       "stock": 4456,
       "url": "https://www.lcsc.com/search?q=29311",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:52.923647+00:00",
+      "part_number": "534-29311",
+      "price_breaks": [
+        {
+          "price": 0.36,
+          "qty": 1
+        },
+        {
+          "price": 0.274,
+          "qty": 10
+        },
+        {
+          "price": 0.244,
+          "qty": 25
+        },
+        {
+          "price": 0.211,
+          "qty": 100
+        },
+        {
+          "price": 0.19,
+          "qty": 2500
+        },
+        {
+          "price": 0.14,
+          "qty": 5000
+        }
+      ],
+      "stock": 4456,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:52.923647+00:00",
+      "part_number": "36-29311-ND",
+      "price_breaks": [
+        {
+          "price": 0.38,
+          "qty": 1
+        },
+        {
+          "price": 0.283,
+          "qty": 10
+        },
+        {
+          "price": 0.2532,
+          "qty": 25
+        },
+        {
+          "price": 0.2144,
+          "qty": 100
+        },
+        {
+          "price": 0.21,
+          "qty": 500
+        },
+        {
+          "price": 0.19,
+          "qty": 2500
+        },
+        {
+          "price": 0.14,
+          "qty": 5000
+        }
+      ],
+      "stock": 17661,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

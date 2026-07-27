@@ -85,8 +85,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:03:36.606898+00:00",
+      "part_number": "81-GRM188C71C475KE1D",
       "price_breaks": [
         {
           "price": 0.077714286,
@@ -116,6 +116,40 @@
       "stock": 18162,
       "url": "https://www.mouser.com/c/?q=GRM188C71C475KE21D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:36.606898+00:00",
+      "part_number": "490-16337-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.05609,
+          "qty": 4000
+        },
+        {
+          "price": 0.05247,
+          "qty": 8000
+        },
+        {
+          "price": 0.05065,
+          "qty": 12000
+        },
+        {
+          "price": 0.04864,
+          "qty": 20000
+        },
+        {
+          "price": 0.04747,
+          "qty": 28000
+        },
+        {
+          "price": 0.04634,
+          "qty": 40000
+        }
+      ],
+      "stock": 104667,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

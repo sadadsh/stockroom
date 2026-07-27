@@ -348,6 +348,78 @@
       "stock": 2385,
       "url": "https://www.lcsc.com/search?q=CX3225SA25000H0HSSC1",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:47.638567+00:00",
+      "part_number": "581-CX3225SAH0HSSC1",
+      "price_breaks": [
+        {
+          "price": 0.83,
+          "qty": 1
+        },
+        {
+          "price": 0.722,
+          "qty": 10
+        },
+        {
+          "price": 0.655,
+          "qty": 25
+        },
+        {
+          "price": 0.628,
+          "qty": 100
+        },
+        {
+          "price": 0.593,
+          "qty": 250
+        },
+        {
+          "price": 0.569,
+          "qty": 500
+        },
+        {
+          "price": 0.545,
+          "qty": 1000
+        },
+        {
+          "price": 0.539,
+          "qty": 3000
+        },
+        {
+          "price": 0.517,
+          "qty": 6000
+        }
+      ],
+      "stock": 2385,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:47.638567+00:00",
+      "part_number": "478-CX3225SA25000H0HSSC1TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.53955,
+          "qty": 3000
+        },
+        {
+          "price": 0.51727,
+          "qty": 6000
+        },
+        {
+          "price": 0.50467,
+          "qty": 9000
+        },
+        {
+          "price": 0.48924,
+          "qty": 15000
+        }
+      ],
+      "stock": 2985,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

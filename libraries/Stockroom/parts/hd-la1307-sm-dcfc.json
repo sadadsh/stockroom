@@ -135,6 +135,74 @@
       "stock": 219,
       "url": "https://www.lcsc.com/search?q=HD-LA1307-SM",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:05.343172+00:00",
+      "part_number": "665-HD-LA1307-SM",
+      "price_breaks": [
+        {
+          "price": 7.09,
+          "qty": 1
+        },
+        {
+          "price": 6.83,
+          "qty": 10
+        },
+        {
+          "price": 6.51,
+          "qty": 25
+        },
+        {
+          "price": 6.28,
+          "qty": 50
+        },
+        {
+          "price": 5.84,
+          "qty": 100
+        },
+        {
+          "price": 5.5,
+          "qty": 400
+        },
+        {
+          "price": 5.43,
+          "qty": 800
+        }
+      ],
+      "stock": 219,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:05.343172+00:00",
+      "part_number": "668-HD-LA1307-SMTR-ND",
+      "price_breaks": [
+        {
+          "price": 5.83565,
+          "qty": 200
+        },
+        {
+          "price": 5.6272,
+          "qty": 400
+        },
+        {
+          "price": 5.5087,
+          "qty": 600
+        },
+        {
+          "price": 5.36302,
+          "qty": 1000
+        },
+        {
+          "price": 5.26916,
+          "qty": 1400
+        }
+      ],
+      "stock": 135,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

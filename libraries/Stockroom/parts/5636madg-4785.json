@@ -341,6 +341,40 @@
       "stock": 24,
       "url": "https://www.lcsc.com/category/653.html?scene=FULL_MATCH&globalKeyword=5636MADG&s_z=n_q_5636MADG",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:27.629228+00:00",
+      "part_number": "642-5636MADG",
+      "price_breaks": [
+        {
+          "price": 52.03,
+          "qty": 1
+        },
+        {
+          "price": 47.03,
+          "qty": 10
+        },
+        {
+          "price": 44.84,
+          "qty": 25
+        },
+        {
+          "price": 41.84,
+          "qty": 50
+        },
+        {
+          "price": 40.2,
+          "qty": 100
+        },
+        {
+          "price": 37.46,
+          "qty": 250
+        }
+      ],
+      "stock": 24,
+      "url": "",
+      "vendor": "Mouser"
     }
   ],
   "requires_override": null,

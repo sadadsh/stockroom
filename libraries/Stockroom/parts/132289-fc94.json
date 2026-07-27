@@ -349,6 +349,62 @@
       "stock": 4657,
       "url": "https://www.lcsc.com/search?q=132289",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:46.541225+00:00",
+      "part_number": "523-132289",
+      "price_breaks": [
+        {
+          "price": 8.8,
+          "qty": 1
+        },
+        {
+          "price": 8.43,
+          "qty": 10
+        },
+        {
+          "price": 8.31,
+          "qty": 25
+        },
+        {
+          "price": 7.91,
+          "qty": 50
+        },
+        {
+          "price": 7.53,
+          "qty": 100
+        },
+        {
+          "price": 7.07,
+          "qty": 250
+        },
+        {
+          "price": 6.73,
+          "qty": 500
+        },
+        {
+          "price": 6.6,
+          "qty": 1000
+        }
+      ],
+      "stock": 4573,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:46.541225+00:00",
+      "part_number": "3937-132289-ND",
+      "price_breaks": [
+        {
+          "price": 23.7818,
+          "qty": 100
+        }
+      ],
+      "stock": 9030,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

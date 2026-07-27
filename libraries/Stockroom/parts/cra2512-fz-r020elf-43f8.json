@@ -506,6 +506,86 @@
       "stock": 5118,
       "url": "https://www.lcsc.com/product-detail/C840620.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:01.258822+00:00",
+      "part_number": "652-CRA2512FZ-R20ELF",
+      "price_breaks": [
+        {
+          "price": 0.55,
+          "qty": 1
+        },
+        {
+          "price": 0.353,
+          "qty": 10
+        },
+        {
+          "price": 0.267,
+          "qty": 25
+        },
+        {
+          "price": 0.238,
+          "qty": 100
+        },
+        {
+          "price": 0.207,
+          "qty": 250
+        },
+        {
+          "price": 0.187,
+          "qty": 500
+        },
+        {
+          "price": 0.171,
+          "qty": 1000
+        },
+        {
+          "price": 0.144,
+          "qty": 4000
+        },
+        {
+          "price": 0.135,
+          "qty": 8000
+        }
+      ],
+      "stock": 105558,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:01.258822+00:00",
+      "part_number": "CRA2512-FZ-R020ELFTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.14471,
+          "qty": 4000
+        },
+        {
+          "price": 0.13455,
+          "qty": 8000
+        },
+        {
+          "price": 0.12933,
+          "qty": 12000
+        },
+        {
+          "price": 0.12342,
+          "qty": 20000
+        },
+        {
+          "price": 0.1199,
+          "qty": 28000
+        },
+        {
+          "price": 0.11646,
+          "qty": 40000
+        }
+      ],
+      "stock": 157443,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

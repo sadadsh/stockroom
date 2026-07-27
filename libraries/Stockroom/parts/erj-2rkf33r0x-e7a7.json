@@ -86,38 +86,80 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:04.007852+00:00",
+      "part_number": "667-ERJ-2RKF33R0X",
       "price_breaks": [
         {
-          "price": 0.004785714,
-          "qty": 20
+          "price": 0.1,
+          "qty": 1
         },
         {
-          "price": 0.003871429,
+          "price": 0.019,
+          "qty": 10
+        },
+        {
+          "price": 0.016,
+          "qty": 100
+        },
+        {
+          "price": 0.013,
+          "qty": 250
+        },
+        {
+          "price": 0.011,
+          "qty": 500
+        },
+        {
+          "price": 0.009,
+          "qty": 1000
+        },
+        {
+          "price": 0.007,
+          "qty": 5000
+        },
+        {
+          "price": 0.004,
+          "qty": 10000
+        }
+      ],
+      "stock": 297120,
+      "url": "https://www.mouser.com/c/?q=ERJ-2RKF33R0X",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:03:04.007852+00:00",
+      "part_number": "P33.0LTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.00542,
+          "qty": 10000
+        },
+        {
+          "price": 0.0049,
           "qty": 20000
         },
         {
-          "price": 0.003357143,
-          "qty": 60000
+          "price": 0.00464,
+          "qty": 30000
         },
         {
-          "price": 0.002685714,
-          "qty": 200000
+          "price": 0.00437,
+          "qty": 50000
         },
         {
-          "price": 0.002428571,
-          "qty": 1000000
+          "price": 0.00421,
+          "qty": 70000
         },
         {
-          "price": 0.002271429,
-          "qty": 2000000
+          "price": 0.00406,
+          "qty": 100000
         }
       ],
-      "stock": 8,
-      "url": "https://www.mouser.com/c/?q=ERJ-2RKF33R0X",
-      "vendor": "Mouser"
+      "stock": 934886,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

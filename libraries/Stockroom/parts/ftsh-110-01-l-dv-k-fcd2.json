@@ -727,6 +727,74 @@
       "stock": 100,
       "url": "https://www.lcsc.com/product-detail/C19190304.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:11.934485+00:00",
+      "part_number": "200-FTSH11001LDVK",
+      "price_breaks": [
+        {
+          "price": 2.61,
+          "qty": 1
+        },
+        {
+          "price": 1.98,
+          "qty": 92
+        },
+        {
+          "price": 1.81,
+          "qty": 276
+        },
+        {
+          "price": 1.63,
+          "qty": 506
+        },
+        {
+          "price": 1.61,
+          "qty": 2024
+        }
+      ],
+      "stock": 7577,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:11.934485+00:00",
+      "part_number": "SAM8803-ND",
+      "price_breaks": [
+        {
+          "price": 3.14,
+          "qty": 1
+        },
+        {
+          "price": 2.47,
+          "qty": 100
+        },
+        {
+          "price": 2.23,
+          "qty": 250
+        },
+        {
+          "price": 1.97,
+          "qty": 500
+        },
+        {
+          "price": 1.73001,
+          "qty": 1000
+        },
+        {
+          "price": 1.56,
+          "qty": 2500
+        },
+        {
+          "price": 1.45001,
+          "qty": 5000
+        }
+      ],
+      "stock": 14299,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

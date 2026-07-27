@@ -84,20 +84,20 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:38.213061+00:00",
+      "part_number": "81-GRM155R71E222KA1D",
       "price_breaks": [
         {
           "price": 0.1,
           "qty": 1
         },
         {
-          "price": 0.013,
+          "price": 0.014,
           "qty": 10
         },
         {
-          "price": 0.011,
+          "price": 0.012,
           "qty": 100
         },
         {
@@ -117,13 +117,47 @@
           "qty": 5000
         },
         {
-          "price": 0.003,
+          "price": 0.004,
           "qty": 10000
         }
       ],
       "stock": 107172,
       "url": "https://www.mouser.com/c/?q=GRM155R71E222KA01D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:38.213061+00:00",
+      "part_number": "490-5419-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.00416,
+          "qty": 10000
+        },
+        {
+          "price": 0.00374,
+          "qty": 20000
+        },
+        {
+          "price": 0.00354,
+          "qty": 30000
+        },
+        {
+          "price": 0.00331,
+          "qty": 50000
+        },
+        {
+          "price": 0.00317,
+          "qty": 70000
+        },
+        {
+          "price": 0.00304,
+          "qty": 100000
+        }
+      ],
+      "stock": 145622,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

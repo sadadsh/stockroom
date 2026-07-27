@@ -137,72 +137,61 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:31.077840+00:00",
       "part_number": "595-INA226AIDGST",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 4.27,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 3.24,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 2.98,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 2.69,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 2.69,
           "qty": 250
         }
       ],
-      "stock": 11852,
+      "stock": 11235,
       "url": "https://www.mouser.com/en/ProductDetail/Texas-Instruments/INA226AIDGST?qs=tQG3bEuiOZB3Ay2BJOjnEQ%3D%3D",
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:31.077840+00:00",
       "part_number": "296-29100-2-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 2.55308,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 2.47104,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 2.42996,
           "qty": 750
         },
         {
-          "currency": "USD",
           "price": 2.38442,
           "qty": 1250
         },
         {
-          "currency": "USD",
           "price": 2.35782,
           "qty": 1750
         },
         {
-          "currency": "USD",
           "price": 2.33224,
           "qty": 2500
         }

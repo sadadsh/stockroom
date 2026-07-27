@@ -567,6 +567,94 @@
       "stock": 2151,
       "url": "https://www.lcsc.com/product-detail/C3034813.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:35.716337+00:00",
+      "part_number": "954-103AT-2",
+      "price_breaks": [
+        {
+          "price": 0.58,
+          "qty": 1
+        },
+        {
+          "price": 0.545,
+          "qty": 10
+        },
+        {
+          "price": 0.509,
+          "qty": 25
+        },
+        {
+          "price": 0.485,
+          "qty": 50
+        },
+        {
+          "price": 0.462,
+          "qty": 100
+        },
+        {
+          "price": 0.416,
+          "qty": 200
+        },
+        {
+          "price": 0.4,
+          "qty": 1000
+        },
+        {
+          "price": 0.366,
+          "qty": 2600
+        }
+      ],
+      "stock": 68854,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:35.716337+00:00",
+      "part_number": "4316-103AT-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.68,
+          "qty": 1
+        },
+        {
+          "price": 0.598,
+          "qty": 5
+        },
+        {
+          "price": 0.567,
+          "qty": 10
+        },
+        {
+          "price": 0.5292,
+          "qty": 25
+        },
+        {
+          "price": 0.5036,
+          "qty": 50
+        },
+        {
+          "price": 0.4803,
+          "qty": 100
+        },
+        {
+          "price": 0.43346,
+          "qty": 500
+        },
+        {
+          "price": 0.41604,
+          "qty": 1000
+        },
+        {
+          "price": 0.38101,
+          "qty": 5000
+        }
+      ],
+      "stock": 14074,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

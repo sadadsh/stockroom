@@ -459,6 +459,62 @@
       "stock": 271,
       "url": "https://www.lcsc.com/product-detail/C516788.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:12.865801+00:00",
+      "part_number": "700-MAX6817EUTT",
+      "price_breaks": [
+        {
+          "price": 9.28,
+          "qty": 1
+        },
+        {
+          "price": 7.22,
+          "qty": 10
+        },
+        {
+          "price": 6.7,
+          "qty": 25
+        },
+        {
+          "price": 6.13,
+          "qty": 100
+        },
+        {
+          "price": 5.98,
+          "qty": 250
+        },
+        {
+          "price": 5.88,
+          "qty": 500
+        },
+        {
+          "price": 5.81,
+          "qty": 1000
+        },
+        {
+          "price": 5.42,
+          "qty": 2500
+        }
+      ],
+      "stock": 9591,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:08:12.865801+00:00",
+      "part_number": "MAX6817EUT+TTR-ND",
+      "price_breaks": [
+        {
+          "price": 5.42018,
+          "qty": 2500
+        }
+      ],
+      "stock": 18257,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

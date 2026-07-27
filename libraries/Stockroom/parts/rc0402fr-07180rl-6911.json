@@ -87,8 +87,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:25.907431+00:00",
+      "part_number": "603-RC0402FR-07180RL",
       "price_breaks": [
         {
           "price": 0.000557143,
@@ -118,6 +118,40 @@
       "stock": 96594,
       "url": "https://www.mouser.com/c/?q=RC0402FR-07180RL",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:25.907431+00:00",
+      "part_number": "311-180LRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.0031,
+          "qty": 10000
+        },
+        {
+          "price": 0.00275,
+          "qty": 20000
+        },
+        {
+          "price": 0.00257,
+          "qty": 30000
+        },
+        {
+          "price": 0.00239,
+          "qty": 50000
+        },
+        {
+          "price": 0.00228,
+          "qty": 70000
+        },
+        {
+          "price": 0.00218,
+          "qty": 100000
+        }
+      ],
+      "stock": 1463200,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

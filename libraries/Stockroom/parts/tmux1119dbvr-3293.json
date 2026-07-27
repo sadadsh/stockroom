@@ -456,6 +456,70 @@
       "stock": 56,
       "url": "https://www.lcsc.com/product-detail/C2877615.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:25.056046+00:00",
+      "part_number": "595-TMUX1119DBVR",
+      "price_breaks": [
+        {
+          "price": 2.66,
+          "qty": 1
+        },
+        {
+          "price": 1.98,
+          "qty": 10
+        },
+        {
+          "price": 1.81,
+          "qty": 25
+        },
+        {
+          "price": 1.63,
+          "qty": 100
+        },
+        {
+          "price": 1.54,
+          "qty": 250
+        },
+        {
+          "price": 1.5,
+          "qty": 500
+        },
+        {
+          "price": 1.46,
+          "qty": 1000
+        },
+        {
+          "price": 1.38,
+          "qty": 3000
+        },
+        {
+          "price": 1.35,
+          "qty": 6000
+        }
+      ],
+      "stock": 3792,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:25.056046+00:00",
+      "part_number": "296-TMUX1119DBVRTR-ND",
+      "price_breaks": [
+        {
+          "price": 1.38115,
+          "qty": 3000
+        },
+        {
+          "price": 1.35442,
+          "qty": 6000
+        }
+      ],
+      "stock": 5143,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

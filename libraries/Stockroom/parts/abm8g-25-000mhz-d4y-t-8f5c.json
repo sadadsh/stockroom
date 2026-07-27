@@ -371,6 +371,82 @@
       "stock": 2578,
       "url": "https://www.lcsc.com/category/1155.html?scene=FULL_MATCH&globalKeyword=ABM8G-25.000MHZ-D4Y-T&s_z=n_q_ABM8G-25.000MHZ-D4Y-T",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:44.971768+00:00",
+      "part_number": "815-ABM8G25MHZD4YT",
+      "price_breaks": [
+        {
+          "price": 0.61,
+          "qty": 1
+        },
+        {
+          "price": 0.528,
+          "qty": 10
+        },
+        {
+          "price": 0.479,
+          "qty": 25
+        },
+        {
+          "price": 0.459,
+          "qty": 100
+        },
+        {
+          "price": 0.434,
+          "qty": 250
+        },
+        {
+          "price": 0.416,
+          "qty": 500
+        },
+        {
+          "price": 0.404,
+          "qty": 1000
+        },
+        {
+          "price": 0.361,
+          "qty": 5000
+        }
+      ],
+      "stock": 2578,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:44.971768+00:00",
+      "part_number": "535-14415-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.39883,
+          "qty": 1000
+        },
+        {
+          "price": 0.38234,
+          "qty": 2000
+        },
+        {
+          "price": 0.37301,
+          "qty": 3000
+        },
+        {
+          "price": 0.36159,
+          "qty": 5000
+        },
+        {
+          "price": 0.35425,
+          "qty": 7000
+        },
+        {
+          "price": 0.34665,
+          "qty": 10000
+        }
+      ],
+      "stock": 330,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

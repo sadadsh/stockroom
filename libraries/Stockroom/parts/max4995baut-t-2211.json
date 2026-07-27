@@ -488,6 +488,62 @@
       "stock": 42,
       "url": "https://www.lcsc.com/product-detail/C2155763.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:09.719573+00:00",
+      "part_number": "700-MAX4995BAUTT",
+      "price_breaks": [
+        {
+          "price": 6.9,
+          "qty": 1
+        },
+        {
+          "price": 5.29,
+          "qty": 10
+        },
+        {
+          "price": 4.89,
+          "qty": 25
+        },
+        {
+          "price": 4.45,
+          "qty": 100
+        },
+        {
+          "price": 4.24,
+          "qty": 250
+        },
+        {
+          "price": 4.11,
+          "qty": 500
+        },
+        {
+          "price": 4.06,
+          "qty": 1000
+        },
+        {
+          "price": 3.99,
+          "qty": 2500
+        }
+      ],
+      "stock": 3740,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:09.719573+00:00",
+      "part_number": "MAX4995BAUT+TTR-ND",
+      "price_breaks": [
+        {
+          "price": 3.9949,
+          "qty": 2500
+        }
+      ],
+      "stock": 4239,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

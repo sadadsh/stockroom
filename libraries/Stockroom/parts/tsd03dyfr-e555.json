@@ -522,6 +522,86 @@
       "stock": 2996,
       "url": "https://www.lcsc.com/product-detail/C52098188.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:48.921660+00:00",
+      "part_number": "595-TSD03DYFR",
+      "price_breaks": [
+        {
+          "price": 0.64,
+          "qty": 1
+        },
+        {
+          "price": 0.393,
+          "qty": 10
+        },
+        {
+          "price": 0.251,
+          "qty": 100
+        },
+        {
+          "price": 0.2,
+          "qty": 500
+        },
+        {
+          "price": 0.17,
+          "qty": 1000
+        },
+        {
+          "price": 0.153,
+          "qty": 3000
+        },
+        {
+          "price": 0.139,
+          "qty": 6000
+        },
+        {
+          "price": 0.116,
+          "qty": 9000
+        },
+        {
+          "price": 0.11,
+          "qty": 24000
+        }
+      ],
+      "stock": 2762,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:48.921660+00:00",
+      "part_number": "296-TSD03DYFRTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.14786,
+          "qty": 3000
+        },
+        {
+          "price": 0.13487,
+          "qty": 6000
+        },
+        {
+          "price": 0.12825,
+          "qty": 9000
+        },
+        {
+          "price": 0.12081,
+          "qty": 15000
+        },
+        {
+          "price": 0.11641,
+          "qty": 21000
+        },
+        {
+          "price": 0.11212,
+          "qty": 30000
+        }
+      ],
+      "stock": 2197,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

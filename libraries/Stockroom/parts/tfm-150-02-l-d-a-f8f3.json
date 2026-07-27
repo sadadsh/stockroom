@@ -736,6 +736,50 @@
       "stock": 5,
       "url": "https://www.lcsc.com/product-detail/C17359523.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:22.890540+00:00",
+      "part_number": "200-TFM15002LDA",
+      "price_breaks": [
+        {
+          "price": 9.87,
+          "qty": 1
+        },
+        {
+          "price": 9.64,
+          "qty": 104
+        },
+        {
+          "price": 9.63,
+          "qty": 256
+        },
+        {
+          "price": 7.76,
+          "qty": 504
+        },
+        {
+          "price": 7.14,
+          "qty": 1000
+        }
+      ],
+      "stock": 280,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:06:22.890540+00:00",
+      "part_number": "3937-TFM-150-02-L-D-A-ND",
+      "price_breaks": [
+        {
+          "price": 28.34,
+          "qty": 1
+        }
+      ],
+      "stock": 75,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

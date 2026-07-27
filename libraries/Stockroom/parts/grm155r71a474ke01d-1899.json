@@ -85,8 +85,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:04:15.705212+00:00",
+      "part_number": "81-GRM155R71A474KE1D",
       "price_breaks": [
         {
           "price": 0.0125,
@@ -116,6 +116,40 @@
       "stock": 6662,
       "url": "https://www.mouser.com/c/?q=GRM155R71A474KE01D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:15.705212+00:00",
+      "part_number": "490-14366-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.10301,
+          "qty": 10000
+        },
+        {
+          "price": 0.0984,
+          "qty": 20000
+        },
+        {
+          "price": 0.0961,
+          "qty": 30000
+        },
+        {
+          "price": 0.09354,
+          "qty": 50000
+        },
+        {
+          "price": 0.09204,
+          "qty": 70000
+        },
+        {
+          "price": 0.09061,
+          "qty": 100000
+        }
+      ],
+      "stock": 63920,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

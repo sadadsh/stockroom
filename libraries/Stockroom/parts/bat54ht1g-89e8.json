@@ -492,6 +492,62 @@
       "stock": 66705,
       "url": "https://www.lcsc.com/product-detail/C21107.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:50.562154+00:00",
+      "part_number": "863-BAT54HT1G",
+      "price_breaks": [
+        {
+          "price": 0.15,
+          "qty": 1
+        },
+        {
+          "price": 0.09,
+          "qty": 10
+        },
+        {
+          "price": 0.056,
+          "qty": 100
+        },
+        {
+          "price": 0.04,
+          "qty": 500
+        },
+        {
+          "price": 0.035,
+          "qty": 1000
+        },
+        {
+          "price": 0.026,
+          "qty": 3000
+        },
+        {
+          "price": 0.023,
+          "qty": 6000
+        }
+      ],
+      "stock": 105786,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:50.562154+00:00",
+      "part_number": "BAT54HT1GOSTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.02649,
+          "qty": 3000
+        },
+        {
+          "price": 0.0235,
+          "qty": 6000
+        }
+      ],
+      "stock": 86883,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

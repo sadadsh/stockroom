@@ -139,52 +139,43 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:12.938578+00:00",
       "part_number": "595-SN74LVC1G08DBVR",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.12,
           "qty": 1
         },
         {
-          "currency": "USD",
           "price": 0.077,
           "qty": 10
         },
         {
-          "currency": "USD",
           "price": 0.068,
           "qty": 25
         },
         {
-          "currency": "USD",
           "price": 0.057,
           "qty": 100
         },
         {
-          "currency": "USD",
           "price": 0.052,
           "qty": 250
         },
         {
-          "currency": "USD",
           "price": 0.049,
           "qty": 500
         },
         {
-          "currency": "USD",
           "price": 0.046,
           "qty": 1000
         },
         {
-          "currency": "USD",
           "price": 0.042,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.041,
           "qty": 6000
         }
@@ -194,37 +185,31 @@
       "vendor": "Mouser"
     },
     {
-      "currency": "",
-      "fetched_at": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:12.938578+00:00",
       "part_number": "296-11601-2-ND",
       "price_breaks": [
         {
-          "currency": "USD",
           "price": 0.04275,
           "qty": 3000
         },
         {
-          "currency": "USD",
           "price": 0.04123,
           "qty": 6000
         },
         {
-          "currency": "USD",
           "price": 0.04047,
           "qty": 9000
         },
         {
-          "currency": "USD",
           "price": 0.03962,
           "qty": 15000
         },
         {
-          "currency": "USD",
           "price": 0.03913,
           "qty": 21000
         },
         {
-          "currency": "USD",
           "price": 0.03866,
           "qty": 30000
         }

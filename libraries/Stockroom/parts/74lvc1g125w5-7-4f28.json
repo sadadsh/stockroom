@@ -550,6 +550,62 @@
       "stock": 2861,
       "url": "https://www.lcsc.com/product-detail/C52098142.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:36.337269+00:00",
+      "part_number": "621-74LVC1G125W5-7",
+      "price_breaks": [
+        {
+          "price": 0.13,
+          "qty": 1
+        },
+        {
+          "price": 0.083,
+          "qty": 10
+        },
+        {
+          "price": 0.073,
+          "qty": 25
+        },
+        {
+          "price": 0.065,
+          "qty": 100
+        },
+        {
+          "price": 0.06,
+          "qty": 250
+        },
+        {
+          "price": 0.056,
+          "qty": 500
+        },
+        {
+          "price": 0.052,
+          "qty": 3000
+        }
+      ],
+      "stock": 9210,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:05:36.337269+00:00",
+      "part_number": "74LVC1G125W5-7DITR-ND",
+      "price_breaks": [
+        {
+          "price": 0.05689,
+          "qty": 3000
+        },
+        {
+          "price": 0.05393,
+          "qty": 9000
+        }
+      ],
+      "stock": 214,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

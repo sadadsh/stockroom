@@ -519,6 +519,86 @@
       "stock": 853,
       "url": "https://www.lcsc.com/product-detail/C702147.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:35.090271+00:00",
+      "part_number": "595-TPS3700DDCT",
+      "price_breaks": [
+        {
+          "price": 2.86,
+          "qty": 1
+        },
+        {
+          "price": 2.13,
+          "qty": 10
+        },
+        {
+          "price": 1.95,
+          "qty": 25
+        },
+        {
+          "price": 1.75,
+          "qty": 100
+        },
+        {
+          "price": 1.65,
+          "qty": 250
+        },
+        {
+          "price": 1.61,
+          "qty": 500
+        },
+        {
+          "price": 1.53,
+          "qty": 1000
+        },
+        {
+          "price": 1.49,
+          "qty": 2500
+        },
+        {
+          "price": 1.46,
+          "qty": 5000
+        }
+      ],
+      "stock": 4618,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:35.090271+00:00",
+      "part_number": "296-30437-2-ND",
+      "price_breaks": [
+        {
+          "price": 1.65092,
+          "qty": 250
+        },
+        {
+          "price": 1.5938,
+          "qty": 500
+        },
+        {
+          "price": 1.5652,
+          "qty": 750
+        },
+        {
+          "price": 1.5335,
+          "qty": 1250
+        },
+        {
+          "price": 1.51495,
+          "qty": 1750
+        },
+        {
+          "price": 1.49714,
+          "qty": 2500
+        }
+      ],
+      "stock": 341,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

@@ -87,8 +87,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:04:11.099353+00:00",
+      "part_number": "603-RC0402FR-07470KL",
       "price_breaks": [
         {
           "price": 0.0006,
@@ -115,7 +115,7 @@
           "qty": 1004000
         }
       ],
-      "stock": 109806,
+      "stock": 91757,
       "url": "https://www.mouser.com/c/?q=RC0402FR-07470KL",
       "vendor": "Mouser"
     }

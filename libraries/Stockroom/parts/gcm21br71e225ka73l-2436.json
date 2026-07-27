@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:01:44.727085+00:00",
+      "part_number": "81-GCM21BR71E225KA3L",
       "price_breaks": [
         {
           "price": 0.047571429,
@@ -117,6 +117,40 @@
       "stock": 5724,
       "url": "https://www.mouser.com/c/?q=GCM21BR71E225KA73L",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:44.727085+00:00",
+      "part_number": "490-4787-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.10568,
+          "qty": 3000
+        },
+        {
+          "price": 0.09955,
+          "qty": 6000
+        },
+        {
+          "price": 0.09648,
+          "qty": 9000
+        },
+        {
+          "price": 0.09308,
+          "qty": 15000
+        },
+        {
+          "price": 0.09109,
+          "qty": 21000
+        },
+        {
+          "price": 0.08917,
+          "qty": 30000
+        }
+      ],
+      "stock": 339775,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

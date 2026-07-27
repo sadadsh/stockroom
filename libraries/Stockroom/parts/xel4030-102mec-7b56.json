@@ -359,6 +359,53 @@
       "stock": 471,
       "url": "https://www.lcsc.com/product-detail/C5441341.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:01:32.111363+00:00",
+      "part_number": "994-XEL4030-102MEC",
+      "price_breaks": [
+        {
+          "price": 3.27,
+          "qty": 1
+        },
+        {
+          "price": 2.79,
+          "qty": 10
+        },
+        {
+          "price": 2.57,
+          "qty": 25
+        },
+        {
+          "price": 1.91,
+          "qty": 100
+        },
+        {
+          "price": 1.86,
+          "qty": 250
+        },
+        {
+          "price": 1.43,
+          "qty": 500
+        },
+        {
+          "price": 1.04,
+          "qty": 5000
+        }
+      ],
+      "stock": 1546,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "",
+      "fetched_at": "2026-07-27T04:01:32.111363+00:00",
+      "part_number": "2457-XEL4030-102MEC-ND",
+      "price_breaks": [],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

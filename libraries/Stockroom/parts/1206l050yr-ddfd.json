@@ -547,6 +547,70 @@
       "stock": 13563,
       "url": "https://www.lcsc.com/product-detail/C163512.html",
       "vendor": "scrape"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:41.693321+00:00",
+      "part_number": "576-1206L050YR",
+      "price_breaks": [
+        {
+          "price": 0.53,
+          "qty": 1
+        },
+        {
+          "price": 0.488,
+          "qty": 10
+        },
+        {
+          "price": 0.405,
+          "qty": 50
+        },
+        {
+          "price": 0.371,
+          "qty": 100
+        },
+        {
+          "price": 0.336,
+          "qty": 200
+        },
+        {
+          "price": 0.31,
+          "qty": 500
+        },
+        {
+          "price": 0.283,
+          "qty": 1000
+        },
+        {
+          "price": 0.271,
+          "qty": 2000
+        },
+        {
+          "price": 0.229,
+          "qty": 4000
+        }
+      ],
+      "stock": 23076,
+      "url": "",
+      "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:07:41.693321+00:00",
+      "part_number": "F2112TR-ND",
+      "price_breaks": [
+        {
+          "price": 0.20782,
+          "qty": 4000
+        },
+        {
+          "price": 0.19963,
+          "qty": 8000
+        }
+      ],
+      "stock": 19888,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

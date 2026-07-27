@@ -86,8 +86,8 @@
   "purchase": [
     {
       "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "fetched_at": "2026-07-27T04:02:09.495550+00:00",
+      "part_number": "81-GRT31CC81C226KE1L",
       "price_breaks": [
         {
           "price": 0.169571429,
@@ -114,9 +114,43 @@
           "qty": 20000
         }
       ],
-      "stock": 2509,
+      "stock": 51826,
       "url": "https://www.mouser.com/c/?q=GRT31CC81C226KE01L",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:02:09.495550+00:00",
+      "part_number": "490-12409-2-ND",
+      "price_breaks": [
+        {
+          "price": 0.11929,
+          "qty": 2000
+        },
+        {
+          "price": 0.11199,
+          "qty": 4000
+        },
+        {
+          "price": 0.10833,
+          "qty": 6000
+        },
+        {
+          "price": 0.10428,
+          "qty": 10000
+        },
+        {
+          "price": 0.10191,
+          "qty": 14000
+        },
+        {
+          "price": 0.09963,
+          "qty": 20000
+        }
+      ],
+      "stock": 58629,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,

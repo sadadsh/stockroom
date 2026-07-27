@@ -84,16 +84,16 @@
   },
   "purchase": [
     {
-      "currency": "",
-      "fetched_at": "",
-      "part_number": "",
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:20.340774+00:00",
+      "part_number": "81-GXT155R61C474KE1D",
       "price_breaks": [
         {
-          "price": 0.15,
+          "price": 0.12,
           "qty": 1
         },
         {
-          "price": 0.063,
+          "price": 0.048,
           "qty": 10
         },
         {
@@ -105,29 +105,63 @@
           "qty": 500
         },
         {
-          "price": 0.023,
+          "price": 0.025,
           "qty": 1000
         },
         {
-          "price": 0.021,
+          "price": 0.022,
           "qty": 2500
         },
         {
-          "price": 0.019,
+          "price": 0.02,
           "qty": 5000
         },
         {
-          "price": 0.018,
+          "price": 0.017,
           "qty": 10000
         },
         {
-          "price": 0.015,
+          "price": 0.013,
           "qty": 20000
         }
       ],
       "stock": 12658,
       "url": "https://www.mouser.com/c/?q=GXT155R61C474KE01D",
       "vendor": "Mouser"
+    },
+    {
+      "currency": "USD",
+      "fetched_at": "2026-07-27T04:04:20.340774+00:00",
+      "part_number": "490-GXT155R61C474KE01DTR-ND",
+      "price_breaks": [
+        {
+          "price": 0.01551,
+          "qty": 10000
+        },
+        {
+          "price": 0.01436,
+          "qty": 20000
+        },
+        {
+          "price": 0.01378,
+          "qty": 30000
+        },
+        {
+          "price": 0.01314,
+          "qty": 50000
+        },
+        {
+          "price": 0.01277,
+          "qty": 70000
+        },
+        {
+          "price": 0.01241,
+          "qty": 100000
+        }
+      ],
+      "stock": null,
+      "url": "",
+      "vendor": "DigiKey"
     }
   ],
   "requires_override": null,
